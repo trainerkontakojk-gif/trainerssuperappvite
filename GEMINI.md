@@ -59,10 +59,12 @@ This project uses `pnpm` and `turbo`.
 - This ensures usage of current APIs and avoids hallucinating deprecated patterns from old training data.
 
 ## Phase Progress
-- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment (P0 Critical)
+- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf
 
 ## Key Documentation
 - `prd.md`: Original project requirements.
-- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-7).
+- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-13).
 - `docs/superpowers/specs/`: Detailed architecture and design specs.
+- `docs/rebuild-logs/phase-12-polish-qa.md`: Loading states, empty states, error handling improvements.
+- `docs/rebuild-logs/phase-13-perf.md`: Code splitting, lazy loading, bundle size reduction.
 - `docs/superpowers/plans/`: Step-by-step implementation plans.

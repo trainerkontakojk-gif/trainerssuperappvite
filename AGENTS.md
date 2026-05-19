@@ -103,6 +103,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 9. Deployment (P0 Critical — DONE)
 10. Frontend Matching & Profiler Module (DONE)
 11. SIDAK Reports (DONE)
+12. Polish & QA — Loading states, empty states, error handling (DONE)
+13. Perf — Code splitting + lazy loading (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
@@ -111,14 +113,16 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, **profiler-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, **profiler**)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
-- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (30 routes total)
+- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (33 routes, all React.lazy())
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
 - `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
 - `apps/web/src/lib/profilerService.ts` — typed Profiler API client
 - `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes)
 - `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler types)
-- `docs/rebuild-logs/` — per-phase completion logs
+- `apps/web/src/components/Layout.tsx` — sidebar, SIDAK submenu, Suspense boundary for lazy routes
+- `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-13)
 
 ## Routes Reference (apps/web)
 
