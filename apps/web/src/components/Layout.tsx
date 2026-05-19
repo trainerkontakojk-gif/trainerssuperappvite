@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from '@tanstack/react-router';
-import { LayoutDashboard, MessageCircle, Mail, Settings, User, BarChart3, Phone, ChevronDown, Activity, Users } from 'lucide-react';
+import { LayoutDashboard, MessageCircle, Mail, Settings, User, BarChart3, Phone, ChevronDown, Activity, Users, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 const SIDAK_CHILDREN = [
   { to: '/sidak', label: 'Beranda SIDAK' },
@@ -126,7 +126,9 @@ export function DashboardLayout() {
           </div>
         </header>
         <section className="flex-1 overflow-auto p-6 lg:p-8">
-          <Outlet />
+          <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+            <Outlet />
+          </Suspense>
         </section>
       </main>
     </div>

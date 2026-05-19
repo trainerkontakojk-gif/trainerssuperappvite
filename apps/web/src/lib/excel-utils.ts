@@ -1,5 +1,3 @@
-import ExcelJS from 'exceljs';
-import * as XLSX from 'xlsx';
 import type { QAIndicator } from '@trainers/types';
 
 const TEMPLATE_COLUMNS = [
@@ -11,7 +9,8 @@ const TEMPLATE_COLUMNS = [
 ];
 
 export async function generateTemplate(indicators: QAIndicator[], serviceType: string): Promise<ArrayBuffer> {
-  const wb = new ExcelJS.Workbook();
+  const ExcelJS = await import('exceljs');
+  const wb = new ExcelJS.default.Workbook();
   const ws = wb.addWorksheet('Input Temuan');
   const refSheet = wb.addWorksheet('_indikator', { state: 'hidden' });
 
@@ -65,8 +64,9 @@ export interface ParsedRow {
 export function parseExcel(file: File, indicators: QAIndicator[]): Promise<ParsedRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import('xlsx');
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array' });
         const sheetName = wb.SheetNames.find(n => n === 'Input Temuan') || wb.SheetNames[0];
