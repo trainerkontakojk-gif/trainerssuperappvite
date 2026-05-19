@@ -102,6 +102,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 8. Hardening (P0 Critical — DONE)
 9. Deployment (P0 Critical — DONE)
 10. Frontend Matching & Profiler Module (DONE)
+11. SIDAK Reports (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
@@ -110,7 +111,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, **profiler-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, **profiler**)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
-- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (26 routes total)
+- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (30 routes total)
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
 - `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
 - `apps/web/src/lib/profilerService.ts` — typed Profiler API client
@@ -150,15 +151,18 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | 25 | `/profiler/add` | Form | Manual participant input |
 | 26 | `/profiler/import` | Import | Excel template + upload + results |
 | 27 | `/profiler/teams` | CRUD | Custom team management |
-| 28 | `/waiting-approval` | Auth | Status polling page |
-| 29 | `/reset-password` | Auth | Password recovery form |
-| 30 | 404 | Catch-all | Custom not-found page |
+| 28 | `/sidak/reports` | Landing | Data vs AI report selection |
+| 29 | `/sidak/reports-data` | Table | Filter form + temuan table + Excel export |
+| 30 | `/sidak/reports-ai` | Form | AI-powered report generation |
+| 31 | `/waiting-approval` | Auth | Status polling page |
+| 32 | `/reset-password` | Auth | Password recovery form |
+| 33 | 404 | Catch-all | Custom not-found page |
 
 ## API Endpoints Reference (apps/api)
 
 | Prefix | Endpoints | Service |
 |--------|-----------|---------|
-| `/api/v1/sidak` | 13 endpoints | `sidak-service.ts` |
+| `/api/v1/sidak` | 15 endpoints | `sidak-service.ts` |
 | `/api/v1/ketik` | 4 endpoints | `ketik-service.ts` |
 | `/api/v1/pdkt` | 6 endpoints | `pdkt-service.ts` |
 | `/api/v1/ai` | 7 endpoints | — |
