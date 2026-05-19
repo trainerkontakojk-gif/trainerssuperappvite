@@ -4,13 +4,14 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  envDir: path.resolve(__dirname, '../../'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
-    port: 3000,
+    port: 3005,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

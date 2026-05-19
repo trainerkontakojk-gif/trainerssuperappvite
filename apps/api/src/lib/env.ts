@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+try {
+  process.loadEnvFile('../../.env.local');
+} catch (e) {
+  // Ignore if file doesn't exist
+}
+
 const envSchema = z.object({
   PORT: z.string().default('3001').transform(Number),
   VITE_SUPABASE_URL: z.string().url(),

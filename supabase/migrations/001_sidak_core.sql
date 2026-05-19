@@ -115,33 +115,6 @@ INSERT INTO qa_service_weights (service_type, critical_weight, non_critical_weig
   ('slik',       0.60, 0.40, 'weighted')
 ON CONFLICT (service_type) DO NOTHING;
 
--- 5. QA Temuan (Findings)
-CREATE TABLE IF NOT EXISTS public.qa_temuan (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  peserta_id uuid NOT NULL REFERENCES public.profiler_peserta(id) ON DELETE CASCADE,
-  period_id uuid NOT NULL REFERENCES public.qa_periods(id) ON DELETE CASCADE,
-  indicator_id uuid NOT NULL REFERENCES public.qa_indicators(id) ON DELETE RESTRICT,
-  rule_version_id uuid REFERENCES public.qa_service_rule_versions(id),
-  rule_indicator_id uuid REFERENCES public.qa_service_rule_indicators(id),
-  service_type text NOT NULL,
-  no_tiket text,
-  is_phantom_padding boolean NOT NULL DEFAULT false,
-  phantom_batch_id text,
-  nilai integer NOT NULL CHECK (nilai BETWEEN 0 AND 3),
-  ketidaksesuaian text,
-  sebaiknya text,
-  tahun integer,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_qa_indicators_service_type ON public.qa_indicators(service_type);
-CREATE INDEX IF NOT EXISTS idx_qa_temuan_period_service ON public.qa_temuan(period_id, service_type);
-CREATE INDEX IF NOT EXISTS idx_qa_temuan_peserta_period ON public.qa_temuan(peserta_id, period_id);
-CREATE INDEX IF NOT EXISTS idx_qa_temuan_indicator_id ON public.qa_temuan(indicator_id);
-CREATE INDEX IF NOT EXISTS idx_qa_temuan_rule_version ON public.qa_temuan(rule_version_id);
-CREATE INDEX IF NOT EXISTS idx_qa_temuan_phantom ON public.qa_temuan(is_phantom_padding) WHERE is_phantom_padding = true;
-
 -- 6. QA Rule Versions (Versioned Rules)
 CREATE TABLE IF NOT EXISTS public.qa_service_rule_versions (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -184,6 +157,33 @@ CREATE TABLE IF NOT EXISTS public.qa_service_rule_indicators (
   updated_at          timestamptz DEFAULT now()
 );
 
+-- 5. QA Temuan (Findings)
+CREATE TABLE IF NOT EXISTS public.qa_temuan (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  peserta_id uuid NOT NULL REFERENCES public.profiler_peserta(id) ON DELETE CASCADE,
+  period_id uuid NOT NULL REFERENCES public.qa_periods(id) ON DELETE CASCADE,
+  indicator_id uuid NOT NULL REFERENCES public.qa_indicators(id) ON DELETE RESTRICT,
+  rule_version_id uuid REFERENCES public.qa_service_rule_versions(id),
+  rule_indicator_id uuid REFERENCES public.qa_service_rule_indicators(id),
+  service_type text NOT NULL,
+  no_tiket text,
+  is_phantom_padding boolean NOT NULL DEFAULT false,
+  phantom_batch_id text,
+  nilai integer NOT NULL CHECK (nilai BETWEEN 0 AND 3),
+  ketidaksesuaian text,
+  sebaiknya text,
+  tahun integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_qa_indicators_service_type ON public.qa_indicators(service_type);
+CREATE INDEX IF NOT EXISTS idx_qa_temuan_period_service ON public.qa_temuan(period_id, service_type);
+CREATE INDEX IF NOT EXISTS idx_qa_temuan_peserta_period ON public.qa_temuan(peserta_id, period_id);
+CREATE INDEX IF NOT EXISTS idx_qa_temuan_indicator_id ON public.qa_temuan(indicator_id);
+CREATE INDEX IF NOT EXISTS idx_qa_temuan_rule_version ON public.qa_temuan(rule_version_id);
+CREATE INDEX IF NOT EXISTS idx_qa_temuan_phantom ON public.qa_temuan(is_phantom_padding) WHERE is_phantom_padding = true;
+
 -- 7. QA Dashboard Summary Cache
 CREATE TABLE IF NOT EXISTS public.qa_dashboard_period_summary (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -197,9 +197,15 @@ CREATE TABLE IF NOT EXISTS public.qa_dashboard_period_summary (
   avg_agent_score numeric NOT NULL DEFAULT 0,
   compliance_rate numeric NOT NULL DEFAULT 0,
   compliance_count integer NOT NULL DEFAULT 0,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (period_id, COALESCE(service_type, ''), COALESCE(folder_id, '00000000-0000-0000-0000-000000000000'))
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS qa_dashboard_period_summary_unique_idx
+  ON public.qa_dashboard_period_summary (
+    period_id,
+    COALESCE(service_type, ''),
+    COALESCE(folder_id, '00000000-0000-0000-0000-000000000000')
+  );
 
 CREATE TABLE IF NOT EXISTS public.qa_dashboard_agent_period_summary (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
