@@ -4,7 +4,7 @@
 
 **Goal:** Implement Supabase Auth integration, Hono auth middleware with status checks, and the Vite dashboard layout.
 
-**Architecture:** Middleware Auth (Approach A). Hono verifies JWT and profile status. Vite uses TanStack Router guards and a dashboard shell.
+**Architecture:** Middleware Auth (Approach A). Hono verifies JWT and profile status. Vite uses TanStack Router guards and a dashboard shell. Refer to `context7` for latest documentation on TanStack Router and Supabase Auth.
 
 **Tech Stack:** Hono, Vite, Supabase JS, TanStack Router, Zustand, Lucide React.
 

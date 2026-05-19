@@ -24,6 +24,7 @@ This project uses `pnpm` and `turbo`.
 ## Development Conventions
 
 ### 1. Monorepo Structure
+- **Tooling:** Use `context7` MCP for documentation lookup and code search before executing tasks.
 - `apps/api`: All business logic, AI integrations, and database mutations.
 - `apps/web`: Lean UI, consumes the Hono API.
 - `packages/types`: Shared Zod schemas and TypeScript interfaces.
@@ -48,6 +49,10 @@ This project uses `pnpm` and `turbo`.
 ### 5. Reference Auditing
 - Before implementing a feature, audit the corresponding logic in `reference-repo/app/(main)/...`.
 - Do not copy-paste. Extract the business logic and reimplement it cleanly in the new stack.
+
+### 6. Always Use Context7 for Documentation
+- **MANDATORY:** Always use the `context7` MCP tool to fetch the latest documentation for Supabase, Hono, TanStack, and other libraries before writing code.
+- This ensures usage of current APIs and avoids hallucinating deprecated patterns from old training data.
 
 ## Key Documentation
 - `prd.md`: Original project requirements.

@@ -6,7 +6,7 @@
 - **Branch:** `main`
 
 ## Summary
-Successfully initialized the monorepo structure using Turborepo and pnpm workspaces. Established a Backend-First architecture with Hono and Vite.
+Successfully initialized the monorepo structure using Turborepo and pnpm workspaces. Established a Backend-First architecture with Hono and Vite. Utilized `context7` (where applicable) and manual auditing of the `reference-repo` for logic mapping.
 
 ## Completed Tasks
 - [x] Initialized monorepo root with `turbo.json` and `pnpm-workspace.yaml`.

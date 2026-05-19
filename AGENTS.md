@@ -2,9 +2,9 @@
 
 ## MCP Servers
 
+- **context7** - Always use context7 MCP for documentation lookup and code search before executing tasks.
 - **supabase-mcp-server** - Gunakan untuk query data Supabase dan operasi database.
 - **shadcn** - Gunakan untuk mencari dan menginstall komponen shadcn/ui. Selalu cek registry sebelum membuat komponen custom.
-- **context7** - (Placeholder) Gunakan untuk fetch dokumentasi terbaru (Supabase, Hono, dll). Membutuhkan API Key yang akan ditambahkan nanti.
 
 ## Subagent Usage
 
@@ -58,6 +58,9 @@ Pastikan README dan panduan modul mudah dipahami oleh pembaca non-teknis.
 
 ### 3. File Editing Harus Pakai Unified Diff
 Baca file terbaru, buat patch minimal, dan terapkan. Hindari overwrite penuh jika tidak perlu.
+
+### 4. Selalu Referensi Context7 untuk Dokumentasi
+Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** gunakan tool `context7` untuk mengecek dokumentasi terbaru. Hindari penggunaan API yang deprecated dari data training lama.
 
 ## Specialized Sub-Agents
 
