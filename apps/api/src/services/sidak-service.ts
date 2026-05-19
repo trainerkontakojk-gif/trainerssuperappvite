@@ -412,6 +412,50 @@ export async function getDashboardData(params: {
 
 // ── Service Weights ────────────────────────────────────────
 
+// ── Reports ────────────────────────────────────────────────
+
+export async function getDataReportRows(params: {
+  serviceType?: string;
+  year?: number;
+  startMonth?: number;
+  endMonth?: number;
+  folderId?: string;
+  pesertaId?: string;
+  indicatorId?: string;
+}): Promise<any[]> {
+  let query = supabaseAdmin
+    .from('qa_temuan')
+    .select('*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan), qa_indicators!inner(id, name, category), qa_periods!inner(id, month, year)');
+
+  if (params.serviceType) query = query.eq('service_type', params.serviceType);
+  if (params.year) query = query.eq('tahun', params.year);
+  if (params.pesertaId) query = query.eq('peserta_id', params.pesertaId);
+  if (params.indicatorId) query = query.eq('indicator_id', params.indicatorId);
+
+  if (params.startMonth && params.year) {
+    const startPeriod = await supabaseAdmin
+      .from('qa_periods')
+      .select('id')
+      .eq('month', params.startMonth)
+      .eq('year', params.year)
+      .single();
+    if (startPeriod.data) query = query.gte('period_id', startPeriod.data.id);
+  }
+
+  if (params.endMonth && params.year) {
+    const endPeriod = await supabaseAdmin
+      .from('qa_periods')
+      .select('id')
+      .eq('month', params.endMonth)
+      .eq('year', params.year)
+      .single();
+    if (endPeriod.data) query = query.lte('period_id', endPeriod.data.id);
+  }
+
+  const { data } = await query.order('created_at', { ascending: false }).limit(1000);
+  return data ?? [];
+}
+
 export async function getServiceWeights(): Promise<any[]> {
   const { data } = await supabaseAdmin.from('qa_service_weights').select('*');
   return data ?? [];

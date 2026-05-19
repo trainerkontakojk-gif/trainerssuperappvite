@@ -173,4 +173,132 @@ sidak.get('/folders', async (c) => {
   return c.json({ success: true, data: data ?? [] });
 });
 
+// ── Reports ──────────────────────────────────────────────
+sidak.post('/reports/data', async (c) => {
+  const body = await c.req.json();
+  const parsed = z.object({
+    serviceType: z.string().optional(),
+    year: z.number().int().optional(),
+    startMonth: z.number().int().min(1).max(12).optional(),
+    endMonth: z.number().int().min(1).max(12).optional(),
+    folderId: z.string().optional(),
+    pesertaId: z.string().optional(),
+    indicatorId: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Filter tidak valid' } }, 400);
+  try {
+    const rows = await sidakService.getDataReportRows(parsed.data);
+    return c.json({ success: true, data: rows });
+  } catch (e: any) {
+    return c.json({ success: false, error: { code: 'REPORT_ERROR', message: e.message } }, 400);
+  }
+});
+
+sidak.post('/reports/ai/generate', async (c: any) => {
+  const user = c.get('user');
+  const body = await c.req.json();
+  const parsed = z.object({
+    modelId: z.string().optional(),
+    serviceType: z.string().optional(),
+    year: z.number().int().optional(),
+    startMonth: z.number().int().min(1).max(12).optional(),
+    endMonth: z.number().int().min(1).max(12).optional(),
+    pesertaId: z.string().optional(),
+    mode: z.enum(['layanan', 'individu']).default('layanan'),
+  }).safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
+
+  try {
+    const rows = await sidakService.getDataReportRows({
+      serviceType: parsed.data.serviceType,
+      year: parsed.data.year,
+      startMonth: parsed.data.startMonth,
+      endMonth: parsed.data.endMonth,
+      pesertaId: parsed.data.mode === 'individu' ? parsed.data.pesertaId : undefined,
+    });
+
+    if (rows.length === 0) {
+      return c.json({ success: false, error: { code: 'NO_DATA', message: 'Tidak ada data temuan untuk filter yang dipilih.' } }, 400);
+    }
+
+    const totalFindings = rows.filter(r => (r.nilai ?? 3) < 3 || r.ketidaksesuaian).length;
+    const agentName = rows[0]?.profiler_peserta?.nama ?? 'Unknown';
+    const serviceTypes = [...new Set(rows.map(r => r.service_type))].join(', ');
+
+    const { generateGeminiContent } = await import('../lib/gemini');
+    const { generateOpenRouterContent } = await import('../lib/openrouter');
+    const { resolveModelProvider } = await import('../lib/ai-models');
+
+    const modelInfo = resolveModelProvider(parsed.data.modelId);
+    const findingsSample = rows.slice(0, 20).map(r => ({
+      agent: r.profiler_peserta?.nama,
+      service: r.service_type,
+      parameter: r.qa_indicators?.name,
+      nilai: r.nilai,
+      ketidaksesuaian: r.ketidaksesuaian,
+      sebaiknya: r.sebaiknya,
+    }));
+
+    const prompt = `Buat laporan analisis kualitas QA dalam Bahasa Indonesia berdasarkan data berikut:
+
+Periode: ${parsed.data.startMonth ? `${parsed.data.startMonth}-${parsed.data.endMonth ?? '?'}/${parsed.data.year}` : `${parsed.data.year || 'Semua'}`}
+Mode: ${parsed.data.mode}
+${parsed.data.mode === 'individu' ? `Nama Agen: ${agentName}` : `Tipe Layanan: ${serviceTypes}`}
+Total Temuan: ${totalFindings}
+Total Baris Data: ${rows.length}
+
+Sample Data (20 baris pertama):
+${JSON.stringify(findingsSample, null, 2)}
+
+Buat laporan dengan format JSON:
+{
+  "executiveSummary": "Ringkasan eksekutif 2-3 paragraf",
+  "keyFindings": ["Temuan penting 1", "Temuan penting 2", "Temuan penting 3"],
+  "scoreAnalysis": "Analisis skor dan tren",
+  "recommendations": ["Rekomendasi 1", "Rekomendasi 2", "Rekomendasi 3"],
+  "priorityAreas": ["Area prioritas perbaikan 1", "Area prioritas perbaikan 2"]
+}`;
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }] as any;
+    const genOptions = {
+      model: modelInfo.modelId,
+      contents,
+      temperature: 0.5,
+      usageContext: { module: 'qa-analyzer' as const, action: 'report_generation' },
+      userId: user?.id,
+    };
+
+    const result = modelInfo.provider === 'openrouter'
+      ? await generateOpenRouterContent(genOptions)
+      : await generateGeminiContent(genOptions);
+
+    if (!result.success) {
+      return c.json({ success: false, error: { code: 'AI_ERROR', message: result.error || 'Gagal generate laporan' } }, 500);
+    }
+
+    let parsedReport;
+    try {
+      const cleaned = (result.text || '').replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+      parsedReport = JSON.parse(cleaned);
+    } catch {
+      parsedReport = { executiveSummary: result.text };
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        report: parsedReport,
+        metadata: {
+          totalRows: rows.length,
+          totalFindings,
+          agentName: parsed.data.mode === 'individu' ? agentName : undefined,
+          serviceTypes,
+        },
+      },
+    });
+  } catch (e: any) {
+    return c.json({ success: false, error: { code: 'REPORT_ERROR', message: e.message } }, 500);
+  }
+});
+
 export { sidak };

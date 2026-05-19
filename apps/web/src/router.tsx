@@ -10,6 +10,9 @@ import SidakSettings from './routes/sidak/settings';
 import SidakPeriods from './routes/sidak/periods';
 import SidakAgents from './routes/sidak/agents';
 import SidakAgentDetail from './routes/sidak/agents.$id';
+import SidakReportsLanding from './routes/sidak/reports/index';
+import SidakReportsData from './routes/sidak/reports-data';
+import SidakReportsAi from './routes/sidak/reports-ai';
 import KetikLanding from './routes/ketik/index';
 import KetikSimulation from './routes/ketik/simulation';
 import KetikHistory from './routes/ketik/history';
@@ -144,6 +147,24 @@ const sidakAgentDetailRoute = createRoute({
   component: SidakAgentDetail,
 });
 
+const sidakReportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sidak/reports',
+  component: SidakReportsLanding,
+});
+
+const sidakReportsDataRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sidak/reports-data',
+  component: SidakReportsData,
+});
+
+const sidakReportsAiRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sidak/reports-ai',
+  component: SidakReportsAi,
+});
+
 const ketikRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/ketik',
@@ -229,6 +250,9 @@ const routeTree = rootRoute.addChildren([
   sidakPeriodsRoute,
   sidakAgentsRoute,
   sidakAgentDetailRoute,
+  sidakReportsRoute,
+  sidakReportsDataRoute,
+  sidakReportsAiRoute,
   ketikRoute,
   ketikSimulationRoute,
   ketikHistoryRoute,

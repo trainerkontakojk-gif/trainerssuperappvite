@@ -8,6 +8,7 @@ const SIDAK_CHILDREN = [
   { to: '/sidak/dashboard', label: 'Dashboard QA' },
   { to: '/sidak/agents', label: 'Analisis Individu', startsWith: true },
   { to: '/sidak/ranking', label: 'Ranking Agen' },
+  { to: '/sidak/reports', label: 'Laporan' },
   { to: '/sidak/input', label: 'Input Temuan' },
   { to: '/sidak/periods', label: 'Periode QA' },
   { to: '/sidak/settings', label: 'Parameter QA' },
