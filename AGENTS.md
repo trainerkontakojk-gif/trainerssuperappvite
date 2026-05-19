@@ -4,6 +4,7 @@
 
 - **supabase-mcp-server** - Gunakan untuk query data Supabase dan operasi database.
 - **shadcn** - Gunakan untuk mencari dan menginstall komponen shadcn/ui. Selalu cek registry sebelum membuat komponen custom.
+- **context7** - (Placeholder) Gunakan untuk fetch dokumentasi terbaru (Supabase, Hono, dll). Membutuhkan API Key yang akan ditambahkan nanti.
 
 ## Subagent Usage
 

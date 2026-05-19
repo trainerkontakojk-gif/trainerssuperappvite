@@ -1,7 +1,13 @@
 import { Context, Next } from 'hono';
 import { supabaseAdmin } from '../lib/supabase';
+import { User } from '@supabase/supabase-js';
 
-export const authMiddleware = async (c: Context, next: Next) => {
+type Variables = {
+  user: User;
+  profile: any;
+};
+
+export const authMiddleware = async (c: Context<{ Variables: Variables }>, next: Next) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
