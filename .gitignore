@@ -4,3 +4,6 @@ node_modules
 dist
 .superpowers
 reference-repo
+.vscode/
+*.log
+.DS_Store
