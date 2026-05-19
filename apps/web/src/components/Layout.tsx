@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from '@tanstack/react-router';
-import { LayoutDashboard, MessageCircle, Mail, Settings, User, BarChart3, Phone, ChevronDown, Activity, Users, Loader2 } from 'lucide-react';
+import { LayoutDashboard, MessageCircle, Mail, Settings, User, BarChart3, Phone, ChevronDown, Activity, Users, Loader2, Layers, UserCheck } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { Suspense, useState } from 'react';
 
@@ -27,6 +27,8 @@ export function DashboardLayout() {
     `flex items-center gap-3 p-2 rounded-lg transition-colors text-sm font-medium ${
       isActive(path, startsWith) ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
     }`;
+
+  const isManager = profile?.role?.toLowerCase() === 'admin' || profile?.role?.toLowerCase() === 'trainer';
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -98,6 +100,30 @@ export function DashboardLayout() {
             <Activity size={20} />
             <span>Monitoring</span>
           </Link>
+
+          {isManager && (
+            <>
+              <div className="pt-4 pb-2 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Admin Panel
+              </div>
+              <Link to="/dashboard/users" className={linkClass('/dashboard/users')} onClick={() => setMobileMenuOpen(false)}>
+                <User size={20} />
+                <span>Kelola Pengguna</span>
+              </Link>
+              <Link to="/dashboard/access-groups" className={linkClass('/dashboard/access-groups')} onClick={() => setMobileMenuOpen(false)}>
+                <Layers size={20} />
+                <span>Grup Akses</span>
+              </Link>
+              <Link to="/dashboard/access-approval" className={linkClass('/dashboard/access-approval')} onClick={() => setMobileMenuOpen(false)}>
+                <UserCheck size={20} />
+                <span>Persetujuan Akses</span>
+              </Link>
+              <Link to="/dashboard/activities" className={linkClass('/dashboard/activities')} onClick={() => setMobileMenuOpen(false)}>
+                <Activity size={20} />
+                <span>Log Aktivitas</span>
+              </Link>
+            </>
+          )}
 
           <div className="border-t my-4" />
 

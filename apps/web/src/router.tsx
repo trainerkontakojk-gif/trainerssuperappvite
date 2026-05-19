@@ -4,6 +4,10 @@ import { DashboardLayout } from './components/Layout';
 
 const IndexPage = lazy(() => import('./routes/index'));
 const DashboardPage = lazy(() => import('./routes/dashboard'));
+const DashboardUsers = lazy(() => import('./routes/dashboard/users'));
+const DashboardAccessGroups = lazy(() => import('./routes/dashboard/access-groups'));
+const DashboardAccessApproval = lazy(() => import('./routes/dashboard/access-approval'));
+const DashboardActivities = lazy(() => import('./routes/dashboard/activities'));
 const SidakLanding = lazy(() => import('./routes/sidak/index'));
 const SidakDashboard = lazy(() => import('./routes/sidak/dashboard'));
 const SidakInput = lazy(() => import('./routes/sidak/input'));
@@ -51,6 +55,30 @@ const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard',
   component: DashboardPage,
+});
+
+const dashboardUsersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard/users',
+  component: DashboardUsers,
+});
+
+const dashboardAccessGroupsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard/access-groups',
+  component: DashboardAccessGroups,
+});
+
+const dashboardAccessApprovalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard/access-approval',
+  component: DashboardAccessApproval,
+});
+
+const dashboardActivitiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard/activities',
+  component: DashboardActivities,
 });
 
 const profilerRoute = createRoute({
@@ -236,6 +264,10 @@ const resetPasswordRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
+  dashboardUsersRoute,
+  dashboardAccessGroupsRoute,
+  dashboardAccessApprovalRoute,
+  dashboardActivitiesRoute,
   profilerRoute,
   profilerTableRoute,
   profilerSlidesRoute,

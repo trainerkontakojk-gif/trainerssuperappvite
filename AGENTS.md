@@ -26,7 +26,7 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Dev:** `pnpm dev` (Menjalankan web, api, dan telefun secara paralel)
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint`
-- **Test:** `pnpm test` (vitest — 80 tests covering API services + frontend hooks/components)
+- **Test:** `pnpm test` (vitest — 88 tests covering API services + frontend hooks/components)
 - **Test (api only):** `pnpm --filter @trainers/api test`
 - **Test (web only):** `pnpm --filter @trainers/web test`
 - **Format:** `pnpm format`
@@ -58,7 +58,7 @@ Monorepo dengan pembagian tanggung jawab yang jelas:
 ## Golden Rules
 
 ### 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build
-- **Reference-repo (Next.js)** memiliki masalah FCP (First Contentful Paint) dan LCP (Largest Contentful Paint) yang memberatkan aplikasi karena bundle besar dan SSR overhead.
+- **Reference-repo (Next.js)** memiliki masalah FCP (First Contentful Paint) dan LCP (Largest Contentful Paint) yang memberatkan aplikasi karena bundle besar and SSR overhead.
 - **Build kedepan WAJIB** mempertimbangkan FCP/LCP, disesuaikan dengan arsitektur Vite + React SPA:
   - Code splitting & lazy loading sudah diterapkan (fase 13) — jangan regresi saat menambah route baru.
   - Hindari static import library besar (Recharts >300 kB, ExcelJS/xlsx >400 kB) di komponen yang tidak selalu dikunjungi. Gunakan dynamic import.
@@ -119,28 +119,29 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 12. Polish & QA — Loading states, empty states, error handling (DONE)
 13. Perf — Code splitting + lazy loading (DONE)
 14. Testing — Vitest API unit tests + Frontend component tests (DONE)
+15. Admin Management Parity (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
-- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun)
+- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core)
 - `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter
-- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, **profiler-service**
-- `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, **profiler**)
+- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
+- `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
-- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (33 routes, all React.lazy())
+- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (37 routes, all React.lazy())
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
 - `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
 - `apps/web/src/lib/profilerService.ts` — typed Profiler API client
-- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes)
+- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes, and `dashboard/users`, `dashboard/access-groups`, `dashboard/access-approval`, `dashboard/activities`)
 - `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
-- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler types)
-- `apps/web/src/components/Layout.tsx` — sidebar, SIDAK submenu, Suspense boundary for lazy routes
+- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
+- `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
 - `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils)
-- `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service)
+- `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-14)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-15)
 
 ## Routes Reference (apps/web)
 
@@ -178,7 +179,11 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | 30 | `/sidak/reports-ai` | Form | AI-powered report generation |
 | 31 | `/waiting-approval` | Auth | Status polling page |
 | 32 | `/reset-password` | Auth | Password recovery form |
-| 33 | 404 | Catch-all | Custom not-found page |
+| 33 | `/dashboard/users` | Table | User status/role management, password reset, soft delete |
+| 34 | `/dashboard/access-groups` | Builder | Dynamic access data rule scopes builder for leaders |
+| 35 | `/dashboard/access-approval` | Action | Assign access groups and approve leader requests |
+| 36 | `/dashboard/activities` | Table | System-wide audit logs with CSV export |
+| 37 | 404 | Catch-all | Custom not-found page |
 
 ## API Endpoints Reference (apps/api)
 
@@ -189,3 +194,4 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | `/api/v1/pdkt` | 6 endpoints | `pdkt-service.ts` |
 | `/api/v1/ai` | 7 endpoints | — |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts` |
+| `/api/v1/admin` | 8 endpoints | `admin-service.ts` |pi/v1/profiler` | 18 endpoints | `profiler-service.ts` |

@@ -20,7 +20,7 @@ This project uses `pnpm` and `turbo`.
 - **Build All:** `pnpm build`
 - **Lint All:** `pnpm lint`
 - **Format Code:** `pnpm format`
-- **Test All:** `pnpm test` (80 tests — API services + frontend hooks/components)
+- **Test All:** `pnpm test` (88 tests — API services + frontend hooks/components)
 - **Test API:** `pnpm --filter @trainers/api test`
 - **Test Web:** `pnpm --filter @trainers/web test`
 
@@ -72,13 +72,14 @@ This project uses `pnpm` and `turbo`.
 - This ensures usage of current APIs and avoids hallucinating deprecated patterns from old training data.
 
 ## Phase Progress
-- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf, Testing (API + Frontend)
+- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf, Testing (API + Frontend), Admin Parity
 
 ## Key Documentation
 - `prd.md`: Original project requirements.
-- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-14).
+- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-15).
 - `docs/superpowers/specs/`: Detailed architecture and design specs.
 - `docs/rebuild-logs/phase-12-polish-qa.md`: Loading states, empty states, error handling improvements.
 - `docs/rebuild-logs/phase-13-perf.md`: Code splitting, lazy loading, bundle size reduction.
-- `docs/rebuild-logs/phase-14-testing.md`: Vitest unit tests (80 tests across API services + frontend).
+- `docs/rebuild-logs/phase-14-testing.md`: Vitest unit tests (88 tests across API services + frontend).
+- `docs/rebuild-logs/phase-15-admin-parity.md`: Replicating Admin user and group management tools.
 - `docs/superpowers/plans/`: Step-by-step implementation plans.

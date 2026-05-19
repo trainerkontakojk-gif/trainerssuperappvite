@@ -95,6 +95,7 @@ Migration files:
 2. `001_sidak_core.sql` — SIDAK tables (periods, indicators, temuan, agents, etc.)
 3. `002_ketik_pdkt_core.sql` — KETIK/PDKT tables + AI usage logging + pricing
 4. `003_telefun_core.sql` — Telefun history table
+5. `004_admin_core.sql` — Admin panel tables (access_groups, access_group_items, leader_access_requests, activity_logs)
 
 ## Build & Run
 
