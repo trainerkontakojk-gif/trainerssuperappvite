@@ -26,8 +26,9 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Dev:** `pnpm dev` (Menjalankan web, api, dan telefun secara paralel)
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint`
-- **Test:** `pnpm test` (vitest — 62 tests covering scoring, sidak-service, profiler-service)
+- **Test:** `pnpm test` (vitest — 80 tests covering API services + frontend hooks/components)
 - **Test (api only):** `pnpm --filter @trainers/api test`
+- **Test (web only):** `pnpm --filter @trainers/web test`
 - **Format:** `pnpm format`
 - **Telefun standalone:** `pnpm --filter @trainers/telefun dev`
 
@@ -117,6 +118,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 11. SIDAK Reports (DONE)
 12. Polish & QA — Loading states, empty states, error handling (DONE)
 13. Perf — Code splitting + lazy loading (DONE)
+14. Testing — Vitest API unit tests + Frontend component tests (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
@@ -134,7 +136,11 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler types)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK submenu, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-13)
+- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils)
+- `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service)
+- `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
+- `apps/api/vitest.config.ts` — Vitest config for API service tests
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-14)
 
 ## Routes Reference (apps/web)
 

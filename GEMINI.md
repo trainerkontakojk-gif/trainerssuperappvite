@@ -20,6 +20,9 @@ This project uses `pnpm` and `turbo`.
 - **Build All:** `pnpm build`
 - **Lint All:** `pnpm lint`
 - **Format Code:** `pnpm format`
+- **Test All:** `pnpm test` (80 tests — API services + frontend hooks/components)
+- **Test API:** `pnpm --filter @trainers/api test`
+- **Test Web:** `pnpm --filter @trainers/web test`
 
 ## Development Conventions
 
@@ -52,19 +55,30 @@ This project uses `pnpm` and `turbo`.
 - Before implementing a feature, audit the corresponding logic in `reference-repo/app/(main)/...`.
 - Do not copy-paste. Extract the business logic and reimplement it cleanly in the new stack.
 
-### 6. Always Use Context7 for Documentation
+### 6. FCP/LCP Performance Awareness
+- **Reference-repo (Next.js)** memiliki masalah FCP (First Contentful Paint) dan LCP (Largest Contentful Paint) yang memberatkan aplikasi karena bundle besar dan SSR overhead.
+- **Build kedepan WAJIB** mempertimbangkan FCP/LCP, disesuaikan dengan arsitektur Vite + React SPA:
+  - Code splitting & lazy loading sudah diterapkan — jangan regresi saat menambah route baru.
+  - Hindari static import library besar (Recharts >300 kB, ExcelJS/xlsx >400 kB) di komponen yang tidak selalu dikunjungi. Gunakan dynamic import.
+  - Perhatikan ukuran bundle per-chunk. Jika ada chunk >200 kB yang bukan vendor stabil, pertimbangkan split lanjutan (`manualChunks`).
+  - Tambahkan resource hints (`modulepreload`, `preconnect`, `dns-prefetch`) di `index.html` untuk mempercepat discovery chunk kritis.
+  - Jangan tambahkan gambar/font besar tanpa optimasi (lazy loading, compression, responsive images via `srcset`).
+  - Jika menambah library baru, selalu cek bundle impact-nya. Library ringan > library populer tapi berat.
+
+### 7. Always Use Context7 for Documentation
 - **MANDATORY:** Always use the `context7` MCP tool (`@upstash/context7-mcp`) to fetch the latest documentation for Supabase, Hono, TanStack, and other libraries before writing code.
 - Workflow: `resolve-library-id` → cari library → `query-docs` dengan library ID untuk ambil dokumentasi terbaru.
 - API key disimpan di `.env.local` sebagai `CONTEXT7_API_KEY`.
 - This ensures usage of current APIs and avoids hallucinating deprecated patterns from old training data.
 
 ## Phase Progress
-- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf
+- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf, Testing (API + Frontend)
 
 ## Key Documentation
 - `prd.md`: Original project requirements.
-- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-13).
+- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-14).
 - `docs/superpowers/specs/`: Detailed architecture and design specs.
 - `docs/rebuild-logs/phase-12-polish-qa.md`: Loading states, empty states, error handling improvements.
 - `docs/rebuild-logs/phase-13-perf.md`: Code splitting, lazy loading, bundle size reduction.
+- `docs/rebuild-logs/phase-14-testing.md`: Vitest unit tests (80 tests across API services + frontend).
 - `docs/superpowers/plans/`: Step-by-step implementation plans.
