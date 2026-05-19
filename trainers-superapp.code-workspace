@@ -1,0 +1,20 @@
+{
+  "folders": [
+    { "name": "root", "path": "." },
+    { "name": "api", "path": "apps/api" },
+    { "name": "web", "path": "apps/web" },
+    { "name": "types", "path": "packages/types" }
+  ],
+  "settings": {
+    "typescript.tsdk": "apps/web/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "typescript.preferences.importModuleSpecifier": "shortest",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "eslint.workingDirectories": [
+      { "pattern": "apps/*/" },
+      { "pattern": "packages/*/" }
+    ]
+  }
+}

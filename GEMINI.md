@@ -24,9 +24,11 @@ This project uses `pnpm` and `turbo`.
 ## Development Conventions
 
 ### 1. Monorepo Structure
-- **Tooling:** Use `context7` MCP for documentation lookup and code search before executing tasks.
+- **Tooling:** Use `context7` MCP (via `@upstash/context7-mcp`, configured in `opencode.json`) for documentation lookup and code search before executing tasks.
+  - Panggil `resolve-library-id` dulu, lalu `query-docs` untuk dokumentasi terbaru.
 - `apps/api`: All business logic, AI integrations, and database mutations.
 - `apps/web`: Lean UI, consumes the Hono API.
+- `apps/telefun`: Dedicated WebSocket proxy server for Gemini Live voice calls.
 - `packages/types`: Shared Zod schemas and TypeScript interfaces.
 - `reference-repo/`: The legacy Next.js project (READ-ONLY) used for business logic reference.
 
@@ -51,10 +53,16 @@ This project uses `pnpm` and `turbo`.
 - Do not copy-paste. Extract the business logic and reimplement it cleanly in the new stack.
 
 ### 6. Always Use Context7 for Documentation
-- **MANDATORY:** Always use the `context7` MCP tool to fetch the latest documentation for Supabase, Hono, TanStack, and other libraries before writing code.
+- **MANDATORY:** Always use the `context7` MCP tool (`@upstash/context7-mcp`) to fetch the latest documentation for Supabase, Hono, TanStack, and other libraries before writing code.
+- Workflow: `resolve-library-id` → cari library → `query-docs` dengan library ID untuk ambil dokumentasi terbaru.
+- API key disimpan di `.env.local` sebagai `CONTEXT7_API_KEY`.
 - This ensures usage of current APIs and avoids hallucinating deprecated patterns from old training data.
+
+## Phase Progress
+- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment (P0 Critical)
 
 ## Key Documentation
 - `prd.md`: Original project requirements.
+- `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-7).
 - `docs/superpowers/specs/`: Detailed architecture and design specs.
 - `docs/superpowers/plans/`: Step-by-step implementation plans.

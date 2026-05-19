@@ -10,14 +10,14 @@ type Variables = {
 export const authMiddleware = async (c: Context<{ Variables: Variables }>, next: Next) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ success: false, error: 'Unauthorized' }, 401);
+    return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } }, 401);
   }
 
   const token = authHeader.split(' ')[1];
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error || !user) {
-    return c.json({ success: false, error: 'Invalid token' }, 401);
+    return c.json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid token' } }, 401);
   }
 
   // Fetch profile status
@@ -30,8 +30,7 @@ export const authMiddleware = async (c: Context<{ Variables: Variables }>, next:
   if (!profile || profile.status !== 'active') {
     return c.json({ 
       success: false, 
-      error: 'Account pending approval', 
-      code: 'ACCOUNT_PENDING' 
+      error: { code: 'ACCOUNT_PENDING', message: 'Account pending approval' },
     }, 403);
   }
 
