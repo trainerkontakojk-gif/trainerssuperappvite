@@ -40,9 +40,9 @@ export default function SidakAgentDetailPage() {
         </div>
       )}
 
-      {data.scoreHistory && data.scoreHistory.length > 0 && (
-        <div className="bg-white rounded-xl border shadow-sm p-6">
-          <h3 className="font-semibold mb-4">Score History</h3>
+      <div className="bg-white rounded-xl border shadow-sm p-6">
+        <h3 className="font-semibold mb-4">Score History</h3>
+        {data.scoreHistory && data.scoreHistory.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -73,12 +73,14 @@ export default function SidakAgentDetailPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-gray-400 text-sm">Belum ada riwayat skor.</p>
+        )}
+      </div>
 
-      {data.temuan.length > 0 && (
-        <div className="bg-white rounded-xl border shadow-sm p-6">
-          <h3 className="font-semibold mb-4">Findings ({data.temuan.length})</h3>
+      <div className="bg-white rounded-xl border shadow-sm p-6">
+        <h3 className="font-semibold mb-4">Findings {data.temuan.length > 0 && `(${data.temuan.length})`}</h3>
+        {data.temuan.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -106,8 +108,10 @@ export default function SidakAgentDetailPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-gray-400 text-sm">Belum ada temuan.</p>
+        )}
+      </div>
     </div>
   );
 }

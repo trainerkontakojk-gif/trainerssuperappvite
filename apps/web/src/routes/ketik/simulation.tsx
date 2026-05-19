@@ -5,7 +5,7 @@ import { useApi } from '../../hooks/useApi';
 interface Scenario { id: string; title: string; description: string; category: string; isActive: boolean; }
 
 export default function KetikSimulation() {
-  const { data: scenarios } = useApi<Scenario[]>('/ketik/scenarios');
+  const { data: scenarios, loading: loadingScenarios, error: scenariosError } = useApi<Scenario[]>('/ketik/scenarios');
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
   const [messages, setMessages] = useState<{ id: string; sender: string; text: string; timestamp: string }[]>([]);
   const [input, setInput] = useState('');
@@ -63,16 +63,27 @@ export default function KetikSimulation() {
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Mulai Simulasi KETIK</h1>
         <p className="text-gray-500">Pilih skenario untuk memulai sesi chat:</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(scenarios || []).map(s => (
-            <button key={s.id} onClick={() => handleStartSession(s)}
-              className="p-4 bg-white rounded-xl border text-left hover:shadow-md transition-shadow">
-              <span className="text-xs text-indigo-500 font-medium">{s.category}</span>
-              <h3 className="font-semibold mt-1">{s.title}</h3>
-              <p className="text-sm text-gray-500 mt-1">{s.description}</p>
-            </button>
-          ))}
-        </div>
+        {scenariosError && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+            <AlertCircle size={14} /> {scenariosError}
+          </div>
+        )}
+        {loadingScenarios ? (
+          <div className="text-center py-8 text-sm text-gray-400">Memuat skenario...</div>
+        ) : scenarios && scenarios.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {scenarios.map(s => (
+              <button key={s.id} onClick={() => handleStartSession(s)}
+                className="p-4 bg-white rounded-xl border text-left hover:shadow-md transition-shadow">
+                <span className="text-xs text-indigo-500 font-medium">{s.category}</span>
+                <h3 className="font-semibold mt-1">{s.title}</h3>
+                <p className="text-sm text-gray-500 mt-1">{s.description}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-sm text-gray-400">Tidak ada skenario tersedia.</div>
+        )}
       </div>
     );
   }

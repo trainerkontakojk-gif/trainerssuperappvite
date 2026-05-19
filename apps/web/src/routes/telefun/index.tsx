@@ -36,7 +36,8 @@ export default function TelefunLanding() {
     setError(null);
     setCallState('connecting');
 
-    const token = localStorage.getItem('supabase_token') || prompt('Masukkan token:');
+    const token = localStorage.getItem('supabase_token');
+    if (!token) { setError('Token tidak ditemukan. Silakan login terlebih dahulu.'); setCallState('idle'); return; }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });

@@ -12,6 +12,7 @@ export default function ProfilerExport() {
   const [peserta, setPeserta] = useState<ProfilerPeserta[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!batchName) return;
@@ -42,7 +43,7 @@ export default function ProfilerExport() {
       XLSX.utils.book_append_sheet(wb, ws, 'Peserta');
       XLSX.writeFile(wb, `profiler-${batchName}.xlsx`);
     } catch (e) {
-      alert('Gagal export Excel');
+      setError('Gagal export Excel');
     }
     setGenerating(null);
   };
@@ -69,7 +70,7 @@ export default function ProfilerExport() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert('Gagal export CSV');
+      setError('Gagal export CSV');
     }
     setGenerating(null);
   };
@@ -100,6 +101,12 @@ export default function ProfilerExport() {
         <p className="text-sm text-gray-500">{peserta.length} peserta tersedia untuk diexport.</p>
       </div>
 
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+          <span>{error}</span>
+          <button className="ml-auto text-xs underline" onClick={() => setError(null)}>Tutup</button>
+        </div>
+      )}
       {loading ? (
         <div className="rounded-xl border bg-white p-8 text-center text-sm text-gray-400">Memuat...</div>
       ) : (

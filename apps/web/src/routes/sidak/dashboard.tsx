@@ -58,9 +58,9 @@ export default function SidakDashboardPage() {
         </div>
       </div>
 
-      {data.topAgents.length > 0 && (
-        <div className="bg-white rounded-xl border shadow-sm p-6">
-          <h3 className="font-semibold mb-4">Top Agents by Defects</h3>
+      <div className="bg-white rounded-xl border shadow-sm p-6">
+        <h3 className="font-semibold mb-4">Top Agents by Defects</h3>
+        {data.topAgents.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -87,8 +87,10 @@ export default function SidakDashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-gray-400 text-sm">Belum ada data agent.</p>
+        )}
+      </div>
     </div>
   );
 }

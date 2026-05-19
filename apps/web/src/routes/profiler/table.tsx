@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Search, ArrowLeft, User, GripVertical, Check, X, Trash2, Edit3 } from 'lucide-react';
+import { Search, ArrowLeft, User, Check, X, Trash2, Edit3 } from 'lucide-react';
 import { useQueryParams } from '../../hooks/useQueryParams';
 import { profilerApi } from '../../lib/profilerService';
 import type { ProfilerPeserta } from '@trainers/types';
@@ -122,9 +122,7 @@ export default function ProfilerTable() {
             <tbody className="divide-y">
               {filtered.map((p) => (
                 <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${editingId === p.id ? 'bg-amber-50' : ''}`}>
-                  <td className="p-2 pl-3">
-                    <GripVertical className="h-4 w-4 text-gray-300 cursor-grab" />
-                  </td>
+                  <td className="p-2 pl-3"></td>
                   <td className="p-3">
                     {editingId === p.id ? (
                       <input

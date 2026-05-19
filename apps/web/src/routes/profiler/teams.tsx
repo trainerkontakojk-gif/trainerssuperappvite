@@ -11,6 +11,7 @@ export default function ProfilerTeams() {
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -27,7 +28,7 @@ export default function ProfilerTeams() {
       setTeams(prev => [...prev, team]);
       setNewName('');
     } catch (e: any) {
-      alert(e.message);
+      setError(e.message);
     }
     setAdding(false);
   };
@@ -74,6 +75,12 @@ export default function ProfilerTeams() {
             <Plus className="h-4 w-4" /> Tambah
           </button>
         </div>
+        {error && (
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+            <span>{error}</span>
+            <button className="ml-auto text-xs underline" onClick={() => setError(null)}>Tutup</button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border bg-white shadow-sm divide-y">
