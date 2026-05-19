@@ -1,55 +1,130 @@
-import { Outlet, Link } from '@tanstack/react-router';
-import { LayoutDashboard, MessageSquare, MessageCircle, Mail, Settings, User, BarChart3, Phone } from 'lucide-react';
+import { Outlet, Link, useLocation } from '@tanstack/react-router';
+import { LayoutDashboard, MessageCircle, Mail, Settings, User, BarChart3, Phone, ChevronDown, Activity, Users } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useState } from 'react';
+
+const SIDAK_CHILDREN = [
+  { to: '/sidak', label: 'Beranda SIDAK' },
+  { to: '/sidak/dashboard', label: 'Dashboard QA' },
+  { to: '/sidak/agents', label: 'Analisis Individu', startsWith: true },
+  { to: '/sidak/ranking', label: 'Ranking Agen' },
+  { to: '/sidak/input', label: 'Input Temuan' },
+  { to: '/sidak/periods', label: 'Periode QA' },
+  { to: '/sidak/settings', label: 'Parameter QA' },
+];
 
 export function DashboardLayout() {
   const profile = useAuthStore((s) => s.profile);
+  const { pathname } = useLocation();
+  const [sidakOpen, setSidakOpen] = useState(pathname.startsWith('/sidak'));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isActive = (path: string, startsWith = false) =>
+    startsWith ? pathname.startsWith(path) : pathname === path;
+
+  const linkClass = (path: string, startsWith = false) =>
+    `flex items-center gap-3 p-2 rounded-lg transition-colors text-sm font-medium ${
+      isActive(path, startsWith) ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+    }`;
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white border-r flex flex-col">
-        <div className="p-6 font-bold text-xl text-indigo-600">Trainers App</div>
-        <nav className="flex-1 p-4 space-y-2">
-          <Link to="/dashboard" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 bg-black/20 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
+      )}
+
+      <aside className={`${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r flex flex-col transition-transform duration-300`}>
+        <div className="p-6 font-bold text-xl text-indigo-600 flex items-center gap-3 border-b">
+          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+            <BarChart3 className="h-4 w-4 text-indigo-600" />
+          </div>
+          Trainers App
+        </div>
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <Link to="/dashboard" className={linkClass('/dashboard')} onClick={() => setMobileMenuOpen(false)}>
             <LayoutDashboard size={20} />
-            <span className="text-sm font-medium">Dashboard</span>
+            <span>Dashboard</span>
           </Link>
-          <Link to="/sidak" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
-            <MessageSquare size={20} />
-            <span className="text-sm font-medium">SIDAK</span>
-          </Link>
-          <Link to="/ketik" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
+
+          <div>
+            <button
+              onClick={() => setSidakOpen(!sidakOpen)}
+              className={`w-full flex items-center justify-between gap-3 p-2 rounded-lg transition-colors text-sm font-medium ${
+                pathname.startsWith('/sidak') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <BarChart3 size={20} />
+                <span>SIDAK</span>
+              </div>
+              <ChevronDown size={16} className={`transition-transform ${sidakOpen ? '' : '-rotate-90'}`} />
+            </button>
+            {sidakOpen && (
+              <div className="ml-6 mt-1 space-y-1 border-l pl-3">
+                {SIDAK_CHILDREN.map((child) => (
+                  <Link
+                    key={child.to}
+                    to={child.to}
+                    className={`block p-2 rounded-lg text-xs font-medium transition-colors ${
+                      isActive(child.to, child.startsWith) ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {child.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Link to="/ketik" className={linkClass('/ketik', true)} onClick={() => setMobileMenuOpen(false)}>
             <MessageCircle size={20} />
-            <span className="text-sm font-medium">KETIK</span>
+            <span>KETIK</span>
           </Link>
-          <Link to="/pdkt" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
+          <Link to="/pdkt" className={linkClass('/pdkt', true)} onClick={() => setMobileMenuOpen(false)}>
             <Mail size={20} />
-            <span className="text-sm font-medium">PDKT</span>
+            <span>PDKT</span>
           </Link>
-          <Link to="/telefun" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
+          <Link to="/telefun" className={linkClass('/telefun', true)} onClick={() => setMobileMenuOpen(false)}>
             <Phone size={20} />
-            <span className="text-sm font-medium">Telefun</span>
+            <span>Telefun</span>
           </Link>
-          <Link to="/monitoring" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
-            <BarChart3 size={20} />
-            <span className="text-sm font-medium">Monitoring</span>
+          <Link to="/profiler" className={linkClass('/profiler', true)} onClick={() => setMobileMenuOpen(false)}>
+            <Users size={20} />
+            <span>KTP / Profiler</span>
           </Link>
-          <Link to="/sidak/settings" className="flex items-center gap-3 p-2 rounded hover:bg-gray-100 transition-colors [&.active]:bg-indigo-50 [&.active]:text-indigo-600">
+          <Link to="/monitoring" className={linkClass('/monitoring')} onClick={() => setMobileMenuOpen(false)}>
+            <Activity size={20} />
+            <span>Monitoring</span>
+          </Link>
+
+          <div className="border-t my-4" />
+
+          <Link to="/account" className={linkClass('/account')} onClick={() => setMobileMenuOpen(false)}>
+            <User size={20} />
+            <span>Akun</span>
+          </Link>
+          <Link to="/sidak/settings" className={linkClass('/sidak/settings')} onClick={() => setMobileMenuOpen(false)}>
             <Settings size={20} />
-            <span className="text-sm font-medium">Settings</span>
+            <span>Pengaturan</span>
           </Link>
         </nav>
       </aside>
+
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b flex items-center justify-end px-8">
+        <header className="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8">
+          <button className="lg:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setMobileMenuOpen(true)}>
+            <BarChart3 size={20} />
+          </button>
+          <div className="flex-1" />
           <div className="flex items-center gap-3">
-             <span className="text-sm font-semibold text-gray-700">{profile?.full_name || 'User'}</span>
-             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                <User size={18} />
-             </div>
+            <span className="text-sm font-semibold text-gray-700">{profile?.full_name || 'User'}</span>
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+              <User size={18} />
+            </div>
           </div>
         </header>
-        <section className="flex-1 overflow-auto p-8">
+        <section className="flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
         </section>
       </main>

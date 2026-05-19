@@ -10,6 +10,7 @@ import { sidak } from './routes/sidak';
 import { ketik } from './routes/ketik';
 import { pdkt } from './routes/pdkt';
 import { ai } from './routes/ai';
+import { profiler } from './routes/profiler';
 
 const allowedOrigins = env.NODE_ENV === 'production'
   ? (env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [])
@@ -64,7 +65,8 @@ const routes = app
   .route('/v1/sidak', sidak)
   .route('/v1/ketik', ketik)
   .route('/v1/pdkt', pdkt)
-  .route('/v1/ai', ai);
+  .route('/v1/ai', ai)
+  .route('/v1/profiler', profiler);
 
 export type AppType = typeof routes;
 export default app;

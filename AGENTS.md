@@ -101,16 +101,65 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 7. Telefun WS (DONE)
 8. Hardening (P0 Critical — DONE)
 9. Deployment (P0 Critical — DONE)
+10. Frontend Matching & Profiler Module (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
 - `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun)
 - `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter
-- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service
-- `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai)
+- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, **profiler-service**
+- `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, **profiler**)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
-- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes
+- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (26 routes total)
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
-- `apps/web/src/routes/` — page components per module
-- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces
+- `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
+- `apps/web/src/lib/profilerService.ts` — typed Profiler API client
+- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes)
+- `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
+- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler types)
 - `docs/rebuild-logs/` — per-phase completion logs
+
+## Routes Reference (apps/web)
+
+| # | Route | Page Type | Notes |
+|---|-------|-----------|-------|
+| 1 | `/` | Landing | Hero, stats, modules showcase, benefits |
+| 2 | `/dashboard` | Overview | Recharts charts, KPI cards, module grid |
+| 3 | `/sidak` | Landing | 6 card links |
+| 4 | `/sidak/dashboard` | QA Dashboard | 4 metric cards, bar charts, top agents |
+| 5 | `/sidak/input` | Form | Multi-step audit input + Excel |
+| 6 | `/sidak/ranking` | Table | Agent ranking sorted by defects |
+| 7 | `/sidak/settings` | CRUD | Service weights configuration |
+| 8 | `/sidak/periods` | Manager | Create/view audit periods |
+| 9 | `/sidak/agents` | Directory | Searchable agent list |
+| 10 | `/sidak/agents/$id` | Detail | Score history + findings table |
+| 11 | `/ketik` | Landing | Chat simulation intro |
+| 12 | `/ketik/simulation` | Chat UI | Scenario selection + chat interface |
+| 13 | `/ketik/history` | Placeholder | Session history |
+| 14 | `/pdkt` | Landing | Email simulation intro |
+| 15 | `/pdkt/simulation` | Email UI | Scenario + inbound email + evaluate |
+| 16 | `/pdkt/history` | Placeholder | Session history |
+| 17 | `/telefun` | Voice UI | WebSocket-based call simulation |
+| 18 | `/monitoring` | Dashboard | AI usage + pricing management |
+| 19 | `/account` | Settings | Edit name + change password |
+| 20 | `/profiler` | Landing | Year/folder sidebar + action tiles |
+| 21 | `/profiler/table` | Table | Search/filter/edit participant data |
+| 22 | `/profiler/slides` | Slides | Slide view per participant |
+| 23 | `/profiler/analytics` | Charts | Recharts analytics (4 charts) |
+| 24 | `/profiler/export` | Export | Excel/CSV export |
+| 25 | `/profiler/add` | Form | Manual participant input |
+| 26 | `/profiler/import` | Import | Excel template + upload + results |
+| 27 | `/profiler/teams` | CRUD | Custom team management |
+| 28 | `/waiting-approval` | Auth | Status polling page |
+| 29 | `/reset-password` | Auth | Password recovery form |
+| 30 | 404 | Catch-all | Custom not-found page |
+
+## API Endpoints Reference (apps/api)
+
+| Prefix | Endpoints | Service |
+|--------|-----------|---------|
+| `/api/v1/sidak` | 13 endpoints | `sidak-service.ts` |
+| `/api/v1/ketik` | 4 endpoints | `ketik-service.ts` |
+| `/api/v1/pdkt` | 6 endpoints | `pdkt-service.ts` |
+| `/api/v1/ai` | 7 endpoints | — |
+| `/api/v1/profiler` | 18 endpoints | `profiler-service.ts` |

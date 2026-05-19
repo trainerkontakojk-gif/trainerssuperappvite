@@ -1,5 +1,7 @@
 import { createRouter, createRoute, createRootRoute } from '@tanstack/react-router';
 import { DashboardLayout } from './components/Layout';
+import IndexPage from './routes/index';
+import DashboardPage from './routes/dashboard';
 import SidakLanding from './routes/sidak/index';
 import SidakDashboard from './routes/sidak/dashboard';
 import SidakInput from './routes/sidak/input';
@@ -16,35 +18,82 @@ import PdktSimulation from './routes/pdkt/simulation';
 import PdktHistory from './routes/pdkt/history';
 import MonitoringPage from './routes/monitoring';
 import TelefunLanding from './routes/telefun/index';
+import AccountPage from './routes/account';
+import NotFoundPage from './routes/not-found';
+import WaitingApprovalPage from './routes/waiting-approval';
+import ResetPasswordPage from './routes/reset-password';
+import ProfilerLanding from './routes/profiler/index';
+import ProfilerTable from './routes/profiler/table';
+import ProfilerSlides from './routes/profiler/slides';
+import ProfilerAnalytics from './routes/profiler/analytics';
+import ProfilerExport from './routes/profiler/export';
+import ProfilerAdd from './routes/profiler/add';
+import ProfilerImport from './routes/profiler/import';
+import ProfilerTeams from './routes/profiler/teams';
 
 const rootRoute = createRootRoute({
   component: DashboardLayout,
+  notFoundComponent: NotFoundPage,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: () => (
-    <div className="flex flex-col items-center justify-center h-screen gap-4">
-      <h1 className="text-4xl font-bold">Welcome to Trainers SuperApp</h1>
-    </div>
-  ),
+  component: IndexPage,
 });
 
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard',
-  component: () => (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Overview</h2>
-      <div className="grid grid-cols-3 gap-4">
-        <div className="p-6 bg-white rounded-xl border shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500">Total Audits</h3>
-          <p className="text-2xl font-bold">128</p>
-        </div>
-      </div>
-    </div>
-  ),
+  component: DashboardPage,
+});
+
+const profilerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler',
+  component: ProfilerLanding,
+});
+
+const profilerTableRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/table',
+  component: ProfilerTable,
+});
+
+const profilerSlidesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/slides',
+  component: ProfilerSlides,
+});
+
+const profilerAnalyticsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/analytics',
+  component: ProfilerAnalytics,
+});
+
+const profilerExportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/export',
+  component: ProfilerExport,
+});
+
+const profilerAddRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/add',
+  component: ProfilerAdd,
+});
+
+const profilerImportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/import',
+  component: ProfilerImport,
+});
+
+const profilerTeamsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/teams',
+  component: ProfilerTeams,
 });
 
 const sidakRoute = createRoute({
@@ -143,9 +192,35 @@ const telefunRoute = createRoute({
   component: TelefunLanding,
 });
 
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/account',
+  component: AccountPage,
+});
+
+const waitingApprovalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/waiting-approval',
+  component: WaitingApprovalPage,
+});
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reset-password',
+  component: ResetPasswordPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
+  profilerRoute,
+  profilerTableRoute,
+  profilerSlidesRoute,
+  profilerAnalyticsRoute,
+  profilerExportRoute,
+  profilerAddRoute,
+  profilerImportRoute,
+  profilerTeamsRoute,
   sidakRoute,
   sidakDashboardRoute,
   sidakInputRoute,
@@ -162,6 +237,9 @@ const routeTree = rootRoute.addChildren([
   pdktHistoryRoute,
   telefunRoute,
   monitoringRoute,
+  accountRoute,
+  waitingApprovalRoute,
+  resetPasswordRoute,
 ]);
 
 export const router = createRouter({ routeTree });
