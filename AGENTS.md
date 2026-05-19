@@ -26,6 +26,8 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Dev:** `pnpm dev` (Menjalankan web, api, dan telefun secara paralel)
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint`
+- **Test:** `pnpm test` (vitest — 62 tests covering scoring, sidak-service, profiler-service)
+- **Test (api only):** `pnpm --filter @trainers/api test`
 - **Format:** `pnpm format`
 - **Telefun standalone:** `pnpm --filter @trainers/telefun dev`
 
@@ -54,16 +56,26 @@ Monorepo dengan pembagian tanggung jawab yang jelas:
 
 ## Golden Rules
 
-### 1. Dokumentasi Wajib Update Sebelum Commit
+### 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build
+- **Reference-repo (Next.js)** memiliki masalah FCP (First Contentful Paint) dan LCP (Largest Contentful Paint) yang memberatkan aplikasi karena bundle besar dan SSR overhead.
+- **Build kedepan WAJIB** mempertimbangkan FCP/LCP, disesuaikan dengan arsitektur Vite + React SPA:
+  - Code splitting & lazy loading sudah diterapkan (fase 13) — jangan regresi saat menambah route baru.
+  - Hindari static import library besar (Recharts >300 kB, ExcelJS/xlsx >400 kB) di komponen yang tidak selalu dikunjungi. Gunakan dynamic import.
+  - Perhatikan ukuran bundle per-chunk. Jika ada chunk >200 kB yang bukan vendor stabil, pertimbangkan split lanjutan (`manualChunks`).
+  - Tambahkan resource hints (`modulepreload`, `preconnect`, `dns-prefetch`) di `index.html` untuk mempercepat discovery chunk kritis.
+  - Jangan tambahkan gambar/font besar tanpa optimasi (lazy loading, compression, responsive images via `srcset`).
+  - Jika menambah library baru, selalu cek bundle impact-nya. Library ringan > library populer tapi berat.
+
+### 2. Dokumentasi Wajib Update Sebelum Commit
 Setiap perubahan behavior, arsitektur, atau fitur baru wajib diiringi update docs di folder `docs/` atau update `AGENTS.md` / `GEMINI.md` jika ada konvensi baru.
 
-### 2. Dokumentasi Ramah Awam (Human-Readable)
+### 3. Dokumentasi Ramah Awam (Human-Readable)
 Pastikan README dan panduan modul mudah dipahami oleh pembaca non-teknis.
 
-### 3. File Editing Harus Pakai Unified Diff
+### 4. File Editing Harus Pakai Unified Diff
 Baca file terbaru, buat patch minimal, dan terapkan. Hindari overwrite penuh jika tidak perlu.
 
-### 4. Selalu Referensi Context7 untuk Dokumentasi
+### 5. Selalu Referensi Context7 untuk Dokumentasi
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
    1. Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
    2. Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
