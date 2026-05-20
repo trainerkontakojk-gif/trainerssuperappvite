@@ -40,8 +40,18 @@ pdkt.post('/generate-template', zValidator('json', generateEmailSchema), async (
     return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Scenario atau consumer type tidak ditemukan.' } }, 404);
   }
 
+  const config: PdktSessionConfig = {
+    scenarios: [scenario],
+    consumerType,
+    identity: body.identity,
+    enableImageGeneration: true,
+    selectedModel: body.selectedModel,
+    resolvedConsumerNameMentionPattern: body.resolvedConsumerNameMentionPattern,
+    writingStyleMode: body.writingStyleMode,
+  };
+
   const result = await pdktService.generateScenarioEmailTemplate(
-    scenario, consumerType, body.identity,
+    scenario, config,
     { module: 'pdkt', action: 'generate_email_template' }, userId,
   );
 
@@ -57,17 +67,8 @@ pdkt.post('/evaluate', zValidator('json', evaluateSchema), async (c) => {
   const user = c.get('user');
   const userId = user?.id;
 
-  const config: PdktSessionConfig = {
-    scenarios: body.config.scenarios,
-    consumerType: body.config.consumerType,
-    identity: body.config.identity,
-    selectedModel: body.config.selectedModel,
-    resolvedConsumerNameMentionPattern: body.config.resolvedConsumerNameMentionPattern as PdktSessionConfig['resolvedConsumerNameMentionPattern'],
-    writingStyleMode: body.config.writingStyleMode as PdktSessionConfig['writingStyleMode'],
-  };
-
   const result = await pdktService.evaluateAgentResponse(
-    config, body.emails,
+    body.config, body.emails,
     { module: 'pdkt', action: 'evaluate_agent_response' }, userId,
   );
 

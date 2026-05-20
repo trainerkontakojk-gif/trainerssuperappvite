@@ -49,6 +49,34 @@ describe('PDKT Service', () => {
     expect(id).toBe('new-id');
     expect(mockSupabase.rpc).toHaveBeenCalledWith('submit_pdkt_mailbox_batch', expect.any(Object));
   });
+
+  describe('helpers', () => {
+    it('normalizes leaked PDKT subjects to empty string', () => {
+      expect(pdktService.normalizeSubject('Ada penipuan pinjol')).toBe('');
+      expect(pdktService.normalizeSubject('Tanya status SLIK')).toBe('');
+      expect(pdktService.normalizeSubject('Halo saya mau tanya')).toBe('Halo saya mau tanya');
+    });
+
+    it('parses fenced JSON returned by AI providers', () => {
+      const fenced = '```json\n{"subject": "test", "body": "content"}\n```';
+      const parsed = pdktService.parseJsonFromModelText(fenced);
+      expect(parsed.subject).toBe('test');
+    });
+
+    it('adds realistic writing instruction only in realistic mode', () => {
+      expect(pdktService.getRealisticWritingInstruction('realistic')).toContain('GAYA PENULISAN REALISTIS');
+      expect(pdktService.getRealisticWritingInstruction('training')).toBe('');
+    });
+
+    it('renders template names according to the resolved mention pattern', () => {
+      const identity = { name: 'Budi', email: 'b@b.com', city: 'Jakarta', bodyName: 'Budi' };
+      const body = 'Ini isi email.';
+      
+      expect(pdktService.renderTemplate(body, identity, 'upfront')).toContain('Halo, saya Budi.');
+      expect(pdktService.renderTemplate(body, identity, 'late')).toContain('Salam,\nBudi');
+      expect(pdktService.renderTemplate(body, identity, 'none')).not.toContain('Budi');
+    });
+  });
 });
 
 import { readFileSync } from 'node:fs';
