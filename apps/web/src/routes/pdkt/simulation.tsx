@@ -3,12 +3,17 @@ import { MailboxSidebar } from './components/MailboxSidebar';
 import { EmailDetailPane } from './components/EmailDetailPane';
 import { ReplyComposer } from './components/ReplyComposer';
 import { CreateEmailModal } from './components/CreateEmailModal';
-import { SettingsModal, type AppSettings } from './components/SettingsModal';
+import { SettingsModal } from './components/SettingsModal';
 import { HistoryModal, type SessionHistory } from './components/HistoryModal';
 import { UsageModal } from './components/UsageModal';
 import { useApi, postApi, deleteApi, getApi } from '../../hooks/useApi';
 import type { PdktMailboxItem, PdktScenario, PdktConsumerType, PdktIdentity } from '@trainers/types';
 import { Loader2, Plus } from 'lucide-react';
+import { 
+  type PdktAppSettings, 
+  generatePdktSessionConfig, 
+  DEFAULT_PDKT_MODEL_ID 
+} from './pdktSettings';
 
 const defaultConsumerTypes: PdktConsumerType[] = [
   { id: 'marah', name: 'Marah & Emosional', description: 'Sangat marah, emosional, tidak sabar.', difficulty: 'Hard', tone: 'Marah, menggunakan tanda seru.' },
@@ -32,7 +37,7 @@ export default function PdktSimulation() {
   const [isUsageOpen, setIsUsageOpen] = useState(false);
 
   // Settings state
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settings, setSettings] = useState<PdktAppSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
 
   // History state
@@ -51,7 +56,7 @@ export default function PdktSimulation() {
   // Fetch Settings & History from DB
   const fetchSettings = async () => {
     try {
-      const res = await getApi<{ success: boolean; settings: AppSettings | null }>('/pdkt/settings');
+      const res = await getApi<{ success: boolean; settings: PdktAppSettings | null }>('/pdkt/settings');
       if (res && res.settings) {
         setSettings(res.settings);
       } else {
@@ -105,7 +110,7 @@ export default function PdktSimulation() {
   }, [selectedId]);
 
   // Save Settings handler
-  const handleSaveSettings = async (newSettings: AppSettings) => {
+  const handleSaveSettings = async (newSettings: PdktAppSettings) => {
     try {
       await postApi('/pdkt/settings', { settings: newSettings });
       setSettings(newSettings);
@@ -160,38 +165,21 @@ export default function PdktSimulation() {
   const handleStartNew = async (scenario: PdktScenario) => {
     setIsStartingNew(true);
     try {
-      // 1. Determine Consumer Type
-      const activeConsumerTypes = settings?.consumerTypes?.filter(c => c.isCustom || (c as any).isActive !== false) 
-        || defaultConsumerTypesFromApi 
-        || defaultConsumerTypes;
-      
-      const globalConsumerId = settings?.globalConsumerTypeId || 'random';
-      let finalConsumerType: PdktConsumerType;
-      
-      if (globalConsumerId === 'random') {
-        if (activeConsumerTypes.length > 0) {
-          finalConsumerType = activeConsumerTypes[Math.floor(Math.random() * activeConsumerTypes.length)];
-        } else {
-          finalConsumerType = defaultConsumerTypes[3]; // Ramah & Kooperatif
-        }
-      } else {
-        const found = activeConsumerTypes.find(c => c.id === globalConsumerId);
-        finalConsumerType = found || activeConsumerTypes[0] || defaultConsumerTypes[3];
-      }
+      // 1. Determine Identity (Fallback)
+      const fallbackIdentity = await postApi<PdktIdentity>('/pdkt/generate-identity', {});
 
-      // 2. Determine Identity
-      let finalIdentity: PdktIdentity;
-      const customId = settings?.customIdentity;
-      if (customId && customId.senderName && customId.email) {
-        finalIdentity = {
-          name: customId.senderName,
-          email: customId.email,
-          city: customId.city || 'Jakarta',
-          bodyName: customId.bodyName || customId.senderName.split(' ')[0]
-        };
-      } else {
-        finalIdentity = await postApi<PdktIdentity>('/pdkt/generate-identity', {});
-      }
+      // 2. Build Config
+      const currentSettings: PdktAppSettings = settings || {
+        scenarios: defaultScenarios || [],
+        consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
+        enableImageGeneration: true,
+        globalConsumerTypeId: 'random',
+        selectedModel: DEFAULT_PDKT_MODEL_ID,
+        consumerNameMentionPattern: 'random',
+        writingStyleMode: 'training',
+      };
+
+      const config = generatePdktSessionConfig(currentSettings, scenario, fallbackIdentity);
 
       // 3. Generate template or bypass if specified
       let subject = '';
@@ -203,36 +191,27 @@ export default function PdktSimulation() {
       } else {
         const templateRes = await postApi<{ subject: string; body: string }>('/pdkt/generate-template', {
           scenarioDraft: scenario,
-          consumerTypeId: finalConsumerType.id,
-          identity: finalIdentity
+          consumerTypeId: config.consumerType.id,
+          identity: config.identity,
+          selectedModel: config.selectedModel,
+          resolvedConsumerNameMentionPattern: config.resolvedConsumerNameMentionPattern,
+          writingStyleMode: config.writingStyleMode,
         });
         subject = templateRes.subject;
         body = templateRes.body;
       }
 
-      const activeScenarios = settings?.scenarios?.filter(s => s.isActive) || defaultScenarios || [];
-      const selectedModel = settings?.selectedModel || 'gemini-3.1-flash-lite';
-      const resolvedConsumerNameMentionPattern = settings?.consumerNameMentionPattern || 'random';
-      const writingStyleMode = settings?.writingStyleMode || 'training';
-
       // 4. Submit new mailbox batch
       const newItemId = await postApi<string>('/pdkt/mailbox/batch', {
-        sender_name: finalIdentity.name,
-        sender_email: finalIdentity.email,
+        sender_name: config.identity.name,
+        sender_email: config.identity.email,
         subject: subject,
         snippet: body.substring(0, 100),
         scenario_snapshot: scenario,
-        config_snapshot: {
-          scenarios: activeScenarios,
-          consumerType: finalConsumerType,
-          identity: finalIdentity,
-          selectedModel,
-          resolvedConsumerNameMentionPattern,
-          writingStyleMode
-        },
+        config_snapshot: config,
         inbound_email: {
           id: 'msg_' + Date.now(),
-          from: finalIdentity.email,
+          from: config.identity.email,
           to: 'ojk@kontak157.go.id',
           subject,
           body,
@@ -312,8 +291,8 @@ export default function PdktSimulation() {
   // Active scenarios for CreateEmailModal: fallback to defaultScenarios if no custom settings exist
   const activeScenarios = settings?.scenarios || defaultScenarios || [];
 
-  // Prepared AppSettings for SettingsModal
-  const currentSettings: AppSettings = settings || {
+  // Prepared PdktAppSettings for SettingsModal
+  const currentSettings: PdktAppSettings = settings || {
     scenarios: defaultScenarios || [],
     consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
     enableImageGeneration: true,

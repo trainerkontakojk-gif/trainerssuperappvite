@@ -3,22 +3,12 @@ import { X, Plus, Check, Edit2, Trash2, Image as ImageIcon, User, Settings, File
 import type { PdktScenario, PdktConsumerType, PdktIdentity } from '@trainers/types';
 import ScenarioImage from './ScenarioImage';
 import { postApi } from '../../../hooks/useApi';
-
-export interface AppSettings {
-  scenarios: PdktScenario[];
-  consumerTypes: PdktConsumerType[];
-  enableImageGeneration: boolean;
-  globalConsumerTypeId: string;
-  selectedModel: string;
-  consumerNameMentionPattern: 'random' | 'upfront' | 'middle' | 'late' | 'none';
-  writingStyleMode: 'realistic' | 'training';
-  customIdentity?: {
-    senderName: string;
-    email: string;
-    city: string;
-    bodyName: string;
-  };
-}
+import { 
+  type PdktAppSettings as AppSettings, 
+  TEXT_MODELS, 
+  DEFAULT_PDKT_MODEL_ID,
+  coercePdktModelId
+} from '../pdktSettings';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -39,18 +29,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'consumers' | 'identity' | 'system'>('scenarios');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
-
-  const TEXT_MODELS = [
-    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', description: 'Cepat dan efisien untuk percakapan.' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (Preview)', description: 'Model Gemini 3 paling cepat.' },
-    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro (Preview)', description: 'Model Gemini 3.1 powerful.' },
-    { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Model ringan Gemini 2.0.' },
-    { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B (OpenRouter)', description: 'Model open-weight yang kuat.' },
-    { id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite (OR)', description: 'Gemini 3.1 via OpenRouter.' },
-    { id: 'google/gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite (OR)', description: 'Gemini 2.0 via OpenRouter.' },
-    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini (OpenRouter)', description: 'Model OpenAI compact.' },
-    { id: 'qwen/qwen3.5-flash-02-23', name: 'Qwen 3.5 Flash (OpenRouter)', description: 'Model Qwen cepat.' },
-  ];
 
   // Scenario Form State
   const [editingScenarioId, setEditingScenarioId] = useState<string | null>(null);
@@ -86,7 +64,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   // Global Settings
   const [enableImageGeneration, setEnableImageGeneration] = useState(localSettings.enableImageGeneration ?? true);
   const [globalConsumerTypeId, setGlobalConsumerTypeId] = useState(localSettings.globalConsumerTypeId || 'random');
-  const [selectedModel, setSelectedModel] = useState(localSettings.selectedModel || 'gemini-3.1-flash-lite');
+  const [selectedModel, setSelectedModel] = useState(localSettings.selectedModel || DEFAULT_PDKT_MODEL_ID);
 
   const [consumerNameMentionPattern, setConsumerNameMentionPattern] = useState(
     localSettings.consumerNameMentionPattern || 'random'
@@ -105,7 +83,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setCustomCity(settings.customIdentity?.city || '');
       setEnableImageGeneration(settings.enableImageGeneration ?? true);
       setGlobalConsumerTypeId(settings.globalConsumerTypeId || 'random');
-      setSelectedModel(settings.selectedModel || 'gemini-3.1-flash-lite');
+      setSelectedModel(settings.selectedModel || DEFAULT_PDKT_MODEL_ID);
       setConsumerNameMentionPattern(settings.consumerNameMentionPattern || 'random');
       setWritingStyleMode(settings.writingStyleMode || 'training');
 
@@ -508,7 +486,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         consumerTypes: defaultConsumerTypes,
         enableImageGeneration: true,
         globalConsumerTypeId: 'random',
-        selectedModel: 'gemini-3.1-flash-lite',
+        selectedModel: DEFAULT_PDKT_MODEL_ID,
         consumerNameMentionPattern: 'random',
         writingStyleMode: 'training',
         customIdentity: {
@@ -522,7 +500,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setLocalSettings(defaultSettings);
       setEnableImageGeneration(true);
       setGlobalConsumerTypeId('random');
-      setSelectedModel('gemini-3.1-flash-lite');
+      setSelectedModel(DEFAULT_PDKT_MODEL_ID);
       setConsumerNameMentionPattern('random');
       setWritingStyleMode('training');
       setCustomSenderName('');
