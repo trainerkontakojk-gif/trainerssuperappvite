@@ -1,50 +1,526 @@
-import { Link } from '@tanstack/react-router';
-import { MessageSquare, Play, History } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Settings, History, Play, MessageSquare, BarChart3 } from 'lucide-react';
+import type { KetikAppSettings, KetikSessionHistoryItem, KetikSessionConfig, KetikScenario, KetikConsumerType, ChatMessage, KetikSessionReview, KetikTypoFinding, KetikReviewDetail } from '@trainers/types';
+import { DEFAULT_KETIK_SETTINGS } from '@trainers/types';
+import { ketikApi } from './ketikApi';
+import ModuleWorkspaceIntro from './components/ModuleWorkspaceIntro';
+import { ChatInterface } from './components/ChatInterface';
+import { SettingsModal } from './components/SettingsModal';
+import { HistoryModal } from './components/HistoryModal';
+import { UsageModal } from './components/UsageModal';
+import { SessionReviewModal } from './components/SessionReviewModal';
+import { useAuthStore } from '../../store/authStore';
+
+const accentClassName = 'text-emerald-600';
+const accentSoftClassName = 'bg-emerald-100';
+
+interface UsageDelta {
+  costIdr: number;
+  totalTokens: number;
+  totalCalls: number;
+}
+
+function computeUsageDelta(before: any | null, after: any | null): UsageDelta | null {
+  if (!before || !after) return null;
+  return {
+    costIdr: Math.max(0, after.total_cost_idr - before.total_cost_idr),
+    totalTokens: Math.max(0, after.total_tokens - before.total_tokens),
+    totalCalls: Math.max(0, after.total_calls - before.total_calls),
+  };
+}
+
+function formatCompactIdr(value: number): string {
+  if (value >= 1_000_000) return `Rp${(value / 1_000_000).toFixed(1)}jt`;
+  if (value >= 1_000) return `Rp${(value / 1_000).toFixed(0)}rb`;
+  return `Rp${value}`;
+}
+
+function formatUsageDeltaLabel(delta: UsageDelta): string {
+  return `+${formatCompactIdr(delta.costIdr)}`;
+}
 
 export default function KetikLanding() {
+  const session = useAuthStore(s => s.session);
+  const [view, setView] = useState<'home' | 'chat'>('home');
+  const [settings, setSettings] = useState<KetikAppSettings>(DEFAULT_KETIK_SETTINGS);
+  const [history, setHistory] = useState<KetikSessionHistoryItem[]>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isUsageOpen, setIsUsageOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentConfig, setCurrentConfig] = useState<KetikSessionConfig | null>(null);
+  const [currentScenario, setCurrentScenario] = useState<KetikScenario | null>(null);
+  const [reviewMessages, setReviewMessages] = useState<ChatMessage[]>([]);
+  const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
+  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
+
+  const [selectedReview, setSelectedReview] = useState<KetikSessionReview | null>(null);
+  const [selectedTypos, setSelectedTypos] = useState<KetikTypoFinding[]>([]);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [selectedSessionForReview, setSelectedSessionForReview] = useState<KetikSessionHistoryItem | null>(null);
+
+  const [reviewProgress, setReviewProgress] = useState<{
+    status: 'idle' | 'starting' | 'processing' | 'delayed' | 'loading-result' | 'ready' | 'failed';
+    percent: number; etaSeconds: number;
+  }>({ status: 'idle', percent: 0, etaSeconds: 0 });
+
+  const sessionBaselineRef = useRef<any>(null);
+  const sessionRunIdRef = useRef(0);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const s = await ketikApi.getSettings();
+        setSettings(s);
+      } catch (e) {
+        console.warn('[Ketik] Failed to load settings, using defaults');
+      }
+      try {
+        const h = await ketikApi.getHistory();
+        setHistory(h);
+      } catch (e) {
+        console.warn('[Ketik] Failed to load history');
+      }
+    };
+    init();
+  }, []);
+
+  const handleSaveSettings = async (newSettings: KetikAppSettings) => {
+    setSettings(newSettings);
+    try {
+      await ketikApi.saveSettings(newSettings);
+    } catch (e) {
+      console.error('[Ketik] Failed to save settings:', e);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await ketikApi.clearHistory();
+      setHistory([]);
+    } catch (e) {
+      console.error('[Ketik] Failed to clear history:', e);
+      alert('Gagal menghapus riwayat.');
+    }
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await ketikApi.deleteSession(id);
+      setHistory(prev => prev.filter(s => s.id !== id));
+    } catch (e) {
+      console.error('[Ketik] Failed to delete session:', e);
+      alert('Gagal menghapus sesi.');
+    }
+  };
+
+  const handleStartManualReview = async (sessionId: string) => {
+    try {
+      setReviewProgress({ status: 'starting', percent: 5, etaSeconds: 30 });
+      await ketikApi.startReview(sessionId);
+
+      if (selectedSessionForReview && selectedSessionForReview.id === sessionId) {
+        const updatedSession = { ...selectedSessionForReview, reviewStatus: 'processing' as const };
+        setSelectedSessionForReview(updatedSession);
+        setHistory(prev => prev.map(item => item.id === sessionId ? updatedSession : item));
+        setReviewProgress({ status: 'processing', percent: 15, etaSeconds: 25 });
+      }
+    } catch (error) {
+      console.error('[Ketik] Error starting manual review:', error);
+      setReviewProgress(prev => ({ ...prev, status: 'failed' }));
+      alert('Gagal memulai analisis AI. Silakan coba lagi.');
+    }
+  };
+
+  const startSimulation = async () => {
+    if (!session?.access_token) {
+      alert('Sesi Anda telah berakhir. Silakan login kembali.');
+      return;
+    }
+
+    const activeScenarios = settings.scenarios.filter(s => s.isActive);
+    if (activeScenarios.length === 0) {
+      alert('Pilih minimal satu skenario di Pengaturan.');
+      setIsSettingsOpen(true);
+      return;
+    }
+    const scenario = activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
+
+    let consumerType: KetikConsumerType;
+    if (settings.activeConsumerTypeId === 'random') {
+      consumerType = settings.consumerTypes[Math.floor(Math.random() * settings.consumerTypes.length)];
+    } else {
+      consumerType = settings.consumerTypes.find(c => c.id === settings.activeConsumerTypeId) || settings.consumerTypes[0];
+    }
+
+    const dummyNames = ['Budi Santoso', 'Siti Aminah', 'Agus Setiawan', 'Dewi Lestari', 'Rina Wati', 'Eko Prasetyo'];
+    const dummyCities = ['Jakarta Selatan', 'Jakarta Pusat', 'Jakarta Barat', 'Jakarta Timur', 'Kota Bogor', 'Kota Depok'];
+    const phonePrefixes = ['0812', '0813', '0821', '0852'];
+
+    const identity = {
+      name: settings.identitySettings.displayName || dummyNames[Math.floor(Math.random() * dummyNames.length)],
+      city: settings.identitySettings.city || dummyCities[Math.floor(Math.random() * dummyCities.length)],
+      phone: settings.identitySettings.phoneNumber || `${phonePrefixes[Math.floor(Math.random() * phonePrefixes.length)]}${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+      signatureName: settings.identitySettings.signatureName,
+    };
+
+    const config: KetikSessionConfig = {
+      scenarios: activeScenarios,
+      consumerType,
+      identity,
+      selectedModel: settings.selectedModel,
+      simulationDuration: settings.simulationDuration || 5,
+      responsePacingMode: settings.responsePacingMode || 'realistic',
+    };
+
+    setCurrentConfig(config);
+    setCurrentScenario(scenario);
+    setReviewMessages([]);
+    setSessionDelta(null);
+    sessionBaselineRef.current = null;
+    const runId = ++sessionRunIdRef.current;
+    setIsLoading(true);
+
+    try {
+      const usage = await ketikApi.getUsageSummary();
+      if (usage && runId === sessionRunIdRef.current) {
+        sessionBaselineRef.current = {
+          total_calls: usage.total_calls,
+          total_tokens: usage.total_tokens,
+          total_cost_idr: usage.total_cost_idr,
+          periodLabel: usage.periodLabel,
+        };
+      }
+    } catch (e) {
+      console.warn('[Ketik] Failed to fetch usage baseline');
+    }
+    setIsLoading(false);
+    setView('chat');
+  };
+
+  const endSession = async (messages: ChatMessage[]) => {
+    if (currentConfig && currentScenario && messages.length > 0 && currentScenario.id !== 'review') {
+      setIsLoading(true);
+      try {
+        const session = await ketikApi.persistSession({
+          scenarioTitle: currentScenario.title,
+          consumerName: currentConfig.identity.name,
+          consumerPhone: currentConfig.identity.phone,
+          consumerCity: currentConfig.identity.city,
+          messages,
+          simulationDuration: currentConfig.simulationDuration,
+        });
+
+        const newSession: KetikSessionHistoryItem = {
+          id: session.id,
+          date: session.date,
+          scenarioTitle: session.scenarioTitle,
+          consumerName: session.consumerName,
+          consumerPhone: session.consumerPhone,
+          consumerCity: session.consumerCity,
+          messages: session.messages,
+          reviewStatus: session.reviewStatus ?? 'pending',
+        };
+
+        setHistory(prev => [newSession, ...prev]);
+        setSelectedSessionForReview(newSession);
+        setIsReviewOpen(true);
+        setSelectedReview(null);
+        setSelectedTypos([]);
+      } catch (error) {
+        console.error('Error ending session:', error);
+        alert('Gagal menyimpan sesi.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    const runId = sessionRunIdRef.current;
+    const baseline = sessionBaselineRef.current;
+    setSessionDeltaPending(true);
+    void (async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        let retries = 5;
+        while (retries > 0 && runId === sessionRunIdRef.current) {
+          const afterUsage = await ketikApi.getUsageSummary();
+          if (afterUsage) {
+            const delta = computeUsageDelta(baseline, afterUsage);
+            if (delta && delta.totalCalls > 0) {
+              setSessionDelta(delta);
+              setSessionDeltaPending(false);
+              break;
+            }
+          }
+          retries--;
+          if (retries > 0) await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (e) {
+        console.warn('[Ketik] Failed to fetch post-session usage:', e);
+      }
+      if (runId === sessionRunIdRef.current) {
+        setSessionDeltaPending(false);
+      }
+    })();
+
+    sessionBaselineRef.current = null;
+    setView('home');
+    setCurrentConfig(null);
+    setCurrentScenario(null);
+    setReviewMessages([]);
+  };
+
+  const handleReviewHistory = (session: KetikSessionHistoryItem) => {
+    const matchingScenario = settings.scenarios.find(s => s.title === session.scenarioTitle);
+    
+    const newConfig: KetikSessionConfig = currentConfig || {
+      identity: { name: session.consumerName, city: session.consumerCity || '', phone: session.consumerPhone || '' },
+      consumerType: settings.consumerTypes[0],
+      responsePacingMode: settings.responsePacingMode || 'realistic',
+      simulationDuration: settings.simulationDuration || 5,
+      selectedModel: settings.selectedModel || 'openai',
+      scenarios: settings.scenarios
+    };
+
+    setCurrentConfig({
+      ...newConfig,
+      identity: { name: session.consumerName, city: session.consumerCity || '', phone: session.consumerPhone || '' },
+    });
+    setCurrentScenario(
+      matchingScenario
+        ? { ...matchingScenario, id: 'review' }
+        : { id: 'review', title: session.scenarioTitle, description: '', category: 'Review', isActive: true }
+    );
+    setReviewMessages(session.messages);
+    setIsHistoryOpen(false);
+    setIsReviewOpen(false);
+    setView('chat');
+  };
+
+  const handleViewReview = async (session: KetikSessionHistoryItem) => {
+    const isSameSession = selectedSessionForReview?.id === session.id;
+    if (!isSameSession) {
+      setSelectedSessionForReview(session);
+      setSelectedReview(null);
+      setSelectedTypos([]);
+    }
+
+    if (session.reviewStatus === 'pending' || session.reviewStatus === 'failed' || !session.reviewStatus) {
+      setIsReviewOpen(true);
+      return;
+    }
+
+    if (session.reviewStatus === 'completed') {
+      setIsReviewOpen(true);
+      if (isSameSession && selectedReview) {
+        setReviewProgress({ status: 'ready', percent: 100, etaSeconds: 0 });
+        return;
+      }
+
+      setReviewProgress(prev => ({ ...prev, status: 'loading-result', percent: Math.max(prev.percent, 92) }));
+
+      try {
+        const detail = await ketikApi.getReviewDetail(session.id);
+        if (detail) {
+          setSelectedReview(detail.review);
+          setSelectedTypos(detail.typos);
+          setReviewProgress({ status: 'ready', percent: 100, etaSeconds: 0 });
+        } else {
+          console.warn('[Ketik] Review marked completed but data missing');
+          alert('Data review tidak ditemukan.');
+          const failedSession = { ...session, reviewStatus: 'failed' as const };
+          setSelectedSessionForReview(failedSession);
+          setHistory(prev => prev.map(item => item.id === session.id ? failedSession : item));
+          setReviewProgress({ status: 'failed', percent: 0, etaSeconds: 0 });
+        }
+      } catch (err) {
+        console.error('[Ketik] Error fetching review details:', err);
+        setReviewProgress({ status: 'failed', percent: 0, etaSeconds: 0 });
+      }
+    }
+  };
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    let progressInterval: ReturnType<typeof setInterval>;
+
+    const currentSessionId = selectedSessionForReview?.id;
+    if (!currentSessionId) return;
+
+    const shouldPoll = selectedSessionForReview && (
+      selectedSessionForReview.reviewStatus === 'processing' ||
+      (selectedSessionForReview.reviewStatus === 'pending' && reviewProgress.status !== 'idle')
+    );
+
+    if (shouldPoll) {
+      progressInterval = setInterval(() => {
+        setReviewProgress(prev => {
+          if (prev.status === 'ready' || prev.status === 'failed' || prev.status === 'idle') return prev;
+          let nextPercent = prev.percent + (prev.percent < 90 ? 1.5 : 0.2);
+          const nextEta = Math.max(0, prev.etaSeconds - 1);
+          let nextStatus = prev.status;
+          if (nextPercent > 92 && prev.status === 'processing') { nextPercent = 92; nextStatus = 'delayed'; }
+          if (nextPercent > 98 && prev.status === 'loading-result') { nextPercent = 98; }
+          return { ...prev, percent: nextPercent, etaSeconds: nextEta, status: nextStatus as any };
+        });
+      }, 1000);
+
+      const poll = async () => {
+        try {
+          const data = await ketikApi.getReviewStatus(currentSessionId);
+          if (selectedSessionForReview?.id !== currentSessionId) return;
+
+          const updatedStatus = data.status;
+          if (updatedStatus !== selectedSessionForReview.reviewStatus) {
+            let updatedSession = { ...selectedSessionForReview, reviewStatus: updatedStatus };
+            if (updatedStatus === 'completed' && data.scores) {
+              updatedSession = {
+                ...updatedSession,
+                finalScore: data.scores.final,
+                empathyScore: data.scores.empathy,
+                probingScore: data.scores.probing,
+                typoScore: data.scores.typo,
+                complianceScore: data.scores.compliance,
+              };
+            }
+            setSelectedSessionForReview(updatedSession);
+            setHistory(prev => prev.map(item => item.id === updatedSession.id ? updatedSession : item));
+
+            if (updatedStatus === 'completed' && data.resultReady) {
+              handleViewReview(updatedSession);
+            } else if (updatedStatus === 'failed') {
+              setReviewProgress(prev => ({ ...prev, status: 'failed' }));
+            }
+          }
+        } catch (e) {
+          console.error('[Ketik] Polling error:', e);
+        }
+      };
+      interval = setInterval(poll, 3000);
+      poll();
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+      if (progressInterval) clearInterval(progressInterval);
+    };
+  }, [selectedSessionForReview?.id, selectedSessionForReview?.reviewStatus, !!selectedReview, reviewProgress.status]);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">KETIK</h1>
-          <p className="text-gray-500">Simulasi Chat dengan Konsumen AI</p>
-        </div>
-      </div>
+    <div className="min-h-screen transition-colors duration-500 font-sans">
+      <AnimatePresence mode="wait">
+        {view === 'home' ? (
+          <motion.div
+            key="home"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="relative z-10 py-6"
+          >
+            <ModuleWorkspaceIntro
+              eyebrow="Kelas Etika & Trik Komunikasi"
+              title="Latih komunikasi chat dalam satu workspace yang fokus."
+              description="Mulai simulasi, buka pengaturan, dan tinjau riwayat percakapan dari satu alur kerja yang konsisten dengan modul lain."
+              accentClassName={accentClassName}
+              accentSoftClassName={accentSoftClassName}
+              icon={<MessageSquare className="h-8 w-8" />}
+              actions={
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={startSimulation}
+                    disabled={isLoading}
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all bg-emerald-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20"
+                  >
+                    {isLoading ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    ) : (
+                      <Play className="h-4 w-4 fill-current" />
+                    )}
+                    <span>{isLoading ? 'Memulai...' : 'Mulai Simulasi'}</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                  >
+                    <Settings className="h-4 w-4 opacity-60" />
+                    <span>Pengaturan</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                  >
+                    <History className="h-4 w-4 opacity-60" />
+                    <span>Riwayat</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setIsUsageOpen(true)}
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                  >
+                    <BarChart3 className="h-4 w-4 opacity-60" />
+                    <span>Usage Bulan Ini</span>
+                    {sessionDelta && (sessionDelta.costIdr > 0 || sessionDelta.totalTokens > 0 || sessionDelta.totalCalls > 0) && (
+                      <span className="ml-auto text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                        {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                      </span>
+                    )}
+                  </motion.button>
+                </>
+              }
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="chat"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-colors duration-500 bg-background"
+          >
+            <div className="w-full max-w-5xl h-full md:max-h-[92vh] md:rounded-[2rem] overflow-hidden relative flex flex-col shadow-2xl shadow-black/10 border border-border/50 bg-card">
+              {currentConfig && currentScenario && (
+                <ChatInterface
+                  config={currentConfig}
+                  scenario={currentScenario}
+                  onEndSession={endSession}
+                  isReviewMode={currentScenario.id === 'review'}
+                  initialMessages={reviewMessages}
+                  isEnding={isLoading}
+                  authReady={true}
+                  currentUserId=""
+                  templates={settings.quickTemplates}
+                  signatureName={settings.identitySettings.signatureName}
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Link to="/ketik/simulation" className="block p-6 bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <Play className="text-indigo-600" size={24} />
-            </div>
-            <div>
-              <h3 className="font-semibold">Mulai Simulasi</h3>
-              <p className="text-sm text-gray-500">Pilih skenario dan mulai chat dengan AI consumer</p>
-            </div>
-          </div>
-        </Link>
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={handleSaveSettings} />
+      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onClear={handleClearHistory} onDelete={handleDeleteSession} onReview={handleViewReview} />
+      <UsageModal isOpen={isUsageOpen} onClose={() => setIsUsageOpen(false)} module="ketik" sessionDelta={sessionDelta} sessionDeltaPending={sessionDeltaPending} />
 
-        <Link to="/ketik/history" className="block p-6 bg-white rounded-xl border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <History className="text-orange-600" size={24} />
-            </div>
-            <div>
-              <h3 className="font-semibold">Riwayat Sesi</h3>
-              <p className="text-sm text-gray-500">Lihat sesi simulasi sebelumnya</p>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      <div className="bg-white rounded-xl border shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">Tentang KETIK</h2>
-        <p className="text-gray-600">
-          KETIK (Konsumen Entertainment Text Interactive Chat) adalah modul simulasi chat
-          di mana Anda berlatih sebagai agen OJK yang menangani keluhan konsumen melalui chat.
-          AI akan berperan sebagai konsumen dengan berbagai karakter dan skenario.
-        </p>
-      </div>
+      {selectedSessionForReview && (
+        <SessionReviewModal
+          isOpen={isReviewOpen}
+          onClose={() => setIsReviewOpen(false)}
+          session={selectedSessionForReview}
+          review={selectedReview || undefined}
+          typos={selectedTypos}
+          onReplay={() => handleReviewHistory(selectedSessionForReview)}
+          onStartReview={handleStartManualReview}
+          progress={reviewProgress}
+        />
+      )}
     </div>
   );
 }

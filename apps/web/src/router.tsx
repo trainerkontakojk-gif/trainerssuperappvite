@@ -20,8 +20,6 @@ const SidakReportsLanding = lazy(() => import('./routes/sidak/reports/index'));
 const SidakReportsData = lazy(() => import('./routes/sidak/reports-data'));
 const SidakReportsAi = lazy(() => import('./routes/sidak/reports-ai'));
 const KetikLanding = lazy(() => import('./routes/ketik/index'));
-const KetikSimulation = lazy(() => import('./routes/ketik/simulation'));
-const KetikHistory = lazy(() => import('./routes/ketik/history'));
 const PdktLanding = lazy(() => import('./routes/pdkt/index'));
 const PdktSimulation = lazy(() => import('./routes/pdkt/simulation'));
 const PdktHistory = lazy(() => import('./routes/pdkt/history'));
@@ -204,13 +202,17 @@ const ketikRoute = createRoute({
 const ketikSimulationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/ketik/simulation',
-  component: KetikSimulation,
+  beforeLoad: () => {
+    throw redirect({ to: '/ketik' });
+  },
 });
 
 const ketikHistoryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/ketik/history',
-  component: KetikHistory,
+  beforeLoad: () => {
+    throw redirect({ to: '/ketik' });
+  },
 });
 
 const pdktRoute = createRoute({

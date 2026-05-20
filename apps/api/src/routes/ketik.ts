@@ -48,6 +48,90 @@ ketik.post('/generate', zValidator('json', generateMessageSchema), async (c) => 
   return c.json({ success: true, data: { text: result.text } });
 });
 
+ketik.get('/settings', async (c) => {
+  const user = c.get('user');
+  try {
+    const settings = await ketikService.getSettings(user.id);
+    return c.json({ success: true, data: settings });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
+ketik.put('/settings', zValidator('json', z.any()), async (c) => {
+  const user = c.get('user');
+  const body = c.req.valid('json');
+  try {
+    await ketikService.saveSettings(user.id, body);
+    return c.json({ success: true, message: 'Pengaturan berhasil disimpan.' });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
+ketik.get('/history', async (c) => {
+  const user = c.get('user');
+  try {
+    const history = await ketikService.getHistory(user.id);
+    return c.json({ success: true, data: history });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
+ketik.post('/history', zValidator('json', z.object({
+  scenarioTitle: z.string(),
+  consumerName: z.string(),
+  consumerPhone: z.string(),
+  consumerCity: z.string(),
+  messages: z.array(z.any()),
+  simulationDuration: z.number().optional(),
+})), async (c) => {
+  const user = c.get('user');
+  const body = c.req.valid('json');
+  try {
+    const session = await ketikService.persistSession(user.id, body);
+    return c.json({ success: true, data: session });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
+ketik.delete('/history', async (c) => {
+  const user = c.get('user');
+  try {
+    await ketikService.clearHistory(user.id);
+    return c.json({ success: true, message: 'Riwayat berhasil dihapus.' });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
+ketik.delete('/history/:id', async (c) => {
+  const user = c.get('user');
+  const sessionId = c.req.param('id');
+  try {
+    await ketikService.deleteSession(sessionId, user.id);
+    return c.json({ success: true, message: 'Sesi berhasil dihapus.' });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
+ketik.get('/review/:sessionId', async (c) => {
+  const user = c.get('user');
+  const sessionId = c.req.param('sessionId');
+  try {
+    const detail = await ketikService.getReviewDetail(sessionId, user.id);
+    if (!detail) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Review tidak ditemukan atau belum selesai.' } }, 404);
+    }
+    return c.json({ success: true, data: detail });
+  } catch (err: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: err.message } }, 500);
+  }
+});
+
 ketik.post('/review', zValidator('json', z.object({ sessionId: z.string(), workerId: z.string().optional() })), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
@@ -55,7 +139,6 @@ ketik.post('/review', zValidator('json', z.object({ sessionId: z.string(), worke
   try {
     await ketikService.triggerKetikAIReview(body.sessionId, user.id);
     
-    // Attempt to process immediately in background if possible
     const processPromise = ketikService.claimAndProcessKetikReviewJob(body.sessionId, body.workerId || 'immediate-web');
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(processPromise);
@@ -95,4 +178,3 @@ ketik.get('/worker', async (c) => {
 });
 
 export { ketik };
-
