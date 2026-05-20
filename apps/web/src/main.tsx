@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initAuth } from './store/authInit';
+import './index.css';
 
 initAuth();
 

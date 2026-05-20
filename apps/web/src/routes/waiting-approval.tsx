@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Clock, LogOut } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { normalizeProfileStatus } from '../lib/profile';
+
+type WaitingApprovalProfile = {
+  status?: string | null;
+  is_deleted?: boolean | null;
+};
 
 export default function WaitingApprovalPage() {
   const navigate = useNavigate();
@@ -23,11 +29,19 @@ export default function WaitingApprovalPage() {
 
       setEmail(user.email || '');
 
-      const { data: profile } = await supabase
+      const primary = await supabase
         .from('profiles')
         .select('status, is_deleted')
         .eq('id', user.id)
         .maybeSingle();
+
+      const profile = (primary.data as WaitingApprovalProfile | null) ?? (await supabase
+        .from('profiles')
+        .select('status')
+        .eq('id', user.id)
+        .maybeSingle()).data as WaitingApprovalProfile | null;
+
+      const profileStatus = normalizeProfileStatus(profile?.status);
 
       if (profile?.is_deleted) {
         await supabase.auth.signOut();
@@ -36,9 +50,9 @@ export default function WaitingApprovalPage() {
         return;
       }
 
-      if (profile?.status === 'approved') {
+      if (profileStatus === 'active') {
         navigate({ to: '/dashboard' });
-      } else if (profile?.status === 'rejected') {
+      } else if (profileStatus === 'inactive') {
         await supabase.auth.signOut();
         localStorage.removeItem('auth_token');
         navigate({ to: '/' });

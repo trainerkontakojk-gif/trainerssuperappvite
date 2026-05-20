@@ -243,7 +243,6 @@ admin.put('/leader-requests/:id/groups', zValidator('json', reassignLeaderReques
   }
 });
 
-// ── Activity Logs Endpoint ──────────────────────────────────
 admin.get('/activity-logs', async (c) => {
   try {
     const data = await adminService.getActivityLogs();
@@ -253,4 +252,15 @@ admin.get('/activity-logs', async (c) => {
   }
 });
 
+admin.delete('/activity-logs/:id', async (c) => {
+  const id = c.req.param('id');
+  try {
+    await adminService.deleteActivity(id);
+    return c.json({ success: true, data: null });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'BAD_REQUEST', message: error.message } }, 400);
+  }
+});
+
 export { admin as adminRouter };
+

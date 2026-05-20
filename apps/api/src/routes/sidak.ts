@@ -301,4 +301,40 @@ Buat laporan dengan format JSON:
   }
 });
 
+sidak.get('/dashboard/available-years', async (c) => {
+  try {
+    const years = await sidakService.getAvailableYears();
+    return c.json({ success: true, data: years });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.get('/dashboard/trend', async (c) => {
+  const yearQuery = c.req.query('year');
+  const startMonthQuery = c.req.query('startMonth');
+  const endMonthQuery = c.req.query('endMonth');
+
+  try {
+    if (yearQuery) {
+      const year = parseInt(yearQuery);
+      const startMonth = startMonthQuery ? parseInt(startMonthQuery) : 1;
+      const endMonth = endMonthQuery ? parseInt(endMonthQuery) : 12;
+      const trend = await sidakService.getServiceTrendForDashboardByRange(year, startMonth, endMonth);
+      return c.json({ success: true, data: trend });
+    } else {
+      const trendAll = await sidakService.getServiceTrendForDashboard('all');
+      const trendMap = {
+        '3m': sidakService.sliceTrendData(trendAll, 3),
+        '6m': sidakService.sliceTrendData(trendAll, 6),
+        'all': trendAll
+      };
+      return c.json({ success: true, data: { trendMap } });
+    }
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } }, 500);
+  }
+});
+
 export { sidak };
+

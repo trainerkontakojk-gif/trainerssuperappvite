@@ -28,6 +28,7 @@ export async function generateGeminiContent(options: {
   systemInstruction?: string;
   contents: Content[];
   responseMimeType?: string;
+  responseSchema?: any;
   temperature?: number;
   usageContext?: UsageContext;
   userId?: string;
@@ -59,6 +60,7 @@ export async function generateGeminiContent(options: {
         config: {
           systemInstruction,
           responseMimeType: options.responseMimeType,
+          responseSchema: options.responseSchema,
           temperature: options.temperature ?? 0.7,
         },
       });
@@ -73,7 +75,11 @@ export async function generateGeminiContent(options: {
         response = await ai.models.generateContent({
           model: modelName,
           contents,
-          config: { responseMimeType: options.responseMimeType, temperature: options.temperature ?? 0.7 },
+          config: {
+            responseMimeType: options.responseMimeType,
+            responseSchema: options.responseSchema,
+            temperature: options.temperature ?? 0.7,
+          },
         });
       } else {
         throw firstError;

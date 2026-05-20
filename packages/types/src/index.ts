@@ -6,6 +6,8 @@ export interface UserProfile {
   email: string;
   full_name: string | null;
   role: 'admin' | 'trainer' | 'leader' | 'agent';
+  status?: 'pending' | 'active' | 'inactive';
+  is_deleted?: boolean;
 }
 
 export type ApiResponse<T> =
@@ -332,6 +334,48 @@ export interface PdktMailboxItem {
   emails_thread: EmailMessage[];
   history_id?: string | null;
   last_activity_at: string;
+  time_taken?: number | null;
+  created_by_user_id?: string;
+  client_request_id?: string;
+  share_batch_id?: string;
+  is_shared_copy?: boolean;
+  shared_at?: string | null;
+  source_mailbox_item_id?: string | null;
+}
+
+export interface TelefunHistory {
+  id: string;
+  user_id: string;
+  timestamp: string;
+  recording_path?: string | null;
+  agent_recording_path?: string | null;
+  voice_assessment?: any | null;
+  session_metrics?: any | null;
+  voice_dashboard_metrics?: any | null;
+  disruption_config?: any | null;
+  disruption_results?: any | null;
+  persona_config?: any | null;
+  realistic_mode_enabled: boolean;
+}
+
+export interface TelefunCoachingSummary {
+  id: string;
+  session_id: string;
+  user_id: string;
+  recommendations: any;
+  generated_at: string;
+}
+
+export interface TelefunReplayAnnotation {
+  id: string;
+  session_id: string;
+  user_id: string;
+  timestamp_ms: number;
+  category: 'strength' | 'improvement_area' | 'critical_moment' | 'technique_used';
+  moment: string;
+  text: string;
+  is_manual: boolean;
+  created_at: string;
 }
 
 export interface PdktSessionHistory {
@@ -423,7 +467,8 @@ export const pdktIdentitySchema = z.object({
 export type PdktIdentity = z.infer<typeof pdktIdentitySchema>;
 
 export const generateEmailSchema = z.object({
-  scenarioId: z.string(),
+  scenarioId: z.string().optional(),
+  scenarioDraft: z.any().optional(),
   consumerTypeId: z.string(),
   identity: pdktIdentitySchema,
 });
@@ -520,7 +565,7 @@ export interface ManagedUser {
   email: string;
   full_name: string | null;
   role: 'admin' | 'trainer' | 'leader' | 'agent';
-  status: 'approved' | 'pending' | 'rejected';
+  status: 'active' | 'pending' | 'inactive';
   is_deleted: boolean;
   created_at?: string;
 }
@@ -626,4 +671,24 @@ export const revokeLeaderRequestSchema = z.object({
 export const reassignLeaderRequestGroupsSchema = z.object({
   accessGroupIds: z.array(z.string())
 });
+
+export const pdktMailboxBatchSchema = z.object({
+  client_request_id: z.string().optional(),
+  sender_name: z.string(),
+  sender_email: z.string(),
+  subject: z.string(),
+  snippet: z.string(),
+  scenario_snapshot: z.any(),
+  config_snapshot: z.any(),
+  inbound_email: z.any(),
+});
+export type PdktMailboxBatch = z.infer<typeof pdktMailboxBatchSchema>;
+
+export const pdktMailboxReplySchema = z.object({
+  mailboxId: z.string().uuid(),
+  reply: z.any(),
+  timeTaken: z.number().int().positive(),
+});
+export type PdktMailboxReply = z.infer<typeof pdktMailboxReplySchema>;
+
 

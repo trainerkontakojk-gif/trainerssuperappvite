@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const updateCalls: any[] = [];
+
 function buildQuery(onAwait: () => any) {
   const q = new Proxy({}, {
     get(_target, prop) {
       if (prop === 'then') return (resolve: any) => resolve(onAwait());
+      if (prop === 'update' || prop === 'insert' || prop === 'delete') {
+        return (payload?: any) => {
+          updateCalls.push({ method: String(prop), payload });
+          return q;
+        };
+      }
       return () => q;
     },
   });
@@ -24,6 +32,7 @@ import * as adminService from '../services/admin-service';
 describe('admin-service', () => {
   beforeEach(() => {
     pendingResolve = () => ({ data: [], error: null });
+    updateCalls.length = 0;
   });
 
   describe('getUsers', () => {
@@ -44,6 +53,15 @@ describe('admin-service', () => {
       await expect(
         adminService.updateUserStatus('target-id', 'approved', 'caller-id', 'caller@example.com')
       ).resolves.toBeUndefined();
+      expect(updateCalls.some((call) => call.method === 'update' && call.payload?.status === 'active')).toBe(true);
+    });
+
+    it('maps rejected status to inactive in the database', async () => {
+      pendingResolve = () => ({ error: null });
+      await expect(
+        adminService.updateUserStatus('target-id', 'rejected', 'caller-id', 'caller@example.com')
+      ).resolves.toBeUndefined();
+      expect(updateCalls.some((call) => call.method === 'update' && call.payload?.status === 'inactive')).toBe(true);
     });
 
     it('prevents self-status updates', async () => {

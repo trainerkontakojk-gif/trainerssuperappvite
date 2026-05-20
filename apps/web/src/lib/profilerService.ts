@@ -57,6 +57,8 @@ export const profilerApi = {
     postApi<{ copied: number }>(`${BASE}/peserta/copy`, { peserta_ids, target_batch_name }),
   reorderPeserta: (peserta_ids: string[]) =>
     putApi<void>(`${BASE}/peserta/reorder`, { peserta_ids }),
+  bulkReorderPeserta: (updates: { id: string; nomor_urut: number }[]) =>
+    postApi<void>(`${BASE}/peserta/bulk-reorder`, { updates }),
   getGlobalPool: (excludeBatch?: string) => {
     const q = excludeBatch ? `?exclude_batch=${encodeURIComponent(excludeBatch)}` : '';
     return fetchApi<ProfilerPeserta[]>(`${BASE}/peserta/global-pool${q}`);

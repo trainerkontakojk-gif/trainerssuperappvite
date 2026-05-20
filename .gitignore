@@ -12,3 +12,5 @@ reference-repo
 local-backups/
 scratch/
 supabase/.temp/
+.pnpm-store/
+.antigravitycli/

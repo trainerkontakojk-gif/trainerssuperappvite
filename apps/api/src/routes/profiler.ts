@@ -236,6 +236,23 @@ profiler.put('/peserta/reorder', async (c) => {
   }
 });
 
+profiler.post('/peserta/bulk-reorder', async (c) => {
+  const body = await c.req.json();
+  const parsed = z.object({
+    updates: z.array(z.object({
+      id: z.string().uuid(),
+      nomor_urut: z.number().int().min(1)
+    })).min(1),
+  }).safeParse(body);
+  if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
+  try {
+    await profilerService.bulkReorderPeserta(parsed.data.updates);
+    return c.json({ success: true, data: null });
+  } catch (e: any) {
+    return c.json({ success: false, error: { code: 'REORDER_ERROR', message: e.message } }, 400);
+  }
+});
+
 // ── Teams ────────────────────────────────────────────────
 profiler.get('/teams', async (c) => {
   const teams = await profilerService.getTeams();

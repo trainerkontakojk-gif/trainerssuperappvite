@@ -9,3 +9,15 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 export function createAdminClient() {
   return supabaseAdmin;
 }
+
+export function createUserClient(token: string) {
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || token;
+  return createClient(supabaseUrl, anonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  });
+}
+

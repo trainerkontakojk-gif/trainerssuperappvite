@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Search, ArrowLeft, User, Check, X, Trash2, Edit3 } from 'lucide-react';
+import { 
+  Search, 
+  ArrowLeft, 
+  User, 
+  Check, 
+  X, 
+  Trash2, 
+  Edit3, 
+  GripVertical,
+  Save,
+  ArrowUpDown,
+  Loader2
+} from 'lucide-react';
 import { useQueryParams } from '../../hooks/useQueryParams';
 import { profilerApi } from '../../lib/profilerService';
 import type { ProfilerPeserta } from '@trainers/types';
@@ -15,12 +27,21 @@ export default function ProfilerTable() {
   const [timFilter, setTimFilter] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<ProfilerPeserta>>({});
+  
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [reorderMap, setReorderMap] = useState<Record<string, number>>({});
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   useEffect(() => {
     if (!batchName) return;
     setLoading(true);
     profilerApi.getPesertaByBatch(batchName)
-      .then(setPeserta)
+      .then((data) => {
+        setPeserta(data);
+        const initialMap: Record<string, number> = {};
+        data.forEach(p => initialMap[p.id] = p.nomor_urut || 0);
+        setReorderMap(initialMap);
+      })
       .finally(() => setLoading(false));
   }, [batchName]);
 
@@ -30,6 +51,13 @@ export default function ProfilerTable() {
     if (search && !p.nama.toLowerCase().includes(search.toLowerCase()) && !p.nik_ojk?.includes(search)) return false;
     if (timFilter && p.tim !== timFilter) return false;
     return true;
+  });
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    if (isReorderMode) {
+      return (reorderMap[a.id] || 0) - (reorderMap[b.id] || 0);
+    }
+    return (a.nomor_urut || 0) - (b.nomor_urut || 0) || a.nama.localeCompare(b.nama);
   });
 
   const startEdit = (p: ProfilerPeserta) => {
@@ -48,6 +76,28 @@ export default function ProfilerTable() {
     if (!confirm('Hapus peserta ini?')) return;
     await profilerApi.deletePeserta(id);
     setPeserta(prev => prev.filter(p => p.id !== id));
+  };
+
+  const handleOrderChange = (id: string, newOrder: number) => {
+    setReorderMap(prev => ({ ...prev, [id]: newOrder }));
+  };
+
+  const saveBulkOrder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const updates = Object.entries(reorderMap).map(([id, nomor_urut]) => ({
+        id,
+        nomor_urut
+      }));
+      await profilerApi.bulkReorderPeserta(updates);
+      // Refresh local state
+      setPeserta(prev => prev.map(p => ({ ...p, nomor_urut: reorderMap[p.id] || p.nomor_urut })));
+      setIsReorderMode(false);
+    } catch (err) {
+      alert('Gagal menyimpan urutan baru.');
+    } finally {
+      setIsSavingOrder(false);
+    }
   };
 
   if (!batchName) {
@@ -71,6 +121,25 @@ export default function ProfilerTable() {
           <h2 className="text-lg font-bold text-gray-900 mt-1">Tabel Peserta — {batchName}</h2>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsReorderMode(!isReorderMode)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold transition ${
+              isReorderMode ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            {isReorderMode ? 'Selesai Reorder' : 'Reorder Peserta'}
+          </button>
+          {isReorderMode && (
+            <button
+              onClick={saveBulkOrder}
+              disabled={isSavingOrder}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50"
+            >
+              {isSavingOrder ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Simpan Urutan
+            </button>
+          )}
           <Link to="/profiler/add" search={{ batch: batchName }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition">
             + Tambah
@@ -105,13 +174,15 @@ export default function ProfilerTable() {
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Memuat...</div>
-        ) : filtered.length === 0 ? (
+        ) : sortedFiltered.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-400">Tidak ada peserta ditemukan.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8"></th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">
+                  {isReorderMode ? 'Urutan' : '#'}
+                </th>
                 <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama</th>
                 <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tim</th>
                 <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Jabatan</th>
@@ -120,9 +191,21 @@ export default function ProfilerTable() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((p) => (
-                <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${editingId === p.id ? 'bg-amber-50' : ''}`}>
-                  <td className="p-2 pl-3"></td>
+              {sortedFiltered.map((p, idx) => (
+                <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${editingId === p.id ? 'bg-amber-50' : ''} ${isReorderMode ? 'cursor-move' : ''}`}>
+                  <td className="p-3">
+                    {isReorderMode ? (
+                      <input
+                        type="number"
+                        min="1"
+                        value={reorderMap[p.id] || ''}
+                        onChange={(e) => handleOrderChange(p.id, parseInt(e.target.value) || 0)}
+                        className="w-12 rounded border px-1.5 py-1 text-xs font-bold text-indigo-600 text-center outline-none focus:border-indigo-500"
+                      />
+                    ) : (
+                      <span className="text-xs font-bold text-gray-400">{(p.nomor_urut || 0) || idx + 1}</span>
+                    )}
+                  </td>
                   <td className="p-3">
                     {editingId === p.id ? (
                       <input
@@ -132,6 +215,7 @@ export default function ProfilerTable() {
                       />
                     ) : (
                       <div className="flex items-center gap-2">
+                        {isReorderMode && <GripVertical className="h-3.5 w-3.5 text-gray-300" />}
                         <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
                           <User className="h-4 w-4" />
                         </div>
@@ -170,8 +254,8 @@ export default function ProfilerTable() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><Edit3 className="h-4 w-4" /></button>
-                        <button onClick={() => deletePeserta(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400"><Trash2 className="h-4 w-4" /></button>
+                        <button onClick={() => startEdit(p)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400" disabled={isReorderMode}><Edit3 className="h-4 w-4" /></button>
+                        <button onClick={() => deletePeserta(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400" disabled={isReorderMode}><Trash2 className="h-4 w-4" /></button>
                       </div>
                     )}
                   </td>

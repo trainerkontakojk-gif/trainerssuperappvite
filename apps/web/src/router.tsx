@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute } from '@tanstack/react-router';
+import { createRouter, createRoute, createRootRoute, redirect } from '@tanstack/react-router';
 import { lazy } from 'react';
 import { DashboardLayout } from './components/Layout';
 
@@ -243,6 +243,12 @@ const telefunRoute = createRoute({
   component: TelefunLanding,
 });
 
+const telefunReplayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/telefun/replay/$id',
+  component: lazy(() => import('./routes/telefun/replay')),
+});
+
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/account',
@@ -259,6 +265,55 @@ const resetPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/reset-password',
   component: ResetPasswordPage,
+});
+
+// Legacy Compatibility Redirect Routes
+const qaAnalyzerRedirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/qa-analyzer',
+  beforeLoad: () => {
+    throw redirect({ to: '/sidak' });
+  },
+});
+
+const qaAnalyzerWildcardRedirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/qa-analyzer/$',
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: `/sidak/${(params as any)._splat}` as any });
+  },
+});
+
+const dashboardMonitoringRedirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard/monitoring',
+  beforeLoad: () => {
+    throw redirect({ to: '/monitoring' });
+  },
+});
+
+const profilerDownloadRedirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/profiler/download',
+  beforeLoad: () => {
+    throw redirect({ to: '/profiler/export' });
+  },
+});
+
+const pendingRedirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/pending',
+  beforeLoad: () => {
+    throw redirect({ to: '/waiting-approval' });
+  },
+});
+
+const previewProfilerSlidesRedirectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/preview/profiler-slides',
+  beforeLoad: () => {
+    throw redirect({ to: '/profiler/slides' });
+  },
 });
 
 const routeTree = rootRoute.addChildren([
@@ -294,10 +349,17 @@ const routeTree = rootRoute.addChildren([
   pdktSimulationRoute,
   pdktHistoryRoute,
   telefunRoute,
+  telefunReplayRoute,
   monitoringRoute,
   accountRoute,
   waitingApprovalRoute,
   resetPasswordRoute,
+  qaAnalyzerRedirectRoute,
+  qaAnalyzerWildcardRedirectRoute,
+  dashboardMonitoringRedirectRoute,
+  profilerDownloadRedirectRoute,
+  pendingRedirectRoute,
+  previewProfilerSlidesRedirectRoute,
 ]);
 
 export const router = createRouter({ routeTree });

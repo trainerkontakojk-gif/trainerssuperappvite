@@ -52,3 +52,8 @@ export async function putApi<T>(path: string, body: any): Promise<T> {
 export async function deleteApi(path: string): Promise<void> {
   await fetchApi(path, { method: 'DELETE' });
 }
+
+export async function getApi<T>(path: string): Promise<T> {
+  return fetchApi<T>(path);
+}
+

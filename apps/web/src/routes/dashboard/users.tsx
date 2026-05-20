@@ -39,6 +39,21 @@ function normalizeRoleLabel(role?: string | null) {
   return role;
 }
 
+function normalizeStatusValue(status?: string | null) {
+  const value = status?.toLowerCase().trim() ?? '';
+  if (value === 'approved') return 'active';
+  if (value === 'rejected') return 'inactive';
+  if (['active', 'pending', 'inactive'].includes(value)) return value;
+  return 'pending';
+}
+
+function normalizeStatusLabel(status?: string | null) {
+  const value = normalizeStatusValue(status);
+  if (value === 'active') return 'Aktif';
+  if (value === 'inactive') return 'Nonaktif';
+  return 'Pending';
+}
+
 export default function UsersPage() {
   const currentProfile = useAuthStore((s) => s.profile);
   const managerRole = (currentProfile?.role?.toLowerCase() === 'admin' ? 'admin' : 'trainer') as ManagerRole;
@@ -47,7 +62,7 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [updating, setUpdating] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'rejected'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'inactive'>('all');
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -132,16 +147,16 @@ export default function UsersPage() {
       entry.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    if (activeTab === 'pending') return matchesSearch && entry.status === 'pending';
-    // approved is mapped to active status in our database
-    if (activeTab === 'active') return matchesSearch && (entry.status === 'approved' || entry.status === 'active');
-    if (activeTab === 'rejected') return matchesSearch && entry.status === 'rejected';
+    const normalizedStatus = normalizeStatusValue(entry.status);
+    if (activeTab === 'pending') return matchesSearch && normalizedStatus === 'pending';
+    if (activeTab === 'active') return matchesSearch && normalizedStatus === 'active';
+    if (activeTab === 'inactive') return matchesSearch && normalizedStatus === 'inactive';
     return matchesSearch;
   });
 
-  const pendingCount = users.filter((entry) => entry.status === 'pending').length;
-  const activeCount = users.filter((entry) => entry.status === 'approved' || entry.status === 'active').length;
-  const rejectedCount = users.filter((entry) => entry.status === 'rejected').length;
+  const pendingCount = users.filter((entry) => normalizeStatusValue(entry.status) === 'pending').length;
+  const activeCount = users.filter((entry) => normalizeStatusValue(entry.status) === 'active').length;
+  const inactiveCount = users.filter((entry) => normalizeStatusValue(entry.status) === 'inactive').length;
 
   return (
     <div className="space-y-8">
@@ -182,11 +197,11 @@ export default function UsersPage() {
             { id: 'all', label: 'Semua', count: users.length },
             { id: 'pending', label: 'Menunggu', count: pendingCount },
             { id: 'active', label: 'Aktif', count: activeCount },
-            { id: 'rejected', label: 'Ditolak', count: rejectedCount },
+            { id: 'inactive', label: 'Nonaktif', count: inactiveCount },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'all' | 'pending' | 'active' | 'rejected')}
+              onClick={() => setActiveTab(tab.id as 'all' | 'pending' | 'active' | 'inactive')}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold tracking-wide transition-all ${
                 activeTab === tab.id
                   ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10'
@@ -218,8 +233,9 @@ export default function UsersPage() {
         ) : (
           filteredUsers.map((entry) => {
             const normalizedEntryRole = normalizeRoleValue(entry.role);
-            const isPending = entry.status === 'pending';
-            const isRejected = entry.status === 'rejected';
+            const normalizedEntryStatus = normalizeStatusValue(entry.status);
+            const isPending = normalizedEntryStatus === 'pending';
+            const isInactive = normalizedEntryStatus === 'inactive';
             const isSelf = entry.id === currentProfile?.id;
             const canDelete = managerRole === 'admin' && !isSelf;
             const canChangeRole = !isSelf;
@@ -234,11 +250,11 @@ export default function UsersPage() {
                 <div className="space-y-6">
                   <div className="flex items-start gap-4">
                     <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                      isPending ? 'bg-amber-50 text-amber-600' : isRejected ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                      isPending ? 'bg-amber-50 text-amber-600' : isInactive ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
                     }`}>
                       {isPending ? (
                         <UserPlus className="h-5 w-5" />
-                      ) : isRejected ? (
+                      ) : isInactive ? (
                         <XCircle className="h-5 w-5" />
                       ) : (
                         <ShieldCheck className="h-5 w-5" />
@@ -249,9 +265,9 @@ export default function UsersPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-bold text-gray-900">{entry.full_name || 'Tanpa Nama'}</h3>
                         <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          isPending ? 'bg-amber-100 text-amber-800' : isRejected ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
+                          isPending ? 'bg-amber-100 text-amber-800' : isInactive ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
                         }`}>
-                          {isPending ? 'Pending' : isRejected ? 'Ditolak' : 'Approved'}
+                          {normalizeStatusLabel(entry.status)}
                         </span>
                         {isSelf && (
                           <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
@@ -278,7 +294,7 @@ export default function UsersPage() {
                         Status Approval
                       </div>
                       <p className="mt-2 text-xs text-gray-500 leading-relaxed">
-                        {isPending ? 'Setujui pendaftaran user baru agar dapat login.' : isRejected ? 'Pulihkan user yang ditolak agar direview kembali.' : 'Suspend user kembali ke pending jika diperlukan.'}
+                        {isPending ? 'Setujui pendaftaran user baru agar dapat login.' : isInactive ? 'Pulihkan user yang dinonaktifkan agar direview kembali.' : 'Nonaktifkan user kembali ke pending jika diperlukan.'}
                       </p>
                     </div>
                     <div className="rounded-xl border p-4 bg-gray-50/50">
@@ -349,7 +365,7 @@ export default function UsersPage() {
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               Approve
-                            </button>
+                              </button>
                             <button
                               onClick={() => updateUserStatus(entry.id, 'rejected')}
                               disabled={updating === entry.id}
@@ -357,9 +373,9 @@ export default function UsersPage() {
                             >
                               <XCircle className="h-3.5 w-3.5" />
                               Tolak
-                            </button>
-                          </>
-                        ) : isRejected ? (
+                              </button>
+                            </>
+                        ) : isInactive ? (
                           <button
                             onClick={() => updateUserStatus(entry.id, 'pending')}
                             disabled={updating === entry.id}

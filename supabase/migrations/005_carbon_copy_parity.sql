@@ -130,7 +130,7 @@ BEGIN
             now()
         FROM public.profiles p
         WHERE p.id != v_creator_id
-          AND p.status = 'approved'
+          AND p.status = 'active'
           AND p.is_deleted = false
           AND LOWER(TRIM(p.role)) IN ('leader', 'agent', 'agents', 'leaders');
     END IF;

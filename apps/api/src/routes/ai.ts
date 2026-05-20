@@ -80,6 +80,72 @@ ai.get('/usage', async (c) => {
   return c.json({ success: true, data });
 });
 
+ai.get('/usage/summary', async (c) => {
+  const user = c.get('user');
+  const userId = user?.id;
+  const moduleParam = c.req.query('module') || 'pdkt';
+
+  const admin = createAdminClient();
+  
+  const now = new Date();
+  const wibTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const year = wibTime.getUTCFullYear();
+  const month = wibTime.getUTCMonth() + 1;
+
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+  start.setUTCHours(start.getUTCHours() - 7);
+
+  const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+  end.setUTCHours(end.getUTCHours() - 7);
+
+  try {
+    const { data: logs, error } = await admin
+      .from('ai_usage_logs')
+      .select('input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr')
+      .eq('user_id', userId)
+      .eq('module', moduleParam)
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString());
+
+    if (error) throw error;
+
+    let totalCalls = 0;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalTokens = 0;
+    let totalCostUsd = 0;
+    let totalCostIdr = 0;
+
+    if (logs) {
+      totalCalls = logs.length;
+      for (const log of logs) {
+        totalInputTokens += log.input_tokens || 0;
+        totalOutputTokens += log.output_tokens || 0;
+        totalTokens += log.total_tokens || 0;
+        totalCostUsd += Number(log.estimated_cost_usd || 0);
+        totalCostIdr += Number(log.estimated_cost_idr || 0);
+      }
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        module: moduleParam,
+        year,
+        month,
+        totalCalls,
+        totalInputTokens,
+        totalOutputTokens,
+        totalTokens,
+        totalCostUsd,
+        totalCostIdr,
+      }
+    });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
 // ── Usage Aggregation ──────────────────────────────────
 ai.get('/monitoring/aggregation', async (c) => {
   const admin = createAdminClient();

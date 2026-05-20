@@ -83,3 +83,31 @@ export const APP_MODULES: AppModuleConfig[] = [
     allowedRoles: ['trainer', 'leader', 'admin'],
   },
 ];
+
+export function normalizeRoleLabel(role?: string | null) {
+  const value = role?.toLowerCase().trim();
+  switch (value) {
+    case 'agent':
+    case 'agents':
+      return 'Agent';
+    case 'leader':
+      return 'Leader';
+    case 'trainer':
+    case 'trainers':
+      return 'Trainer';
+    case 'admin':
+      return 'Admin';
+    default:
+      return 'User';
+  }
+}
+
+export function isRoleAllowed(role: string | undefined | null, allowedRoles?: string[]) {
+  if (!allowedRoles || allowedRoles.length === 0) return true;
+  const normalizedRole = role?.toLowerCase().trim();
+  
+  // Normalize role to singular form
+  const finalRole = normalizedRole === 'trainers' ? 'trainer' : normalizedRole === 'agents' ? 'agent' : normalizedRole;
+  
+  return allowedRoles.includes(finalRole || '');
+}

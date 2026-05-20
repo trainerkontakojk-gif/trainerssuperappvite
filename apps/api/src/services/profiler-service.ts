@@ -283,11 +283,11 @@ export async function copyPesertaToFolder(pesertaIds: string[], targetBatchName:
 export async function reorderPeserta(pesertaIds: string[]): Promise<void> {
   const updates = pesertaIds.map((id, index) => ({
     id,
-    nomor_urut: index,
+    nomor_urut: index + 1,
   }));
 
   const { error } = await supabaseAdmin.rpc('bulk_reorder_profiler_peserta', {
-    p_updates: JSON.stringify(updates),
+    p_updates: updates,
   });
 
   if (error) {
@@ -298,6 +298,13 @@ export async function reorderPeserta(pesertaIds: string[]): Promise<void> {
         .eq('id', update.id);
     }
   }
+}
+
+export async function bulkReorderPeserta(updates: { id: string; nomor_urut: number }[]): Promise<void> {
+  const { error } = await supabaseAdmin.rpc('bulk_reorder_profiler_peserta', {
+    p_updates: updates,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function getGlobalPesertaPool(excludeBatch?: string): Promise<ProfilerPeserta[]> {

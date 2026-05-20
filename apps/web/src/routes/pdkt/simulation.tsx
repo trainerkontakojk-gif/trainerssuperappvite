@@ -1,188 +1,420 @@
-import { useState } from 'react';
-import { Mail, User, Bot, Send, FileText, BarChart3, AlertCircle } from 'lucide-react';
-import { useApi } from '../../hooks/useApi';
+import { useState, useEffect } from 'react';
+import { MailboxSidebar } from './components/MailboxSidebar';
+import { EmailDetailPane } from './components/EmailDetailPane';
+import { ReplyComposer } from './components/ReplyComposer';
+import { CreateEmailModal } from './components/CreateEmailModal';
+import { SettingsModal, type AppSettings } from './components/SettingsModal';
+import { HistoryModal, type SessionHistory } from './components/HistoryModal';
+import { UsageModal } from './components/UsageModal';
+import { useApi, postApi, deleteApi, getApi } from '../../hooks/useApi';
+import type { PdktMailboxItem, PdktScenario, PdktConsumerType, PdktIdentity } from '@trainers/types';
+import { Loader2, Plus } from 'lucide-react';
 
-interface Scenario { id: string; title: string; description: string; category: string; isActive: boolean; }
-interface PdktIdentity { name: string; email: string; city: string; bodyName: string; }
+const defaultConsumerTypes: PdktConsumerType[] = [
+  { id: 'marah', name: 'Marah & Emosional', description: 'Sangat marah, emosional, tidak sabar.', difficulty: 'Hard', tone: 'Marah, menggunakan tanda seru.' },
+  { id: 'bingung', name: 'Bingung & Gaptek', description: 'Kebingungan, tidak paham teknologi.', difficulty: 'Medium', tone: 'Bingung, ragu-ragu.' },
+  { id: 'kritis', name: 'Kritis & Detail', description: 'Kritis, menanyakan dasar hukum.', difficulty: 'Hard', tone: 'Kritis, logis, skeptis.' },
+  { id: 'ramah', name: 'Ramah & Kooperatif', description: 'Ramah, sopan, kooperatif.', difficulty: 'Easy', tone: 'Ramah, sopan.' },
+  { id: 'terburu-buru', name: 'Terburu-buru', description: 'Ingin jawaban singkat dan cepat.', difficulty: 'Medium', tone: 'Singkat, padat.' },
+  { id: 'pasrah', name: 'Pasrah & Sedih', description: 'Putus asa, nada sedih.', difficulty: 'Medium', tone: 'Sedih, memohon bantuan.' },
+];
 
 export default function PdktSimulation() {
-  const { data: scenarios, loading: loadingScenarios, error: scenariosError } = useApi<Scenario[]>('/pdkt/scenarios');
-  const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
-  const [inboundEmail, setInboundEmail] = useState<{ subject: string; body: string } | null>(null);
-  const [reply, setReply] = useState('');
-  const [evaluation, setEvaluation] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [evaluating, setEvaluating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isReplyOpen, setIsReplyOpen] = useState(false);
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isStartingNew, setIsStartingNew] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
 
-  const handleStart = async (scenario: Scenario) => {
-    setSelectedScenario(scenario);
-    setInboundEmail(null);
-    setReply('');
-    setEvaluation(null);
-    setLoading(true);
+  // Modals visibility
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isUsageOpen, setIsUsageOpen] = useState(false);
 
+  // Settings state
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+
+  // History state
+  const [history, setHistory] = useState<SessionHistory[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  
+  // Timer for time_taken
+  const [startTime, setStartTime] = useState<number | null>(null);
+
+  const { data: mailboxItems, loading, error, refetch } = useApi<PdktMailboxItem[]>('/pdkt/mailbox');
+  const { data: defaultScenarios } = useApi<PdktScenario[]>('/pdkt/scenarios');
+  const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>('/pdkt/consumer-types');
+
+  const selectedItem = mailboxItems?.find(item => item.id === selectedId);
+
+  // Fetch Settings & History from DB
+  const fetchSettings = async () => {
     try {
-      const idRes = await fetch('/api/v1/pdkt/generate-identity', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-      const idJson = await idRes.json();
-      const identity: PdktIdentity = idJson.data;
-
-      const res = await fetch('/api/v1/pdkt/generate-template', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenarioId: scenario.id, consumerTypeId: 'ramah', identity }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setInboundEmail(json.data);
-        setError(null);
+      const res = await getApi<{ success: boolean; settings: AppSettings | null }>('/pdkt/settings');
+      if (res && res.settings) {
+        setSettings(res.settings);
       } else {
-        setError(json.error?.message || 'Gagal memulai sesi');
+        setSettings(null);
       }
     } catch (err) {
-      setError('Terjadi kesalahan koneksi. Silakan coba lagi.');
-      console.error('Start error:', err);
+      console.error('[PDKT] Failed to load settings:', err);
     } finally {
-      setLoading(false);
+      setSettingsLoading(false);
     }
   };
 
-  const handleEvaluate = async () => {
-    if (!reply.trim() || !inboundEmail) return;
-    setEvaluating(true);
-
+  const fetchHistory = async () => {
     try {
-      const res = await fetch('/api/v1/pdkt/evaluate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config: {
-            scenarios: [],
-            consumerType: {},
-            identity: {},
-            selectedModel: 'gemini-3.1-flash-lite',
-            resolvedConsumerNameMentionPattern: 'none',
-            writingStyleMode: 'training',
-          },
-          emails: [
-            { id: '1', from: 'consumer@email.com', to: 'ojk@kontak157.go.id', subject: inboundEmail.subject, body: inboundEmail.body, timestamp: new Date().toISOString(), isAgent: false },
-            { id: '2', from: 'ojk@kontak157.go.id', to: 'consumer@email.com', subject: `Re: ${inboundEmail.subject}`, body: reply, timestamp: new Date().toISOString(), isAgent: true },
-          ],
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setEvaluation(json.data);
-        setError(null);
-      } else {
-        setError(json.error?.message || 'Gagal mengevaluasi');
+      const res = await getApi<any[]>('/pdkt/history');
+      if (res) {
+        const mapped = res.map((item: any) => ({
+          id: item.id,
+          timestamp: item.timestamp,
+          config: item.config,
+          emails: item.emails || [],
+          evaluation: item.evaluation,
+          evaluationStatus: item.evaluation_status || (item.evaluation ? 'completed' : 'processing'),
+          evaluationError: item.evaluation_error,
+          timeTaken: item.time_taken
+        }));
+        setHistory(mapped);
       }
     } catch (err) {
-      setError('Terjadi kesalahan koneksi saat evaluasi.');
-      console.error('Evaluate error:', err);
+      console.error('[PDKT] Failed to load history:', err);
     } finally {
-      setEvaluating(false);
+      setHistoryLoading(false);
     }
   };
 
-  if (!selectedScenario) {
+  useEffect(() => {
+    fetchSettings();
+    fetchHistory();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId && mailboxItems && mailboxItems.length > 0) {
+      setSelectedId(mailboxItems[0].id);
+    }
+  }, [mailboxItems, selectedId]);
+
+  // Reset reply state and timer when selecting a new item
+  useEffect(() => {
+    setIsReplyOpen(false);
+    setStartTime(null);
+  }, [selectedId]);
+
+  // Save Settings handler
+  const handleSaveSettings = async (newSettings: AppSettings) => {
+    try {
+      await postApi('/pdkt/settings', { settings: newSettings });
+      setSettings(newSettings);
+      // Refetch history as scenarios configuration might affect display
+      await fetchHistory();
+    } catch (err) {
+      alert('Gagal menyimpan pengaturan.');
+    }
+  };
+
+  // Delete specific history session
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await deleteApi(`/pdkt/history/${id}`);
+      setHistory(prev => prev.filter(h => h.id !== id));
+      
+      // Also soft-delete matching mailbox item
+      await deleteApi(`/pdkt/mailbox/${id}`);
+      await refetch();
+      if (selectedId === id) setSelectedId(null);
+    } catch (err) {
+      alert('Gagal menghapus riwayat sesi.');
+    }
+  };
+
+  // Clear all history
+  const handleClearHistory = async () => {
+    try {
+      await deleteApi('/pdkt/history');
+      setHistory([]);
+      
+      // Clear mailbox too
+      if (mailboxItems) {
+        for (const item of mailboxItems) {
+          await deleteApi(`/pdkt/mailbox/${item.id}`);
+        }
+      }
+      await refetch();
+      setSelectedId(null);
+    } catch (err) {
+      alert('Gagal membersihkan riwayat.');
+    }
+  };
+
+  // Select session from history
+  const handleSelectSession = (session: SessionHistory) => {
+    setSelectedId(session.id);
+    setIsHistoryOpen(false);
+  };
+
+  // Start new simulation session
+  const handleStartNew = async (scenario: PdktScenario) => {
+    setIsStartingNew(true);
+    try {
+      // 1. Determine Consumer Type
+      const activeConsumerTypes = settings?.consumerTypes?.filter(c => c.isCustom || (c as any).isActive !== false) 
+        || defaultConsumerTypesFromApi 
+        || defaultConsumerTypes;
+      
+      const globalConsumerId = settings?.globalConsumerTypeId || 'random';
+      let finalConsumerType: PdktConsumerType;
+      
+      if (globalConsumerId === 'random') {
+        if (activeConsumerTypes.length > 0) {
+          finalConsumerType = activeConsumerTypes[Math.floor(Math.random() * activeConsumerTypes.length)];
+        } else {
+          finalConsumerType = defaultConsumerTypes[3]; // Ramah & Kooperatif
+        }
+      } else {
+        const found = activeConsumerTypes.find(c => c.id === globalConsumerId);
+        finalConsumerType = found || activeConsumerTypes[0] || defaultConsumerTypes[3];
+      }
+
+      // 2. Determine Identity
+      let finalIdentity: PdktIdentity;
+      const customId = settings?.customIdentity;
+      if (customId && customId.senderName && customId.email) {
+        finalIdentity = {
+          name: customId.senderName,
+          email: customId.email,
+          city: customId.city || 'Jakarta',
+          bodyName: customId.bodyName || customId.senderName.split(' ')[0]
+        };
+      } else {
+        finalIdentity = await postApi<PdktIdentity>('/pdkt/generate-identity', {});
+      }
+
+      // 3. Generate template or bypass if specified
+      let subject = '';
+      let body = '';
+
+      if (scenario.alwaysUseSampleEmail && scenario.sampleEmailTemplate?.body) {
+        subject = scenario.sampleEmailTemplate.subject || `Pertanyaan mengenai ${scenario.title}`;
+        body = scenario.sampleEmailTemplate.body;
+      } else {
+        const templateRes = await postApi<{ subject: string; body: string }>('/pdkt/generate-template', {
+          scenarioDraft: scenario,
+          consumerTypeId: finalConsumerType.id,
+          identity: finalIdentity
+        });
+        subject = templateRes.subject;
+        body = templateRes.body;
+      }
+
+      const activeScenarios = settings?.scenarios?.filter(s => s.isActive) || defaultScenarios || [];
+      const selectedModel = settings?.selectedModel || 'gemini-3.1-flash-lite';
+      const resolvedConsumerNameMentionPattern = settings?.consumerNameMentionPattern || 'random';
+      const writingStyleMode = settings?.writingStyleMode || 'training';
+
+      // 4. Submit new mailbox batch
+      const newItemId = await postApi<string>('/pdkt/mailbox/batch', {
+        sender_name: finalIdentity.name,
+        sender_email: finalIdentity.email,
+        subject: subject,
+        snippet: body.substring(0, 100),
+        scenario_snapshot: scenario,
+        config_snapshot: {
+          scenarios: activeScenarios,
+          consumerType: finalConsumerType,
+          identity: finalIdentity,
+          selectedModel,
+          resolvedConsumerNameMentionPattern,
+          writingStyleMode
+        },
+        inbound_email: {
+          id: 'msg_' + Date.now(),
+          from: finalIdentity.email,
+          to: 'ojk@kontak157.go.id',
+          subject,
+          body,
+          timestamp: new Date().toISOString(),
+          isAgent: false
+        }
+      });
+
+      await refetch();
+      await fetchHistory(); // update history list as well
+      setSelectedId(newItemId);
+      setIsNewModalOpen(false);
+    } catch (err) {
+      console.error('[PDKT] Failed to start new simulation:', err);
+      alert('Gagal memulai simulasi baru.');
+    } finally {
+      setIsStartingNew(false);
+    }
+  };
+
+  const handleReplyOpen = () => {
+    setIsReplyOpen(true);
+    setStartTime(Date.now());
+  };
+
+  const handleReplySubmit = async (replyText: string) => {
+    if (!selectedId || !selectedItem || !startTime) return;
+    setIsReplying(true);
+    
+    try {
+      const timeTaken = Math.round((Date.now() - startTime) / 1000);
+      const reply = {
+        id: 'reply_' + Date.now(),
+        from: 'ojk@kontak157.go.id',
+        to: selectedItem.sender_email,
+        subject: `Re: ${selectedItem.subject}`,
+        body: replyText,
+        timestamp: new Date().toISOString(),
+        isAgent: true
+      };
+
+      await postApi('/pdkt/mailbox/reply', {
+        mailboxId: selectedId,
+        reply,
+        timeTaken
+      });
+
+      await refetch();
+      await fetchHistory(); // reload evaluation status in history
+      setIsReplyOpen(false);
+    } catch (err) {
+      alert('Gagal mengirim balasan.');
+    } finally {
+      setIsReplying(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Hapus email ini?')) return;
+    try {
+      await deleteApi(`/pdkt/mailbox/${id}`);
+      await refetch();
+      if (selectedId === id) setSelectedId(null);
+    } catch (err) {
+      alert('Gagal menghapus email.');
+    }
+  };
+
+  if (loading && !mailboxItems) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Mulai Simulasi PDKT</h1>
-        <p className="text-gray-500">Pilih skenario untuk memulai simulasi email:</p>
-        {scenariosError && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
-            <AlertCircle size={14} /> {scenariosError}
-          </div>
-        )}
-        {loadingScenarios ? (
-          <div className="text-center py-8 text-sm text-gray-400">Memuat skenario...</div>
-        ) : scenarios && scenarios.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {scenarios.map(s => (
-              <button key={s.id} onClick={() => handleStart(s)}
-                className="p-4 bg-white rounded-xl border text-left hover:shadow-md transition-shadow">
-                <span className="text-xs text-indigo-500 font-medium">{s.category}</span>
-                <h3 className="font-semibold mt-1">{s.title}</h3>
-                <p className="text-sm text-gray-500 mt-1">{s.description}</p>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-sm text-gray-400">Tidak ada skenario tersedia.</div>
-        )}
+      <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+        <Loader2 className="w-8 h-8 text-sky-600 animate-spin" />
       </div>
     );
   }
 
-  if (loading) return <div className="text-center p-8 text-gray-500">Membuat email konsumen...</div>;
+  // Active scenarios for CreateEmailModal: fallback to defaultScenarios if no custom settings exist
+  const activeScenarios = settings?.scenarios || defaultScenarios || [];
+
+  // Prepared AppSettings for SettingsModal
+  const currentSettings: AppSettings = settings || {
+    scenarios: defaultScenarios || [],
+    consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
+    enableImageGeneration: true,
+    globalConsumerTypeId: 'random',
+    selectedModel: 'gemini-3.1-flash-lite',
+    consumerNameMentionPattern: 'random',
+    writingStyleMode: 'training',
+    customIdentity: {
+      senderName: '',
+      email: '',
+      city: '',
+      bodyName: ''
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      {error && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
-          <AlertCircle size={14} />
-          <span>{error}</span>
-          <button className="ml-auto text-xs underline" onClick={() => setError(null)}>Tutup</button>
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">{selectedScenario.title}</h2>
-        <button onClick={() => setSelectedScenario(null)}
-          className="text-sm text-red-500 hover:underline">Kembali</button>
-      </div>
+    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm relative">
+      <MailboxSidebar
+        items={mailboxItems || []}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onNew={() => setIsNewModalOpen(true)}
+        onSettings={() => setIsSettingsOpen(true)}
+        onHistory={async () => { await fetchHistory(); setIsHistoryOpen(true); }}
+        onUsage={() => setIsUsageOpen(true)}
+      />
 
-      {inboundEmail && (
-        <>
-          <div className="bg-white rounded-xl border shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Mail size={18} className="text-gray-400" />
-              <span className="text-sm font-medium">Email dari Konsumen</span>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <p className="text-sm"><span className="font-medium">Subjek:</span> {inboundEmail.subject}</p>
-              <p className="text-sm whitespace-pre-wrap">{inboundEmail.body}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border shadow-sm p-6">
-            <h3 className="text-sm font-medium mb-2">Balas Email</h3>
-            <textarea
-              value={reply}
-              onChange={e => setReply(e.target.value)}
-              placeholder="Tulis balasan email..."
-              rows={8}
-              className="w-full p-3 border rounded-lg text-sm resize-none"
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {selectedItem ? (
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <EmailDetailPane
+              item={selectedItem}
+              onReply={handleReplyOpen}
+              onDelete={() => handleDelete(selectedItem.id)}
+              isComposerOpen={isReplyOpen}
             />
-            <div className="flex justify-end mt-3">
-              <button onClick={handleEvaluate} disabled={evaluating || !reply.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm">
-                <BarChart3 size={16} />
-                {evaluating ? 'Mengevaluasi...' : 'Kirim & Evaluasi'}
+            {isReplyOpen && (
+              <div className="shrink-0">
+                <ReplyComposer
+                  recipient={selectedItem.sender_email}
+                  subject={`Re: ${selectedItem.subject}`}
+                  onSend={handleReplySubmit}
+                  onClose={() => setIsReplyOpen(false)}
+                  isLoading={isReplying}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-gray-400">
+            <Plus className="w-12 h-12 mb-4 text-gray-200" />
+            <p className="text-sm font-medium">Pilih email atau buat simulasi baru</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsNewModalOpen(true)}
+                className="mt-4 px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-bold hover:bg-sky-700 transition-all"
+              >
+                Simulasi Baru
+              </button>
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="mt-4 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all"
+              >
+                Pengaturan
               </button>
             </div>
           </div>
+        )}
+      </div>
 
-          {evaluation && (
-            <div className="bg-white rounded-xl border shadow-sm p-6">
-              <h3 className="font-semibold mb-4">Hasil Evaluasi</h3>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="text-3xl font-bold text-indigo-600">{evaluation.score}</div>
-                <div className="text-sm text-gray-500">dari 100</div>
-              </div>
-              <p className="text-sm text-gray-700 mb-4">{evaluation.feedback}</p>
-              {evaluation.typos?.length > 0 && (
-                <div className="mb-3">
-                  <span className="text-xs font-medium text-red-500">Typo:</span>
-                  <ul className="list-disc list-inside text-xs text-gray-500 mt-1">
-                    {evaluation.typos.map((t: string, i: number) => <li key={i}>{t}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+      <CreateEmailModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        scenarios={activeScenarios}
+        onCreate={handleStartNew}
+        isLoading={isStartingNew}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={currentSettings}
+        onSave={handleSaveSettings}
+        defaultScenarios={defaultScenarios || []}
+        defaultConsumerTypes={defaultConsumerTypesFromApi || defaultConsumerTypes}
+      />
+
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
+        onClearHistory={handleClearHistory}
+      />
+
+      <UsageModal
+        isOpen={isUsageOpen}
+        onClose={() => setIsUsageOpen(false)}
+        module="pdkt"
+      />
     </div>
   );
 }

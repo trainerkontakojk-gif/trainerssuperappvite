@@ -51,7 +51,13 @@ export async function updateUserStatus(
     throw new Error('Anda tidak dapat mengubah status akun Anda sendiri dari panel ini');
   }
 
-  const dbStatus = status === 'approved' ? 'active' : status.toLowerCase();
+  const normalizedStatus = status.toLowerCase();
+  const dbStatus =
+    normalizedStatus === 'approved'
+      ? 'active'
+      : normalizedStatus === 'rejected'
+        ? 'inactive'
+        : normalizedStatus;
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({ status: dbStatus })
@@ -62,7 +68,7 @@ export async function updateUserStatus(
   await logActivity({
     userId: callerId,
     userName: callerEmail,
-    action: `Mengubah status user ${userId} menjadi ${status}`,
+    action: `Mengubah status user ${userId} menjadi ${dbStatus}`,
     module: 'USER_MGMT',
     type: 'update_status'
   });
@@ -524,4 +530,13 @@ export async function getActivityLogs(): Promise<ActivityLog[]> {
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function deleteActivity(id: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('activity_logs')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
 }

@@ -26,7 +26,7 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Dev:** `pnpm dev` (Menjalankan web, api, dan telefun secara paralel)
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint`
-- **Test:** `pnpm test` (vitest — 88 tests covering API services + frontend hooks/components)
+- **Test:** `pnpm test` (vitest — 92 tests covering API services + frontend hooks/components)
 - **Test (api only):** `pnpm --filter @trainers/api test`
 - **Test (web only):** `pnpm --filter @trainers/web test`
 - **Format:** `pnpm format`
@@ -120,6 +120,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 13. Perf — Code splitting + lazy loading (DONE)
 14. Testing — Vitest API unit tests + Frontend component tests (DONE)
 15. Admin Management Parity (DONE)
+16. Dashboard Visual & Data Parity (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
@@ -141,7 +142,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-15)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-16)
 
 ## Routes Reference (apps/web)
 
@@ -194,4 +195,5 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | `/api/v1/pdkt` | 6 endpoints | `pdkt-service.ts` |
 | `/api/v1/ai` | 7 endpoints | — |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts` |
-| `/api/v1/admin` | 8 endpoints | `admin-service.ts` |pi/v1/profiler` | 18 endpoints | `profiler-service.ts` |
+| `/api/v1/admin` | 8 endpoints | `admin-service.ts` |
+
