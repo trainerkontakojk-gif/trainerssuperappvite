@@ -4,7 +4,7 @@ import { Settings, History, Play, MessageSquare, BarChart3 } from 'lucide-react'
 import type { KetikAppSettings, KetikSessionHistoryItem, KetikSessionConfig, KetikScenario, KetikConsumerType, ChatMessage, KetikSessionReview, KetikTypoFinding, KetikReviewDetail } from '@trainers/types';
 import { DEFAULT_KETIK_SETTINGS } from '@trainers/types';
 import { ketikApi } from './ketikApi';
-import ModuleWorkspaceIntro from './components/ModuleWorkspaceIntro';
+import ModuleWorkspaceIntro from '../../components/ModuleWorkspaceIntro';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
 import { HistoryModal } from './components/HistoryModal';

@@ -65,7 +65,13 @@ Menyamakan modul KETIK Vite dengan full module legacy:
 - **Auth guard**: Added `session?.access_token` check in `startSimulation` before proceeding
 - **sessionDeltaPending**: Added state and passing to UsageModal for post-session delta tracking
 
+## Bugfixes (Round 3)
+- **Duration options**: `[3, 5, 10, 15, 20, 30]` → `[5, 10, 15]` + Custom input toggle (matching legacy)
+- **Consumers/Identity tab split**: Fixed structural corruption where identity content was nested inside consumers tab
+- **Category select wrapper**: Added missing `</div>` closing the `relative` wrapper around the `<select>`/SVG caret
+- **ModuleWorkspaceIntro**: Moved from local `./components/` to shared `../../components/` for reuse by PDKT
+
 ## Verification
-- `pnpm --filter @trainers/api test` - **82 passed** (settings load/save, history CRUD, AI review)
-- `pnpm --filter @trainers/web test` - **24 passed** (landing, modals, simulation, scrollIntoView fix)
+- `pnpm --filter @trainers/api test` - **89 passed** (settings load/save, history CRUD, AI review + PDKT additions)
+- `pnpm --filter @trainers/web test` - **44 passed** (landing, modals, simulation, scrollIntoView fix + PDKT tests)
 - `pnpm build` - Full monorepo build succeeds (types, API, web)

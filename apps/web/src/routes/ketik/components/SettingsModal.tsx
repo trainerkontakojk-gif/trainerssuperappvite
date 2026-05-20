@@ -35,6 +35,12 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [newTemplateKeyword, setNewTemplateKeyword] = useState('');
   const [newTemplateContent, setNewTemplateContent] = useState('');
+  const [customDuration, setCustomDuration] = useState<number>(() => {
+    const d = settings.simulationDuration;
+    return !d || [5, 10, 15].includes(d) ? 20 : d;
+  });
+
+  const isPresetDuration = (d: number) => [5, 10, 15].includes(d);
 
   const TEXT_MODELS = [
     { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', description: 'Cepat dan efisien untuk simulasi chat ringan.', provider: 'gemini' },
@@ -78,6 +84,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
     setEditingScenarioId(scenario.id); setNewScenarioCategory(scenario.category); setNewScenarioTitle(scenario.title);
     setNewScenarioDesc(scenario.description); setNewScenarioScript(scenario.script || ''); setIsScenarioScriptEnabled(Boolean(scenario.script?.trim()));
     setNewScenarioImages(scenario.images || []); setIsNewCategoryInput(!categories.includes(scenario.category)); setIsScenarioFormOpen(true);
+    setTimeout(() => document.getElementById('scenario-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   };
   const handleSaveScenario = () => {
     if (!newScenarioTitle || !newScenarioDesc) return;
@@ -93,7 +100,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       Array.from(e.target.files).forEach(file => {
-        if (file.size > 500 * 1024) { alert(`File ${file.name} terlalu besar (>500KB).`); return; }
+        if (file.size > 500 * 1024) { alert(`File ${file.name} terlalu besar (>500KB). Mohon kompres gambar terlebih dahulu.`); return; }
         const reader = new FileReader();
         reader.onloadend = () => setNewScenarioImages(prev => [...prev, reader.result as string]);
         reader.readAsDataURL(file);
@@ -102,7 +109,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   };
 
   const resetConsumerForm = () => { setEditingConsumerId(null); setNewConsumerName(''); setNewConsumerDesc(''); setNewConsumerDifficulty('Sedang'); };
-  const handleEditConsumer = (consumer: KetikConsumerType) => { setEditingConsumerId(consumer.id); setNewConsumerName(consumer.name); setNewConsumerDesc(consumer.description); setNewConsumerDifficulty(consumer.difficulty); setIsConsumerFormOpen(true); };
+  const handleEditConsumer = (consumer: KetikConsumerType) => { setEditingConsumerId(consumer.id); setNewConsumerName(consumer.name); setNewConsumerDesc(consumer.description); setNewConsumerDifficulty(consumer.difficulty); setIsConsumerFormOpen(true); setTimeout(() => document.getElementById('consumer-form')?.scrollIntoView({ behavior: 'smooth' }), 100); };
   const handleSaveConsumer = () => {
     if (!newConsumerName || !newConsumerDesc) return;
     if (editingConsumerId) {
@@ -127,9 +134,34 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   };
   const handleDeleteTemplate = (id: string) => { if (window.confirm('Hapus template ini?')) setLocalSettings(prev => ({ ...prev, quickTemplates: (prev.quickTemplates || []).filter(t => t.id !== id) })); };
 
+  const isScenarioDraftDirty = () => isScenarioFormOpen;
+  const isScenarioDraftValid = () => !!(newScenarioTitle && newScenarioDesc);
+  const isConsumerDraftDirty = () => isConsumerFormOpen;
+  const isConsumerDraftValid = () => !!(newConsumerName && newConsumerDesc);
+  const isTemplateDirty = () => isTemplateFormOpen;
+
   const handleSave = () => {
+    if (isScenarioDraftDirty() && !isScenarioDraftValid()) {
+      setActiveTab('scenarios');
+      setTimeout(() => document.getElementById('scenario-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+      alert('Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.');
+      return;
+    }
+    if (isConsumerDraftDirty() && !isConsumerDraftValid()) {
+      setActiveTab('consumers');
+      setTimeout(() => document.getElementById('consumer-form')?.scrollIntoView({ behavior: 'smooth' }), 100);
+      alert('Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.');
+      return;
+    }
+    if (isTemplateDirty() && (!newTemplateKeyword || !newTemplateContent)) {
+      setActiveTab('template');
+      setTimeout(() => document.getElementById('template-form')?.scrollIntoView({ behavior: 'smooth' }), 100);
+      alert('Template yang sedang Anda buat belum lengkap. Isi keyword dan konten terlebih dahulu, atau klik Batal untuk membatalkan template.');
+      return;
+    }
+
     let finalSettings = localSettings;
-    if (isScenarioFormOpen && newScenarioTitle && newScenarioDesc) {
+    if (isScenarioDraftDirty() && isScenarioDraftValid()) {
       const category = isNewCategoryInput ? newScenarioCategory : newScenarioCategory || 'Umum';
       if (editingScenarioId) {
         finalSettings = { ...finalSettings, scenarios: finalSettings.scenarios.map(s => s.id === editingScenarioId ? { ...s, category, title: newScenarioTitle, description: newScenarioDesc, script: isScenarioScriptEnabled ? newScenarioScript : '', images: newScenarioImages } : s) };
@@ -137,19 +169,23 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
         finalSettings = { ...finalSettings, scenarios: [...finalSettings.scenarios, { id: `s-${Date.now()}`, category, title: newScenarioTitle, description: newScenarioDesc, script: isScenarioScriptEnabled ? newScenarioScript : '', isActive: true, images: newScenarioImages }] };
       }
     }
-    if (isConsumerFormOpen && newConsumerName && newConsumerDesc) {
+    if (isConsumerDraftDirty() && isConsumerDraftValid()) {
       if (editingConsumerId) {
         finalSettings = { ...finalSettings, consumerTypes: finalSettings.consumerTypes.map(c => c.id === editingConsumerId ? { ...c, name: newConsumerName, description: newConsumerDesc, difficulty: newConsumerDifficulty } : c) };
       } else {
         finalSettings = { ...finalSettings, consumerTypes: [...finalSettings.consumerTypes, { id: `c-${Date.now()}`, name: newConsumerName, description: newConsumerDesc, difficulty: newConsumerDifficulty, isCustom: true }] };
       }
     }
+    if (isScenarioDraftDirty()) { resetScenarioForm(); setIsScenarioFormOpen(false); }
+    if (isConsumerDraftDirty()) { resetConsumerForm(); setIsConsumerFormOpen(false); }
+    if (isTemplateDirty()) { setEditingTemplateId(null); setNewTemplateKeyword(''); setNewTemplateContent(''); setIsTemplateFormOpen(false); }
+
     onSave(finalSettings);
     onClose();
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Apakah Anda yakin ingin mereset semua pengaturan ke awal?')) setLocalSettings(DEFAULT_KETIK_SETTINGS);
+    if (window.confirm('Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.')) setLocalSettings(DEFAULT_KETIK_SETTINGS);
   };
 
   const tabs = [
@@ -167,23 +203,31 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl max-h-[86vh] rounded-[2rem] flex flex-col overflow-hidden shadow-2xl shadow-black/10 bg-card border border-border/50">
             <div className="px-5 py-4 sm:px-6 sm:py-5 border-b flex justify-between items-center shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent pointer-events-none" />
               <div className="relative z-10">
                 <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">Pengaturan Simulasi</h2>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Module KETIK</span>
                 </div>
               </div>
-              <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-xl text-muted-foreground hover:text-foreground transition-all border border-transparent hover:border-border/50">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-4 relative z-10">
+                <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-xl text-muted-foreground hover:text-foreground transition-all border border-transparent hover:border-border/50">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="px-5 sm:px-6 pt-5 pb-3 shrink-0">
               <div className="flex p-2 rounded-2xl bg-foreground/[0.02] border border-border/50">
                 {tabs.map((tab) => (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 flex items-center justify-center gap-3 py-3.5 text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all relative group ${activeTab === tab.id ? 'text-primary bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 flex items-center justify-center gap-3 py-3.5 text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all relative group ${activeTab === tab.id ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>
+                    {activeTab === tab.id && (
+                      <motion.div layoutId="activeTabKetik" className="absolute inset-0 bg-background shadow-sm rounded-xl" transition={{ type: 'spring', bounce: 0.15, duration: 0.6 }} />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2.5">
+                      <tab.icon className="w-4 h-4" />
+                      {tab.label}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -237,19 +281,23 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                       <span>Tambah Skenario Baru</span>
                     </button>
                   ) : (
-                    <div className="bg-card border border-border/50 rounded-[2rem] overflow-hidden relative">
-                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5">
+                    <div id="scenario-form" className="bg-card border border-border/50 rounded-[2rem] shadow-3xl overflow-hidden relative">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5 relative z-10">
                         <h3 className="font-black text-foreground text-lg tracking-tighter">{editingScenarioId ? 'Edit Skenario' : 'Tambah Skenario Baru'}</h3>
                       </div>
-                      <div className="p-8 grid grid-cols-2 gap-6">
+                      <div className="p-8 grid grid-cols-2 gap-6 relative z-10">
                         <div className="col-span-2">
                           <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Kategori</label>
                           {!isNewCategoryInput ? (
-                            <select className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none appearance-none transition-all" value={newScenarioCategory} onChange={(e) => { if (e.target.value === 'NEW') { setIsNewCategoryInput(true); setNewScenarioCategory(''); } else setNewScenarioCategory(e.target.value); }}>
+                            <div className="relative">
+                              <select className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none appearance-none transition-all" value={newScenarioCategory} onChange={(e) => { if (e.target.value === 'NEW') { setIsNewCategoryInput(true); setNewScenarioCategory(''); } else setNewScenarioCategory(e.target.value); }}>
                               <option value="">Pilih Kategori</option>
                               {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                              <option value="NEW">+ Tambah Kategori Lainnya</option>
-                            </select>
+                                  <option value="NEW">+ Tambah Kategori Lainnya</option>
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground"><svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
+                              </div>
                           ) : (
                             <div className="flex gap-3">
                               <input type="text" className="flex-1 rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="Kategori Baru" value={newScenarioCategory} onChange={(e) => setNewScenarioCategory(e.target.value)} />
@@ -273,21 +321,55 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                               {isScenarioScriptEnabled ? 'Ikuti Skrip' : 'Sangat Kreatif'}
                             </button>
                           </div>
-                          <textarea className={`w-full rounded-2xl border p-4 text-sm outline-none resize-none transition-all ${isScenarioScriptEnabled ? 'border-border/50 bg-foreground/5 text-foreground focus:ring-2 focus:ring-primary' : 'border-border/30 bg-foreground/[0.03] text-muted-foreground cursor-not-allowed'}`} rows={8} value={newScenarioScript} onChange={(e) => setNewScenarioScript(e.target.value)} disabled={!isScenarioScriptEnabled} placeholder="Contoh: Agent: ...&#10;Konsumen: ..." />
+                          <textarea className={`w-full rounded-2xl border p-4 text-sm outline-none resize-none transition-all ${isScenarioScriptEnabled ? 'border-border/50 bg-foreground/5 text-foreground focus:ring-2 focus:ring-primary' : 'border-border/30 bg-foreground/[0.03] text-muted-foreground cursor-not-allowed'}`} rows={12} value={newScenarioScript} onChange={(e) => setNewScenarioScript(e.target.value)} disabled={!isScenarioScriptEnabled} placeholder={`Contoh format 1 - Dialog:
+Agent: Selamat pagi, ada yang bisa saya bantu?
+Konsumen: Mas saya ada masalah transaksi.
+Agent: Baik, transaksi seperti apa ya?
+Konsumen: Tadi pagi ada transaksi kartu kredit yang saya tidak kenal.
+
+Contoh format 2 - Alur:
+Awal:
+- Konsumen membuka chat dengan nada panik dan singkat.
+- Menyebut ada transaksi kartu kredit yang tidak dikenali.
+
+Jika agen bertanya detail:
+- Konsumen menyebut transaksi terjadi tadi pagi.
+- Nilai transaksi sekitar Rp3.250.000.
+- Konsumen tidak pernah memberikan OTP ke siapa pun.
+
+Jika agen memberi arahan pemblokiran:
+- Konsumen mulai sedikit tenang.
+- Lalu bertanya apakah dana masih bisa diselamatkan.
+
+Akhir:
+- Konsumen berterima kasih setelah mendapat langkah lanjut.`}
+                          />
+                          <p className="mt-3 text-xs text-muted-foreground leading-relaxed font-medium">
+                            Checklist <span className="font-black text-foreground">Ikuti Skrip</span> untuk mengaktifkan kolom ini. Saat tidak dicentang, konsumen akan dibiarkan lebih bebas dan kreatif mengikuti konteks skenario. Saat dicentang, AI akan berusaha mengikuti skrip sebagai panduan alur.
+                          </p>
+                          <p className="mt-2 text-xs text-muted-foreground leading-relaxed font-medium">
+                            Anda bisa menulis skrip dalam format dialog seperti <span className="font-black text-foreground">Agent:</span> /
+                            <span className="font-black text-foreground"> Konsumen:</span> atau dalam format poin alur seperti
+                            <span className="font-black text-foreground"> Awal</span>, <span className="font-black text-foreground">Jika agen bertanya</span>,
+                            dan <span className="font-black text-foreground">Akhir</span>. AI akan tetap menjawab secara natural sesuai pertanyaan agen dan situasi percakapan.
+                          </p>
                         </div>
                         <div className="col-span-2">
                           <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Lampiran Gambar</label>
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border/50 rounded-[2rem] cursor-pointer bg-foreground/5 hover:bg-foreground/10 hover:border-primary/30 transition-all group">
-                            <ImageIcon className="w-6 h-6 text-muted-foreground mb-2" />
-                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">PNG, JPG (MAX. 500KB)</p>
+                          <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-border/50 rounded-[2rem] cursor-pointer bg-foreground/5 hover:bg-foreground/10 hover:border-primary/30 transition-all group">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <div className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><ImageIcon className="w-6 h-6 text-muted-foreground" /></div>
+                              <p className="mb-1 text-xs font-black uppercase tracking-widest text-muted-foreground">Drop File atau Klik</p>
+                              <p className="text-[10px] font-medium text-muted-foreground italic">PNG, JPG (MAX. 500KB)</p>
+                            </div>
                             <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
                           </label>
                           {newScenarioImages.length > 0 && (
-                            <div className="flex gap-4 mt-4 overflow-x-auto pb-2">
+                            <div className="flex gap-4 mt-6 overflow-x-auto pb-4">
                               {newScenarioImages.map((img, idx) => (
-                                <div key={idx} className="relative w-20 h-20 shrink-0 group">
-                                  <img src={img} alt={`Preview ${idx}`} className="object-cover w-full h-full rounded-2xl border border-border/50" />
-                                  <button onClick={() => setNewScenarioImages(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
+                                <div key={idx} className="relative w-24 h-24 shrink-0 group">
+                                  <img src={img} alt={`Preview ${idx}`} className="object-cover w-full h-full rounded-2xl border border-border/50 shadow-md" />
+                                  <button onClick={() => setNewScenarioImages(prev => prev.filter((_, i) => i !== idx))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10"><X className="w-4 h-4" /></button>
                                 </div>
                               ))}
                             </div>
@@ -306,13 +388,14 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
               {activeTab === 'consumers' && (
                 <div className="space-y-8 pb-10">
                   <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
-                    <div className="flex items-start gap-6">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                    <div className="flex items-start gap-6 relative z-10">
                       <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
                         <Users className="w-7 h-7 text-orange-500" />
                       </div>
                       <div>
                         <h3 className="font-black text-foreground text-xl tracking-tighter">Pilih Karakter Pelanggan</h3>
-                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">Pilih satu kepribadian pelanggan yang akan Anda hadapi.</p>
+                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">Pilih satu kepribadian pelanggan yang akan Anda hadapi. Karakter ini akan digunakan untuk <span className="text-foreground font-black">semua skenario</span> yang aktif.</p>
                       </div>
                     </div>
                   </div>
@@ -322,7 +405,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                         <h4 className="font-black text-foreground tracking-tight flex items-center gap-2 text-lg">Acak</h4>
                         {localSettings.activeConsumerTypeId === 'random' && <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-3 font-medium leading-relaxed">Sistem akan memilih salah satu karakter secara acak.</p>
+                      <p className="text-sm text-muted-foreground mt-3 font-medium leading-relaxed">Sistem akan memilih salah satu karakter secara acak setiap kali sesi simulasi dimulai.</p>
                     </div>
                     {localSettings.consumerTypes.map(c => (
                       <div key={c.id} onClick={() => handleSelectConsumerType(c.id)} className={`cursor-pointer p-8 rounded-[2.5rem] border-2 transition-all relative group ${localSettings.activeConsumerTypeId === c.id ? 'border-primary bg-primary/5' : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'}`}>
@@ -330,29 +413,33 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                           <h4 className="font-black text-foreground tracking-tight text-lg">{c.name}</h4>
                           <div className="flex items-center gap-2">
                             <span className={`text-[9px] px-3 py-1 rounded-lg font-black uppercase tracking-widest border ${c.difficulty === 'Mudah' ? 'bg-green-500/10 text-green-500 border-green-500/20' : c.difficulty === 'Sedang' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>{c.difficulty}</span>
-                            {localSettings.activeConsumerTypeId === c.id && <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
+                            {localSettings.activeConsumerTypeId === c.id ? (
+                              <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>
+                            ) : (
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditConsumer(c); }} className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-border/50"><Edit2 className="w-4 h-4" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteConsumer(c.id); }} className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-border/50"><Trash2 className="w-4 h-4" /></button>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm text-muted-foreground leading-relaxed font-medium">{c.description}</p>
-                        <div className="absolute top-4 right-14 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); handleEditConsumer(c); }} className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-border/50"><Edit2 className="w-4 h-4" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteConsumer(c.id); }} className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-border/50"><Trash2 className="w-4 h-4" /></button>
-                        </div>
                       </div>
                     ))}
                   </div>
                   {!isConsumerFormOpen && (
                     <button onClick={() => { resetConsumerForm(); setIsConsumerFormOpen(true); }} className="w-full py-6 flex flex-col items-center justify-center gap-3 bg-card/40 border border-dashed border-border/50 rounded-[2.5rem] text-muted-foreground hover:text-primary hover:border-primary/30 transition-all font-black text-xs uppercase tracking-widest group">
-                      <Plus className="w-6 h-6" />
+                      <div className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors"><Plus className="w-6 h-6" /></div>
                       <span>Buat Karakteristik Baru</span>
                     </button>
                   )}
                   {isConsumerFormOpen && (
-                    <div className="bg-card border border-border/50 rounded-[2.5rem] overflow-hidden">
-                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5">
+                    <div id="consumer-form" className="bg-card border border-border/50 rounded-[2.5rem] shadow-3xl overflow-hidden relative">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5 relative z-10">
                         <h3 className="font-black text-foreground text-lg tracking-tighter">{editingConsumerId ? 'Edit Karakter' : 'Tambah Karakter Baru'}</h3>
                       </div>
-                      <div className="p-8 space-y-6">
+                      <div className="p-8 space-y-6 relative z-10">
                         <div>
                           <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Nama Karakter</label>
                           <input className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all" value={newConsumerName} onChange={e => setNewConsumerName(e.target.value)} placeholder="Contoh: Pelanggan Marah" />
@@ -366,8 +453,8 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Deskripsi</label>
-                          <textarea className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all" rows={3} value={newConsumerDesc} onChange={e => setNewConsumerDesc(e.target.value)} placeholder="Deskripsikan karakter ini..." />
+                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Deskripsi / AI Prompt</label>
+                          <textarea className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all" rows={3} value={newConsumerDesc} onChange={e => setNewConsumerDesc(e.target.value)} placeholder="Deskripsikan bagaimana karakter ini berperilaku..." />
                         </div>
                         <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
                           <button onClick={() => { resetConsumerForm(); setIsConsumerFormOpen(false); }} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/5 transition-all">Batal</button>
@@ -381,8 +468,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
 
               {activeTab === 'identity' && (
                 <div className="space-y-8 pb-10">
-                  <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm">
-                    <div className="flex items-start gap-6">
+                  <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                    <div className="flex items-start gap-6 relative z-10">
                       <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
                         <Fingerprint className="w-7 h-7 text-primary" />
                       </div>
@@ -392,8 +480,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                       </div>
                     </div>
                   </div>
-                  <div className="p-10 rounded-[2.5rem] border border-border/50 bg-card">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="p-10 rounded-[2.5rem] border border-border/50 bg-card shadow-sm relative overflow-hidden">
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -ml-32 -mb-32 pointer-events-none" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
                       <div>
                         <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Nama Konsumen</label>
                         <input type="text" className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-base text-foreground focus:ring-2 focus:ring-primary outline-none transition-all" placeholder="Contoh: Agus Setiawan" value={localSettings.identitySettings.displayName} onChange={(e) => handleIdentityChange('displayName', e.target.value)} />
@@ -449,18 +538,22 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                     </button>
                   )}
                   {isTemplateFormOpen && (
-                    <div className="bg-card border border-border/50 rounded-[2.5rem] overflow-hidden">
-                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5">
+                    <div id="template-form" className="bg-card border border-border/50 rounded-[2.5rem] shadow-3xl overflow-hidden relative">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5 relative z-10">
                         <h3 className="font-black text-foreground text-lg tracking-tighter">{editingTemplateId ? 'Edit Template' : 'Tambah Template Baru'}</h3>
                       </div>
-                      <div className="p-8 space-y-6">
+                      <div className="p-8 space-y-6 relative z-10">
                         <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Shortcut Keyword</label>
-                          <input className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all" value={newTemplateKeyword} onChange={e => setNewTemplateKeyword(e.target.value.toLowerCase().replace(/\s+/g, '-'))} placeholder="contoh: salam" />
+                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Shortcut Keyword (Tanpa Spasi)</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black">/</span>
+                            <input className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-foreground/20 pl-8" value={newTemplateKeyword} onChange={e => setNewTemplateKeyword(e.target.value.toLowerCase().replace(/\s+/g, '-'))} placeholder="contoh: salam" />
+                          </div>
                         </div>
                         <div>
                           <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">Isi Template</label>
-                          <textarea className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all" rows={5} value={newTemplateContent} onChange={e => setNewTemplateContent(e.target.value)} placeholder="Masukkan isi pesan..." />
+                          <textarea className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all font-medium leading-relaxed" rows={5} value={newTemplateContent} onChange={e => setNewTemplateContent(e.target.value)} placeholder="Masukkan isi pesan yang akan muncul saat shortcut dipanggil..." />
                         </div>
                         <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
                           <button onClick={() => { setEditingTemplateId(null); setNewTemplateKeyword(''); setNewTemplateContent(''); setIsTemplateFormOpen(false); }} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/5 transition-all">Batal</button>
@@ -475,8 +568,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
               {activeTab === 'system' && (
                 <div className="space-y-10 pb-10">
                   <section className="space-y-6">
-                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm">
-                      <div className="flex items-start gap-6">
+                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                      <div className="flex items-start gap-6 relative z-10">
                         <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center shrink-0 border border-purple-500/20">
                           <span className="text-3xl">&#x1F916;</span>
                         </div>
@@ -506,8 +600,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                   </section>
 
                   <section className="space-y-6">
-                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm">
-                      <div className="flex items-start gap-6">
+                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                      <div className="flex items-start gap-6 relative z-10">
                         <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
                           <Clock className="w-7 h-7 text-orange-500" />
                         </div>
@@ -517,16 +612,27 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 p-8 bg-card rounded-[2rem] border border-border/50">
-                      {[3, 5, 10, 15, 20, 30].map(d => (
+                    <div className="flex flex-wrap items-center gap-4 p-8 bg-card rounded-[2rem] border border-border/50">
+                      {[5, 10, 15].map(d => (
                         <button key={d} onClick={() => setLocalSettings(prev => ({ ...prev, simulationDuration: d }))} className={`px-6 py-4 rounded-2xl text-sm font-black tracking-tight transition-all border-2 ${localSettings.simulationDuration === d ? 'border-primary bg-primary/10 text-primary' : 'border-border/50 bg-foreground/5 text-muted-foreground hover:border-primary/30'}`}>{d} menit</button>
                       ))}
+                      <div className="flex items-center gap-2">
+                        {localSettings.simulationDuration === customDuration || !isPresetDuration(localSettings.simulationDuration) ? (
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={1} max={120} value={customDuration} onChange={e => setCustomDuration(Number(e.target.value))} onBlur={() => setLocalSettings(prev => ({ ...prev, simulationDuration: customDuration }))} className="w-20 rounded-2xl border border-primary bg-primary/10 p-4 text-sm font-black text-primary text-center outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            <span className="text-sm font-black text-muted-foreground">menit</span>
+                          </div>
+                        ) : (
+                          <button onClick={() => setCustomDuration(localSettings.simulationDuration)} className={`px-6 py-4 rounded-2xl text-sm font-black tracking-tight transition-all border-2 border-border/50 bg-foreground/5 text-muted-foreground hover:border-primary/30 hover:text-primary`}>Custom</button>
+                        )}
+                      </div>
                     </div>
                   </section>
 
                   <section className="space-y-6">
-                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm">
-                      <div className="flex items-start gap-6">
+                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                      <div className="flex items-start gap-6 relative z-10">
                         <div className="w-14 h-14 rounded-2xl bg-teal-500/10 flex items-center justify-center shrink-0 border border-teal-500/20">
                           <Zap className="w-7 h-7 text-teal-500" />
                         </div>
@@ -551,7 +657,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
               )}
             </div>
 
-            <div className="px-10 py-8 border-t border-border/50 flex justify-between items-center bg-card/50 shrink-0">
+            <div className="px-10 py-8 border-t border-border/50 flex justify-between items-center bg-card/50 backdrop-blur-2xl shrink-0">
               <button onClick={handleResetDefaults} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:text-red-500 transition-all px-6 py-3 rounded-2xl hover:bg-red-500/5 border border-transparent hover:border-red-500/20">
                 <RotateCcw className="w-4 h-4" />
                 Reset Default
