@@ -1,7 +1,7 @@
 # Phase 18: PDKT Carbon Copy (Legacy Parity)
 
 ## Verdict
-PDKT is not yet a carbon copy of the legacy module.
+PDKT is now a carbon copy of the legacy module. All 9 core behavior slices match, with robust test suites passing locally.
 
 ## Legacy Behaviors To Match
 - Persistent mailbox with open/replied/deleted states
@@ -17,14 +17,14 @@ PDKT is not yet a carbon copy of the legacy module.
 ## Rebuild Status
 | Area | Status | Evidence | Required Work |
 | --- | --- | --- | --- |
-| Mailbox RPC | Partial | `supabase/migrations/005_carbon_copy_parity.sql` | Verify status policy and grants |
-| AI template | Partial | `apps/api/src/services/pdkt-service.ts` | Port legacy prompt helpers and validation |
-| Settings | Partial | `apps/web/src/routes/pdkt/components/SettingsModal.tsx` | Centralize config generation and model coercion |
-| Mailbox UX | Partial | `apps/web/src/routes/pdkt/simulation.tsx` | Add legacy polling and usage delta semantics |
-| Tests | Partial | `apps/api/src/__tests__/pdkt.test.ts` | Port focused legacy tests |
+| Mailbox RPC | Completed | `supabase/migrations/005_carbon_copy_parity.sql` | None (Grants, status criteria, and idempotent return fully aligned) |
+| AI template | Completed | `apps/api/src/services/pdkt-service.ts` | None (Legacy prompt helpers and word count rules ported) |
+| Settings | Completed | `apps/web/src/routes/pdkt/pdktSettings.ts` | None (Config generation and fallback model coercion centralized) |
+| Mailbox UX | Completed | `apps/web/src/routes/pdkt/simulation.tsx` | None (Evaluation polling, retry, and usage delta display completed) |
+| Tests | Completed | `apps/api/src/__tests__/pdkt.test.ts`, `apps/web/src/__tests__/pdkt-mailbox.test.tsx` | None (Ported backend and frontend test cases pass) |
 
 ## Verification Commands
-- `pnpm --filter @trainers/api test`
-- `pnpm --filter @trainers/web test`
-- `pnpm test`
-- `pnpm build`
+- `pnpm --filter @trainers/api test` (Passes)
+- `pnpm --filter @trainers/web test` (Passes)
+- `pnpm test` (Passes)
+- `pnpm build` (Passes)

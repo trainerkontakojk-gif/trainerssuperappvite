@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MailboxSidebar } from './components/MailboxSidebar';
 import { EmailDetailPane } from './components/EmailDetailPane';
 import { ReplyComposer } from './components/ReplyComposer';
@@ -44,8 +44,28 @@ export default function PdktSimulation() {
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   
-  // Timer for time_taken
-  const [startTime, setStartTime] = useState<number | null>(null);
+  // Timer for time_taken (per mailbox)
+  const sessionStartTimeRef = useRef<Record<string, number>>({});
+
+  // Evaluation tracking by mailbox id
+  const [evaluations, setEvaluations] = useState<Record<string, {
+    result: any | null;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    error: string | null;
+  }>>({});
+
+  // Usage delta states
+  const [sessionDelta, setSessionDelta] = useState<{
+    totalCalls: number;
+    totalTokens: number;
+    costIdr: number;
+  } | null>(null);
+  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
+  const usageSnapshotRef = useRef<{
+    totalCalls: number;
+    totalTokens: number;
+    totalCostIdr: number;
+  } | null>(null);
 
   const { data: mailboxItems, loading, error, refetch } = useApi<PdktMailboxItem[]>('/pdkt/mailbox');
   const { data: defaultScenarios } = useApi<PdktScenario[]>('/pdkt/scenarios');
@@ -103,11 +123,151 @@ export default function PdktSimulation() {
     }
   }, [mailboxItems, selectedId]);
 
-  // Reset reply state and timer when selecting a new item
+  // Start timer for open items when selected
+  useEffect(() => {
+    if (selectedId && selectedItem && selectedItem.status === 'open') {
+      if (!sessionStartTimeRef.current[selectedId]) {
+        sessionStartTimeRef.current[selectedId] = Date.now();
+      }
+    }
+  }, [selectedId, selectedItem]);
+
+  // Reset reply state when selecting a new item
   useEffect(() => {
     setIsReplyOpen(false);
-    setStartTime(null);
   }, [selectedId]);
+
+  // Synchronize evaluations state from history/mailboxItems
+  useEffect(() => {
+    if (!mailboxItems) return;
+    const nextEvals: typeof evaluations = { ...evaluations };
+    let changed = false;
+
+    mailboxItems.forEach(item => {
+      if (item.status === 'replied' && item.history_id) {
+        const histItem = history.find(h => h.id === item.history_id);
+        const currentEval = nextEvals[item.id];
+
+        if (histItem) {
+          const newStatus = histItem.evaluationStatus || (histItem.evaluation ? 'completed' : 'processing');
+          if (
+            !currentEval ||
+            currentEval.status !== newStatus ||
+            JSON.stringify(currentEval.result) !== JSON.stringify(histItem.evaluation)
+          ) {
+            nextEvals[item.id] = {
+              result: histItem.evaluation || null,
+              status: newStatus as any,
+              error: histItem.evaluationError || null,
+            };
+            changed = true;
+          }
+        } else {
+          if (!currentEval) {
+            nextEvals[item.id] = {
+              result: null,
+              status: 'processing',
+              error: null,
+            };
+            changed = true;
+          }
+        }
+      }
+    });
+
+    if (changed) {
+      setEvaluations(nextEvals);
+    }
+  }, [mailboxItems, history]);
+
+  // Poll evaluation status for processing/pending items
+  useEffect(() => {
+    if (!mailboxItems) return;
+
+    const processingItems = mailboxItems.filter(item =>
+      item.status === 'replied' &&
+      item.history_id &&
+      (!evaluations[item.id] || evaluations[item.id].status === 'processing' || evaluations[item.id].status === 'pending')
+    );
+
+    if (processingItems.length === 0) return;
+
+    const checkStatus = async (item: PdktMailboxItem) => {
+      if (!item.history_id) return;
+      try {
+        const res = await getApi<any>(`/pdkt/history/eval/${item.history_id}`);
+        if (res) {
+          const oldStatus = evaluations[item.id]?.status;
+          const newStatus = res.evaluation_status;
+
+          setEvaluations(prev => ({
+            ...prev,
+            [item.id]: {
+              result: res.evaluation || null,
+              status: res.evaluation_status || 'processing',
+              error: res.evaluation_error || null
+            }
+          }));
+
+          // If it completed or failed, refetch and compute usage delta
+          if (oldStatus === 'processing' && (newStatus === 'completed' || newStatus === 'failed')) {
+            await refetch();
+            await fetchHistory();
+            await computeUsageDelta();
+          }
+        }
+      } catch (err) {
+        console.error('[PDKT] Failed to poll evaluation:', err);
+      }
+    };
+
+    const timer = setInterval(() => {
+      processingItems.forEach(checkStatus);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [mailboxItems, evaluations, refetch]);
+
+  // Usage delta helper functions
+  const captureUsageBaseline = async () => {
+    try {
+      const summary = await getApi<any>('/ai/usage/summary?module=pdkt');
+      if (summary) {
+        usageSnapshotRef.current = {
+          totalCalls: summary.totalCalls,
+          totalTokens: summary.totalTokens,
+          totalCostIdr: summary.totalCostIdr
+        };
+      }
+    } catch (err) {
+      console.error('[PDKT] Failed to capture usage baseline:', err);
+    }
+  };
+
+  const computeUsageDelta = async () => {
+    if (!usageSnapshotRef.current) {
+      setSessionDeltaPending(false);
+      return;
+    }
+    try {
+      const summary = await getApi<any>('/ai/usage/summary?module=pdkt');
+      if (summary) {
+        const deltaCalls = Math.max(0, summary.totalCalls - usageSnapshotRef.current.totalCalls);
+        const deltaTokens = Math.max(0, summary.totalTokens - usageSnapshotRef.current.totalTokens);
+        const deltaCost = Math.max(0, summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr);
+
+        setSessionDelta({
+          totalCalls: deltaCalls,
+          totalTokens: deltaTokens,
+          costIdr: deltaCost
+        });
+      }
+    } catch (err) {
+      console.error('[PDKT] Failed to compute usage delta:', err);
+    } finally {
+      setSessionDeltaPending(false);
+    }
+  };
 
   // Save Settings handler
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
@@ -122,16 +282,20 @@ export default function PdktSimulation() {
   };
 
   // Delete specific history session
-  const handleDeleteSession = async (id: string) => {
+  const handleDeleteSession = async (historyId: string) => {
     try {
-      await deleteApi(`/pdkt/history/${id}`);
-      setHistory(prev => prev.filter(h => h.id !== id));
+      await deleteApi(`/pdkt/history/${historyId}`);
+      setHistory(prev => prev.filter(h => h.id !== historyId));
       
       // Also soft-delete matching mailbox item
-      await deleteApi(`/pdkt/mailbox/${id}`);
-      await refetch();
-      if (selectedId === id) setSelectedId(null);
+      const matchingMailbox = mailboxItems?.find(item => item.history_id === historyId);
+      if (matchingMailbox) {
+        await deleteApi(`/pdkt/mailbox/${matchingMailbox.id}`);
+        await refetch();
+        if (selectedId === matchingMailbox.id) setSelectedId(null);
+      }
     } catch (err) {
+      console.error('[PDKT] Failed to delete session:', err);
       alert('Gagal menghapus riwayat sesi.');
     }
   };
@@ -157,13 +321,22 @@ export default function PdktSimulation() {
 
   // Select session from history
   const handleSelectSession = (session: SessionHistory) => {
-    setSelectedId(session.id);
+    const matchingMailbox = mailboxItems?.find(item => item.history_id === session.id);
+    if (matchingMailbox) {
+      setSelectedId(matchingMailbox.id);
+    } else {
+      alert('Sesi ini hanya ada di riwayat dan tidak aktif di kotak masuk.');
+    }
     setIsHistoryOpen(false);
   };
 
   // Start new simulation session
   const handleStartNew = async (scenario: PdktScenario) => {
     setIsStartingNew(true);
+    // Capture baseline before generating template/initializing email session
+    await captureUsageBaseline();
+    setSessionDelta(null);
+    setSessionDeltaPending(true);
     try {
       // 1. Determine Identity (Fallback)
       const fallbackIdentity = await postApi<PdktIdentity>('/pdkt/generate-identity', {});
@@ -227,6 +400,7 @@ export default function PdktSimulation() {
     } catch (err) {
       console.error('[PDKT] Failed to start new simulation:', err);
       alert('Gagal memulai simulasi baru.');
+      setSessionDeltaPending(false);
     } finally {
       setIsStartingNew(false);
     }
@@ -234,14 +408,18 @@ export default function PdktSimulation() {
 
   const handleReplyOpen = () => {
     setIsReplyOpen(true);
-    setStartTime(Date.now());
   };
 
   const handleReplySubmit = async (replyText: string) => {
-    if (!selectedId || !selectedItem || !startTime) return;
+    if (!selectedId || !selectedItem) return;
     setIsReplying(true);
+    // Capture baseline before submitting reply
+    await captureUsageBaseline();
+    setSessionDelta(null);
+    setSessionDeltaPending(true);
     
     try {
+      const startTime = sessionStartTimeRef.current[selectedId] || Date.now();
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
       const reply = {
         id: 'reply_' + Date.now(),
@@ -264,8 +442,38 @@ export default function PdktSimulation() {
       setIsReplyOpen(false);
     } catch (err) {
       alert('Gagal mengirim balasan.');
+      setSessionDeltaPending(false);
     } finally {
       setIsReplying(false);
+    }
+  };
+
+  const handleRetryEval = async (mailboxId: string, historyId: string) => {
+    // Capture baseline before retrying evaluation
+    await captureUsageBaseline();
+    setSessionDelta(null);
+    setSessionDeltaPending(true);
+
+    setEvaluations(prev => ({
+      ...prev,
+      [mailboxId]: {
+        result: null,
+        status: 'processing',
+        error: null,
+      }
+    }));
+    try {
+      await postApi('/pdkt/history/retry-eval', { historyId });
+    } catch (err: any) {
+      setEvaluations(prev => ({
+        ...prev,
+        [mailboxId]: {
+          result: null,
+          status: 'failed',
+          error: err?.message || 'Gagal memulai ulang evaluasi.',
+        }
+      }));
+      setSessionDeltaPending(false);
     }
   };
 
@@ -328,6 +536,10 @@ export default function PdktSimulation() {
               onReply={handleReplyOpen}
               onDelete={() => handleDelete(selectedItem.id)}
               isComposerOpen={isReplyOpen}
+              evaluation={evaluations[selectedItem.id]?.result || null}
+              evaluationStatus={evaluations[selectedItem.id]?.status || null}
+              evaluationError={evaluations[selectedItem.id]?.error || null}
+              onRetryEval={() => selectedItem.history_id && handleRetryEval(selectedItem.id, selectedItem.history_id)}
             />
             {isReplyOpen && (
               <div className="shrink-0">
@@ -393,6 +605,8 @@ export default function PdktSimulation() {
         isOpen={isUsageOpen}
         onClose={() => setIsUsageOpen(false)}
         module="pdkt"
+        sessionDelta={sessionDelta}
+        sessionDeltaPending={sessionDeltaPending}
       />
     </div>
   );

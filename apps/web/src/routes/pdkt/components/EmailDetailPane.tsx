@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Reply, 
   Trash2, 
@@ -13,13 +13,16 @@ import {
 import type { PdktMailboxItem } from '@trainers/types';
 import ScenarioImage from './ScenarioImage';
 import { getImageDataUri } from '../utils/detectMimeType';
-import { useApi, postApi } from '../../../hooks/useApi';
 
 interface EmailDetailPaneProps {
   item: PdktMailboxItem;
   onReply: () => void;
   onDelete: () => void;
   isComposerOpen?: boolean;
+  evaluation: any | null;
+  evaluationStatus: 'pending' | 'processing' | 'completed' | 'failed' | null;
+  evaluationError: string | null;
+  onRetryEval: () => void;
 }
 
 interface EvaluationData {
@@ -30,92 +33,24 @@ interface EvaluationData {
   contentGaps: string[];
 }
 
-interface HistoryEvalResponse {
-  evaluation_status: 'pending' | 'processing' | 'completed' | 'failed';
-  evaluation: EvaluationData | null;
-  evaluation_error: string | null;
-  time_taken: number | null;
-}
-
 export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   item,
   onReply,
   onDelete,
-  isComposerOpen = false
+  isComposerOpen = false,
+  evaluation,
+  evaluationStatus,
+  evaluationError,
+  onRetryEval
 }) => {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [evalStatus, setEvalStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | null>(null);
-  const [evalData, setEvalData] = useState<EvaluationData | null>(null);
-  const [evalError, setEvalError] = useState<string | null>(null);
-  const [isRetrying, setIsRetrying] = useState(false);
 
-  // Poll evaluation status if replied and history_id exists
-  useEffect(() => {
-    if (item.status !== 'replied' || !item.history_id) {
-      setEvalStatus(null);
-      setEvalData(null);
-      setEvalError(null);
-      return;
-    }
+  const evalStatus = evaluationStatus;
+  const evalData = evaluation;
+  const evalError = evaluationError;
+  const handleRetryEval = onRetryEval;
 
-    let isMounted = true;
-    let timeoutId: any = null;
-
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(`/api/v1/pdkt/history/eval/${item.history_id}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        });
-        const json = await response.json();
-        
-        if (!isMounted) return;
-
-        if (json.success && json.data) {
-          const data: HistoryEvalResponse = json.data;
-          setEvalStatus(data.evaluation_status);
-          setEvalData(data.evaluation);
-          setEvalError(data.evaluation_error);
-
-          if (data.evaluation_status === 'pending' || data.evaluation_status === 'processing') {
-            timeoutId = setTimeout(checkStatus, 3000);
-          }
-        } else {
-          setEvalStatus('failed');
-          setEvalError(json.error?.message || 'Gagal mengambil evaluasi');
-        }
-      } catch (err: any) {
-        if (!isMounted) return;
-        setEvalStatus('failed');
-        setEvalError(err?.message || 'Gangguan koneksi evaluasi');
-      }
-    };
-
-    checkStatus();
-
-    return () => {
-      isMounted = false;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [item.id, item.status, item.history_id, isRetrying]);
-
-  const handleRetryEval = async () => {
-    if (!item.history_id || isRetrying) return;
-    setIsRetrying(true);
-    setEvalStatus('processing');
-    setEvalError(null);
-    try {
-      await postApi('/pdkt/history/retry-eval', { historyId: item.history_id });
-      // Triggers re-running the poll effect
-      setIsRetrying(false);
-    } catch (err: any) {
-      setEvalStatus('failed');
-      setEvalError(err?.message || 'Gagal memulai ulang evaluasi.');
-      setIsRetrying(false);
-    }
-  };
 
   const formatEmailDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('id-ID', { 
