@@ -130,7 +130,7 @@ BEGIN
             now()
         FROM public.profiles p
         WHERE p.id != v_creator_id
-          AND p.status = 'active'
+          AND p.status = 'approved'
           AND p.is_deleted = false
           AND LOWER(TRIM(p.role)) IN ('leader', 'agent', 'agents', 'leaders');
     END IF;
@@ -139,6 +139,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.submit_pdkt_mailbox_batch(TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.submit_pdkt_mailbox_batch(TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, JSONB) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.submit_pdkt_mailbox_reply(
@@ -213,6 +214,7 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.submit_pdkt_mailbox_reply(UUID, JSONB, INTEGER) FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.submit_pdkt_mailbox_reply(UUID, JSONB, INTEGER) TO authenticated;
 
 -- 3. Extend telefun_history & create supporting replay tables

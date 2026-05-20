@@ -50,3 +50,29 @@ describe('PDKT Service', () => {
     expect(mockSupabase.rpc).toHaveBeenCalledWith('submit_pdkt_mailbox_batch', expect.any(Object));
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+describe('PDKT mailbox SQL contract', () => {
+  const sql = () => readFileSync(
+    join(process.cwd(), '../../supabase/migrations/005_carbon_copy_parity.sql'),
+    'utf8',
+  );
+
+  it('revokes public and anon execute access for mailbox batch RPC', () => {
+    expect(sql()).toContain(
+      'REVOKE EXECUTE ON FUNCTION public.submit_pdkt_mailbox_batch',
+    );
+    expect(sql()).toContain('FROM public, anon');
+  });
+
+  it('returns only the creator source row for duplicate mailbox requests', () => {
+    expect(sql()).toContain('AND user_id = v_creator_id');
+    expect(sql()).toContain('AND is_shared_copy = false');
+  });
+
+  it('uses the approved profile status expected by the legacy fanout RPC', () => {
+    expect(sql()).toContain("p.status = 'approved'");
+  });
+});
