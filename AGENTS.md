@@ -16,7 +16,7 @@
 
 ## Superpowers Skills
 
-Selalu panggil `Skill` tool jika ada kemungkinan skill relevan (brainstorming, writing-plans, TDD, dll). Ikuti workflow secara disiplin.
+**WAJIB** panggil `Skill` tool di setiap task — cek apakah ada skill yang relevan sebelum memulai pekerjaan. Skill tersedia untuk: brainstorming, writing-plans, TDD, customize-opencode, dll. Ikuti workflow skill secara disiplin.
 
 ## Commands (Monorepo)
 
@@ -89,10 +89,12 @@ Setiap plan implementasi WAJIB dibuat dalam 2 format dan disimpan di folder `pla
 - **Format HTML** (nama file: `plan-<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline estimasi, dependensi, risk register.
 - **Format Markdown** (nama file: `plan-<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block. Sertakan: spec references, file affected, test strategy, rollback plan.
 
-### 7. Selalu Referensi Context7 untuk Dokumentasi
-Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
-   1. Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
-   2. Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
+### 7. Selalu Referensi Context7 + Superpowers untuk Dokumentasi
+Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
+1. Panggil `Skill` tool untuk cek apakah ada superpower skill yang relevan.
+2. Gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
+   - Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
+   - Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
    Hindari penggunaan API yang deprecated dari data training lama.
 
 ## AI Integration Conventions
