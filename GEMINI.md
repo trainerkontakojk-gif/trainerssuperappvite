@@ -65,7 +65,18 @@ This project uses `pnpm` and `turbo`.
   - Jangan tambahkan gambar/font besar tanpa optimasi (lazy loading, compression, responsive images via `srcset`).
   - Jika menambah library baru, selalu cek bundle impact-nya. Library ringan > library populer tapi berat.
 
-### 7. Always Use Context7 for Documentation
+### 7. Spec-Driven Development Wajib
+Setiap memulai pekerjaan baru (fitur, bug fix, refactor), WAJIB menerapkan **Spec-Driven Development (SDD)**:
+1. Tulis spec terlebih dahulu: tujuan, acceptance criteria, edge cases, dan constraint teknis.
+2. Buat plan implementasi dalam 2 format (lihat aturan #8) sebelum menulis kode.
+3. Jangan memulai coding sebelum plan diverifikasi / disetujui.
+
+### 8. Plan Wajib Dibuat dalam 2 Format
+Setiap plan implementasi WAJIB dibuat dalam 2 format dan disimpan di folder `plan/`:
+- **Format HTML** (nama file: `plan-<nama-fitur>.html`) — Untuk dibaca manusia. Styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline, dependensi, risk register.
+- **Format Markdown** (nama file: `plan-<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan heading, tabel, checklist, code block. Sertakan: spec references, file affected, test strategy, rollback plan.
+
+### 9. Always Use Context7 for Documentation
 - **MANDATORY:** Always use the `context7` MCP tool (`@upstash/context7-mcp`) to fetch the latest documentation for Supabase, Hono, TanStack, and other libraries before writing code.
 - Workflow: `resolve-library-id` → cari library → `query-docs` dengan library ID untuk ambil dokumentasi terbaru.
 - API key disimpan di `.env.local` sebagai `CONTEXT7_API_KEY`.

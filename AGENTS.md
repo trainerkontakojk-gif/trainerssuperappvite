@@ -76,7 +76,18 @@ Pastikan README dan panduan modul mudah dipahami oleh pembaca non-teknis.
 ### 4. File Editing Harus Pakai Unified Diff
 Baca file terbaru, buat patch minimal, dan terapkan. Hindari overwrite penuh jika tidak perlu.
 
-### 5. Selalu Referensi Context7 untuk Dokumentasi
+### 5. Spec-Driven Development Wajib
+Setiap memulai pekerjaan baru (fitur, bug fix, refactor), WAJIB menerapkan **Spec-Driven Development (SDD)**:
+1. Tulis spec terlebih dahulu: tujuan, acceptance criteria, edge cases, dan constraint teknis.
+2. Buat plan implementasi dalam 2 format (lihat aturan #6) sebelum menulis kode.
+3. Jangan memulai coding sebelum plan diverifikasi / disetujui.
+
+### 6. Plan Wajib Dibuat dalam 2 Format
+Setiap plan implementasi WAJIB dibuat dalam 2 format dan disimpan di folder `plan/`:
+- **Format HTML** (nama file: `plan-<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline estimasi, dependensi, risk register.
+- **Format Markdown** (nama file: `plan-<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block. Sertakan: spec references, file affected, test strategy, rollback plan.
+
+### 7. Selalu Referensi Context7 untuk Dokumentasi
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
    1. Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
    2. Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
