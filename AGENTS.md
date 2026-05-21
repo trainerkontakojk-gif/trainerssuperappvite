@@ -86,8 +86,8 @@ Setiap memulai pekerjaan baru (fitur, bug fix, refactor), WAJIB menerapkan **Spe
 
 ### 6. Plan Wajib Dibuat dalam 2 Format (wajib di folder `plan/`)
 Setiap plan implementasi WAJIB dibuat dalam 2 format dan **WAJIB** disimpan di folder `plan/` (bukan di folder lain):
-- **Format HTML** (file: `plan/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline estimasi, dependensi, risk register.
-- **Format Markdown** (file: `plan/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block. Sertakan: spec references, file affected, test strategy, rollback plan.
+- **Format HTML** (file: `plan/html/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline estimasi, dependensi, risk register.
+- **Format Markdown** (file: `plan/markdown/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block. Sertakan: spec references, file affected, test strategy, rollback plan.
 
 ### 7. Selalu Referensi Context7 + Superpowers untuk Dokumentasi
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
