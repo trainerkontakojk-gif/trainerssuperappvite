@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { KetikAppSettings, KetikScenario, KetikConsumerType, KetikQuickTemplate } from '@trainers/types';
 import { DEFAULT_KETIK_SETTINGS } from '@trainers/types';
 import { Clock, Trash2, X, Plus, Check, Edit2, RotateCcw, Save, Image as ImageIcon, Settings, FileText, Users, Fingerprint, Zap, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { notify } from '../../../lib/toast';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -35,18 +36,74 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [newTemplateKeyword, setNewTemplateKeyword] = useState('');
   const [newTemplateContent, setNewTemplateContent] = useState('');
-  const [customDuration, setCustomDuration] = useState<number>(() => {
-    const d = settings.simulationDuration;
-    return !d || [5, 10, 15].includes(d) ? 20 : d;
-  });
+  const [customInputValue, setCustomInputValue] = useState('');
+  const [durationValidationError, setDurationValidationError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const isPresetDuration = (d: number) => [5, 10, 15].includes(d);
+  const PRESET_DURATIONS = [5, 10, 15];
+  const MIN_DURATION = 1;
+  const MAX_DURATION = 60;
+
+  const classifyDurationMode = (val: number | undefined): 'preset' | 'custom' => {
+    const d = Number(val);
+    if (isNaN(d)) return 'custom';
+    return (PRESET_DURATIONS as number[]).includes(d) ? 'preset' : 'custom';
+  };
+
+  const durationMode = classifyDurationMode(localSettings.simulationDuration);
+
+  const handlePresetClick = (d: number) => {
+    setCustomInputValue('');
+    setDurationValidationError(null);
+    setLocalSettings(prev => ({ ...prev, simulationDuration: d }));
+  };
+
+  const handleCustomClick = () => {
+    const current = localSettings.simulationDuration;
+    setCustomInputValue(current ? String(current) : '');
+    setDurationValidationError(null);
+  };
+
+  const handleDurationInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const filtered = raw.replace(/[^0-9]/g, '');
+    setCustomInputValue(filtered);
+    setDurationValidationError(null);
+    const num = parseInt(filtered, 10);
+    if (filtered.length > 0 && !isNaN(num) && num >= MIN_DURATION && num <= MAX_DURATION) {
+      setLocalSettings(prev => ({ ...prev, simulationDuration: num }));
+    }
+  };
+
+  const handleDurationBlur = () => {
+    const num = parseInt(customInputValue, 10);
+    if (isNaN(num) || num < MIN_DURATION || num > MAX_DURATION) {
+      setDurationValidationError(`Masukkan angka ${MIN_DURATION}-${MAX_DURATION}.`);
+      setLocalSettings(prev => ({ ...prev, simulationDuration: clampDuration(prev.simulationDuration) }));
+      return;
+    }
+    setCustomInputValue(String(num));
+    setDurationValidationError(null);
+    setLocalSettings(prev => ({ ...prev, simulationDuration: num }));
+  };
+
+  const clampDuration = (val: number | undefined): number => {
+    const d = Number(val);
+    if (isNaN(d) || d < MIN_DURATION) return MIN_DURATION;
+    if (d > MAX_DURATION) return MAX_DURATION;
+    return d;
+  };
 
   const TEXT_MODELS = [
     { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', description: 'Cepat dan efisien untuk simulasi chat ringan.', provider: 'gemini' },
-    { id: 'gemini-3.1-flat-002', name: 'Gemini 3.1 Flash', description: 'Keseimbangan antara kecepatan dan kualitas.', provider: 'gemini' },
-    { id: 'openrouter/anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku', description: 'Respons cepat dengan kualitas baik.', provider: 'openrouter' },
-    { id: 'openrouter/openai/gpt-4o-mini', name: 'GPT-4o Mini', description: 'Model ringan OpenAI dengan performa solid.', provider: 'openrouter' },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (Preview)', description: 'Model Gemini terbaru dengan performa tinggi.', provider: 'gemini' },
+    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro (Preview)', description: 'Model terbesar dengan kemampuan analisis mendalam.', provider: 'gemini' },
+    { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Model ringan dengan kecepatan respons tinggi.', provider: 'gemini' },
+    { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', description: 'Model open-source 120B parameter gratis.', provider: 'openrouter' },
+    { id: 'google/gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite (OpenRouter)', description: 'Gemini Flash Lite via OpenRouter.', provider: 'openrouter' },
+    { id: 'google/gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite (OpenRouter)', description: 'Gemini Flash Lite 2.0 via OpenRouter.', provider: 'openrouter' },
+    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', description: 'Model ringan OpenAI dengan performa solid.', provider: 'openrouter' },
+    { id: 'qwen/qwen3.5-flash-02-23', name: 'Qwen 3.5 Flash', description: 'Model Qwen cepat dengan kualitas baik.', provider: 'openrouter' },
   ];
 
   const handleIdentityChange = (field: string, value: string) => {
@@ -100,7 +157,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       Array.from(e.target.files).forEach(file => {
-        if (file.size > 500 * 1024) { alert(`File ${file.name} terlalu besar (>500KB). Mohon kompres gambar terlebih dahulu.`); return; }
+        if (file.size > 500 * 1024) { notify.error(`File ${file.name} terlalu besar (>500KB). Mohon kompres gambar terlebih dahulu.`); return; }
         const reader = new FileReader();
         reader.onloadend = () => setNewScenarioImages(prev => [...prev, reader.result as string]);
         reader.readAsDataURL(file);
@@ -144,19 +201,19 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
     if (isScenarioDraftDirty() && !isScenarioDraftValid()) {
       setActiveTab('scenarios');
       setTimeout(() => document.getElementById('scenario-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-      alert('Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.');
+      notify.warning('Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.');
       return;
     }
     if (isConsumerDraftDirty() && !isConsumerDraftValid()) {
       setActiveTab('consumers');
       setTimeout(() => document.getElementById('consumer-form')?.scrollIntoView({ behavior: 'smooth' }), 100);
-      alert('Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.');
+      notify.warning('Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.');
       return;
     }
     if (isTemplateDirty() && (!newTemplateKeyword || !newTemplateContent)) {
       setActiveTab('template');
       setTimeout(() => document.getElementById('template-form')?.scrollIntoView({ behavior: 'smooth' }), 100);
-      alert('Template yang sedang Anda buat belum lengkap. Isi keyword dan konten terlebih dahulu, atau klik Batal untuk membatalkan template.');
+      notify.warning('Template yang sedang Anda buat belum lengkap. Isi keyword dan konten terlebih dahulu, atau klik Batal untuk membatalkan template.');
       return;
     }
 
@@ -199,7 +256,7 @@ export function SettingsModal({ isOpen, onClose, settings, onSave }: SettingsMod
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
+        <div data-module="ketik" className="module-clean-app fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
           <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-4xl max-h-[86vh] rounded-[2rem] flex flex-col overflow-hidden shadow-2xl shadow-black/10 bg-card border border-border/50">
             <div className="px-5 py-4 sm:px-6 sm:py-5 border-b flex justify-between items-center shrink-0 relative overflow-hidden">
@@ -584,7 +641,7 @@ Akhir:
                       {TEXT_MODELS.map(model => {
                         const isSelected = localSettings.selectedModel === model.id;
                         return (
-                          <div key={model.id} onClick={() => setLocalSettings(prev => ({ ...prev, selectedModel: model.id }))} className={`cursor-pointer p-6 rounded-[2rem] border-2 transition-all flex items-center justify-between gap-6 ${isSelected ? 'border-primary bg-primary/5' : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'}`}>
+                          <div key={model.id} onClick={() => setLocalSettings(prev => ({ ...prev, selectedModel: model.id }))} className={`cursor-pointer p-6 rounded-[2rem] border-2 transition-all flex items-center justify-between gap-6 group ${isSelected ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/5' : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'}`}>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <h4 className="font-black text-foreground tracking-tight text-lg">{model.name}</h4>
@@ -592,7 +649,7 @@ Akhir:
                               </div>
                               <p className="text-sm text-muted-foreground mt-1 font-medium">{model.description}</p>
                             </div>
-                            {isSelected && <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center shrink-0"><Check className="w-4 h-4 text-white" /></div>}
+                            {isSelected && <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0"><Check className="w-4 h-4 text-white" /></div>}
                           </div>
                         );
                       })}
@@ -612,21 +669,61 @@ Akhir:
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-4 p-8 bg-card rounded-[2rem] border border-border/50">
-                      {[5, 10, 15].map(d => (
-                        <button key={d} onClick={() => setLocalSettings(prev => ({ ...prev, simulationDuration: d }))} className={`px-6 py-4 rounded-2xl text-sm font-black tracking-tight transition-all border-2 ${localSettings.simulationDuration === d ? 'border-primary bg-primary/10 text-primary' : 'border-border/50 bg-foreground/5 text-muted-foreground hover:border-primary/30'}`}>{d} menit</button>
-                      ))}
-                      <div className="flex items-center gap-2">
-                        {localSettings.simulationDuration === customDuration || !isPresetDuration(localSettings.simulationDuration) ? (
-                          <div className="flex items-center gap-2">
-                            <input type="number" min={1} max={120} value={customDuration} onChange={e => setCustomDuration(Number(e.target.value))} onBlur={() => setLocalSettings(prev => ({ ...prev, simulationDuration: customDuration }))} className="w-20 rounded-2xl border border-primary bg-primary/10 p-4 text-sm font-black text-primary text-center outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                            <span className="text-sm font-black text-muted-foreground">menit</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                      {PRESET_DURATIONS.map(d => {
+                        const isSelected = durationMode === 'preset' && localSettings.simulationDuration === d;
+                        return (
+                          <div key={d} onClick={() => handlePresetClick(d)} className={`cursor-pointer p-6 sm:p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-2 sm:gap-3 text-center relative group ${isSelected ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/5' : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'}`}>
+                            <span className={`text-3xl sm:text-4xl font-black tracking-tighter ${isSelected ? 'text-primary' : 'text-foreground/20'}`}>{d}</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Menit</span>
+                            {isSelected && (
+                              <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 z-10">
+                                <Check className="w-4 h-4 text-white" />
+                              </div>
+                            )}
                           </div>
-                        ) : (
-                          <button onClick={() => setCustomDuration(localSettings.simulationDuration)} className={`px-6 py-4 rounded-2xl text-sm font-black tracking-tight transition-all border-2 border-border/50 bg-foreground/5 text-muted-foreground hover:border-primary/30 hover:text-primary`}>Custom</button>
+                        );
+                      })}
+                      <div onClick={handleCustomClick} className={`cursor-pointer p-6 sm:p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-2 sm:gap-3 text-center relative group ${durationMode === 'custom' ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/5' : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'}`}>
+                        <span className={`text-3xl sm:text-4xl font-black tracking-tighter ${durationMode === 'custom' ? 'text-primary' : 'text-foreground/20'}`}>&#x2699;&#xFE0F;</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Kustom</span>
+                        {durationMode === 'custom' && (
+                          <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 z-10">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
                         )}
                       </div>
                     </div>
+                    <AnimatePresence>
+                      {durationMode === 'custom' && (
+                        <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
+                          <div className="p-6 rounded-[2rem] border border-border/50 bg-card/50 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+                            <div>
+                              <label className="block text-xs font-black text-foreground uppercase tracking-wider mb-1">Masukkan Durasi Kustom</label>
+                              <p className="text-[11px] text-muted-foreground font-medium">Tentukan durasi simulasi antara {MIN_DURATION} hingga {MAX_DURATION} menit.</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <div className="relative w-36">
+                                <input
+                                  ref={inputRef}
+                                  type="text"
+                                  inputMode="numeric"
+                                  placeholder="5"
+                                  value={customInputValue}
+                                  onChange={handleDurationInputChange}
+                                  onBlur={handleDurationBlur}
+                                  className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-3.5 pr-12 text-base font-black text-foreground focus:ring-2 focus:ring-primary outline-none transition-all text-right"
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black uppercase tracking-widest text-muted-foreground pointer-events-none">Min</span>
+                              </div>
+                              {durationValidationError && (
+                                <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[10px] font-black text-red-500 uppercase tracking-wider mt-1">{durationValidationError}</motion.span>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </section>
 
                   <section className="space-y-6">

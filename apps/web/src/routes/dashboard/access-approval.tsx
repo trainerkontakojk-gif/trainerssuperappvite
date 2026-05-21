@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserCheck, ShieldCheck, XCircle, Search, HelpCircle, Save, Info, Check, ShieldAlert, ArrowRight, UserMinus, Plus, Settings } from 'lucide-react';
 import { useApi, postApi, putApi } from '../../hooks/useApi';
+import { notify } from '../../lib/toast';
 
 interface LeaderRequest {
   id: string;
@@ -77,12 +78,12 @@ export default function AccessApprovalPage() {
     if (!selectedReqId) return;
 
     if (type === 'approve' && selectedGroupIds.length === 0) {
-      alert('Pilih minimal satu grup akses sebelum menyetujui.');
+      notify.warning('Pilih minimal satu grup akses sebelum menyetujui.');
       return;
     }
 
     if ((type === 'reject' || type === 'revoke') && !actionNote.trim()) {
-      alert('Masukkan catatan/alasan penolakan atau pencabutan akses.');
+      notify.warning('Masukkan catatan/alasan penolakan atau pencabutan akses.');
       return;
     }
 
@@ -92,22 +93,22 @@ export default function AccessApprovalPage() {
         await postApi(`/admin/leader-requests/${selectedReqId}/approve`, {
           accessGroupIds: selectedGroupIds,
         });
-        alert('Permintaan akses berhasil disetujui');
+        notify.success('Permintaan akses berhasil disetujui');
       } else if (type === 'reject') {
         await postApi(`/admin/leader-requests/${selectedReqId}/reject`, {
           note: actionNote,
         });
-        alert('Permintaan akses berhasil ditolak');
+        notify.success('Permintaan akses berhasil ditolak');
       } else if (type === 'revoke') {
         await postApi(`/admin/leader-requests/${selectedReqId}/revoke`, {
           note: actionNote,
         });
-        alert('Akses berhasil dicabut');
+        notify.success('Akses berhasil dicabut');
       } else if (type === 'update_groups') {
         await putApi(`/admin/leader-requests/${selectedReqId}/groups`, {
           accessGroupIds: selectedGroupIds,
         });
-        alert('Grup akses berhasil diperbarui');
+        notify.success('Grup akses berhasil diperbarui');
       }
 
       setSelectedReqId(null);
@@ -117,7 +118,7 @@ export default function AccessApprovalPage() {
         await refetchApproved();
       }
     } catch (err: any) {
-      alert(err.message || 'Gagal memproses aksi.');
+      notify.error(err.message || 'Gagal memproses aksi.');
     } finally {
       setProcessing(false);
       setActionType(null);

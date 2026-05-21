@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { PdktScenario, PdktConsumerType, PdktIdentity } from '@trainers/types';
 import ScenarioImage from './ScenarioImage';
 import { postApi } from '../../../hooks/useApi';
+import { notify } from '../../../lib/toast';
 import {
   type PdktAppSettings as AppSettings,
   TEXT_MODELS,
@@ -176,12 +177,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       const file = files[0];
 
       if (file.size > 500 * 1024) {
-        alert("Ukuran gambar terlalu besar! Maksimal 500KB per gambar agar pengaturan dapat disimpan.");
+        notify.error("Ukuran gambar terlalu besar! Maksimal 500KB per gambar agar pengaturan dapat disimpan.");
         return;
       }
 
       if (newScenarioImages.length >= 5) {
-        alert("Maksimal 5 gambar per skenario.");
+        notify.warning("Maksimal 5 gambar per skenario.");
         return;
       }
 
@@ -202,7 +203,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleSaveScenario = () => {
     if (!newScenarioTitle || !newScenarioDesc) return;
     if (newScenarioAlwaysUseTemplate && !newScenarioTemplateBody.trim()) {
-      alert('Isi body template email jika Anda memilih "Always use this email".');
+      notify.warning('Isi body template email jika Anda memilih "Always use this email".');
       return;
     }
     const category = isNewCategoryInput ? newScenarioCategory : newScenarioCategory || "Umum";
@@ -253,7 +254,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleGenerateTemplate = async () => {
     if (!newScenarioTitle || !newScenarioDesc) {
-      alert('Isi judul dan deskripsi masalah terlebih dahulu untuk generate template.');
+      notify.warning('Isi judul dan deskripsi masalah terlebih dahulu untuk generate template.');
       return;
     }
 
@@ -295,7 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setNewScenarioTemplateSubject(result.subject);
       setNewScenarioTemplateBody(result.body);
     } catch (e: any) {
-      alert(e.message || 'Gagal generate template.');
+      notify.error(e.message || 'Gagal generate template.');
     } finally {
       if (templateGenerationTokenRef.current === draftIdentity) {
         setIsGeneratingTemplate(false);
@@ -475,7 +476,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setTimeout(() => {
         document.getElementById('scenario-form')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-      alert('Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.');
+      notify.warning('Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.');
       return;
     }
 
@@ -484,7 +485,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setTimeout(() => {
         document.getElementById('scenario-form')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-      alert('Isi body template email jika Anda memilih "Always use this email".');
+      notify.warning('Isi body template email jika Anda memilih "Always use this email".');
       return;
     }
 
@@ -493,7 +494,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setTimeout(() => {
         document.getElementById('consumer-form')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-      alert('Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.');
+      notify.warning('Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.');
       return;
     }
 
@@ -532,7 +533,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onSave(settingsToSave);
       onClose();
     } catch (e) {
-      alert("Gagal menyimpan! Ukuran data (gambar) terlalu besar untuk penyimpanan browser. Silakan hapus beberapa gambar.");
+      notify.error("Gagal menyimpan! Ukuran data (gambar) terlalu besar untuk penyimpanan browser. Silakan hapus beberapa gambar.");
       console.error(e);
     }
   };

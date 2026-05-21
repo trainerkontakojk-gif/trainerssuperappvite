@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layers, Plus, Search, HelpCircle, Save, Trash2, Shield, Settings, Info, Check, Filter } from 'lucide-react';
 import { useApi, postApi, putApi, deleteApi } from '../../hooks/useApi';
+import { notify } from '../../lib/toast';
 
 interface AccessGroup {
   id: string;
@@ -102,19 +103,19 @@ export default function AccessGroupsPage() {
           description: groupDescription,
           is_active: groupIsActive,
         });
-        alert('Grup akses berhasil diperbarui');
+        notify.success('Grup akses berhasil diperbarui');
       } else {
         const newGroup = await postApi<AccessGroup>('/admin/access-groups', {
           name: groupName,
           description: groupDescription,
         });
-        alert('Grup akses berhasil dibuat');
+        notify.success('Grup akses berhasil dibuat');
         setSelectedGroupId(newGroup.id);
       }
       setIsModalOpen(false);
       await refetchGroups();
     } catch (err: any) {
-      alert(err.message || 'Gagal menyimpan grup akses.');
+      notify.error(err.message || 'Gagal menyimpan grup akses.');
     } finally {
       setSavingGroup(false);
     }
@@ -133,7 +134,7 @@ export default function AccessGroupsPage() {
       setNewFieldValue('');
       await refetchItems();
     } catch (err: any) {
-      alert(err.message || 'Gagal menambahkan aturan akses.');
+      notify.error(err.message || 'Gagal menambahkan aturan akses.');
     } finally {
       setAddingRule(false);
     }
@@ -146,7 +147,7 @@ export default function AccessGroupsPage() {
       await deleteApi(`/admin/access-groups/items/${itemId}`);
       await refetchItems();
     } catch (err: any) {
-      alert(err.message || 'Gagal menghapus aturan akses.');
+      notify.error(err.message || 'Gagal menghapus aturan akses.');
     }
   };
 

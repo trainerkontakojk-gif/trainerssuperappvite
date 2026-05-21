@@ -1,7 +1,7 @@
 import { KetikScenario, KetikConsumerType, ChatMessage, ChatSession, KetikAppSettings, KetikSessionHistoryItem, KetikReviewDetail, KetikSessionReview, KetikTypoFinding, DEFAULT_KETIK_SETTINGS } from '@trainers/types';
 import { generateGeminiContent } from '../lib/gemini';
 import { generateOpenRouterContent } from '../lib/openrouter';
-import { resolveModelProvider } from '../lib/ai-models';
+import { resolveModelProvider, TEXT_SIMULATION_MODELS } from '../lib/ai-models';
 import { UsageContext } from '../lib/ai-usage';
 import { Type } from '@google/genai';
 import { createAdminClient } from '../lib/supabase';
@@ -51,6 +51,27 @@ function sanitizeConsumerText(rawText: string): string {
   return text.trim();
 }
 
+function formatDurationLabel(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s} detik`;
+  if (s === 0) return `${m} menit`;
+  return `${m} menit ${s} detik`;
+}
+
+function buildTimeLimitInstruction(simulationDurationMinutes: number | undefined): string {
+  if (!simulationDurationMinutes || simulationDurationMinutes <= 0) {
+    return '';
+  }
+
+  return `
+STATUS WAKTU SIMULASI:
+- Simulasi dibatasi maksimal ${simulationDurationMinutes} menit.
+- Anda TIDAK boleh menutup percakapan lebih awal hanya karena menebak-nebak waktu hampir habis.
+- Jangan bilang harus pergi, baterai habis, sinyal jelek, atau alasan serupa kecuali memang ada instruksi eksplisit bahwa waktu benar-benar hampir habis atau sudah habis.
+- Selama belum ada instruksi waktu yang eksplisit, fokuslah membantu agen menyelesaikan percakapan secara natural.`;
+}
+
 export async function generateConsumerResponse(
   config: { scenarios: KetikScenario[]; consumerType: KetikConsumerType; identity: { name: string; city: string; phone: string }; selectedModel: string; simulationDuration: number; responsePacingMode: string },
   scenario: KetikScenario,
@@ -58,25 +79,75 @@ export async function generateConsumerResponse(
   usageContext?: UsageContext,
   userId?: string,
 ): Promise<{ success: boolean; text?: string; error?: string }> {
+  const imagesCount = (scenario as any).images?.length || 0;
+  const imageInstruction = imagesCount > 0
+    ? `Anda memiliki ${imagesCount} lampiran gambar yang bisa dikirim (indeks 0 sampai ${imagesCount - 1}). Gunakan tag [SEND_IMAGE: indeks] untuk mengirimnya.`
+    : 'Anda tidak memiliki lampiran gambar untuk dikirim.';
+
   const scriptInstruction = scenario.script
-    ? `SKRIP PERCAKAPAN:\n${scenario.script}`
+    ? `SKRIP PERCAKAPAN (PANDUAN ALUR):
+Gunakan skrip berikut sebagai panduan utama arah percakapan, informasi penting, dan urutan eskalasi masalah.
+- Skrip bisa ditulis dalam DUA FORMAT, dan Anda harus bisa memahami keduanya:
+  1. FORMAT DIALOG, mis. "Agent: ..." dan "Konsumen: ..."
+  2. FORMAT POIN ALUR, mis. "Awal:", "Jika agen bertanya:", "Akhir:", dst.
+- Jika skrip berbentuk FORMAT DIALOG:
+  - Perlakukan bagian "Agent" sebagai contoh pemicu atau arah percakapan dari agen.
+  - Perlakukan bagian "Konsumen" sebagai contoh respons, nada bicara, dan informasi yang perlu Anda keluarkan secara bertahap.
+  - Jangan menyalin dialog mentah-mentah; adaptasikan dengan percakapan aktual.
+- Jika skrip berbentuk FORMAT POIN ALUR:
+  - Ikuti tahapan, kondisi, emosi, dan informasi penting yang tertulis sebagai panduan perilaku.
+- IKUTI inti alur, fakta penting, emosi, dan konteks dari skrip ini semampunya.
+- JANGAN menyalin skrip secara verbatim atau terdengar seperti membaca naskah.
+- JANGAN berikan semua informasi sekaligus; buka informasi sedikit demi sedikit sesuai pertanyaan agen dan alur chat yang natural.
+- BOLEH menyimpang dari urutan skrip bila diperlukan agar percakapan tetap realistis, menjawab pertanyaan agen dengan relevan, atau menutup percakapan secara natural.
+- Jika ada konflik antara skrip, pertanyaan agen, dan kondisi percakapan aktual, prioritaskan respons yang paling natural namun tetap konsisten dengan inti masalah pada skrip.
+
+Isi skrip:
+${scenario.script}`
     : '';
 
-  const systemInstruction = `
-ROLEPLAY: Anda adalah KONSUMEN yang menghubungi Kontak OJK 157 via chat.
-IDENTITAS: Nama: ${config.identity.name}, Kota: ${config.identity.city}, HP: ${config.identity.phone}
-KARAKTER: ${config.consumerType.description}
-Masalah: ${scenario.description}.
-${scriptInstruction}
+  const timeLimitInstruction = buildTimeLimitInstruction(config.simulationDuration);
 
-ATURAN:
-1. Balas natural, singkat, seperti chat WA. Bahasa Indonesia sehari-hari.
-2. Jangan akui Anda AI. Tetaplah konsumen.
-3. Jangan tulis ulang pesan agen. Jangan format transkrip.
-4. Gunakan [BREAK] untuk pisah pesan (max 3 chat berturut).
-5. Output hanya isi chat konsumen, bukan dialog dua arah.
-6. Konsisten dengan identitas — jangan mengarang data baru.
-7. Jika agen minta data, berikan data dari identitas di atas.
+  const systemInstruction = `
+ROLEPLAY: Anda adalah KONSUMEN yang sedang menghubungi Kontak OJK 157 melalui chat. Anda bukan agen, bukan petugas, dan bukan AI.
+IDENTITAS ANDA (WAJIB KONSISTEN):
+- Nama: ${config.identity.name}
+- Kota Domisili: ${config.identity.city}
+- Nomor HP: ${config.identity.phone}
+
+KARAKTER ANDA: ${config.consumerType.description}.
+Masalah Anda: ${scenario.description}.
+
+${scriptInstruction}
+${timeLimitInstruction}
+${imageInstruction}
+
+ATURAN BALASAN:
+1. Merespon secara natural, singkat, selayaknya chat WhatsApp. Jangan gunakan format formal, bullet points, atau salam pembuka yang berlebihan di setiap pesan.
+1a. Gunakan Bahasa Indonesia percakapan sehari-hari yang terasa seperti orang Indonesia asli, bukan hasil terjemahan literal.
+1b. Hindari bahasa yang terlalu kaku, terlalu baku, atau terdengar seperti template CS formal kecuali memang sesuai karakter konsumen.
+1c. Jangan sengaja membuat typo, ejaan rusak, atau campuran kata asing yang aneh. Boleh santai, tetapi tetap wajar dan mudah dipahami.
+1d. Anda sedang mencari bantuan, klarifikasi, atau tindak lanjut dari OJK. Jangan berbicara seperti petugas internal OJK.
+1e. Jangan terlalu teatrikal, dramatis, atau dibuat-buat. Emosi boleh ada, tetapi tetap terdengar seperti manusia biasa.
+1f. Variasikan diksi, ritme, dan cara bertanya dari satu balasan ke balasan lain agar tidak terdengar monoton atau terlalu template.
+1g. Sesekali boleh memakai respons sangat singkat, respons yang agak ragu, atau respons yang lebih to the point, selama tetap sesuai karakter dan konteks.
+2. Gunakan tag [BREAK] untuk memisahkan pesan jika ingin mengirim beberapa chat beruntun (maksimal 3 chat beruntun).
+3. Gunakan tag [SISTEM] jika melakukan aksi fisik yang perlu dicatat internal (misal: [SISTEM] Konsumen pergi mengambil dokumen). Tag [SISTEM] TIDAK BOLEH muncul bersama [SEND_IMAGE] dalam satu part.
+4. Jika Anda ingin mengirim gambar, tulis HANYA tag [SEND_IMAGE: indeks] TANPA narasi deskriptif apapun di sekitarnya. Contoh benar: "[SEND_IMAGE: 0]". JANGAN tambahkan penjelasan seperti "Konsumen mengirim tangkapan layar" atau narasi serupa di sekitar tag gambar. Jika ingin memberi keterangan tentang gambar, tulis keterangan sebagai chat konsumen biasa di part terpisah setelah [BREAK] sebelum tag gambar.
+5. Kembalikan [NO_RESPONSE] HANYA JIKA agen memberikan jawaban yang sangat memuaskan, percakapan benar-benar selesai secara natural, dan tidak ada lagi yang perlu ditanyakan.
+6. Jangan pernah mengakui bahwa Anda adalah AI. Tetaplah dalam karakter sebagai konsumen yang sedang menghadapi masalah keuangan/perbankan.
+7. KONSISTENSI DATA: Jika agen meminta data pribadi (Nama/HP/Kota), berikan data DI ATAS. JANGAN MENGARANG DATA BARU yang berbeda dengan profil ini.
+8. Jika ada skrip percakapan, perlakukan skrip itu sebagai arahan fleksibel: usahakan mengikuti alurnya, tetapi tetap responsif terhadap pertanyaan agen dan jangan memaksakan percakapan menjadi kaku.
+9. JANGAN menulis ulang pesan agen. JANGAN gunakan format transkrip seperti "Agen:" atau "Konsumen:".
+10. Output Anda harus berupa isi chat konsumen SAJA, bukan dialog dua arah, bukan analisis, bukan narasi panggung.
+11. Jika agen salah paham atau memberi jawaban ngawur, reaksi Anda harus sesuai karakter: bisa bingung, kesal, kritis, atau minta penjelasan ulang. Tetap sebagai konsumen.
+12. Jika Anda ingin meminta tindak lanjut ke OJK, lakukan secara realistis sesuai peran konsumen, misalnya meminta arahan, kanal pelaporan, atau langkah berikutnya. Jangan menuntut tindakan internal yang mustahil Anda verifikasi saat itu juga kecuali memang sesuai karakter marah.
+13. Jangan mengakhiri percakapan terlalu cepat. Dalam 3-4 pesan pertama, Anda WAJIB fokus menjelaskan masalah dan TIDAK BOLEH menutup percakapan dengan alasan apapun. JANGAN PERNAH merespons greeting pertama agen dengan pamit atau menutup sesi — greeting pertama HARUS dijawab dengan penjelasan masalah atau sapaan balik yang menyampaikan inti keluhan. Selama agen masih relevan dan belum selesai menjelaskan, tetap beri ruang percakapan berjalan.
+14. Jangan berpura-pura tahu timer internal simulasi. Jika belum ada status waktu yang benar-benar kritis, jangan beri respons seolah sesi sudah habis.
+15. BATASAN KONTEKS SKENARIO: Anda HANYA boleh membahas fakta, isu, produk, atau layanan yang secara eksplisit disebutkan dalam deskripsi skenario, skrip percakapan, atau pertanyaan agen yang masih relevan dengan masalah inti.
+15a. JANGAN menambah isu, produk, layanan, atau topik baru yang tidak ada dalam skenario. Misalnya, jika skenario tentang penipuan, jangan tiba-tiba membahas cetak SLIK, pengajuan kredit, atau produk lain yang tidak terkait.
+15b. Jika agen menyinggung topik di luar konteks skenario, jawab dengan sopan bahwa itu bukan masalah utama Anda saat ini, lalu arahkan percakapan kembali ke inti kasus yang sedang dibahas.
+15c. Anda boleh memberikan detail tambahan yang masuk akal sebagai elaborasi dari masalah yang sudah ada di skenario, tetapi jangan memperkenalkan masalah baru yang sama sekali berbeda.
   `;
 
   const historyText = chatHistory
@@ -472,21 +543,50 @@ export async function getKetikReviewStatus(sessionId: string, userId: string): P
 
   if (error || !history) return null;
 
-  return {
-    status: history.review_status,
-    resultReady: history.review_status === 'completed',
-    scores: history.review_status === 'completed' ? {
-      final: history.final_score,
-      empathy: history.empathy_score,
-      probing: history.probing_score,
-      typo: history.typo_score,
-      compliance: history.compliance_score
-    } : null
-  };
+  let status = history.review_status || 'pending';
+  let resultReady = false;
+  let scores = null;
+
+  if (status === 'completed') {
+    // Auto-heal check: verify review row actually exists
+    const { data: review, error: reviewError } = await adminClient
+      .from('ketik_session_reviews')
+      .select('id')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+
+    if (!review || reviewError) {
+      status = 'failed';
+      await adminClient
+        .from('ketik_history')
+        .update({ review_status: 'failed' })
+        .eq('id', sessionId);
+      await adminClient
+        .from('ketik_review_jobs')
+        .update({ status: 'failed' })
+        .eq('session_id', sessionId);
+    } else {
+      resultReady = true;
+      scores = {
+        final: history.final_score,
+        empathy: history.empathy_score,
+        probing: history.probing_score,
+        typo: history.typo_score,
+        compliance: history.compliance_score,
+      };
+    }
+  }
+
+  // Queue lifecycle is internal; UI should treat queued as processing.
+  if (status === 'queued') {
+    status = 'processing';
+  }
+
+  return { status, resultReady, scores };
 }
 
-const TEXT_SIMULATION_MODELS = ['gemini-3.1-flash-lite', 'gemini-1.5-pro', 'gpt-4o-mini', 'claude-3-haiku-20240307', 'openrouter/openai/gpt-4o-mini'];
-const coerceKetikModelId = (modelId?: string) => TEXT_SIMULATION_MODELS.includes(modelId as any) ? modelId! : 'gemini-3.1-flash-lite';
+
+const coerceKetikModelId = (modelId?: string) => TEXT_SIMULATION_MODELS.some(m => m.id === modelId) ? modelId! : 'gemini-3.1-flash-lite';
 const coerceDuration = (duration?: number) => {
   if (typeof duration !== 'number' || isNaN(duration)) return 5;
   return Math.max(1, Math.min(60, duration));

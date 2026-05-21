@@ -9,6 +9,7 @@ import { UsageModal } from './components/UsageModal';
 import { useApi, postApi, deleteApi, getApi } from '../../hooks/useApi';
 import type { PdktMailboxItem, PdktScenario, PdktConsumerType, PdktIdentity } from '@trainers/types';
 import { Loader2, Plus } from 'lucide-react';
+import { notify } from '../../lib/toast';
 import { 
   type PdktAppSettings, 
   generatePdktSessionConfig, 
@@ -277,7 +278,7 @@ export default function PdktSimulation() {
       // Refetch history as scenarios configuration might affect display
       await fetchHistory();
     } catch (err) {
-      alert('Gagal menyimpan pengaturan.');
+      notify.error('Gagal menyimpan pengaturan.');
     }
   };
 
@@ -296,7 +297,7 @@ export default function PdktSimulation() {
       }
     } catch (err) {
       console.error('[PDKT] Failed to delete session:', err);
-      alert('Gagal menghapus riwayat sesi.');
+      notify.error('Gagal menghapus riwayat sesi.');
     }
   };
 
@@ -315,7 +316,7 @@ export default function PdktSimulation() {
       await refetch();
       setSelectedId(null);
     } catch (err) {
-      alert('Gagal membersihkan riwayat.');
+      notify.error('Gagal membersihkan riwayat.');
     }
   };
 
@@ -325,7 +326,7 @@ export default function PdktSimulation() {
     if (matchingMailbox) {
       setSelectedId(matchingMailbox.id);
     } else {
-      alert('Sesi ini hanya ada di riwayat dan tidak aktif di kotak masuk.');
+      notify.info('Sesi ini hanya ada di riwayat dan tidak aktif di kotak masuk.');
     }
     setIsHistoryOpen(false);
   };
@@ -399,7 +400,7 @@ export default function PdktSimulation() {
       setIsNewModalOpen(false);
     } catch (err) {
       console.error('[PDKT] Failed to start new simulation:', err);
-      alert('Gagal memulai simulasi baru.');
+      notify.error('Gagal memulai simulasi baru.');
       setSessionDeltaPending(false);
     } finally {
       setIsStartingNew(false);
@@ -441,7 +442,7 @@ export default function PdktSimulation() {
       await fetchHistory(); // reload evaluation status in history
       setIsReplyOpen(false);
     } catch (err) {
-      alert('Gagal mengirim balasan.');
+      notify.error('Gagal mengirim balasan.');
       setSessionDeltaPending(false);
     } finally {
       setIsReplying(false);
@@ -484,7 +485,7 @@ export default function PdktSimulation() {
       await refetch();
       if (selectedId === id) setSelectedId(null);
     } catch (err) {
-      alert('Gagal menghapus email.');
+      notify.error('Gagal menghapus email.');
     }
   };
 

@@ -23,6 +23,7 @@ import { useAuthStore } from '../store/authStore';
 import { APP_MODULES, isRoleAllowed, normalizeRoleLabel } from '../lib/app-config';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { MonthRangePicker } from '../components/ui/MonthRangePicker';
+import { notify } from '../lib/toast';
 
 interface TrendData {
   labels: string[];
@@ -236,11 +237,11 @@ export default function DashboardPage() {
             setActivityLogs(logsJson.data || []);
           }
         } else {
-          alert(json.error?.message || 'Gagal menghapus log');
+          notify.error(json.error?.message || 'Gagal menghapus log');
         }
       } catch (err) {
         console.error('Delete activity error:', err);
-        alert('Gagal menghapus log');
+        notify.error('Gagal menghapus log');
       }
     }
   };

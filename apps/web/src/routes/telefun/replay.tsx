@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApi, postApi, deleteApi } from '../../hooks/useApi';
 import type { TelefunHistory, TelefunCoachingSummary, TelefunReplayAnnotation } from '@trainers/types';
+import { notify } from '../../lib/toast';
 
 export default function TelefunReplay() {
   const { id } = useParams({ from: '/telefun/replay/$id' });
@@ -75,7 +76,7 @@ export default function TelefunReplay() {
       setNewAnnotation({ text: '', category: 'strength' });
       await refetchAnnotations();
     } catch (err) {
-      alert('Gagal menambah anotasi.');
+      notify.error('Gagal menambah anotasi.');
     } finally {
       setIsAddingAnnotation(false);
     }
@@ -86,7 +87,7 @@ export default function TelefunReplay() {
       await deleteApi(`/telefun/annotations/${annoId}`);
       await refetchAnnotations();
     } catch (err) {
-      alert('Gagal menghapus anotasi.');
+      notify.error('Gagal menghapus anotasi.');
     }
   };
 

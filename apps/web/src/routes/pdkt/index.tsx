@@ -10,6 +10,7 @@ import { useApi, getApi, deleteApi } from '../../hooks/useApi';
 import type { PdktAppSettings } from './pdktSettings';
 import { DEFAULT_PDKT_MODEL_ID } from './pdktSettings';
 import type { PdktScenario, PdktConsumerType } from '@trainers/types';
+import { notify } from '../../lib/toast';
 
 const accentClassName = 'text-purple-500';
 const accentSoftClassName = 'bg-purple-100';
@@ -99,7 +100,7 @@ export default function PdktLanding() {
       setSettings(newSettings);
       await fetchHistory();
     } catch (err) {
-      alert('Gagal menyimpan pengaturan.');
+      notify.error('Gagal menyimpan pengaturan.');
     }
   };
 
@@ -109,7 +110,7 @@ export default function PdktLanding() {
       setHistory(prev => prev.filter(h => h.id !== historyId));
     } catch (err) {
       console.error('[PDKT] Failed to delete session:', err);
-      alert('Gagal menghapus riwayat sesi.');
+      notify.error('Gagal menghapus riwayat sesi.');
     }
   };
 
@@ -118,7 +119,7 @@ export default function PdktLanding() {
       await deleteApi('/pdkt/history');
       setHistory([]);
     } catch (err) {
-      alert('Gagal membersihkan riwayat.');
+      notify.error('Gagal membersihkan riwayat.');
     }
   };
 

@@ -11,6 +11,7 @@ import { HistoryModal } from './components/HistoryModal';
 import { UsageModal } from './components/UsageModal';
 import { SessionReviewModal } from './components/SessionReviewModal';
 import { useAuthStore } from '../../store/authStore';
+import { notify } from '../../lib/toast';
 
 const accentClassName = 'text-emerald-600';
 const accentSoftClassName = 'bg-emerald-100';
@@ -101,7 +102,7 @@ export default function KetikLanding() {
       setHistory([]);
     } catch (e) {
       console.error('[Ketik] Failed to clear history:', e);
-      alert('Gagal menghapus riwayat.');
+      notify.error('Gagal menghapus riwayat.');
     }
   };
 
@@ -111,7 +112,7 @@ export default function KetikLanding() {
       setHistory(prev => prev.filter(s => s.id !== id));
     } catch (e) {
       console.error('[Ketik] Failed to delete session:', e);
-      alert('Gagal menghapus sesi.');
+      notify.error('Gagal menghapus sesi.');
     }
   };
 
@@ -129,19 +130,19 @@ export default function KetikLanding() {
     } catch (error) {
       console.error('[Ketik] Error starting manual review:', error);
       setReviewProgress(prev => ({ ...prev, status: 'failed' }));
-      alert('Gagal memulai analisis AI. Silakan coba lagi.');
+      notify.error('Gagal memulai analisis AI. Silakan coba lagi.');
     }
   };
 
   const startSimulation = async () => {
     if (!session?.access_token) {
-      alert('Sesi Anda telah berakhir. Silakan login kembali.');
+      notify.error('Sesi Anda telah berakhir. Silakan login kembali.');
       return;
     }
 
     const activeScenarios = settings.scenarios.filter(s => s.isActive);
     if (activeScenarios.length === 0) {
-      alert('Pilih minimal satu skenario di Pengaturan.');
+      notify.warning('Pilih minimal satu skenario di Pengaturan.');
       setIsSettingsOpen(true);
       return;
     }
@@ -230,7 +231,7 @@ export default function KetikLanding() {
         setSelectedTypos([]);
       } catch (error) {
         console.error('Error ending session:', error);
-        alert('Gagal menyimpan sesi.');
+        notify.error('Gagal menyimpan sesi.');
       } finally {
         setIsLoading(false);
       }
@@ -328,7 +329,7 @@ export default function KetikLanding() {
           setReviewProgress({ status: 'ready', percent: 100, etaSeconds: 0 });
         } else {
           console.warn('[Ketik] Review marked completed but data missing');
-          alert('Data review tidak ditemukan.');
+          notify.error('Data review tidak ditemukan.');
           const failedSession = { ...session, reviewStatus: 'failed' as const };
           setSelectedSessionForReview(failedSession);
           setHistory(prev => prev.map(item => item.id === session.id ? failedSession : item));

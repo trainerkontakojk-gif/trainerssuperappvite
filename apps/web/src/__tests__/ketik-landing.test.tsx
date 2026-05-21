@@ -98,7 +98,7 @@ describe('KETIK Landing Page', () => {
     await screen.findByText('Mulai Simulasi');
     await user.click(screen.getByText('Mulai Simulasi'));
 
-    // Should transition to chat view - check for timer display (5:00 for 5min default)
-    await screen.findByText(/5:00/);
+    // Should transition to chat view - check for elapsed timer display (0:00 at start)
+    await screen.findByText(/0:00/);
   });
 });
