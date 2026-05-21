@@ -4,6 +4,7 @@ import { User } from '@supabase/supabase-js';
 import { generateEmailSchema, evaluateSchema, pdktMailboxBatchSchema, pdktMailboxReplySchema } from '@trainers/types';
 import type { PdktSessionConfig } from '@trainers/types';
 import * as pdktService from '../services/pdkt-service';
+import { readPdktSettings, writePdktSettings } from '../lib/pdkt-settings';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient, createAdminClient } from '../lib/supabase';
 
@@ -227,7 +228,7 @@ pdkt.get('/settings', async (c) => {
 
     if (error) throw error;
 
-    return c.json({ success: true, settings: data?.settings || null });
+    return c.json({ success: true, settings: readPdktSettings(data?.settings) });
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
   }
@@ -241,11 +242,21 @@ pdkt.post('/settings', async (c) => {
   const body = await c.req.json();
 
   try {
+    const { data: existing, error: existingError } = await userClient
+      .from('user_settings')
+      .select('settings')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const updatedSettings = writePdktSettings(existing?.settings, body.settings);
+
     const { data, error } = await userClient
       .from('user_settings')
       .upsert({
         user_id: user.id,
-        settings: body.settings,
+        settings: updatedSettings,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' })
       .select()
@@ -319,4 +330,3 @@ pdkt.delete('/history/:id', async (c) => {
 });
 
 export { pdkt };
-

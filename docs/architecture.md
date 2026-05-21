@@ -94,6 +94,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
   - Admin Client (Service Role): Hanya di backend untuk AI logging, background jobs, dan heavy reports.
 - Monitoring lintas akun dan usage billing menggunakan server-side access via admin client, bukan direct browser read terhadap tabel sensitif.
 - History simulasi KETIK/PDKT menggunakan tabel modul masing-masing sebagai sumber utama.
+- Module settings (KETIK, PDKT, Telefun) disimpan namespaced di `user_settings.settings.<module>` agar tidak saling timpa. Setiap modul wajib membaca existing settings sebelum menulis.
 
 ## AI Integration Pattern
 

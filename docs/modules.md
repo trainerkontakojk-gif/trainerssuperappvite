@@ -51,7 +51,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **Filtering & Search**: Memudahkan user mencari email tertentu atau memfilter berdasarkan status.
-- **Catatan Teknis**: PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk. Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
+- **Catatan Teknis**: PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk. Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
 
 ## 4. TELEFUN (Telephone Fun)
 Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon telepon.
