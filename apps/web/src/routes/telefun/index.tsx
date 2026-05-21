@@ -32,8 +32,14 @@ export default function TelefunLanding() {
   useEffect(() => {
     getApi<{ success: boolean; settings: TelefunAppSettings | null }>('/telefun/settings')
       .then(res => {
-        if (res?.settings) setSettings(res.settings);
-        else setSettings(DEFAULT_TELEFUN_SETTINGS);
+        if (res?.settings) {
+          setSettings({
+            ...DEFAULT_TELEFUN_SETTINGS,
+            ...res.settings,
+            scenarios: res.settings.scenarios || DEFAULT_TELEFUN_SETTINGS.scenarios,
+            consumerTypes: res.settings.consumerTypes || DEFAULT_TELEFUN_SETTINGS.consumerTypes,
+          });
+        } else setSettings(DEFAULT_TELEFUN_SETTINGS);
       })
       .catch(() => setSettings(DEFAULT_TELEFUN_SETTINGS))
       .finally(() => setSettingsLoading(false));

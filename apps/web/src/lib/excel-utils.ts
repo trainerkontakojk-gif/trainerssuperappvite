@@ -61,7 +61,7 @@ export interface ParsedRow {
   error?: string;
 }
 
-export function parseExcel(file: File, indicators: QAIndicator[]): Promise<ParsedRow[]> {
+export function parseExcel(file: File, indicators: QAIndicator[], serviceType?: string): Promise<ParsedRow[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -73,7 +73,8 @@ export function parseExcel(file: File, indicators: QAIndicator[]): Promise<Parse
         const ws = wb.Sheets[sheetName];
         const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-        const indicatorMap = new Map(indicators.map(i => [i.name.toLowerCase(), i]));
+        const filtered = serviceType ? indicators.filter(i => i.service_type === serviceType) : indicators;
+        const indicatorMap = new Map(filtered.map(i => [i.name.toLowerCase(), i]));
 
         const result: ParsedRow[] = [];
         for (let i = 0; i < rows.length; i++) {

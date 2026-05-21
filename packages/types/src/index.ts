@@ -89,6 +89,42 @@ export const serviceWeightSchema = z.object({
 });
 export type ServiceWeight = z.infer<typeof serviceWeightSchema>;
 
+export const ruleVersionStatusSchema = z.enum(['draft', 'published', 'superseded']);
+export type RuleVersionStatus = z.infer<typeof ruleVersionStatusSchema>;
+
+export const ruleVersionSchema = z.object({
+  id: z.string().uuid(),
+  service_type: serviceTypeSchema,
+  effective_period_id: z.string().uuid(),
+  status: ruleVersionStatusSchema,
+  critical_weight: z.number(),
+  non_critical_weight: z.number(),
+  scoring_mode: scoringModeSchema,
+  version_number: z.number().int(),
+  indicator_count: z.number().int().optional(),
+  change_reason: z.string().nullable().optional(),
+  created_by: z.string().uuid().nullable().optional(),
+  created_by_user: z.object({ full_name: z.string() }).nullable().optional(),
+  published_by: z.string().uuid().nullable().optional(),
+  published_by_user: z.object({ full_name: z.string() }).nullable().optional(),
+  published_at: z.string().datetime().nullable().optional(),
+  superseded_by: z.string().uuid().nullable().optional(),
+  superseded_at: z.string().datetime().nullable().optional(),
+  created_at: z.string().datetime(),
+  updated_at: z.string().datetime().nullable().optional(),
+});
+export type RuleVersion = z.infer<typeof ruleVersionSchema>;
+
+export const createRuleVersionSchema = z.object({
+  service_type: serviceTypeSchema,
+  effective_period_id: z.string().uuid(),
+  critical_weight: z.number().min(0).max(1).default(0.5),
+  non_critical_weight: z.number().min(0).max(1).default(0.5),
+  scoring_mode: scoringModeSchema.default('weighted'),
+  change_reason: z.string().optional(),
+});
+export type CreateRuleVersion = z.infer<typeof createRuleVersionSchema>;
+
 // ── Scoring Types ───────────────────────────────────────
 export interface ScoreDetail {
   indicatorId: string;

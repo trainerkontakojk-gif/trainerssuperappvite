@@ -261,8 +261,8 @@ Contoh catatan:
 - [x] Narasi AI tidak mengarang data.
 - [x] Report bisa dirender dalam format A4.
 - [x] Multi-page report tidak terpotong.
-- [~] Export DOCX/PDF tersedia jika ditargetkan.
-  - Catatan: Print-to-PDF via `@media print` (A4, page breaks, `window.print()`). DOCX belum.
+- [x] Export DOCX/PDF tersedia jika ditargetkan.
+  - Catatan: DOCX via `docx` library di backend (`POST /sidak/reports/ai/export-docx` → `buildAiReportDocx()`). PDF via `@media print` (A4, page breaks, `window.print()`). `html2canvas` installed.
 - [x] Preview sebelum export tersedia.
 - [x] Report per layanan tersedia.
 - [x] Filter service type tersedia.
@@ -285,8 +285,8 @@ Contoh catatan:
 - [x] Perubahan role langsung berdambah ke akses menu.
 - [x] Trainer/admin bisa membuat scenario KETIK.
 - [x] Trainer/admin bisa membuat scenario PDKT.
-- [~] Trainer/admin bisa membuat scenario Telefun.
-  - Catatan: Settings modal ada scenario presets + custom instructions. Belum ada CRUD scenario terpisah seperti KETIK/PDKT.
+- [x] Trainer/admin bisa membuat scenario Telefun.
+  - Catatan: Full CRUD scenario (title + instruction) dan consumer type (name, gender, description) di SettingsModal. Tipe `TelefunScenario` dan `TelefunConsumerType` di `telefunSettings.ts`. API Zod schema mendukung array scenarios/consumerTypes. Migrasi otomatis dari format lama via defaults merge.
 - [x] Scenario punya status draft/published.
 - [x] Scenario bisa diedit sebelum publish.
 - [x] Scenario published tidak rusak saat dipakai sesi lama.
@@ -309,10 +309,12 @@ Contoh catatan:
   - Catatan: Hanya draft yang bisa diedit di UI. Published version read-only.
 - [x] Ada versioning/revision.
   - Catatan: Sequential `version_number` per `service_type`. Status: draft/published/superseded.
-- [~] Ada alasan perubahan.
-  - Catatan: Belum ada field `change_reason` di schema/UI.
-- [ ] Ada preview sebelum apply.
-- [ ] Ada validasi sebelum upload batch memakai parameter baru.
+- [x] Ada alasan perubahan.
+  - Catatan: Field `change_reason` sudah ada di schema DB, create/edit/publish/supersede form UI. Shared Zod schema `ruleVersionSchema` di `packages/types`. Edit draft via modal. Publish/supersede via confirmation dialog dengan optional reason.
+- [x] Ada preview sebelum apply.
+  - Catatan: Expandable indicator table per version (add/delete untuk draft), diff comparison vs published version, indicator count di version card, dan publish confirmation dialog dengan summary perubahan.
+- [x] Ada validasi sebelum upload batch memakai parameter baru.
+  - Catatan: Backend resolve active published rule version + validasi indicator_id terhadap service_type + validasi indicator_id terhadap rule version via `legacy_indicator_id`. Frontend banner peringatan jika ada draft belum publish. Excel parser filter by service_type.
 
 ---
 
@@ -399,7 +401,8 @@ Contoh catatan:
 - [ ] Validasi service type tersedia.
 - [ ] Validasi agent/profiler tersedia.
 - [ ] Validasi indicator_id tersedia.
-- [ ] Mapping parameter QA memakai version yang benar.
+- [x] Mapping parameter QA memakai version yang benar.
+  - Catatan: `rule_version_id` dipopulate dari active published version. `legacy_indicator_id` linking untuk cross-validate indicator temuan vs rule indicators.
 - [ ] Foreign key error ditangani sebelum insert.
 - [ ] Insert batch memakai transaksi.
 - [ ] Jika satu batch gagal, data tidak masuk sebagian tanpa kontrol.
@@ -645,21 +648,28 @@ Contoh catatan:
 
 ## 4.6 QA Parameter Versioning `P1`
 
-- [ ] Tabel rule version punya `version_number`.
-- [ ] Ada status: draft, published, superseded, archived.
-- [ ] Ada `change_reason`.
-- [ ] Ada `created_by`.
-- [ ] Ada `updated_by`.
-- [ ] Ada `published_at`.
-- [ ] Ada `superseded_at`.
-- [ ] Ada `superseded_by_version_id`.
-- [ ] Hanya satu published version aktif per service/periode jika aturan begitu.
+- [x] Tabel rule version punya `version_number`.
+- [x] Ada status: draft, published, superseded.
+  - Catatan: 'archived' belum diimplementasikan.
+- [x] Ada `change_reason`.
+- [x] Ada `created_by`.
+- [x] Ada `updated_by`.
+- [x] Ada `published_at`.
+- [x] Ada `superseded_at`.
+- [x] Ada `superseded_by_version_id`.
+- [x] Hanya satu published version aktif per service.
+  - Catatan: `publishRuleVersion()` auto-supersede semua published version untuk service_type yang sama.
 - [ ] Publish dilakukan lewat RPC/transaksi.
-- [ ] Publish otomatis supersede version lama.
-- [ ] Draft bisa diedit.
-- [ ] Published tidak diedit langsung.
-- [ ] Revision membuat version baru.
+- [x] Publish otomatis supersede version lama.
+  - Catatan: Diimplementasikan di `publishRuleVersion()` — query published versions untuk service_type yang sama, update status jadi superseded dengan `superseded_by_version_id` merujuk ke version baru.
+- [x] Draft bisa diedit.
+  - Catatan: Edit modal via `PUT /sidak/rule-versions/:id`. Field: scoring_mode, weights, change_reason.
+- [x] Published tidak diedit langsung.
+  - Catatan: `updateRuleVersion()` me-reject jika status bukan draft.
+- [x] Revision membuat version baru.
+  - Catatan: `version_number` auto-increment via `MAX(version_number) + 1` per service_type.
 - [ ] Upload QA memakai rule version yang benar.
+  - Catatan: `qa_temuan.rule_version_id` masih NULL. Lihat item #5 di plan untuk implementasi linkage.
 
 ## 4.7 RPC / Database Function `P1`
 

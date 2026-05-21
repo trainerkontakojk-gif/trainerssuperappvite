@@ -139,7 +139,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
 - `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core)
-- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter
+- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **report-docx-builder**
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
@@ -159,9 +159,9 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/lib/toast.ts` — sonner v2 wrapper (notify.success/error/warning)
 - `apps/web/src/routes/unauthorized.tsx` — 403 role-denied page
 - `apps/web/src/components/ui/Pagination.tsx` — shared pagination with page-size selector
-- `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types, VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
-- `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 3-tab Telefun settings modal
-- `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints
+- `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types (TelefunScenario, TelefunConsumerType), VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
+- `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
+- `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
 - `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-19)
 

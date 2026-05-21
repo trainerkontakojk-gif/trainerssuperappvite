@@ -1,3 +1,17 @@
+export interface TelefunScenario {
+  id: string;
+  title: string;
+  instruction: string;
+  isActive: boolean;
+}
+
+export interface TelefunConsumerType {
+  id: string;
+  name: string;
+  gender: string;
+  description: string;
+}
+
 export type TelefunAppSettings = {
   selectedModel: string;
   voiceName: string;
@@ -5,6 +19,8 @@ export type TelefunAppSettings = {
   consumerName: string;
   consumerGender: string;
   scenarioTitle?: string;
+  scenarios: TelefunScenario[];
+  consumerTypes: TelefunConsumerType[];
 };
 
 export const VOICE_MODELS = [
@@ -27,12 +43,30 @@ export const CONSUMER_GENDERS = [
   { id: 'female', name: 'Perempuan' },
 ];
 
+export const DEFAULT_CONSUMER_TYPES: TelefunConsumerType[] = [
+  { id: 'default-male', name: 'Budi Santoso', gender: 'male', description: 'Konsumen pria dewasa, sopan dan kooperatif.' },
+  { id: 'default-female', name: 'Siti Rahma', gender: 'female', description: 'Konsumen wanita dewasa, ramah namun teliti.' },
+  { id: 'angry-male', name: 'Rudi Hartono', gender: 'male', description: 'Konsumen pria yang sedang kesal dan mudah terpancing emosi.' },
+  { id: 'confused-female', name: 'Dewi Lestari', gender: 'female', description: 'Konsumen wanita yang bingung dan kurang paham istilah teknis.' },
+];
+
+export const DEFAULT_SCENARIOS: TelefunScenario[] = [
+  ...SCENARIO_PRESETS.map((p, i) => ({
+    id: `preset-${i}`,
+    title: p.title,
+    instruction: p.instruction,
+    isActive: true,
+  })),
+];
+
 export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
   selectedModel: 'gemini-3.1-flash-live-preview',
   voiceName: 'Kore',
   systemInstruction: 'Anda adalah konsumen yang menghubungi OJK. Bantu agen melatih kemampuan komunikasi.',
   consumerName: 'Budi Santoso',
   consumerGender: 'male',
+  scenarios: DEFAULT_SCENARIOS,
+  consumerTypes: DEFAULT_CONSUMER_TYPES,
 };
 
 export const SCENARIO_PRESETS = [

@@ -15,6 +15,7 @@
     "@hono/zod-validator": "^0.8.0",
     "@supabase/supabase-js": "^2.0.0",
     "@trainers/types": "workspace:*",
+    "docx": "^9.6.1",
     "hono": "^4.0.0",
     "zod": "^3.0.0"
   },

@@ -100,6 +100,54 @@ export async function createTemuanBatch(items: {
   no_tiket?: string | null;
   items: { indicator_id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }[];
 }) {
+  // resolve active published rule version
+  const { data: activeVersion } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('id')
+    .eq('service_type', items.service_type)
+    .eq('status', 'published')
+    .order('version_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // validate indicator_id against service_type
+  const { data: validIndicators } = await supabaseAdmin
+    .from('qa_indicators')
+    .select('id, name, service_type')
+    .in('id', items.items.map(i => i.indicator_id));
+
+  const indicatorMap = new Map((validIndicators ?? []).map(i => [i.id, i]));
+  for (const item of items.items) {
+    const ind = indicatorMap.get(item.indicator_id);
+    if (!ind) {
+      throw new Error(`Indikator dengan ID ${item.indicator_id} tidak ditemukan di database`);
+    }
+    if (ind.service_type !== items.service_type) {
+      throw new Error(`Indikator "${ind.name}" milik layanan ${ind.service_type}, bukan ${items.service_type}`);
+    }
+  }
+
+  // if active rule version exists, validate indicators are part of it
+  let ruleVersionId: string | null = null;
+  if (activeVersion) {
+    ruleVersionId = activeVersion.id;
+    const { data: ruleIndicators } = await supabaseAdmin
+      .from('qa_service_rule_indicators')
+      .select('legacy_indicator_id')
+      .eq('rule_version_id', activeVersion.id)
+      .not('legacy_indicator_id', 'is', null);
+
+    if (ruleIndicators && ruleIndicators.length > 0) {
+      const validLegacyIds = new Set(ruleIndicators.map(ri => ri.legacy_indicator_id));
+      for (const item of items.items) {
+        if (!validLegacyIds.has(item.indicator_id)) {
+          const ind = indicatorMap.get(item.indicator_id);
+          throw new Error(`Indikator "${ind?.name || item.indicator_id}" tidak termasuk dalam versi aturan aktif (published v${(items as any).versionNumber || ''}). Tambahkan indikator ke versi aturan terlebih dahulu.`);
+        }
+      }
+    }
+  }
+
   const rows = items.items.map(item => ({
     peserta_id: items.peserta_id,
     period_id: items.period_id,
@@ -109,6 +157,7 @@ export async function createTemuanBatch(items: {
     nilai: item.nilai,
     ketidaksesuaian: item.ketidaksesuaian ?? null,
     sebaiknya: item.sebaiknya ?? null,
+    rule_version_id: ruleVersionId,
   }));
 
   const { data, error } = await supabaseAdmin
@@ -860,6 +909,22 @@ export async function getRuleVersions(serviceType?: string) {
   if (serviceType) query = query.eq('service_type', serviceType);
   const { data, error } = await query;
   if (error) throw new Error(`Gagal memuat versi aturan: ${error.message}`);
+
+  if (data && data.length > 0) {
+    const { data: indicatorRows } = await supabaseAdmin
+      .from('qa_service_rule_indicators')
+      .select('rule_version_id')
+      .in('rule_version_id', data.map(v => v.id));
+
+    const countMap: Record<string, number> = {};
+    if (indicatorRows) {
+      for (const row of indicatorRows) {
+        countMap[row.rule_version_id] = (countMap[row.rule_version_id] || 0) + 1;
+      }
+    }
+    return data.map(v => ({ ...v, indicator_count: countMap[v.id] || 0 }));
+  }
+
   return data ?? [];
 }
 
@@ -926,23 +991,50 @@ export async function updateRuleVersion(id: string, data: {
   return result;
 }
 
-export async function publishRuleVersion(id: string, userId: string) {
+export async function publishRuleVersion(id: string, userId: string, change_reason?: string) {
   const { data: existing } = await supabaseAdmin
     .from('qa_service_rule_versions')
-    .select('status')
+    .select('status, service_type')
     .eq('id', id)
     .single();
 
   if (!existing) throw new Error('Versi aturan tidak ditemukan');
   if (existing.status !== 'draft') throw new Error('Hanya versi draft yang bisa dipublikasikan');
 
+  const now = new Date().toISOString();
+
+  // auto-supersede other published versions for the same service_type
+  const { data: publishedVersions } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('id')
+    .eq('service_type', existing.service_type)
+    .eq('status', 'published')
+    .neq('id', id);
+
+  if (publishedVersions && publishedVersions.length > 0) {
+    const { error: supersedeError } = await supabaseAdmin
+      .from('qa_service_rule_versions')
+      .update({
+        status: 'superseded',
+        superseded_by: userId,
+        superseded_at: now,
+        superseded_by_version_id: id,
+      })
+      .in('id', publishedVersions.map(p => p.id));
+
+    if (supersedeError) throw new Error(`Gagal menonaktifkan versi lama: ${supersedeError.message}`);
+  }
+
+  const updates: Record<string, any> = {
+    status: 'published',
+    published_by: userId,
+    published_at: now,
+  };
+  if (change_reason !== undefined) updates.change_reason = change_reason;
+
   const { data: result, error } = await supabaseAdmin
     .from('qa_service_rule_versions')
-    .update({
-      status: 'published',
-      published_by: userId,
-      published_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();
@@ -951,7 +1043,7 @@ export async function publishRuleVersion(id: string, userId: string) {
   return result;
 }
 
-export async function supersedeRuleVersion(id: string, userId: string) {
+export async function supersedeRuleVersion(id: string, userId: string, change_reason?: string) {
   const { data: existing } = await supabaseAdmin
     .from('qa_service_rule_versions')
     .select('status')
@@ -961,13 +1053,16 @@ export async function supersedeRuleVersion(id: string, userId: string) {
   if (!existing) throw new Error('Versi aturan tidak ditemukan');
   if (existing.status !== 'published') throw new Error('Hanya versi published yang bisa di-supersede');
 
+  const updates: Record<string, any> = {
+    status: 'superseded',
+    superseded_by: userId,
+    superseded_at: new Date().toISOString(),
+  };
+  if (change_reason !== undefined) updates.change_reason = change_reason;
+
   const { data: result, error } = await supabaseAdmin
     .from('qa_service_rule_versions')
-    .update({
-      status: 'superseded',
-      superseded_by: userId,
-      superseded_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', id)
     .select()
     .single();
@@ -996,6 +1091,7 @@ export async function addRuleVersionIndicator(data: {
   has_na?: boolean;
   threshold?: number;
   sort_order?: number;
+  legacy_indicator_id?: string;
 }, userId: string) {
   const { data: result, error } = await supabaseAdmin
     .from('qa_service_rule_indicators')

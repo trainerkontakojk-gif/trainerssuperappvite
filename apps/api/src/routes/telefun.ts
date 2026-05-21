@@ -36,6 +36,18 @@ telefun.put('/settings', zValidator('json', z.object({
   consumerName: z.string(),
   consumerGender: z.string(),
   scenarioTitle: z.string().optional(),
+  scenarios: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    instruction: z.string(),
+    isActive: z.boolean(),
+  })).optional(),
+  consumerTypes: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    gender: z.string(),
+    description: z.string(),
+  })).optional(),
 })), async (c) => {
   const user = c.get('user');
   const adminClient = createAdminClient();

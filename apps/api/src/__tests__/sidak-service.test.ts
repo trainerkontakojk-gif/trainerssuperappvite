@@ -69,8 +69,14 @@ describe('sidak-service', () => {
   });
 
   describe('createTemuanBatch', () => {
-    it('inserts rows', async () => {
-      pendingResolve = () => ({ data: [{ id: 't1' }], error: null });
+    it('inserts rows with rule_version_id and validasi indicator', async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: null, error: null }; // rule_versions: no published version
+        if (callCount === 2) return { data: [{ id: 'i1', name: 'Test', service_type: 'call' }], error: null }; // qa_indicators
+        return { data: [{ id: 't1' }], error: null }; // insert
+      };
       const r = await sidakService.createTemuanBatch({
         peserta_id: 'p1', period_id: 'per1', service_type: 'call',
         items: [{ indicator_id: 'i1', nilai: 2 }],
@@ -78,11 +84,25 @@ describe('sidak-service', () => {
       expect(r).toHaveLength(1);
     });
 
+    it('rejects indicator not matching service_type', async () => {
+      pendingResolve = () => ({ data: [{ id: 'i1', name: 'Wrong', service_type: 'email' }], error: null });
+      await expect(sidakService.createTemuanBatch({
+        peserta_id: 'p1', period_id: 'per1', service_type: 'call',
+        items: [{ indicator_id: 'i1', nilai: 0 }],
+      })).rejects.toThrow('milik layanan email');
+    });
+
     it('friendly msg for FK error', async () => {
-      pendingResolve = () => ({ data: null, error: { message: 'violates foreign key constraint' } });
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: null, error: null }; // rule_versions
+        if (callCount === 2) return { data: [{ id: 'i1', name: 'Test', service_type: 'call' }], error: null }; // qa_indicators
+        return { data: null, error: { message: 'violates foreign key constraint' } }; // insert fails
+      };
       await expect(sidakService.createTemuanBatch({
         peserta_id: 'bad', period_id: 'bad', service_type: 'call',
-        items: [{ indicator_id: 'bad', nilai: 0 }],
+        items: [{ indicator_id: 'i1', nilai: 0 }],
       })).rejects.toThrow('Data tidak valid');
     });
   });

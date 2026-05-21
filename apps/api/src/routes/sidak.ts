@@ -5,6 +5,7 @@ import { User } from '@supabase/supabase-js';
 import { authMiddleware } from '../middleware/auth';
 import * as sidakService from '../services/sidak-service';
 import { serviceTypeSchema, categorySchema, createTemuanBatchSchema } from '@trainers/types';
+import { buildAiReportDocx } from '../lib/report-docx-builder';
 
 type Variables = { user: User; profile: any };
 
@@ -396,8 +397,15 @@ sidak.put('/rule-versions/:id', async (c) => {
 sidak.post('/rule-versions/:id/publish', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
+  const body = await c.req.json();
+  const parsed = z.object({
+    change_reason: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid', details: parsed.error } }, 400);
+  }
   try {
-    const version = await sidakService.publishRuleVersion(id, user.id);
+    const version = await sidakService.publishRuleVersion(id, user.id, parsed.data.change_reason);
     return c.json({ success: true, data: version });
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
@@ -407,8 +415,15 @@ sidak.post('/rule-versions/:id/publish', async (c) => {
 sidak.post('/rule-versions/:id/supersede', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
+  const body = await c.req.json();
+  const parsed = z.object({
+    change_reason: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid', details: parsed.error } }, 400);
+  }
   try {
-    const version = await sidakService.supersedeRuleVersion(id, user.id);
+    const version = await sidakService.supersedeRuleVersion(id, user.id, parsed.data.change_reason);
     return c.json({ success: true, data: version });
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
@@ -437,6 +452,7 @@ sidak.post('/rule-versions/:id/indicators', async (c) => {
     has_na: z.boolean().optional().default(false),
     threshold: z.number().optional(),
     sort_order: z.number().int().optional().default(0),
+    legacy_indicator_id: z.string().uuid().optional(),
   }).safeParse(body);
   if (!parsed.success) {
     return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data indikator tidak valid', details: parsed.error } }, 400);
@@ -456,6 +472,41 @@ sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', async (c) => {
     return c.json({ success: true, message: 'Indikator berhasil dihapus' });
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/reports/ai/export-docx', async (c) => {
+  const body = await c.req.json();
+  const parsed = z.object({
+    title: z.string().default('Laporan Analisis QA'),
+    periodLabel: z.string().default(''),
+    serviceLabel: z.string().default(''),
+    mode: z.enum(['layanan', 'individu']).default('layanan'),
+    agentName: z.string().optional(),
+    totalFindings: z.number().default(0),
+    totalRows: z.number().default(0),
+    executiveSummary: z.string().default(''),
+    keyFindings: z.array(z.string()).default([]),
+    scoreAnalysis: z.string().default(''),
+    recommendations: z.array(z.string()).default([]),
+    priorityAreas: z.array(z.string()).default([]),
+    chartImages: z.object({
+      pareto: z.string().nullable().optional(),
+      donut: z.string().nullable().optional(),
+      trend: z.string().nullable().optional(),
+    }).optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data laporan tidak valid', details: parsed.error } }, 400);
+  }
+  try {
+    const buf = await buildAiReportDocx(parsed.data);
+    return c.newResponse(new Uint8Array(buf), 200, {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="laporan-ai-${Date.now()}.docx"`,
+    });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'EXPORT_ERROR', message: error.message } }, 500);
   }
 });
 

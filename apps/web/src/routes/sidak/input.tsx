@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { useApi, postApi } from '../../hooks/useApi';
+import { useState, useRef, useEffect } from 'react';
+import { useApi, getApi, postApi } from '../../hooks/useApi';
 import type { QAIndicator, QAPeriod } from '@trainers/types';
 import { Plus, Trash2, Save, Upload, Download, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { generateTemplate, parseExcel, validateImportRows, type ParsedRow } from '../../lib/excel-utils';
@@ -21,6 +21,19 @@ export default function SidakInputPage() {
   const [showImport, setShowImport] = useState(false);
   const [importRows, setImportRows] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
+
+  // Draft warning
+  const [draftCount, setDraftCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    getApi<{ success: boolean; data: any[] }>(`/sidak/rule-versions?service_type=${selectedService}`)
+      .then(res => {
+        if (!cancelled) setDraftCount(res.data?.filter((v: any) => v.status === 'draft').length ?? 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [selectedService]);
 
   const filteredIndicators = indicators?.filter(i => i.service_type === selectedService) ?? [];
 
@@ -69,7 +82,7 @@ export default function SidakInputPage() {
     const file = e.target.files?.[0];
     if (!file || !indicators) return;
     try {
-      const rows = await parseExcel(file, indicators);
+      const rows = await parseExcel(file, indicators, selectedService);
       setImportRows(rows);
     } catch (err) {
       setMessage({ type: 'error', text: 'Gagal membaca file Excel.' });
@@ -112,6 +125,16 @@ export default function SidakInputPage() {
       {message && (
         <div className={`p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
           {message.text}
+        </div>
+      )}
+
+      {draftCount > 0 && (
+        <div className="flex items-start gap-2 p-3 rounded-lg text-sm bg-amber-50 text-amber-800 border border-amber-200">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-semibold">Draft parameter belum dipublish.</span>{' '}
+            Ada {draftCount} draft versi aturan untuk layanan ini yang belum dipublish. Upload akan menggunakan parameter yang sudah published.
+          </div>
         </div>
       )}
 

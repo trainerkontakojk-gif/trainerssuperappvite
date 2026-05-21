@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { Link } from '@tanstack/react-router';
-import { ArrowLeft, Brain, Loader2, AlertCircle, CheckCircle, FileText, Printer } from 'lucide-react';
+import { ArrowLeft, Brain, Loader2, AlertCircle, CheckCircle, FileText, Printer, Download } from 'lucide-react';
 import { useApi, postApi } from '../../hooks/useApi';
 
 const SERVICE_TYPES = ['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik'] as const;
@@ -24,6 +24,8 @@ export default function SidakReportsAi() {
     ? [...new Set(periods.map((p: any) => p.year))].sort((a, b) => b - a)
     : [new Date().getFullYear()];
 
+  const [exportingDocx, setExportingDocx] = useState(false);
+
   const generateReport = async () => {
     setLoading(true);
     setError(null);
@@ -43,6 +45,46 @@ export default function SidakReportsAi() {
     }
     setLoading(false);
   };
+
+  const handleExportDocx = useCallback(async () => {
+    if (!report) return;
+    setExportingDocx(true);
+    try {
+      const res = await fetch('/api/v1/sidak/reports/ai/export-docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Laporan AI - ${report.metadata?.serviceTypes || 'Semua Layanan'}`,
+          periodLabel: `${String(startMonth).padStart(2, '0')}-${String(endMonth).padStart(2, '0')}/${year}`,
+          serviceLabel: report.metadata?.serviceTypes || '',
+          mode,
+          agentName: report.metadata?.agentName,
+          totalFindings: report.metadata?.totalFindings ?? 0,
+          totalRows: report.metadata?.totalRows ?? 0,
+          executiveSummary: report.report?.executiveSummary || '',
+          keyFindings: report.report?.keyFindings || [],
+          scoreAnalysis: report.report?.scoreAnalysis || '',
+          recommendations: report.report?.recommendations || [],
+          priorityAreas: report.report?.priorityAreas || [],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err?.error?.message || 'Gagal export DOCX');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `laporan-ai-${Date.now()}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setExportingDocx(false);
+    }
+  }, [report, mode, startMonth, endMonth, year]);
 
   return (
     <>
@@ -159,10 +201,17 @@ export default function SidakReportsAi() {
               <span className="ml-auto text-xs text-gray-500">
                 {report.metadata?.totalRows} baris · {report.metadata?.totalFindings} temuan
               </span>
-              <button onClick={() => window.print()} className="no-print inline-flex items-center gap-1.5 rounded-lg bg-white border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition ml-2">
-                <Printer className="h-3.5 w-3.5" />
-                Cetak
-              </button>
+              <div className="no-print flex items-center gap-2 ml-2">
+                <button onClick={handleExportDocx} disabled={exportingDocx}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-60">
+                  {exportingDocx ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  {exportingDocx ? 'Mengunduh...' : 'Unduh DOCX'}
+                </button>
+                <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 transition">
+                  <Printer className="h-3.5 w-3.5" />
+                  Cetak
+                </button>
+              </div>
             </div>
           </div>
 
