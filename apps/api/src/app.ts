@@ -45,6 +45,7 @@ app.notFound((c) => {
   }, 404);
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const routes = app
   .get('/health', (c) => c.json({ status: 'ok' }))
   .get('/auth/me', (c) => {

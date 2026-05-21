@@ -18,7 +18,8 @@ This project uses `pnpm` and `turbo`.
 - **Install Dependencies:** `pnpm install`
 - **Development Mode:** `pnpm dev` (Runs all apps in parallel)
 - **Build All:** `pnpm build`
-- **Lint All:** `pnpm lint`
+- **Lint All:** `pnpm lint` (ESLint 9 flat config — `eslint.config.mjs` di root)
+- **Lint (single workspace):** `pnpm --filter @trainers/web lint`
 - **Format Code:** `pnpm format`
 - **Test All:** `pnpm test` (92 tests — API services + frontend hooks/components)
 - **Test API:** `pnpm --filter @trainers/api test`
@@ -35,7 +36,16 @@ This project uses `pnpm` and `turbo`.
 - `packages/types`: Shared Zod schemas and TypeScript interfaces.
 - `reference-repo/`: The legacy Next.js project (READ-ONLY) used for business logic reference.
 
-### 2. Backend-First Logic
+### 2. Linting & Formatting
+- **ESLint 9 flat config** (`eslint.config.mjs` di root) — berlaku untuk semua workspace.
+  - TypeScript recommended rules, React hooks recommended (kecuali `set-state-in-effect` dimatikan), React Refresh.
+  - `@typescript-eslint/no-explicit-any`: off.
+  - `@typescript-eslint/no-unused-vars`: warn, dengan allow pattern `^_`.
+  - Test files otomatis mendapat globals vitest.
+  - React-specific rules hanya untuk `apps/web`; Node globals untuk `apps/api` + `apps/telefun`.
+- **Prettier** (`pnpm format`) untuk formatting code.
+
+### 3. Backend-First Logic
 - **NEVER** query Supabase directly from the frontend for sensitive data (SIDAK, AI Usage, Reports).
 - **ALWAYS** route through Hono. Hono validates the Supabase JWT and enforces permissions.
 - Use the **Hybrid Supabase Client** pattern:

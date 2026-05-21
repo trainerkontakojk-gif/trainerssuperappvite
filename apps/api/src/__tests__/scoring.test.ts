@@ -10,7 +10,7 @@ import {
   scoreLabel,
   DEFAULT_SERVICE_WEIGHTS,
 } from '../lib/scoring';
-import type { QAIndicator, QAScore } from '@trainers/types';
+import type { QAIndicator } from '@trainers/types';
 
 function makeIndicator(overrides: Partial<QAIndicator> = {}): QAIndicator {
   return {

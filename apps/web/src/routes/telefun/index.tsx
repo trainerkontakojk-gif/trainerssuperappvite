@@ -64,6 +64,13 @@ export default function TelefunLanding() {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [transcript]);
 
+  const cleanup = useCallback(() => {
+    recorderRef.current?.stop();
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    wsRef.current?.close();
+    audioRef.current?.pause();
+  }, []);
+
   const startCall = useCallback(async () => {
     setError(null);
     setCallState('connecting');
@@ -164,14 +171,7 @@ export default function TelefunLanding() {
       setError('Gagal mengakses mikrofon.');
       setCallState('ended');
     }
-  }, [settings]);
-
-  const cleanup = useCallback(() => {
-    recorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    wsRef.current?.close();
-    audioRef.current?.pause();
-  }, []);
+  }, [settings, cleanup]);
 
   const endCall = useCallback(() => {
     cleanup();

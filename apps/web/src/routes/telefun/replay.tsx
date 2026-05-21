@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useParams, Link } from '@tanstack/react-router';
 import { 
   Play, 
@@ -25,6 +25,9 @@ export default function TelefunReplay() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // eslint-disable-next-line react-hooks/purity
+  const barHeights = useMemo(() => Array.from({ length: 100 }, () => 20 + Math.random() * 80), []);
 
   const { data: session, loading: loadingSession } = useApi<TelefunHistory>(`/telefun/history/${id}`);
   const { data: summary, refetch: refetchSummary } = useApi<TelefunCoachingSummary>(`/telefun/coaching-summary/${id}`);
@@ -139,7 +142,7 @@ export default function TelefunReplay() {
                     className={`flex-1 rounded-full transition-all ${
                       (i / 100) * duration <= currentTime ? 'bg-indigo-500' : 'bg-gray-200'
                     }`}
-                    style={{ height: `${20 + Math.random() * 80}%` }}
+                    style={{ height: `${barHeights[i]}%` }}
                   />
                 ))}
               </div>

@@ -524,7 +524,7 @@ export default function SidakSettingsPage() {
                                     </td>
                                   )}
                                 </tr>
-                              ))}
+                              );})}
                             </tbody>
                           </table>
                         </div>

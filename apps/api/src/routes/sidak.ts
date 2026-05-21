@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { User } from '@supabase/supabase-js';
 import { authMiddleware } from '../middleware/auth';
+import { requireRole } from '../middleware/role';
+import { aiRateLimitMiddleware } from '../middleware/rateLimit';
 import * as sidakService from '../services/sidak-service';
-import { serviceTypeSchema, categorySchema, createTemuanBatchSchema } from '@trainers/types';
+import { createTemuanBatchSchema } from '@trainers/types';
 import { buildAiReportDocx } from '../lib/report-docx-builder';
+import { buildHtmlReport } from '../lib/report-html-builder';
 
 type Variables = { user: User; profile: any };
 
@@ -15,12 +17,12 @@ const sidak = new Hono<{ Variables: Variables }>();
 sidak.use('/*', authMiddleware);
 
 // ── Periods ────────────────────────────────────────────
-sidak.get('/periods', async (c) => {
+sidak.get('/periods', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const periods = await sidakService.getPeriods();
   return c.json({ success: true, data: periods });
 });
 
-sidak.post('/periods', async (c) => {
+sidak.post('/periods', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     month: z.number().int().min(1).max(12),
@@ -34,13 +36,13 @@ sidak.post('/periods', async (c) => {
 });
 
 // ── Indicators ─────────────────────────────────────────
-sidak.get('/indicators', async (c) => {
+sidak.get('/indicators', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const serviceType = c.req.query('service_type');
   const indicators = await sidakService.getIndicators(serviceType);
   return c.json({ success: true, data: indicators });
 });
 
-sidak.post('/indicators', async (c) => {
+sidak.post('/indicators', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
@@ -57,32 +59,37 @@ sidak.post('/indicators', async (c) => {
 });
 
 // ── Temuan (Findings) ──────────────────────────────────
-sidak.get('/temuan', async (c) => {
+sidak.get('/temuan', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const peserta_id = c.req.query('peserta_id');
   const period_id = c.req.query('period_id');
   const service_type = c.req.query('service_type');
   const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 50;
   const offset = c.req.query('offset') ? parseInt(c.req.query('offset')!) : 0;
 
-  const result = await sidakService.getTemuan({ peserta_id, period_id, service_type, limit, offset });
+  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
+  const result = await sidakService.getTemuan({ peserta_id, period_id, service_type, limit, offset, agent_ids: accessibleIds ?? undefined });
   return c.json({ success: true, data: { items: result.data, total: result.total } });
 });
 
-sidak.post('/temuan/batch', async (c) => {
+sidak.post('/temuan/batch', requireRole('admin', 'trainer', 'qa'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const body = await c.req.json();
   const parsed = createTemuanBatchSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data temuan tidak valid', details: parsed.error } }, 400);
   }
   try {
-    const result = await sidakService.createTemuanBatch(parsed.data);
+    const result = await sidakService.createTemuanBatch(parsed.data, user.id, profile?.full_name ?? undefined);
     return c.json({ success: true, data: result }, 201);
   } catch (e: any) {
     return c.json({ success: false, error: { code: 'INSERT_ERROR', message: e.message } }, 400);
   }
 });
 
-sidak.put('/temuan/:id', async (c) => {
+sidak.put('/temuan/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const parsed = z.object({
@@ -101,7 +108,7 @@ sidak.put('/temuan/:id', async (c) => {
   }
 });
 
-sidak.delete('/temuan/:id', async (c) => {
+sidak.delete('/temuan/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const id = c.req.param('id');
   try {
     await sidakService.deleteTemuan(id);
@@ -112,18 +119,27 @@ sidak.delete('/temuan/:id', async (c) => {
 });
 
 // ── Agents ─────────────────────────────────────────────
-sidak.get('/agents', async (c) => {
+sidak.get('/agents', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const batch_name = c.req.query('batch_name');
   const tim = c.req.query('tim');
   const search = c.req.query('search');
-  const agents = await sidakService.getAgents({ batch_name, tim, search });
+  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
+  const agents = await sidakService.getAgents({ batch_name, tim, search, agent_ids: accessibleIds ?? undefined });
   return c.json({ success: true, data: agents });
 });
 
-sidak.get('/agents/:id', async (c) => {
+sidak.get('/agents/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const id = c.req.param('id');
   const year = c.req.query('year') ? parseInt(c.req.query('year')!) : undefined;
   const serviceType = c.req.query('service_type') || undefined;
+  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
+  if (accessibleIds && !accessibleIds.includes(id)) {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke data agent ini.' } }, 403);
+  }
   try {
     const detail = await sidakService.getAgentDetail(id, year, serviceType);
     return c.json({ success: true, data: detail });
@@ -133,23 +149,26 @@ sidak.get('/agents/:id', async (c) => {
 });
 
 // ── Dashboard ──────────────────────────────────────────
-sidak.get('/dashboard', async (c) => {
+sidak.get('/dashboard', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const period_ids = c.req.query('period_ids')?.split(',');
   const service_type = c.req.query('service_type');
   const folder_ids = c.req.query('folder_ids')?.split(',');
   const year = c.req.query('year') ? parseInt(c.req.query('year')!) : undefined;
 
-  const data = await sidakService.getDashboardData({ period_ids, service_type, folder_ids, year });
+  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
+  const data = await sidakService.getDashboardData({ period_ids, service_type, folder_ids, year, agent_ids: accessibleIds ?? undefined });
   return c.json({ success: true, data });
 });
 
 // ── Service Weights ────────────────────────────────────
-sidak.get('/service-weights', async (c) => {
+sidak.get('/service-weights', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const weights = await sidakService.getServiceWeights();
   return c.json({ success: true, data: weights });
 });
 
-sidak.put('/service-weights/:serviceType', async (c) => {
+sidak.put('/service-weights/:serviceType', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const serviceType = c.req.param('serviceType');
   const body = await c.req.json();
   const parsed = z.object({
@@ -169,7 +188,7 @@ sidak.put('/service-weights/:serviceType', async (c) => {
 });
 
 // ── Folders ────────────────────────────────────────────
-sidak.get('/folders', async (c) => {
+sidak.get('/folders', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const { data } = await (await import('../lib/supabase')).supabaseAdmin
     .from('profiler_folders')
     .select('id, name')
@@ -178,7 +197,9 @@ sidak.get('/folders', async (c) => {
 });
 
 // ── Reports ──────────────────────────────────────────────
-sidak.post('/reports/data', async (c) => {
+sidak.post('/reports/data', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const body = await c.req.json();
   const parsed = z.object({
     serviceType: z.string().optional(),
@@ -190,16 +211,18 @@ sidak.post('/reports/data', async (c) => {
     indicatorId: z.string().optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Filter tidak valid' } }, 400);
+  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
   try {
-    const rows = await sidakService.getDataReportRows(parsed.data);
+    const rows = await sidakService.getDataReportRows({ ...parsed.data, agent_ids: accessibleIds ?? undefined });
     return c.json({ success: true, data: rows });
   } catch (e: any) {
     return c.json({ success: false, error: { code: 'REPORT_ERROR', message: e.message } }, 400);
   }
 });
 
-sidak.post('/reports/ai/generate', async (c: any) => {
+sidak.post('/reports/ai/generate', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), aiRateLimitMiddleware, async (c: any) => {
   const user = c.get('user');
+  const profile = c.get('profile');
   const body = await c.req.json();
   const parsed = z.object({
     modelId: z.string().optional(),
@@ -213,12 +236,14 @@ sidak.post('/reports/ai/generate', async (c: any) => {
   if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
 
   try {
+    const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
     const rows = await sidakService.getDataReportRows({
       serviceType: parsed.data.serviceType,
       year: parsed.data.year,
       startMonth: parsed.data.startMonth,
       endMonth: parsed.data.endMonth,
       pesertaId: parsed.data.mode === 'individu' ? parsed.data.pesertaId : undefined,
+      agent_ids: accessibleIds ?? undefined,
     });
 
     if (rows.length === 0) {
@@ -243,7 +268,9 @@ sidak.post('/reports/ai/generate', async (c: any) => {
       sebaiknya: r.sebaiknya,
     }));
 
-    const prompt = `Buat laporan analisis kualitas QA dalam Bahasa Indonesia berdasarkan data berikut:
+    const prompt = `Buat laporan analisis kualitas QA dalam Bahasa Indonesia berdasarkan data berikut.
+
+PENTING: Gunakan HANYA data yang disediakan di bawah ini. Jangan pernah mengarang, menebak, atau menambahkan angka atau temuan yang tidak ada di data. Jika data tidak mencukupi, nyatakan dengan jujur bahwa data terbatas.
 
 Periode: ${parsed.data.startMonth ? `${parsed.data.startMonth}-${parsed.data.endMonth ?? '?'}/${parsed.data.year}` : `${parsed.data.year || 'Semua'}`}
 Mode: ${parsed.data.mode}
@@ -305,29 +332,35 @@ Buat laporan dengan format JSON:
   }
 });
 
-sidak.get('/dashboard/available-years', async (c) => {
+sidak.get('/dashboard/available-years', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const accessibleIds = profile ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '') : null;
   try {
-    const years = await sidakService.getAvailableYears();
+    const years = await sidakService.getAvailableYears(accessibleIds ?? undefined);
     return c.json({ success: true, data: years });
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } }, 500);
   }
 });
 
-sidak.get('/dashboard/trend', async (c) => {
+sidak.get('/dashboard/trend', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
   const yearQuery = c.req.query('year');
   const startMonthQuery = c.req.query('startMonth');
   const endMonthQuery = c.req.query('endMonth');
+  const accessibleIds = profile ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '') : null;
 
   try {
     if (yearQuery) {
       const year = parseInt(yearQuery);
       const startMonth = startMonthQuery ? parseInt(startMonthQuery) : 1;
       const endMonth = endMonthQuery ? parseInt(endMonthQuery) : 12;
-      const trend = await sidakService.getServiceTrendForDashboardByRange(year, startMonth, endMonth);
+      const trend = await sidakService.getServiceTrendForDashboardByRange(year, startMonth, endMonth, accessibleIds ?? undefined);
       return c.json({ success: true, data: trend });
     } else {
-      const trendAll = await sidakService.getServiceTrendForDashboard('all');
+      const trendAll = await sidakService.getServiceTrendForDashboard('all', accessibleIds ?? undefined);
       const trendMap = {
         '3m': sidakService.sliceTrendData(trendAll, 3),
         '6m': sidakService.sliceTrendData(trendAll, 6),
@@ -341,7 +374,7 @@ sidak.get('/dashboard/trend', async (c) => {
 });
 
 // ── QA Rule Versions ────────────────────────────────────
-sidak.get('/rule-versions', async (c) => {
+sidak.get('/rule-versions', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const serviceType = c.req.query('service_type');
   try {
     const versions = await sidakService.getRuleVersions(serviceType || undefined);
@@ -351,7 +384,7 @@ sidak.get('/rule-versions', async (c) => {
   }
 });
 
-sidak.post('/rule-versions', async (c) => {
+sidak.post('/rule-versions', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const parsed = z.object({
@@ -373,7 +406,7 @@ sidak.post('/rule-versions', async (c) => {
   }
 });
 
-sidak.put('/rule-versions/:id', async (c) => {
+sidak.put('/rule-versions/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -394,7 +427,7 @@ sidak.put('/rule-versions/:id', async (c) => {
   }
 });
 
-sidak.post('/rule-versions/:id/publish', async (c) => {
+sidak.post('/rule-versions/:id/publish', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -412,7 +445,7 @@ sidak.post('/rule-versions/:id/publish', async (c) => {
   }
 });
 
-sidak.post('/rule-versions/:id/supersede', async (c) => {
+sidak.post('/rule-versions/:id/supersede', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -430,7 +463,7 @@ sidak.post('/rule-versions/:id/supersede', async (c) => {
   }
 });
 
-sidak.get('/rule-versions/:id/indicators', async (c) => {
+sidak.get('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const id = c.req.param('id');
   try {
     const indicators = await sidakService.getRuleVersionIndicators(id);
@@ -440,7 +473,7 @@ sidak.get('/rule-versions/:id/indicators', async (c) => {
   }
 });
 
-sidak.post('/rule-versions/:id/indicators', async (c) => {
+sidak.post('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -465,7 +498,7 @@ sidak.post('/rule-versions/:id/indicators', async (c) => {
   }
 });
 
-sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', async (c) => {
+sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const indicatorId = c.req.param('indicatorId');
   try {
     await sidakService.deleteRuleVersionIndicator(indicatorId);
@@ -475,7 +508,7 @@ sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', async (c) => {
   }
 });
 
-sidak.post('/reports/ai/export-docx', async (c) => {
+sidak.post('/reports/ai/export-docx', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     title: z.string().default('Laporan Analisis QA'),
@@ -507,6 +540,60 @@ sidak.post('/reports/ai/export-docx', async (c) => {
     });
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'EXPORT_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/reports/ai/export-html', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const body = await c.req.json();
+  const parsed = z.object({
+    title: z.string().default('Laporan Analisis QA'),
+    periodLabel: z.string().default(''),
+    serviceLabel: z.string().default(''),
+    mode: z.enum(['layanan', 'individu']).default('layanan'),
+    agentName: z.string().optional(),
+    totalFindings: z.number().default(0),
+    totalRows: z.number().default(0),
+    executiveSummary: z.string().default(''),
+    keyFindings: z.array(z.string()).default([]),
+    scoreAnalysis: z.string().default(''),
+    recommendations: z.array(z.string()).default([]),
+    priorityAreas: z.array(z.string()).default([]),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data laporan tidak valid', details: parsed.error } }, 400);
+  }
+  try {
+    const html = buildHtmlReport(parsed.data);
+    return c.newResponse(html, 200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': `attachment; filename="laporan-ai-${Date.now()}.html"`,
+    });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'EXPORT_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/reports/ai/chart-data', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const body = await c.req.json();
+  const parsed = z.object({
+    serviceType: z.string().optional(),
+    year: z.number().int().optional(),
+    startMonth: z.number().int().min(1).max(12).optional(),
+    endMonth: z.number().int().min(1).max(12).optional(),
+    folderId: z.string().optional(),
+    pesertaId: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Filter tidak valid' } }, 400);
+  }
+  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
+  try {
+    const chartData = await sidakService.getReportChartData({ ...parsed.data, agent_ids: accessibleIds ?? undefined });
+    return c.json({ success: true, data: chartData });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'REPORT_ERROR', message: error.message } }, 500);
   }
 });
 

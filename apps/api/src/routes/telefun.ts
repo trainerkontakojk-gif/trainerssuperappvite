@@ -10,6 +10,31 @@ type Variables = { user: User; profile: any };
 const telefun = new Hono<{ Variables: Variables }>();
 telefun.use('*', authMiddleware);
 
+telefun.get('/sessions', async (c) => {
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const adminClient = createAdminClient();
+
+  try {
+    const isManager = ['admin', 'trainer', 'qa'].includes(profile?.role);
+    let query = adminClient
+      .from('telefun_history')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (!isManager) {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return c.json({ success: true, data: data ?? [] });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
 telefun.get('/settings', async (c) => {
   const user = c.get('user');
   const adminClient = createAdminClient();

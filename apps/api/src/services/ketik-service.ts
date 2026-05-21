@@ -1,4 +1,4 @@
-import { KetikScenario, KetikConsumerType, ChatMessage, ChatSession, KetikAppSettings, KetikSessionHistoryItem, KetikReviewDetail, KetikSessionReview, KetikTypoFinding, DEFAULT_KETIK_SETTINGS } from '@trainers/types';
+import { KetikScenario, KetikConsumerType, ChatMessage, KetikAppSettings, KetikSessionHistoryItem, KetikReviewDetail, KetikSessionReview, KetikTypoFinding, DEFAULT_KETIK_SETTINGS } from '@trainers/types';
 import { generateGeminiContent } from '../lib/gemini';
 import { generateOpenRouterContent } from '../lib/openrouter';
 import { resolveModelProvider, TEXT_SIMULATION_MODELS } from '../lib/ai-models';
@@ -49,14 +49,6 @@ function sanitizeConsumerText(rawText: string): string {
     if (consumerLines.length > 0) text = consumerLines.join(' ');
   }
   return text.trim();
-}
-
-function formatDurationLabel(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  if (m === 0) return `${s} detik`;
-  if (s === 0) return `${m} menit`;
-  return `${m} menit ${s} detik`;
 }
 
 function buildTimeLimitInstruction(simulationDurationMinutes: number | undefined): string {
@@ -438,7 +430,7 @@ export async function processKetikReviewJob(sessionId: string, leaseOwner?: stri
     }
   } catch (error) {
     console.error("[processKetikReviewJob] Failed to parse or normalize AI response:", error, aiResponse.text);
-    throw new Error('AI response JSON tidak valid atau format tidak sesuai.');
+    throw new Error('AI response JSON tidak valid atau format tidak sesuai.', { cause: error });
   }
 
   if (leaseOwner) {

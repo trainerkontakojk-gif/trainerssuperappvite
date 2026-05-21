@@ -116,9 +116,9 @@ export function normalizeSubject(raw: string | undefined | null): string {
 
 export function parseJsonFromModelText(raw: string): any {
   const trimmed = raw.trim();
-  try { return JSON.parse(trimmed); } catch {}
+  try { return JSON.parse(trimmed); } catch { /* fallthrough */ }
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced?.[1]) { try { return JSON.parse(fenced[1].trim()); } catch {} }
+  if (fenced?.[1]) { try { return JSON.parse(fenced[1].trim()); } catch { /* fallthrough */ } }
   const bracketMatch = trimmed.match(/\{[\s\S]*\}/);
   if (bracketMatch?.[0]) { return JSON.parse(bracketMatch[0]); }
   throw new Error('Tidak ada data JSON valid dari model.');
@@ -210,7 +210,7 @@ export function getSystemInstruction(config: PdktSessionConfig, hasCustomImages:
     ? `TEMPLATE REFERENSI: Anda bisa merujuk pada gaya bahasa template berikut, namun buatlah versi yang lebih panjang dan bertele-tele:\n"${scenario.sampleEmailTemplate.body}"`
     : "";
 
-  let imageInstruction = "";
+  let imageInstruction: string;
   if (hasCustomImages) {
     imageInstruction = "User (Program) sudah melampirkan bukti gambar secara manual. Fokus saja pada cerita keluhannya.";
   } else if (config.enableImageGeneration) {

@@ -11,28 +11,6 @@ vi.mock('../lib/supabase', () => ({
 import * as ketikService from '../services/ketik-service';
 import { DEFAULT_KETIK_SETTINGS } from '@trainers/types';
 
-function buildQuery(result: any) {
-  const q = { data: result, error: null };
-  const proxy = new Proxy({}, {
-    get(_target, prop) {
-      if (prop === 'then') return (resolve: any) => resolve(q);
-      return () => proxy;
-    },
-  });
-  return proxy;
-}
-
-function buildQueryWithError(error: any) {
-  const q = { data: null, error };
-  const proxy = new Proxy({}, {
-    get(_target, prop) {
-      if (prop === 'then') return (resolve: any) => resolve(q);
-      return () => proxy;
-    },
-  });
-  return proxy;
-}
-
 describe('KETIK Service - Settings', () => {
   beforeEach(() => {
     mockFrom.mockReset();

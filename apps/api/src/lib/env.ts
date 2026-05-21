@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 try {
   process.loadEnvFile('../../.env.local');
-} catch (e) {
+} catch (_e) {
   // Ignore if file doesn't exist
 }
 

@@ -6,6 +6,82 @@ import type {
   AgentPeriodSummary, TopAgentData, ParetoData,
 } from '@trainers/types';
 
+const TRAINER_ROLES = ['admin', 'trainer', 'qa'] as const;
+const LEADER_ROLES = ['tl', 'spv', 'om'] as const;
+
+export async function getAccessibleAgentIds(userId: string, role: string): Promise<string[] | null> {
+  if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
+
+  if (role === 'agent') {
+    const { data } = await supabaseAdmin
+      .from('profiler_peserta')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return data ? [data.id] : [];
+  }
+
+  if ((LEADER_ROLES as readonly string[]).includes(role)) {
+    const { data: requests } = await supabaseAdmin
+      .from('leader_access_requests')
+      .select('id')
+      .eq('leader_user_id', userId)
+      .eq('status', 'approved')
+      .eq('module', 'sidak');
+
+    if (!requests || requests.length === 0) return [];
+
+    const requestIds = requests.map(r => r.id);
+    const { data: groupLinks } = await supabaseAdmin
+      .from('leader_access_request_groups')
+      .select('access_group_id')
+      .in('request_id', requestIds);
+
+    if (!groupLinks || groupLinks.length === 0) return [];
+    const groupIds = [...new Set(groupLinks.map(g => g.access_group_id))];
+
+    const { data: items } = await supabaseAdmin
+      .from('access_group_items')
+      .select('field_name, field_value')
+      .in('access_group_id', groupIds)
+      .eq('is_active', true);
+
+    if (!items || items.length === 0) return [];
+
+    const directIds: string[] = [];
+    const batchNames: string[] = [];
+    const tims: string[] = [];
+
+    for (const item of items) {
+      if (item.field_name === 'peserta_id') directIds.push(item.field_value);
+      else if (item.field_name === 'batch_name') batchNames.push(item.field_value);
+      else if (item.field_name === 'tim') tims.push(item.field_value);
+    }
+
+    const resolvedIds = [...directIds];
+
+    if (batchNames.length > 0) {
+      const { data: batchData } = await supabaseAdmin
+        .from('profiler_peserta')
+        .select('id')
+        .in('batch_name', batchNames);
+      if (batchData) resolvedIds.push(...batchData.map(b => b.id));
+    }
+
+    if (tims.length > 0) {
+      const { data: timData } = await supabaseAdmin
+        .from('profiler_peserta')
+        .select('id')
+        .in('tim', tims);
+      if (timData) resolvedIds.push(...timData.map(t => t.id));
+    }
+
+    return [...new Set(resolvedIds)];
+  }
+
+  return [];
+}
+
 function roundTo(value: number, digits: number): number {
   if (!Number.isFinite(value)) return 0;
   return Number(value.toFixed(digits));
@@ -75,6 +151,7 @@ export async function getTemuan(params: {
   service_type?: string;
   limit?: number;
   offset?: number;
+  agent_ids?: string[];
 }): Promise<{ data: QATemuan[]; total: number }> {
   let query = supabaseAdmin
     .from('qa_temuan')
@@ -83,6 +160,7 @@ export async function getTemuan(params: {
   if (params.peserta_id) query = query.eq('peserta_id', params.peserta_id);
   if (params.period_id) query = query.eq('period_id', params.period_id);
   if (params.service_type) query = query.eq('service_type', params.service_type);
+  if (params.agent_ids && params.agent_ids.length > 0) query = query.in('peserta_id', params.agent_ids);
 
   query = query.order('created_at', { ascending: false });
 
@@ -93,13 +171,17 @@ export async function getTemuan(params: {
   return { data: data ?? [], total: count ?? 0 };
 }
 
-export async function createTemuanBatch(items: {
-  peserta_id: string;
-  period_id: string;
-  service_type: ServiceType;
-  no_tiket?: string | null;
-  items: { indicator_id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }[];
-}) {
+export async function createTemuanBatch(
+  items: {
+    peserta_id: string;
+    period_id: string;
+    service_type: ServiceType;
+    no_tiket?: string | null;
+    items: { indicator_id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }[];
+  },
+  userId?: string,
+  userName?: string,
+): Promise<{ inserted: number; skipped: number; total: number }> {
   // resolve active published rule version
   const { data: activeVersion } = await supabaseAdmin
     .from('qa_service_rule_versions')
@@ -148,7 +230,33 @@ export async function createTemuanBatch(items: {
     }
   }
 
-  const rows = items.items.map(item => ({
+  // dedup check: skip existing (period_id, peserta_id, indicator_id) combinations
+  const { data: existing } = await supabaseAdmin
+    .from('qa_temuan')
+    .select('indicator_id')
+    .eq('period_id', items.period_id)
+    .eq('peserta_id', items.peserta_id);
+
+  const existingIndicatorIds = new Set((existing ?? []).map(e => e.indicator_id));
+
+  const newItems = items.items.filter(item => !existingIndicatorIds.has(item.indicator_id));
+  const skipped = items.items.length - newItems.length;
+
+  if (newItems.length === 0) {
+    // log upload even if all skipped
+    if (userId) {
+      await supabaseAdmin.from('activity_logs').insert({
+        user_id: userId,
+        user_name: userName,
+        action: 'upload_sidak_batch',
+        module: 'sidak',
+        type: 'upload_skipped',
+      });
+    }
+    return { inserted: 0, skipped, total: items.items.length };
+  }
+
+  const rows = newItems.map(item => ({
     peserta_id: items.peserta_id,
     period_id: items.period_id,
     indicator_id: item.indicator_id,
@@ -171,7 +279,19 @@ export async function createTemuanBatch(items: {
     }
     throw new Error(`Gagal menyimpan temuan: ${error.message}`);
   }
-  return data ?? [];
+
+  // activity log
+  if (userId) {
+    await supabaseAdmin.from('activity_logs').insert({
+      user_id: userId,
+      user_name: userName,
+      action: 'upload_sidak_batch',
+      module: 'sidak',
+      type: 'upload',
+    });
+  }
+
+  return { inserted: data?.length ?? 0, skipped, total: items.items.length };
 }
 
 export async function updateTemuan(id: string, updates: {
@@ -200,6 +320,7 @@ export async function getAgents(params: {
   batch_name?: string;
   tim?: string;
   search?: string;
+  agent_ids?: string[];
 }): Promise<any[]> {
   let query = supabaseAdmin
     .from('profiler_peserta')
@@ -209,6 +330,7 @@ export async function getAgents(params: {
   if (params.batch_name) query = query.eq('batch_name', params.batch_name);
   if (params.tim) query = query.eq('tim', params.tim);
   if (params.search) query = query.ilike('nama', `%${params.search}%`);
+  if (params.agent_ids && params.agent_ids.length > 0) query = query.in('id', params.agent_ids);
 
   const { data } = await query;
   return data ?? [];
@@ -285,6 +407,8 @@ export async function getDashboardData(params: {
   service_type?: string;
   folder_ids?: string[];
   year?: number;
+  peserta_id?: string;
+  agent_ids?: string[];
 }): Promise<DashboardData> {
   const [periods, folders, indicators, weights] = await Promise.all([
     getPeriods(),
@@ -305,6 +429,12 @@ export async function getDashboardData(params: {
   }
   if (params.year) {
     query = query.eq('tahun', params.year);
+  }
+  if (params.peserta_id) {
+    query = query.eq('peserta_id', params.peserta_id);
+  }
+  if (params.agent_ids && params.agent_ids.length > 0) {
+    query = query.in('peserta_id', params.agent_ids);
   }
 
   const { data: allTemuan } = await query;
@@ -423,7 +553,7 @@ export async function getDashboardData(params: {
     .slice(0, 20);
 
   const paretoArray: ParetoData[] = Array.from(paretoMap.entries())
-    .map(([key, val]) => ({ name: val.name, fullName: val.name, count: val.count, cumulative: 0, category: val.cat as any }))
+    .map(([_key, val]) => ({ name: val.name, fullName: val.name, count: val.count, cumulative: 0, category: val.cat as any }))
     .sort((a, b) => b.count - a.count);
 
   let cumulative = 0;
@@ -471,6 +601,7 @@ export async function getDataReportRows(params: {
   folderId?: string;
   pesertaId?: string;
   indicatorId?: string;
+  agent_ids?: string[];
 }): Promise<any[]> {
   let query = supabaseAdmin
     .from('qa_temuan')
@@ -480,6 +611,7 @@ export async function getDataReportRows(params: {
   if (params.year) query = query.eq('tahun', params.year);
   if (params.pesertaId) query = query.eq('peserta_id', params.pesertaId);
   if (params.indicatorId) query = query.eq('indicator_id', params.indicatorId);
+  if (params.agent_ids && params.agent_ids.length > 0) query = query.in('peserta_id', params.agent_ids);
 
   if (params.startMonth && params.year) {
     const startPeriod = await supabaseAdmin
@@ -503,6 +635,68 @@ export async function getDataReportRows(params: {
 
   const { data } = await query.order('created_at', { ascending: false }).limit(1000);
   return data ?? [];
+}
+
+export async function getReportChartData(params: {
+  serviceType?: string;
+  year?: number;
+  startMonth?: number;
+  endMonth?: number;
+  folderId?: string;
+  pesertaId?: string;
+  agent_ids?: string[];
+}): Promise<{
+  donutData: { critical: number; nonCritical: number; total: number };
+  paretoData: { name: string; count: number; cumulative: number }[];
+  trendData: { month: string; total: number }[];
+}> {
+  const rows = await getDataReportRows(params);
+  if (rows.length === 0) {
+    return { donutData: { critical: 0, nonCritical: 0, total: 0 }, paretoData: [], trendData: [] };
+  }
+
+  const indicators = await getIndicators(params.serviceType);
+  const paretoMap = new Map<string, number>();
+  let criticalCount = 0;
+  let nonCriticalCount = 0;
+
+  for (const row of rows) {
+    const ind = indicators.find(i => i.id === row.indicator_id);
+    if (ind) {
+      const key = ind.name;
+      paretoMap.set(key, (paretoMap.get(key) ?? 0) + 1);
+      if (ind.category === 'critical') criticalCount++;
+      else if (ind.category === 'non_critical') nonCriticalCount++;
+    }
+  }
+
+  const paretoArray = Array.from(paretoMap.entries())
+    .map(([name, count]) => ({ name, count, cumulative: 0 }))
+    .sort((a, b) => b.count - a.count);
+
+  let cumulative = 0;
+  for (const p of paretoArray) {
+    cumulative += p.count;
+    p.cumulative = cumulative;
+  }
+
+  const periodMap = new Map<string, number>();
+  for (const row of rows) {
+    const period = row.qa_periods as { month?: number; year?: number } | undefined;
+    if (period?.month && period?.year) {
+      const key = `${String(period.month).padStart(2, '0')}/${period.year}`;
+      periodMap.set(key, (periodMap.get(key) ?? 0) + 1);
+    }
+  }
+
+  const sortedPeriods = Array.from(periodMap.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const trendData = sortedPeriods.map(([month, total]) => ({ month, total }));
+
+  return {
+    donutData: { critical: criticalCount, nonCritical: nonCriticalCount, total: criticalCount + nonCriticalCount },
+    paretoData: paretoArray.slice(0, 15),
+    trendData,
+  };
 }
 
 export async function getServiceWeights(): Promise<any[]> {
@@ -529,7 +723,7 @@ export async function updateServiceWeight(serviceType: string, updates: {
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
 
-export async function fetchPaginatedTrendData(pIds: string[], year?: number) {
+export async function fetchPaginatedTrendData(pIds: string[], year?: number, agent_ids?: string[]) {
   let allData: any[] = [];
   let from = 0;
   const step = 1000;
@@ -546,6 +740,9 @@ export async function fetchPaginatedTrendData(pIds: string[], year?: number) {
 
     if (year) {
       query = query.eq('tahun', year);
+    }
+    if (agent_ids && agent_ids.length > 0) {
+      query = query.in('peserta_id', agent_ids);
     }
 
     const { data, error } = await query;
@@ -592,7 +789,7 @@ export async function calculateTopParameters(temuan: any[]) {
   return result;
 }
 
-export async function getServiceTrendForDashboard(timeframe: '3m' | '6m' | 'all' = '3m') {
+export async function getServiceTrendForDashboard(timeframe: '3m' | '6m' | 'all' = '3m', agent_ids?: string[]) {
   const limitMap = { '3m': 3, '6m': 6, 'all': 12 };
   const limit = limitMap[timeframe] || 3;
 
@@ -621,7 +818,7 @@ export async function getServiceTrendForDashboard(timeframe: '3m' | '6m' | 'all'
   const pIds = sortedPeriods.map(p => p.id);
   const labels = sortedPeriods.map(p => `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`);
 
-  const temuan = await fetchPaginatedTrendData(pIds);
+  const temuan = await fetchPaginatedTrendData(pIds, undefined, agent_ids);
   const topParameters = await calculateTopParameters(temuan);
 
   if (!temuan || temuan.length === 0) {
@@ -719,7 +916,7 @@ export async function getServiceTrendForDashboard(timeframe: '3m' | '6m' | 'all'
   };
 }
 
-export async function getServiceTrendForDashboardByRange(year: number, startMonth: number, endMonth: number) {
+export async function getServiceTrendForDashboardByRange(year: number, startMonth: number, endMonth: number, agent_ids?: string[]) {
   const allPeriods = await getPeriods();
   const sortedPeriods = allPeriods
     .filter(p => p.year === year && p.month >= startMonth && p.month <= endMonth)
@@ -741,7 +938,7 @@ export async function getServiceTrendForDashboardByRange(year: number, startMont
     };
   }
 
-  const temuan = await fetchPaginatedTrendData(pIds, year);
+  const temuan = await fetchPaginatedTrendData(pIds, year, agent_ids);
   const topParameters = await calculateTopParameters(temuan);
 
   if (!temuan || temuan.length === 0) {
@@ -891,11 +1088,20 @@ export function sliceTrendData(data: any, months: number) {
   };
 }
 
-export async function getAvailableYears(): Promise<number[]> {
-  const { data: rows, error } = await supabaseAdmin.from('qa_periods').select('year');
-  if (error) throw error;
-  const years = (rows ?? []).map(r => r.year).filter(Boolean);
-  return [...new Set(years)].sort((a, b) => b - a);
+export async function getAvailableYears(agent_ids?: string[]): Promise<number[]> {
+  let query = supabaseAdmin
+    .from('qa_temuan')
+    .select('tahun')
+    .not('tahun', 'is', null);
+
+  if (agent_ids && agent_ids.length > 0) {
+    query = query.in('peserta_id', agent_ids);
+  }
+
+  const { data } = await query.order('tahun', { ascending: false });
+
+  const years = [...new Set((data ?? []).map(r => r.tahun).filter(Boolean))] as number[];
+  return years;
 }
 
 // ── QA Rule Versions ────────────────────────────────────────

@@ -25,7 +25,8 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Install:** `pnpm install`
 - **Dev:** `pnpm dev` (Menjalankan web, api, dan telefun secara paralel)
 - **Build:** `pnpm build`
-- **Lint:** `pnpm lint`
+- **Lint:** `pnpm lint` (ESLint 9 flat config — `eslint.config.mjs` di root)
+- **Lint (single workspace):** `pnpm --filter @trainers/web lint`
 - **Test:** `pnpm test` (vitest — 92 tests covering API services + frontend hooks/components)
 - **Test (api only):** `pnpm --filter @trainers/api test`
 - **Test (web only):** `pnpm --filter @trainers/web test`
@@ -54,6 +55,7 @@ Monorepo dengan pembagian tanggung jawab yang jelas:
   - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs`.
   - Jika pricing model tidak ada, tetap catat token dengan cost 0.
 - **Error Handling**: Jangan biarkan error database mentah (misal: foreign key error) muncul ke user. Berikan pesan yang manusiawi.
+- **Linting**: ESLint 9 flat config (`eslint.config.mjs` di root) dengan `typescript-eslint` recommended, `react-hooks` recommended (kecuali `set-state-in-effect` dimatikan), dan `react-refresh`. Unused vars prefix `_` diperbolehkan (warning). `no-explicit-any` dimatikan. Formatting via Prettier (`pnpm format`).
 
 ## Golden Rules
 

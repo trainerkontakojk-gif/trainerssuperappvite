@@ -76,6 +76,7 @@ export default function ActivitiesPage() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
+    // eslint-disable-next-line react-hooks/purity
     link.setAttribute('download', `audit_trail_logs_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();

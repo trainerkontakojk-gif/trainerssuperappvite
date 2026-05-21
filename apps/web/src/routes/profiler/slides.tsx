@@ -80,17 +80,21 @@ export default function ProfilerSlides() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Masa Dinas</p>
                   <p className="text-sm text-gray-900 mt-0.5">
+                    {/* eslint-disable react-hooks/purity */}
                     {p.bergabung_date
                       ? `${Math.floor((Date.now() - new Date(p.bergabung_date).getTime()) / (365.25 * 24 * 60 * 60 * 1000))} tahun`
                       : '-'}
+                    {/* eslint-enable react-hooks/purity */}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Usia</p>
                   <p className="text-sm text-gray-900 mt-0.5">
+                    {/* eslint-disable react-hooks/purity */}
                     {p.tgl_lahir
                       ? `${Math.floor((Date.now() - new Date(p.tgl_lahir).getTime()) / (365.25 * 24 * 60 * 60 * 1000))} tahun`
                       : '-'}
+                    {/* eslint-enable react-hooks/purity */}
                   </p>
                 </div>
               </div>
