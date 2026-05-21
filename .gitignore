@@ -15,3 +15,5 @@ supabase/.temp/
 .pnpm-store/
 .antigravitycli/
 docs/superpowers/
+plan/
+apps/api/src/inspect_db.ts

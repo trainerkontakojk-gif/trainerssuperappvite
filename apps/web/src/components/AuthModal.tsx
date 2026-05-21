@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, ArrowRight, Cpu, Loader2, ShieldCheck, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizeProfileStatus } from '../lib/profile';
+import { fetchAuthProfile } from '../lib/fetchAuthProfile';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -78,26 +79,34 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
     return null;
   }
 
-  async function resolvePostLoginPath(userId: string) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('status')
-      .eq('id', userId)
-      .maybeSingle();
+  function clearAuthLocalStorage() {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_profile');
+    localStorage.removeItem('trainers_login_time');
+    localStorage.removeItem('trainers_last_activity');
+  }
 
-    if (profileError || !profile) {
-      console.warn('[AuthModal] Failed to read profile after login:', profileError?.message);
+  async function resolvePostLoginPath(userId: string) {
+    const profile = await fetchAuthProfile(userId);
+
+    if (!profile) {
+      console.warn('[AuthModal] Failed to fetch profile after login');
       return '/dashboard';
     }
 
-    const profileStatus = normalizeProfileStatus(profile?.status);
+    if (profile.is_deleted) {
+      await supabase.auth.signOut();
+      clearAuthLocalStorage();
+      throw new Error('Akun Anda telah dinonaktifkan. Silakan hubungi administrator.');
+    }
 
-    if (profileStatus === 'pending') {
+    if (profile.status === 'pending') {
       return '/waiting-approval';
     }
 
-    if (profileStatus === 'inactive') {
+    if (profile.status === 'inactive') {
       await supabase.auth.signOut();
+      clearAuthLocalStorage();
       throw new Error('Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.');
     }
 
@@ -133,8 +142,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
         }
 
         const nextPath = await resolvePostLoginPath(session.user.id);
-        localStorage.removeItem('trainers_login_time');
-        localStorage.removeItem('trainers_last_activity');
+        localStorage.setItem('auth_token', session.access_token);
         window.location.assign(nextPath);
         return;
       }

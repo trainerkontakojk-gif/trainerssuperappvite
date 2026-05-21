@@ -164,6 +164,12 @@ export function DashboardLayout() {
   const userInitial = (profile?.full_name || session?.user?.email || 'U').charAt(0).toUpperCase();
 
   const handleLogout = async () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_profile');
+    localStorage.removeItem('trainers_login_time');
+    localStorage.removeItem('trainers_last_activity');
+    useAuthStore.getState().setSession(null);
+    useAuthStore.getState().setProfile(null);
     await supabase.auth.signOut();
   };
 

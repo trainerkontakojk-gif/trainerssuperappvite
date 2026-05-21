@@ -16,6 +16,9 @@ export default function WaitingApprovalPage() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_profile');
+    localStorage.removeItem('trainers_login_time');
+    localStorage.removeItem('trainers_last_activity');
     navigate({ to: '/' });
   };
 
@@ -46,6 +49,9 @@ export default function WaitingApprovalPage() {
       if (profile?.is_deleted) {
         await supabase.auth.signOut();
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_profile');
+        localStorage.removeItem('trainers_login_time');
+        localStorage.removeItem('trainers_last_activity');
         navigate({ to: '/' });
         return;
       }
@@ -55,6 +61,9 @@ export default function WaitingApprovalPage() {
       } else if (profileStatus === 'inactive') {
         await supabase.auth.signOut();
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_profile');
+        localStorage.removeItem('trainers_login_time');
+        localStorage.removeItem('trainers_last_activity');
         navigate({ to: '/' });
       }
     };

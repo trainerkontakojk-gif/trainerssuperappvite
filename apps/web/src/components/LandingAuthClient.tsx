@@ -11,7 +11,7 @@ type AuthContextType = {
   openAuth: (mode: 'login' | 'register' | 'forgot') => void;
 };
 
-const AuthContext = createContext<AuthContextType>({
+export const AuthContext = createContext<AuthContextType>({
   isLoggedIn: false,
   isCheckingAuth: true,
   openAuth: () => {},
@@ -43,10 +43,33 @@ export function LandingAuthProvider({ children }: { children: React.ReactNode })
   }, [search.auth]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setIsLoggedIn(!!user);
-      setIsCheckingAuth(false);
-    });
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        setIsCheckingAuth(false);
+        console.warn('[LandingAuthClient] Auth check timed out, showing login fallback');
+      }
+    }, 5000);
+
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => {
+        if (!cancelled) {
+          setIsLoggedIn(!!user);
+          setIsCheckingAuth(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[LandingAuthClient] Auth check failed:', err);
+          setIsLoggedIn(false);
+          setIsCheckingAuth(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleOpenAuth = useCallback((mode: 'login' | 'register' | 'forgot') => {
