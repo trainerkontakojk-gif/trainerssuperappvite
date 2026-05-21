@@ -86,15 +86,18 @@ CREATE INDEX IF NOT EXISTS idx_leader_access_request_groups_group_id
   ON public.leader_access_request_groups(access_group_id);
 
 -- Set updated_at trigger for new tables
-CREATE OR REPLACE TRIGGER update_access_groups_updated_at
+DROP TRIGGER IF EXISTS update_access_groups_updated_at ON public.access_groups;
+CREATE TRIGGER update_access_groups_updated_at
   BEFORE UPDATE ON public.access_groups
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-CREATE OR REPLACE TRIGGER update_access_group_items_updated_at
+DROP TRIGGER IF EXISTS update_access_group_items_updated_at ON public.access_group_items;
+CREATE TRIGGER update_access_group_items_updated_at
   BEFORE UPDATE ON public.access_group_items
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-CREATE OR REPLACE TRIGGER update_leader_access_requests_updated_at
+DROP TRIGGER IF EXISTS update_leader_access_requests_updated_at ON public.leader_access_requests;
+CREATE TRIGGER update_leader_access_requests_updated_at
   BEFORE UPDATE ON public.leader_access_requests
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
@@ -121,6 +124,7 @@ GRANT ALL ON public.leader_access_requests TO service_role;
 GRANT ALL ON public.leader_access_request_groups TO service_role;
 
 -- Policies: access_groups
+DROP POLICY IF EXISTS "Admin and trainer manage access groups" ON public.access_groups;
 CREATE POLICY "Admin and trainer manage access groups" ON public.access_groups
   FOR ALL USING (
     exists (
@@ -131,6 +135,7 @@ CREATE POLICY "Admin and trainer manage access groups" ON public.access_groups
   );
 
 -- Policies: access_group_items
+DROP POLICY IF EXISTS "Admin and trainer manage access group items" ON public.access_group_items;
 CREATE POLICY "Admin and trainer manage access group items" ON public.access_group_items
   FOR ALL USING (
     exists (
@@ -141,9 +146,11 @@ CREATE POLICY "Admin and trainer manage access group items" ON public.access_gro
   );
 
 -- Policies: leader_access_requests
+DROP POLICY IF EXISTS "Leader views own requests" ON public.leader_access_requests;
 CREATE POLICY "Leader views own requests" ON public.leader_access_requests
   FOR SELECT USING (leader_user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Leader inserts own pending request" ON public.leader_access_requests;
 CREATE POLICY "Leader inserts own pending request" ON public.leader_access_requests
   FOR INSERT WITH CHECK (
     leader_user_id = auth.uid()
@@ -156,6 +163,7 @@ CREATE POLICY "Leader inserts own pending request" ON public.leader_access_reque
     )
   );
 
+DROP POLICY IF EXISTS "Admin and trainer manage leader access requests" ON public.leader_access_requests;
 CREATE POLICY "Admin and trainer manage leader access requests" ON public.leader_access_requests
   FOR ALL USING (
     exists (
@@ -166,6 +174,7 @@ CREATE POLICY "Admin and trainer manage leader access requests" ON public.leader
   );
 
 -- Policies: leader_access_request_groups
+DROP POLICY IF EXISTS "Admin and trainer manage access request groups" ON public.leader_access_request_groups;
 CREATE POLICY "Admin and trainer manage access request groups" ON public.leader_access_request_groups
   FOR ALL USING (
     exists (
@@ -175,6 +184,7 @@ CREATE POLICY "Admin and trainer manage access request groups" ON public.leader_
     )
   );
 
+DROP POLICY IF EXISTS "Leader views own request groups" ON public.leader_access_request_groups;
 CREATE POLICY "Leader views own request groups" ON public.leader_access_request_groups
   FOR SELECT USING (
     exists (

@@ -246,49 +246,81 @@ ALTER TABLE public.qa_dashboard_period_summary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.qa_dashboard_agent_period_summary ENABLE ROW LEVEL SECURITY;
 
 -- Read policies for authenticated users
+DROP POLICY IF EXISTS "read_all" ON public.profiler_years;
 CREATE POLICY "read_all" ON public.profiler_years FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.profiler_folders;
 CREATE POLICY "read_all" ON public.profiler_folders FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.profiler_peserta;
 CREATE POLICY "read_all" ON public.profiler_peserta FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.profiler_tim_list;
 CREATE POLICY "read_all" ON public.profiler_tim_list FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_periods;
 CREATE POLICY "read_all" ON public.qa_periods FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_indicators;
 CREATE POLICY "read_all" ON public.qa_indicators FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_service_weights;
 CREATE POLICY "read_all" ON public.qa_service_weights FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_temuan;
 CREATE POLICY "read_all" ON public.qa_temuan FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_service_rule_versions;
 CREATE POLICY "read_all" ON public.qa_service_rule_versions FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_service_rule_indicators;
 CREATE POLICY "read_all" ON public.qa_service_rule_indicators FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_dashboard_period_summary;
 CREATE POLICY "read_all" ON public.qa_dashboard_period_summary FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "read_all" ON public.qa_dashboard_agent_period_summary;
 CREATE POLICY "read_all" ON public.qa_dashboard_agent_period_summary FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Write policies for admin/trainer roles
+DROP POLICY IF EXISTS "write_trainer" ON public.profiler_years;
 CREATE POLICY "write_trainer" ON public.profiler_years FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.profiler_folders;
 CREATE POLICY "write_trainer" ON public.profiler_folders FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.profiler_peserta;
 CREATE POLICY "write_trainer" ON public.profiler_peserta FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.profiler_tim_list;
 CREATE POLICY "write_trainer" ON public.profiler_tim_list FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_periods;
 CREATE POLICY "write_trainer" ON public.qa_periods FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_indicators;
 CREATE POLICY "write_trainer" ON public.qa_indicators FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_service_weights;
 CREATE POLICY "write_trainer" ON public.qa_service_weights FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_temuan;
 CREATE POLICY "write_trainer" ON public.qa_temuan FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_service_rule_versions;
 CREATE POLICY "write_trainer" ON public.qa_service_rule_versions FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_service_rule_indicators;
 CREATE POLICY "write_trainer" ON public.qa_service_rule_indicators FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer', 'trainers'))
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
+);
+
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_dashboard_period_summary;
+CREATE POLICY "write_trainer" ON public.qa_dashboard_period_summary FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
+);
+
+DROP POLICY IF EXISTS "write_trainer" ON public.qa_dashboard_agent_period_summary;
+CREATE POLICY "write_trainer" ON public.qa_dashboard_agent_period_summary FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'trainer'))
 );
 
 -- 10. Triggers

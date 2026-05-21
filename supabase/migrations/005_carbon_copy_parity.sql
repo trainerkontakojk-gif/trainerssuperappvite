@@ -131,7 +131,7 @@ BEGIN
         FROM public.profiles p
         WHERE p.id != v_creator_id
           AND p.status = 'approved'
-          AND p.is_deleted = false
+          AND (p.is_deleted IS NULL OR p.is_deleted = false)
           AND LOWER(TRIM(p.role)) IN ('leader', 'agent', 'agents', 'leaders');
     END IF;
 
@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS public.telefun_coaching_summary (
 
 ALTER TABLE public.telefun_coaching_summary ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own coaching summaries" ON public.telefun_coaching_summary;
 CREATE POLICY "Users can view their own coaching summaries"
   ON public.telefun_coaching_summary FOR SELECT
   USING (auth.uid() = user_id);
@@ -257,10 +258,12 @@ CREATE TABLE IF NOT EXISTS public.telefun_replay_annotations (
 
 ALTER TABLE public.telefun_replay_annotations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own replay annotations" ON public.telefun_replay_annotations;
 CREATE POLICY "Users can view their own replay annotations"
   ON public.telefun_replay_annotations FOR SELECT TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own replay annotations" ON public.telefun_replay_annotations;
 CREATE POLICY "Users can insert their own replay annotations"
   ON public.telefun_replay_annotations FOR INSERT TO authenticated
   WITH CHECK (
@@ -271,6 +274,7 @@ CREATE POLICY "Users can insert their own replay annotations"
     )
   );
 
+DROP POLICY IF EXISTS "Users can delete their own replay annotations" ON public.telefun_replay_annotations;
 CREATE POLICY "Users can delete their own replay annotations"
   ON public.telefun_replay_annotations FOR DELETE TO authenticated
   USING (auth.uid() = user_id);

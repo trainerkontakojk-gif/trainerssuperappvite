@@ -2,7 +2,7 @@
 -- Migration 003: Telefun Core Schema
 -- ═══════════════════════════════════════════════════════
 
-CREATE TABLE telefun_history (
+CREATE TABLE IF NOT EXISTS telefun_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   scenario_title TEXT NOT NULL,
@@ -19,15 +19,18 @@ CREATE TABLE telefun_history (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_telefun_history_user_id ON telefun_history(user_id);
-CREATE INDEX idx_telefun_history_created_at ON telefun_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_telefun_history_user_id ON telefun_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_telefun_history_created_at ON telefun_history(created_at);
 
 ALTER TABLE telefun_history ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "telefun_history_select_own" ON telefun_history;
 CREATE POLICY "telefun_history_select_own" ON telefun_history
   FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "telefun_history_insert_own" ON telefun_history;
 CREATE POLICY "telefun_history_insert_own" ON telefun_history
   FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "telefun_history_update_own" ON telefun_history;
 CREATE POLICY "telefun_history_update_own" ON telefun_history
   FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 

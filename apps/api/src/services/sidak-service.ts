@@ -171,6 +171,101 @@ export async function getTemuan(params: {
   return { data: data ?? [], total: count ?? 0 };
 }
 
+export interface ValidationError {
+  indicator_id: string;
+  error: string;
+}
+
+export interface PreviewResult {
+  valid: { indicator_id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }[];
+  invalid: ValidationError[];
+  skipped: { indicator_id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }[];
+  stats: { valid_count: number; invalid_count: number; skipped_count: number };
+}
+
+export async function validateTemuanBatch(
+  items: {
+    peserta_id: string;
+    period_id: string;
+    service_type: ServiceType;
+    items: { indicator_id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }[];
+  },
+): Promise<PreviewResult> {
+  const [activeVersion, validIndicators, existing] = await Promise.all([
+    supabaseAdmin
+      .from('qa_service_rule_versions')
+      .select('id')
+      .eq('service_type', items.service_type)
+      .eq('status', 'published')
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('qa_indicators')
+      .select('id, name, service_type')
+      .in('id', items.items.map(i => i.indicator_id)),
+    supabaseAdmin
+      .from('qa_temuan')
+      .select('indicator_id')
+      .eq('period_id', items.period_id)
+      .eq('peserta_id', items.peserta_id),
+  ]);
+
+  const indicatorMap = new Map((validIndicators?.data ?? []).map((i: any) => [i.id, i]));
+  const existingIndicatorIds = new Set((existing?.data ?? []).map((e: any) => e.indicator_id));
+
+  let validLegacyIds: Set<string> | null = null;
+
+  if (activeVersion?.data) {
+    const { data: ruleIndicators } = await supabaseAdmin
+      .from('qa_service_rule_indicators')
+      .select('legacy_indicator_id')
+      .eq('rule_version_id', activeVersion.data.id)
+      .not('legacy_indicator_id', 'is', null);
+    if (ruleIndicators && ruleIndicators.length > 0) {
+      validLegacyIds = new Set(ruleIndicators.map((ri: any) => ri.legacy_indicator_id));
+    }
+  }
+
+  const valid: PreviewResult['valid'] = [];
+  const invalid: ValidationError[] = [];
+  const skipped: PreviewResult['skipped'] = [];
+
+  for (const item of items.items) {
+    const ind = indicatorMap.get(item.indicator_id);
+
+    if (!ind) {
+      invalid.push({ indicator_id: item.indicator_id, error: 'Indikator tidak ditemukan di database' });
+      continue;
+    }
+    if (ind.service_type !== items.service_type) {
+      invalid.push({ indicator_id: item.indicator_id, error: `Indikator "${ind.name}" milik layanan ${ind.service_type}, bukan ${items.service_type}` });
+      continue;
+    }
+    if (validLegacyIds && !validLegacyIds.has(item.indicator_id)) {
+      invalid.push({ indicator_id: item.indicator_id, error: `Indikator "${ind.name}" tidak termasuk dalam versi aturan aktif` });
+      continue;
+    }
+    if (existingIndicatorIds.has(item.indicator_id)) {
+      skipped.push(item);
+      continue;
+    }
+
+    valid.push(item);
+  }
+
+  return {
+    valid,
+    invalid,
+    skipped,
+    stats: {
+      valid_count: valid.length,
+      invalid_count: invalid.length,
+      skipped_count: skipped.length,
+    },
+  };
+}
+
 export async function createTemuanBatch(
   items: {
     peserta_id: string;
@@ -182,68 +277,9 @@ export async function createTemuanBatch(
   userId?: string,
   userName?: string,
 ): Promise<{ inserted: number; skipped: number; total: number }> {
-  // resolve active published rule version
-  const { data: activeVersion } = await supabaseAdmin
-    .from('qa_service_rule_versions')
-    .select('id')
-    .eq('service_type', items.service_type)
-    .eq('status', 'published')
-    .order('version_number', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const validation = await validateTemuanBatch(items);
 
-  // validate indicator_id against service_type
-  const { data: validIndicators } = await supabaseAdmin
-    .from('qa_indicators')
-    .select('id, name, service_type')
-    .in('id', items.items.map(i => i.indicator_id));
-
-  const indicatorMap = new Map((validIndicators ?? []).map(i => [i.id, i]));
-  for (const item of items.items) {
-    const ind = indicatorMap.get(item.indicator_id);
-    if (!ind) {
-      throw new Error(`Indikator dengan ID ${item.indicator_id} tidak ditemukan di database`);
-    }
-    if (ind.service_type !== items.service_type) {
-      throw new Error(`Indikator "${ind.name}" milik layanan ${ind.service_type}, bukan ${items.service_type}`);
-    }
-  }
-
-  // if active rule version exists, validate indicators are part of it
-  let ruleVersionId: string | null = null;
-  if (activeVersion) {
-    ruleVersionId = activeVersion.id;
-    const { data: ruleIndicators } = await supabaseAdmin
-      .from('qa_service_rule_indicators')
-      .select('legacy_indicator_id')
-      .eq('rule_version_id', activeVersion.id)
-      .not('legacy_indicator_id', 'is', null);
-
-    if (ruleIndicators && ruleIndicators.length > 0) {
-      const validLegacyIds = new Set(ruleIndicators.map(ri => ri.legacy_indicator_id));
-      for (const item of items.items) {
-        if (!validLegacyIds.has(item.indicator_id)) {
-          const ind = indicatorMap.get(item.indicator_id);
-          throw new Error(`Indikator "${ind?.name || item.indicator_id}" tidak termasuk dalam versi aturan aktif (published v${(items as any).versionNumber || ''}). Tambahkan indikator ke versi aturan terlebih dahulu.`);
-        }
-      }
-    }
-  }
-
-  // dedup check: skip existing (period_id, peserta_id, indicator_id) combinations
-  const { data: existing } = await supabaseAdmin
-    .from('qa_temuan')
-    .select('indicator_id')
-    .eq('period_id', items.period_id)
-    .eq('peserta_id', items.peserta_id);
-
-  const existingIndicatorIds = new Set((existing ?? []).map(e => e.indicator_id));
-
-  const newItems = items.items.filter(item => !existingIndicatorIds.has(item.indicator_id));
-  const skipped = items.items.length - newItems.length;
-
-  if (newItems.length === 0) {
-    // log upload even if all skipped
+  if (validation.valid.length === 0) {
     if (userId) {
       await supabaseAdmin.from('activity_logs').insert({
         user_id: userId,
@@ -253,10 +289,22 @@ export async function createTemuanBatch(
         type: 'upload_skipped',
       });
     }
-    return { inserted: 0, skipped, total: items.items.length };
+    return { inserted: 0, skipped: validation.stats.skipped_count, total: items.items.length };
   }
 
-  const rows = newItems.map(item => ({
+  // Resolve rule version id again for insert
+  let ruleVersionId: string | null = null;
+  const { data: activeVersion } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('id')
+    .eq('service_type', items.service_type)
+    .eq('status', 'published')
+    .order('version_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (activeVersion) ruleVersionId = activeVersion.id;
+
+  const rows = validation.valid.map(item => ({
     peserta_id: items.peserta_id,
     period_id: items.period_id,
     indicator_id: item.indicator_id,
@@ -280,7 +328,6 @@ export async function createTemuanBatch(
     throw new Error(`Gagal menyimpan temuan: ${error.message}`);
   }
 
-  // activity log
   if (userId) {
     await supabaseAdmin.from('activity_logs').insert({
       user_id: userId,
@@ -291,7 +338,143 @@ export async function createTemuanBatch(
     });
   }
 
-  return { inserted: data?.length ?? 0, skipped, total: items.items.length };
+  if (data && data.length > 0) {
+    refreshDashboardSummary(items.period_id, items.service_type).catch(err => {
+      console.error('Summary refresh failed:', err);
+    });
+  }
+
+  return { inserted: data?.length ?? 0, skipped: validation.stats.skipped_count, total: items.items.length };
+}
+
+export async function refreshDashboardSummary(
+  periodId: string,
+  serviceType?: string,
+) {
+  const [indicators, weights] = await Promise.all([
+    getIndicators(serviceType),
+    supabaseAdmin.from('qa_service_weights').select('*'),
+  ]);
+
+  const weightMap = (weights?.data ?? []).reduce((acc: Record<string, any>, w: any) => {
+    acc[w.service_type] = w;
+    return acc;
+  }, {});
+
+  let query = supabaseAdmin
+    .from('qa_temuan')
+    .select('*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)')
+    .eq('period_id', periodId);
+
+  if (serviceType) query = query.eq('service_type', serviceType);
+
+  const { data: allTemuan } = await query;
+  const rows = allTemuan ?? [];
+
+  if (rows.length === 0) {
+    return { message: 'No data to summarize', period_id: periodId, agent_count: 0 };
+  }
+
+  const agentMap = new Map<string, {
+    id: string; nama: string; batch_name: string; tim: string; jabatan: string; rows: any[];
+  }>();
+
+  for (const row of rows) {
+    const pid = row.peserta_id;
+    if (!agentMap.has(pid)) {
+      const p = row.profiler_peserta as any;
+      agentMap.set(pid, {
+        id: pid, nama: p?.nama ?? 'Unknown',
+        batch_name: p?.batch_name ?? '', tim: p?.tim ?? '', jabatan: p?.jabatan ?? '', rows: [],
+      });
+    }
+    agentMap.get(pid)!.rows.push(row);
+  }
+
+  const auditedAgents = Array.from(agentMap.values());
+  const svc = serviceType ?? auditedAgents[0]?.rows[0]?.service_type ?? 'call';
+
+  let totalFindings = 0;
+  let totalScore = 0;
+  let zeroErrorCount = 0;
+  let complianceCount = 0;
+  const complianceThreshold = 95;
+
+  const agentRows: {
+    agent_id: string; period_id: string; service_type: string;
+    final_score: number; non_critical_score: number; critical_score: number;
+    session_count: number; findings_count: number;
+  }[] = [];
+
+  for (const agent of auditedAgents) {
+    const agentSvc = agent.rows[0]?.service_type ?? svc;
+    const weight = weightMap[agentSvc] ?? DEFAULT_SERVICE_WEIGHTS[agentSvc as ServiceType] ?? DEFAULT_SERVICE_WEIGHTS.call;
+
+    const realRows = agent.rows.filter((r: any) => r.is_phantom_padding !== true);
+    const scoreRows = realRows.length > 0 ? realRows : agent.rows;
+    const score = calculateQAScoreFromTemuan(indicators, scoreRows, weight);
+
+    const findingRows = agent.rows.filter((r: any) => isCountableFinding(r));
+    const agentFindings = findingRows.length;
+    totalFindings += agentFindings;
+    totalScore += score.finalScore;
+
+    if (agentFindings === 0) zeroErrorCount++;
+    if (score.finalScore >= complianceThreshold) complianceCount++;
+
+    agentRows.push({
+      agent_id: agent.id,
+      period_id: periodId,
+      service_type: agentSvc,
+      final_score: score.finalScore,
+      non_critical_score: score.nonCriticalScore,
+      critical_score: score.criticalScore,
+      session_count: score.sessionCount,
+      findings_count: agentFindings,
+    });
+  }
+
+  const totalAgents = auditedAgents.length;
+
+  const { error: clearAgentsErr } = await supabaseAdmin
+    .from('qa_dashboard_agent_period_summary')
+    .delete()
+    .eq('period_id', periodId)
+    .eq('service_type', svc);
+  if (clearAgentsErr) throw new Error(`Gagal membersihkan cache agent: ${clearAgentsErr.message}`);
+
+  const { error: clearPeriodErr } = await supabaseAdmin
+    .from('qa_dashboard_period_summary')
+    .delete()
+    .eq('period_id', periodId)
+    .eq('service_type', svc);
+  if (clearPeriodErr) throw new Error(`Gagal membersihkan cache periode: ${clearPeriodErr.message}`);
+
+  if (agentRows.length > 0) {
+    const { error: agentErr } = await supabaseAdmin
+      .from('qa_dashboard_agent_period_summary')
+      .insert(agentRows);
+    if (agentErr) throw new Error(`Gagal menyimpan cache agen: ${agentErr.message}`);
+  }
+
+  const periodSummary = {
+    period_id: periodId,
+    service_type: svc,
+    total_agents: totalAgents,
+    total_defects: totalFindings,
+    avg_defects_per_audit: roundTo(totalAgents > 0 ? totalFindings / totalAgents : 0, 2),
+    zero_error_rate: roundTo(totalAgents > 0 ? (zeroErrorCount / totalAgents) * 100 : 0, 2),
+    avg_agent_score: roundTo(totalAgents > 0 ? totalScore / totalAgents : 0, 2),
+    compliance_rate: roundTo(totalAgents > 0 ? (complianceCount / totalAgents) * 100 : 0, 2),
+    compliance_count: complianceCount,
+  };
+
+  const { error: periodErr } = await supabaseAdmin
+    .from('qa_dashboard_period_summary')
+    .insert(periodSummary);
+  if (periodErr) throw new Error(`Gagal menyimpan cache periode: ${periodErr.message}`);
+
+  return { message: 'Summary refreshed', period_id: periodId, agent_count: totalAgents };
 }
 
 export async function updateTemuan(id: string, updates: {
@@ -517,7 +700,7 @@ export async function getDashboardData(params: {
 
   const totalAgents = auditedAgents.length;
 
-  const summary: DashboardSummary = {
+  let summary: DashboardSummary = {
     totalDefects: totalFindings,
     avgDefectsPerAudit: roundTo(totalAgents > 0 ? totalFindings / totalAgents : 0, 2),
     zeroErrorRate: roundTo(totalAgents > 0 ? (zeroErrorCount / totalAgents) * 100 : 0, 2),
@@ -526,6 +709,31 @@ export async function getDashboardData(params: {
     complianceCount,
     totalAgents,
   };
+
+  // Cache override: when single period + specific service type, use pre-computed summary
+  if (params.period_ids?.length === 1 && params.service_type && params.service_type !== 'all') {
+    try {
+      const { data: cachedPeriod } = await supabaseAdmin
+        .from('qa_dashboard_period_summary')
+        .select('*')
+        .eq('period_id', params.period_ids[0])
+        .eq('service_type', params.service_type)
+        .maybeSingle();
+      if (cachedPeriod) {
+        summary = {
+          totalDefects: cachedPeriod.total_defects,
+          avgDefectsPerAudit: Number(cachedPeriod.avg_defects_per_audit),
+          zeroErrorRate: Number(cachedPeriod.zero_error_rate),
+          avgAgentScore: Number(cachedPeriod.avg_agent_score),
+          complianceRate: Number(cachedPeriod.compliance_rate),
+          complianceCount: cachedPeriod.compliance_count,
+          totalAgents: cachedPeriod.total_agents,
+        };
+      }
+    } catch {
+      // Cache unavailable — use computed values
+    }
+  }
 
   const topAgents: TopAgentData[] = auditedAgents
     .map(agent => {
@@ -1316,5 +1524,80 @@ export async function deleteRuleVersionIndicator(id: string) {
     .eq('id', id);
 
   if (error) throw new Error(`Gagal menghapus indikator: ${error.message}`);
+}
+
+type ReportArchiveInput = {
+  userId: string;
+  title: string;
+  reportType: 'data' | 'ai';
+  filterParams: Record<string, unknown>;
+  reportData: Record<string, unknown>;
+  reportHtml?: string;
+  reportJson?: Record<string, unknown>;
+};
+
+export async function saveReportArchive(params: ReportArchiveInput) {
+  const { data, error } = await supabaseAdmin
+    .from('report_archives')
+    .insert({
+      user_id: params.userId,
+      title: params.title,
+      report_type: params.reportType,
+      filter_params: params.filterParams,
+      report_data: params.reportData,
+      report_html: params.reportHtml ?? null,
+      report_json: params.reportJson ?? null,
+    })
+    .select('id, title, report_type, created_at')
+    .single();
+
+  if (error) throw new Error(`Gagal menyimpan report: ${error.message}`);
+  return data;
+}
+
+export async function getReportArchives(userId: string, role: string) {
+  const adminRoles: readonly string[] = ['admin', 'trainer', 'qa'];
+  let query = supabaseAdmin
+    .from('report_archives')
+    .select('id, title, report_type, filter_params, created_at')
+    .order('created_at', { ascending: false });
+
+  if (!adminRoles.includes(role)) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Gagal memuat daftar report: ${error.message}`);
+  return data ?? [];
+}
+
+export async function getReportArchiveById(archiveId: string, userId: string, role: string) {
+  const { data, error } = await supabaseAdmin
+    .from('report_archives')
+    .select('*')
+    .eq('id', archiveId)
+    .single();
+
+  if (error) return null;
+
+  const adminRoles: readonly string[] = ['admin', 'trainer', 'qa'];
+  if (!adminRoles.includes(role) && data.user_id !== userId) return null;
+
+  return data;
+}
+
+export async function deleteReportArchive(archiveId: string, userId: string, role: string) {
+  const adminRoles: readonly string[] = ['admin', 'trainer', 'qa'];
+  let query = supabaseAdmin
+    .from('report_archives')
+    .delete()
+    .eq('id', archiveId);
+
+  if (!adminRoles.includes(role)) {
+    query = query.eq('user_id', userId);
+  }
+
+  const { error } = await query;
+  if (error) throw new Error(`Gagal menghapus report: ${error.message}`);
 }
 

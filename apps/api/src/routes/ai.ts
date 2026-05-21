@@ -5,14 +5,12 @@ import { User } from '@supabase/supabase-js';
 import { AI_MODELS, getModelsForModule, resolveModelProvider } from '../lib/ai-models';
 import { generateGeminiContent } from '../lib/gemini';
 import { generateOpenRouterContent } from '../lib/openrouter';
-import { authMiddleware } from '../middleware/auth';
 import { requireRole } from '../middleware/role';
 import { createAdminClient } from '../lib/supabase';
 
 type Variables = { user: User; profile: any };
 
 const ai = new Hono<{ Variables: Variables }>();
-ai.use('*', authMiddleware);
 
 ai.get('/models', (c) => {
   const module = c.req.query('module') as 'ketik' | 'pdkt' | undefined;
@@ -28,7 +26,7 @@ const generateSchema = z.object({
   responseMimeType: z.string().optional(),
 });
 
-ai.post('/generate', zValidator('json', generateSchema), async (c) => {
+ai.post('/generate', requireRole('admin', 'trainer', 'qa'), zValidator('json', generateSchema), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
   const userId = user?.id;
@@ -147,7 +145,7 @@ ai.get('/usage/summary', async (c) => {
 });
 
 // ── Usage Aggregation ──────────────────────────────────
-ai.get('/monitoring/aggregation', async (c) => {
+ai.get('/monitoring/aggregation', requireRole('admin', 'trainer'), async (c) => {
   const admin = createAdminClient();
   const year = parseInt(c.req.query('year') || String(new Date().getFullYear()), 10);
   const month = parseInt(c.req.query('month') || String(new Date().getMonth() + 1), 10);
@@ -209,7 +207,7 @@ ai.get('/monitoring/aggregation', async (c) => {
 });
 
 // ── Pricing CRUD ──────────────────────────────────────
-ai.get('/monitoring/pricing', async (c) => {
+ai.get('/monitoring/pricing', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('ai_pricing_settings')
@@ -262,7 +260,7 @@ ai.put('/monitoring/pricing', requireRole('admin', 'trainer'), zValidator('json'
 });
 
 // ── Billing ───────────────────────────────────────────
-ai.get('/monitoring/billing', async (c) => {
+ai.get('/monitoring/billing', requireRole('admin', 'trainer'), async (c) => {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('ai_billing_settings')

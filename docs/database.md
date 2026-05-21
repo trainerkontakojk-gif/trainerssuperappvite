@@ -36,11 +36,17 @@ erDiagram
 
 ## Tabel Utama
 
-**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` dengan numbering:
-- `001_sidak.sql` — SIDAK core tables
-- `002_ketik_pdkt_ai.sql` — KETIK, PDKT, AI usage tables
-- `003_telefun.sql` — Telefun tables
+**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (10 files, 000-008, fully idempotent):
+- `000_profiles_core.sql` — Profiles & auth tables
+- `001_sidak_core.sql` — SIDAK core + Profiler tables (12 tables, all RLS-enabled)
+- `002_ketik_pdkt_core.sql` — KETIK, PDKT, AI usage tables
+- `003_telefun_core.sql` — Telefun tables
 - `004_admin_core.sql` — Admin management tables
+- `005_carbon_copy_parity.sql` — KETIK/PDKT carbon copy parity features
+- `006_create_user_settings.sql` — User settings table
+- `007_report_archives.sql` — Report archives for persistence
+- `008_profile_admin_policies.sql` — Admin/trainer SELECT+UPDATE on profiles (defense-in-depth)
+- `20260520054101_add_is_deleted_to_profiles.sql` — Soft delete flag for profiles
 
 ### 1. `public.profiles`
 
@@ -131,13 +137,15 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 | `telefun_replay_annotations` | Read/Insert (Own) | No Access | Read/Insert (via server action) |
 | `access_groups` / `access_group_items` | No Access | No Access | Full CRUD (Admin/Trainer) |
 | `leader_access_requests` | No Access | Read/Insert (Own) | Full CRUD (Admin/Trainer) |
-| `qa_dashboard_period_summary` | Read (All) | Read (All) | Read/Delete (Trainer/Admin) |
+| `qa_dashboard_period_summary` | Read (All) | Read (All) | Full CRUD (Admin/Trainer) |
+| `qa_dashboard_agent_period_summary` | Read (All) | Read (All) | Full CRUD (Admin/Trainer) |
 
 **Catatan Proteksi `profiles`:**
 - Self-insert dibatasi ke profil sendiri dengan `status = 'pending'` dan `role != 'admin'`.
 - Self-update dibatasi ke kolom `full_name`.
 - Mutasi manajerial (change status/role/soft-delete) memakai admin client di backend yang bypass RLS via service role, setelah validasi caller.
 - **SELECT membutuhkan RLS policies** — table grant `SELECT` saja tidak cukup. Policies wajib: own-profile, admin-all, trainer-all, leader-all.
+- Migration `008_profile_admin_policies.sql` menambahkan `profiles_select_admin` dan `profiles_update_admin` untuk defense-in-depth via user JWT (sebelumnya hanya via service_role).
 
 **Catatan Monitoring AI Usage:**
 - `leader` hanya mendapatkan visibilitas usage monitoring dari backend API yang sudah di-gate role.

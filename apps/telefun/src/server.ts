@@ -4,6 +4,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { env } from './env.js';
 import { verifyToken } from './auth.js';
 import { parseUsageMetadata, mergeSnapshot, flushLiveUsage, type LiveUsageSnapshot } from './usage.js';
+import { createSession, updateSession } from './db.js';
+import { SilenceDetector, UtteranceBuffer } from './silence.js';
+import { TurnManager, TurnState } from './turn-taking.js';
 
 process.on('uncaughtException', (err) => console.error('[Telefun] Uncaught:', err));
 process.on('unhandledRejection', (reason) => console.error('[Telefun] Unhandled Rejection:', reason));
@@ -28,17 +31,32 @@ function normalizeOrigin(raw: string): string {
 const allowedOrigins = env.ALLOWED_ORIGINS === '*'
   ? [] : env.ALLOWED_ORIGINS.split(',').map(o => normalizeOrigin(o.trim())).filter(Boolean);
 
+const MAX_RECONNECT_ATTEMPTS = 3;
+
+function connectGemini(): WebSocket {
+  const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${env.GEMINI_API_KEY}`;
+  return new WebSocket(geminiUrl);
+}
+
 wss.on('connection', async (ws, req) => {
   const pendingMessages: string[] = [];
+  const transcriptMessages: { role: string; text: string; timestamp: number }[] = [];
   let geminiWs: WebSocket | null = null;
   let isGeminiOpen = false;
   let authed = false;
   let userId = '';
+  let sessionId = '';
+  const callStartedAt = Date.now();
   const requestId = `telefun-live-${randomUUID()}`;
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   let usageSnapshot: LiveUsageSnapshot | null = null;
   let usageFlushed = false;
   let activeModelId = 'gemini-3.1-flash-live-preview';
+  let reconnectAttempts = 0;
+
+  const silence = new SilenceDetector(5000);
+  const utteranceBuffer = new UtteranceBuffer(500, 1000);
+  const turnManager = new TurnManager();
 
   const flushUsage = async () => {
     if (usageFlushed || !authed || !usageSnapshot) return;
@@ -46,35 +64,167 @@ wss.on('connection', async (ws, req) => {
     await flushLiveUsage(requestId, userId, usageSnapshot, activeModelId);
   };
 
-  // Buffer client messages until Gemini WS is ready
-  ws.on('message', (data) => {
-    const raw = data.toString();
-    if (geminiWs && isGeminiOpen) {
+  const saveAndCloseSession = async (status: string) => {
+    const duration = Math.floor((Date.now() - callStartedAt) / 1000);
+    if (sessionId) {
+      await updateSession(sessionId, {
+        status,
+        duration_seconds: duration,
+        messages: transcriptMessages as unknown[],
+      });
+    }
+  };
+
+  const sendToGemini = (raw: string) => {
+    if (geminiWs && isGeminiOpen && geminiWs.readyState === WebSocket.OPEN) {
       geminiWs.send(raw);
     } else {
       pendingMessages.push(raw);
     }
+  };
 
-    // Detect model from setup messages
+  const setupGeminiWs = () => {
+    geminiWs = connectGemini();
+
+    geminiWs.on('open', () => {
+      isGeminiOpen = true;
+      reconnectAttempts = 0;
+      console.log('[Telefun] Gemini Live connected');
+      while (pendingMessages.length > 0) {
+        const msg = pendingMessages.shift();
+        if (msg) geminiWs!.send(msg);
+      }
+    });
+
+    geminiWs.on('message', (data) => {
+      const raw = data.toString();
+
+      if (raw.includes('"usageMetadata"')) {
+        try {
+          const parsed = JSON.parse(raw);
+          const meta = parseUsageMetadata(parsed.usageMetadata);
+          if (meta) usageSnapshot = mergeSnapshot(usageSnapshot, meta);
+        } catch { /* skip */ }
+      }
+
+      // Extract AI text + detect turn boundaries
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.serverContent?.modelTurn?.parts) {
+          turnManager.startAiSpeaking();
+          for (const part of parsed.serverContent.modelTurn.parts) {
+            if (part.text) {
+              transcriptMessages.push({ role: 'ai', text: part.text, timestamp: Date.now() });
+            }
+          }
+        }
+        if (parsed.serverContent?.turnComplete) {
+          turnManager.endAiSpeaking();
+        }
+      } catch { /* skip */ }
+
+      if (ws.readyState === WebSocket.OPEN) ws.send(raw);
+    });
+
+    geminiWs.on('error', () => {
+      void saveAndCloseSession('failed').then(() => flushUsage());
+      if (ws.readyState === WebSocket.OPEN) ws.close(1011, 'Gemini API Error');
+    });
+
+    geminiWs.on('close', (code, reason) => {
+      console.log(`[Telefun] Gemini closed: ${code} (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+      isGeminiOpen = false;
+
+      // Attempt reconnect on non-clean close
+      if (code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
+        console.log(`[Telefun] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            setupGeminiWs();
+          }
+        }, delay);
+        return;
+      }
+
+      void flushUsage();
+      const safeCode = (code >= 3000 && code <= 4999) || (code >= 1000 && code <= 1013) ? code : 1011;
+      if (ws.readyState === WebSocket.OPEN) ws.close(safeCode, reason.toString().slice(0, 123));
+    });
+  };
+
+  // Silence handler: send gentle prompt to user
+  silence.onSilence(() => {
+    console.log('[Telefun] Silence detected > 5s');
+    try {
+      ws.send(JSON.stringify({
+        type: 'silence',
+        message: 'Saya masih mendengarkan. Silakan lanjutkan.',
+      }));
+    } catch { /* ignore */ }
+  });
+
+  // Utterance buffer flush: send batched audio to Gemini
+  utteranceBuffer.onFlush((batched) => {
+    if (turnManager.canSendToGemini()) {
+      turnManager.sendToGemini();
+      sendToGemini(batched);
+    }
+  });
+
+  // Message handler: use turn buffer and silence detection
+  ws.on('message', (data) => {
+    const raw = data.toString();
+    silence.ping();
+
+    // Detect if this is an audio chunk (binary or structured JSON)
     try {
       const parsed = JSON.parse(raw);
       if (parsed.setup?.model) {
         activeModelId = parsed.setup.model.replace(/^models\//, '');
       }
-    } catch { /* non-JSON */ }
+      // Non-audio messages (setup, clientContent JSON) go directly
+      if (parsed.clientContent || parsed.setup || parsed.realtimeInput) {
+        if (turnManager.canSendToGemini() || parsed.setup) {
+          turnManager.startUserUtterance();
+          sendToGemini(raw);
+        }
+        // Extract user text for transcript
+        if (parsed.clientContent?.turns) {
+          for (const turn of parsed.clientContent.turns) {
+            for (const part of turn.parts || []) {
+              if (part.text) {
+                transcriptMessages.push({ role: 'user', text: part.text, timestamp: Date.now() });
+              }
+            }
+          }
+        }
+        return;
+      }
+    } catch { /* non-JSON - likely audio binary */ }
+
+    // Audio binary: buffer short utterances
+    utteranceBuffer.push(raw);
   });
 
-  ws.on('close', () => {
+  ws.on('close', async () => {
+    silence.stop();
+    utteranceBuffer.flushNow();
     if (geminiWs && (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING)) {
       geminiWs.close();
     }
+    await saveAndCloseSession('completed');
     setTimeout(() => void flushUsage(), 2000);
   });
 
-  ws.on('error', () => {
+  ws.on('error', async () => {
+    silence.stop();
+    utteranceBuffer.clear();
     if (geminiWs && (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING)) {
       geminiWs.close();
     }
+    await saveAndCloseSession('failed');
     setTimeout(() => void flushUsage(), 2000);
   });
 
@@ -101,42 +251,19 @@ wss.on('connection', async (ws, req) => {
   authed = true;
   console.log('[Telefun] User connected:', authResult.user?.email);
 
+  // Create session record
+  try {
+    sessionId = await createSession(userId);
+    console.log('[Telefun] Session created:', sessionId);
+  } catch (err) {
+    console.error('[Telefun] Failed to create session:', err);
+  }
+
+  // Start silence detection after auth
+  silence.start();
+
   // Connect to Gemini Live API
-  const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${env.GEMINI_API_KEY}`;
-  geminiWs = new WebSocket(geminiUrl);
-
-  geminiWs.on('open', () => {
-    isGeminiOpen = true;
-    console.log('[Telefun] Gemini Live connected');
-    while (pendingMessages.length > 0) {
-      const msg = pendingMessages.shift();
-      if (msg) geminiWs!.send(msg);
-    }
-  });
-
-  geminiWs.on('message', (data) => {
-    const raw = data.toString();
-    if (raw.includes('"usageMetadata"')) {
-      try {
-        const parsed = JSON.parse(raw);
-        const meta = parseUsageMetadata(parsed.usageMetadata);
-        if (meta) usageSnapshot = mergeSnapshot(usageSnapshot, meta);
-      } catch { /* skip */ }
-    }
-    if (ws.readyState === WebSocket.OPEN) ws.send(raw);
-  });
-
-  geminiWs.on('error', () => {
-    void flushUsage();
-    if (ws.readyState === WebSocket.OPEN) ws.close(1011, 'Gemini API Error');
-  });
-
-  geminiWs.on('close', (code, reason) => {
-    console.log(`[Telefun] Gemini closed: ${code}`);
-    void flushUsage();
-    const safeCode = (code >= 3000 && code <= 4999) || (code >= 1000 && code <= 1013) ? code : 1011;
-    if (ws.readyState === WebSocket.OPEN) ws.close(safeCode, reason.toString().slice(0, 123));
-  });
+  setupGeminiWs();
 });
 
 server.listen(env.PORT, '0.0.0.0', () => {

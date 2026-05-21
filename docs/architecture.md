@@ -72,7 +72,7 @@ Struktur folder monorepo:
 │   ├── app/                    # Next.js App Router (referensi saja)
 │   └── docs/                   # Dokumentasi legacy (referensi)
 ├── supabase/
-│   └── migrations/             # DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core)
+│   └── migrations/             # DB schemas (000 profiles, 001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin, 005 carbon copy, 006 user settings, 007 report archives, 008 profile admin policies)
 ├── docs/                       # Dokumentasi teknis sistem
 │   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-18)
 │   └── superpowers/            # Plans dan specs dari superpowers skills
@@ -145,7 +145,7 @@ pnpm build
 # Lint seluruh workspace
 pnpm lint
 
-# Test seluruh workspace (92 tests)
+# Test seluruh workspace (108 API + 61 web = 169 tests)
 pnpm test
 
 # Test API only
@@ -169,8 +169,8 @@ Catatan:
 
 Keamanan aplikasi dijaga di beberapa sisi:
 1. **Frontend Route Guards**: TanStack Router dengan lazy loading dan auth checks di komponen Layout.
-2. **Backend Middleware**: Hono middleware untuk validasi JWT dan role checking.
-3. **Database RLS**: Filter data di tingkat PostgreSQL sehingga user hanya bisa melihat/mengubah data sesuai hak akses mereka.
+2. **Backend Middleware**: Hono middleware chain — `authMiddleware` (JWT validation, global via app.ts) + `requireRole()` (per-route) applied to 48+ endpoints across Profiler, PDKT, AI monitoring, KETIK, SIDAK, and Admin. Duplicate authMiddleware removed from all 7 sub-routers.
+3. **Database RLS**: Filter data di tingkat PostgreSQL sehingga user hanya bisa melihat/mengubah data sesuai hak akses mereka. Semua 32 tabel RLS-enabled. Policy gaps closed: write_trainer for dashboard summary tables, admin profiles policies (migration 008).
 4. **Admin Server Boundary**: Service role hanya dipakai di backend (Hono) untuk operasi yang membutuhkan akses lintas akun.
 5. **Hono RPC Type Safety**: `hc<AppType>` memastikan frontend tidak bisa mengirim payload yang tidak sesuai dengan validasi Zod di backend.
 

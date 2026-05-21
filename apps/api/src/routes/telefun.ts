@@ -2,13 +2,11 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { User } from '@supabase/supabase-js';
-import { authMiddleware } from '../middleware/auth';
 import { createAdminClient } from '../lib/supabase';
 
 type Variables = { user: User; profile: any };
 
 const telefun = new Hono<{ Variables: Variables }>();
-telefun.use('*', authMiddleware);
 
 telefun.get('/sessions', async (c) => {
   const user = c.get('user');

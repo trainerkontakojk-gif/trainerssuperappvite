@@ -1,7 +1,7 @@
-import { Context, Next } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 
-export function requireRole(...roles: string[]) {
-  return async (c: Context, next: Next) => {
+export function requireRole(...roles: string[]): MiddlewareHandler {
+  return async (c, next) => {
     const profile = c.get('profile') as { role?: string } | undefined;
     if (!profile || !roles.includes(profile.role ?? '')) {
       return c.json({

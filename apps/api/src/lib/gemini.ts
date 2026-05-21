@@ -1,7 +1,8 @@
 import { Content } from '@google/genai';
 import { randomUUID } from 'crypto';
-import { getGeminiClient, getProviderFromModelId } from './ai-models';
+import { AI_MODELS, getGeminiClient, getProviderFromModelId } from './ai-models';
 import { logAiUsage, UsageContext } from './ai-usage';
+import { sanitizeAiResponse } from './ai-sanitize';
 
 export interface GeminiResponse {
   success: boolean;
@@ -52,18 +53,31 @@ export async function generateGeminiContent(options: {
       }
     }
 
+    const modelInfo = AI_MODELS.find(m => m.id === modelName);
+    const timeoutMs = modelInfo?.timeoutMs ?? 120_000;
+
+    const generateWithTimeout = async () => {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Gemini request timed out after ${timeoutMs}ms`)), timeoutMs)
+      );
+      return await Promise.race([
+        ai.models.generateContent({
+          model: modelName,
+          contents,
+          config: {
+            systemInstruction,
+            responseMimeType: options.responseMimeType,
+            responseSchema: options.responseSchema,
+            temperature: options.temperature ?? 0.7,
+          },
+        }),
+        timeoutPromise,
+      ]);
+    };
+
     let response;
     try {
-      response = await ai.models.generateContent({
-        model: modelName,
-        contents,
-        config: {
-          systemInstruction,
-          responseMimeType: options.responseMimeType,
-          responseSchema: options.responseSchema,
-          temperature: options.temperature ?? 0.7,
-        },
-      });
+      response = await generateWithTimeout();
     } catch (firstError: unknown) {
       const err = firstError as { message?: string };
       if (
@@ -72,15 +86,21 @@ export async function generateGeminiContent(options: {
       ) {
         console.warn(`[Gemini] Model "${modelName}" does not support developer instruction. Injecting into contents.`);
         contents = injectSystemInstructionIntoContents(options.contents, options.systemInstruction);
-        response = await ai.models.generateContent({
-          model: modelName,
-          contents,
-          config: {
-            responseMimeType: options.responseMimeType,
-            responseSchema: options.responseSchema,
-            temperature: options.temperature ?? 0.7,
-          },
-        });
+        const retryTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Gemini request timed out after ${timeoutMs}ms`)), timeoutMs)
+        );
+        response = await Promise.race([
+          ai.models.generateContent({
+            model: modelName,
+            contents,
+            config: {
+              responseMimeType: options.responseMimeType,
+              responseSchema: options.responseSchema,
+              temperature: options.temperature ?? 0.7,
+            },
+          }),
+          retryTimeout,
+        ]);
       } else {
         throw firstError;
       }
@@ -106,7 +126,8 @@ export async function generateGeminiContent(options: {
       }
     }
 
-    return { success: true, text: resolveResponseText(response) };
+    const rawText = resolveResponseText(response);
+    return { success: true, text: sanitizeAiResponse(rawText) };
   } catch (error) {
     console.error('[Gemini] Error:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };

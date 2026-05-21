@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { User } from '@supabase/supabase-js';
-import { authMiddleware } from '../middleware/auth';
 import * as adminService from '../services/admin-service';
 import {
   updateUserStatusSchema,
@@ -25,9 +24,6 @@ type Variables = {
 };
 
 const admin = new Hono<{ Variables: Variables }>();
-
-// All admin/management operations require authMiddleware
-admin.use('/*', authMiddleware);
 
 // Middleware to assert caller is admin or trainer
 const managerOnly = async (c: any, next: any) => {

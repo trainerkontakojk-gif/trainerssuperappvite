@@ -42,7 +42,7 @@ Untuk menjaga keamanan internal, pendaftaran user baru melalui proses approval:
 
 ### 1. Auth Guard
 Sistem menggunakan helper untuk menjaga akses route:
-- **Backend (Hono)**: Middleware validasi JWT dan role checking di `apps/api/src/`.
+- **Backend (Hono)**: Middleware chain — `authMiddleware` (JWT validation, global via app.ts) + `requireRole()` per-route di 48+ endpoints.
 - **Frontend (Vite)**: Route guards di TanStack Router dengan auth checks di komponen Layout (`apps/web/src/components/Layout.tsx`).
 - **Auth Pages**: Komponen auth di `apps/web/src/routes/` untuk login, register, reset password.
 
@@ -50,9 +50,21 @@ Sistem menggunakan helper untuk menjaga akses route:
 Setiap halaman atau aksi sensitif dilindungi dengan pengecekan role di backend:
 
 ```typescript
-// Backend Hono middleware
-// Validasi JWT dan role dari token
+// Backend Hono middleware chain
+// app.ts: authMiddleware global di /v1/*
+// per-route: requireRole('admin', 'trainer', ...)
 ```
+
+Role enforcement coverage per module (Phase B hardening):
+
+| Module | Endpoints | Read Roles | Write Roles |
+|--------|-----------|------------|-------------|
+| **SIDAK** | 15 | admin, trainer, qa, tl, spv, om | admin, trainer, qa |
+| **Profiler** | 23 | admin, trainer, qa, tl, spv, om | admin, trainer, qa |
+| **PDKT** | 16 | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa (AI) |
+| **AI Monitoring** | 5 | admin, trainer (aggregation) | admin, trainer, qa (pricing) |
+| **KETIK** | 4 | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa, tl, spv, om, agent |
+| **Admin** | 8 | admin only | admin only |
 
 ### 3. Profile Read Contract & Recovery
 

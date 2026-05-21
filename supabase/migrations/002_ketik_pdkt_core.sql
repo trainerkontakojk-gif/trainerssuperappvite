@@ -3,7 +3,7 @@
 -- ═══════════════════════════════════════════════════════
 
 -- ── AI Pricing & Billing ──────────────────────────────
-CREATE TABLE ai_pricing_settings (
+CREATE TABLE IF NOT EXISTS ai_pricing_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   model_id TEXT NOT NULL UNIQUE,
   input_price_usd_per_million NUMERIC NOT NULL DEFAULT 0,
@@ -12,14 +12,14 @@ CREATE TABLE ai_pricing_settings (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE ai_billing_settings (
+CREATE TABLE IF NOT EXISTS ai_billing_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   usd_to_idr_rate NUMERIC NOT NULL DEFAULT 15000,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE ai_usage_logs (
+CREATE TABLE IF NOT EXISTS ai_usage_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_id TEXT NOT NULL UNIQUE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -38,13 +38,13 @@ CREATE TABLE ai_usage_logs (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_ai_usage_logs_user_id ON ai_usage_logs(user_id);
-CREATE INDEX idx_ai_usage_logs_module ON ai_usage_logs(module);
-CREATE INDEX idx_ai_usage_logs_created_at ON ai_usage_logs(created_at);
-CREATE INDEX idx_ai_usage_logs_model_id ON ai_usage_logs(model_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_user_id ON ai_usage_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_module ON ai_usage_logs(module);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON ai_usage_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_model_id ON ai_usage_logs(model_id);
 
 -- ── KETIK Tables ──────────────────────────────────────
-CREATE TABLE ketik_history (
+CREATE TABLE IF NOT EXISTS ketik_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   date TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -63,10 +63,10 @@ CREATE TABLE ketik_history (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_ketik_history_user_id ON ketik_history(user_id);
-CREATE INDEX idx_ketik_history_date ON ketik_history(date);
+CREATE INDEX IF NOT EXISTS idx_ketik_history_user_id ON ketik_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_ketik_history_date ON ketik_history(date);
 
-CREATE TABLE ketik_session_reviews (
+CREATE TABLE IF NOT EXISTS ketik_session_reviews (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID REFERENCES ketik_history(id) ON DELETE CASCADE,
   ai_summary TEXT,
@@ -76,7 +76,7 @@ CREATE TABLE ketik_session_reviews (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE ketik_typo_findings (
+CREATE TABLE IF NOT EXISTS ketik_typo_findings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID REFERENCES ketik_history(id) ON DELETE CASCADE,
   message_id TEXT NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE ketik_typo_findings (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE ketik_review_jobs (
+CREATE TABLE IF NOT EXISTS ketik_review_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id UUID NOT NULL REFERENCES ketik_history(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'queued'
@@ -100,7 +100,7 @@ CREATE TABLE ketik_review_jobs (
 );
 
 -- ── PDKT Tables ───────────────────────────────────────
-CREATE TABLE pdkt_history (
+CREATE TABLE IF NOT EXISTS pdkt_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -116,10 +116,10 @@ CREATE TABLE pdkt_history (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_pdkt_history_user_id ON pdkt_history(user_id);
-CREATE INDEX idx_pdkt_history_timestamp ON pdkt_history(timestamp);
+CREATE INDEX IF NOT EXISTS idx_pdkt_history_user_id ON pdkt_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_pdkt_history_timestamp ON pdkt_history(timestamp);
 
-CREATE TABLE pdkt_mailbox_items (
+CREATE TABLE IF NOT EXISTS pdkt_mailbox_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'open'
@@ -140,8 +140,8 @@ CREATE TABLE pdkt_mailbox_items (
   last_activity_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_pdkt_mailbox_user_id ON pdkt_mailbox_items(user_id);
-CREATE INDEX idx_pdkt_mailbox_status ON pdkt_mailbox_items(status);
+CREATE INDEX IF NOT EXISTS idx_pdkt_mailbox_user_id ON pdkt_mailbox_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_pdkt_mailbox_status ON pdkt_mailbox_items(status);
 
 -- ── RLS Policies ──────────────────────────────────────
 ALTER TABLE ai_pricing_settings ENABLE ROW LEVEL SECURITY;
@@ -155,46 +155,59 @@ ALTER TABLE pdkt_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pdkt_mailbox_items ENABLE ROW LEVEL SECURITY;
 
 -- Pricing/billing: read-only for authenticated, admin-only writes
+DROP POLICY IF EXISTS "ai_pricing_settings_select" ON ai_pricing_settings;
 CREATE POLICY "ai_pricing_settings_select" ON ai_pricing_settings
   FOR SELECT USING (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "ai_billing_settings_select" ON ai_billing_settings;
 CREATE POLICY "ai_billing_settings_select" ON ai_billing_settings
   FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Usage logs: users see own, admins see all
+DROP POLICY IF EXISTS "ai_usage_logs_select_own" ON ai_usage_logs;
 CREATE POLICY "ai_usage_logs_select_own" ON ai_usage_logs
   FOR SELECT USING (auth.uid() = user_id);
 
 -- KETIK: users see own data
+DROP POLICY IF EXISTS "ketik_history_select_own" ON ketik_history;
 CREATE POLICY "ketik_history_select_own" ON ketik_history
   FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "ketik_history_insert_own" ON ketik_history;
 CREATE POLICY "ketik_history_insert_own" ON ketik_history
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "ketik_session_reviews_select_own" ON ketik_session_reviews;
 CREATE POLICY "ketik_session_reviews_select_own" ON ketik_session_reviews
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM ketik_history WHERE ketik_history.id = session_id AND ketik_history.user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "ketik_typo_findings_select_own" ON ketik_typo_findings;
 CREATE POLICY "ketik_typo_findings_select_own" ON ketik_typo_findings
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM ketik_history WHERE ketik_history.id = session_id AND ketik_history.user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "ketik_review_jobs_select_own" ON ketik_review_jobs;
 CREATE POLICY "ketik_review_jobs_select_own" ON ketik_review_jobs
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM ketik_history WHERE ketik_history.id = session_id AND ketik_history.user_id = auth.uid())
   );
 
 -- PDKT: users see own data
+DROP POLICY IF EXISTS "pdkt_history_select_own" ON pdkt_history;
 CREATE POLICY "pdkt_history_select_own" ON pdkt_history
   FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "pdkt_history_insert_own" ON pdkt_history;
 CREATE POLICY "pdkt_history_insert_own" ON pdkt_history
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "pdkt_mailbox_select_own" ON pdkt_mailbox_items;
 CREATE POLICY "pdkt_mailbox_select_own" ON pdkt_mailbox_items
   FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "pdkt_mailbox_insert_own" ON pdkt_mailbox_items;
 CREATE POLICY "pdkt_mailbox_insert_own" ON pdkt_mailbox_items
   FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "pdkt_mailbox_update_own" ON pdkt_mailbox_items;
 CREATE POLICY "pdkt_mailbox_update_own" ON pdkt_mailbox_items
   FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
@@ -212,4 +225,4 @@ INSERT INTO ai_pricing_settings (model_id, input_price_usd_per_million, output_p
   ('qwen/qwen3.5-flash-02-23', 0.10, 0.40)
 ON CONFLICT (model_id) DO NOTHING;
 
-INSERT INTO ai_billing_settings (usd_to_idr_rate) VALUES (15000);
+INSERT INTO ai_billing_settings (usd_to_idr_rate) SELECT 15000 WHERE NOT EXISTS (SELECT 1 FROM ai_billing_settings);

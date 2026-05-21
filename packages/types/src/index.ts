@@ -542,6 +542,7 @@ export interface AiModelInfo {
   name: string;
   description: string;
   provider: AIProvider;
+  timeoutMs?: number;
 }
 
 export interface AiUsageLog {

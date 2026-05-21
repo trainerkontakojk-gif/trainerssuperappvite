@@ -5,27 +5,27 @@ import { generateEmailSchema, evaluateSchema, pdktMailboxBatchSchema, pdktMailbo
 import type { PdktSessionConfig } from '@trainers/types';
 import * as pdktService from '../services/pdkt-service';
 import { readPdktSettings, writePdktSettings } from '../lib/pdkt-settings';
-import { authMiddleware } from '../middleware/auth';
+import { requireRole } from '../middleware/role';
+import { aiRateLimitMiddleware } from '../middleware/rateLimit';
 import { createUserClient, createAdminClient } from '../lib/supabase';
 
 type Variables = { user: User; profile: any };
 
 const pdkt = new Hono<{ Variables: Variables }>();
-pdkt.use('*', authMiddleware);
 
-pdkt.get('/scenarios', (c) => {
+pdkt.get('/scenarios', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), (c) => {
   return c.json({ success: true, data: pdktService.getScenarios() });
 });
 
-pdkt.get('/consumer-types', (c) => {
+pdkt.get('/consumer-types', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), (c) => {
   return c.json({ success: true, data: pdktService.getConsumerTypes() });
 });
 
-pdkt.post('/generate-identity', (c) => {
+pdkt.post('/generate-identity', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), (c) => {
   return c.json({ success: true, data: pdktService.generateRandomIdentity() });
 });
 
-pdkt.post('/generate-template', zValidator('json', generateEmailSchema), async (c) => {
+pdkt.post('/generate-template', requireRole('admin', 'trainer', 'qa'), aiRateLimitMiddleware, zValidator('json', generateEmailSchema), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
   const userId = user?.id;
@@ -63,7 +63,7 @@ pdkt.post('/generate-template', zValidator('json', generateEmailSchema), async (
   return c.json({ success: true, data: { subject: result.subject, body: result.body } });
 });
 
-pdkt.post('/evaluate', zValidator('json', evaluateSchema), async (c) => {
+pdkt.post('/evaluate', requireRole('admin', 'trainer', 'qa'), aiRateLimitMiddleware, zValidator('json', evaluateSchema), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
   const userId = user?.id;
@@ -83,7 +83,7 @@ pdkt.post('/evaluate', zValidator('json', evaluateSchema), async (c) => {
   });
 });
 
-pdkt.get('/mailbox', async (c) => {
+pdkt.get('/mailbox', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
   const token = authHeader!.split(' ')[1];
@@ -97,7 +97,7 @@ pdkt.get('/mailbox', async (c) => {
   }
 });
 
-pdkt.post('/mailbox/batch', zValidator('json', pdktMailboxBatchSchema), async (c) => {
+pdkt.post('/mailbox/batch', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), zValidator('json', pdktMailboxBatchSchema), async (c) => {
   const body = c.req.valid('json');
   const authHeader = c.req.header('Authorization');
   const token = authHeader!.split(' ')[1];
@@ -111,7 +111,7 @@ pdkt.post('/mailbox/batch', zValidator('json', pdktMailboxBatchSchema), async (c
   }
 });
 
-pdkt.delete('/mailbox/:id', async (c) => {
+pdkt.delete('/mailbox/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
@@ -126,7 +126,7 @@ pdkt.delete('/mailbox/:id', async (c) => {
   }
 });
 
-pdkt.post('/mailbox/reply', zValidator('json', pdktMailboxReplySchema), async (c) => {
+pdkt.post('/mailbox/reply', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), zValidator('json', pdktMailboxReplySchema), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
@@ -150,7 +150,7 @@ pdkt.post('/mailbox/reply', zValidator('json', pdktMailboxReplySchema), async (c
   }
 });
 
-pdkt.get('/history/eval/:id', async (c) => {
+pdkt.get('/history/eval/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
@@ -175,7 +175,7 @@ pdkt.get('/history/eval/:id', async (c) => {
   }
 });
 
-pdkt.post('/history/retry-eval', async (c) => {
+pdkt.post('/history/retry-eval', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   try {
     const body = await c.req.json();
     const historyId = body.historyId;
@@ -213,7 +213,7 @@ pdkt.post('/history/retry-eval', async (c) => {
   }
 });
 
-pdkt.get('/settings', async (c) => {
+pdkt.get('/settings', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
   const token = authHeader!.split(' ')[1];
@@ -234,7 +234,7 @@ pdkt.get('/settings', async (c) => {
   }
 });
 
-pdkt.post('/settings', async (c) => {
+pdkt.post('/settings', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
   const token = authHeader!.split(' ')[1];
@@ -270,7 +270,7 @@ pdkt.post('/settings', async (c) => {
   }
 });
 
-pdkt.get('/history', async (c) => {
+pdkt.get('/history', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const user = c.get('user');
   const authHeader = c.req.header('Authorization');
   const token = authHeader!.split(' ')[1];
@@ -291,7 +291,7 @@ pdkt.get('/history', async (c) => {
   }
 });
 
-pdkt.delete('/history', async (c) => {
+pdkt.delete('/history', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const user = c.get('user');
   const adminClient = createAdminClient();
 
@@ -309,7 +309,7 @@ pdkt.delete('/history', async (c) => {
   }
 });
 
-pdkt.delete('/history/:id', async (c) => {
+pdkt.delete('/history/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('user');
   const adminClient = createAdminClient();

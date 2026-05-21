@@ -3,13 +3,13 @@ import { zValidator } from '@hono/zod-validator';
 import { User } from '@supabase/supabase-js';
 import { generateMessageSchema } from '@trainers/types';
 import * as ketikService from '../services/ketik-service';
-import { authMiddleware } from '../middleware/auth';
+import { requireRole } from '../middleware/role';
+import { aiRateLimitMiddleware } from '../middleware/rateLimit';
 import { z } from 'zod';
 
 type Variables = { user: User; profile: any };
 
 const ketik = new Hono<{ Variables: Variables }>();
-ketik.use('*', authMiddleware);
 
 ketik.get('/scenarios', (c) => {
   return c.json({ success: true, data: ketikService.getScenarios() });
@@ -19,7 +19,7 @@ ketik.get('/consumer-types', (c) => {
   return c.json({ success: true, data: ketikService.getConsumerTypes() });
 });
 
-ketik.post('/generate', zValidator('json', generateMessageSchema), async (c) => {
+ketik.post('/generate', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), aiRateLimitMiddleware, zValidator('json', generateMessageSchema), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
   const userId = user?.id;
@@ -132,7 +132,7 @@ ketik.get('/review/:sessionId', async (c) => {
   }
 });
 
-ketik.post('/review', zValidator('json', z.object({ sessionId: z.string(), workerId: z.string().optional() })), async (c) => {
+ketik.post('/review', requireRole('admin', 'trainer', 'qa'), aiRateLimitMiddleware, zValidator('json', z.object({ sessionId: z.string(), workerId: z.string().optional() })), async (c) => {
   const body = c.req.valid('json');
   const user = c.get('user');
   
@@ -167,7 +167,7 @@ ketik.get('/review/status/:sessionId', async (c) => {
   }
 });
 
-ketik.get('/worker', async (c) => {
+ketik.get('/worker', requireRole('admin', 'trainer', 'qa'), async (c) => {
   const workerId = c.req.query('workerId') || 'web-daemon';
   try {
     const result = await ketikService.processOldestQueuedJob(workerId);

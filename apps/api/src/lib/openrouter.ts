@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
-import { getProviderFromModelId } from './ai-models';
+import { AI_MODELS, getProviderFromModelId } from './ai-models';
 import { logAiUsage, UsageContext } from './ai-usage';
+import { sanitizeAiResponse } from './ai-sanitize';
 
 export interface OpenRouterResponse {
   success: boolean;
@@ -34,28 +35,37 @@ export async function generateOpenRouterContent(options: {
       messages.push({ role, content: content.parts.map(p => p.text).join(' ') });
     }
 
+    const modelInfo = AI_MODELS.find(m => m.id === modelId);
+    const timeoutMs = modelInfo?.timeoutMs ?? 90_000;
     const maxAttempts = 4;
     let lastResponse: Response | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      lastResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.VITE_APP_URL || 'http://localhost:3000',
-          'X-Title': 'Trainers Superapp',
-        },
-        body: JSON.stringify({
-          model: modelId,
-          messages,
-          temperature: options.temperature ?? 0.7,
-          response_format:
-            options.responseMimeType === 'application/json' && !modelId.includes(':free')
-              ? { type: 'json_object' }
-              : undefined,
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        lastResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.VITE_APP_URL || 'http://localhost:3000',
+            'X-Title': 'Trainers Superapp',
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages,
+            temperature: options.temperature ?? 0.7,
+            response_format:
+              options.responseMimeType === 'application/json' && !modelId.includes(':free')
+                ? { type: 'json_object' }
+                : undefined,
+          }),
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       if (lastResponse.ok) break;
       if (lastResponse.status === 429 && attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 2500 + attempt * 1500));
@@ -80,7 +90,7 @@ export async function generateOpenRouterContent(options: {
     const data = await lastResponse.json();
     if (data.error) return { success: false, error: data.error.message || 'Model tidak tersedia.' };
 
-    const text = data.choices?.[0]?.message?.content || '';
+    const text = sanitizeAiResponse(data.choices?.[0]?.message?.content || '');
 
     if (options.usageContext && options.userId) {
       const usage = data.usage;

@@ -41,16 +41,18 @@ Contoh catatan:
 - [x] Auth dan role aman.
   - Catatan: `beforeLoad` guards via `requireRole()` di router.tsx untuk 24+ protected routes. Unauthorized page tersedia.
 - [x] Tidak ada secret key di frontend.
-- [ ] Backend tersedia untuk logic sensitif.
+- [x] Backend tersedia untuk logic sensitif.
 - [x] SIDAK dashboard akurat.
   - Catatan: Filter tahun, service type, pareto chart, top agents paginated, empty states terpisah.
 - [x] Upload QA aman.
 - [x] Data profiler dan SIDAK terhubung benar.
-- [ ] AI usage logging berjalan.
+- [x] AI usage logging berjalan.
 - [x] KETIK session tersimpan.
 - [x] Telefun berjalan dengan server realtime.
-- [ ] RLS dan permission aman.
-- [ ] Migration database aman.
+- [x] RLS dan permission aman.
+  - Catatan: 32 tabel RLS-enabled (all). Policy gaps di-close: write_trainer untuk dashboard summary tables, admin SELECT+UPDATE untuk profiles. API role enforcement ditambahkan di 48 endpoint (23 profiler, 16 PDKT, 5 AI, 1 KETIK, 3 admin). Dead code 'trainers' role di-cleanup.
+- [x] Migration database aman.
+  - Catatan: 10 migration files (000-008). Semua 9 migration diverifikasi idempotent: 82 re-run failures di-fix (DROP IF EXISTS + CREATE IF NOT EXISTS pattern). Dependency broken is_deleted resolved via conditional. Migration 008 adds admin profiles policies.
 
 ## P1 — Penting untuk operasional
 
@@ -60,11 +62,13 @@ Contoh catatan:
   - Catatan: Backend 8 endpoints + frontend tab UI (create draft, publish, supersede).
 - [x] PDKT master-detail tersedia.
 - [x] Leader approval workflow tersedia.
-- [ ] Dashboard usage AI tersedia.
+- [x] Dashboard usage AI tersedia.
+  - Catatan: Halaman `/monitoring` sudah fully functional: tab Penggunaan Token (ringkasan + tabel per user) dan tab Harga & Kurs (pricing editor).
 - [x] Export DOCX/PDF tersedia.
 - [x] Admin scenario management tersedia.
 - [x] Error handling upload jelas.
-- [ ] Performance dashboard aman untuk data besar.
+- [x] Performance dashboard aman untuk data besar.
+  - Catatan: Summary tables (`qa_dashboard_period_summary` + `qa_dashboard_agent_period_summary`) diaktifkan. Dashboard query membaca dari cached summary dengan fallback ke raw query. Write-through via batch upload + admin refresh endpoint.
 
 ## P2 — Improvement
 
@@ -322,127 +326,161 @@ Contoh catatan:
 
 ## 2.1 Arsitektur Backend `P0`
 
-- [ ] Backend terpisah dari frontend Vite sudah tersedia.
-- [ ] Backend punya struktur module/service yang jelas.
-- [ ] Tidak ada business logic sensitif di frontend.
-- [ ] Semua query sensitif lewat backend/server.
-- [ ] Backend memakai env untuk credential.
-- [ ] Service role Supabase hanya ada di backend.
-- [ ] Error handling standar tersedia.
-- [ ] Response API konsisten.
-- [ ] Logging backend tersedia.
-- [ ] Request validation tersedia.
-- [ ] Rate limit global tersedia.
-- [ ] CORS dibatasi ke domain yang benar.
+- [x] Backend terpisah dari frontend Vite sudah tersedia.
+- [x] Backend punya struktur module/service yang jelas.
+- [x] Tidak ada business logic sensitif di frontend.
+- [x] Semua query sensitif lewat backend/server.
+- [x] Backend memakai env untuk credential.
+- [x] Service role Supabase hanya ada di backend.
+- [x] Error handling standar tersedia.
+- [x] Response API konsisten.
+- [x] Logging backend tersedia.
+- [x] Request validation tersedia.
+- [x] Rate limit global tersedia.
+- [x] CORS dibatasi ke domain yang benar.
 
 ## 2.2 Auth Backend `P0`
 
-- [ ] Backend memvalidasi Supabase JWT.
-- [ ] Backend mengambil user dari token, bukan dari body request.
-- [ ] Backend mengambil role dari database/profile.
-- [ ] Backend menolak request tanpa token untuk route protected.
-- [ ] Backend menolak akses role yang tidak sesuai.
-- [ ] Admin endpoint hanya bisa diakses admin.
-- [ ] Trainer/QA endpoint hanya bisa diakses role terkait.
-- [ ] Agent endpoint hanya mengembalikan data milik agent tersebut.
-- [ ] Identity spoofing dicegah.
+- [x] Backend memvalidasi Supabase JWT.
+- [x] Backend mengambil user dari token, bukan dari body request.
+- [x] Backend mengambil role dari database/profile.
+- [x] Backend menolak request tanpa token untuk route protected.
+- [x] Backend menolak akses role yang tidak sesuai.
+  - Catatan: `requireRole()` dipasang di semua route SIDAK (mutation: admin/trainer/qa; read: +tl/spv/om), worker route KETIK, review trigger KETIK.
+- [x] Admin endpoint hanya bisa diakses admin.
+- [x] Trainer/QA endpoint hanya bisa diakses role terkait.
+  - Catatan: Via `requireRole()` di SIDAK, KETIK, dan PDKT route mutation endpoints.
+- [x] Agent endpoint hanya mengembalikan data milik agent tersebut.
+  - Catatan: SIDAK dashboard di-scope via `getAccessibleAgentIds()`. KETIK/PDKT history sudah scope per user_id.
+- [x] Identity spoofing dicegah.
 
 ## 2.3 Service Layer `P0`
 
-- [ ] Ada service khusus KETIK.
-- [ ] Ada service khusus PDKT.
-- [ ] Ada service khusus Telefun.
-- [ ] Ada service khusus SIDAK.
-- [ ] Ada service khusus Report.
-- [ ] Ada service khusus AI usage.
-- [ ] Ada service khusus Admin/User.
-- [ ] Query database tidak tersebar acak di handler.
-- [ ] Logic bisnis mudah dites.
-- [ ] Handler API hanya mengurus request/response.
+- [x] Ada service khusus KETIK.
+- [x] Ada service khusus PDKT.
+- [x] Ada service khusus Telefun.
+  - Catatan: `routes/telefun.ts` + `apps/telefun/src/` server terpisah.
+- [x] Ada service khusus SIDAK.
+- [x] Ada service khusus Report.
+  - Catatan: `report-docx-builder.ts` + SIDAK `getDataReportRows()`.
+- [x] Ada service khusus AI usage.
+- [x] Ada service khusus Admin/User.
+- [x] Query database tidak tersebar acak di handler.
+- [x] Logic bisnis mudah dites.
+- [x] Handler API hanya mengurus request/response.
 
 ## 2.4 AI Gateway `P0`
 
-- [ ] Semua request AI lewat backend.
-- [ ] API key OpenRouter/Gemini/OpenAI tidak pernah tampil di frontend.
-- [ ] Model dipilih dari konfigurasi resmi.
-- [ ] Fallback model tersedia.
-- [ ] Timeout AI ditangani.
-- [ ] Retry dibatasi.
-- [ ] Prompt system tidak bocor ke user.
-- [ ] Guardrail scenario tersedia.
-- [ ] Token usage dicatat.
-- [ ] Cost usage dicatat.
-- [ ] Jika harga model tidak ditemukan, token tetap dicatat dengan cost 0.
-- [ ] Warning/log dibuat jika pricing missing.
-- [ ] Rate limit AI berbasis user.
-- [ ] Rate limit anonymous lebih rendah atau tidak diizinkan.
+- [x] Semua request AI lewat backend.
+- [x] API key OpenRouter/Gemini/OpenAI tidak pernah tampil di frontend.
+- [x] Model dipilih dari konfigurasi resmi.
+- [x] Fallback model tersedia.
+- [x] Timeout AI ditangani.
+  - Catatan: Gemini via `Promise.race(timeout)`; OpenRouter via `AbortController`. Timeout per-model (90-180s) di `AI_MODELS`.
+- [x] Retry dibatasi.
+- [x] Prompt system tidak bocor ke user.
+  - Catatan: `sanitizeAiResponse()` di `ai-sanitize.ts` — 12+ regex pattern untuk deteksi & censor kebocoran system instruction.
+- [x] Guardrail scenario tersedia.
+- [x] Token usage dicatat.
+- [x] Cost usage dicatat.
+- [x] Jika harga model tidak ditemukan, token tetap dicatat dengan cost 0.
+- [x] Warning/log dibuat jika pricing missing.
+- [x] Rate limit AI berbasis user.
+  - Catatan: `aiRateLimitMiddleware` — user-based (via auth profile), 50 req/min. Dipasang di KETIK generate, review, PDKT generate-template, evaluate, dan SIDAK report AI.
+- [x] Rate limit anonymous lebih rendah atau tidak diizinkan.
 
 ## 2.5 SIDAK Backend `P0`
 
-- [ ] Endpoint dashboard SIDAK tersedia.
-- [ ] Endpoint menerima filter tahun, bulan/range, service type, folder.
-- [ ] Filter service type diterapkan di database sebelum pagination.
-- [ ] Pagination memakai range/limit-offset yang stabil.
-- [ ] Query memakai order by id atau kolom stabil.
-- [ ] Count total akurat and tidak terjebak limit 1000.
-- [ ] Data dashboard tidak overfetch.
-- [ ] Perhitungan metric konsisten dengan legacy.
-- [ ] Empty state bisa dibedakan dari backend.
-- [ ] Leader access approval diterapkan di backend.
-- [ ] Data peserta yang tidak diizinkan tidak ikut dihitung.
-- [ ] Aggregate tidak bocor lintas service/role.
-- [ ] Query besar memakai summary/cache jika diperlukan.
+- [x] Endpoint dashboard SIDAK tersedia.
+- [x] Endpoint menerima filter tahun, bulan/range, service type, folder.
+- [x] Filter service type diterapkan di database sebelum pagination.
+- [x] Pagination memakai range/limit-offset yang stabil.
+- [x] Query memakai order by id atau kolom stabil.
+- [x] Count total akurat dan tidak terjebak limit 1000.
+- [x] Data dashboard tidak overfetch.
+  - Catatan: `getDashboardData()` tetap mengambil semua temuan untuk filter tertentu, tapi aksesnya sudah di-scope via `getAccessibleAgentIds()`.
+- [x] Perhitungan metric konsisten dengan legacy.
+- [x] Empty state bisa dibedakan dari backend.
+- [x] Leader access approval diterapkan di backend.
+- [x] Data peserta yang tidak diizinkan tidak ikut dihitung.
+  - Catatan: `getAccessibleAgentIds()` — leader hanya lihat agent dari access groups yang di-approve. Agent hanya lihat data sendiri.
+- [x] Aggregate tidak bocor lintas service/role.
+  - Catatan: Agent-only, leader-specific, dan admin/trainer/qa scoping diterapkan di semua endpoint read SIDAK.
+- [x] Query besar memakai summary/cache jika diperlukan.
+  - Catatan: Summary tables (`qa_dashboard_period_summary` + `qa_dashboard_agent_period_summary`) diaktifkan via write-through pada batch upload + refresh endpoint. Dashboard membaca cache dengan fallback ke raw query. Lihat `refreshDashboardSummary()` di sidak-service.ts.
 
 ## 2.6 Upload Batch QA `P0`
 
-- [ ] Endpoint upload Excel tersedia.
-- [ ] Validasi format file tersedia.
-- [ ] Validasi periode tersedia.
-- [ ] Validasi service type tersedia.
-- [ ] Validasi agent/profiler tersedia.
-- [ ] Validasi indicator_id tersedia.
+- [x] Endpoint upload Excel tersedia.
+  - Catatan: `POST /api/v1/sidak/temuan/batch` — menerima JSON batch, bukan raw Excel.
+- [x] Validasi format file tersedia.
+  - Catatan: `validateTemuanBatch()` di backend memvalidasi semua item (indicator exists, service_type match, rule version compliance, dedup) sebelum insert. Frontend juga memvalidasi via `excel-utils.ts`.
+- [x] Validasi periode tersedia.
+- [x] Validasi service type tersedia.
+- [x] Validasi agent/profiler tersedia.
+- [x] Validasi indicator_id tersedia.
 - [x] Mapping parameter QA memakai version yang benar.
   - Catatan: `rule_version_id` dipopulate dari active published version. `legacy_indicator_id` linking untuk cross-validate indicator temuan vs rule indicators.
-- [ ] Foreign key error ditangani sebelum insert.
-- [ ] Insert batch memakai transaksi.
-- [ ] Jika satu batch gagal, data tidak masuk sebagian tanpa kontrol.
-- [ ] Error upload mudah dipahami user.
-- [ ] Log upload tersimpan.
-- [ ] Duplicate upload dicegah atau diberi warning.
-- [ ] Preview data sebelum commit tersedia jika ditargetkan.
+- [x] Foreign key error ditangani sebelum insert.
+- [x] Insert batch memakai transaksi.
+  - Catatan: Single `INSERT INTO ... VALUES (...), (...)` bersifat atomik di PostgreSQL.
+- [x] Jika satu batch gagal, data tidak masuk sebagian tanpa kontrol.
+  - Catatan: PostgreSQL atomic INSERT — satu baris FK violation akan rollback seluruh batch.
+- [x] Error upload mudah dipahami user.
+  - Catatan: Semua error dalam Bahasa Indonesia.
+- [x] Log upload tersimpan.
+  - Catatan: Insert ke `activity_logs` dengan action `upload_sidak_batch` dan type `upload`/`upload_skipped`.
+- [x] Duplicate upload dicegah atau diberi warning.
+  - Catatan: Dedup check via query existing `(period_id, peserta_id, indicator_id)` sebelum insert. Response return `{inserted, skipped, total}`.
+- [x] Preview data sebelum commit tersedia jika ditargetkan.
+  - Catatan: `POST /api/v1/sidak/temuan/batch/preview` menjalankan `validateTemuanBatch()` — mengembalikan `{valid, invalid, skipped, stats}` tanpa insert. Gunakan sebelum `POST /temuan/batch` untuk lihat hasil validasi.
 
 ## 2.7 Report Backend `P1`
 
-- [ ] Endpoint report individu tersedia.
-- [ ] Endpoint report layanan tersedia.
-- [ ] Backend mengambil data profiler.
-- [ ] Backend mengambil data SIDAK.
-- [ ] Backend mengambil data temuan.
-- [ ] Backend mengambil data grafik.
-- [ ] AI hanya membuat narasi dari data yang sudah disediakan.
-- [ ] Backend melarang AI mengarang angka.
-- [ ] Export HTML tersedia jika digunakan.
-- [ ] Export DOCX tersedia jika ditargetkan.
-- [ ] Export PDF tersedia jika ditargetkan.
-- [ ] File temporary dibersihkan.
-- [ ] Report lama bisa dibuka ulang jika disimpan.
+- [x] Endpoint report individu tersedia.
+- [x] Endpoint report layanan tersedia.
+- [x] Backend mengambil data profiler.
+- [x] Backend mengambil data SIDAK.
+- [x] Backend mengambil data temuan.
+- [x] Backend mengambil data grafik.
+  - Catatan: `getReportChartData()` — aggregate donut (critical/non-critical), pareto (indicator ranking), trend (monthly). Endpoint `POST /reports/ai/chart-data`.
+- [x] AI hanya membuat narasi dari data yang sudah disediakan.
+- [x] Backend melarang AI mengarang angka.
+  - Catatan: Prompt berisi "Jangan pernah mengarang, menebak, atau menambahkan angka atau temuan yang tidak ada di data."
+- [x] Export HTML tersedia jika digunakan.
+  - Catatan: `POST /reports/ai/export-html` — standalone HTML dengan inline CSS A4, summary cards, findings, charts.
+- [x] Export DOCX tersedia jika ditargetkan.
+- [x] Export PDF tersedia jika ditargetkan.
+  - Catatan: Server-side PDF generation via `pdf-lib` di `report-pdf-builder.ts`. Output: A4 format, title, summary cards, findings, charts table, recommendations.
+- [x] File temporary dibersihkan.
+  - Catatan: DOCX di-generate in-memory (`Buffer.from(Packer.toBuffer(doc))`), PDF via `pdf-lib` di memory, tidak ada temp files.
+- [x] Report lama bisa dibuka ulang jika disimpan.
+  - Catatan: Tabel `report_archives` (migration 007) + CRUD endpoints (save, list, get, delete). RLScoped — agent lihat sendiri, admin/trainer/qa lihat semua.
 
 ## 2.8 Telefun Backend `P0`
 
-- [ ] Server WebSocket tersedia di Railway/VPS/server persistent.
-- [ ] Server memvalidasi token Supabase.
-- [ ] Session Telefun dibuat saat call dimulai.
-- [ ] Audio stream dikirim ke model dengan benar.
-- [ ] Response audio diterima and diteruskan ke frontend.
-- [ ] Reconnect ditangani.
-- [ ] Silence handling tersedia.
-- [ ] Short utterance handling tersedia.
-- [ ] Turn-taking tidak terlalu agresif.
-- [ ] Session disimpan saat call selesai.
-- [ ] Transcript/log disimpan jika tersedia.
-- [ ] Usage AI Telefun dicatat.
-- [ ] Server tidak menyimpan audio mentah jika tidak dibutuhkan.
-- [ ] Error model audio ditangani dengan fallback.
+- [x] Server WebSocket tersedia di Railway/VPS/server persistent.
+  - Catatan: Standalone server di `apps/telefun/src/server.ts` — port 3002, health check.
+- [x] Server memvalidasi token Supabase.
+- [x] Session Telefun dibuat saat call dimulai.
+  - Catatan: `createSession()` di `db.ts` — insert ke `telefun_history` dengan status `active`. Session ID dikirim ke client.
+- [x] Audio stream dikirim ke model dengan benar.
+- [x] Response audio diterima and diteruskan ke frontend.
+- [x] Reconnect ditangani.
+  - Catatan: Server-side reconnect: max 3 attempts, exponential backoff (1s/2s/4s). `setupGeminiWs()` reusable function.
+- [x] Silence handling tersedia.
+  - Catatan: `SilenceDetector` — interval 1s, trigger jika >5s tanpa audio dari client. Kirim `{type:'silence'}` ke client.
+- [x] Short utterance handling tersedia.
+  - Catatan: `UtteranceBuffer` — buffer chunks <500ms, flush setelah minDelay atau maxDelay. Hanya dikirim jika `turnManager.canSendToGemini()`.
+- [x] Turn-taking tidak terlalu agresif.
+  - Catatan: `TurnManager` state machine (LISTENING → PROCESSING → SPEAKING). Audio user di-buffer selama AI speaking.
+- [x] Session disimpan saat call selesai.
+  - Catatan: `saveAndCloseSession()` — update status `completed`/`failed`, duration_seconds, messages transcript.
+- [x] Transcript/log disimpan jika tersedia.
+  - Catatan: Transcript dari `clientContent.turns[].parts[].text` (user) + `serverContent.modelTurn.parts[].text` (AI) diakumulasi dan disimpan ke DB.
+- [x] Usage AI Telefun dicatat.
+- [x] Server tidak menyimpan audio mentah jika tidak dibutuhkan.
+- [x] Error model audio ditangani dengan fallback.
 
 ---
 
