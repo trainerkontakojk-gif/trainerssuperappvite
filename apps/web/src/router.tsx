@@ -1,6 +1,7 @@
 import { createRouter, createRoute, createRootRoute, redirect } from '@tanstack/react-router';
 import { lazy } from 'react';
 import { DashboardLayout } from './components/Layout';
+import { isRoleAllowed } from './lib/app-config';
 
 const IndexPage = lazy(() => import('./routes/index'));
 const DashboardPage = lazy(() => import('./routes/dashboard'));
@@ -26,6 +27,7 @@ const MonitoringPage = lazy(() => import('./routes/monitoring'));
 const TelefunLanding = lazy(() => import('./routes/telefun/index'));
 const AccountPage = lazy(() => import('./routes/account'));
 const NotFoundPage = lazy(() => import('./routes/not-found'));
+const UnauthorizedPage = lazy(() => import('./routes/unauthorized'));
 const WaitingApprovalPage = lazy(() => import('./routes/waiting-approval'));
 const ResetPasswordPage = lazy(() => import('./routes/reset-password'));
 const ProfilerLanding = lazy(() => import('./routes/profiler/index'));
@@ -58,138 +60,161 @@ const dashboardUsersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard/users',
   component: DashboardUsers,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const dashboardAccessGroupsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard/access-groups',
   component: DashboardAccessGroups,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const dashboardAccessApprovalRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard/access-approval',
   component: DashboardAccessApproval,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const dashboardActivitiesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard/activities',
   component: DashboardActivities,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const profilerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler',
   component: ProfilerLanding,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerTableRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/table',
   component: ProfilerTable,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerSlidesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/slides',
   component: ProfilerSlides,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerAnalyticsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/analytics',
   component: ProfilerAnalytics,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerExportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/export',
   component: ProfilerExport,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/add',
   component: ProfilerAdd,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerImportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/import',
   component: ProfilerImport,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const profilerTeamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/profiler/teams',
   component: ProfilerTeams,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const sidakRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak',
   component: SidakLanding,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const sidakDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/dashboard',
   component: SidakDashboard,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const sidakInputRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/input',
   component: SidakInput,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const sidakRankingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/ranking',
   component: SidakRanking,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const sidakSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/settings',
   component: SidakSettings,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const sidakPeriodsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/periods',
   component: SidakPeriods,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const sidakAgentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/agents',
   component: SidakAgents,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const sidakAgentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/agents/$id',
   component: SidakAgentDetail,
+  beforeLoad: requireRole(['trainer', 'leader', 'admin']),
 });
 
 const sidakReportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/reports',
   component: SidakReportsLanding,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const sidakReportsDataRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/reports-data',
   component: SidakReportsData,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const sidakReportsAiRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/sidak/reports-ai',
   component: SidakReportsAi,
+  beforeLoad: requireRole(['trainer', 'admin']),
 });
 
 const ketikRoute = createRoute({
@@ -269,6 +294,29 @@ const resetPasswordRoute = createRoute({
   path: '/reset-password',
   component: ResetPasswordPage,
 });
+
+const unauthorizedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/unauthorized',
+  component: UnauthorizedPage,
+});
+
+function requireRole(allowedRoles: string[]) {
+  return () => {
+    const profileJson = localStorage.getItem('auth_profile');
+    if (!profileJson) {
+      throw redirect({ to: '/' });
+    }
+    try {
+      const profile = JSON.parse(profileJson);
+      if (!isRoleAllowed(profile?.role, allowedRoles)) {
+        throw redirect({ to: '/unauthorized' });
+      }
+    } catch {
+      throw redirect({ to: '/' });
+    }
+  };
+}
 
 // Legacy Compatibility Redirect Routes
 const qaAnalyzerRedirectRoute = createRoute({
@@ -357,6 +405,7 @@ const routeTree = rootRoute.addChildren([
   accountRoute,
   waitingApprovalRoute,
   resetPasswordRoute,
+  unauthorizedRoute,
   qaAnalyzerRedirectRoute,
   qaAnalyzerWildcardRedirectRoute,
   dashboardMonitoringRedirectRoute,

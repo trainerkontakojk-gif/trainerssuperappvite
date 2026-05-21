@@ -1,11 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { User } from '@supabase/supabase-js';
 import { authMiddleware } from '../middleware/auth';
 import * as sidakService from '../services/sidak-service';
 import { serviceTypeSchema, categorySchema, createTemuanBatchSchema } from '@trainers/types';
 
-const sidak = new Hono();
+type Variables = { user: User; profile: any };
+
+const sidak = new Hono<{ Variables: Variables }>();
 
 // All SIDAK routes require auth
 sidak.use('/*', authMiddleware);
@@ -333,6 +336,126 @@ sidak.get('/dashboard/trend', async (c) => {
     }
   } catch (error: any) {
     return c.json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } }, 500);
+  }
+});
+
+// ── QA Rule Versions ────────────────────────────────────
+sidak.get('/rule-versions', async (c) => {
+  const serviceType = c.req.query('service_type');
+  try {
+    const versions = await sidakService.getRuleVersions(serviceType || undefined);
+    return c.json({ success: true, data: versions });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/rule-versions', async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json();
+  const parsed = z.object({
+    service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
+    effective_period_id: z.string().uuid(),
+    critical_weight: z.number().min(0).max(1).default(0.5),
+    non_critical_weight: z.number().min(0).max(1).default(0.5),
+    scoring_mode: z.enum(['weighted', 'flat', 'no_category']).default('weighted'),
+    change_reason: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data versi aturan tidak valid', details: parsed.error } }, 400);
+  }
+  try {
+    const version = await sidakService.createRuleVersion(parsed.data, user.id);
+    return c.json({ success: true, data: version }, 201);
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.put('/rule-versions/:id', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const parsed = z.object({
+    critical_weight: z.number().min(0).max(1).optional(),
+    non_critical_weight: z.number().min(0).max(1).optional(),
+    scoring_mode: z.enum(['weighted', 'flat', 'no_category']).optional(),
+    change_reason: z.string().optional(),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid', details: parsed.error } }, 400);
+  }
+  try {
+    const version = await sidakService.updateRuleVersion(id, parsed.data, user.id);
+    return c.json({ success: true, data: version });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/rule-versions/:id/publish', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  try {
+    const version = await sidakService.publishRuleVersion(id, user.id);
+    return c.json({ success: true, data: version });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/rule-versions/:id/supersede', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  try {
+    const version = await sidakService.supersedeRuleVersion(id, user.id);
+    return c.json({ success: true, data: version });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.get('/rule-versions/:id/indicators', async (c) => {
+  const id = c.req.param('id');
+  try {
+    const indicators = await sidakService.getRuleVersionIndicators(id);
+    return c.json({ success: true, data: indicators });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.post('/rule-versions/:id/indicators', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const parsed = z.object({
+    service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
+    name: z.string().min(1),
+    category: z.enum(['critical', 'non_critical', 'none']),
+    bobot: z.number().positive(),
+    has_na: z.boolean().optional().default(false),
+    threshold: z.number().optional(),
+    sort_order: z.number().int().optional().default(0),
+  }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data indikator tidak valid', details: parsed.error } }, 400);
+  }
+  try {
+    const indicator = await sidakService.addRuleVersionIndicator({ rule_version_id: id, ...parsed.data }, user.id);
+    return c.json({ success: true, data: indicator }, 201);
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+  }
+});
+
+sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', async (c) => {
+  const indicatorId = c.req.param('indicatorId');
+  try {
+    await sidakService.deleteRuleVersionIndicator(indicatorId);
+    return c.json({ success: true, message: 'Indikator berhasil dihapus' });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
   }
 });
 

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { ShieldCheck, UserPlus, XCircle, Search, Users, CheckCircle2, KeyRound, Settings2, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useApi, postApi, putApi, deleteApi } from '../../hooks/useApi';
+import { notify } from '../../lib/toast';
+import { Pagination } from '../../components/ui/Pagination';
 
 interface ManagedUser {
   id: string;
@@ -64,6 +66,12 @@ export default function UsersPage() {
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'active' | 'inactive'>('all');
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, activeTab]);
 
   useEffect(() => {
     if (initialUsers) {
@@ -82,7 +90,7 @@ export default function UsersPage() {
       await putApi(`/admin/users/${userId}/status`, { status });
       await refetch();
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui status pengguna.');
+      notify.error(err.message || 'Gagal memperbarui status pengguna.');
     } finally {
       setUpdating(null);
     }
@@ -96,9 +104,9 @@ export default function UsersPage() {
     try {
       await putApi(`/admin/users/${userId}/role`, { role: nextRole });
       await refetch();
-      alert('Role berhasil diperbarui');
+      notify.success('Role berhasil diperbarui');
     } catch (err: any) {
-      alert(err.message || 'Gagal memperbarui role pengguna.');
+      notify.error(err.message || 'Gagal memperbarui role pengguna.');
     } finally {
       setUpdating(null);
     }
@@ -111,9 +119,9 @@ export default function UsersPage() {
     try {
       await deleteApi(`/admin/users/${userId}`);
       await refetch();
-      alert('User berhasil dihapus');
+      notify.success('User berhasil dihapus');
     } catch (err: any) {
-      alert(err.message || 'Gagal menghapus pengguna.');
+      notify.error(err.message || 'Gagal menghapus pengguna.');
     } finally {
       setUpdating(null);
     }
@@ -121,7 +129,7 @@ export default function UsersPage() {
 
   const resetUserPassword = async (userId: string, userEmail: string | null) => {
     if (!userEmail) {
-      alert('Email pengguna tidak tersedia.');
+      notify.error('Email pengguna tidak tersedia.');
       return;
     }
 
@@ -134,7 +142,7 @@ export default function UsersPage() {
       setResetSuccess(userId);
       setTimeout(() => setResetSuccess(null), 3000);
     } catch (err: any) {
-      alert(`Gagal mengirim reset password: ${err.message || 'unknown error'}`);
+      notify.error(`Gagal mengirim reset password: ${err.message || 'unknown error'}`);
     } finally {
       setUpdating(null);
     }
@@ -153,6 +161,8 @@ export default function UsersPage() {
     if (activeTab === 'inactive') return matchesSearch && normalizedStatus === 'inactive';
     return matchesSearch;
   });
+
+  const paginatedUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
   const pendingCount = users.filter((entry) => normalizeStatusValue(entry.status) === 'pending').length;
   const activeCount = users.filter((entry) => normalizeStatusValue(entry.status) === 'active').length;
@@ -231,7 +241,8 @@ export default function UsersPage() {
             <p className="text-xs text-gray-500 mt-1">Coba sesuaikan kata kunci pencarian Anda.</p>
           </div>
         ) : (
-          filteredUsers.map((entry) => {
+          <>
+            {paginatedUsers.map((entry) => {
             const normalizedEntryRole = normalizeRoleValue(entry.role);
             const normalizedEntryStatus = normalizeStatusValue(entry.status);
             const isPending = normalizedEntryStatus === 'pending';
@@ -432,7 +443,18 @@ export default function UsersPage() {
                 </div>
               </div>
             );
-          })
+          })}
+            <div className="rounded-2xl border bg-white p-4 shadow-sm">
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={filteredUsers.length}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                showPageSizeSelector
+              />
+            </div>
+          </>
         )}
       </div>
     </div>

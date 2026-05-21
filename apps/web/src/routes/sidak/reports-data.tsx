@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Search, Download, Loader2, AlertCircle } from 'lucide-react';
 import { useApi, postApi } from '../../hooks/useApi';
+import { Pagination } from '../../components/ui/Pagination';
 import type { ServiceType } from '@trainers/types';
 
 const SERVICE_TYPES = ['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik'] as const;
@@ -22,6 +23,12 @@ export default function SidakReportsData() {
   const [results, setResults] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setPage(1);
+  }, [serviceType, year, startMonth, endMonth, pesertaId]);
 
   const availableYears = periods
     ? [...new Set(periods.map((p: any) => p.year))].sort((a, b) => b - a)
@@ -43,6 +50,7 @@ export default function SidakReportsData() {
       setError(e.message);
     }
     setLoading(false);
+    setPage(1);
   };
 
   const exportExcel = async () => {
@@ -148,43 +156,55 @@ export default function SidakReportsData() {
           {results.length === 0 ? (
             <div className="p-8 text-center text-sm text-gray-400">Tidak ada data untuk filter yang dipilih.</div>
           ) : (
-            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Layanan</th>
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Periode</th>
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Agen</th>
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Parameter</th>
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Temuan</th>
-                    <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Seharusnya</th>
-                    <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Skor</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {results.map((r: any, i: number) => (
-                    <tr key={r.id || i} className="hover:bg-gray-50">
-                      <td className="p-3 text-gray-700">{SERVICE_LABELS[r.service_type] || r.service_type}</td>
-                      <td className="p-3 text-gray-600 font-mono text-xs">
-                        {String(r.qa_periods?.month || '').padStart(2, '0')}/{r.qa_periods?.year || ''}
-                      </td>
-                      <td className="p-3">
-                        <span className="font-medium text-gray-900">{r.profiler_peserta?.nama || '-'}</span>
-                        <span className="text-xs text-gray-400 ml-1">({r.profiler_peserta?.batch_name || ''})</span>
-                      </td>
-                      <td className="p-3 text-gray-700">{r.qa_indicators?.name || '-'}</td>
-                      <td className="p-3 text-rose-700 italic text-xs max-w-[200px] truncate">{r.ketidaksesuaian || '-'}</td>
-                      <td className="p-3 text-emerald-700 text-xs max-w-[200px] truncate">{r.sebaiknya || '-'}</td>
-                      <td className="p-3 text-center">
-                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
-                          (r.nilai ?? 3) >= 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                        }`}>{r.nilai}</span>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Layanan</th>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Periode</th>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Agen</th>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Parameter</th>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Temuan</th>
+                      <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Seharusnya</th>
+                      <th className="text-center p-3 text-xs font-semibold text-gray-500 uppercase">Skor</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y">
+                    {results.slice((page - 1) * pageSize, page * pageSize).map((r: any, i: number) => (
+                      <tr key={r.id || i} className="hover:bg-gray-50">
+                        <td className="p-3 text-gray-700">{SERVICE_LABELS[r.service_type] || r.service_type}</td>
+                        <td className="p-3 text-gray-600 font-mono text-xs">
+                          {String(r.qa_periods?.month || '').padStart(2, '0')}/{r.qa_periods?.year || ''}
+                        </td>
+                        <td className="p-3">
+                          <span className="font-medium text-gray-900">{r.profiler_peserta?.nama || '-'}</span>
+                          <span className="text-xs text-gray-400 ml-1">({r.profiler_peserta?.batch_name || ''})</span>
+                        </td>
+                        <td className="p-3 text-gray-700">{r.qa_indicators?.name || '-'}</td>
+                        <td className="p-3 text-rose-700 italic text-xs max-w-[200px] truncate">{r.ketidaksesuaian || '-'}</td>
+                        <td className="p-3 text-emerald-700 text-xs max-w-[200px] truncate">{r.sebaiknya || '-'}</td>
+                        <td className="p-3 text-center">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                            (r.nilai ?? 3) >= 3 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          }`}>{r.nilai}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-6 py-4 border-t">
+                <Pagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={results.length}
+                  onPageChange={setPage}
+                  onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                  showPageSizeSelector
+                />
+              </div>
+            </>
           )}
         </div>
       )}

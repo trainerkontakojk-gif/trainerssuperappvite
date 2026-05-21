@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { History, Search, ArrowDownToLine, RefreshCw, Filter, Calendar, Shield, Activity, HelpCircle } from 'lucide-react';
 import { useApi } from '../../hooks/useApi';
+import { Pagination } from '../../components/ui/Pagination';
 
 interface ActivityLog {
   id: string;
@@ -15,6 +16,12 @@ export default function ActivitiesPage() {
   const { data: logs, loading, refetch } = useApi<ActivityLog[]>('/admin/activity-logs');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedActionType, setSelectedActionType] = useState<string>('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, selectedActionType]);
 
   const filteredLogs = (logs || []).filter((log) => {
     const matchesSearch =
@@ -27,6 +34,8 @@ export default function ActivitiesPage() {
 
     return matchesSearch && matchesAction;
   });
+
+  const paginatedLogs = filteredLogs.slice((page - 1) * pageSize, page * pageSize);
 
   const getActionColor = (action: string) => {
     const act = action.toUpperCase();
@@ -155,53 +164,65 @@ export default function ActivitiesPage() {
             <p className="text-xs text-gray-500 mt-1">Belum ada rekaman mutasi yang terekam.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-4">Waktu</th>
-                  <th className="px-6 py-4">Aktor (Admin)</th>
-                  <th className="px-6 py-4">Jenis Aksi</th>
-                  <th className="px-6 py-4">Target User</th>
-                  <th className="px-6 py-4">Detail Perubahan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y text-xs text-gray-700">
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">
-                      {new Date(log.created_at).toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-gray-900">
-                      {log.actor_email}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex rounded border px-2 py-0.5 font-bold uppercase tracking-wide text-[10px] ${getActionColor(log.action_type)}`}>
-                        {getActionLabel(log.action_type)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-indigo-700">
-                      {log.target_user_email || '-'}
-                    </td>
-                    <td className="px-6 py-4 max-w-xs md:max-w-md truncate text-gray-500" title={JSON.stringify(log.details)}>
-                      {log.details ? (
-                        <div className="space-y-1">
-                          {Object.entries(log.details).map(([key, val]) => (
-                            <div key={key} className="flex gap-1.5">
-                              <span className="font-semibold text-gray-400">{key}:</span>
-                              <span className="truncate">{typeof val === 'object' ? JSON.stringify(val) : String(val)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <th className="px-6 py-4">Waktu</th>
+                    <th className="px-6 py-4">Aktor (Admin)</th>
+                    <th className="px-6 py-4">Jenis Aksi</th>
+                    <th className="px-6 py-4">Target User</th>
+                    <th className="px-6 py-4">Detail Perubahan</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y text-xs text-gray-700">
+                  {paginatedLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">
+                        {new Date(log.created_at).toLocaleString('id-ID')}
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-gray-900">
+                        {log.actor_email}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex rounded border px-2 py-0.5 font-bold uppercase tracking-wide text-[10px] ${getActionColor(log.action_type)}`}>
+                          {getActionLabel(log.action_type)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-indigo-700">
+                        {log.target_user_email || '-'}
+                      </td>
+                      <td className="px-6 py-4 max-w-xs md:max-w-md truncate text-gray-500" title={JSON.stringify(log.details)}>
+                        {log.details ? (
+                          <div className="space-y-1">
+                            {Object.entries(log.details).map(([key, val]) => (
+                              <div key={key} className="flex gap-1.5">
+                                <span className="font-semibold text-gray-400">{key}:</span>
+                                <span className="truncate">{typeof val === 'object' ? JSON.stringify(val) : String(val)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-6 py-4 border-t">
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={filteredLogs.length}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                showPageSizeSelector
+              />
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -1,14 +1,19 @@
+import { useState } from 'react';
 import { useApi } from '../../hooks/useApi';
 import type { DashboardData } from '@trainers/types';
 import { Medal, TrendingDown } from 'lucide-react';
+import { Pagination } from '../../components/ui/Pagination';
 
 export default function SidakRankingPage() {
   const { data, loading } = useApi<DashboardData>('/sidak/dashboard');
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
   if (!data) return <div className="p-8 text-center text-gray-500">No data</div>;
 
   const sorted = [...data.topAgents].sort((a, b) => b.defects - a.defects || a.nama.localeCompare(b.nama));
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-6">
@@ -31,15 +36,17 @@ export default function SidakRankingPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {sorted.map((agent, i) => (
+              {paginated.map((agent, i) => {
+                const rank = (page - 1) * pageSize + i + 1;
+                return (
                 <tr key={agent.agentId} className="hover:bg-gray-50">
                   <td className="p-3">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                      i === 0 ? 'bg-amber-100 text-amber-700' :
-                      i === 1 ? 'bg-gray-100 text-gray-600' :
-                      i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-400'
+                      rank === 1 ? 'bg-amber-100 text-amber-700' :
+                      rank === 2 ? 'bg-gray-100 text-gray-600' :
+                      rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-400'
                     }`}>
-                      {i + 1}
+                      {rank}
                     </div>
                   </td>
                   <td className="p-3 font-medium">{agent.nama}</td>
@@ -67,9 +74,20 @@ export default function SidakRankingPage() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
+          {sorted.length > pageSize && (
+            <div className="px-6 py-4 border-t">
+              <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={sorted.length}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

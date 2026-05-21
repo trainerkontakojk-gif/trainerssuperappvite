@@ -72,15 +72,19 @@ This project uses `pnpm` and `turbo`.
 - This ensures usage of current APIs and avoids hallucinating deprecated patterns from old training data.
 
 ## Phase Progress
-- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf, Testing (API + Frontend), Admin Parity, Dashboard Parity
+- **Done:** Monorepo Foundation, Auth & Layout, SIDAK Core, KETIK & PDKT, Report AI (Monitoring), Upload Excel SIDAK, Telefun WS, Hardening, Deployment, Frontend Matching & Profiler Module, SIDAK Reports, Polish & QA, Code Splitting/Perf, Testing (API + Frontend), Admin Parity, Dashboard Parity, KETIK Carbon Copy, PDKT Carbon Copy, Frontend Checklist Fixes (P0-P2)
 
 ## Key Documentation
 - `prd.md`: Original project requirements.
 - `docs/rebuild-logs/`: Per-phase completion logs (phase-1 through phase-16).
 - `docs/superpowers/specs/`: Detailed architecture and design specs.
+- `docs/checklist-audit-trainers-superapp.md`: Frontend/Backend audit checklist (sections 1.1-1.8 updated through phase 19).
 - `docs/rebuild-logs/phase-12-polish-qa.md`: Loading states, empty states, error handling improvements.
 - `docs/rebuild-logs/phase-13-perf.md`: Code splitting, lazy loading, bundle size reduction.
 - `docs/rebuild-logs/phase-14-testing.md`: Vitest unit tests (92 tests across API services + frontend).
 - `docs/rebuild-logs/phase-15-admin-parity.md`: Replicating Admin user and group management tools.
 - `docs/rebuild-logs/phase-16-dashboard-parity.md`: Integrating live dashboard QA trends and activity logs.
+- `docs/rebuild-logs/phase-17-ketik-carbon-copy.md`: KETIK module parity with legacy (mailbox, settings, evaluation, tests).
+- `docs/rebuild-logs/phase-18-pdkt-carbon-copy.md`: PDKT module parity with legacy (mailbox, AI template, settings, tests).
+- `docs/rebuild-logs/phase-19-frontend-checklist.md`: Frontend checklist fixes — toast, route guards, pagination, transcript export, draft autosave, Telefun settings, QA parameter versioning.
 - `docs/superpowers/plans/`: Step-by-step implementation plans.

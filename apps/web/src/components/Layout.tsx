@@ -97,8 +97,12 @@ export function DashboardLayout() {
 
   // Redirect unauthorized users trying to access private dashboard routes
   useEffect(() => {
-    if (!isPublicRoute && !localStorage.getItem('auth_token')) {
-      window.location.assign('/');
+    if (!isPublicRoute) {
+      const token = localStorage.getItem('auth_token');
+      const profileJson = localStorage.getItem('auth_profile');
+      if (!token || !profileJson) {
+        window.location.assign('/');
+      }
     }
   }, [isPublicRoute, pathname]);
 

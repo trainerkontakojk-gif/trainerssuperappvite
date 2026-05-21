@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Send, X, Loader2, Reply } from 'lucide-react';
 
 interface ReplyComposerProps {
@@ -16,17 +16,50 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
   onClose,
   isLoading,
 }) => {
-  const [replyText, setReplyText] = useState('');
+  const draftKey = `pdkt_draft_${recipient}_${subject}`;
+  const [replyText, setReplyText] = useState(() => {
+    try {
+      return localStorage.getItem(draftKey) || '';
+    } catch {
+      return '';
+    }
+  });
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        if (replyText.trim()) {
+          localStorage.setItem(draftKey, replyText);
+        } else {
+          localStorage.removeItem(draftKey);
+        }
+      } catch { /* storage full */ }
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [replyText, draftKey]);
 
   const handleSend = () => {
     if (!replyText.trim() || isLoading) return;
     onSend(replyText);
     setReplyText('');
+    try { localStorage.removeItem(draftKey); } catch { /* noop */ }
+  };
+
+  const handleClose = () => {
+    try {
+      if (replyText.trim()) {
+        localStorage.setItem(draftKey, replyText);
+      } else {
+        localStorage.removeItem(draftKey);
+      }
+    } catch { /* noop */ }
+    onClose();
   };
 
   return (
     <div className="mx-3 mb-3 bg-gray-50/50 border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      {/* Header Section */}
       <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-gray-200 border-l-2 border-l-sky-600 bg-sky-50/50">
         <div className="flex items-center gap-2">
           <Reply className="w-4 h-4 text-sky-600" />
@@ -35,7 +68,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
           </span>
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="w-8 h-8 flex items-center justify-center hover:bg-gray-150 rounded-lg transition-all text-gray-500"
           aria-label="Tutup form balasan"
         >
@@ -43,7 +76,6 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
         </button>
       </div>
 
-      {/* Field Section */}
       <div className="px-4 md:px-6 py-2.5 space-y-2 border-b border-gray-200 text-xs">
         <div className="flex items-center">
           <span className="text-gray-400 w-14 shrink-0 font-medium">Kepada</span>
@@ -61,7 +93,6 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
         </div>
       </div>
 
-      {/* Textarea Section */}
       <textarea
         value={replyText}
         onChange={(e) => setReplyText(e.target.value)}
@@ -70,7 +101,6 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
         autoFocus
       />
 
-      {/* Footer Section */}
       <div className="px-4 md:px-6 py-3 flex justify-end items-center border-t border-gray-200">
         <button
           onClick={handleSend}

@@ -12,6 +12,7 @@ import { pdkt } from './routes/pdkt';
 import { ai } from './routes/ai';
 import { profiler } from './routes/profiler';
 import { adminRouter } from './routes/admin';
+import { telefun } from './routes/telefun';
 
 const allowedOrigins = env.NODE_ENV === 'production'
   ? (env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [])
@@ -68,7 +69,8 @@ const routes = app
   .route('/v1/pdkt', pdkt)
   .route('/v1/ai', ai)
   .route('/v1/profiler', profiler)
-  .route('/v1/admin', adminRouter);
+  .route('/v1/admin', adminRouter)
+  .route('/v1/telefun', telefun);
 
 export type AppType = typeof routes;
 export default app;

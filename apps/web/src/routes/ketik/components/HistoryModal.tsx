@@ -1,8 +1,51 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, History, Trash2, ChevronRight, MessageSquare, Calendar, Clock, Database, Play } from 'lucide-react';
+import { X, History, Trash2, ChevronRight, MessageSquare, Calendar, Clock, Database, Play, Download } from 'lucide-react';
 import type { KetikSessionHistoryItem } from '@trainers/types';
+import { notify } from '../../../lib/toast';
 import { SessionReplayModal } from './SessionReplayModal';
+
+function downloadTranscript(session: KetikSessionHistoryItem) {
+  const header = [
+    '=== TRANSCRIPT SIMULASI KETIK ===',
+    `Skema: ${session.scenarioTitle}`,
+    `Konsumen: ${session.consumerName}${session.consumerPhone ? ` (${session.consumerPhone})` : ''}${session.consumerCity ? ` - ${session.consumerCity}` : ''}`,
+    `Tanggal: ${new Date(session.date).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })}`,
+    session.simulationDuration ? `Durasi: ${session.simulationDuration} menit` : '',
+    '',
+    '--- Percakapan ---',
+    '',
+  ].filter(Boolean).join('\n');
+
+  const body = session.messages
+    .filter(m => m.sender !== 'system')
+    .map(m => {
+      const label = m.sender === 'agent' ? 'Agent' : 'Konsumen';
+      const time = new Date(m.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      return `[${time}] ${label}: ${m.text}`;
+    })
+    .join('\n\n');
+
+  let footer = '';
+  if (session.finalScore !== undefined) {
+    footer += `\n\n--- Skor ---\n`;
+    footer += `Final Score: ${session.finalScore}\n`;
+    if (session.empathyScore !== undefined) footer += `Empathy: ${session.empathyScore}\n`;
+    if (session.probingScore !== undefined) footer += `Probing: ${session.probingScore}\n`;
+    if (session.typoScore !== undefined) footer += `Typo: ${session.typoScore}\n`;
+    if (session.complianceScore !== undefined) footer += `Compliance: ${session.complianceScore}\n`;
+  }
+
+  const content = header + '\n' + body + footer;
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `transcript_${session.scenarioTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${session.id.slice(0, 8)}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  notify.success('Transcript downloaded');
+}
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -34,9 +77,14 @@ export function HistoryModal({ isOpen, onClose, history, onClear, onDelete, onRe
           </div>
           <div className="flex items-center gap-3">
             {history.length > 0 && (
-              <button onClick={() => { if (confirm('Hapus semua riwayat?')) onClear(); }} className="w-10 h-10 flex items-center justify-center hover:bg-red-500/10 text-red-500/60 hover:text-red-500 rounded-xl transition-all border border-transparent hover:border-red-500/20" title="Hapus Semua">
-                <Trash2 className="w-5 h-5" />
-              </button>
+              <>
+                <button onClick={() => { history.forEach(downloadTranscript); }} className="w-10 h-10 flex items-center justify-center hover:bg-emerald-500/10 text-emerald-500/60 hover:text-emerald-500 rounded-xl transition-all border border-transparent hover:border-emerald-500/20" title="Download Semua">
+                  <Download className="w-5 h-5" />
+                </button>
+                <button onClick={() => { if (confirm('Hapus semua riwayat?')) onClear(); }} className="w-10 h-10 flex items-center justify-center hover:bg-red-500/10 text-red-500/60 hover:text-red-500 rounded-xl transition-all border border-transparent hover:border-red-500/20" title="Hapus Semua">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </>
             )}
             <button onClick={onClose} className="w-10 h-10 flex items-center justify-center hover:bg-foreground/5 rounded-xl transition-all border border-transparent hover:border-foreground/10">
               <X className="w-5 h-5 text-muted-foreground" />
@@ -81,6 +129,9 @@ export function HistoryModal({ isOpen, onClose, history, onClear, onDelete, onRe
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <button onClick={(e) => { e.stopPropagation(); downloadTranscript(session); }} className="w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-emerald-500/10 text-emerald-500/60 hover:text-emerald-500 rounded-xl transition-all" title="Download Transcript">
+                        <Download className="w-4 h-4" />
+                      </button>
                       <button onClick={(e) => { e.stopPropagation(); setReplaySession(session); }} className="w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-primary/10 text-primary/60 hover:text-primary rounded-xl transition-all" title="Replay Sesi">
                         <Play className="w-4 h-4 fill-current" />
                       </button>
@@ -100,6 +151,12 @@ export function HistoryModal({ isOpen, onClose, history, onClear, onDelete, onRe
                         <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">Intensitas</div>
                         <div className="text-xs font-bold text-foreground flex items-center gap-2">{session.messages.length} Chat</div>
                       </div>
+                      {session.simulationDuration && (
+                        <div className="space-y-1.5">
+                          <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">Durasi</div>
+                          <div className="text-xs font-bold text-foreground flex items-center gap-2">{session.simulationDuration} mnt</div>
+                        </div>
+                      )}
                       {session.reviewStatus && (
                         <div className="space-y-1.5">
                           <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground font-black">Review AI</div>
@@ -131,7 +188,7 @@ export function HistoryModal({ isOpen, onClose, history, onClear, onDelete, onRe
         <footer className="px-5 sm:px-6 py-4 border-t text-center shrink-0">
           <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em] flex items-center justify-center gap-2">
             <Database className="w-3 h-3" />
-            Data tersimpan di server Anda
+            Data lokal terenkripsi di browser Anda
           </p>
         </footer>
       </motion.div>

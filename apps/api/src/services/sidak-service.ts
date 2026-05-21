@@ -849,3 +849,170 @@ export async function getAvailableYears(): Promise<number[]> {
   return [...new Set(years)].sort((a, b) => b - a);
 }
 
+// ── QA Rule Versions ────────────────────────────────────────
+
+export async function getRuleVersions(serviceType?: string) {
+  let query = supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('*, created_by_user:created_by(full_name), published_by_user:published_by(full_name)')
+    .order('version_number', { ascending: false });
+
+  if (serviceType) query = query.eq('service_type', serviceType);
+  const { data, error } = await query;
+  if (error) throw new Error(`Gagal memuat versi aturan: ${error.message}`);
+  return data ?? [];
+}
+
+export async function createRuleVersion(data: {
+  service_type: string;
+  effective_period_id: string;
+  critical_weight: number;
+  non_critical_weight: number;
+  scoring_mode: string;
+  change_reason?: string;
+}, userId: string) {
+  const { data: versions } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('version_number')
+    .eq('service_type', data.service_type)
+    .order('version_number', { ascending: false })
+    .limit(1);
+
+  const versionNumber = (versions?.[0]?.version_number ?? 0) + 1;
+
+  const { data: result, error } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .insert({
+      service_type: data.service_type,
+      effective_period_id: data.effective_period_id,
+      status: 'draft',
+      critical_weight: data.critical_weight,
+      non_critical_weight: data.non_critical_weight,
+      scoring_mode: data.scoring_mode,
+      version_number: versionNumber,
+      change_reason: data.change_reason,
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Gagal membuat versi aturan: ${error.message}`);
+  return result;
+}
+
+export async function updateRuleVersion(id: string, data: {
+  critical_weight?: number;
+  non_critical_weight?: number;
+  scoring_mode?: string;
+  change_reason?: string;
+}, userId: string) {
+  const { data: existing } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (!existing) throw new Error('Versi aturan tidak ditemukan');
+  if (existing.status !== 'draft') throw new Error('Hanya versi draft yang bisa diedit');
+
+  const { data: result, error } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .update({ ...data, updated_by: userId })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Gagal mengupdate versi aturan: ${error.message}`);
+  return result;
+}
+
+export async function publishRuleVersion(id: string, userId: string) {
+  const { data: existing } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (!existing) throw new Error('Versi aturan tidak ditemukan');
+  if (existing.status !== 'draft') throw new Error('Hanya versi draft yang bisa dipublikasikan');
+
+  const { data: result, error } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .update({
+      status: 'published',
+      published_by: userId,
+      published_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Gagal mempublikasikan versi aturan: ${error.message}`);
+  return result;
+}
+
+export async function supersedeRuleVersion(id: string, userId: string) {
+  const { data: existing } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (!existing) throw new Error('Versi aturan tidak ditemukan');
+  if (existing.status !== 'published') throw new Error('Hanya versi published yang bisa di-supersede');
+
+  const { data: result, error } = await supabaseAdmin
+    .from('qa_service_rule_versions')
+    .update({
+      status: 'superseded',
+      superseded_by: userId,
+      superseded_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Gagal menonaktifkan versi aturan: ${error.message}`);
+  return result;
+}
+
+export async function getRuleVersionIndicators(versionId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('qa_service_rule_indicators')
+    .select('*')
+    .eq('rule_version_id', versionId)
+    .order('sort_order', { ascending: true });
+
+  if (error) throw new Error(`Gagal memuat indikator: ${error.message}`);
+  return data ?? [];
+}
+
+export async function addRuleVersionIndicator(data: {
+  rule_version_id: string;
+  service_type: string;
+  name: string;
+  category: 'critical' | 'non_critical' | 'none';
+  bobot: number;
+  has_na?: boolean;
+  threshold?: number;
+  sort_order?: number;
+}, userId: string) {
+  const { data: result, error } = await supabaseAdmin
+    .from('qa_service_rule_indicators')
+    .insert({ ...data, created_by: userId })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Gagal menambah indikator: ${error.message}`);
+  return result;
+}
+
+export async function deleteRuleVersionIndicator(id: string) {
+  const { error } = await supabaseAdmin
+    .from('qa_service_rule_indicators')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(`Gagal menghapus indikator: ${error.message}`);
+}
+

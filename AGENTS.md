@@ -121,6 +121,9 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 14. Testing — Vitest API unit tests + Frontend component tests (DONE)
 15. Admin Management Parity (DONE)
 16. Dashboard Visual & Data Parity (DONE)
+17. KETIK Carbon Copy (DONE)
+18. PDKT Carbon Copy (DONE)
+19. Frontend Checklist Fixes — Toast, route guards, pagination, transcript export, draft autosave, Telefun settings, QA versioning (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
@@ -142,7 +145,14 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-16)
+- `apps/web/src/lib/toast.ts` — sonner v2 wrapper (notify.success/error/warning)
+- `apps/web/src/routes/unauthorized.tsx` — 403 role-denied page
+- `apps/web/src/components/ui/Pagination.tsx` — shared pagination with page-size selector
+- `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types, VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
+- `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 3-tab Telefun settings modal
+- `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints
+- `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-19)
 
 ## Routes Reference (apps/web)
 
@@ -184,7 +194,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | 34 | `/dashboard/access-groups` | Builder | Dynamic access data rule scopes builder for leaders |
 | 35 | `/dashboard/access-approval` | Action | Assign access groups and approve leader requests |
 | 36 | `/dashboard/activities` | Table | System-wide audit logs with CSV export |
-| 37 | 404 | Catch-all | Custom not-found page |
+| 37 | `/unauthorized` | Error | 403 role-denied page |
+| 38 | 404 | Catch-all | Custom not-found page |
 
 ## API Endpoints Reference (apps/api)
 
@@ -196,4 +207,5 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | `/api/v1/ai` | 7 endpoints | — |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts` |
 | `/api/v1/admin` | 8 endpoints | `admin-service.ts` |
+| `/api/v1/telefun` | 2 endpoints | `telefun.ts` (settings GET/PUT) |
 
