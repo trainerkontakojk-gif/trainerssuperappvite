@@ -101,9 +101,18 @@ describe('profiler-service', () => {
 
   describe('createPeserta', () => {
     it('creates with minimal fields', async () => {
-      pendingResolve = () => ({ data: { id: 'p1', nama: 'Test' }, error: null });
+      let calls = 0;
+      pendingResolve = () => calls++ === 0
+        ? ({ data: null, error: null })
+        : ({ data: { id: 'p1', nama: 'Test' }, error: null });
       const r = await profilerService.createPeserta({ nama: 'Test', batch_name: 'B1' });
       expect(r.nama).toBe('Test');
+    });
+
+    it('rejects duplicate names in the same batch before insert', async () => {
+      pendingResolve = () => ({ data: { id: 'p1' }, error: null });
+      await expect(profilerService.createPeserta({ nama: 'Test', batch_name: 'B1' }))
+        .rejects.toThrow('Peserta dengan nama "Test" sudah terdaftar di batch "B1"');
     });
   });
 

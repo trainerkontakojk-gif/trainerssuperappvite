@@ -102,4 +102,196 @@ telefun.put('/settings', zValidator('json', z.object({
   }
 });
 
+telefun.get('/history/:id', async (c) => {
+  const id = c.req.param('id');
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const adminClient = createAdminClient();
+
+  try {
+    const { data, error } = await adminClient
+      .from('telefun_history')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Sesi tidak ditemukan.' } }, 404);
+    }
+
+    const isManager = ['admin', 'trainer', 'qa'].includes(profile?.role);
+    if (!isManager && data.user_id !== user.id) {
+      return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Anda tidak memiliki akses ke sesi ini.' } }, 403);
+    }
+
+    return c.json({ success: true, data });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
+telefun.get('/coaching-summary/:id', async (c) => {
+  const sessionId = c.req.param('id');
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const adminClient = createAdminClient();
+
+  try {
+    const { data: session, error: sessionError } = await adminClient
+      .from('telefun_history')
+      .select('user_id')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Sesi tidak ditemukan.' } }, 404);
+    }
+
+    const isManager = ['admin', 'trainer', 'qa'].includes(profile?.role);
+    if (!isManager && session.user_id !== user.id) {
+      return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Anda tidak memiliki akses ke sesi ini.' } }, 403);
+    }
+
+    const { data, error } = await adminClient
+      .from('telefun_coaching_summary')
+      .select('*')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return c.json({ success: true, data: data || null });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
+telefun.get('/annotations/:id', async (c) => {
+  const sessionId = c.req.param('id');
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const adminClient = createAdminClient();
+
+  try {
+    const { data: session, error: sessionError } = await adminClient
+      .from('telefun_history')
+      .select('user_id')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Sesi tidak ditemukan.' } }, 404);
+    }
+
+    const isManager = ['admin', 'trainer', 'qa'].includes(profile?.role);
+    if (!isManager && session.user_id !== user.id) {
+      return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Anda tidak memiliki akses ke sesi ini.' } }, 403);
+    }
+
+    const { data, error } = await adminClient
+      .from('telefun_replay_annotations')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('timestamp_ms', { ascending: true });
+
+    if (error) throw error;
+    return c.json({ success: true, data: data ?? [] });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
+telefun.post('/annotations/:id', zValidator('json', z.object({
+  timestamp_ms: z.number().int(),
+  category: z.enum(['strength', 'improvement_area', 'critical_moment', 'technique_used']),
+  moment: z.string(),
+  text: z.string().max(500),
+  is_manual: z.boolean().default(true),
+})), async (c) => {
+  const sessionId = c.req.param('id');
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const adminClient = createAdminClient();
+  const body = c.req.valid('json');
+
+  try {
+    const { data: session, error: sessionError } = await adminClient
+      .from('telefun_history')
+      .select('user_id')
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (sessionError) throw sessionError;
+    if (!session) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Sesi tidak ditemukan.' } }, 404);
+    }
+
+    const isManager = ['admin', 'trainer', 'qa'].includes(profile?.role);
+    if (!isManager && session.user_id !== user.id) {
+      return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Anda tidak memiliki akses ke sesi ini.' } }, 403);
+    }
+
+    const { data, error } = await adminClient
+      .from('telefun_replay_annotations')
+      .insert({
+        session_id: sessionId,
+        user_id: session.user_id,
+        timestamp_ms: body.timestamp_ms,
+        category: body.category,
+        moment: body.moment,
+        text: body.text,
+        is_manual: true
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return c.json({ success: true, data });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
+telefun.delete('/annotations/:annotationId', async (c) => {
+  const annotationId = c.req.param('annotationId');
+  const user = c.get('user');
+  const profile = c.get('profile');
+  const adminClient = createAdminClient();
+
+  try {
+    const { data: annotation, error: fetchError } = await adminClient
+      .from('telefun_replay_annotations')
+      .select('user_id, session_id, is_manual')
+      .eq('id', annotationId)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!annotation) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Anotasi tidak ditemukan.' } }, 404);
+    }
+
+    const isManager = ['admin', 'trainer', 'qa'].includes(profile?.role);
+    if (!isManager && annotation.user_id !== user.id) {
+      return c.json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Anda tidak memiliki akses untuk menghapus anotasi ini.' } }, 403);
+    }
+
+    if (!annotation.is_manual) {
+      return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Hanya anotasi manual yang dapat dihapus.' } }, 400);
+    }
+
+    const { error: deleteError } = await adminClient
+      .from('telefun_replay_annotations')
+      .delete()
+      .eq('id', annotationId)
+      .eq('is_manual', true);
+
+    if (deleteError) throw deleteError;
+    return c.json({ success: true, message: 'Anotasi berhasil dihapus.' });
+  } catch (error: any) {
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: error?.message || 'Database error.' } }, 500);
+  }
+});
+
 export { telefun };

@@ -131,57 +131,152 @@ export async function getPesertaByBatch(batchName: string): Promise<ProfilerPese
   return data ?? [];
 }
 
+async function checkFotoUrl(fotoUrl: string | null | undefined): Promise<boolean> {
+  if (!fotoUrl) return true;
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  if (!supabaseUrl) return true;
+
+  let filename = fotoUrl;
+  if (fotoUrl.startsWith('http')) {
+    const parts = fotoUrl.split('/foto-avatar/');
+    if (parts.length > 1) {
+      filename = parts[1];
+    } else {
+      filename = fotoUrl.substring(fotoUrl.lastIndexOf('/') + 1);
+    }
+  }
+
+  const url = `${supabaseUrl}/storage/v1/object/public/foto-avatar/${filename}`;
+
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal
+    });
+    clearTimeout(id);
+
+    if (response.status === 404) {
+      return false;
+    }
+    return true;
+  } catch (_err) {
+    return true;
+  }
+}
+
+function cleanEmptyStrings(obj: any) {
+  const cleaned: any = {};
+  for (const [key, val] of Object.entries(obj)) {
+    cleaned[key] = val === '' ? null : val;
+  }
+  return cleaned;
+}
+
 export async function createPeserta(peserta: Partial<ProfilerPeserta>): Promise<ProfilerPeserta> {
-  const { data, error } = await supabaseAdmin
-    .from('profiler_peserta')
-    .insert({
-      batch_name: peserta.batch_name,
-      nomor_urut: peserta.nomor_urut ?? 0,
-      nama: peserta.nama,
-      tim: peserta.tim,
-      jabatan: peserta.jabatan,
-      foto_url: peserta.foto_url ?? null,
-      photo_frame: peserta.photo_frame ?? null,
-      nik_ojk: peserta.nik_ojk ?? null,
-      bergabung_date: peserta.bergabung_date ?? null,
-      email_ojk: peserta.email_ojk ?? null,
-      no_telepon: peserta.no_telepon ?? null,
-      no_telepon_darurat: peserta.no_telepon_darurat ?? null,
-      nama_kontak_darurat: peserta.nama_kontak_darurat ?? null,
-      hubungan_kontak_darurat: peserta.hubungan_kontak_darurat ?? null,
-      jenis_kelamin: peserta.jenis_kelamin ?? null,
-      agama: peserta.agama ?? null,
-      tgl_lahir: peserta.tgl_lahir ?? null,
-      status_perkawinan: peserta.status_perkawinan ?? null,
-      pendidikan: peserta.pendidikan ?? null,
-      no_ktp: peserta.no_ktp ?? null,
-      no_npwp: peserta.no_npwp ?? null,
-      nomor_rekening: peserta.nomor_rekening ?? null,
-      nama_bank: peserta.nama_bank ?? null,
-      alamat_tinggal: peserta.alamat_tinggal ?? null,
-      status_tempat_tinggal: peserta.status_tempat_tinggal ?? null,
-      nama_lembaga: peserta.nama_lembaga ?? null,
-      jurusan: peserta.jurusan ?? null,
-      previous_company: peserta.previous_company ?? null,
-      pengalaman_cc: peserta.pengalaman_cc ?? null,
-      catatan_tambahan: peserta.catatan_tambahan ?? null,
-      keterangan: peserta.keterangan ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return data;
+  const isFotoValid = await checkFotoUrl(peserta.foto_url);
+  if (!isFotoValid) {
+    throw new Error('Avatar tidak ditemukan di storage');
+  }
+
+  const cleaned = cleanEmptyStrings(peserta);
+
+  if (cleaned.batch_name && cleaned.nama) {
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('profiler_peserta')
+      .select('id')
+      .eq('batch_name', cleaned.batch_name)
+      .eq('nama', cleaned.nama)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw new Error(existingError.message);
+    if (existing) {
+      throw new Error(`Peserta dengan nama "${cleaned.nama}" sudah terdaftar di batch "${cleaned.batch_name}"`);
+    }
+  }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profiler_peserta')
+      .insert({
+        batch_name: cleaned.batch_name,
+        nomor_urut: cleaned.nomor_urut ?? 0,
+        nama: cleaned.nama,
+        tim: cleaned.tim,
+        jabatan: cleaned.jabatan,
+        foto_url: cleaned.foto_url ?? null,
+        photo_frame: cleaned.photo_frame ?? null,
+        nik_ojk: cleaned.nik_ojk ?? null,
+        bergabung_date: cleaned.bergabung_date ?? null,
+        email_ojk: cleaned.email_ojk ?? null,
+        no_telepon: cleaned.no_telepon ?? null,
+        no_telepon_darurat: cleaned.no_telepon_darurat ?? null,
+        nama_kontak_darurat: cleaned.nama_kontak_darurat ?? null,
+        hubungan_kontak_darurat: cleaned.hubungan_kontak_darurat ?? null,
+        jenis_kelamin: cleaned.jenis_kelamin ?? null,
+        agama: cleaned.agama ?? null,
+        tgl_lahir: cleaned.tgl_lahir ?? null,
+        status_perkawinan: cleaned.status_perkawinan ?? null,
+        pendidikan: cleaned.pendidikan ?? null,
+        no_ktp: cleaned.no_ktp ?? null,
+        no_npwp: cleaned.no_npwp ?? null,
+        nomor_rekening: cleaned.nomor_rekening ?? null,
+        nama_bank: cleaned.nama_bank ?? null,
+        alamat_tinggal: cleaned.alamat_tinggal ?? null,
+        status_tempat_tinggal: cleaned.status_tempat_tinggal ?? null,
+        nama_lembaga: cleaned.nama_lembaga ?? null,
+        jurusan: cleaned.jurusan ?? null,
+        previous_company: cleaned.previous_company ?? null,
+        pengalaman_cc: cleaned.pengalaman_cc ?? null,
+        catatan_tambahan: cleaned.catatan_tambahan ?? null,
+        keterangan: cleaned.keterangan ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (error: any) {
+    if (error.code === '23505') {
+      throw new Error(`Peserta dengan nama "${peserta.nama}" sudah terdaftar di batch "${peserta.batch_name}"`, { cause: error });
+    }
+    throw new Error(error.message || String(error), { cause: error });
+  }
 }
 
 export async function updatePeserta(id: string, updates: Partial<ProfilerPeserta>): Promise<ProfilerPeserta> {
-  const { data, error } = await supabaseAdmin
-    .from('profiler_peserta')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw new Error(error.message);
-  return data;
+  if (updates && 'foto_url' in updates) {
+    const isFotoValid = await checkFotoUrl(updates.foto_url);
+    if (!isFotoValid) {
+      throw new Error('Avatar tidak ditemukan di storage');
+    }
+  }
+
+  const cleaned = cleanEmptyStrings(updates);
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('profiler_peserta')
+      .update(cleaned)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (error: any) {
+    if (error.code === '23505') {
+      let nama = updates.nama;
+      let batchName = updates.batch_name;
+      if (!nama || !batchName) {
+        const existing = await getPesertaById(id).catch(() => null);
+        nama = nama || existing?.nama || '';
+        batchName = batchName || existing?.batch_name || '';
+      }
+      throw new Error(`Peserta dengan nama "${nama}" sudah terdaftar di batch "${batchName}"`, { cause: error });
+    }
+    throw new Error(error.message || String(error), { cause: error });
+  }
 }
 
 export async function deletePeserta(id: string): Promise<void> {
@@ -190,7 +285,52 @@ export async function deletePeserta(id: string): Promise<void> {
 }
 
 export async function bulkCreatePeserta(items: Partial<ProfilerPeserta>[]): Promise<ProfilerPeserta[]> {
-  const rows = items.map(item => ({
+  if (items.length === 0) {
+    throw new Error('Tidak ada data peserta untuk diimpor');
+  }
+
+  const batchNames = Array.from(new Set(items.map(item => item.batch_name).filter(Boolean) as string[]));
+  
+  const existingNamesByBatch: Record<string, Set<string>> = {};
+  if (batchNames.length > 0) {
+    const { data: existing } = await supabaseAdmin
+      .from('profiler_peserta')
+      .select('batch_name, nama')
+      .in('batch_name', batchNames);
+    
+    if (existing) {
+      for (const p of existing) {
+        if (!existingNamesByBatch[p.batch_name]) {
+          existingNamesByBatch[p.batch_name] = new Set();
+        }
+        existingNamesByBatch[p.batch_name].add(p.nama.toLowerCase().trim());
+      }
+    }
+  }
+
+  const uniqueRowsToInsert: typeof items = [];
+  const processedKeys = new Set<string>();
+
+  for (const item of items) {
+    if (!item.batch_name || !item.nama) continue;
+    const batch = item.batch_name;
+    const name = item.nama;
+    const key = `${batch.toLowerCase().trim()}::${name.toLowerCase().trim()}`;
+    
+    const isExistingInDb = existingNamesByBatch[batch]?.has(name.toLowerCase().trim()) ?? false;
+    const isExistingInImport = processedKeys.has(key);
+
+    if (!isExistingInDb && !isExistingInImport) {
+      uniqueRowsToInsert.push(item);
+      processedKeys.add(key);
+    }
+  }
+
+  if (uniqueRowsToInsert.length === 0) {
+    throw new Error('Semua peserta dalam daftar sudah terdaftar di batch masing-masing');
+  }
+
+  const rows = uniqueRowsToInsert.map(item => ({
     batch_name: item.batch_name,
     nomor_urut: item.nomor_urut ?? 0,
     nama: item.nama,
@@ -227,7 +367,13 @@ export async function bulkCreatePeserta(items: Partial<ProfilerPeserta>[]): Prom
     .from('profiler_peserta')
     .insert(rows)
     .select();
-  if (error) throw new Error(error.message);
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Ada peserta yang sudah terdaftar di batch');
+    }
+    throw new Error(error.message);
+  }
   return data ?? [];
 }
 
@@ -239,7 +385,29 @@ export async function copyPesertaToFolder(pesertaIds: string[], targetBatchName:
 
   if (!sourcePeserta || sourcePeserta.length === 0) throw new Error('Peserta tidak ditemukan');
 
-  const rows = sourcePeserta.map(p => ({
+  const { data: existingPeserta } = await supabaseAdmin
+    .from('profiler_peserta')
+    .select('nama')
+    .eq('batch_name', targetBatchName);
+  
+  const existingNames = new Set((existingPeserta || []).map(p => p.nama.toLowerCase().trim()));
+
+  const uniqueRowsToInsert: typeof sourcePeserta = [];
+  const processedNames = new Set<string>();
+
+  for (const p of sourcePeserta) {
+    const normName = p.nama.toLowerCase().trim();
+    if (!existingNames.has(normName) && !processedNames.has(normName)) {
+      uniqueRowsToInsert.push(p);
+      processedNames.add(normName);
+    }
+  }
+
+  if (uniqueRowsToInsert.length === 0) {
+    throw new Error(`Semua peserta yang disalin sudah terdaftar di batch "${targetBatchName}"`);
+  }
+
+  const rows = uniqueRowsToInsert.map(p => ({
     batch_name: targetBatchName,
     nomor_urut: p.nomor_urut,
     nama: p.nama,
@@ -276,7 +444,12 @@ export async function copyPesertaToFolder(pesertaIds: string[], targetBatchName:
     .from('profiler_peserta')
     .insert(rows)
     .select();
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error(`Ada peserta yang sudah terdaftar di batch "${targetBatchName}"`);
+    }
+    throw new Error(error.message);
+  }
   return data?.length ?? 0;
 }
 
