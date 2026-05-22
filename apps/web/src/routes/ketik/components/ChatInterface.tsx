@@ -1,8 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Phone, X, Check, CheckCheck, ArrowLeft, Download, Sparkles } from 'lucide-react';
-import type { ChatMessage, KetikSessionConfig, KetikScenario, KetikQuickTemplate, PacingMeta } from '@trainers/types';
-import { ketikApi } from '../ketikApi';
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Send,
+  Phone,
+  X,
+  Check,
+  CheckCheck,
+  ArrowLeft,
+  Download,
+  Sparkles,
+} from "lucide-react";
+import type {
+  ChatMessage,
+  KetikSessionConfig,
+  KetikScenario,
+  KetikQuickTemplate,
+  PacingMeta,
+} from "@trainers/types";
+import { ketikApi } from "../ketikApi";
 
 interface ChatInterfaceProps {
   config: KetikSessionConfig;
@@ -19,8 +34,8 @@ interface ChatInterfaceProps {
 
 const TickIcon = ({ status }: { status?: string }) => {
   if (!status) return null;
-  const color = status === 'read' ? 'text-primary' : 'text-muted-foreground';
-  if (status === 'sent') return <Check className={`w-3.5 h-3.5 ${color}`} />;
+  const color = status === "read" ? "text-primary" : "text-muted-foreground";
+  if (status === "sent") return <Check className={`w-3.5 h-3.5 ${color}`} />;
   return <CheckCheck className={`w-3.5 h-3.5 ${color}`} />;
 };
 
@@ -28,10 +43,11 @@ const IMAGE_TAG_PATTERN = /\[SEND_IMAGE\s*:\s*\d+\]/i;
 const IMAGE_TAG_PATTERN_GLOBAL = /\[SEND_IMAGE\s*:\s*\d+\]/gi;
 const SYSTEM_TAG_PATTERN = /\[(sistem|system)\]/i;
 const SYSTEM_TAG_PATTERN_GLOBAL = /\[(sistem|system)\]/gi;
-const MAINTENANCE_TEMPLATE = 'Demikian informasi yang dapat kami sampaikan. Apakah informasinya sudah cukup jelas? Ada hal lain yang dapat kami bantu?';
+const MAINTENANCE_TEMPLATE =
+  "Demikian informasi yang dapat kami sampaikan. Apakah informasinya sudah cukup jelas? Ada hal lain yang dapat kami bantu?";
 
 function stripSystemTags(text: string): string {
-  return text.replace(SYSTEM_TAG_PATTERN_GLOBAL, '').trim();
+  return text.replace(SYSTEM_TAG_PATTERN_GLOBAL, "").trim();
 }
 
 function hasImageTag(text: string): boolean {
@@ -40,23 +56,32 @@ function hasImageTag(text: string): boolean {
 
 function isImageOnlyText(text: string): boolean {
   const cleaned = stripSystemTags(text);
-  return cleaned.length > 0 && hasImageTag(cleaned) && cleaned.replace(IMAGE_TAG_PATTERN_GLOBAL, '').trim() === '';
+  return (
+    cleaned.length > 0 &&
+    hasImageTag(cleaned) &&
+    cleaned.replace(IMAGE_TAG_PATTERN_GLOBAL, "").trim() === ""
+  );
 }
 
 function stripNarrationFromImagePart(text: string): string {
   const match = text.match(IMAGE_TAG_PATTERN);
   if (match) {
-    const stripped = text.replace(IMAGE_TAG_PATTERN_GLOBAL, '').trim();
+    const stripped = text.replace(IMAGE_TAG_PATTERN_GLOBAL, "").trim();
     if (stripped) {
-      console.warn('[ketik][stripNarration] Stripped narration from image part:', { stripped, kept: match[0] });
+      console.warn(
+        "[ketik][stripNarration] Stripped narration from image part:",
+        { stripped, kept: match[0] },
+      );
     }
     return match[0];
   }
   return text;
 }
 
-function normalizeGeneratedParts(parts: string[]): Array<Pick<ChatMessage, 'sender' | 'text'>> {
-  const normalized: Array<Pick<ChatMessage, 'sender' | 'text'>> = [];
+function normalizeGeneratedParts(
+  parts: string[],
+): Array<Pick<ChatMessage, "sender" | "text">> {
+  const normalized: Array<Pick<ChatMessage, "sender" | "text">> = [];
 
   for (let index = 0; index < parts.length; index += 1) {
     const currentRaw = parts[index];
@@ -66,18 +91,32 @@ function normalizeGeneratedParts(parts: string[]): Array<Pick<ChatMessage, 'send
     if (!currentText) continue;
 
     if (SYSTEM_TAG_PATTERN.test(currentRaw) && hasImageTag(currentRaw)) {
-      normalized.push({ sender: 'consumer', text: stripNarrationFromImagePart(currentRaw) });
+      normalized.push({
+        sender: "consumer",
+        text: stripNarrationFromImagePart(currentRaw),
+      });
       continue;
     }
 
-    if (SYSTEM_TAG_PATTERN.test(currentRaw) && nextRaw && isImageOnlyText(nextRaw)) {
-      normalized.push({ sender: 'consumer', text: `${currentText} ${stripSystemTags(nextRaw)}`.trim() });
+    if (
+      SYSTEM_TAG_PATTERN.test(currentRaw) &&
+      nextRaw &&
+      isImageOnlyText(nextRaw)
+    ) {
+      normalized.push({
+        sender: "consumer",
+        text: `${currentText} ${stripSystemTags(nextRaw)}`.trim(),
+      });
       index += 1;
       continue;
     }
 
     normalized.push({
-      sender: hasImageTag(currentText) ? 'consumer' : SYSTEM_TAG_PATTERN.test(currentRaw) ? 'system' : 'consumer',
+      sender: hasImageTag(currentText)
+        ? "consumer"
+        : SYSTEM_TAG_PATTERN.test(currentRaw)
+          ? "system"
+          : "consumer",
       text: currentText,
     });
   }
@@ -90,38 +129,48 @@ function normalizeMessagesForDisplay(messages: ChatMessage[]): ChatMessage[] {
 
   for (let index = 0; index < messages.length; index += 1) {
     const current = messages[index];
-    const currentText = typeof current.text === 'string' ? current.text : '';
+    const currentText = typeof current.text === "string" ? current.text : "";
     const cleanedText = stripSystemTags(currentText);
     const next = messages[index + 1];
 
-    if (current.sender === 'system' && hasImageTag(currentText)) {
-      normalized.push({ ...current, sender: 'consumer', text: stripNarrationFromImagePart(currentText) });
+    if (current.sender === "system" && hasImageTag(currentText)) {
+      normalized.push({
+        ...current,
+        sender: "consumer",
+        text: stripNarrationFromImagePart(currentText),
+      });
       continue;
     }
 
-    if (current.sender === 'system' && next && isImageOnlyText(next.text)) {
-      normalized.push({ ...next, sender: 'consumer', text: `${cleanedText} ${stripSystemTags(next.text)}`.trim() });
+    if (current.sender === "system" && next && isImageOnlyText(next.text)) {
+      normalized.push({
+        ...next,
+        sender: "consumer",
+        text: `${cleanedText} ${stripSystemTags(next.text)}`.trim(),
+      });
       index += 1;
       continue;
     }
 
     if (hasImageTag(currentText)) {
-      normalized.push({ ...current, sender: 'consumer', text: cleanedText });
+      normalized.push({ ...current, sender: "consumer", text: cleanedText });
       continue;
     }
 
-    normalized.push(cleanedText !== currentText ? { ...current, text: cleanedText } : current);
+    normalized.push(
+      cleanedText !== currentText ? { ...current, text: cleanedText } : current,
+    );
   }
 
   return normalized;
 }
 
-type SessionPhase = 'active' | 'expired' | 'closed';
+type SessionPhase = "active" | "expired" | "closed";
 
-function classifyTextBand(textLength: number): 'short' | 'normal' | 'long' {
-  if (textLength <= 25) return 'short';
-  if (textLength <= 90) return 'normal';
-  return 'long';
+function classifyTextBand(textLength: number): "short" | "normal" | "long" {
+  if (textLength <= 25) return "short";
+  if (textLength <= 90) return "normal";
+  return "long";
 }
 
 function isAgentGivingSolution(lastAgentText: string | undefined): boolean {
@@ -138,15 +187,28 @@ function isSlowEligible(params: {
   elapsedSeconds?: number;
   totalDurationSeconds?: number;
 }): boolean {
-  const { consumerTurnIndex, consecutiveSlowCount, totalSlowCount, sessionDurationMinutes, remainingSeconds, elapsedSeconds, totalDurationSeconds } = params;
+  const {
+    consumerTurnIndex,
+    consecutiveSlowCount,
+    totalSlowCount,
+    sessionDurationMinutes,
+    remainingSeconds,
+    elapsedSeconds,
+    totalDurationSeconds,
+  } = params;
   if (consumerTurnIndex < 4) return false;
   if (consecutiveSlowCount >= 1) return false;
   if (remainingSeconds < 45) return false;
-  if (elapsedSeconds !== undefined && totalDurationSeconds !== undefined && totalDurationSeconds > 0) {
+  if (
+    elapsedSeconds !== undefined &&
+    totalDurationSeconds !== undefined &&
+    totalDurationSeconds > 0
+  ) {
     const elapsedRatio = elapsedSeconds / totalDurationSeconds;
     if (elapsedRatio < 0.25) return false;
   }
-  const maxSlow = sessionDurationMinutes <= 5 ? 1 : sessionDurationMinutes <= 15 ? 2 : 2;
+  const maxSlow =
+    sessionDurationMinutes <= 5 ? 1 : sessionDurationMinutes <= 15 ? 2 : 2;
   if (totalSlowCount >= maxSlow) return false;
   return Math.random() < 0.15;
 }
@@ -174,16 +236,26 @@ function boundedRandom(min: number, max: number): number {
 }
 
 export function ChatInterface({
-  config, scenario, onEndSession, isReviewMode = false,
-  initialMessages = [], isEnding = false, authReady = true,
-  currentUserId, templates = [],
-  signatureName = '',
+  config,
+  scenario,
+  onEndSession,
+  isReviewMode = false,
+  initialMessages = [],
+  isEnding = false,
+  authReady = true,
+  currentUserId,
+  templates = [],
+  signatureName = "",
 }: ChatInterfaceProps) {
   const durationMinutes = config.simulationDuration || 5;
-  const [messages, setMessages] = useState<ChatMessage[]>(() => normalizeMessagesForDisplay(initialMessages));
-  const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    normalizeMessagesForDisplay(initialMessages),
+  );
+  const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionPhase, setSessionPhase] = useState<SessionPhase>(isReviewMode ? 'closed' : 'active');
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>(
+    isReviewMode ? "closed" : "active",
+  );
   const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -192,10 +264,14 @@ export function ChatInterface({
   const [hasTemplateBeenClicked, setHasTemplateBeenClicked] = useState(false);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const pendingTimeoutsRef = useRef<number[]>([]);
-  const sessionPhaseRef = useRef<SessionPhase>(isReviewMode ? 'closed' : 'active');
+  const sessionPhaseRef = useRef<SessionPhase>(
+    isReviewMode ? "closed" : "active",
+  );
   const timeoutFinalizedRef = useRef(false);
   const closingMessageSentRef = useRef(false);
-  const messagesRef = useRef<ChatMessage[]>(normalizeMessagesForDisplay(initialMessages));
+  const messagesRef = useRef<ChatMessage[]>(
+    normalizeMessagesForDisplay(initialMessages),
+  );
   const isMountedRef = useRef(true);
   const consumerTurnCountRef = useRef(0);
   const totalSlowCountRef = useRef(0);
@@ -203,16 +279,16 @@ export function ChatInterface({
   const sendGenerationRef = useRef(0);
 
   const [showTemplatePopup, setShowTemplatePopup] = useState(false);
-  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
   const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const templatePopupRef = useRef<HTMLDivElement>(null);
 
-  const filteredTemplates = (templates || []).filter(t =>
-    t.keyword.toLowerCase().includes(templateSearchQuery.toLowerCase())
+  const filteredTemplates = (templates || []).filter((t) =>
+    t.keyword.toLowerCase().includes(templateSearchQuery.toLowerCase()),
   );
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const clearPendingTimeouts = useCallback(() => {
@@ -243,13 +319,17 @@ export function ChatInterface({
   }, [sessionPhase]);
 
   useEffect(() => {
-    if (!isReviewMode && sessionPhase === 'active') {
+    if (!isReviewMode && sessionPhase === "active") {
       textareaRef.current?.focus();
     }
   }, [isReviewMode, sessionPhase]);
 
   useEffect(() => {
-    if (isReviewMode || (sessionPhase !== 'active' && sessionPhase !== 'expired')) return;
+    if (
+      isReviewMode ||
+      (sessionPhase !== "active" && sessionPhase !== "expired")
+    )
+      return;
     const timer = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
@@ -258,21 +338,24 @@ export function ChatInterface({
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height =
+        Math.min(textareaRef.current.scrollHeight, 120) + "px";
     }
-    const lastSlashIndex = inputText.lastIndexOf('/');
+    const lastSlashIndex = inputText.lastIndexOf("/");
     if (lastSlashIndex !== -1) {
       const textAfterSlash = inputText.substring(lastSlashIndex + 1);
       const beforeSlash = inputText.substring(0, lastSlashIndex);
-      const isTriggerValid = (lastSlashIndex === 0 || beforeSlash.endsWith(' ')) && !textAfterSlash.includes(' ');
+      const isTriggerValid =
+        (lastSlashIndex === 0 || beforeSlash.endsWith(" ")) &&
+        !textAfterSlash.includes(" ");
 
       if (isTriggerValid) {
         setShowTemplatePopup(true);
         setTemplateSearchQuery(textAfterSlash);
         setSelectedTemplateIndex((prev) => {
-          const newFiltered = (templates || []).filter(t =>
-            t.keyword.toLowerCase().includes(textAfterSlash.toLowerCase())
+          const newFiltered = (templates || []).filter((t) =>
+            t.keyword.toLowerCase().includes(textAfterSlash.toLowerCase()),
           );
           return prev >= newFiltered.length ? 0 : prev;
         });
@@ -296,27 +379,33 @@ export function ChatInterface({
         setShowTemplatePopup(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showTemplatePopup]);
 
   const handleSessionTimeout = useCallback(() => {
-    if (sessionPhaseRef.current !== 'active' || timeoutFinalizedRef.current || closingMessageSentRef.current) return;
+    if (
+      sessionPhaseRef.current !== "active" ||
+      timeoutFinalizedRef.current ||
+      closingMessageSentRef.current
+    )
+      return;
     timeoutFinalizedRef.current = true;
     closingMessageSentRef.current = true;
 
     clearPendingTimeouts();
     setIsLoading(false);
-    sessionPhaseRef.current = 'expired';
-    setSessionPhase('expired');
+    sessionPhaseRef.current = "expired";
+    setSessionPhase("expired");
 
-    const fallbackClosingText = 'Maaf, saya harus lanjut aktivitas dulu. Nanti saya hubungi lagi ya. Terima kasih.';
+    const fallbackClosingText =
+      "Maaf, saya harus lanjut aktivitas dulu. Nanti saya hubungi lagi ya. Terima kasih.";
     const timeoutMessageId = `timeout-${Date.now()}`;
 
     setMessages((prev) => {
       const closingMessage: ChatMessage = {
         id: timeoutMessageId,
-        sender: 'consumer',
+        sender: "consumer",
         text: fallbackClosingText,
         timestamp: new Date().toISOString(),
       };
@@ -325,7 +414,7 @@ export function ChatInterface({
   }, [clearPendingTimeouts]);
 
   useEffect(() => {
-    if (isReviewMode || sessionPhase !== 'active') return;
+    if (isReviewMode || sessionPhase !== "active") return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
@@ -333,24 +422,26 @@ export function ChatInterface({
   }, [isReviewMode, sessionPhase]);
 
   useEffect(() => {
-    if (isReviewMode || sessionPhase !== 'active' || timeLeft > 0) return;
+    if (isReviewMode || sessionPhase !== "active" || timeLeft > 0) return;
     handleSessionTimeout();
   }, [isReviewMode, sessionPhase, timeLeft, handleSessionTimeout]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   useEffect(() => {
     if (!isReviewMode && messages.length === 0) {
-      setMessages([{
-        id: Date.now().toString(),
-        sender: 'system',
-        text: `iMessage with ${config.identity.name}`,
-        timestamp: new Date().toISOString(),
-      }]);
+      setMessages([
+        {
+          id: Date.now().toString(),
+          sender: "system",
+          text: `iMessage with ${config.identity.name}`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     }
   }, [isReviewMode, messages.length, config.identity.name]);
 
@@ -359,24 +450,28 @@ export function ChatInterface({
     sendGenerationRef.current += 1;
     const currentGeneration = sendGenerationRef.current;
 
-    if (!inputText.trim() || (sessionPhase !== 'active' && sessionPhase !== 'expired')) return;
+    if (
+      !inputText.trim() ||
+      (sessionPhase !== "active" && sessionPhase !== "expired")
+    )
+      return;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
-      sender: 'agent',
+      sender: "agent",
       text: inputText.trim(),
       timestamp: new Date().toISOString(),
-      status: 'sent',
+      status: "sent",
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg]);
     if (hasTemplateBeenClicked && !isMaintenanceMode) {
       setIsMaintenanceMode(true);
     }
-    setInputText('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    setInputText("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    if (sessionPhase !== 'active' || timeLeft <= 0) return;
+    if (sessionPhase !== "active" || timeLeft <= 0) return;
 
     setIsLoading(true);
 
@@ -393,7 +488,7 @@ export function ChatInterface({
         chatHistory: currentHistory,
       });
 
-      if (sessionPhaseRef.current !== 'active') {
+      if (sessionPhaseRef.current !== "active") {
         setIsLoading(false);
         return;
       }
@@ -402,34 +497,43 @@ export function ChatInterface({
 
       if (!result || !result.text) {
         setIsLoading(false);
-        setMessages((prev) => [...prev, {
-          id: 'error-' + Date.now(),
-          sender: 'system',
-          text: 'Terjadi kesalahan.',
-          timestamp: new Date().toISOString(),
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "error-" + Date.now(),
+            sender: "system",
+            text: "Terjadi kesalahan.",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
         return;
       }
 
       const responseText = result.text;
-      if (responseText !== '[NO_RESPONSE]') {
-        const rawParts = responseText.split('[BREAK]').map(p => p.trim()).filter(p => p);
+      if (responseText !== "[NO_RESPONSE]") {
+        const rawParts = responseText
+          .split("[BREAK]")
+          .map((p) => p.trim())
+          .filter((p) => p);
         const parts = normalizeGeneratedParts(rawParts);
-        const pacingMode = config.responsePacingMode || 'realistic';
+        const pacingMode = config.responsePacingMode || "realistic";
         const remaining = timeLeft;
 
-        const lastAgentMsg = [...currentHistory].reverse().find(m => m.sender === 'agent');
+        const lastAgentMsg = [...currentHistory]
+          .reverse()
+          .find((m) => m.sender === "agent");
         const agentGivingSolution = isAgentGivingSolution(lastAgentMsg?.text);
 
         const isFirstConsumerTurn = consumerTurnCountRef.current === 0;
         consumerTurnCountRef.current += 1;
         const currentConsumerTurn = consumerTurnCountRef.current;
 
-        let firstBand: 'short' | 'normal' | 'long' | 'slow' | 'greeting_reply' = isFirstConsumerTurn
-          ? 'greeting_reply'
-          : classifyTextBand(parts[0]?.text.length || 0);
+        let firstBand: "short" | "normal" | "long" | "slow" | "greeting_reply" =
+          isFirstConsumerTurn
+            ? "greeting_reply"
+            : classifyTextBand(parts[0]?.text.length || 0);
         const shouldUseSlow =
-          pacingMode === 'realistic' &&
+          pacingMode === "realistic" &&
           parts.length > 0 &&
           !agentGivingSolution &&
           isSlowEligible({
@@ -443,20 +547,21 @@ export function ChatInterface({
           });
 
         if (shouldUseSlow) {
-          firstBand = 'slow';
+          firstBand = "slow";
           totalSlowCountRef.current += 1;
           consecutiveSlowCountRef.current += 1;
         } else {
           consecutiveSlowCountRef.current = 0;
         }
 
-        const ranges = pacingMode === 'realistic' ? REALISTIC_RANGES : TRAINING_FAST_RANGES;
+        const ranges =
+          pacingMode === "realistic" ? REALISTIC_RANGES : TRAINING_FAST_RANGES;
         let delay = 0;
 
         for (let i = 0; i < parts.length; i += 1) {
           const part = parts[i];
           const isFirst = i === 0;
-          const band = isFirst ? firstBand : 'follow_up';
+          const band = isFirst ? firstBand : "follow_up";
           const range = ranges[band];
           let plannedDelay = boundedRandom(range.minMs, range.maxMs);
 
@@ -476,20 +581,25 @@ export function ChatInterface({
 
           delay += plannedDelay;
           const pacingMeta: PacingMeta = {
-            mode: pacingMode as 'realistic' | 'training_fast',
+            mode: pacingMode as "realistic" | "training_fast",
             band,
             plannedDelayMs: plannedDelay,
             timerClamped: remaining < 20,
           };
 
           const timeoutId = window.setTimeout(() => {
-            setMessages(prev => normalizeMessagesForDisplay([...prev, {
-              id: Date.now().toString() + Math.random(),
-              sender: part.sender,
-              text: part.text,
-              timestamp: new Date().toISOString(),
-              pacingMeta,
-            }]));
+            setMessages((prev) =>
+              normalizeMessagesForDisplay([
+                ...prev,
+                {
+                  id: Date.now().toString() + Math.random(),
+                  sender: part.sender,
+                  text: part.text,
+                  timestamp: new Date().toISOString(),
+                  pacingMeta,
+                },
+              ]),
+            );
           }, delay);
           pendingTimeoutsRef.current.push(timeoutId);
         }
@@ -498,27 +608,30 @@ export function ChatInterface({
         pendingTimeoutsRef.current.push(finishId);
       } else {
         setIsLoading(false);
-        setSessionPhase('closed');
+        setSessionPhase("closed");
       }
     } catch (error) {
-      console.error('Error generating response', error);
+      console.error("Error generating response", error);
       setIsLoading(false);
-      setMessages(prev => [...prev, {
-        id: 'error-' + Date.now(),
-        sender: 'system',
-        text: 'Terjadi gangguan koneksi dengan konsumen. Coba kirim pesan lagi.',
-        timestamp: new Date().toISOString(),
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: "error-" + Date.now(),
+          sender: "system",
+          text: "Terjadi gangguan koneksi dengan konsumen. Coba kirim pesan lagi.",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     }
   };
 
   const applyTemplate = () => {
     const hour = new Date().getHours();
-    let greeting = 'Pagi';
-    if (hour >= 11 && hour < 15) greeting = 'Siang';
-    else if (hour >= 15) greeting = 'Sore';
+    let greeting = "Pagi";
+    if (hour >= 11 && hour < 15) greeting = "Siang";
+    else if (hour >= 15) greeting = "Sore";
 
-    const agentName = signatureName || 'Petugas';
+    const agentName = signatureName || "Petugas";
     const consumerName = config.identity.name;
 
     const template = `Anda telah terhubung dengan Layanan Kontak OJK 157. Selamat ${greeting}. Saya ${agentName} dengan senang hati memberikan informasi yang Bapak/Ibu ${consumerName} butuhkan seputar Sektor Jasa Keuangan. Perihal apa yang dapat kami bantu?`;
@@ -529,7 +642,7 @@ export function ChatInterface({
   };
 
   const insertTemplate = (tmpl: { content: string }) => {
-    const lastSlashIndex = inputText.lastIndexOf('/');
+    const lastSlashIndex = inputText.lastIndexOf("/");
     const beforeSlash = inputText.substring(0, lastSlashIndex);
     setInputText(beforeSlash + tmpl.content);
     setShowTemplatePopup(false);
@@ -538,22 +651,27 @@ export function ChatInterface({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (showTemplatePopup) {
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedTemplateIndex(prev => (prev + 1) % filteredTemplates.length);
-      } else if (e.key === 'ArrowUp') {
+        setSelectedTemplateIndex(
+          (prev) => (prev + 1) % filteredTemplates.length,
+        );
+      } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedTemplateIndex(prev => (prev - 1 + filteredTemplates.length) % filteredTemplates.length);
-      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        setSelectedTemplateIndex(
+          (prev) =>
+            (prev - 1 + filteredTemplates.length) % filteredTemplates.length,
+        );
+      } else if (e.key === "Enter" || e.key === "Tab") {
         if (filteredTemplates.length > 0) {
           e.preventDefault();
           insertTemplate(filteredTemplates[selectedTemplateIndex]);
         }
-      } else if (e.key === 'Escape') {
+      } else if (e.key === "Escape") {
         e.preventDefault();
         setShowTemplatePopup(false);
       }
-    } else if (e.key === 'Enter' && !e.shiftKey) {
+    } else if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -576,7 +694,12 @@ export function ChatInterface({
 
         if (imgSrc) {
           return (
-            <motion.div key={index} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="my-2">
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="my-2"
+            >
               <img
                 src={imgSrc}
                 alt={`Attachment ${imgIndex}`}
@@ -586,14 +709,21 @@ export function ChatInterface({
             </motion.div>
           );
         }
-        return <span key={index} className="text-sm italic text-muted-foreground">Lampiran gambar</span>;
+        return (
+          <span key={index} className="text-sm italic text-muted-foreground">
+            Lampiran gambar
+          </span>
+        );
       }
       return <span key={index}>{part}</span>;
     });
   };
 
   return (
-    <div data-module="ketik" className="module-clean-app flex flex-col h-full w-full bg-background overflow-hidden relative">
+    <div
+      data-module="ketik"
+      className="module-clean-app flex flex-col h-full w-full bg-background overflow-hidden relative"
+    >
       {/* Premium Header */}
       <div className="module-clean-toolbar px-8 py-6 flex items-center justify-between border-b shrink-0 w-full z-50 relative">
         <div className="flex items-center gap-4 w-1/4">
@@ -605,7 +735,9 @@ export function ChatInterface({
               <div className="module-clean-button-secondary w-10 h-10 rounded-xl flex items-center justify-center transition-all">
                 <ArrowLeft className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Kembali</span>
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
+                Kembali
+              </span>
             </button>
           )}
           {!isReviewMode && (
@@ -624,17 +756,23 @@ export function ChatInterface({
           <div className="module-clean-panel flex items-center gap-3 mt-1.5 px-4 py-1 rounded-full">
             <div className="flex items-center gap-1.5">
               <Phone className="w-3 h-3 text-primary" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{config.identity.phone}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {config.identity.phone}
+              </span>
             </div>
             <span className="w-1 h-1 bg-foreground/20 rounded-full"></span>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px]">📍</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{config.identity.city}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                {config.identity.city}
+              </span>
             </div>
           </div>
           {!isReviewMode ? (
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-module-ketik">Online</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-module-ketik">
+                Online
+              </span>
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground tabular-nums">
                 {formatTime(elapsedSeconds)}
               </span>
@@ -643,7 +781,9 @@ export function ChatInterface({
           ) : (
             <div className="flex items-center gap-2 mt-0.5">
               <X className="w-3 h-3 text-orange-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">Review Mode</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">
+                Review Mode
+              </span>
             </div>
           )}
         </div>
@@ -653,17 +793,28 @@ export function ChatInterface({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  const csvContent = 'data:text/csv;charset=utf-8,Pengirim,Pesan,Waktu\n' +
-                    messages.map(m => {
-                      const sender = m.sender === 'agent' ? 'Agen' : m.sender === 'consumer' ? 'Konsumen' : 'Sistem';
-                      const text = m.text.replace(/"/g, '""');
-                      const time = new Date(m.timestamp).toLocaleString();
-                      return `"${sender}","${text}","${time}"`;
-                    }).join('\n');
+                  const csvContent =
+                    "data:text/csv;charset=utf-8,Pengirim,Pesan,Waktu\n" +
+                    messages
+                      .map((m) => {
+                        const sender =
+                          m.sender === "agent"
+                            ? "Agen"
+                            : m.sender === "consumer"
+                              ? "Konsumen"
+                              : "Sistem";
+                        const text = m.text.replace(/"/g, '""');
+                        const time = new Date(m.timestamp).toLocaleString();
+                        return `"${sender}","${text}","${time}"`;
+                      })
+                      .join("\n");
                   const encodedUri = encodeURI(csvContent);
-                  const link = document.createElement('a');
-                  link.setAttribute('href', encodedUri);
-                  link.setAttribute('download', `chat_review_${Date.now()}.csv`);
+                  const link = document.createElement("a");
+                  link.setAttribute("href", encodedUri);
+                  link.setAttribute(
+                    "download",
+                    `chat_review_${Date.now()}.csv`,
+                  );
                   document.body.appendChild(link);
                   link.click();
                   document.body.removeChild(link);
@@ -691,9 +842,11 @@ export function ChatInterface({
               }}
               disabled={isLoading || isEnding || !authReady}
               className={`px-6 py-2.5 text-white font-black text-[10px] uppercase tracking-widest transition-all rounded-xl shadow-lg flex items-center gap-2
-                ${(isLoading || isEnding || !authReady)
-                  ? 'bg-red-400 cursor-not-allowed opacity-80'
-                  : 'bg-red-500 hover:bg-red-600 shadow-red-500/20 active:scale-95'}`}
+                ${
+                  isLoading || isEnding || !authReady
+                    ? "bg-red-400 cursor-not-allowed opacity-80"
+                    : "bg-red-500 hover:bg-red-600 shadow-red-500/20 active:scale-95"
+                }`}
             >
               {isEnding || !authReady ? (
                 <>
@@ -701,7 +854,7 @@ export function ChatInterface({
                   <span>Memproses...</span>
                 </>
               ) : (
-                'Selesai'
+                "Selesai"
               )}
             </button>
           )}
@@ -712,11 +865,11 @@ export function ChatInterface({
       <div className="module-clean-stage flex-1 overflow-y-auto z-10 scroll-smooth custom-scrollbar flex flex-col p-4 space-y-2">
         <AnimatePresence initial={false}>
           {messages.map((msg) => {
-            if (msg.sender === 'system') {
+            if (msg.sender === "system") {
               const msgHasImageTag = IMAGE_TAG_PATTERN.test(msg.text);
               const systemTextWithoutTag = msgHasImageTag
-                ? ''
-                : msg.text.replace(IMAGE_TAG_PATTERN_GLOBAL, '').trim();
+                ? ""
+                : msg.text.replace(IMAGE_TAG_PATTERN_GLOBAL, "").trim();
 
               return (
                 <motion.div
@@ -741,30 +894,36 @@ export function ChatInterface({
               );
             }
 
-            const isAgent = msg.sender === 'agent';
+            const isAgent = msg.sender === "agent";
 
             return (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                className={`flex w-full ${isAgent ? 'justify-end' : 'justify-start'}`}
+                className={`flex w-full ${isAgent ? "justify-end" : "justify-start"}`}
               >
                 <div
                   className={`max-w-[80%] px-6 py-4 relative text-[15px] leading-relaxed shadow-sm
-                    ${isAgent
-                      ? 'bg-module-ketik text-white rounded-[2rem] rounded-tr-none shadow-module-ketik/20'
-                      : 'module-clean-panel text-foreground rounded-[2rem] rounded-tl-none'
+                    ${
+                      isAgent
+                        ? "bg-module-ketik text-white rounded-[2rem] rounded-tr-none shadow-module-ketik/20"
+                        : "module-clean-panel text-foreground rounded-[2rem] rounded-tl-none"
                     }`}
                 >
                   <div className="font-medium whitespace-pre-wrap break-words">
                     {renderMessageContent(msg.text)}
                   </div>
-                  <div className={`text-[9px] font-black uppercase tracking-widest flex items-center justify-end gap-2 mt-2 ${isAgent ? 'text-white/80' : 'text-muted-foreground'}`}>
+                  <div
+                    className={`text-[9px] font-black uppercase tracking-widest flex items-center justify-end gap-2 mt-2 ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
+                  >
                     <span>
                       {msg.timestamp
-                        ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : ''}
+                        ? new Date(msg.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : ""}
                     </span>
                     {isAgent && <TickIcon status={msg.status} />}
                   </div>
@@ -782,9 +941,21 @@ export function ChatInterface({
           >
             <div className="module-clean-panel rounded-[20px] rounded-bl-sm px-4 py-3">
               <div className="flex space-x-1">
-                <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
-                <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
-                <motion.div animate={{ y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-1.5 h-1.5 bg-muted-foreground rounded-full" />
+                <motion.div
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.6 }}
+                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                />
+                <motion.div
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                />
+                <motion.div
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                />
               </div>
             </div>
           </motion.div>
@@ -793,7 +964,8 @@ export function ChatInterface({
       </div>
 
       {/* Input Area */}
-      {!isReviewMode && (sessionPhase === 'active' || sessionPhase === 'expired') ? (
+      {!isReviewMode &&
+      (sessionPhase === "active" || sessionPhase === "expired") ? (
         <div className="module-clean-toolbar p-6 border-t z-40 shrink-0 relative">
           <div className="absolute inset-x-0 -top-12 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
 
@@ -803,13 +975,19 @@ export function ChatInterface({
               className="module-clean-button-secondary flex items-center gap-2.5 px-6 py-2.5 rounded-2xl shadow-sm text-[10px] font-black uppercase tracking-widest text-module-ketik transition-all group"
             >
               <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-              <span>{isMaintenanceMode ? 'Gunakan Maintenance' : 'Gunakan Template Salam'}</span>
+              <span>
+                {isMaintenanceMode
+                  ? "Gunakan Maintenance"
+                  : "Gunakan Template Salam"}
+              </span>
             </button>
           </div>
 
           <div className="max-w-4xl mx-auto flex items-end gap-4">
             <div className="module-clean-input-shell flex-1 rounded-[2rem] border-2 flex flex-col px-6 py-2.5 focus-within:border-module-ketik transition-all shadow-inner">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50 mb-1 ml-1 select-none">Pesan Baru</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50 mb-1 ml-1 select-none">
+                Pesan Baru
+              </span>
               <textarea
                 ref={textareaRef}
                 value={inputText}
@@ -831,8 +1009,12 @@ export function ChatInterface({
                     className="absolute bottom-full left-6 mb-4 w-72 max-h-64 overflow-y-auto bg-card border border-border/50 rounded-[2rem] shadow-2xl z-[60] p-3 flex flex-col gap-1 custom-scrollbar"
                   >
                     <div className="px-4 py-2 border-b border-border/10 mb-1 flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Pilih Template</span>
-                      <span className="text-[9px] font-medium text-primary/50">↑↓ Navigasi</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                        Pilih Template
+                      </span>
+                      <span className="text-[9px] font-medium text-primary/50">
+                        ↑↓ Navigasi
+                      </span>
                     </div>
                     {filteredTemplates.length > 0 ? (
                       filteredTemplates.map((t, i) => (
@@ -842,11 +1024,13 @@ export function ChatInterface({
                           onMouseEnter={() => setSelectedTemplateIndex(i)}
                           className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex flex-col gap-0.5 ${
                             i === selectedTemplateIndex
-                              ? 'bg-primary/10 border border-primary/20'
-                              : 'hover:bg-foreground/5 border border-transparent'
+                              ? "bg-primary/10 border border-primary/20"
+                              : "hover:bg-foreground/5 border border-transparent"
                           }`}
                         >
-                          <span className={`text-[10px] font-black uppercase tracking-wider ${i === selectedTemplateIndex ? 'text-primary' : 'text-muted-foreground'}`}>
+                          <span
+                            className={`text-[10px] font-black uppercase tracking-wider ${i === selectedTemplateIndex ? "text-primary" : "text-muted-foreground"}`}
+                          >
                             /{t.keyword}
                           </span>
                           <span className="text-xs text-foreground font-medium line-clamp-1 opacity-80">
@@ -856,7 +1040,9 @@ export function ChatInterface({
                       ))
                     ) : (
                       <div className="px-4 py-3 text-center">
-                        <span className="text-xs text-muted-foreground font-medium">Tidak ada template yang cocok</span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Tidak ada template yang cocok
+                        </span>
                       </div>
                     )}
                   </motion.div>
@@ -870,11 +1056,13 @@ export function ChatInterface({
               disabled={!inputText.trim()}
               className={`w-14 h-14 rounded-[2rem] flex items-center justify-center transition-all ${
                 inputText.trim()
-                  ? 'module-clean-button-primary text-white'
-                  : 'bg-foreground/5 text-muted-foreground'
+                  ? "module-clean-button-primary text-white"
+                  : "bg-foreground/5 text-muted-foreground"
               }`}
             >
-              <Send className={`w-6 h-6 ${inputText.trim() ? 'translate-x-0.5 -translate-y-0.5' : ''}`} />
+              <Send
+                className={`w-6 h-6 ${inputText.trim() ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+              />
             </motion.button>
           </div>
         </div>

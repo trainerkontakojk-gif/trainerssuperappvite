@@ -1,39 +1,59 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, ArrowRight, Cpu, Loader2, ShieldCheck, X } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { normalizeProfileStatus } from '../lib/profile';
-import { fetchAuthProfile } from '../lib/fetchAuthProfile';
+import { useEffect, useState, type FormEvent } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  AlertCircle,
+  ArrowRight,
+  Cpu,
+  Loader2,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import { supabase } from "../lib/supabase";
+import { normalizeProfileStatus } from "../lib/profile";
+import { fetchAuthProfile } from "../lib/fetchAuthProfile";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialMode?: 'login' | 'register' | 'forgot';
-  initialNotice?: { type: 'error' | 'info'; text: string };
+  initialMode?: "login" | "register" | "forgot";
+  initialNotice?: { type: "error" | "info"; text: string };
 }
 
 const AUTH_COPY = {
   login: {
-    title: 'Masuk',
-    description: 'Silakan masuk menggunakan akun aktif perusahaan Anda.',
-    submit: 'Masuk sekarang',
+    title: "Masuk",
+    description: "Silakan masuk menggunakan akun aktif perusahaan Anda.",
+    submit: "Masuk sekarang",
   },
   register: {
-    title: 'Minta Akses Baru',
-    description: 'Isi data berikut untuk meminta akses ke sistem. Proses ini memerlukan persetujuan dari administrator.',
-    submit: 'Ajukan akses',
+    title: "Minta Akses Baru",
+    description:
+      "Isi data berikut untuk meminta akses ke sistem. Proses ini memerlukan persetujuan dari administrator.",
+    submit: "Ajukan akses",
   },
   forgot: {
-    title: 'Lupa Kata Sandi',
-    description: 'Masukkan email Anda dan kami akan mengirimkan instruksi untuk mengatur ulang kata sandi.',
-    submit: 'Kirim tautan pemulihan',
+    title: "Lupa Kata Sandi",
+    description:
+      "Masukkan email Anda dan kami akan mengirimkan instruksi untuk mengatur ulang kata sandi.",
+    submit: "Kirim tautan pemulihan",
   },
 } as const;
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login', initialNotice }: AuthModalProps) {
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode);
-  const [error, setError] = useState<string | null>(initialNotice?.type === 'error' ? initialNotice.text : null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(initialNotice?.type === 'info' ? initialNotice.text : null);
+export default function AuthModal({
+  isOpen,
+  onClose,
+  initialMode = "login",
+  initialNotice,
+}: AuthModalProps) {
+  const [mode, setMode] = useState<"login" | "register" | "forgot">(
+    initialMode,
+  );
+  const [error, setError] = useState<string | null>(
+    initialNotice?.type === "error" ? initialNotice.text : null,
+  );
+  const [successMessage, setSuccessMessage] = useState<string | null>(
+    initialNotice?.type === "info" ? initialNotice.text : null,
+  );
   const [loading, setLoading] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -41,8 +61,10 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
   useEffect(() => {
     if (isOpen) {
       setMode(initialMode);
-      setError(initialNotice?.type === 'error' ? initialNotice.text : null);
-      setSuccessMessage(initialNotice?.type === 'info' ? initialNotice.text : null);
+      setError(initialNotice?.type === "error" ? initialNotice.text : null);
+      setSuccessMessage(
+        initialNotice?.type === "info" ? initialNotice.text : null,
+      );
       setLoading(false);
       setForgotLoading(false);
       setGoogleLoading(false);
@@ -56,8 +78,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
     setForgotLoading(false);
     setGoogleLoading(false);
     const url = new URL(window.location.href);
-    url.searchParams.delete('auth');
-    window.history.replaceState({}, '', url.pathname || '/');
+    url.searchParams.delete("auth");
+    window.history.replaceState({}, "", url.pathname || "/");
     onClose();
   };
 
@@ -69,7 +91,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
       } = await supabase.auth.getUser();
 
       if (user && !error) {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         return session;
       }
 
@@ -80,37 +104,41 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
   }
 
   function clearAuthLocalStorage() {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_profile');
-    localStorage.removeItem('trainers_login_time');
-    localStorage.removeItem('trainers_last_activity');
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_profile");
+    localStorage.removeItem("trainers_login_time");
+    localStorage.removeItem("trainers_last_activity");
   }
 
   async function resolvePostLoginPath(userId: string) {
     const profile = await fetchAuthProfile(userId);
 
     if (!profile) {
-      console.warn('[AuthModal] Failed to fetch profile after login');
-      return '/dashboard';
+      console.warn("[AuthModal] Failed to fetch profile after login");
+      return "/dashboard";
     }
 
     if (profile.is_deleted) {
       await supabase.auth.signOut();
       clearAuthLocalStorage();
-      throw new Error('Akun Anda telah dinonaktifkan. Silakan hubungi administrator.');
+      throw new Error(
+        "Akun Anda telah dinonaktifkan. Silakan hubungi administrator.",
+      );
     }
 
-    if (profile.status === 'pending') {
-      return '/waiting-approval';
+    if (profile.status === "pending") {
+      return "/waiting-approval";
     }
 
-    if (profile.status === 'inactive') {
+    if (profile.status === "inactive") {
       await supabase.auth.signOut();
       clearAuthLocalStorage();
-      throw new Error('Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.');
+      throw new Error(
+        "Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.",
+      );
     }
 
-    return '/dashboard';
+    return "/dashboard";
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -120,12 +148,15 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
     setSuccessMessage(null);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
 
     try {
-      if (mode === 'login') {
-        const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (mode === "login") {
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
         if (loginError) {
           setError(loginError.message);
@@ -136,29 +167,34 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
         const session = await waitForActiveSession();
 
         if (!session?.user) {
-          setError('Sesi login belum siap. Silakan coba sekali lagi.');
+          setError("Sesi login belum siap. Silakan coba sekali lagi.");
           setLoading(false);
           return;
         }
 
         const nextPath = await resolvePostLoginPath(session.user.id);
-        localStorage.setItem('auth_token', session.access_token);
+        localStorage.setItem("auth_token", session.access_token);
         window.location.assign(nextPath);
         return;
       }
 
-      const role = formData.get('role') as string;
-      const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
+      const role = formData.get("role") as string;
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
 
       if (signUpError) {
-        const isDuplicate = 
-          (signUpError as any).code === 'user_already_exists' || 
-          signUpError.message?.toLowerCase().includes('already registered') ||
-          signUpError.message?.toLowerCase().includes('already exists') ||
-          signUpError.message?.toLowerCase().includes('user already');
+        const isDuplicate =
+          (signUpError as any).code === "user_already_exists" ||
+          signUpError.message?.toLowerCase().includes("already registered") ||
+          signUpError.message?.toLowerCase().includes("already exists") ||
+          signUpError.message?.toLowerCase().includes("user already");
 
         if (isDuplicate) {
-          setSuccessMessage('Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.');
+          setSuccessMessage(
+            "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.",
+          );
           setLoading(false);
           return;
         }
@@ -168,36 +204,48 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
       }
 
       if (data.user) {
-        const { error: profileError } = await supabase.from('profiles').insert(
-          [
-            {
-              id: data.user.id,
-              email,
-              role,
-              status: 'pending',
-            },
-          ]
-        );
+        const { error: profileError } = await supabase.from("profiles").insert([
+          {
+            id: data.user.id,
+            email,
+            role,
+            status: "pending",
+          },
+        ]);
 
         if (profileError) {
-          if (profileError.code === '23505' || profileError.message?.toLowerCase().includes('duplicate')) {
-            setSuccessMessage('Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.');
+          if (
+            profileError.code === "23505" ||
+            profileError.message?.toLowerCase().includes("duplicate")
+          ) {
+            setSuccessMessage(
+              "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.",
+            );
             setLoading(false);
             return;
           }
-          setError('Terjadi masalah jaringan saat mendaftar. Silakan coba lagi.');
+          setError(
+            "Terjadi masalah jaringan saat mendaftar. Silakan coba lagi.",
+          );
           setLoading(false);
           return;
         }
       }
 
-      setSuccessMessage('Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.');
+      setSuccessMessage(
+        "Permintaan akses berhasil dikirim! Anda bisa masuk setelah akun Anda disetujui.",
+      );
     } catch (err: any) {
-      console.error('[AuthModal] Submission error:', err);
-      if (err instanceof TypeError && err.message === 'Failed to fetch') {
-        setError('Gagal menghubungkan ke server. Periksa koneksi internet Anda atau hubungi admin jika masalah berlanjut.');
+      console.error("[AuthModal] Submission error:", err);
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        setError(
+          "Gagal menghubungkan ke server. Periksa koneksi internet Anda atau hubungi admin jika masalah berlanjut.",
+        );
       } else {
-        setError(err.message || 'Terjadi kesalahan sistem saat memproses permintaan Anda.');
+        setError(
+          err.message ||
+            "Terjadi kesalahan sistem saat memproses permintaan Anda.",
+        );
       }
     } finally {
       setLoading(false);
@@ -211,24 +259,33 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
     setSuccessMessage(null);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
+    const email = formData.get("email") as string;
 
     try {
-      const { error: forgotError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const { error: forgotError } = await supabase.auth.resetPasswordForEmail(
+        email,
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
+      );
 
       if (forgotError) {
         setError(forgotError.message);
       } else {
-        setSuccessMessage('Tautan untuk mengatur ulang kata sandi sudah dikirim ke email Anda.');
+        setSuccessMessage(
+          "Tautan untuk mengatur ulang kata sandi sudah dikirim ke email Anda.",
+        );
       }
     } catch (err: any) {
-      console.error('[AuthModal] Forgot password error:', err);
-      if (err instanceof TypeError && err.message === 'Failed to fetch') {
-        setError('Gagal menghubungkan ke server. Silakan periksa koneksi internet Anda.');
+      console.error("[AuthModal] Forgot password error:", err);
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        setError(
+          "Gagal menghubungkan ke server. Silakan periksa koneksi internet Anda.",
+        );
       } else {
-        setError(err.message || 'Gagal memproses permintaan pemulihan kata sandi.');
+        setError(
+          err.message || "Gagal memproses permintaan pemulihan kata sandi.",
+        );
       }
     } finally {
       setForgotLoading(false);
@@ -241,7 +298,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
     setSuccessMessage(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: `${window.location.origin}/api/auth/callback`,
         },
@@ -251,8 +308,8 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
         setGoogleLoading(false);
       }
     } catch (err: any) {
-      console.error('[AuthModal] Google OAuth error:', err);
-      setError('Gagal menginisialisasi login Google. Silakan coba lagi.');
+      console.error("[AuthModal] Google OAuth error:", err);
+      setError("Gagal menginisialisasi login Google. Silakan coba lagi.");
       setGoogleLoading(false);
     }
   }
@@ -263,7 +320,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -289,8 +350,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                       <Cpu className="h-5 w-5" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-sm font-semibold tracking-tight">Trainers SuperApp</span>
-                      <span className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Workspace internal</span>
+                      <span className="text-sm font-semibold tracking-tight">
+                        Trainers SuperApp
+                      </span>
+                      <span className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                        Workspace internal
+                      </span>
                     </div>
                   </div>
 
@@ -303,25 +368,37 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                       Platform operasional pintar untuk tim trainer.
                     </h2>
                     <p className="max-w-md text-sm leading-6 text-muted-foreground">
-                      Latih tim, pantau metrik, dan analisis kualitas interaksi layanan dari satu panel instrumen yang terpusat.
+                      Latih tim, pantau metrik, dan analisis kualitas interaksi
+                      layanan dari satu panel instrumen yang terpusat.
                     </p>
                   </div>
 
                   <div className="mt-auto space-y-3 pt-10">
                     <div className="rounded-[1.5rem] border border-border/50 bg-background/70 p-4">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Lebih Teratur</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+                        Lebih Teratur
+                      </p>
                       <p className="mt-2 text-sm leading-6 text-foreground/90">
-                        Dirancang agar pelatih bisa fokus penuh membimbing tim tanpa terdistraksi masalah pelaporan data.
+                        Dirancang agar pelatih bisa fokus penuh membimbing tim
+                        tanpa terdistraksi masalah pelaporan data.
                       </p>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-[1.5rem] border border-border/50 bg-card/70 p-4">
                         <p className="text-xs font-semibold">Simulasi Nyata</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Praktikkan dialog pelanggan layaknya kasus sesungguhnya.</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          Praktikkan dialog pelanggan layaknya kasus
+                          sesungguhnya.
+                        </p>
                       </div>
                       <div className="rounded-[1.5rem] border border-border/50 bg-card/70 p-4">
-                        <p className="text-xs font-semibold">Terkendali Penuh</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Kelola siapa yang bisa mengakses bagian dari sistem ini sedetail mungkin.</p>
+                        <p className="text-xs font-semibold">
+                          Terkendali Penuh
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          Kelola siapa yang bisa mengakses bagian dari sistem
+                          ini sedetail mungkin.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -342,8 +419,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                     <Cpu className="h-5 w-5" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold tracking-tight">Trainers SuperApp</span>
-                    <span className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">Workspace internal</span>
+                    <span className="text-sm font-semibold tracking-tight">
+                      Trainers SuperApp
+                    </span>
+                    <span className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                      Workspace internal
+                    </span>
                   </div>
                 </div>
 
@@ -358,14 +439,25 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                     <div className="mb-8 space-y-3">
                       <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
                         <ShieldCheck className="h-3.5 w-3.5" />
-                        {mode === 'login' ? 'Masuk aman' : mode === 'register' ? 'Permintaan akses' : 'Pemulihan akun'}
+                        {mode === "login"
+                          ? "Masuk aman"
+                          : mode === "register"
+                            ? "Permintaan akses"
+                            : "Pemulihan akun"}
                       </div>
-                      <h2 className="text-3xl font-semibold tracking-tight">{content.title}</h2>
-                      <p className="text-sm leading-6 text-muted-foreground">{content.description}</p>
+                      <h2 className="text-3xl font-semibold tracking-tight">
+                        {content.title}
+                      </h2>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {content.description}
+                      </p>
                     </div>
 
-                    {mode === 'forgot' ? (
-                      <form onSubmit={handleForgotPassword} className="flex flex-col gap-4">
+                    {mode === "forgot" ? (
+                      <form
+                        onSubmit={handleForgotPassword}
+                        className="flex flex-col gap-4"
+                      >
                         <Field label="Email">
                           <input
                             type="email"
@@ -377,9 +469,20 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                             className="auth-input"
                           />
                         </Field>
-                        <Feedback error={error} successMessage={successMessage} />
-                        <button type="submit" disabled={forgotLoading || !!successMessage} className="auth-submit cursor-pointer">
-                          {forgotLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : content.submit}
+                        <Feedback
+                          error={error}
+                          successMessage={successMessage}
+                        />
+                        <button
+                          type="submit"
+                          disabled={forgotLoading || !!successMessage}
+                          className="auth-submit cursor-pointer"
+                        >
+                          {forgotLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            content.submit
+                          )}
                           {!forgotLoading && <ArrowRight className="h-4 w-4" />}
                         </button>
                       </form>
@@ -421,11 +524,16 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                             <span className="w-full border-t border-border/40" />
                           </div>
                           <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
-                            <span className="bg-card/85 px-3 text-muted-foreground">atau gunakan email</span>
+                            <span className="bg-card/85 px-3 text-muted-foreground">
+                              atau gunakan email
+                            </span>
                           </div>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        <form
+                          onSubmit={handleSubmit}
+                          className="flex flex-col gap-4"
+                        >
                           <Field label="Email">
                             <input
                               type="email"
@@ -445,20 +553,24 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                               required
                               minLength={6}
                               disabled={loading}
-                              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                              autoComplete={
+                                mode === "login"
+                                  ? "current-password"
+                                  : "new-password"
+                              }
                               placeholder="••••••••"
                               className="auth-input tracking-[0.2em]"
                             />
                           </Field>
 
-                          {mode === 'login' && (
+                          {mode === "login" && (
                             <div className="-mt-2 flex justify-end">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setError(null);
                                   setSuccessMessage(null);
-                                  setMode('forgot');
+                                  setMode("forgot");
                                 }}
                                 className="px-1 text-xs font-semibold text-muted-foreground transition hover:text-primary cursor-pointer"
                                 disabled={loading}
@@ -468,9 +580,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                             </div>
                           )}
 
-                          {mode === 'register' && (
+                          {mode === "register" && (
                             <Field label="Peran">
-                              <select name="role" required disabled={loading} className="auth-input">
+                              <select
+                                name="role"
+                                required
+                                disabled={loading}
+                                className="auth-input"
+                              >
                                 <option value="agent">Agent</option>
                                 <option value="leader">Leader</option>
                                 <option value="trainer">Trainer</option>
@@ -478,10 +595,21 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                             </Field>
                           )}
 
-                          <Feedback error={error} successMessage={successMessage} />
+                          <Feedback
+                            error={error}
+                            successMessage={successMessage}
+                          />
 
-                          <button type="submit" disabled={loading || !!successMessage} className="auth-submit cursor-pointer">
-                            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : content.submit}
+                          <button
+                            type="submit"
+                            disabled={loading || !!successMessage}
+                            className="auth-submit cursor-pointer"
+                          >
+                            {loading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              content.submit
+                            )}
                             {!loading && <ArrowRight className="h-4 w-4" />}
                           </button>
                         </form>
@@ -489,13 +617,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                     )}
 
                     <div className="mt-7 text-center">
-                      {mode === 'forgot' ? (
+                      {mode === "forgot" ? (
                         <button
                           type="button"
                           onClick={() => {
                             setError(null);
                             setSuccessMessage(null);
-                            setMode('login');
+                            setMode("login");
                           }}
                           className="text-xs font-semibold text-muted-foreground transition hover:text-primary cursor-pointer"
                           disabled={isBusy}
@@ -508,12 +636,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
                           onClick={() => {
                             setError(null);
                             setSuccessMessage(null);
-                            setMode(mode === 'login' ? 'register' : 'login');
+                            setMode(mode === "login" ? "register" : "login");
                           }}
                           className="text-xs font-semibold text-muted-foreground transition hover:text-primary cursor-pointer"
                           disabled={isBusy}
                         >
-                          {mode === 'login' ? 'Belum punya akun? Ajukan akses' : 'Sudah punya akun? Masuk di sini'}
+                          {mode === "login"
+                            ? "Belum punya akun? Ajukan akses"
+                            : "Sudah punya akun? Masuk di sini"}
                         </button>
                       )}
                     </div>
@@ -528,23 +658,37 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', init
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">{label}</span>
+      <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );
 }
 
-function Feedback({ error, successMessage }: { error: string | null; successMessage: string | null }) {
+function Feedback({
+  error,
+  successMessage,
+}: {
+  error: string | null;
+  successMessage: string | null;
+}) {
   return (
     <>
       <AnimatePresence>
         {error && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="flex items-start gap-3 overflow-hidden rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-600"
           >
@@ -557,7 +701,7 @@ function Feedback({ error, successMessage }: { error: string | null; successMess
         {successMessage && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
+            animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-green-700"
           >

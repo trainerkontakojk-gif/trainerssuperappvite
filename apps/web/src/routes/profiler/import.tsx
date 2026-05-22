@@ -1,10 +1,17 @@
-import { useState, useRef } from 'react';
-import { Link } from '@tanstack/react-router';
-import { ArrowLeft, Upload, FileSpreadsheet, Download, Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { useQueryParams } from '../../hooks/useQueryParams';
+import { useState, useRef } from "react";
+import { Link } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Upload,
+  FileSpreadsheet,
+  Download,
+  Loader2,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
+import { useQueryParams } from "../../hooks/useQueryParams";
 
-
-import { profilerApi } from '../../lib/profilerService';
+import { profilerApi } from "../../lib/profilerService";
 
 interface ImportResult {
   success: number;
@@ -13,12 +20,12 @@ interface ImportResult {
 }
 
 function qs(obj: Record<string, string>) {
-  return '?' + new URLSearchParams(obj).toString();
+  return "?" + new URLSearchParams(obj).toString();
 }
 
 export default function ProfilerImport() {
   const { batch } = useQueryParams();
-  const batchName = batch || '';
+  const batchName = batch || "";
 
   const [file, setFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -27,14 +34,32 @@ export default function ProfilerImport() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const downloadTemplate = async () => {
-    const XLSX = await import('xlsx');
+    const XLSX = await import("xlsx");
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Nama*', 'Tim*', 'Jabatan*', 'NIP OJK', 'Email', 'Telepon', 'Jenis Kelamin', 'Pendidikan'],
-      ['', '', '', '', '', '', '', ''],
+      [
+        "Nama*",
+        "Tim*",
+        "Jabatan*",
+        "NIP OJK",
+        "Email",
+        "Telepon",
+        "Jenis Kelamin",
+        "Pendidikan",
+      ],
+      ["", "", "", "", "", "", "", ""],
     ]);
-    ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+    ws["!cols"] = [
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 20 },
+    ];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, `template-import-${batchName}.xlsx`);
   };
 
@@ -50,19 +75,27 @@ export default function ProfilerImport() {
     setProcessing(true);
     setError(null);
     try {
-      const XLSX = await import('xlsx');
+      const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: 'array' });
+      const wb = XLSX.read(buffer, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
       const headerRow = rows[0] as string[];
-      const namaIdx = headerRow.findIndex(h => h?.toString().toLowerCase().includes('nama'));
-      const timIdx = headerRow.findIndex(h => h?.toString().toLowerCase().includes('tim'));
-      const jabatanIdx = headerRow.findIndex(h => h?.toString().toLowerCase().includes('jabatan'));
+      const namaIdx = headerRow.findIndex((h) =>
+        h?.toString().toLowerCase().includes("nama"),
+      );
+      const timIdx = headerRow.findIndex((h) =>
+        h?.toString().toLowerCase().includes("tim"),
+      );
+      const jabatanIdx = headerRow.findIndex((h) =>
+        h?.toString().toLowerCase().includes("jabatan"),
+      );
 
       if (namaIdx === -1 || timIdx === -1 || jabatanIdx === -1) {
-        throw new Error('Format file tidak sesuai. Pastikan ada kolom Nama, Tim, dan Jabatan.');
+        throw new Error(
+          "Format file tidak sesuai. Pastikan ada kolom Nama, Tim, dan Jabatan.",
+        );
       }
 
       let success = 0;
@@ -71,14 +104,17 @@ export default function ProfilerImport() {
 
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (!row || !row[namaIdx]) { skipped++; continue; }
+        if (!row || !row[namaIdx]) {
+          skipped++;
+          continue;
+        }
 
         try {
           await profilerApi.createPeserta({
             batch_name: batchName,
-            nama: String(row[namaIdx] || '').trim(),
-            tim: String(row[timIdx] || '').trim(),
-            jabatan: String(row[jabatanIdx] || '').trim(),
+            nama: String(row[namaIdx] || "").trim(),
+            tim: String(row[timIdx] || "").trim(),
+            jabatan: String(row[jabatanIdx] || "").trim(),
           });
           success++;
         } catch (e: any) {
@@ -98,7 +134,10 @@ export default function ProfilerImport() {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Pilih batch terlebih dahulu.</p>
-        <Link to="/profiler" className="mt-4 inline-flex items-center gap-2 text-indigo-600 text-sm font-semibold">
+        <Link
+          to="/profiler"
+          className="mt-4 inline-flex items-center gap-2 text-indigo-600 text-sm font-semibold"
+        >
           <ArrowLeft className="h-4 w-4" /> Kembali
         </Link>
       </div>
@@ -108,10 +147,15 @@ export default function ProfilerImport() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <a href={`/profiler/table${qs({ batch: batchName })}`} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+        <a
+          href={`/profiler/table${qs({ batch: batchName })}`}
+          className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+        >
           <ArrowLeft className="h-3 w-3" /> Kembali
         </a>
-        <h2 className="text-lg font-bold text-gray-900 mt-1">Import Excel — {batchName}</h2>
+        <h2 className="text-lg font-bold text-gray-900 mt-1">
+          Import Excel — {batchName}
+        </h2>
       </div>
 
       {/* Step 1: Download Template */}
@@ -121,10 +165,17 @@ export default function ProfilerImport() {
             <FileSpreadsheet className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900">1. Download Template</p>
-            <p className="text-xs text-gray-500">Download template Excel, isi data peserta, lalu upload kembali.</p>
+            <p className="text-sm font-semibold text-gray-900">
+              1. Download Template
+            </p>
+            <p className="text-xs text-gray-500">
+              Download template Excel, isi data peserta, lalu upload kembali.
+            </p>
           </div>
-          <button onClick={downloadTemplate} className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50 transition">
+          <button
+            onClick={downloadTemplate}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50 transition"
+          >
             <Download className="h-4 w-4" /> Template
           </button>
         </div>
@@ -137,12 +188,22 @@ export default function ProfilerImport() {
             <Upload className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900">2. Upload File</p>
-            <p className="text-xs text-gray-500">Upload file .xlsx atau .xls yang sudah diisi.</p>
+            <p className="text-sm font-semibold text-gray-900">
+              2. Upload File
+            </p>
+            <p className="text-xs text-gray-500">
+              Upload file .xlsx atau .xls yang sudah diisi.
+            </p>
           </div>
           <label className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50 transition cursor-pointer">
             <Upload className="h-4 w-4" /> Pilih File
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFile}
+              className="hidden"
+            />
           </label>
         </div>
         {file && (
@@ -160,12 +221,20 @@ export default function ProfilerImport() {
           disabled={processing}
           className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-6 py-3 text-sm font-bold text-white hover:opacity-90 transition disabled:opacity-60"
         >
-          {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          {processing ? 'Memproses...' : 'Mulai Import'}
+          {processing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Upload className="h-4 w-4" />
+          )}
+          {processing ? "Memproses..." : "Mulai Import"}
         </button>
       )}
 
-      {error && <p className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
       {result && (
         <div className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
@@ -173,16 +242,22 @@ export default function ProfilerImport() {
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-emerald-50 text-center">
               <CheckCircle className="h-6 w-6 text-emerald-600 mx-auto" />
-              <p className="text-2xl font-bold text-emerald-600 mt-1">{result.success}</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">
+                {result.success}
+              </p>
               <p className="text-xs text-emerald-700">Berhasil</p>
             </div>
             <div className="p-4 rounded-xl bg-gray-50 text-center">
-              <span className="text-2xl font-bold text-gray-500">{result.skipped}</span>
+              <span className="text-2xl font-bold text-gray-500">
+                {result.skipped}
+              </span>
               <p className="text-xs text-gray-500 mt-1">Dilewati</p>
             </div>
             <div className="p-4 rounded-xl bg-red-50 text-center">
               <XCircle className="h-6 w-6 text-red-600 mx-auto" />
-              <p className="text-2xl font-bold text-red-600 mt-1">{result.errors.length}</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">
+                {result.errors.length}
+              </p>
               <p className="text-xs text-red-700">Error</p>
             </div>
           </div>
@@ -190,18 +265,31 @@ export default function ProfilerImport() {
           {result.errors.length > 0 && (
             <div className="max-h-32 overflow-y-auto space-y-1">
               {result.errors.map((err, i) => (
-                <p key={i} className="text-xs text-red-600 bg-red-50 p-2 rounded">{err}</p>
+                <p
+                  key={i}
+                  className="text-xs text-red-600 bg-red-50 p-2 rounded"
+                >
+                  {err}
+                </p>
               ))}
             </div>
           )}
 
           <div className="flex gap-3">
-            <button onClick={() => { setFile(null); setResult(null); if (fileRef.current) fileRef.current.value = ''; }}
-              className="flex-1 rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50 transition">
+            <button
+              onClick={() => {
+                setFile(null);
+                setResult(null);
+                if (fileRef.current) fileRef.current.value = "";
+              }}
+              className="flex-1 rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50 transition"
+            >
               Import Lagi
             </button>
-            <a href={`/profiler/table${qs({ batch: batchName })}`}
-              className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white text-center hover:opacity-90 transition">
+            <a
+              href={`/profiler/table${qs({ batch: batchName })}`}
+              className="flex-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white text-center hover:opacity-90 transition"
+            >
               Lihat Tabel
             </a>
           </div>

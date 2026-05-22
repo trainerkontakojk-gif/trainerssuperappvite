@@ -22,46 +22,46 @@ export function buildHtmlReport(params: {
         <h3>Distribusi Temuan</h3>
         <p>Critical: ${params.chartData.donutData.critical} | Non-Critical: ${params.chartData.donutData.nonCritical}</p>
        </div>`
-    : '';
+    : "";
 
   const paretoHtml = params.chartData?.paretoData?.length
     ? `<div class="chart-card">
         <h3>Top Parameter</h3>
         <table><tr><th>Parameter</th><th>Jumlah</th><th>Kumulatif</th></tr>
-        ${params.chartData.paretoData.map(p => `<tr><td>${p.name}</td><td>${p.count}</td><td>${p.cumulative}</td></tr>`).join('')}
+        ${params.chartData.paretoData.map((p) => `<tr><td>${p.name}</td><td>${p.count}</td><td>${p.cumulative}</td></tr>`).join("")}
         </table>
        </div>`
-    : '';
+    : "";
 
   const trendHtml = params.chartData?.trendData?.length
     ? `<div class="chart-card">
         <h3>Tren Bulanan</h3>
         <table><tr><th>Periode</th><th>Total Temuan</th></tr>
-        ${params.chartData.trendData.map(t => `<tr><td>${t.month}</td><td>${t.total}</td></tr>`).join('')}
+        ${params.chartData.trendData.map((t) => `<tr><td>${t.month}</td><td>${t.total}</td></tr>`).join("")}
         </table>
        </div>`
-    : '';
+    : "";
 
   const findingsHtml = params.keyFindings.length
     ? `<div class="section findings">
         <h2>Temuan Penting</h2>
-        <ul>${params.keyFindings.map(f => `<li>${f}</li>`).join('')}</ul>
+        <ul>${params.keyFindings.map((f) => `<li>${f}</li>`).join("")}</ul>
        </div>`
-    : '';
+    : "";
 
   const recHtml = params.recommendations.length
     ? `<div class="section">
         <h2>Rekomendasi</h2>
-        <ul>${params.recommendations.map(r => `<li>${r}</li>`).join('')}</ul>
+        <ul>${params.recommendations.map((r) => `<li>${r}</li>`).join("")}</ul>
        </div>`
-    : '';
+    : "";
 
   const priorityHtml = params.priorityAreas.length
     ? `<div class="section">
         <h2>Area Prioritas Perbaikan</h2>
-        <ul>${params.priorityAreas.map(p => `<li>${p}</li>`).join('')}</ul>
+        <ul>${params.priorityAreas.map((p) => `<li>${p}</li>`).join("")}</ul>
        </div>`
-    : '';
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -101,7 +101,7 @@ export function buildHtmlReport(params: {
 <body>
 <h1>${params.title}</h1>
 <p class="subtitle">Laporan Analisis Kualitas QA</p>
-<p class="meta">Periode: ${params.periodLabel} &nbsp;|&nbsp; Layanan: ${params.serviceLabel} &nbsp;|&nbsp; Mode: ${params.mode}${params.agentName ? ` &nbsp;|&nbsp; Agen: ${params.agentName}` : ''}</p>
+<p class="meta">Periode: ${params.periodLabel} &nbsp;|&nbsp; Layanan: ${params.serviceLabel} &nbsp;|&nbsp; Mode: ${params.mode}${params.agentName ? ` &nbsp;|&nbsp; Agen: ${params.agentName}` : ""}</p>
 
 <div class="summary-card">
   <div class="stat"><div class="num">${params.totalFindings}</div><div class="lbl">Total Temuan</div></div>

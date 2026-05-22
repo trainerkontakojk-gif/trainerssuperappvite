@@ -3,7 +3,7 @@
  */
 
 export function getImageDataUri(base64: string): string {
-  if (base64.startsWith('data:image/')) {
+  if (base64.startsWith("data:image/")) {
     return base64;
   }
 
@@ -18,7 +18,7 @@ function detectMimeFromBytes(base64: string): string {
 
     // JPEG: FF D8 FF
     if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-      return 'image/jpeg';
+      return "image/jpeg";
     }
     // PNG: 89 50 4E 47
     if (
@@ -27,7 +27,7 @@ function detectMimeFromBytes(base64: string): string {
       bytes[2] === 0x4e &&
       bytes[3] === 0x47
     ) {
-      return 'image/png';
+      return "image/png";
     }
     // WebP: 52 49 46 46 (RIFF header)
     if (
@@ -36,7 +36,7 @@ function detectMimeFromBytes(base64: string): string {
       bytes[2] === 0x46 &&
       bytes[3] === 0x46
     ) {
-      return 'image/webp';
+      return "image/webp";
     }
     // GIF: 47 49 46 38
     if (
@@ -45,11 +45,11 @@ function detectMimeFromBytes(base64: string): string {
       bytes[2] === 0x46 &&
       bytes[3] === 0x38
     ) {
-      return 'image/gif';
+      return "image/gif";
     }
   } catch {
     // ignore
   }
 
-  return 'image/png';
+  return "image/png";
 }

@@ -35,11 +35,11 @@ Dokumen ini menjelaskan logika bisnis SIDAK yang dipakai saat ini: sumber data, 
 
 Ada tiga mode skor:
 
-| Mode | Rumus |
-| --- | --- |
-| `flat` | `score = (sum((nilai / 3) * bobot) / sum(bobot)) * 100` |
-| `no_category` | Sama seperti `flat` |
-| `weighted` | Hitung skor per kategori dulu, lalu gabungkan dengan bobot service |
+| Mode          | Rumus                                                              |
+| ------------- | ------------------------------------------------------------------ |
+| `flat`        | `score = (sum((nilai / 3) * bobot) / sum(bobot)) * 100`            |
+| `no_category` | Sama seperti `flat`                                                |
+| `weighted`    | Hitung skor per kategori dulu, lalu gabungkan dengan bobot service |
 
 ### Mode `weighted`
 
@@ -91,14 +91,14 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 
 ## Metrik Dashboard Dan Ranking
 
-| Metrik | Rumus |
-| --- | --- |
-| `totalAgents` | Jumlah agent dengan audit presence |
-| `totalDefects` | Jumlah `findingRows` countable |
-| `avgDefectsPerAudit` | `totalDefects / totalAgents` |
-| `zeroErrorRate` | `(agent tanpa findingRows / totalAgents) * 100` |
-| `avgAgentScore` | `sum(finalAgentScore) / totalAgents` |
-| `complianceRate` | `(agent dengan score >= 95 / totalAgents) * 100` |
+| Metrik               | Rumus                                            |
+| -------------------- | ------------------------------------------------ |
+| `totalAgents`        | Jumlah agent dengan audit presence               |
+| `totalDefects`       | Jumlah `findingRows` countable                   |
+| `avgDefectsPerAudit` | `totalDefects / totalAgents`                     |
+| `zeroErrorRate`      | `(agent tanpa findingRows / totalAgents) * 100`  |
+| `avgAgentScore`      | `sum(finalAgentScore) / totalAgents`             |
+| `complianceRate`     | `(agent dengan score >= 95 / totalAgents) * 100` |
 
 Ranking agent diurutkan dari defect terbanyak ke tersedikit, lalu nama agent sebagai tie-break.
 
@@ -110,11 +110,11 @@ Pareto dan donut memakai `findingRows` saja. Phantom tidak dihitung sebagai defe
 
 Asumsi service memakai bobot `critical = 0.50` dan `non-critical = 0.50`.
 
-| Indikator | Kategori | Bobot | Nilai |
-| --- | --- | --- | --- |
-| A | non-critical | 2 | 3 |
-| B | non-critical | 1 | 2 |
-| C | critical | 1 | 0 |
+| Indikator | Kategori     | Bobot | Nilai |
+| --------- | ------------ | ----- | ----- |
+| A         | non-critical | 2     | 3     |
+| B         | non-critical | 1     | 2     |
+| C         | critical     | 1     | 0     |
 
 Hitungan:
 

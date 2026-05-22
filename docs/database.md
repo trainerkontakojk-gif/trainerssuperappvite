@@ -7,13 +7,15 @@ Dokumen ini menjelaskan struktur tabel PostgreSQL di Supabase dan kebijakan Row 
 ## 🌟 Pengantar untuk Pengguna Umum (Human-Readable Overview)
 
 ### Apa itu Struktur Database dan Keamanan Ini?
+
 Database Supabase bertindak sebagai brankas utama tempat seluruh data aplikasi Trainers SuperApp disimpan—mulai dari informasi akun pengguna, hasil simulasi pelatihan, hingga temuan audit kualitas.
 
 Sistem keamanan database kami dirancang dengan prinsip **"Tolak Akses Sejak Awal" (Deny-by-Default)**. Artinya, secara bawaan, tidak ada satu pun orang atau program luar yang diizinkan mengintip atau mengubah isi tabel apa pun, kecuali mereka memiliki kunci atau izin khusus yang secara eksplisit diberikan oleh sistem.
 
 ### Manfaat Langsung bagi Pengguna:
+
 1. **Privasi Data Terjamin:** Data pribadi, nilai simulasi, dan rekaman suara Anda sepenuhnya terisolasi. Pengguna lain tidak akan bisa melihat data Anda tanpa otorisasi yang sah.
-2. **Perlindungan dari Pihak Luar:** Pihak yang tidak masuk log (*unauthenticated/anon*) tidak memiliki celah untuk menebak-nebak daftar email pengguna atau mengakses fitur apa pun di latar belakang.
+2. **Perlindungan dari Pihak Luar:** Pihak yang tidak masuk log (_unauthenticated/anon_) tidak memiliki celah untuk menebak-nebak daftar email pengguna atau mengakses fitur apa pun di latar belakang.
 3. **Keteraturan Kerja:** Setiap peran (Agent, Leader, dan Trainer) memiliki jalur atau pintu khusus. Hal ini mencegah kekeliruan, seperti Agent tanpa sengaja mengubah pengaturan harga atau menghapus rekaman orang lain.
 
 ---
@@ -37,6 +39,7 @@ erDiagram
 ## Tabel Utama
 
 **Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (12 files, 000-010 + timestamped, fully idempotent):
+
 - `000_profiles_core.sql` — Profiles & auth tables
 - `001_sidak_core.sql` — SIDAK core + Profiler tables (12 tables, all RLS-enabled)
 - `002_ketik_pdkt_core.sql` — KETIK, PDKT, AI usage tables
@@ -53,6 +56,7 @@ erDiagram
 ### 1. `public.profiles`
 
 Menyimpan data profil user yang terintegrasi dengan `auth.users`.
+
 - `id` (UUID, Primary Key): ID user dari Supabase Auth.
 - `email` (Text, Unique): Email user.
 - `full_name` (Text): Nama lengkap user.
@@ -62,7 +66,9 @@ Menyimpan data profil user yang terintegrasi dengan `auth.users`.
 - `is_deleted` (Boolean): Flag untuk soft delete akun.
 
 ### 2. `public.results`
+
 Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
+
 - `id` (UUID, Primary Key): ID unik hasil simulasi.
 - `user_id` (UUID): Referensi ke `auth.users(id)`.
 - `module` (Text): Nama modul.
@@ -71,6 +77,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - `created_at`, `updated_at` (Timestamptz): Timestamp.
 
 ### 3. Modul Simulasi
+
 - **`ketik_history`**: Riwayat sesi KETIK per user, termasuk skenario, identitas konsumen, dan messages.
 - **`ketik_session_reviews`**: Hasil review AI per sesi KETIK. Berisi skor, rubrik, dan feedback dalam format JSONB.
 - **`pdkt_history`**: Riwayat sesi PDKT per user, email thread, config, dan hasil evaluasi async.
@@ -80,12 +87,14 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`user_settings`**: Settings modul yang disimpan per user untuk KETIK, PDKT, dan TELEFUN.
 
 ### 4. Modul Profiler (KTP)
+
 - **`profiler_years`**: Daftar tahun database.
 - **`profiler_folders`**: Batch atau grup peserta (mendukung struktur folder bertingkat).
 - **`profiler_peserta`**: Data detail peserta (NIK, Alamat, Foto, dll).
 - **`profiler_tim_list`**: Daftar tim operasional yang tersedia.
 
 ### 5. Modul SIDAK (QA Analyzer)
+
 - **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard per periode. Direfresh async via `refreshMaterializedView()` setelah batch upload.
 - **`qa_dashboard_period_summary`**: Summary KPI per periode untuk dashboard SIDAK (fallback jika MV belum tersedia).
 - **`qa_dashboard_indicator_period_summary`**: Breakdown KPI per indikator per periode.
@@ -100,12 +109,14 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 **Soft-delete Exclusion**: Queries dashboard SIDAK (`getDashboardData`, `getAgents`, `getDataReportRows`) secara otomatis mengecualikan peserta yang terhubung ke profile soft-deleted (`is_deleted=true`) atau inactive (`status=inactive`), kecuali `show_archived=true` dikirim sebagai query param.
 
 ### 6. Admin & Access Control
+
 - **`access_groups`**: Definisi access group (nama, deskripsi, scope_type, is_active).
 - **`access_group_items`**: Item scope individual (field_name: `peserta_id`, `batch_name`, `tim`, `service_type`).
 - **`leader_access_requests`**: Request approval per leader per module.
 - **`leader_access_request_groups`**: Join table: satu approved request bisa memiliki >1 access group.
 
 ### 7. Monitoring AI Usage & Billing
+
 - **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard SIDAK per periode. Diprioritaskan dari pada `qa_dashboard_period_summary` dengan fallback chain: MV → cache → computed.
 - **`ai_usage_logs`**: Log 1 baris per AI call (sukses maupun gagal/timeout). Menyimpan `request_id`, `user_id`, `provider`, `model_id`, `module`, `action`, token, harga, kurs, estimasi biaya, `status` (success/failed/timeout), dan `error_message`.
 - **`ai_pricing_settings`**: Harga token input/output per model kanonik.
@@ -116,37 +127,41 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 Sistem otorisasi data kami menggabungkan dua lapisan pertahanan utama: **Explicit Data API Grants** pada tingkat tabel/fungsi dan **Row Level Security (RLS)** pada tingkat baris.
 
 ### 🔒 Lapisan 1: Hak Akses Eksplisit (Explicit Data API Grants)
+
 Berdasarkan mitigasi keamanan terbaru, seluruh hak akses bawaan yang luas (`GRANT ALL ON ... TO anon, public`) telah **dicabut secara permanen**.
+
 - **Peran `anon` dan `public`:** Tidak memiliki akses `SELECT`, `INSERT`, `UPDATE`, atau `DELETE` pada tabel aplikasi apa pun.
-- **Peran `authenticated`:** Diberikan hak akses secara terperinci (granular) hanya pada tabel-tabel yang berinteraksi dengan pengguna aktif. Tabel internal tingkat sistem seperti `ai_usage_logs`, `ai_pricing_settings`, dan `ai_billing_settings` sepenuhnya **tertutup** dari akses client (*zero client-side grants*) dan hanya dapat dimanipulasi melalui klien admin di sisi backend (Hono API).
+- **Peran `authenticated`:** Diberikan hak akses secara terperinci (granular) hanya pada tabel-tabel yang berinteraksi dengan pengguna aktif. Tabel internal tingkat sistem seperti `ai_usage_logs`, `ai_pricing_settings`, dan `ai_billing_settings` sepenuhnya **tertutup** dari akses client (_zero client-side grants_) dan hanya dapat dimanipulasi melalui klien admin di sisi backend (Hono API).
 - **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) fungsi dibatasi secara ketat ke peran `authenticated` atau `service_role`.
 
 ### 🛡️ Lapisan 2: Row Level Security (RLS)
+
 Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya dapat melihat atau memodifikasi baris data yang menjadi haknya. RLS diaktifkan di seluruh tabel tanpa terkecuali.
 
-| Tabel | Role: Agent | Role: Leader | Role: Trainer/Admin |
-|---|---|---|---|
-| `profiles` | Insert (Own Pending), Update (full_name only), Read (Own) | Read (All), Update (full_name only) | Mutasi via Admin Client (service role) |
-| `results` | Read/Write (Own) | Read (Team) | Read/Update (All) |
-| `profiler_years` | No Access | Read (Approved KTP scope only) | Full CRUD Access |
-| `profiler_folders` | No Access | Read (Scoped via `batch_name`) | Full CRUD Access |
-| `profiler_tim_list` | No Access | Read (Scoped via `tim`) | Full CRUD Access |
-| `profiler_peserta` | No Access | Read (Scoped via `leader_can_access_peserta`) | Full CRUD Access |
-| `qa_periods` | Read (All) | Read (All) | Full CRUD Access |
-| `qa_indicators` | Read (All) | Read (All) | Full CRUD Access |
-| `qa_temuan` | Read (Own via email_ojk match) | Read (Scoped via `leader_can_access_sidak_temuan`) | Full CRUD Access |
-| `ketik_history` | Read/Write/Delete (Own) | No Access | No Access |
-| `pdkt_history` | Read/Write/Delete (Own) | No Access | No Access |
-| `user_settings` | Full CRUD (Own) | Full CRUD (Own) | Full CRUD (Own) |
-| `ketik_session_reviews` | Read (Own) | No Access | Read/Delete (Trainer/Admin) |
-| `pdkt_mailbox_items` | Read/Update (Own) | Read (Scoped) | Read/Delete (Trainer/Admin) |
-| `telefun_replay_annotations` | Read/Insert (Own) | No Access | Read/Insert (via server action) |
-| `access_groups` / `access_group_items` | No Access | No Access | Full CRUD (Admin/Trainer) |
-| `leader_access_requests` | No Access | Read/Insert (Own) | Full CRUD (Admin/Trainer) |
-| `qa_dashboard_period_summary` | Read (All) | Read (All) | Full CRUD (Admin/Trainer) |
-| `qa_dashboard_agent_period_summary` | Read (All) | Read (All) | Full CRUD (Admin/Trainer) |
+| Tabel                                  | Role: Agent                                               | Role: Leader                                       | Role: Trainer/Admin                    |
+| -------------------------------------- | --------------------------------------------------------- | -------------------------------------------------- | -------------------------------------- |
+| `profiles`                             | Insert (Own Pending), Update (full_name only), Read (Own) | Read (All), Update (full_name only)                | Mutasi via Admin Client (service role) |
+| `results`                              | Read/Write (Own)                                          | Read (Team)                                        | Read/Update (All)                      |
+| `profiler_years`                       | No Access                                                 | Read (Approved KTP scope only)                     | Full CRUD Access                       |
+| `profiler_folders`                     | No Access                                                 | Read (Scoped via `batch_name`)                     | Full CRUD Access                       |
+| `profiler_tim_list`                    | No Access                                                 | Read (Scoped via `tim`)                            | Full CRUD Access                       |
+| `profiler_peserta`                     | No Access                                                 | Read (Scoped via `leader_can_access_peserta`)      | Full CRUD Access                       |
+| `qa_periods`                           | Read (All)                                                | Read (All)                                         | Full CRUD Access                       |
+| `qa_indicators`                        | Read (All)                                                | Read (All)                                         | Full CRUD Access                       |
+| `qa_temuan`                            | Read (Own via email_ojk match)                            | Read (Scoped via `leader_can_access_sidak_temuan`) | Full CRUD Access                       |
+| `ketik_history`                        | Read/Write/Delete (Own)                                   | No Access                                          | No Access                              |
+| `pdkt_history`                         | Read/Write/Delete (Own)                                   | No Access                                          | No Access                              |
+| `user_settings`                        | Full CRUD (Own)                                           | Full CRUD (Own)                                    | Full CRUD (Own)                        |
+| `ketik_session_reviews`                | Read (Own)                                                | No Access                                          | Read/Delete (Trainer/Admin)            |
+| `pdkt_mailbox_items`                   | Read/Update (Own)                                         | Read (Scoped)                                      | Read/Delete (Trainer/Admin)            |
+| `telefun_replay_annotations`           | Read/Insert (Own)                                         | No Access                                          | Read/Insert (via server action)        |
+| `access_groups` / `access_group_items` | No Access                                                 | No Access                                          | Full CRUD (Admin/Trainer)              |
+| `leader_access_requests`               | No Access                                                 | Read/Insert (Own)                                  | Full CRUD (Admin/Trainer)              |
+| `qa_dashboard_period_summary`          | Read (All)                                                | Read (All)                                         | Full CRUD (Admin/Trainer)              |
+| `qa_dashboard_agent_period_summary`    | Read (All)                                                | Read (All)                                         | Full CRUD (Admin/Trainer)              |
 
 **Catatan Proteksi `profiles`:**
+
 - Self-insert dibatasi ke profil sendiri dengan `status = 'pending'` dan `role != 'admin'`.
 - Self-update dibatasi ke kolom `full_name`.
 - Mutasi manajerial (change status/role/soft-delete) memakai admin client di backend yang bypass RLS via service role, setelah validasi caller.
@@ -154,12 +169,15 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 - Migration `008_profile_admin_policies.sql` menambahkan `profiles_select_admin` dan `profiles_update_admin` untuk defense-in-depth via user JWT (sebelumnya hanya via service_role).
 
 **Catatan Monitoring AI Usage:**
+
 - `leader` hanya mendapatkan visibilitas usage monitoring dari backend API yang sudah di-gate role.
 - Editor pricing dan kurs hanya tersedia untuk `trainer` dan `admin`.
 - Akses aplikasi untuk permukaan monitoring dijelaskan lebih detail di `docs/auth-rbac.md` dan `docs/MONITORING_TOKEN_USAGE_BILLING.md`.
 
 ## Storage
+
 Aplikasi menggunakan Supabase Storage bucket:
+
 - `profiler-foto`: Menyimpan foto aset peserta (KTP/Profiler). Bucket ini public untuk read, write dibatasi ke role `trainer` dan `admin`.
 - `reports`: Menyimpan dokumen laporan AI SIDAK yang di-generate (`.docx` dan `.html`).
 - `telefun-recordings`: Menyimpan rekaman Telefun jika fitur rekaman digunakan.

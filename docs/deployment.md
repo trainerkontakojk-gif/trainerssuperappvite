@@ -19,11 +19,11 @@
 
 ## Service Overview
 
-| Service | Port | Stack | Deploy Target |
-|---------|------|-------|---------------|
-| `apps/web` | 3000 | Vite SPA (static files) | Vercel / Cloudflare Pages |
-| `apps/api` | 3001 | Hono (Node.js HTTP) | Railway / Fly.io / VPS |
-| `apps/telefun` | 3002 | WebSocket (persistent) | Railway / Fly.io / VPS |
+| Service        | Port | Stack                   | Deploy Target             |
+| -------------- | ---- | ----------------------- | ------------------------- |
+| `apps/web`     | 3000 | Vite SPA (static files) | Vercel / Cloudflare Pages |
+| `apps/api`     | 3001 | Hono (Node.js HTTP)     | Railway / Fly.io / VPS    |
+| `apps/telefun` | 3002 | WebSocket (persistent)  | Railway / Fly.io / VPS    |
 
 ## Prerequisites
 
@@ -59,6 +59,7 @@ CONTEXT7_API_KEY=your_context7_key
 ### Production Env Vars (per service)
 
 **apps/api:**
+
 - `PORT` — HTTP port (default 3001)
 - `VITE_SUPABASE_URL` — Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` — Service role key (DO NOT expose to frontend)
@@ -68,12 +69,14 @@ CONTEXT7_API_KEY=your_context7_key
 - `NODE_ENV` — `production`
 
 **apps/web (build-time):**
+
 - `VITE_SUPABASE_URL` — Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` — Supabase anon key
 - `VITE_TELEFUN_WS_URL` — WebSocket URL (e.g. `wss://telefun.example.com`)
 - `VITE_API_URL` — API base URL (e.g. `https://api.example.com`)
 
 **apps/telefun:**
+
 - `PORT` — WS port (default 3002)
 - `SUPABASE_URL` — Supabase project URL
 - `SUPABASE_ANON_KEY` — Supabase anon key
@@ -91,6 +94,7 @@ supabase migration up
 ```
 
 Migration files:
+
 1. `000_profiles_core.sql` — profiles table + auto-create trigger
 2. `001_sidak_core.sql` — SIDAK tables (periods, indicators, temuan, agents, etc.)
 3. `002_ketik_pdkt_core.sql` — KETIK/PDKT tables + AI usage logging + pricing

@@ -32,6 +32,7 @@ graph TD
 ```
 
 ### Penjelasan Alur:
+
 1. **Frontend (`apps/web`)**: Vite + React SPA dengan TanStack Router. Semua route di-lazy load via `React.lazy()`.
 2. **Backend (`apps/api`)**: Hono API server dengan route handlers di `src/routes/`. Business logic di `src/services/`.
 3. **Hono RPC**: Frontend mengonsumsi API via `hc<AppType>` dari Hono RPC — full type-safety tanpa perlu definisi API terpisah.
@@ -112,23 +113,27 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 ## Environment & Runtime
 
 ### Frontend (`apps/web`) — prefix `VITE_`:
+
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_TELEFUN_WS_URL`
 
 ### Backend (`apps/api`) — variabel langsung:
+
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
 - `OPENROUTER_API_KEY`
 
 ### Telefun Server (`apps/telefun`) — variabel langsung:
+
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
 
 ### MCP / Tools:
+
 - `CONTEXT7_API_KEY` — disimpan di `.env.local` untuk context7 MCP server.
 
 File `.env.local` di root diabaikan oleh git, tapi isinya harus disinkronkan ke masing-masing apps jika diperlukan.
@@ -165,12 +170,14 @@ pnpm --filter @trainers/telefun dev
 ```
 
 Catatan:
+
 - Build tidak menerapkan migration Supabase. SQL di `supabase/migrations/` tetap harus dipush atau dieksekusi ke target Supabase.
 - Artifact backup berada di `local-backups/` dan tidak boleh masuk git.
 
 ## Security Model
 
 Keamanan aplikasi dijaga di beberapa sisi:
+
 1. **Frontend Route Guards**: TanStack Router dengan lazy loading dan auth checks di komponen Layout.
 2. **Backend Middleware**: Hono middleware chain — `authMiddleware` (JWT validation, global via app.ts) + `requireRole()` (per-route) applied to 48+ endpoints across Profiler, PDKT, AI monitoring, KETIK, SIDAK, and Admin. Duplicate authMiddleware removed from all 7 sub-routers.
 3. **Database RLS**: Filter data di tingkat PostgreSQL sehingga user hanya bisa melihat/mengubah data sesuai hak akses mereka. Semua 32 tabel RLS-enabled. Policy gaps closed: write_trainer for dashboard summary tables, admin profiles policies (migration 008).

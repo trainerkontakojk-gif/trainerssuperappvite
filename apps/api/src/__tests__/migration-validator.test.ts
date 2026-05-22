@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import * as fc from 'fast-check';
+import { describe, it, expect } from "vitest";
+import * as fc from "fast-check";
 
 /**
  * Property 2: Migration Validator Halt-on-Failure and Report Correctness
@@ -21,7 +21,7 @@ interface MigrationError {
 
 interface MigrationResult {
   filename: string;
-  status: 'pass' | 'fail';
+  status: "pass" | "fail";
   durationMs: number;
   error?: MigrationError;
 }
@@ -44,7 +44,12 @@ interface MigrationReport {
  * This mirrors the core loop logic in validateMigrations() without database I/O.
  */
 function buildMigrationReport(
-  outcomes: Array<{ filename: string; status: 'pass' | 'fail'; durationMs: number; error?: MigrationError }>
+  outcomes: Array<{
+    filename: string;
+    status: "pass" | "fail";
+    durationMs: number;
+    error?: MigrationError;
+  }>,
 ): MigrationReport {
   const results: MigrationResult[] = [];
 
@@ -55,18 +60,18 @@ function buildMigrationReport(
       durationMs: outcome.durationMs,
     };
 
-    if (outcome.status === 'fail' && outcome.error) {
+    if (outcome.status === "fail" && outcome.error) {
       result.error = outcome.error;
     }
 
     results.push(result);
 
-    if (outcome.status === 'fail') {
+    if (outcome.status === "fail") {
       // Halt on first failure — do not process subsequent files
       return {
         results,
         totalFiles: outcomes.length,
-        passed: results.filter((r) => r.status === 'pass').length,
+        passed: results.filter((r) => r.status === "pass").length,
         failed: 1,
         haltedAt: outcome.filename,
       };
@@ -84,30 +89,34 @@ function buildMigrationReport(
 
 // --- Arbitraries ---
 
-const filenameArb = fc.tuple(
-  fc.integer({ min: 0, max: 999 }),
-  fc.stringMatching(/^[a-z][a-z0-9_]{2,20}$/)
-).map(([num, name]) => `${String(num).padStart(3, '0')}_${name}.sql`);
+const filenameArb = fc
+  .tuple(
+    fc.integer({ min: 0, max: 999 }),
+    fc.stringMatching(/^[a-z][a-z0-9_]{2,20}$/),
+  )
+  .map(([num, name]) => `${String(num).padStart(3, "0")}_${name}.sql`);
 
 const durationMsArb = fc.integer({ min: 0, max: 30_000 });
 
 const migrationErrorArb = fc.record({
   line: fc.option(fc.integer({ min: 1, max: 1000 }), { nil: undefined }),
-  statement: fc.option(fc.string({ minLength: 1, maxLength: 200 }), { nil: undefined }),
+  statement: fc.option(fc.string({ minLength: 1, maxLength: 200 }), {
+    nil: undefined,
+  }),
   message: fc.string({ minLength: 1, maxLength: 500 }),
 });
 
 const passOutcomeArb = (filename: string) =>
   durationMsArb.map((durationMs) => ({
     filename,
-    status: 'pass' as const,
+    status: "pass" as const,
     durationMs,
   }));
 
 const failOutcomeArb = (filename: string) =>
   fc.tuple(durationMsArb, migrationErrorArb).map(([durationMs, error]) => ({
     filename,
-    status: 'fail' as const,
+    status: "fail" as const,
     durationMs,
     error,
   }));
@@ -128,7 +137,10 @@ const migrationSequenceWithFailureArb = fc
     const totalFiles = beforeCount + 1 + afterCount;
     // Generate unique filenames for all files
     return fc
-      .uniqueArray(filenameArb, { minLength: totalFiles, maxLength: totalFiles })
+      .uniqueArray(filenameArb, {
+        minLength: totalFiles,
+        maxLength: totalFiles,
+      })
       .chain((filenames) => {
         // Sort filenames to simulate ascending order
         const sortedFilenames = [...filenames].sort();
@@ -145,24 +157,30 @@ const migrationSequenceWithFailureArb = fc
         // Generate outcomes for files after failure (these should never be executed)
         const afterArbs = sortedFilenames
           .slice(beforeCount + 1)
-          .map((fn) =>
-            fc.oneof(passOutcomeArb(fn), failOutcomeArb(fn))
-          );
+          .map((fn) => fc.oneof(passOutcomeArb(fn), failOutcomeArb(fn)));
 
         return fc.tuple(
-          beforeArbs.length > 0 ? fc.tuple(...beforeArbs) : fc.constant([] as any[]),
+          beforeArbs.length > 0
+            ? fc.tuple(...beforeArbs)
+            : fc.constant([] as any[]),
           failArb,
-          afterArbs.length > 0 ? fc.tuple(...afterArbs) : fc.constant([] as any[]),
+          afterArbs.length > 0
+            ? fc.tuple(...afterArbs)
+            : fc.constant([] as any[]),
           fc.constant({ beforeCount, afterCount, totalFiles, sortedFilenames }),
         );
       });
   })
   .map(([beforeResults, failResult, afterResults, meta]) => {
     const before = Array.isArray(beforeResults)
-      ? (meta.beforeCount === 0 ? [] : [beforeResults].flat())
+      ? meta.beforeCount === 0
+        ? []
+        : [beforeResults].flat()
       : [beforeResults];
     const after = Array.isArray(afterResults)
-      ? (meta.afterCount === 0 ? [] : [afterResults].flat())
+      ? meta.afterCount === 0
+        ? []
+        : [afterResults].flat()
       : [afterResults];
 
     return {
@@ -180,18 +198,20 @@ const migrationSequenceWithFailureArb = fc
 const allPassSequenceArb = fc
   .integer({ min: 1, max: 15 })
   .chain((count) =>
-    fc.uniqueArray(filenameArb, { minLength: count, maxLength: count }).chain((filenames) => {
-      const sorted = [...filenames].sort();
-      return fc.tuple(...sorted.map((fn) => passOutcomeArb(fn)));
-    })
+    fc
+      .uniqueArray(filenameArb, { minLength: count, maxLength: count })
+      .chain((filenames) => {
+        const sorted = [...filenames].sort();
+        return fc.tuple(...sorted.map((fn) => passOutcomeArb(fn)));
+      }),
   )
   .map((outcomes) => (Array.isArray(outcomes) ? outcomes : [outcomes]));
 
 // --- Property Tests ---
 
-describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness', () => {
-  describe('Halt behavior: no files executed after first failure', () => {
-    it('report contains only files up to and including the first failure', () => {
+describe("Property 2: Migration Validator Halt-on-Failure and Report Correctness", () => {
+  describe("Halt behavior: no files executed after first failure", () => {
+    it("report contains only files up to and including the first failure", () => {
       fc.assert(
         fc.property(
           migrationSequenceWithFailureArb,
@@ -204,7 +224,9 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
 
             // No files after the failure index should be in results
             const resultFilenames = report.results.map((r) => r.filename);
-            const afterFilenames = allOutcomes.slice(failIndex + 1).map((o) => o.filename);
+            const afterFilenames = allOutcomes
+              .slice(failIndex + 1)
+              .map((o) => o.filename);
             for (const afterFile of afterFilenames) {
               expect(resultFilenames).not.toContain(afterFile);
             }
@@ -214,7 +236,7 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
       );
     });
 
-    it('haltedAt is set to the failing filename', () => {
+    it("haltedAt is set to the failing filename", () => {
       fc.assert(
         fc.property(
           migrationSequenceWithFailureArb,
@@ -229,39 +251,33 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
       );
     });
 
-    it('failed count is exactly 1 when halted', () => {
+    it("failed count is exactly 1 when halted", () => {
       fc.assert(
-        fc.property(
-          migrationSequenceWithFailureArb,
-          ({ allOutcomes }) => {
-            const report = buildMigrationReport(allOutcomes);
+        fc.property(migrationSequenceWithFailureArb, ({ allOutcomes }) => {
+          const report = buildMigrationReport(allOutcomes);
 
-            // Only one failure is recorded (halt on first)
-            expect(report.failed).toBe(1);
-          },
-        ),
+          // Only one failure is recorded (halt on first)
+          expect(report.failed).toBe(1);
+        }),
         { numRuns: 100 },
       );
     });
 
-    it('the last result in the report is always the failing file', () => {
+    it("the last result in the report is always the failing file", () => {
       fc.assert(
-        fc.property(
-          migrationSequenceWithFailureArb,
-          ({ allOutcomes }) => {
-            const report = buildMigrationReport(allOutcomes);
+        fc.property(migrationSequenceWithFailureArb, ({ allOutcomes }) => {
+          const report = buildMigrationReport(allOutcomes);
 
-            const lastResult = report.results[report.results.length - 1];
-            expect(lastResult.status).toBe('fail');
-            expect(lastResult.filename).toBe(report.haltedAt);
-          },
-        ),
+          const lastResult = report.results[report.results.length - 1];
+          expect(lastResult.status).toBe("fail");
+          expect(lastResult.filename).toBe(report.haltedAt);
+        }),
         { numRuns: 100 },
       );
     });
   });
 
-  describe('Report correctness: statuses, filenames, and durations', () => {
+  describe("Report correctness: statuses, filenames, and durations", () => {
     it('all results before the failure have status "pass"', () => {
       fc.assert(
         fc.property(
@@ -272,7 +288,7 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
             // All results except the last should be 'pass'
             const beforeResults = report.results.slice(0, beforeCount);
             for (const result of beforeResults) {
-              expect(result.status).toBe('pass');
+              expect(result.status).toBe("pass");
             }
           },
         ),
@@ -280,7 +296,7 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
       );
     });
 
-    it('report contains correct filenames matching input order', () => {
+    it("report contains correct filenames matching input order", () => {
       fc.assert(
         fc.property(
           migrationSequenceWithFailureArb,
@@ -297,23 +313,20 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
       );
     });
 
-    it('each result has a non-negative durationMs', () => {
+    it("each result has a non-negative durationMs", () => {
       fc.assert(
-        fc.property(
-          migrationSequenceWithFailureArb,
-          ({ allOutcomes }) => {
-            const report = buildMigrationReport(allOutcomes);
+        fc.property(migrationSequenceWithFailureArb, ({ allOutcomes }) => {
+          const report = buildMigrationReport(allOutcomes);
 
-            for (const result of report.results) {
-              expect(result.durationMs).toBeGreaterThanOrEqual(0);
-            }
-          },
-        ),
+          for (const result of report.results) {
+            expect(result.durationMs).toBeGreaterThanOrEqual(0);
+          }
+        }),
         { numRuns: 100 },
       );
     });
 
-    it('totalFiles reflects the total number of migration files (not just executed)', () => {
+    it("totalFiles reflects the total number of migration files (not just executed)", () => {
       fc.assert(
         fc.property(
           migrationSequenceWithFailureArb,
@@ -337,7 +350,7 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
 
             expect(report.passed).toBe(beforeCount);
             expect(report.passed).toBe(
-              report.results.filter((r) => r.status === 'pass').length
+              report.results.filter((r) => r.status === "pass").length,
             );
           },
         ),
@@ -345,76 +358,67 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
       );
     });
 
-    it('failing result contains error information', () => {
+    it("failing result contains error information", () => {
       fc.assert(
-        fc.property(
-          migrationSequenceWithFailureArb,
-          ({ allOutcomes }) => {
-            const report = buildMigrationReport(allOutcomes);
+        fc.property(migrationSequenceWithFailureArb, ({ allOutcomes }) => {
+          const report = buildMigrationReport(allOutcomes);
 
-            const failingResult = report.results.find((r) => r.status === 'fail');
-            expect(failingResult).toBeDefined();
-            expect(failingResult!.error).toBeDefined();
-            expect(failingResult!.error!.message.length).toBeGreaterThan(0);
-          },
-        ),
+          const failingResult = report.results.find((r) => r.status === "fail");
+          expect(failingResult).toBeDefined();
+          expect(failingResult!.error).toBeDefined();
+          expect(failingResult!.error!.message.length).toBeGreaterThan(0);
+        }),
         { numRuns: 100 },
       );
     });
   });
 
-  describe('All-pass scenario: no halt, complete report', () => {
-    it('when all migrations pass, report has no haltedAt and failed is 0', () => {
+  describe("All-pass scenario: no halt, complete report", () => {
+    it("when all migrations pass, report has no haltedAt and failed is 0", () => {
       fc.assert(
-        fc.property(
-          allPassSequenceArb,
-          (outcomes) => {
-            const report = buildMigrationReport(outcomes);
+        fc.property(allPassSequenceArb, (outcomes) => {
+          const report = buildMigrationReport(outcomes);
 
-            expect(report.haltedAt).toBeUndefined();
-            expect(report.failed).toBe(0);
-            expect(report.passed).toBe(outcomes.length);
-            expect(report.totalFiles).toBe(outcomes.length);
-            expect(report.results.length).toBe(outcomes.length);
-          },
-        ),
+          expect(report.haltedAt).toBeUndefined();
+          expect(report.failed).toBe(0);
+          expect(report.passed).toBe(outcomes.length);
+          expect(report.totalFiles).toBe(outcomes.length);
+          expect(report.results.length).toBe(outcomes.length);
+        }),
         { numRuns: 100 },
       );
     });
 
     it('when all pass, every result has status "pass" and valid durationMs', () => {
       fc.assert(
-        fc.property(
-          allPassSequenceArb,
-          (outcomes) => {
-            const report = buildMigrationReport(outcomes);
+        fc.property(allPassSequenceArb, (outcomes) => {
+          const report = buildMigrationReport(outcomes);
 
-            for (const result of report.results) {
-              expect(result.status).toBe('pass');
-              expect(result.durationMs).toBeGreaterThanOrEqual(0);
-              expect(result.error).toBeUndefined();
-            }
-          },
-        ),
+          for (const result of report.results) {
+            expect(result.status).toBe("pass");
+            expect(result.durationMs).toBeGreaterThanOrEqual(0);
+            expect(result.error).toBeUndefined();
+          }
+        }),
         { numRuns: 100 },
       );
     });
   });
 
-  describe('Edge cases', () => {
-    it('first file fails: report has 1 result, 0 passed, haltedAt is first file', () => {
+  describe("Edge cases", () => {
+    it("first file fails: report has 1 result, 0 passed, haltedAt is first file", () => {
       fc.assert(
         fc.property(
           fc.integer({ min: 1, max: 10 }).chain((totalFiles) =>
-            fc.uniqueArray(filenameArb, { minLength: totalFiles, maxLength: totalFiles }).chain(
-              (filenames) => {
+            fc
+              .uniqueArray(filenameArb, {
+                minLength: totalFiles,
+                maxLength: totalFiles,
+              })
+              .chain((filenames) => {
                 const sorted = [...filenames].sort();
-                return fc.tuple(
-                  failOutcomeArb(sorted[0]),
-                  fc.constant(sorted),
-                );
-              }
-            )
+                return fc.tuple(failOutcomeArb(sorted[0]), fc.constant(sorted));
+              }),
           ),
           ([failOutcome, sortedFilenames]) => {
             // Build outcomes: first fails, rest would pass (but never executed)
@@ -422,7 +426,7 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
               failOutcome,
               ...sortedFilenames.slice(1).map((fn) => ({
                 filename: fn,
-                status: 'pass' as const,
+                status: "pass" as const,
                 durationMs: 100,
               })),
             ];
@@ -439,7 +443,7 @@ describe('Property 2: Migration Validator Halt-on-Failure and Report Correctness
       );
     });
 
-    it('empty file list produces empty report', () => {
+    it("empty file list produces empty report", () => {
       const report = buildMigrationReport([]);
 
       expect(report.results).toEqual([]);

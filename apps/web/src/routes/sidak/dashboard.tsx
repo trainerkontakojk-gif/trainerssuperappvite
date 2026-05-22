@@ -1,40 +1,60 @@
-import { useState, useEffect } from 'react';
-import { useApi } from '../../hooks/useApi';
-import type { DashboardData } from '@trainers/types';
-import { BarChart3, TrendingDown, Users, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useState, useEffect } from "react";
+import { useApi } from "../../hooks/useApi";
+import type { DashboardData } from "@trainers/types";
+import {
+  BarChart3,
+  TrendingDown,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 
 const SERVICE_LABELS: Record<string, string> = {
-  call: 'Call',
-  chat: 'Chat',
-  email: 'Email',
-  cso: 'CSO',
-  pencatatan: 'Pencatatan',
-  bko: 'BKO',
-  slik: 'SLIK',
+  call: "Call",
+  chat: "Chat",
+  email: "Email",
+  cso: "CSO",
+  pencatatan: "Pencatatan",
+  bko: "BKO",
+  slik: "SLIK",
 };
 
 const SERVICE_COLORS: Record<string, string> = {
-  call: '#3B82F6',
-  chat: '#10B981',
-  email: '#F59E0B',
-  cso: '#8B5CF6',
-  pencatatan: '#EC4899',
-  bko: '#06B6D4',
-  slik: '#F97316',
+  call: "#3B82F6",
+  chat: "#10B981",
+  email: "#F59E0B",
+  cso: "#8B5CF6",
+  pencatatan: "#EC4899",
+  bko: "#06B6D4",
+  slik: "#F97316",
 };
 
 export default function SidakDashboardPage() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [serviceType, setServiceType] = useState<string>('all');
+  const [serviceType, setServiceType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
   const { data, loading, refetch } = useApi<DashboardData>(
-    `/sidak/dashboard?year=${year}${serviceType !== 'all' ? `&service_type=${serviceType}` : ''}`
+    `/sidak/dashboard?year=${year}${serviceType !== "all" ? `&service_type=${serviceType}` : ""}`,
   );
 
-  const { data: yearsData } = useApi<{ years: number[] }>('/sidak/dashboard/available-years');
+  const { data: yearsData } = useApi<{ years: number[] }>(
+    "/sidak/dashboard/available-years",
+  );
 
   useEffect(() => {
     setPage(1);
@@ -43,23 +63,36 @@ export default function SidakDashboardPage() {
   const years = yearsData?.years || [new Date().getFullYear()];
   const s = data?.summary;
   const hasData = data && (s?.totalAgents ?? 0) > 0;
-  const hasNoPeriods = data && (s?.totalAgents ?? 0) === 0 && (s?.totalDefects ?? 0) === 0;
+  const hasNoPeriods =
+    data && (s?.totalAgents ?? 0) === 0 && (s?.totalDefects ?? 0) === 0;
 
   const topAgents = data?.topAgents || [];
-  const paginatedAgents = topAgents.slice((page - 1) * pageSize, page * pageSize);
+  const paginatedAgents = topAgents.slice(
+    (page - 1) * pageSize,
+    page * pageSize,
+  );
   const totalPages = Math.ceil(topAgents.length / pageSize);
 
   const paretoData = (data?.paretoData || [])
     .sort((a: { count: number }, b: { count: number }) => b.count - a.count)
     .slice(0, 8)
-    .map((p: { name: string; count: number; cumulative: number }, i: number, arr: { count: number }[]) => {
-      const total = arr.reduce((sum: number, x: { count: number }) => sum + x.count, 0);
-      return {
-        name: p.name.length > 20 ? p.name.slice(0, 20) + '...' : p.name,
-        count: p.count,
-        cumulative: total > 0 ? Math.round((p.cumulative / total) * 100) : 0,
-      };
-    });
+    .map(
+      (
+        p: { name: string; count: number; cumulative: number },
+        i: number,
+        arr: { count: number }[],
+      ) => {
+        const total = arr.reduce(
+          (sum: number, x: { count: number }) => sum + x.count,
+          0,
+        );
+        return {
+          name: p.name.length > 20 ? p.name.slice(0, 20) + "..." : p.name,
+          count: p.count,
+          cumulative: total > 0 ? Math.round((p.cumulative / total) * 100) : 0,
+        };
+      },
+    );
 
   if (loading) {
     return (
@@ -82,8 +115,12 @@ export default function SidakDashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <BarChart3 className="h-16 w-16 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700">Gagal memuat dashboard</h3>
-        <p className="text-sm text-gray-500 mt-1">Terjadi kesalahan saat mengambil data. Silakan coba lagi.</p>
+        <h3 className="text-lg font-semibold text-gray-700">
+          Gagal memuat dashboard
+        </h3>
+        <p className="text-sm text-gray-500 mt-1">
+          Terjadi kesalahan saat mengambil data. Silakan coba lagi.
+        </p>
         <button
           onClick={() => refetch()}
           className="mt-4 px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition-colors"
@@ -98,9 +135,12 @@ export default function SidakDashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <Filter className="h-16 w-16 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700">Belum ada periode audit</h3>
+        <h3 className="text-lg font-semibold text-gray-700">
+          Belum ada periode audit
+        </h3>
         <p className="text-sm text-gray-500 mt-1 max-w-md">
-          Data SIDAK akan muncul setelah periode audit dibuat dan data temuan diupload. Hubungi admin untuk membuat periode baru.
+          Data SIDAK akan muncul setelah periode audit dibuat dan data temuan
+          diupload. Hubungi admin untuk membuat periode baru.
         </p>
       </div>
     );
@@ -112,7 +152,9 @@ export default function SidakDashboardPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-2xl font-bold">Dashboard QA</h2>
-          <p className="text-sm text-gray-500 mt-1">Ringkasan hasil audit kualitas per layanan dan periode.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Ringkasan hasil audit kualitas per layanan dan periode.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
@@ -123,7 +165,9 @@ export default function SidakDashboardPage() {
               className="rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
             >
               {years.map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>
+                  {y}
+                </option>
               ))}
             </select>
           </div>
@@ -136,7 +180,9 @@ export default function SidakDashboardPage() {
             >
               <option value="all">Semua</option>
               {Object.entries(SERVICE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
+                <option key={key} value={key}>
+                  {label}
+                </option>
               ))}
             </select>
           </div>
@@ -145,10 +191,34 @@ export default function SidakDashboardPage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard icon={Users} label="Total Agent" value={s?.totalAgents ?? 0} color="text-blue-600" bg="bg-blue-50" />
-        <MetricCard icon={AlertTriangle} label="Total Temuan" value={s?.totalDefects ?? 0} color="text-red-600" bg="bg-red-50" />
-        <MetricCard icon={CheckCircle2} label="Zero Error Rate" value={`${s?.zeroErrorRate?.toFixed(1) ?? 0}%`} color="text-green-600" bg="bg-green-50" />
-        <MetricCard icon={TrendingDown} label="Avg Score" value={s?.avgAgentScore?.toFixed(1) ?? '0'} color="text-amber-600" bg="bg-amber-50" />
+        <MetricCard
+          icon={Users}
+          label="Total Agent"
+          value={s?.totalAgents ?? 0}
+          color="text-blue-600"
+          bg="bg-blue-50"
+        />
+        <MetricCard
+          icon={AlertTriangle}
+          label="Total Temuan"
+          value={s?.totalDefects ?? 0}
+          color="text-red-600"
+          bg="bg-red-50"
+        />
+        <MetricCard
+          icon={CheckCircle2}
+          label="Zero Error Rate"
+          value={`${s?.zeroErrorRate?.toFixed(1) ?? 0}%`}
+          color="text-green-600"
+          bg="bg-green-50"
+        />
+        <MetricCard
+          icon={TrendingDown}
+          label="Avg Score"
+          value={s?.avgAgentScore?.toFixed(1) ?? "0"}
+          color="text-amber-600"
+          bg="bg-amber-50"
+        />
       </div>
 
       {/* Charts Row */}
@@ -159,7 +229,10 @@ export default function SidakDashboardPage() {
           {hasData ? (
             <div className="space-y-3">
               <ScoreBar label="Avg Agent Score" value={s?.avgAgentScore ?? 0} />
-              <ScoreBar label="Compliance Rate" value={s?.complianceRate ?? 0} />
+              <ScoreBar
+                label="Compliance Rate"
+                value={s?.complianceRate ?? 0}
+              />
               <div className="text-sm text-gray-500 mt-2">
                 {s?.complianceCount ?? 0} agent comply (skor &ge;95)
               </div>
@@ -176,21 +249,31 @@ export default function SidakDashboardPage() {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={paretoData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-30} textAnchor="end" height={60} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 10 }}
+                  interval={0}
+                  angle={-30}
+                  textAnchor="end"
+                  height={60}
+                />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip
                   contentStyle={{ fontSize: 12, borderRadius: 8 }}
                   formatter={(value: unknown, name: unknown) => {
-                    const n = String(name || '');
+                    const n = String(name || "");
                     return [
-                      n === 'count' ? `${value} temuan` : `${value}%`,
-                      n === 'count' ? 'Jumlah' : 'Kumulatif'
+                      n === "count" ? `${value} temuan` : `${value}%`,
+                      n === "count" ? "Jumlah" : "Kumulatif",
                     ];
                   }}
                 />
                 <Bar dataKey="count" fill="#f43f5e" radius={[4, 4, 0, 0]}>
                   {paretoData.map((_: unknown, i: number) => (
-                    <Cell key={i} fill={i < 3 ? '#f43f5e' : i < 5 ? '#f59e0b' : '#3b82f6'} />
+                    <Cell
+                      key={i}
+                      fill={i < 3 ? "#f43f5e" : i < 5 ? "#f59e0b" : "#3b82f6"}
+                    />
                   ))}
                 </Bar>
               </BarChart>
@@ -207,19 +290,25 @@ export default function SidakDashboardPage() {
         {data.serviceData.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {data.serviceData.map((svc) => (
-              <div key={svc.serviceType} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+              <div
+                key={svc.serviceType}
+                className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
+              >
                 <span className="text-sm font-medium">{svc.name}</span>
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
                       style={{
-                        width: `${Math.min(100, (svc.total / (Math.max(...data.serviceData.map(d => d.total), 1))) * 100)}%`,
-                        backgroundColor: SERVICE_COLORS[svc.serviceType] || '#6b7280',
+                        width: `${Math.min(100, (svc.total / Math.max(...data.serviceData.map((d) => d.total), 1)) * 100)}%`,
+                        backgroundColor:
+                          SERVICE_COLORS[svc.serviceType] || "#6b7280",
                       }}
                     />
                   </div>
-                  <span className="font-medium text-sm w-6 text-right">{svc.total}</span>
+                  <span className="font-medium text-sm w-6 text-right">
+                    {svc.total}
+                  </span>
                 </div>
               </div>
             ))}
@@ -242,7 +331,9 @@ export default function SidakDashboardPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-xs text-gray-500">{page} / {totalPages}</span>
+              <span className="text-xs text-gray-500">
+                {page} / {totalPages}
+              </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
@@ -268,12 +359,20 @@ export default function SidakDashboardPage() {
               <tbody>
                 {paginatedAgents.map((agent, idx) => (
                   <tr key={agent.agentId} className="border-b last:border-0">
-                    <td className="py-2 text-gray-400">{(page - 1) * pageSize + idx + 1}</td>
+                    <td className="py-2 text-gray-400">
+                      {(page - 1) * pageSize + idx + 1}
+                    </td>
                     <td className="py-2 font-medium">{agent.nama}</td>
                     <td className="py-2 text-gray-500">{agent.batch}</td>
-                    <td className={`py-2 text-right font-medium ${agent.defects > 0 ? 'text-red-600' : 'text-green-600'}`}>{agent.defects}</td>
+                    <td
+                      className={`py-2 text-right font-medium ${agent.defects > 0 ? "text-red-600" : "text-green-600"}`}
+                    >
+                      {agent.defects}
+                    </td>
                     <td className="py-2 text-right">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${agent.score >= 85 ? 'bg-green-100 text-green-700' : agent.score >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${agent.score >= 85 ? "bg-green-100 text-green-700" : agent.score >= 70 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}
+                      >
                         {agent.score}
                       </span>
                     </td>
@@ -290,11 +389,27 @@ export default function SidakDashboardPage() {
   );
 }
 
-function MetricCard({ icon: Icon, label, value, color, bg }: { icon: any; label: string; value: string | number; color: string; bg: string }) {
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+  bg,
+}: {
+  icon: any;
+  label: string;
+  value: string | number;
+  color: string;
+  bg: string;
+}) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4">
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center`}><Icon size={20} className={color} /></div>
+        <div
+          className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center`}
+        >
+          <Icon size={20} className={color} />
+        </div>
         <div>
           <p className="text-xs text-gray-500">{label}</p>
           <p className={`text-xl font-bold ${color}`}>{value}</p>
@@ -305,7 +420,8 @@ function MetricCard({ icon: Icon, label, value, color, bg }: { icon: any; label:
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
-  const color = value >= 85 ? 'bg-green-500' : value >= 70 ? 'bg-amber-500' : 'bg-red-500';
+  const color =
+    value >= 85 ? "bg-green-500" : value >= 70 ? "bg-amber-500" : "bg-red-500";
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
@@ -313,7 +429,10 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
         <span className="font-medium">{value.toFixed(1)}</span>
       </div>
       <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, value)}%` }} />
+        <div
+          className={`h-full rounded-full ${color}`}
+          style={{ width: `${Math.min(100, value)}%` }}
+        />
       </div>
     </div>
   );

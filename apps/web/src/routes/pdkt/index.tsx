@@ -1,31 +1,67 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Play, Settings, History, BarChart3 } from 'lucide-react';
-import ModuleWorkspaceIntro from '../../components/ModuleWorkspaceIntro';
-import PdktSimulation from './simulation';
-import { SettingsModal } from './components/SettingsModal';
-import { HistoryModal, type SessionHistory } from './components/HistoryModal';
-import { UsageModal } from './components/UsageModal';
-import { useApi, getApi, deleteApi } from '../../hooks/useApi';
-import type { PdktAppSettings } from './pdktSettings';
-import { DEFAULT_PDKT_MODEL_ID } from './pdktSettings';
-import type { PdktScenario, PdktConsumerType } from '@trainers/types';
-import { notify } from '../../lib/toast';
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Play, Settings, History, BarChart3 } from "lucide-react";
+import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
+import PdktSimulation from "./simulation";
+import { SettingsModal } from "./components/SettingsModal";
+import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
+import { UsageModal } from "./components/UsageModal";
+import { useApi, getApi, deleteApi } from "../../hooks/useApi";
+import type { PdktAppSettings } from "./pdktSettings";
+import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
+import type { PdktScenario, PdktConsumerType } from "@trainers/types";
+import { notify } from "../../lib/toast";
 
-const accentClassName = 'text-purple-500';
-const accentSoftClassName = 'bg-purple-100';
+const accentClassName = "text-purple-500";
+const accentSoftClassName = "bg-purple-100";
 
 const defaultConsumerTypes: PdktConsumerType[] = [
-  { id: 'marah', name: 'Marah & Emosional', description: 'Sangat marah, emosional, tidak sabar.', difficulty: 'Hard', tone: 'Marah, menggunakan tanda seru.' },
-  { id: 'bingung', name: 'Bingung & Gaptek', description: 'Kebingungan, tidak paham teknologi.', difficulty: 'Medium', tone: 'Bingung, ragu-ragu.' },
-  { id: 'kritis', name: 'Kritis & Detail', description: 'Kritis, menanyakan dasar hukum.', difficulty: 'Hard', tone: 'Kritis, logis, skeptis.' },
-  { id: 'ramah', name: 'Ramah & Kooperatif', description: 'Ramah, sopan, kooperatif.', difficulty: 'Easy', tone: 'Ramah, sopan.' },
-  { id: 'terburu-buru', name: 'Terburu-buru', description: 'Ingin jawaban singkat dan cepat.', difficulty: 'Medium', tone: 'Singkat, padat.' },
-  { id: 'pasrah', name: 'Pasrah & Sedih', description: 'Putus asa, nada sedih.', difficulty: 'Medium', tone: 'Sedih, memohon bantuan.' },
+  {
+    id: "marah",
+    name: "Marah & Emosional",
+    description: "Sangat marah, emosional, tidak sabar.",
+    difficulty: "Hard",
+    tone: "Marah, menggunakan tanda seru.",
+  },
+  {
+    id: "bingung",
+    name: "Bingung & Gaptek",
+    description: "Kebingungan, tidak paham teknologi.",
+    difficulty: "Medium",
+    tone: "Bingung, ragu-ragu.",
+  },
+  {
+    id: "kritis",
+    name: "Kritis & Detail",
+    description: "Kritis, menanyakan dasar hukum.",
+    difficulty: "Hard",
+    tone: "Kritis, logis, skeptis.",
+  },
+  {
+    id: "ramah",
+    name: "Ramah & Kooperatif",
+    description: "Ramah, sopan, kooperatif.",
+    difficulty: "Easy",
+    tone: "Ramah, sopan.",
+  },
+  {
+    id: "terburu-buru",
+    name: "Terburu-buru",
+    description: "Ingin jawaban singkat dan cepat.",
+    difficulty: "Medium",
+    tone: "Singkat, padat.",
+  },
+  {
+    id: "pasrah",
+    name: "Pasrah & Sedih",
+    description: "Putus asa, nada sedih.",
+    difficulty: "Medium",
+    tone: "Sedih, memohon bantuan.",
+  },
 ];
 
 export default function PdktLanding() {
-  const [view, setView] = useState<'home' | 'mailbox'>('home');
+  const [view, setView] = useState<"home" | "mailbox">("home");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isUsageOpen, setIsUsageOpen] = useState(false);
@@ -47,19 +83,24 @@ export default function PdktLanding() {
     totalCostIdr: number;
   } | null>(null);
 
-  const { data: defaultScenarios } = useApi<PdktScenario[]>('/pdkt/scenarios');
-  const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>('/pdkt/consumer-types');
+  const { data: defaultScenarios } = useApi<PdktScenario[]>("/pdkt/scenarios");
+  const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
+    "/pdkt/consumer-types",
+  );
 
   const fetchSettings = async () => {
     try {
-      const res = await getApi<{ success: boolean; settings: PdktAppSettings | null }>('/pdkt/settings');
+      const res = await getApi<{
+        success: boolean;
+        settings: PdktAppSettings | null;
+      }>("/pdkt/settings");
       if (res && res.settings) {
         setSettings(res.settings);
       } else {
         setSettings(null);
       }
     } catch (err) {
-      console.error('[PDKT] Failed to load settings:', err);
+      console.error("[PDKT] Failed to load settings:", err);
     } finally {
       setSettingsLoading(false);
     }
@@ -67,7 +108,7 @@ export default function PdktLanding() {
 
   const fetchHistory = async () => {
     try {
-      const res = await getApi<any[]>('/pdkt/history');
+      const res = await getApi<any[]>("/pdkt/history");
       if (res) {
         const mapped = res.map((item: any) => ({
           id: item.id,
@@ -75,14 +116,16 @@ export default function PdktLanding() {
           config: item.config,
           emails: item.emails || [],
           evaluation: item.evaluation,
-          evaluationStatus: item.evaluation_status || (item.evaluation ? 'completed' : 'processing'),
+          evaluationStatus:
+            item.evaluation_status ||
+            (item.evaluation ? "completed" : "processing"),
           evaluationError: item.evaluation_error,
-          timeTaken: item.time_taken
+          timeTaken: item.time_taken,
         }));
         setHistory(mapped);
       }
     } catch (err) {
-      console.error('[PDKT] Failed to load history:', err);
+      console.error("[PDKT] Failed to load history:", err);
     } finally {
       setHistoryLoading(false);
     }
@@ -95,51 +138,51 @@ export default function PdktLanding() {
 
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
     try {
-      const { postApi } = await import('../../hooks/useApi');
-      await postApi('/pdkt/settings', { settings: newSettings });
+      const { postApi } = await import("../../hooks/useApi");
+      await postApi("/pdkt/settings", { settings: newSettings });
       setSettings(newSettings);
       await fetchHistory();
     } catch (err) {
-      notify.error('Gagal menyimpan pengaturan.');
+      notify.error("Gagal menyimpan pengaturan.");
     }
   };
 
   const handleDeleteSession = async (historyId: string) => {
     try {
       await deleteApi(`/pdkt/history/${historyId}`);
-      setHistory(prev => prev.filter(h => h.id !== historyId));
+      setHistory((prev) => prev.filter((h) => h.id !== historyId));
     } catch (err) {
-      console.error('[PDKT] Failed to delete session:', err);
-      notify.error('Gagal menghapus riwayat sesi.');
+      console.error("[PDKT] Failed to delete session:", err);
+      notify.error("Gagal menghapus riwayat sesi.");
     }
   };
 
   const handleClearHistory = async () => {
     try {
-      await deleteApi('/pdkt/history');
+      await deleteApi("/pdkt/history");
       setHistory([]);
     } catch (err) {
-      notify.error('Gagal membersihkan riwayat.');
+      notify.error("Gagal membersihkan riwayat.");
     }
   };
 
   const handleSelectSession = (_session: SessionHistory) => {
     setIsHistoryOpen(false);
-    setView('mailbox');
+    setView("mailbox");
   };
 
   const captureUsageBaseline = async () => {
     try {
-      const summary = await getApi<any>('/ai/usage/summary?module=pdkt');
+      const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
       if (summary) {
         usageSnapshotRef.current = {
           totalCalls: summary.totalCalls,
           totalTokens: summary.totalTokens,
-          totalCostIdr: summary.totalCostIdr
+          totalCostIdr: summary.totalCostIdr,
         };
       }
     } catch (err) {
-      console.error('[PDKT] Failed to capture usage baseline:', err);
+      console.error("[PDKT] Failed to capture usage baseline:", err);
     }
   };
 
@@ -149,15 +192,28 @@ export default function PdktLanding() {
       return;
     }
     try {
-      const summary = await getApi<any>('/ai/usage/summary?module=pdkt');
+      const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
       if (summary) {
-        const deltaCalls = Math.max(0, summary.totalCalls - usageSnapshotRef.current.totalCalls);
-        const deltaTokens = Math.max(0, summary.totalTokens - usageSnapshotRef.current.totalTokens);
-        const deltaCost = Math.max(0, summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr);
-        setSessionDelta({ totalCalls: deltaCalls, totalTokens: deltaTokens, costIdr: deltaCost });
+        const deltaCalls = Math.max(
+          0,
+          summary.totalCalls - usageSnapshotRef.current.totalCalls,
+        );
+        const deltaTokens = Math.max(
+          0,
+          summary.totalTokens - usageSnapshotRef.current.totalTokens,
+        );
+        const deltaCost = Math.max(
+          0,
+          summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr,
+        );
+        setSessionDelta({
+          totalCalls: deltaCalls,
+          totalTokens: deltaTokens,
+          costIdr: deltaCost,
+        });
       }
     } catch (err) {
-      console.error('[PDKT] Failed to compute usage delta:', err);
+      console.error("[PDKT] Failed to compute usage delta:", err);
     } finally {
       setSessionDeltaPending(false);
     }
@@ -167,7 +223,7 @@ export default function PdktLanding() {
     await captureUsageBaseline();
     setSessionDelta(null);
     setSessionDeltaPending(true);
-    setView('mailbox');
+    setView("mailbox");
   };
 
   const handleOpenSettings = () => {
@@ -187,16 +243,16 @@ export default function PdktLanding() {
     scenarios: defaultScenarios || [],
     consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
     enableImageGeneration: true,
-    globalConsumerTypeId: 'random',
+    globalConsumerTypeId: "random",
     selectedModel: DEFAULT_PDKT_MODEL_ID,
-    consumerNameMentionPattern: 'random',
-    writingStyleMode: 'training',
+    consumerNameMentionPattern: "random",
+    writingStyleMode: "training",
   };
 
   return (
     <div className="min-h-screen transition-colors duration-500 font-sans">
       <AnimatePresence mode="wait">
-        {view === 'home' ? (
+        {view === "home" ? (
           <motion.div
             key="home"
             initial={{ opacity: 0, y: 20 }}
@@ -248,11 +304,15 @@ export default function PdktLanding() {
                   >
                     <BarChart3 className="h-4 w-4 opacity-60" />
                     <span>Usage Bulan Ini</span>
-                    {sessionDelta && (sessionDelta.costIdr > 0 || sessionDelta.totalTokens > 0 || sessionDelta.totalCalls > 0) && (
-                      <span className="ml-auto text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                        +Rp{(sessionDelta.costIdr / 1000).toFixed(0)}rb sesi terakhir
-                      </span>
-                    )}
+                    {sessionDelta &&
+                      (sessionDelta.costIdr > 0 ||
+                        sessionDelta.totalTokens > 0 ||
+                        sessionDelta.totalCalls > 0) && (
+                        <span className="ml-auto text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                          +Rp{(sessionDelta.costIdr / 1000).toFixed(0)}rb sesi
+                          terakhir
+                        </span>
+                      )}
                   </motion.button>
                 </>
               }
@@ -279,7 +339,9 @@ export default function PdktLanding() {
         settings={currentSettings}
         onSave={handleSaveSettings}
         defaultScenarios={defaultScenarios || []}
-        defaultConsumerTypes={defaultConsumerTypesFromApi || defaultConsumerTypes}
+        defaultConsumerTypes={
+          defaultConsumerTypesFromApi || defaultConsumerTypes
+        }
       />
 
       <HistoryModal

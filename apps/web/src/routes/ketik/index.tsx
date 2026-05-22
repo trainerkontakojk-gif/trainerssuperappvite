@@ -1,20 +1,36 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, History, Play, MessageSquare, BarChart3 } from 'lucide-react';
-import type { KetikAppSettings, KetikSessionHistoryItem, KetikSessionConfig, KetikScenario, KetikConsumerType, ChatMessage, KetikSessionReview, KetikTypoFinding, KetikReviewDetail } from '@trainers/types';
-import { DEFAULT_KETIK_SETTINGS } from '@trainers/types';
-import { ketikApi } from './ketikApi';
-import ModuleWorkspaceIntro from '../../components/ModuleWorkspaceIntro';
-import { ChatInterface } from './components/ChatInterface';
-import { SettingsModal } from './components/SettingsModal';
-import { HistoryModal } from './components/HistoryModal';
-import { UsageModal } from './components/UsageModal';
-import { SessionReviewModal } from './components/SessionReviewModal';
-import { useAuthStore } from '../../store/authStore';
-import { notify } from '../../lib/toast';
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Settings,
+  History,
+  Play,
+  MessageSquare,
+  BarChart3,
+} from "lucide-react";
+import type {
+  KetikAppSettings,
+  KetikSessionHistoryItem,
+  KetikSessionConfig,
+  KetikScenario,
+  KetikConsumerType,
+  ChatMessage,
+  KetikSessionReview,
+  KetikTypoFinding,
+  KetikReviewDetail,
+} from "@trainers/types";
+import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import { ketikApi } from "./ketikApi";
+import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
+import { ChatInterface } from "./components/ChatInterface";
+import { SettingsModal } from "./components/SettingsModal";
+import { HistoryModal } from "./components/HistoryModal";
+import { UsageModal } from "./components/UsageModal";
+import { SessionReviewModal } from "./components/SessionReviewModal";
+import { useAuthStore } from "../../store/authStore";
+import { notify } from "../../lib/toast";
 
-const accentClassName = 'text-emerald-600';
-const accentSoftClassName = 'bg-emerald-100';
+const accentClassName = "text-emerald-600";
+const accentSoftClassName = "bg-emerald-100";
 
 interface UsageDelta {
   costIdr: number;
@@ -22,7 +38,10 @@ interface UsageDelta {
   totalCalls: number;
 }
 
-function computeUsageDelta(before: any | null, after: any | null): UsageDelta | null {
+function computeUsageDelta(
+  before: any | null,
+  after: any | null,
+): UsageDelta | null {
   if (!before || !after) return null;
   return {
     costIdr: Math.max(0, after.total_cost_idr - before.total_cost_idr),
@@ -42,29 +61,45 @@ function formatUsageDeltaLabel(delta: UsageDelta): string {
 }
 
 export default function KetikLanding() {
-  const session = useAuthStore(s => s.session);
-  const [view, setView] = useState<'home' | 'chat'>('home');
-  const [settings, setSettings] = useState<KetikAppSettings>(DEFAULT_KETIK_SETTINGS);
+  const session = useAuthStore((s) => s.session);
+  const [view, setView] = useState<"home" | "chat">("home");
+  const [settings, setSettings] = useState<KetikAppSettings>(
+    DEFAULT_KETIK_SETTINGS,
+  );
   const [history, setHistory] = useState<KetikSessionHistoryItem[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isUsageOpen, setIsUsageOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentConfig, setCurrentConfig] = useState<KetikSessionConfig | null>(null);
-  const [currentScenario, setCurrentScenario] = useState<KetikScenario | null>(null);
+  const [currentConfig, setCurrentConfig] = useState<KetikSessionConfig | null>(
+    null,
+  );
+  const [currentScenario, setCurrentScenario] = useState<KetikScenario | null>(
+    null,
+  );
   const [reviewMessages, setReviewMessages] = useState<ChatMessage[]>([]);
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
 
-  const [selectedReview, setSelectedReview] = useState<KetikSessionReview | null>(null);
+  const [selectedReview, setSelectedReview] =
+    useState<KetikSessionReview | null>(null);
   const [selectedTypos, setSelectedTypos] = useState<KetikTypoFinding[]>([]);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [selectedSessionForReview, setSelectedSessionForReview] = useState<KetikSessionHistoryItem | null>(null);
+  const [selectedSessionForReview, setSelectedSessionForReview] =
+    useState<KetikSessionHistoryItem | null>(null);
 
   const [reviewProgress, setReviewProgress] = useState<{
-    status: 'idle' | 'starting' | 'processing' | 'delayed' | 'loading-result' | 'ready' | 'failed';
-    percent: number; etaSeconds: number;
-  }>({ status: 'idle', percent: 0, etaSeconds: 0 });
+    status:
+      | "idle"
+      | "starting"
+      | "processing"
+      | "delayed"
+      | "loading-result"
+      | "ready"
+      | "failed";
+    percent: number;
+    etaSeconds: number;
+  }>({ status: "idle", percent: 0, etaSeconds: 0 });
 
   const sessionBaselineRef = useRef<any>(null);
   const sessionRunIdRef = useRef(0);
@@ -75,13 +110,13 @@ export default function KetikLanding() {
         const s = await ketikApi.getSettings();
         setSettings(s);
       } catch (e) {
-        console.warn('[Ketik] Failed to load settings, using defaults');
+        console.warn("[Ketik] Failed to load settings, using defaults");
       }
       try {
         const h = await ketikApi.getHistory();
         setHistory(h);
       } catch (e) {
-        console.warn('[Ketik] Failed to load history');
+        console.warn("[Ketik] Failed to load history");
       }
     };
     init();
@@ -92,7 +127,7 @@ export default function KetikLanding() {
     try {
       await ketikApi.saveSettings(newSettings);
     } catch (e) {
-      console.error('[Ketik] Failed to save settings:', e);
+      console.error("[Ketik] Failed to save settings:", e);
     }
   };
 
@@ -101,68 +136,111 @@ export default function KetikLanding() {
       await ketikApi.clearHistory();
       setHistory([]);
     } catch (e) {
-      console.error('[Ketik] Failed to clear history:', e);
-      notify.error('Gagal menghapus riwayat.');
+      console.error("[Ketik] Failed to clear history:", e);
+      notify.error("Gagal menghapus riwayat.");
     }
   };
 
   const handleDeleteSession = async (id: string) => {
     try {
       await ketikApi.deleteSession(id);
-      setHistory(prev => prev.filter(s => s.id !== id));
+      setHistory((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
-      console.error('[Ketik] Failed to delete session:', e);
-      notify.error('Gagal menghapus sesi.');
+      console.error("[Ketik] Failed to delete session:", e);
+      notify.error("Gagal menghapus sesi.");
     }
   };
 
   const handleStartManualReview = async (sessionId: string) => {
     try {
-      setReviewProgress({ status: 'starting', percent: 5, etaSeconds: 30 });
+      setReviewProgress({ status: "starting", percent: 5, etaSeconds: 30 });
       await ketikApi.startReview(sessionId);
 
-      if (selectedSessionForReview && selectedSessionForReview.id === sessionId) {
-        const updatedSession = { ...selectedSessionForReview, reviewStatus: 'processing' as const };
+      if (
+        selectedSessionForReview &&
+        selectedSessionForReview.id === sessionId
+      ) {
+        const updatedSession = {
+          ...selectedSessionForReview,
+          reviewStatus: "processing" as const,
+        };
         setSelectedSessionForReview(updatedSession);
-        setHistory(prev => prev.map(item => item.id === sessionId ? updatedSession : item));
-        setReviewProgress({ status: 'processing', percent: 15, etaSeconds: 25 });
+        setHistory((prev) =>
+          prev.map((item) => (item.id === sessionId ? updatedSession : item)),
+        );
+        setReviewProgress({
+          status: "processing",
+          percent: 15,
+          etaSeconds: 25,
+        });
       }
     } catch (error) {
-      console.error('[Ketik] Error starting manual review:', error);
-      setReviewProgress(prev => ({ ...prev, status: 'failed' }));
-      notify.error('Gagal memulai analisis AI. Silakan coba lagi.');
+      console.error("[Ketik] Error starting manual review:", error);
+      setReviewProgress((prev) => ({ ...prev, status: "failed" }));
+      notify.error("Gagal memulai analisis AI. Silakan coba lagi.");
     }
   };
 
   const startSimulation = async () => {
     if (!session?.access_token) {
-      notify.error('Sesi Anda telah berakhir. Silakan login kembali.');
+      notify.error("Sesi Anda telah berakhir. Silakan login kembali.");
       return;
     }
 
-    const activeScenarios = settings.scenarios.filter(s => s.isActive);
+    const activeScenarios = settings.scenarios.filter((s) => s.isActive);
     if (activeScenarios.length === 0) {
-      notify.warning('Pilih minimal satu skenario di Pengaturan.');
+      notify.warning("Pilih minimal satu skenario di Pengaturan.");
       setIsSettingsOpen(true);
       return;
     }
-    const scenario = activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
+    const scenario =
+      activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
 
     let consumerType: KetikConsumerType;
-    if (settings.activeConsumerTypeId === 'random') {
-      consumerType = settings.consumerTypes[Math.floor(Math.random() * settings.consumerTypes.length)];
+    if (settings.activeConsumerTypeId === "random") {
+      consumerType =
+        settings.consumerTypes[
+          Math.floor(Math.random() * settings.consumerTypes.length)
+        ];
     } else {
-      consumerType = settings.consumerTypes.find(c => c.id === settings.activeConsumerTypeId) || settings.consumerTypes[0];
+      consumerType =
+        settings.consumerTypes.find(
+          (c) => c.id === settings.activeConsumerTypeId,
+        ) || settings.consumerTypes[0];
     }
 
-    const dummyNames = ['Budi Santoso', 'Siti Aminah', 'Agus Setiawan', 'Dewi Lestari', 'Rina Wati', 'Eko Prasetyo'];
-    const dummyCities = ['Jakarta Selatan', 'Jakarta Pusat', 'Jakarta Barat', 'Jakarta Timur', 'Kota Bogor', 'Kota Depok'];
-    const phonePrefixes = ['0812', '0813', '0821', '0852'];
+    const dummyNames = [
+      "Budi Santoso",
+      "Siti Aminah",
+      "Agus Setiawan",
+      "Dewi Lestari",
+      "Rina Wati",
+      "Eko Prasetyo",
+    ];
+    const dummyCities = [
+      "Jakarta Selatan",
+      "Jakarta Pusat",
+      "Jakarta Barat",
+      "Jakarta Timur",
+      "Kota Bogor",
+      "Kota Depok",
+    ];
+    const phonePrefixes = ["0812", "0813", "0821", "0852"];
 
     const identity = {
-      name: settings.identitySettings.displayName || dummyNames[Math.floor(Math.random() * dummyNames.length)],
-      city: settings.identitySettings.city || dummyCities[Math.floor(Math.random() * dummyCities.length)],
-      phone: settings.identitySettings.phoneNumber || `${phonePrefixes[Math.floor(Math.random() * phonePrefixes.length)]}${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`,
+      name:
+        settings.identitySettings.displayName ||
+        dummyNames[Math.floor(Math.random() * dummyNames.length)],
+      city:
+        settings.identitySettings.city ||
+        dummyCities[Math.floor(Math.random() * dummyCities.length)],
+      phone:
+        settings.identitySettings.phoneNumber ||
+        `${phonePrefixes[Math.floor(Math.random() * phonePrefixes.length)]}${Math.floor(
+          Math.random() * 100000000,
+        )
+          .toString()
+          .padStart(8, "0")}`,
       signatureName: settings.identitySettings.signatureName,
     };
 
@@ -172,7 +250,7 @@ export default function KetikLanding() {
       identity,
       selectedModel: settings.selectedModel,
       simulationDuration: settings.simulationDuration || 5,
-      responsePacingMode: settings.responsePacingMode || 'realistic',
+      responsePacingMode: settings.responsePacingMode || "realistic",
     };
 
     setCurrentConfig(config);
@@ -194,14 +272,19 @@ export default function KetikLanding() {
         };
       }
     } catch (e) {
-      console.warn('[Ketik] Failed to fetch usage baseline');
+      console.warn("[Ketik] Failed to fetch usage baseline");
     }
     setIsLoading(false);
-    setView('chat');
+    setView("chat");
   };
 
   const endSession = async (messages: ChatMessage[]) => {
-    if (currentConfig && currentScenario && messages.length > 0 && currentScenario.id !== 'review') {
+    if (
+      currentConfig &&
+      currentScenario &&
+      messages.length > 0 &&
+      currentScenario.id !== "review"
+    ) {
       setIsLoading(true);
       try {
         const session = await ketikApi.persistSession({
@@ -221,17 +304,17 @@ export default function KetikLanding() {
           consumerPhone: session.consumerPhone,
           consumerCity: session.consumerCity,
           messages: session.messages,
-          reviewStatus: session.reviewStatus ?? 'pending',
+          reviewStatus: session.reviewStatus ?? "pending",
         };
 
-        setHistory(prev => [newSession, ...prev]);
+        setHistory((prev) => [newSession, ...prev]);
         setSelectedSessionForReview(newSession);
         setIsReviewOpen(true);
         setSelectedReview(null);
         setSelectedTypos([]);
       } catch (error) {
-        console.error('Error ending session:', error);
-        notify.error('Gagal menyimpan sesi.');
+        console.error("Error ending session:", error);
+        notify.error("Gagal menyimpan sesi.");
       } finally {
         setIsLoading(false);
       }
@@ -242,7 +325,7 @@ export default function KetikLanding() {
     setSessionDeltaPending(true);
     void (async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         let retries = 5;
         while (retries > 0 && runId === sessionRunIdRef.current) {
           const afterUsage = await ketikApi.getUsageSummary();
@@ -255,10 +338,11 @@ export default function KetikLanding() {
             }
           }
           retries--;
-          if (retries > 0) await new Promise(resolve => setTimeout(resolve, 1000));
+          if (retries > 0)
+            await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (e) {
-        console.warn('[Ketik] Failed to fetch post-session usage:', e);
+        console.warn("[Ketik] Failed to fetch post-session usage:", e);
       }
       if (runId === sessionRunIdRef.current) {
         setSessionDeltaPending(false);
@@ -266,37 +350,53 @@ export default function KetikLanding() {
     })();
 
     sessionBaselineRef.current = null;
-    setView('home');
+    setView("home");
     setCurrentConfig(null);
     setCurrentScenario(null);
     setReviewMessages([]);
   };
 
   const handleReviewHistory = (session: KetikSessionHistoryItem) => {
-    const matchingScenario = settings.scenarios.find(s => s.title === session.scenarioTitle);
-    
+    const matchingScenario = settings.scenarios.find(
+      (s) => s.title === session.scenarioTitle,
+    );
+
     const newConfig: KetikSessionConfig = currentConfig || {
-      identity: { name: session.consumerName, city: session.consumerCity || '', phone: session.consumerPhone || '' },
+      identity: {
+        name: session.consumerName,
+        city: session.consumerCity || "",
+        phone: session.consumerPhone || "",
+      },
       consumerType: settings.consumerTypes[0],
-      responsePacingMode: settings.responsePacingMode || 'realistic',
+      responsePacingMode: settings.responsePacingMode || "realistic",
       simulationDuration: settings.simulationDuration || 5,
-      selectedModel: settings.selectedModel || 'openai',
-      scenarios: settings.scenarios
+      selectedModel: settings.selectedModel || "openai",
+      scenarios: settings.scenarios,
     };
 
     setCurrentConfig({
       ...newConfig,
-      identity: { name: session.consumerName, city: session.consumerCity || '', phone: session.consumerPhone || '' },
+      identity: {
+        name: session.consumerName,
+        city: session.consumerCity || "",
+        phone: session.consumerPhone || "",
+      },
     });
     setCurrentScenario(
       matchingScenario
-        ? { ...matchingScenario, id: 'review' }
-        : { id: 'review', title: session.scenarioTitle, description: '', category: 'Review', isActive: true }
+        ? { ...matchingScenario, id: "review" }
+        : {
+            id: "review",
+            title: session.scenarioTitle,
+            description: "",
+            category: "Review",
+            isActive: true,
+          },
     );
     setReviewMessages(session.messages);
     setIsHistoryOpen(false);
     setIsReviewOpen(false);
-    setView('chat');
+    setView("chat");
   };
 
   const handleViewReview = async (session: KetikSessionHistoryItem) => {
@@ -307,37 +407,47 @@ export default function KetikLanding() {
       setSelectedTypos([]);
     }
 
-    if (session.reviewStatus === 'pending' || session.reviewStatus === 'failed' || !session.reviewStatus) {
+    if (
+      session.reviewStatus === "pending" ||
+      session.reviewStatus === "failed" ||
+      !session.reviewStatus
+    ) {
       setIsReviewOpen(true);
       return;
     }
 
-    if (session.reviewStatus === 'completed') {
+    if (session.reviewStatus === "completed") {
       setIsReviewOpen(true);
       if (isSameSession && selectedReview) {
-        setReviewProgress({ status: 'ready', percent: 100, etaSeconds: 0 });
+        setReviewProgress({ status: "ready", percent: 100, etaSeconds: 0 });
         return;
       }
 
-      setReviewProgress(prev => ({ ...prev, status: 'loading-result', percent: Math.max(prev.percent, 92) }));
+      setReviewProgress((prev) => ({
+        ...prev,
+        status: "loading-result",
+        percent: Math.max(prev.percent, 92),
+      }));
 
       try {
         const detail = await ketikApi.getReviewDetail(session.id);
         if (detail) {
           setSelectedReview(detail.review);
           setSelectedTypos(detail.typos);
-          setReviewProgress({ status: 'ready', percent: 100, etaSeconds: 0 });
+          setReviewProgress({ status: "ready", percent: 100, etaSeconds: 0 });
         } else {
-          console.warn('[Ketik] Review marked completed but data missing');
-          notify.error('Data review tidak ditemukan.');
-          const failedSession = { ...session, reviewStatus: 'failed' as const };
+          console.warn("[Ketik] Review marked completed but data missing");
+          notify.error("Data review tidak ditemukan.");
+          const failedSession = { ...session, reviewStatus: "failed" as const };
           setSelectedSessionForReview(failedSession);
-          setHistory(prev => prev.map(item => item.id === session.id ? failedSession : item));
-          setReviewProgress({ status: 'failed', percent: 0, etaSeconds: 0 });
+          setHistory((prev) =>
+            prev.map((item) => (item.id === session.id ? failedSession : item)),
+          );
+          setReviewProgress({ status: "failed", percent: 0, etaSeconds: 0 });
         }
       } catch (err) {
-        console.error('[Ketik] Error fetching review details:', err);
-        setReviewProgress({ status: 'failed', percent: 0, etaSeconds: 0 });
+        console.error("[Ketik] Error fetching review details:", err);
+        setReviewProgress({ status: "failed", percent: 0, etaSeconds: 0 });
       }
     }
   };
@@ -349,21 +459,37 @@ export default function KetikLanding() {
     const currentSessionId = selectedSessionForReview?.id;
     if (!currentSessionId) return;
 
-    const shouldPoll = selectedSessionForReview && (
-      selectedSessionForReview.reviewStatus === 'processing' ||
-      (selectedSessionForReview.reviewStatus === 'pending' && reviewProgress.status !== 'idle')
-    );
+    const shouldPoll =
+      selectedSessionForReview &&
+      (selectedSessionForReview.reviewStatus === "processing" ||
+        (selectedSessionForReview.reviewStatus === "pending" &&
+          reviewProgress.status !== "idle"));
 
     if (shouldPoll) {
       progressInterval = setInterval(() => {
-        setReviewProgress(prev => {
-          if (prev.status === 'ready' || prev.status === 'failed' || prev.status === 'idle') return prev;
+        setReviewProgress((prev) => {
+          if (
+            prev.status === "ready" ||
+            prev.status === "failed" ||
+            prev.status === "idle"
+          )
+            return prev;
           let nextPercent = prev.percent + (prev.percent < 90 ? 1.5 : 0.2);
           const nextEta = Math.max(0, prev.etaSeconds - 1);
           let nextStatus = prev.status;
-          if (nextPercent > 92 && prev.status === 'processing') { nextPercent = 92; nextStatus = 'delayed'; }
-          if (nextPercent > 98 && prev.status === 'loading-result') { nextPercent = 98; }
-          return { ...prev, percent: nextPercent, etaSeconds: nextEta, status: nextStatus as any };
+          if (nextPercent > 92 && prev.status === "processing") {
+            nextPercent = 92;
+            nextStatus = "delayed";
+          }
+          if (nextPercent > 98 && prev.status === "loading-result") {
+            nextPercent = 98;
+          }
+          return {
+            ...prev,
+            percent: nextPercent,
+            etaSeconds: nextEta,
+            status: nextStatus as any,
+          };
         });
       }, 1000);
 
@@ -374,8 +500,11 @@ export default function KetikLanding() {
 
           const updatedStatus = data.status;
           if (updatedStatus !== selectedSessionForReview.reviewStatus) {
-            let updatedSession = { ...selectedSessionForReview, reviewStatus: updatedStatus };
-            if (updatedStatus === 'completed' && data.scores) {
+            let updatedSession = {
+              ...selectedSessionForReview,
+              reviewStatus: updatedStatus,
+            };
+            if (updatedStatus === "completed" && data.scores) {
               updatedSession = {
                 ...updatedSession,
                 finalScore: data.scores.final,
@@ -386,16 +515,20 @@ export default function KetikLanding() {
               };
             }
             setSelectedSessionForReview(updatedSession);
-            setHistory(prev => prev.map(item => item.id === updatedSession.id ? updatedSession : item));
+            setHistory((prev) =>
+              prev.map((item) =>
+                item.id === updatedSession.id ? updatedSession : item,
+              ),
+            );
 
-            if (updatedStatus === 'completed' && data.resultReady) {
+            if (updatedStatus === "completed" && data.resultReady) {
               handleViewReview(updatedSession);
-            } else if (updatedStatus === 'failed') {
-              setReviewProgress(prev => ({ ...prev, status: 'failed' }));
+            } else if (updatedStatus === "failed") {
+              setReviewProgress((prev) => ({ ...prev, status: "failed" }));
             }
           }
         } catch (e) {
-          console.error('[Ketik] Polling error:', e);
+          console.error("[Ketik] Polling error:", e);
         }
       };
       interval = setInterval(poll, 3000);
@@ -406,12 +539,17 @@ export default function KetikLanding() {
       if (interval) clearInterval(interval);
       if (progressInterval) clearInterval(progressInterval);
     };
-  }, [selectedSessionForReview?.id, selectedSessionForReview?.reviewStatus, !!selectedReview, reviewProgress.status]);
+  }, [
+    selectedSessionForReview?.id,
+    selectedSessionForReview?.reviewStatus,
+    !!selectedReview,
+    reviewProgress.status,
+  ]);
 
   return (
     <div className="min-h-screen transition-colors duration-500 font-sans">
       <AnimatePresence mode="wait">
-        {view === 'home' ? (
+        {view === "home" ? (
           <motion.div
             key="home"
             initial={{ opacity: 0, y: 20 }}
@@ -440,7 +578,7 @@ export default function KetikLanding() {
                     ) : (
                       <Play className="h-4 w-4 fill-current" />
                     )}
-                    <span>{isLoading ? 'Memulai...' : 'Mulai Simulasi'}</span>
+                    <span>{isLoading ? "Memulai..." : "Mulai Simulasi"}</span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.01, y: -1 }}
@@ -468,11 +606,14 @@ export default function KetikLanding() {
                   >
                     <BarChart3 className="h-4 w-4 opacity-60" />
                     <span>Usage Bulan Ini</span>
-                    {sessionDelta && (sessionDelta.costIdr > 0 || sessionDelta.totalTokens > 0 || sessionDelta.totalCalls > 0) && (
-                      <span className="ml-auto text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                        {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
-                      </span>
-                    )}
+                    {sessionDelta &&
+                      (sessionDelta.costIdr > 0 ||
+                        sessionDelta.totalTokens > 0 ||
+                        sessionDelta.totalCalls > 0) && (
+                        <span className="ml-auto text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                          {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                        </span>
+                      )}
                   </motion.button>
                 </>
               }
@@ -492,7 +633,7 @@ export default function KetikLanding() {
                   config={currentConfig}
                   scenario={currentScenario}
                   onEndSession={endSession}
-                  isReviewMode={currentScenario.id === 'review'}
+                  isReviewMode={currentScenario.id === "review"}
                   initialMessages={reviewMessages}
                   isEnding={isLoading}
                   authReady={true}
@@ -506,9 +647,27 @@ export default function KetikLanding() {
         )}
       </AnimatePresence>
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={handleSaveSettings} />
-      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} history={history} onClear={handleClearHistory} onDelete={handleDeleteSession} onReview={handleViewReview} />
-      <UsageModal isOpen={isUsageOpen} onClose={() => setIsUsageOpen(false)} module="ketik" sessionDelta={sessionDelta} sessionDeltaPending={sessionDeltaPending} />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onSave={handleSaveSettings}
+      />
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onClear={handleClearHistory}
+        onDelete={handleDeleteSession}
+        onReview={handleViewReview}
+      />
+      <UsageModal
+        isOpen={isUsageOpen}
+        onClose={() => setIsUsageOpen(false)}
+        module="ketik"
+        sessionDelta={sessionDelta}
+        sessionDeltaPending={sessionDeltaPending}
+      />
 
       {selectedSessionForReview && (
         <SessionReviewModal

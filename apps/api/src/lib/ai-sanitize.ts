@@ -23,11 +23,19 @@ export function sanitizeAiResponse(text: string): string {
     const match = result.match(pattern);
     if (match) {
       const startIdx = Math.max(0, match.index! - 40);
-      const endIdx = Math.min(result.length, match.index! + match[0].length + 80);
+      const endIdx = Math.min(
+        result.length,
+        match.index! + match[0].length + 80,
+      );
       const snippet = result.slice(startIdx, endIdx);
-      console.warn(`[AI Sanitize] Detected potential system prompt leak: "${snippet}"`);
-      const replacement = '*'.repeat(match[0].length);
-      result = result.slice(0, match.index!) + replacement + result.slice(match.index! + match[0].length);
+      console.warn(
+        `[AI Sanitize] Detected potential system prompt leak: "${snippet}"`,
+      );
+      const replacement = "*".repeat(match[0].length);
+      result =
+        result.slice(0, match.index!) +
+        replacement +
+        result.slice(match.index! + match[0].length);
     }
   }
 

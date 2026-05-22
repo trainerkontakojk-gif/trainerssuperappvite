@@ -1,309 +1,554 @@
-import { Hono } from 'hono';
-import { z } from 'zod';
-import { User } from '@supabase/supabase-js';
-import { requireRole } from '../middleware/role';
-import { aiRateLimitMiddleware } from '../middleware/rateLimit';
-import * as sidakService from '../services/sidak-service';
-import { createTemuanBatchSchema } from '@trainers/types';
-import { buildAiReportDocx } from '../lib/report-docx-builder';
-import { buildHtmlReport } from '../lib/report-html-builder';
-import { buildAiReportPdf } from '../lib/report-pdf-builder';
+import { Hono } from "hono";
+import { z } from "zod";
+import { User } from "@supabase/supabase-js";
+import { requireRole } from "../middleware/role";
+import { aiRateLimitMiddleware } from "../middleware/rateLimit";
+import * as sidakService from "../services/sidak-service";
+import { createTemuanBatchSchema } from "@trainers/types";
+import { buildAiReportDocx } from "../lib/report-docx-builder";
+import { buildHtmlReport } from "../lib/report-html-builder";
+import { buildAiReportPdf } from "../lib/report-pdf-builder";
 
 type Variables = { user: User; profile: any };
 
 const sidak = new Hono<{ Variables: Variables }>();
 
 // ── Periods ────────────────────────────────────────────
-sidak.get('/periods', requireRole('admin', 'trainer', 'leader'), async (c) => {
+sidak.get("/periods", requireRole("admin", "trainer", "leader"), async (c) => {
   const periods = await sidakService.getPeriods();
   return c.json({ success: true, data: periods });
 });
 
-sidak.post('/periods', requireRole('admin', 'trainer'), async (c) => {
+sidak.post("/periods", requireRole("admin", "trainer"), async (c) => {
   const body = await c.req.json();
-  const parsed = z.object({
-    month: z.number().int().min(1).max(12),
-    year: z.number().int().min(2000).max(2100),
-  }).safeParse(body);
+  const parsed = z
+    .object({
+      month: z.number().int().min(1).max(12),
+      year: z.number().int().min(2000).max(2100),
+    })
+    .safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data periode tidak valid', details: parsed.error } }, 400);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Data periode tidak valid",
+          details: parsed.error,
+        },
+      },
+      400,
+    );
   }
-  const period = await sidakService.createPeriod(parsed.data.month, parsed.data.year);
+  const period = await sidakService.createPeriod(
+    parsed.data.month,
+    parsed.data.year,
+  );
   return c.json({ success: true, data: period }, 201);
 });
 
 // ── Indicators ─────────────────────────────────────────
-sidak.get('/indicators', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const serviceType = c.req.query('service_type');
-  const indicators = await sidakService.getIndicators(serviceType);
-  return c.json({ success: true, data: indicators });
-});
+sidak.get(
+  "/indicators",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const serviceType = c.req.query("service_type");
+    const indicators = await sidakService.getIndicators(serviceType);
+    return c.json({ success: true, data: indicators });
+  },
+);
 
-sidak.post('/indicators', requireRole('admin', 'trainer'), async (c) => {
+sidak.post("/indicators", requireRole("admin", "trainer"), async (c) => {
   const body = await c.req.json();
-  const parsed = z.object({
-    service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
-    name: z.string().min(1),
-    category: z.enum(['critical', 'non_critical', 'none']),
-    bobot: z.number().positive(),
-    has_na: z.boolean().optional().default(false),
-  }).safeParse(body);
+  const parsed = z
+    .object({
+      service_type: z.enum([
+        "call",
+        "chat",
+        "email",
+        "cso",
+        "pencatatan",
+        "bko",
+        "slik",
+      ]),
+      name: z.string().min(1),
+      category: z.enum(["critical", "non_critical", "none"]),
+      bobot: z.number().positive(),
+      has_na: z.boolean().optional().default(false),
+    })
+    .safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data indikator tidak valid', details: parsed.error } }, 400);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Data indikator tidak valid",
+          details: parsed.error,
+        },
+      },
+      400,
+    );
   }
   const indicator = await sidakService.createIndicator(parsed.data as any);
   return c.json({ success: true, data: indicator }, 201);
 });
 
 // ── Temuan (Findings) ──────────────────────────────────
-sidak.get('/temuan', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const peserta_id = c.req.query('peserta_id');
-  const period_id = c.req.query('period_id');
-  const service_type = c.req.query('service_type');
-  const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 50;
-  const offset = c.req.query('offset') ? parseInt(c.req.query('offset')!) : 0;
+sidak.get("/temuan", requireRole("admin", "trainer", "leader"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const peserta_id = c.req.query("peserta_id");
+  const period_id = c.req.query("period_id");
+  const service_type = c.req.query("service_type");
+  const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 50;
+  const offset = c.req.query("offset") ? parseInt(c.req.query("offset")!) : 0;
 
-  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  const result = await sidakService.getTemuan({ peserta_id, period_id, service_type, limit, offset, agent_ids: accessibleIds ?? undefined });
-  return c.json({ success: true, data: { items: result.data, total: result.total } });
+  const accessibleIds = await sidakService.getAccessibleAgentIds(
+    user.id,
+    profile?.role ?? "",
+  );
+  const result = await sidakService.getTemuan({
+    peserta_id,
+    period_id,
+    service_type,
+    limit,
+    offset,
+    agent_ids: accessibleIds ?? undefined,
+  });
+  return c.json({
+    success: true,
+    data: { items: result.data, total: result.total },
+  });
 });
 
-sidak.post('/temuan/batch', requireRole('admin', 'trainer'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
+sidak.post("/temuan/batch", requireRole("admin", "trainer"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
   const body = await c.req.json();
   const parsed = createTemuanBatchSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data temuan tidak valid', details: parsed.error } }, 400);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Data temuan tidak valid",
+          details: parsed.error,
+        },
+      },
+      400,
+    );
   }
   try {
-    const result = await sidakService.createTemuanBatch(parsed.data, user.id, profile?.full_name ?? undefined);
+    const result = await sidakService.createTemuanBatch(
+      parsed.data,
+      user.id,
+      profile?.full_name ?? undefined,
+    );
     return c.json({ success: true, data: result }, 201);
   } catch (e: any) {
-    return c.json({ success: false, error: { code: 'INSERT_ERROR', message: e.message } }, 400);
+    return c.json(
+      { success: false, error: { code: "INSERT_ERROR", message: e.message } },
+      400,
+    );
   }
 });
 
-sidak.post('/temuan/batch/preview', requireRole('admin', 'trainer'), async (c) => {
-  const body = await c.req.json();
-  const parsed = createTemuanBatchSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data temuan tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const result = await sidakService.validateTemuanBatch(parsed.data);
-    return c.json({ success: true, data: result });
-  } catch (e: any) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: e.message } }, 400);
-  }
-});
+sidak.post(
+  "/temuan/batch/preview",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = createTemuanBatchSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data temuan tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const result = await sidakService.validateTemuanBatch(parsed.data);
+      return c.json({ success: true, data: result });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
-sidak.put('/temuan/:id', requireRole('admin', 'trainer'), async (c) => {
-  const id = c.req.param('id');
+sidak.put("/temuan/:id", requireRole("admin", "trainer"), async (c) => {
+  const id = c.req.param("id");
   const body = await c.req.json();
-  const parsed = z.object({
-    nilai: z.number().int().min(0).max(3).optional(),
-    ketidaksesuaian: z.string().nullable().optional(),
-    sebaiknya: z.string().nullable().optional(),
-  }).safeParse(body);
+  const parsed = z
+    .object({
+      nilai: z.number().int().min(0).max(3).optional(),
+      ketidaksesuaian: z.string().nullable().optional(),
+      sebaiknya: z.string().nullable().optional(),
+    })
+    .safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
+    return c.json(
+      {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+      },
+      400,
+    );
   }
   try {
     const result = await sidakService.updateTemuan(id, parsed.data);
     return c.json({ success: true, data: result });
   } catch (e: any) {
-    return c.json({ success: false, error: { code: 'UPDATE_ERROR', message: e.message } }, 400);
+    return c.json(
+      { success: false, error: { code: "UPDATE_ERROR", message: e.message } },
+      400,
+    );
   }
 });
 
-sidak.delete('/temuan/:id', requireRole('admin', 'trainer'), async (c) => {
-  const id = c.req.param('id');
+sidak.delete("/temuan/:id", requireRole("admin", "trainer"), async (c) => {
+  const id = c.req.param("id");
   try {
     await sidakService.deleteTemuan(id);
     return c.json({ success: true, data: null });
   } catch (e: any) {
-    return c.json({ success: false, error: { code: 'DELETE_ERROR', message: e.message } }, 400);
+    return c.json(
+      { success: false, error: { code: "DELETE_ERROR", message: e.message } },
+      400,
+    );
   }
 });
 
 // ── Agents ─────────────────────────────────────────────
-sidak.get('/agents', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const batch_name = c.req.query('batch_name');
-  const tim = c.req.query('tim');
-  const search = c.req.query('search');
-  const showArchived = c.req.query('show_archived') === 'true';
-  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  const agents = await sidakService.getAgents({ batch_name, tim, search, agent_ids: accessibleIds ?? undefined, showArchived });
+sidak.get("/agents", requireRole("admin", "trainer", "leader"), async (c) => {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  const batch_name = c.req.query("batch_name");
+  const tim = c.req.query("tim");
+  const search = c.req.query("search");
+  const showArchived = c.req.query("show_archived") === "true";
+  const accessibleIds = await sidakService.getAccessibleAgentIds(
+    user.id,
+    profile?.role ?? "",
+  );
+  const agents = await sidakService.getAgents({
+    batch_name,
+    tim,
+    search,
+    agent_ids: accessibleIds ?? undefined,
+    showArchived,
+  });
   return c.json({ success: true, data: agents });
 });
 
-sidak.get('/agents/:id', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const id = c.req.param('id');
-  const year = c.req.query('year') ? parseInt(c.req.query('year')!) : undefined;
-  const serviceType = c.req.query('service_type') || undefined;
-  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  if (accessibleIds && !accessibleIds.includes(id)) {
-    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke data agent ini.' } }, 403);
-  }
-  try {
-    const detail = await sidakService.getAgentDetail(id, year, serviceType);
-    return c.json({ success: true, data: detail });
-  } catch (e: any) {
-    return c.json({ success: false, error: { code: 'NOT_FOUND', message: e.message } }, 404);
-  }
-});
+sidak.get(
+  "/agents/:id",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const id = c.req.param("id");
+    const year = c.req.query("year")
+      ? parseInt(c.req.query("year")!)
+      : undefined;
+    const serviceType = c.req.query("service_type") || undefined;
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    if (accessibleIds && !accessibleIds.includes(id)) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Anda tidak memiliki akses ke data agent ini.",
+          },
+        },
+        403,
+      );
+    }
+    try {
+      const detail = await sidakService.getAgentDetail(id, year, serviceType);
+      return c.json({ success: true, data: detail });
+    } catch (e: any) {
+      return c.json(
+        { success: false, error: { code: "NOT_FOUND", message: e.message } },
+        404,
+      );
+    }
+  },
+);
 
 // ── Dashboard ──────────────────────────────────────────
-sidak.get('/dashboard', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const period_ids = c.req.query('period_ids')?.split(',');
-  const service_type = c.req.query('service_type');
-  const folder_ids = c.req.query('folder_ids')?.split(',');
-  const year = c.req.query('year') ? parseInt(c.req.query('year')!) : undefined;
-  const showArchived = c.req.query('show_archived') === 'true';
+sidak.get(
+  "/dashboard",
+  requireRole("admin", "trainer", "leader", "agent"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const period_ids = c.req.query("period_ids")?.split(",");
+    const service_type = c.req.query("service_type");
+    const folder_ids = c.req.query("folder_ids")?.split(",");
+    const year = c.req.query("year")
+      ? parseInt(c.req.query("year")!)
+      : undefined;
+    const showArchived = c.req.query("show_archived") === "true";
 
-  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  const data = await sidakService.getDashboardData({ period_ids, service_type, folder_ids, year, agent_ids: accessibleIds ?? undefined, showArchived });
-  return c.json({ success: true, data });
-});
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    const data = await sidakService.getDashboardData({
+      period_ids,
+      service_type,
+      folder_ids,
+      year,
+      agent_ids: accessibleIds ?? undefined,
+      showArchived,
+    });
+    return c.json({ success: true, data });
+  },
+);
 
-sidak.post('/dashboard/refresh-summary', requireRole('admin', 'trainer'), async (c) => {
-  const body = await c.req.json();
-  const parsed = z.object({
-    periodId: z.string().uuid(),
-    serviceType: z.string().optional(),
-  }).safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
-  try {
-    const result = await sidakService.refreshDashboardSummary(parsed.data.periodId, parsed.data.serviceType);
-    return c.json({ success: true, data: result });
-  } catch (e: any) {
-    return c.json({ success: false, error: { code: 'REFRESH_ERROR', message: e.message } }, 400);
-  }
-});
+sidak.post(
+  "/dashboard/refresh-summary",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        periodId: z.string().uuid(),
+        serviceType: z.string().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    try {
+      const result = await sidakService.refreshDashboardSummary(
+        parsed.data.periodId,
+        parsed.data.serviceType,
+      );
+      return c.json({ success: true, data: result });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "REFRESH_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
 // ── Service Weights ────────────────────────────────────
-sidak.get('/service-weights', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const weights = await sidakService.getServiceWeights();
-  return c.json({ success: true, data: weights });
-});
+sidak.get(
+  "/service-weights",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const weights = await sidakService.getServiceWeights();
+    return c.json({ success: true, data: weights });
+  },
+);
 
-sidak.put('/service-weights/:serviceType', requireRole('admin', 'trainer'), async (c) => {
-  const serviceType = c.req.param('serviceType');
-  const body = await c.req.json();
-  const parsed = z.object({
-    critical_weight: z.number().min(0).max(1).optional(),
-    non_critical_weight: z.number().min(0).max(1).optional(),
-    scoring_mode: z.enum(['weighted', 'flat', 'no_category']).optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
-  }
-  try {
-    const result = await sidakService.updateServiceWeight(serviceType, parsed.data);
-    return c.json({ success: true, data: result });
-  } catch (e: any) {
-    return c.json({ success: false, error: { code: 'UPDATE_ERROR', message: e.message } }, 400);
-  }
-});
+sidak.put(
+  "/service-weights/:serviceType",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const serviceType = c.req.param("serviceType");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        critical_weight: z.number().min(0).max(1).optional(),
+        non_critical_weight: z.number().min(0).max(1).optional(),
+        scoring_mode: z.enum(["weighted", "flat", "no_category"]).optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    }
+    try {
+      const result = await sidakService.updateServiceWeight(
+        serviceType,
+        parsed.data,
+      );
+      return c.json({ success: true, data: result });
+    } catch (e: any) {
+      return c.json(
+        { success: false, error: { code: "UPDATE_ERROR", message: e.message } },
+        400,
+      );
+    }
+  },
+);
 
 // ── Folders ────────────────────────────────────────────
-sidak.get('/folders', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const { data } = await (await import('../lib/supabase')).supabaseAdmin
-    .from('profiler_folders')
-    .select('id, name')
-    .order('name');
+sidak.get("/folders", requireRole("admin", "trainer", "leader"), async (c) => {
+  const { data } = await (await import("../lib/supabase")).supabaseAdmin
+    .from("profiler_folders")
+    .select("id, name")
+    .order("name");
   return c.json({ success: true, data: data ?? [] });
 });
 
 // ── Reports ──────────────────────────────────────────────
-sidak.post('/reports/data', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const body = await c.req.json();
-  const parsed = z.object({
-    serviceType: z.string().optional(),
-    year: z.number().int().optional(),
-    startMonth: z.number().int().min(1).max(12).optional(),
-    endMonth: z.number().int().min(1).max(12).optional(),
-    folderId: z.string().optional(),
-    pesertaId: z.string().optional(),
-    indicatorId: z.string().optional(),
-    showArchived: z.boolean().optional(),
-  }).safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Filter tidak valid' } }, 400);
-  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  try {
-    const rows = await sidakService.getDataReportRows({ ...parsed.data, agent_ids: accessibleIds ?? undefined });
-    return c.json({ success: true, data: rows });
-  } catch (e: any) {
-    return c.json({ success: false, error: { code: 'REPORT_ERROR', message: e.message } }, 400);
-  }
-});
-
-sidak.post('/reports/ai/generate', requireRole('admin', 'trainer', 'leader'), aiRateLimitMiddleware, async (c: any) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const body = await c.req.json();
-  const parsed = z.object({
-    modelId: z.string().optional(),
-    serviceType: z.string().optional(),
-    year: z.number().int().optional(),
-    startMonth: z.number().int().min(1).max(12).optional(),
-    endMonth: z.number().int().min(1).max(12).optional(),
-    pesertaId: z.string().optional(),
-    mode: z.enum(['layanan', 'individu']).default('layanan'),
-  }).safeParse(body);
-  if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid' } }, 400);
-
-  try {
-    const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-    const rows = await sidakService.getDataReportRows({
-      serviceType: parsed.data.serviceType,
-      year: parsed.data.year,
-      startMonth: parsed.data.startMonth,
-      endMonth: parsed.data.endMonth,
-      pesertaId: parsed.data.mode === 'individu' ? parsed.data.pesertaId : undefined,
-      agent_ids: accessibleIds ?? undefined,
-    });
-
-    if (rows.length === 0) {
-      return c.json({ success: false, error: { code: 'NO_DATA', message: 'Tidak ada data temuan untuk filter yang dipilih.' } }, 400);
+sidak.post(
+  "/reports/data",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        serviceType: z.string().optional(),
+        year: z.number().int().optional(),
+        startMonth: z.number().int().min(1).max(12).optional(),
+        endMonth: z.number().int().min(1).max(12).optional(),
+        folderId: z.string().optional(),
+        pesertaId: z.string().optional(),
+        indicatorId: z.string().optional(),
+        showArchived: z.boolean().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Filter tidak valid" },
+        },
+        400,
+      );
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    try {
+      const rows = await sidakService.getDataReportRows({
+        ...parsed.data,
+        agent_ids: accessibleIds ?? undefined,
+      });
+      return c.json({ success: true, data: rows });
+    } catch (e: any) {
+      return c.json(
+        { success: false, error: { code: "REPORT_ERROR", message: e.message } },
+        400,
+      );
     }
+  },
+);
 
-    const totalFindings = rows.filter(r => (r.nilai ?? 3) < 3 || r.ketidaksesuaian).length;
-    const agentName = rows[0]?.profiler_peserta?.nama ?? 'Unknown';
-    const serviceTypes = [...new Set(rows.map(r => r.service_type))].join(', ');
+sidak.post(
+  "/reports/ai/generate",
+  requireRole("admin", "trainer", "leader"),
+  aiRateLimitMiddleware,
+  async (c: any) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        modelId: z.string().optional(),
+        serviceType: z.string().optional(),
+        year: z.number().int().optional(),
+        startMonth: z.number().int().min(1).max(12).optional(),
+        endMonth: z.number().int().min(1).max(12).optional(),
+        pesertaId: z.string().optional(),
+        mode: z.enum(["layanan", "individu"]).default("layanan"),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
 
-    const { generateGeminiContent } = await import('../lib/gemini');
-    const { generateOpenRouterContent } = await import('../lib/openrouter');
-    const { resolveModelProvider } = await import('../lib/ai-models');
+    try {
+      const accessibleIds = await sidakService.getAccessibleAgentIds(
+        user.id,
+        profile?.role ?? "",
+      );
+      const rows = await sidakService.getDataReportRows({
+        serviceType: parsed.data.serviceType,
+        year: parsed.data.year,
+        startMonth: parsed.data.startMonth,
+        endMonth: parsed.data.endMonth,
+        pesertaId:
+          parsed.data.mode === "individu" ? parsed.data.pesertaId : undefined,
+        agent_ids: accessibleIds ?? undefined,
+      });
 
-    const modelInfo = resolveModelProvider(parsed.data.modelId);
-    const findingsSample = rows.slice(0, 20).map(r => ({
-      agent: r.profiler_peserta?.nama,
-      service: r.service_type,
-      parameter: r.qa_indicators?.name,
-      nilai: r.nilai,
-      ketidaksesuaian: r.ketidaksesuaian,
-      sebaiknya: r.sebaiknya,
-    }));
+      if (rows.length === 0) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "NO_DATA",
+              message: "Tidak ada data temuan untuk filter yang dipilih.",
+            },
+          },
+          400,
+        );
+      }
 
-    const prompt = `Buat laporan analisis kualitas QA dalam Bahasa Indonesia berdasarkan data berikut.
+      const totalFindings = rows.filter(
+        (r) => (r.nilai ?? 3) < 3 || r.ketidaksesuaian,
+      ).length;
+      const agentName = rows[0]?.profiler_peserta?.nama ?? "Unknown";
+      const serviceTypes = [...new Set(rows.map((r) => r.service_type))].join(
+        ", ",
+      );
+
+      const { generateGeminiContent } = await import("../lib/gemini");
+      const { generateOpenRouterContent } = await import("../lib/openrouter");
+      const { resolveModelProvider } = await import("../lib/ai-models");
+
+      const modelInfo = resolveModelProvider(parsed.data.modelId);
+      const findingsSample = rows.slice(0, 20).map((r) => ({
+        agent: r.profiler_peserta?.nama,
+        service: r.service_type,
+        parameter: r.qa_indicators?.name,
+        nilai: r.nilai,
+        ketidaksesuaian: r.ketidaksesuaian,
+        sebaiknya: r.sebaiknya,
+      }));
+
+      const prompt = `Buat laporan analisis kualitas QA dalam Bahasa Indonesia berdasarkan data berikut.
 
 PENTING: Gunakan HANYA data yang disediakan di bawah ini. Jangan pernah mengarang, menebak, atau menambahkan angka atau temuan yang tidak ada di data. Jika data tidak mencukupi, nyatakan dengan jujur bahwa data terbatas.
 
-Periode: ${parsed.data.startMonth ? `${parsed.data.startMonth}-${parsed.data.endMonth ?? '?'}/${parsed.data.year}` : `${parsed.data.year || 'Semua'}`}
+Periode: ${parsed.data.startMonth ? `${parsed.data.startMonth}-${parsed.data.endMonth ?? "?"}/${parsed.data.year}` : `${parsed.data.year || "Semua"}`}
 Mode: ${parsed.data.mode}
-${parsed.data.mode === 'individu' ? `Nama Agen: ${agentName}` : `Tipe Layanan: ${serviceTypes}`}
+${parsed.data.mode === "individu" ? `Nama Agen: ${agentName}` : `Tipe Layanan: ${serviceTypes}`}
 Total Temuan: ${totalFindings}
 Total Baris Data: ${rows.length}
 
@@ -319,398 +564,772 @@ Buat laporan dengan format JSON:
   "priorityAreas": ["Area prioritas perbaikan 1", "Area prioritas perbaikan 2"]
 }`;
 
-    const contents = [{ role: 'user', parts: [{ text: prompt }] }] as any;
-    const genOptions = {
-      model: modelInfo.modelId,
-      contents,
-      temperature: 0.5,
-      usageContext: { module: 'qa-analyzer' as const, action: 'report_generation' },
-      userId: user?.id,
-    };
-
-    const result = modelInfo.provider === 'openrouter'
-      ? await generateOpenRouterContent(genOptions)
-      : await generateGeminiContent(genOptions);
-
-    if (!result.success) {
-      return c.json({ success: false, error: { code: 'AI_ERROR', message: result.error || 'Gagal generate laporan' } }, 500);
-    }
-
-    let parsedReport;
-    try {
-      const cleaned = (result.text || '').replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-      parsedReport = JSON.parse(cleaned);
-    } catch {
-      parsedReport = { executiveSummary: result.text };
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        report: parsedReport,
-        metadata: {
-          totalRows: rows.length,
-          totalFindings,
-          agentName: parsed.data.mode === 'individu' ? agentName : undefined,
-          serviceTypes,
+      const contents = [{ role: "user", parts: [{ text: prompt }] }] as any;
+      const genOptions = {
+        model: modelInfo.modelId,
+        contents,
+        temperature: 0.5,
+        usageContext: {
+          module: "qa-analyzer" as const,
+          action: "report_generation",
         },
-      },
-    });
-  } catch (e: any) {
-    return c.json({ success: false, error: { code: 'REPORT_ERROR', message: e.message } }, 500);
-  }
-});
-
-sidak.get('/dashboard/available-years', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const accessibleIds = profile ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '') : null;
-  try {
-    const years = await sidakService.getAvailableYears(accessibleIds ?? undefined);
-    return c.json({ success: true, data: years });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } }, 500);
-  }
-});
-
-sidak.get('/dashboard/trend', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const yearQuery = c.req.query('year');
-  const startMonthQuery = c.req.query('startMonth');
-  const endMonthQuery = c.req.query('endMonth');
-  const accessibleIds = profile ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '') : null;
-
-  try {
-    if (yearQuery) {
-      const year = parseInt(yearQuery);
-      const startMonth = startMonthQuery ? parseInt(startMonthQuery) : 1;
-      const endMonth = endMonthQuery ? parseInt(endMonthQuery) : 12;
-      const trend = await sidakService.getServiceTrendForDashboardByRange(year, startMonth, endMonth, accessibleIds ?? undefined);
-      return c.json({ success: true, data: trend });
-    } else {
-      const trendAll = await sidakService.getServiceTrendForDashboard('all', accessibleIds ?? undefined);
-      const trendMap = {
-        '3m': sidakService.sliceTrendData(trendAll, 3),
-        '6m': sidakService.sliceTrendData(trendAll, 6),
-        'all': trendAll
+        userId: user?.id,
       };
-      return c.json({ success: true, data: { trendMap } });
+
+      const result =
+        modelInfo.provider === "openrouter"
+          ? await generateOpenRouterContent(genOptions)
+          : await generateGeminiContent(genOptions);
+
+      if (!result.success) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "AI_ERROR",
+              message: result.error || "Gagal generate laporan",
+            },
+          },
+          500,
+        );
+      }
+
+      let parsedReport;
+      try {
+        const cleaned = (result.text || "")
+          .replace(/^```(?:json)?\s*/, "")
+          .replace(/\s*```$/, "");
+        parsedReport = JSON.parse(cleaned);
+      } catch {
+        parsedReport = { executiveSummary: result.text };
+      }
+
+      return c.json({
+        success: true,
+        data: {
+          report: parsedReport,
+          metadata: {
+            totalRows: rows.length,
+            totalFindings,
+            agentName: parsed.data.mode === "individu" ? agentName : undefined,
+            serviceTypes,
+          },
+        },
+      });
+    } catch (e: any) {
+      return c.json(
+        { success: false, error: { code: "REPORT_ERROR", message: e.message } },
+        500,
+      );
     }
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } }, 500);
-  }
-});
+  },
+);
+
+sidak.get(
+  "/dashboard/available-years",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const accessibleIds = profile
+      ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? "")
+      : null;
+    try {
+      const years = await sidakService.getAvailableYears(
+        accessibleIds ?? undefined,
+      );
+      return c.json({ success: true, data: years });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "SERVER_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
+
+sidak.get(
+  "/dashboard/trend",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const yearQuery = c.req.query("year");
+    const startMonthQuery = c.req.query("startMonth");
+    const endMonthQuery = c.req.query("endMonth");
+    const accessibleIds = profile
+      ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? "")
+      : null;
+
+    try {
+      if (yearQuery) {
+        const year = parseInt(yearQuery);
+        const startMonth = startMonthQuery ? parseInt(startMonthQuery) : 1;
+        const endMonth = endMonthQuery ? parseInt(endMonthQuery) : 12;
+        const trend = await sidakService.getServiceTrendForDashboardByRange(
+          year,
+          startMonth,
+          endMonth,
+          accessibleIds ?? undefined,
+        );
+        return c.json({ success: true, data: trend });
+      } else {
+        const trendAll = await sidakService.getServiceTrendForDashboard(
+          "all",
+          accessibleIds ?? undefined,
+        );
+        const trendMap = {
+          "3m": sidakService.sliceTrendData(trendAll, 3),
+          "6m": sidakService.sliceTrendData(trendAll, 6),
+          all: trendAll,
+        };
+        return c.json({ success: true, data: { trendMap } });
+      }
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "SERVER_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 // ── QA Rule Versions ────────────────────────────────────
-sidak.get('/rule-versions', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const serviceType = c.req.query('service_type');
-  try {
-    const versions = await sidakService.getRuleVersions(serviceType || undefined);
-    return c.json({ success: true, data: versions });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.get(
+  "/rule-versions",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const serviceType = c.req.query("service_type");
+    try {
+      const versions = await sidakService.getRuleVersions(
+        serviceType || undefined,
+      );
+      return c.json({ success: true, data: versions });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.post('/rule-versions', requireRole('admin', 'trainer'), async (c) => {
-  const user = c.get('user');
+sidak.post("/rule-versions", requireRole("admin", "trainer"), async (c) => {
+  const user = c.get("user");
   const body = await c.req.json();
-  const parsed = z.object({
-    service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
-    effective_period_id: z.string().uuid(),
-    critical_weight: z.number().min(0).max(1).default(0.5),
-    non_critical_weight: z.number().min(0).max(1).default(0.5),
-    scoring_mode: z.enum(['weighted', 'flat', 'no_category']).default('weighted'),
-    change_reason: z.string().optional(),
-  }).safeParse(body);
+  const parsed = z
+    .object({
+      service_type: z.enum([
+        "call",
+        "chat",
+        "email",
+        "cso",
+        "pencatatan",
+        "bko",
+        "slik",
+      ]),
+      effective_period_id: z.string().uuid(),
+      critical_weight: z.number().min(0).max(1).default(0.5),
+      non_critical_weight: z.number().min(0).max(1).default(0.5),
+      scoring_mode: z
+        .enum(["weighted", "flat", "no_category"])
+        .default("weighted"),
+      change_reason: z.string().optional(),
+    })
+    .safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data versi aturan tidak valid', details: parsed.error } }, 400);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Data versi aturan tidak valid",
+          details: parsed.error,
+        },
+      },
+      400,
+    );
   }
   try {
     const version = await sidakService.createRuleVersion(parsed.data, user.id);
     return c.json({ success: true, data: version }, 201);
   } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+    return c.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: error.message },
+      },
+      500,
+    );
   }
 });
 
-sidak.put('/rule-versions/:id', requireRole('admin', 'trainer'), async (c) => {
-  const user = c.get('user');
-  const id = c.req.param('id');
+sidak.put("/rule-versions/:id", requireRole("admin", "trainer"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
   const body = await c.req.json();
-  const parsed = z.object({
-    critical_weight: z.number().min(0).max(1).optional(),
-    non_critical_weight: z.number().min(0).max(1).optional(),
-    scoring_mode: z.enum(['weighted', 'flat', 'no_category']).optional(),
-    change_reason: z.string().optional(),
-  }).safeParse(body);
+  const parsed = z
+    .object({
+      critical_weight: z.number().min(0).max(1).optional(),
+      non_critical_weight: z.number().min(0).max(1).optional(),
+      scoring_mode: z.enum(["weighted", "flat", "no_category"]).optional(),
+      change_reason: z.string().optional(),
+    })
+    .safeParse(body);
   if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid', details: parsed.error } }, 400);
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Data tidak valid",
+          details: parsed.error,
+        },
+      },
+      400,
+    );
   }
   try {
-    const version = await sidakService.updateRuleVersion(id, parsed.data, user.id);
+    const version = await sidakService.updateRuleVersion(
+      id,
+      parsed.data,
+      user.id,
+    );
     return c.json({ success: true, data: version });
   } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
+    return c.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: error.message },
+      },
+      500,
+    );
   }
 });
 
-sidak.post('/rule-versions/:id/publish', requireRole('admin', 'trainer'), async (c) => {
-  const user = c.get('user');
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  const parsed = z.object({
-    change_reason: z.string().optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const version = await sidakService.publishRuleVersion(id, user.id, parsed.data.change_reason);
-    return c.json({ success: true, data: version });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.post(
+  "/rule-versions/:id/publish",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        change_reason: z.string().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const version = await sidakService.publishRuleVersion(
+        id,
+        user.id,
+        parsed.data.change_reason,
+      );
+      return c.json({ success: true, data: version });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.post('/rule-versions/:id/supersede', requireRole('admin', 'trainer'), async (c) => {
-  const user = c.get('user');
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  const parsed = z.object({
-    change_reason: z.string().optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const version = await sidakService.supersedeRuleVersion(id, user.id, parsed.data.change_reason);
-    return c.json({ success: true, data: version });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.post(
+  "/rule-versions/:id/supersede",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        change_reason: z.string().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const version = await sidakService.supersedeRuleVersion(
+        id,
+        user.id,
+        parsed.data.change_reason,
+      );
+      return c.json({ success: true, data: version });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.get('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const id = c.req.param('id');
-  try {
-    const indicators = await sidakService.getRuleVersionIndicators(id);
-    return c.json({ success: true, data: indicators });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.get(
+  "/rule-versions/:id/indicators",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const id = c.req.param("id");
+    try {
+      const indicators = await sidakService.getRuleVersionIndicators(id);
+      return c.json({ success: true, data: indicators });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.post('/rule-versions/:id/indicators', requireRole('admin', 'trainer'), async (c) => {
-  const user = c.get('user');
-  const id = c.req.param('id');
-  const body = await c.req.json();
-  const parsed = z.object({
-    service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
-    name: z.string().min(1),
-    category: z.enum(['critical', 'non_critical', 'none']),
-    bobot: z.number().positive(),
-    has_na: z.boolean().optional().default(false),
-    threshold: z.number().optional(),
-    sort_order: z.number().int().optional().default(0),
-    legacy_indicator_id: z.string().uuid().optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data indikator tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const indicator = await sidakService.addRuleVersionIndicator({ rule_version_id: id, ...parsed.data }, user.id);
-    return c.json({ success: true, data: indicator }, 201);
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.post(
+  "/rule-versions/:id/indicators",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        service_type: z.enum([
+          "call",
+          "chat",
+          "email",
+          "cso",
+          "pencatatan",
+          "bko",
+          "slik",
+        ]),
+        name: z.string().min(1),
+        category: z.enum(["critical", "non_critical", "none"]),
+        bobot: z.number().positive(),
+        has_na: z.boolean().optional().default(false),
+        threshold: z.number().optional(),
+        sort_order: z.number().int().optional().default(0),
+        legacy_indicator_id: z.string().uuid().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data indikator tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const indicator = await sidakService.addRuleVersionIndicator(
+        { rule_version_id: id, ...parsed.data },
+        user.id,
+      );
+      return c.json({ success: true, data: indicator }, 201);
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', requireRole('admin', 'trainer'), async (c) => {
-  const indicatorId = c.req.param('indicatorId');
-  try {
-    await sidakService.deleteRuleVersionIndicator(indicatorId);
-    return c.json({ success: true, message: 'Indikator berhasil dihapus' });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.delete(
+  "/rule-versions/:versionId/indicators/:indicatorId",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const indicatorId = c.req.param("indicatorId");
+    try {
+      await sidakService.deleteRuleVersionIndicator(indicatorId);
+      return c.json({ success: true, message: "Indikator berhasil dihapus" });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.post('/reports/ai/export-docx', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const body = await c.req.json();
-  const parsed = z.object({
-    title: z.string().default('Laporan Analisis QA'),
-    periodLabel: z.string().default(''),
-    serviceLabel: z.string().default(''),
-    mode: z.enum(['layanan', 'individu']).default('layanan'),
-    agentName: z.string().optional(),
-    totalFindings: z.number().default(0),
-    totalRows: z.number().default(0),
-    executiveSummary: z.string().default(''),
-    keyFindings: z.array(z.string()).default([]),
-    scoreAnalysis: z.string().default(''),
-    recommendations: z.array(z.string()).default([]),
-    priorityAreas: z.array(z.string()).default([]),
-    chartImages: z.object({
-      pareto: z.string().nullable().optional(),
-      donut: z.string().nullable().optional(),
-      trend: z.string().nullable().optional(),
-    }).optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data laporan tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const buf = await buildAiReportDocx(parsed.data);
-    return c.newResponse(new Uint8Array(buf), 200, {
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'Content-Disposition': `attachment; filename="laporan-ai-${Date.now()}.docx"`,
-    });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'EXPORT_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.post(
+  "/reports/ai/export-docx",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        title: z.string().default("Laporan Analisis QA"),
+        periodLabel: z.string().default(""),
+        serviceLabel: z.string().default(""),
+        mode: z.enum(["layanan", "individu"]).default("layanan"),
+        agentName: z.string().optional(),
+        totalFindings: z.number().default(0),
+        totalRows: z.number().default(0),
+        executiveSummary: z.string().default(""),
+        keyFindings: z.array(z.string()).default([]),
+        scoreAnalysis: z.string().default(""),
+        recommendations: z.array(z.string()).default([]),
+        priorityAreas: z.array(z.string()).default([]),
+        chartImages: z
+          .object({
+            pareto: z.string().nullable().optional(),
+            donut: z.string().nullable().optional(),
+            trend: z.string().nullable().optional(),
+          })
+          .optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data laporan tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const buf = await buildAiReportDocx(parsed.data);
+      return c.newResponse(new Uint8Array(buf), 200, {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="laporan-ai-${Date.now()}.docx"`,
+      });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "EXPORT_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.post('/reports/ai/export-html', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const body = await c.req.json();
-  const parsed = z.object({
-    title: z.string().default('Laporan Analisis QA'),
-    periodLabel: z.string().default(''),
-    serviceLabel: z.string().default(''),
-    mode: z.enum(['layanan', 'individu']).default('layanan'),
-    agentName: z.string().optional(),
-    totalFindings: z.number().default(0),
-    totalRows: z.number().default(0),
-    executiveSummary: z.string().default(''),
-    keyFindings: z.array(z.string()).default([]),
-    scoreAnalysis: z.string().default(''),
-    recommendations: z.array(z.string()).default([]),
-    priorityAreas: z.array(z.string()).default([]),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data laporan tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const html = buildHtmlReport(parsed.data);
-    return c.newResponse(html, 200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Content-Disposition': `attachment; filename="laporan-ai-${Date.now()}.html"`,
-    });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'EXPORT_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.post(
+  "/reports/ai/export-html",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        title: z.string().default("Laporan Analisis QA"),
+        periodLabel: z.string().default(""),
+        serviceLabel: z.string().default(""),
+        mode: z.enum(["layanan", "individu"]).default("layanan"),
+        agentName: z.string().optional(),
+        totalFindings: z.number().default(0),
+        totalRows: z.number().default(0),
+        executiveSummary: z.string().default(""),
+        keyFindings: z.array(z.string()).default([]),
+        scoreAnalysis: z.string().default(""),
+        recommendations: z.array(z.string()).default([]),
+        priorityAreas: z.array(z.string()).default([]),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data laporan tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const html = buildHtmlReport(parsed.data);
+      return c.newResponse(html, 200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Disposition": `attachment; filename="laporan-ai-${Date.now()}.html"`,
+      });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "EXPORT_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidak.post('/reports/ai/chart-data', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const body = await c.req.json();
-  const parsed = z.object({
-    serviceType: z.string().optional(),
-    year: z.number().int().optional(),
-    startMonth: z.number().int().min(1).max(12).optional(),
-    endMonth: z.number().int().min(1).max(12).optional(),
-    folderId: z.string().optional(),
-    pesertaId: z.string().optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Filter tidak valid' } }, 400);
-  }
-  const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  try {
-    const chartData = await sidakService.getReportChartData({ ...parsed.data, agent_ids: accessibleIds ?? undefined });
-    return c.json({ success: true, data: chartData });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'REPORT_ERROR', message: error.message } }, 500);
-  }
-});
+sidak.post(
+  "/reports/ai/chart-data",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        serviceType: z.string().optional(),
+        year: z.number().int().optional(),
+        startMonth: z.number().int().min(1).max(12).optional(),
+        endMonth: z.number().int().min(1).max(12).optional(),
+        folderId: z.string().optional(),
+        pesertaId: z.string().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Filter tidak valid" },
+        },
+        400,
+      );
+    }
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    try {
+      const chartData = await sidakService.getReportChartData({
+        ...parsed.data,
+        agent_ids: accessibleIds ?? undefined,
+      });
+      return c.json({ success: true, data: chartData });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "REPORT_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 // ── Report Archives ─────────────────────────────────
-sidak.post('/reports/ai/save', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const user = c.get('user');
-  const body = await c.req.json();
-  const parsed = z.object({
-    title: z.string().min(1),
-    reportType: z.enum(['data', 'ai']).default('ai'),
-    filterParams: z.record(z.unknown()).default({}),
-    reportData: z.record(z.unknown()),
-    reportHtml: z.string().optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data report tidak valid', details: parsed.error } }, 400);
-  }
-  const result = await sidakService.saveReportArchive({
-    userId: user.id,
-    title: parsed.data.title,
-    reportType: parsed.data.reportType,
-    filterParams: parsed.data.filterParams,
-    reportData: parsed.data.reportData,
-    reportHtml: parsed.data.reportHtml,
-  });
-  return c.json({ success: true, data: result }, 201);
-});
-
-sidak.get('/reports/archives', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const data = await sidakService.getReportArchives(user.id, profile?.role ?? '');
-  return c.json({ success: true, data });
-});
-
-sidak.get('/reports/archives/:id', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const id = c.req.param('id');
-  const result = await sidakService.getReportArchiveById(id, user.id, profile?.role ?? '');
-  if (!result) {
-    return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Report tidak ditemukan atau tidak memiliki akses' } }, 404);
-  }
-  return c.json({ success: true, data: result });
-});
-
-sidak.delete('/reports/archives/:id', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
-  const user = c.get('user');
-  const profile = c.get('profile');
-  const id = c.req.param('id');
-  await sidakService.deleteReportArchive(id, user.id, profile?.role ?? '');
-  return c.json({ success: true, data: null });
-});
-
-sidak.post('/reports/ai/export-pdf', requireRole('admin', 'trainer', 'leader'), async (c) => {
-  const body = await c.req.json();
-  const parsed = z.object({
-    title: z.string().default('Laporan Analisis QA'),
-    periodLabel: z.string().default(''),
-    serviceLabel: z.string().default(''),
-    mode: z.enum(['layanan', 'individu']).default('layanan'),
-    agentName: z.string().optional(),
-    totalFindings: z.number().default(0),
-    totalRows: z.number().default(0),
-    executiveSummary: z.string().default(''),
-    keyFindings: z.array(z.string()).default([]),
-    scoreAnalysis: z.string().default(''),
-    recommendations: z.array(z.string()).default([]),
-    priorityAreas: z.array(z.string()).default([]),
-    chartData: z.object({
-      donutData: z.object({ critical: z.number(), nonCritical: z.number(), total: z.number() }).optional(),
-      paretoData: z.array(z.object({ name: z.string(), count: z.number(), cumulative: z.number() })).optional(),
-      trendData: z.array(z.object({ month: z.string(), total: z.number() })).optional(),
-    }).optional(),
-  }).safeParse(body);
-  if (!parsed.success) {
-    return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Data laporan tidak valid', details: parsed.error } }, 400);
-  }
-  try {
-    const pdfBytes = await buildAiReportPdf(parsed.data);
-    return c.newResponse(new Uint8Array(pdfBytes), 200, {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="laporan-ai-${Date.now()}.pdf"`,
+sidak.post(
+  "/reports/ai/save",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        title: z.string().min(1),
+        reportType: z.enum(["data", "ai"]).default("ai"),
+        filterParams: z.record(z.unknown()).default({}),
+        reportData: z.record(z.unknown()),
+        reportHtml: z.string().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data report tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    const result = await sidakService.saveReportArchive({
+      userId: user.id,
+      title: parsed.data.title,
+      reportType: parsed.data.reportType,
+      filterParams: parsed.data.filterParams,
+      reportData: parsed.data.reportData,
+      reportHtml: parsed.data.reportHtml,
     });
-  } catch (error: any) {
-    return c.json({ success: false, error: { code: 'EXPORT_ERROR', message: error.message } }, 500);
-  }
-});
+    return c.json({ success: true, data: result }, 201);
+  },
+);
+
+sidak.get(
+  "/reports/archives",
+  requireRole("admin", "trainer", "leader", "agent"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const data = await sidakService.getReportArchives(
+      user.id,
+      profile?.role ?? "",
+    );
+    return c.json({ success: true, data });
+  },
+);
+
+sidak.get(
+  "/reports/archives/:id",
+  requireRole("admin", "trainer", "leader", "agent"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const id = c.req.param("id");
+    const result = await sidakService.getReportArchiveById(
+      id,
+      user.id,
+      profile?.role ?? "",
+    );
+    if (!result) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Report tidak ditemukan atau tidak memiliki akses",
+          },
+        },
+        404,
+      );
+    }
+    return c.json({ success: true, data: result });
+  },
+);
+
+sidak.delete(
+  "/reports/archives/:id",
+  requireRole("admin", "trainer", "leader", "agent"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const id = c.req.param("id");
+    await sidakService.deleteReportArchive(id, user.id, profile?.role ?? "");
+    return c.json({ success: true, data: null });
+  },
+);
+
+sidak.post(
+  "/reports/ai/export-pdf",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        title: z.string().default("Laporan Analisis QA"),
+        periodLabel: z.string().default(""),
+        serviceLabel: z.string().default(""),
+        mode: z.enum(["layanan", "individu"]).default("layanan"),
+        agentName: z.string().optional(),
+        totalFindings: z.number().default(0),
+        totalRows: z.number().default(0),
+        executiveSummary: z.string().default(""),
+        keyFindings: z.array(z.string()).default([]),
+        scoreAnalysis: z.string().default(""),
+        recommendations: z.array(z.string()).default([]),
+        priorityAreas: z.array(z.string()).default([]),
+        chartData: z
+          .object({
+            donutData: z
+              .object({
+                critical: z.number(),
+                nonCritical: z.number(),
+                total: z.number(),
+              })
+              .optional(),
+            paretoData: z
+              .array(
+                z.object({
+                  name: z.string(),
+                  count: z.number(),
+                  cumulative: z.number(),
+                }),
+              )
+              .optional(),
+            trendData: z
+              .array(z.object({ month: z.string(), total: z.number() }))
+              .optional(),
+          })
+          .optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data laporan tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const pdfBytes = await buildAiReportPdf(parsed.data);
+      return c.newResponse(new Uint8Array(pdfBytes), 200, {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="laporan-ai-${Date.now()}.pdf"`,
+      });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "EXPORT_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 export { sidak };
-

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, Loader2, Reply } from 'lucide-react';
+import React, { useState, useEffect, useRef } from "react";
+import { Send, X, Loader2, Reply } from "lucide-react";
 
 interface ReplyComposerProps {
   recipient: string;
@@ -19,12 +19,14 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
   const draftKey = `pdkt_draft_${recipient}_${subject}`;
   const [replyText, setReplyText] = useState(() => {
     try {
-      return localStorage.getItem(draftKey) || '';
+      return localStorage.getItem(draftKey) || "";
     } catch {
-      return '';
+      return "";
     }
   });
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   useEffect(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -35,16 +37,24 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
         } else {
           localStorage.removeItem(draftKey);
         }
-      } catch { /* storage full */ }
+      } catch {
+        /* storage full */
+      }
     }, 500);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [replyText, draftKey]);
 
   const handleSend = () => {
     if (!replyText.trim() || isLoading) return;
     onSend(replyText);
-    setReplyText('');
-    try { localStorage.removeItem(draftKey); } catch { /* noop */ }
+    setReplyText("");
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {
+      /* noop */
+    }
   };
 
   const handleClose = () => {
@@ -54,7 +64,9 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
       } else {
         localStorage.removeItem(draftKey);
       }
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     onClose();
   };
 
@@ -78,17 +90,29 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
 
       <div className="px-4 md:px-6 py-2.5 space-y-2 border-b border-gray-200 text-xs">
         <div className="flex items-center">
-          <span className="text-gray-400 w-14 shrink-0 font-medium">Kepada</span>
-          <span className="text-gray-800 font-semibold truncate">{recipient}</span>
+          <span className="text-gray-400 w-14 shrink-0 font-medium">
+            Kepada
+          </span>
+          <span className="text-gray-800 font-semibold truncate">
+            {recipient}
+          </span>
         </div>
         <div className="flex items-center">
           <span className="text-gray-400 w-14 shrink-0 font-medium">Cc</span>
           <span className="text-gray-400 truncate">-</span>
         </div>
         <div className="flex items-center">
-          <span className="text-gray-400 w-14 shrink-0 font-medium">Subjek</span>
-          <span className={subject ? 'text-gray-800 font-semibold truncate' : 'text-gray-400 italic truncate'}>
-            {subject || 'Tanpa Subjek'}
+          <span className="text-gray-400 w-14 shrink-0 font-medium">
+            Subjek
+          </span>
+          <span
+            className={
+              subject
+                ? "text-gray-800 font-semibold truncate"
+                : "text-gray-400 italic truncate"
+            }
+          >
+            {subject || "Tanpa Subjek"}
           </span>
         </div>
       </div>

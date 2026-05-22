@@ -1,28 +1,108 @@
-import { KetikScenario, KetikConsumerType, ChatMessage, KetikAppSettings, KetikSessionHistoryItem, KetikReviewDetail, KetikSessionReview, KetikTypoFinding, DEFAULT_KETIK_SETTINGS } from '@trainers/types';
-import { generateGeminiContent } from '../lib/gemini';
-import { generateOpenRouterContent } from '../lib/openrouter';
-import { resolveModelProvider, TEXT_SIMULATION_MODELS } from '../lib/ai-models';
-import { UsageContext } from '../lib/ai-usage';
-import { Type } from '@google/genai';
-import { createAdminClient } from '../lib/supabase';
-
+import {
+  KetikScenario,
+  KetikConsumerType,
+  ChatMessage,
+  KetikAppSettings,
+  KetikSessionHistoryItem,
+  KetikReviewDetail,
+  KetikSessionReview,
+  KetikTypoFinding,
+  DEFAULT_KETIK_SETTINGS,
+} from "@trainers/types";
+import { generateGeminiContent } from "../lib/gemini";
+import { generateOpenRouterContent } from "../lib/openrouter";
+import { resolveModelProvider, TEXT_SIMULATION_MODELS } from "../lib/ai-models";
+import { UsageContext } from "../lib/ai-usage";
+import { Type } from "@google/genai";
+import { createAdminClient } from "../lib/supabase";
 
 const DEFAULT_SCENARIOS: KetikScenario[] = [
-  { id: 'pinjol', category: 'Pinjol', title: 'Pinjol Ilegal', description: 'Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.', isActive: true },
-  { id: 'penipuan', category: 'Penipuan', title: 'Penipuan Undian', description: 'Konsumen menerima pesan menang undian dan diminta transfer pajak.', isActive: true },
-  { id: 'slik', category: 'SLIK', title: 'Pengecekan SLIK', description: 'Konsumen ingin mengecek status BI Checking / SLIK.', isActive: true },
-  { id: 'asuransi', category: 'Asuransi', title: 'Klaim Asuransi Ditolak', description: 'Konsumen mengeluh klaim asuransi kesehatannya ditolak.', isActive: true },
-  { id: 'investasi', category: 'Investasi', title: 'Investasi Bodong', description: 'Konsumen melaporkan tawaran investasi dengan imbal hasil tidak wajar.', isActive: true },
-  { id: 'kartu-kredit', category: 'Perbankan', title: 'Tagihan Kartu Kredit', description: 'Konsumen keberatan dengan biaya administrasi di kartu kreditnya.', isActive: true },
+  {
+    id: "pinjol",
+    category: "Pinjol",
+    title: "Pinjol Ilegal",
+    description:
+      "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.",
+    isActive: true,
+  },
+  {
+    id: "penipuan",
+    category: "Penipuan",
+    title: "Penipuan Undian",
+    description:
+      "Konsumen menerima pesan menang undian dan diminta transfer pajak.",
+    isActive: true,
+  },
+  {
+    id: "slik",
+    category: "SLIK",
+    title: "Pengecekan SLIK",
+    description: "Konsumen ingin mengecek status BI Checking / SLIK.",
+    isActive: true,
+  },
+  {
+    id: "asuransi",
+    category: "Asuransi",
+    title: "Klaim Asuransi Ditolak",
+    description: "Konsumen mengeluh klaim asuransi kesehatannya ditolak.",
+    isActive: true,
+  },
+  {
+    id: "investasi",
+    category: "Investasi",
+    title: "Investasi Bodong",
+    description:
+      "Konsumen melaporkan tawaran investasi dengan imbal hasil tidak wajar.",
+    isActive: true,
+  },
+  {
+    id: "kartu-kredit",
+    category: "Perbankan",
+    title: "Tagihan Kartu Kredit",
+    description:
+      "Konsumen keberatan dengan biaya administrasi di kartu kreditnya.",
+    isActive: true,
+  },
 ];
 
 const DEFAULT_CONSUMER_TYPES: KetikConsumerType[] = [
-  { id: 'marah', name: 'Marah & Emosional', description: 'Konsumen sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, mudah terpancing.', difficulty: 'Sulit' },
-  { id: 'bingung', name: 'Bingung & Gaptek', description: 'Konsumen awam, bingung, kurang paham istilah teknis.', difficulty: 'Sedang' },
-  { id: 'kritis', name: 'Kritis & Detail', description: 'Konsumen teliti, skeptis, suka meminta dasar aturan.', difficulty: 'Sulit' },
-  { id: 'ramah', name: 'Ramah & Kooperatif', description: 'Konsumen sopan, tenang, kooperatif.', difficulty: 'Mudah' },
-  { id: 'terburu-buru', name: 'Terburu-buru', description: 'Konsumen sempit waktu, ingin jawaban cepat.', difficulty: 'Sedang' },
-  { id: 'pasrah', name: 'Pasrah & Sedih', description: 'Konsumen lelah dan putus asa, nada chat sedih.', difficulty: 'Sedang' },
+  {
+    id: "marah",
+    name: "Marah & Emosional",
+    description:
+      "Konsumen sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, mudah terpancing.",
+    difficulty: "Sulit",
+  },
+  {
+    id: "bingung",
+    name: "Bingung & Gaptek",
+    description: "Konsumen awam, bingung, kurang paham istilah teknis.",
+    difficulty: "Sedang",
+  },
+  {
+    id: "kritis",
+    name: "Kritis & Detail",
+    description: "Konsumen teliti, skeptis, suka meminta dasar aturan.",
+    difficulty: "Sulit",
+  },
+  {
+    id: "ramah",
+    name: "Ramah & Kooperatif",
+    description: "Konsumen sopan, tenang, kooperatif.",
+    difficulty: "Mudah",
+  },
+  {
+    id: "terburu-buru",
+    name: "Terburu-buru",
+    description: "Konsumen sempit waktu, ingin jawaban cepat.",
+    difficulty: "Sedang",
+  },
+  {
+    id: "pasrah",
+    name: "Pasrah & Sedih",
+    description: "Konsumen lelah dan putus asa, nada chat sedih.",
+    difficulty: "Sedang",
+  },
 ];
 
 export function getScenarios(): KetikScenario[] {
@@ -35,25 +115,38 @@ export function getConsumerTypes(): KetikConsumerType[] {
 
 function sanitizeConsumerText(rawText: string): string {
   if (!rawText) return rawText;
-  let text = rawText.trim()
-    .replace(/^(Agen|Agent|CS|Customer Service)\s*:\s*[\s\S]*?\n{1,2}/i, '')
-    .replace(/^(Konsumen|Pelanggan|Customer|Nasabah|Klien|User|Pengguna|Bapak\/Ibu)\s*:\s*/i, '')
-    .replace(/\(pesan chat sebelumnya\)/gi, '')
-    .replace(/\[pesan( chat)? sebelumnya\]/gi, '');
+  let text = rawText
+    .trim()
+    .replace(/^(Agen|Agent|CS|Customer Service)\s*:\s*[\s\S]*?\n{1,2}/i, "")
+    .replace(
+      /^(Konsumen|Pelanggan|Customer|Nasabah|Klien|User|Pengguna|Bapak\/Ibu)\s*:\s*/i,
+      "",
+    )
+    .replace(/\(pesan chat sebelumnya\)/gi, "")
+    .replace(/\[pesan( chat)? sebelumnya\]/gi, "");
 
   if (/(^|\n)\s*(Agen|Agent|CS|Customer Service)\s*:/i.test(text)) {
-    const consumerLines = text.split('\n')
-      .map(l => l.trim()).filter(Boolean)
-      .filter(l => !/^(Agen|Agent|CS|Customer Service)\s*:/i.test(l))
-      .map(l => l.replace(/^(Konsumen|Pelanggan|Customer|Nasabah|Klien|User|Pengguna|Bapak\/Ibu)\s*:\s*/i, ''));
-    if (consumerLines.length > 0) text = consumerLines.join(' ');
+    const consumerLines = text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((l) => !/^(Agen|Agent|CS|Customer Service)\s*:/i.test(l))
+      .map((l) =>
+        l.replace(
+          /^(Konsumen|Pelanggan|Customer|Nasabah|Klien|User|Pengguna|Bapak\/Ibu)\s*:\s*/i,
+          "",
+        ),
+      );
+    if (consumerLines.length > 0) text = consumerLines.join(" ");
   }
   return text.trim();
 }
 
-function buildTimeLimitInstruction(simulationDurationMinutes: number | undefined): string {
+function buildTimeLimitInstruction(
+  simulationDurationMinutes: number | undefined,
+): string {
   if (!simulationDurationMinutes || simulationDurationMinutes <= 0) {
-    return '';
+    return "";
   }
 
   return `
@@ -65,16 +158,24 @@ STATUS WAKTU SIMULASI:
 }
 
 export async function generateConsumerResponse(
-  config: { scenarios: KetikScenario[]; consumerType: KetikConsumerType; identity: { name: string; city: string; phone: string }; selectedModel: string; simulationDuration: number; responsePacingMode: string },
+  config: {
+    scenarios: KetikScenario[];
+    consumerType: KetikConsumerType;
+    identity: { name: string; city: string; phone: string };
+    selectedModel: string;
+    simulationDuration: number;
+    responsePacingMode: string;
+  },
   scenario: KetikScenario,
   chatHistory: ChatMessage[],
   usageContext?: UsageContext,
   userId?: string,
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   const imagesCount = (scenario as any).images?.length || 0;
-  const imageInstruction = imagesCount > 0
-    ? `Anda memiliki ${imagesCount} lampiran gambar yang bisa dikirim (indeks 0 sampai ${imagesCount - 1}). Gunakan tag [SEND_IMAGE: indeks] untuk mengirimnya.`
-    : 'Anda tidak memiliki lampiran gambar untuk dikirim.';
+  const imageInstruction =
+    imagesCount > 0
+      ? `Anda memiliki ${imagesCount} lampiran gambar yang bisa dikirim (indeks 0 sampai ${imagesCount - 1}). Gunakan tag [SEND_IMAGE: indeks] untuk mengirimnya.`
+      : "Anda tidak memiliki lampiran gambar untuk dikirim.";
 
   const scriptInstruction = scenario.script
     ? `SKRIP PERCAKAPAN (PANDUAN ALUR):
@@ -96,9 +197,11 @@ Gunakan skrip berikut sebagai panduan utama arah percakapan, informasi penting, 
 
 Isi skrip:
 ${scenario.script}`
-    : '';
+    : "";
 
-  const timeLimitInstruction = buildTimeLimitInstruction(config.simulationDuration);
+  const timeLimitInstruction = buildTimeLimitInstruction(
+    config.simulationDuration,
+  );
 
   const systemInstruction = `
 ROLEPLAY: Anda adalah KONSUMEN yang sedang menghubungi Kontak OJK 157 melalui chat. Anda bukan agen, bukan petugas, dan bukan AI.
@@ -143,18 +246,18 @@ ATURAN BALASAN:
   `;
 
   const historyText = chatHistory
-    .filter(m => m.sender !== 'system')
-    .map(m => `${m.sender === 'agent' ? '[AGEN]' : '[KONSUMEN]'} ${m.text}`)
-    .join('\n');
+    .filter((m) => m.sender !== "system")
+    .map((m) => `${m.sender === "agent" ? "[AGEN]" : "[KONSUMEN]"} ${m.text}`)
+    .join("\n");
 
   const prompt = `Skenario: ${scenario.title}\n\nRiwayat Chat:\n${historyText}\n\nBalas sebagai konsumen:`;
 
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
-  const isOpenRouter = provider === 'openrouter';
+  const isOpenRouter = provider === "openrouter";
   const callPayload = {
     model: modelId,
     systemInstruction,
-    contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
+    contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
     temperature: isOpenRouter ? 0.55 : 0.82,
     usageContext,
     userId,
@@ -166,59 +269,68 @@ ATURAN BALASAN:
       : await generateGeminiContent(callPayload);
 
     if (!response.success) {
-      return { success: false, error: response.error || 'AI tidak tersedia.' };
+      return { success: false, error: response.error || "AI tidak tersedia." };
     }
-    const rawText = typeof response.text === 'string' ? response.text : '[NO_RESPONSE]';
+    const rawText =
+      typeof response.text === "string" ? response.text : "[NO_RESPONSE]";
     const sanitizedText = sanitizeConsumerText(rawText);
-    return { success: true, text: sanitizedText || '[NO_RESPONSE]' };
+    return { success: true, text: sanitizedText || "[NO_RESPONSE]" };
   } catch (error) {
-    console.error('[KETIK] Error:', error);
-    return { success: false, error: 'Gangguan AI. Coba lagi.' };
+    console.error("[KETIK] Error:", error);
+    return { success: false, error: "Gangguan AI. Coba lagi." };
   }
 }
 
-export async function triggerKetikAIReview(sessionId: string, userId: string): Promise<any> {
+export async function triggerKetikAIReview(
+  sessionId: string,
+  userId: string,
+): Promise<any> {
   const adminClient = createAdminClient();
-  
+
   const { data: session, error: sessionError } = await adminClient
-    .from('ketik_history')
-    .select('*')
-    .eq('id', sessionId)
-    .eq('user_id', userId)
+    .from("ketik_history")
+    .select("*")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
     .single();
 
   if (sessionError || !session) {
-    console.error(`[triggerKetikAIReview] Session not found or unauthorized: ${sessionId}`);
-    throw new Error('Session not found or unauthorized');
+    console.error(
+      `[triggerKetikAIReview] Session not found or unauthorized: ${sessionId}`,
+    );
+    throw new Error("Session not found or unauthorized");
   }
 
-  if (session.review_status === 'completed') {
-    return { status: 'skipped' };
+  if (session.review_status === "completed") {
+    return { status: "skipped" };
   }
 
   const { error: jobError } = await adminClient
-    .from('ketik_review_jobs')
+    .from("ketik_review_jobs")
     .upsert(
       {
         session_id: sessionId,
-        status: 'queued',
+        status: "queued",
         lease_owner: null,
         lease_expires_at: null,
         error_message: null,
       },
-      { onConflict: 'session_id' }
+      { onConflict: "session_id" },
     );
 
   if (jobError) throw jobError;
-  
-  await adminClient.from('ketik_history').update({ review_status: 'pending' }).eq('id', sessionId);
 
-  return { status: 'queued' };
+  await adminClient
+    .from("ketik_history")
+    .update({ review_status: "pending" })
+    .eq("id", sessionId);
+
+  return { status: "queued" };
 }
 
 export async function claimAndProcessKetikReviewJob(
   sessionId: string,
-  workerId: string = 'system-auto'
+  workerId: string = "system-auto",
 ): Promise<any> {
   const adminClient = createAdminClient();
 
@@ -226,73 +338,77 @@ export async function claimAndProcessKetikReviewJob(
   const leaseExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
   const { data: claimed, error: claimError } = await adminClient
-    .from('ketik_review_jobs')
+    .from("ketik_review_jobs")
     .update({
-      status: 'processing',
+      status: "processing",
       lease_owner: workerId,
       lease_expires_at: leaseExpiresAt,
       error_message: null,
     })
-    .eq('session_id', sessionId)
-    .or(`status.eq.queued,and(status.eq.processing,lease_expires_at.lt.${nowIso})`)
-    .select('id, attempt_count');
+    .eq("session_id", sessionId)
+    .or(
+      `status.eq.queued,and(status.eq.processing,lease_expires_at.lt.${nowIso})`,
+    )
+    .select("id, attempt_count");
 
   if (claimError) throw claimError;
 
   if (!claimed || claimed.length === 0) {
     const { data: current } = await adminClient
-      .from('ketik_review_jobs')
-      .select('status')
-      .eq('session_id', sessionId)
+      .from("ketik_review_jobs")
+      .select("status")
+      .eq("session_id", sessionId)
       .maybeSingle();
 
-    if (!current) return { status: 'skipped' };
-    if (current.status === 'completed') return { status: 'completed' };
-    if (current.status === 'failed') return { status: 'failed', error: 'Job previously failed' };
-    return { status: 'processing' };
+    if (!current) return { status: "skipped" };
+    if (current.status === "completed") return { status: "completed" };
+    if (current.status === "failed")
+      return { status: "failed", error: "Job previously failed" };
+    return { status: "processing" };
   }
 
   const nextAttempt = (claimed[0].attempt_count || 0) + 1;
   if (nextAttempt > 3) {
     await adminClient
-      .from('ketik_review_jobs')
+      .from("ketik_review_jobs")
       .update({
-        status: 'failed',
-        error_message: 'Max attempts reached',
+        status: "failed",
+        error_message: "Max attempts reached",
         lease_owner: null,
         lease_expires_at: null,
       })
-      .eq('session_id', sessionId);
+      .eq("session_id", sessionId);
     await adminClient
-      .from('ketik_history')
-      .update({ review_status: 'failed' })
-      .eq('id', sessionId);
-    return { status: 'failed', error: 'Max attempts reached' };
+      .from("ketik_history")
+      .update({ review_status: "failed" })
+      .eq("id", sessionId);
+    return { status: "failed", error: "Max attempts reached" };
   }
 
   await adminClient
-    .from('ketik_review_jobs')
+    .from("ketik_review_jobs")
     .update({ attempt_count: nextAttempt })
-    .eq('session_id', sessionId);
+    .eq("session_id", sessionId);
 
   try {
     return await processKetikReviewJob(sessionId, workerId);
   } catch (error: any) {
-    const error_message = error instanceof Error ? error.message : 'Unknown processing error';
+    const error_message =
+      error instanceof Error ? error.message : "Unknown processing error";
     await adminClient
-      .from('ketik_review_jobs')
+      .from("ketik_review_jobs")
       .update({
-        status: 'failed',
+        status: "failed",
         error_message,
         lease_owner: null,
         lease_expires_at: null,
       })
-      .eq('session_id', sessionId);
+      .eq("session_id", sessionId);
     await adminClient
-      .from('ketik_history')
-      .update({ review_status: 'failed' })
-      .eq('id', sessionId);
-    return { status: 'failed', error: error_message };
+      .from("ketik_history")
+      .update({ review_status: "failed" })
+      .eq("id", sessionId);
+    return { status: "failed", error: error_message };
   }
 }
 
@@ -312,7 +428,7 @@ const responseSchema = {
         typo: { type: Type.NUMBER },
         compliance: { type: Type.NUMBER },
       },
-      required: ["final", "empathy", "probing", "typo", "compliance"]
+      required: ["final", "empathy", "probing", "typo", "compliance"],
     },
     typos: {
       type: Type.ARRAY,
@@ -322,26 +438,39 @@ const responseSchema = {
           messageId: { type: Type.STRING },
           originalWord: { type: Type.STRING },
           correctedWord: { type: Type.STRING },
-          severity: { type: Type.STRING, enum: ["minor", "medium", "critical"] },
+          severity: {
+            type: Type.STRING,
+            enum: ["minor", "medium", "critical"],
+          },
         },
-        required: ["messageId", "originalWord", "correctedWord", "severity"]
-      }
-    }
+        required: ["messageId", "originalWord", "correctedWord", "severity"],
+      },
+    },
   },
-  required: ["summary", "strengths", "weaknesses", "coachingFocus", "scores", "typos"]
+  required: [
+    "summary",
+    "strengths",
+    "weaknesses",
+    "coachingFocus",
+    "scores",
+    "typos",
+  ],
 };
 
-export async function processKetikReviewJob(sessionId: string, leaseOwner?: string): Promise<any> {
+export async function processKetikReviewJob(
+  sessionId: string,
+  leaseOwner?: string,
+): Promise<any> {
   const adminClient = createAdminClient();
-  
+
   const { data: session, error: sessionError } = await adminClient
-    .from('ketik_history')
-    .select('*')
-    .eq('id', sessionId)
+    .from("ketik_history")
+    .select("*")
+    .eq("id", sessionId)
     .single();
 
   if (sessionError || !session) {
-    throw new Error('Session not found');
+    throw new Error("Session not found");
   }
 
   const transcript = JSON.stringify(session.messages);
@@ -372,23 +501,25 @@ export async function processKetikReviewJob(sessionId: string, leaseOwner?: stri
   `;
 
   const aiResponse = await generateGeminiContent({
-    model: 'gemini-3.1-flash-lite',
+    model: "gemini-3.1-flash-lite",
     systemInstruction,
-    contents: [{ role: 'user', parts: [{ text: `Transcript:\n${transcript}` }] }],
+    contents: [
+      { role: "user", parts: [{ text: `Transcript:\n${transcript}` }] },
+    ],
     responseMimeType: "application/json",
     responseSchema: responseSchema as any,
-    usageContext: { module: 'ketik', action: 'coaching_review' },
-    userId: session.user_id
+    usageContext: { module: "ketik", action: "coaching_review" },
+    userId: session.user_id,
   });
 
   if (!aiResponse.success || !aiResponse.text) {
     throw new Error(aiResponse.error || "AI Response failed or empty");
   }
-  
+
   let reviewResult: any;
   try {
     reviewResult = JSON.parse(aiResponse.text);
-    
+
     const clamp = (val: any) => {
       const num = Number(val);
       if (isNaN(num)) return 0;
@@ -407,65 +538,100 @@ export async function processKetikReviewJob(sessionId: string, leaseOwner?: stri
       (reviewResult.scores.empathy +
         reviewResult.scores.probing +
         reviewResult.scores.typo +
-        reviewResult.scores.compliance) / 4
+        reviewResult.scores.compliance) /
+        4,
     );
-    
-    if (reviewResult.scores.final === 0 || Math.abs(reviewResult.scores.final - calculatedFinal) > 15) {
+
+    if (
+      reviewResult.scores.final === 0 ||
+      Math.abs(reviewResult.scores.final - calculatedFinal) > 15
+    ) {
       reviewResult.scores.final = calculatedFinal;
     }
 
-    if (!reviewResult.summary) reviewResult.summary = "Ringkasan tidak tersedia.";
-    if (!Array.isArray(reviewResult.strengths) || reviewResult.strengths.length === 0) reviewResult.strengths = ["Pertahankan profesionalisme dalam berkomunikasi."];
-    if (!Array.isArray(reviewResult.weaknesses) || reviewResult.weaknesses.length === 0) reviewResult.weaknesses = ["Terus latih teknik probing dan empati."];
-    if (!Array.isArray(reviewResult.coachingFocus) || reviewResult.coachingFocus.length === 0) reviewResult.coachingFocus = ["Fokus pada detail kebutuhan konsumen."];
+    if (!reviewResult.summary)
+      reviewResult.summary = "Ringkasan tidak tersedia.";
+    if (
+      !Array.isArray(reviewResult.strengths) ||
+      reviewResult.strengths.length === 0
+    )
+      reviewResult.strengths = [
+        "Pertahankan profesionalisme dalam berkomunikasi.",
+      ];
+    if (
+      !Array.isArray(reviewResult.weaknesses) ||
+      reviewResult.weaknesses.length === 0
+    )
+      reviewResult.weaknesses = ["Terus latih teknik probing dan empati."];
+    if (
+      !Array.isArray(reviewResult.coachingFocus) ||
+      reviewResult.coachingFocus.length === 0
+    )
+      reviewResult.coachingFocus = ["Fokus pada detail kebutuhan konsumen."];
 
     if (
       !reviewResult ||
-      typeof reviewResult !== 'object' ||
+      typeof reviewResult !== "object" ||
       !reviewResult.scores ||
-      typeof reviewResult.scores.final !== 'number' ||
-      typeof reviewResult.summary !== 'string'
+      typeof reviewResult.scores.final !== "number" ||
+      typeof reviewResult.summary !== "string"
     ) {
-      throw new Error('Invalid AI response shape after normalization');
+      throw new Error("Invalid AI response shape after normalization");
     }
   } catch (error) {
-    console.error("[processKetikReviewJob] Failed to parse or normalize AI response:", error, aiResponse.text);
-    throw new Error('AI response JSON tidak valid atau format tidak sesuai.', { cause: error });
+    console.error(
+      "[processKetikReviewJob] Failed to parse or normalize AI response:",
+      error,
+      aiResponse.text,
+    );
+    throw new Error("AI response JSON tidak valid atau format tidak sesuai.", {
+      cause: error,
+    });
   }
 
   if (leaseOwner) {
-    const renewedLeaseExpiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const renewedLeaseExpiresAt = new Date(
+      Date.now() + 5 * 60 * 1000,
+    ).toISOString();
     const { data: leaseRows, error: leaseError } = await adminClient
-      .from('ketik_review_jobs')
+      .from("ketik_review_jobs")
       .update({ lease_expires_at: renewedLeaseExpiresAt })
-      .eq('session_id', sessionId)
-      .eq('status', 'processing')
-      .eq('lease_owner', leaseOwner)
-      .select('id');
+      .eq("session_id", sessionId)
+      .eq("status", "processing")
+      .eq("lease_owner", leaseOwner)
+      .select("id");
 
     if (leaseError) throw leaseError;
 
     if (!leaseRows || leaseRows.length === 0) {
-      console.warn(`[processKetikReviewJob] Lease lost before persistence for session: ${sessionId}`);
-      return { status: 'processing' };
+      console.warn(
+        `[processKetikReviewJob] Lease lost before persistence for session: ${sessionId}`,
+      );
+      return { status: "processing" };
     }
   }
 
-  await adminClient.from('ketik_session_reviews').delete().eq('session_id', sessionId);
-  
+  await adminClient
+    .from("ketik_session_reviews")
+    .delete()
+    .eq("session_id", sessionId);
+
   const { error: reviewInsertError } = await adminClient
-    .from('ketik_session_reviews')
+    .from("ketik_session_reviews")
     .insert({
       session_id: sessionId,
       ai_summary: reviewResult.summary,
       strengths: reviewResult.strengths,
       weaknesses: reviewResult.weaknesses,
-      coaching_focus: reviewResult.coachingFocus
+      coaching_focus: reviewResult.coachingFocus,
     });
 
   if (reviewInsertError) throw reviewInsertError;
 
-  await adminClient.from('ketik_typo_findings').delete().eq('session_id', sessionId);
+  await adminClient
+    .from("ketik_typo_findings")
+    .delete()
+    .eq("session_id", sessionId);
 
   if (reviewResult.typos && reviewResult.typos.length > 0) {
     const typoInserts = reviewResult.typos.map((t: any) => ({
@@ -473,90 +639,99 @@ export async function processKetikReviewJob(sessionId: string, leaseOwner?: stri
       message_id: t.messageId,
       original_word: t.originalWord,
       corrected_word: t.correctedWord,
-      severity: t.severity
+      severity: t.severity,
     }));
 
     const { error: typoInsertError } = await adminClient
-      .from('ketik_typo_findings')
+      .from("ketik_typo_findings")
       .insert(typoInserts);
 
     if (typoInsertError) throw typoInsertError;
   }
 
   const { error: updateError } = await adminClient
-    .from('ketik_history')
+    .from("ketik_history")
     .update({
       final_score: reviewResult.scores.final,
       empathy_score: reviewResult.scores.empathy,
       probing_score: reviewResult.scores.probing,
       typo_score: reviewResult.scores.typo,
       compliance_score: reviewResult.scores.compliance,
-      review_status: 'completed'
+      review_status: "completed",
     })
-    .eq('id', sessionId);
+    .eq("id", sessionId);
 
   if (updateError) throw updateError;
 
   // Dual-update to results
   try {
-    await adminClient.from('results').update({
-      score: reviewResult.scores.final,
-      status: 'completed'
-    }).eq('session_id', sessionId).eq('module', 'ketik');
+    await adminClient
+      .from("results")
+      .update({
+        score: reviewResult.scores.final,
+        status: "completed",
+      })
+      .eq("session_id", sessionId)
+      .eq("module", "ketik");
   } catch (e) {
     console.error(e);
   }
 
   let jobUpdateQuery = adminClient
-    .from('ketik_review_jobs')
-    .update({ status: 'completed', lease_owner: null, lease_expires_at: null })
-    .eq('session_id', sessionId)
-    .eq('status', 'processing');
+    .from("ketik_review_jobs")
+    .update({ status: "completed", lease_owner: null, lease_expires_at: null })
+    .eq("session_id", sessionId)
+    .eq("status", "processing");
 
   if (leaseOwner) {
-    jobUpdateQuery = jobUpdateQuery.eq('lease_owner', leaseOwner);
+    jobUpdateQuery = jobUpdateQuery.eq("lease_owner", leaseOwner);
   }
 
   const { error: jobUpdateError } = await jobUpdateQuery;
   if (jobUpdateError) throw jobUpdateError;
 
-  return { status: 'completed' };
+  return { status: "completed" };
 }
 
-export async function getKetikReviewStatus(sessionId: string, userId: string): Promise<any> {
+export async function getKetikReviewStatus(
+  sessionId: string,
+  userId: string,
+): Promise<any> {
   const adminClient = createAdminClient();
-  
+
   const { data: history, error } = await adminClient
-    .from('ketik_history')
-    .select('review_status, final_score, empathy_score, probing_score, typo_score, compliance_score')
-    .eq('id', sessionId)
-    .eq('user_id', userId)
+    .from("ketik_history")
+    .select(
+      "review_status, final_score, empathy_score, probing_score, typo_score, compliance_score",
+    )
+    .eq("id", sessionId)
+    .eq("user_id", userId)
     .single();
 
   if (error || !history) return null;
 
-  let status = history.review_status || 'pending';
+  let status = history.review_status || "pending";
   let resultReady = false;
   let scores = null;
 
-  if (status === 'completed') {
+  if (status === "completed") {
     // Auto-heal check: verify review row actually exists
     const { data: review, error: reviewError } = await adminClient
-      .from('ketik_session_reviews')
-      .select('id')
-      .eq('session_id', sessionId)
+      .from("ketik_session_reviews")
+      .select("id")
+      .eq("session_id", sessionId)
       .maybeSingle();
 
     if (!review || reviewError) {
-      status = 'failed';
+      status = "failed";
       await adminClient
-        .from('ketik_history')
-        .update({ review_status: 'failed' })
-        .eq('id', sessionId);
+        .from("ketik_history")
+        .update({ review_status: "failed" })
+        .eq("id", sessionId);
       await adminClient
-        .from('ketik_review_jobs')
-        .update({ status: 'failed' })
-        .eq('session_id', sessionId);
+        .from("ketik_review_jobs")
+        .update({ status: "failed" })
+        .eq("session_id", sessionId);
     } else {
       resultReady = true;
       scores = {
@@ -570,56 +745,73 @@ export async function getKetikReviewStatus(sessionId: string, userId: string): P
   }
 
   // Queue lifecycle is internal; UI should treat queued as processing.
-  if (status === 'queued') {
-    status = 'processing';
+  if (status === "queued") {
+    status = "processing";
   }
 
   return { status, resultReady, scores };
 }
 
-
-const coerceKetikModelId = (modelId?: string) => TEXT_SIMULATION_MODELS.some(m => m.id === modelId) ? modelId! : 'gemini-3.1-flash-lite';
+const coerceKetikModelId = (modelId?: string) =>
+  TEXT_SIMULATION_MODELS.some((m) => m.id === modelId)
+    ? modelId!
+    : "gemini-3.1-flash-lite";
 const coerceDuration = (duration?: number) => {
-  if (typeof duration !== 'number' || isNaN(duration)) return 5;
+  if (typeof duration !== "number" || isNaN(duration)) return 5;
   return Math.max(1, Math.min(60, duration));
 };
 
 function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
-  const mergedScenarios = DEFAULT_KETIK_SETTINGS.scenarios.map(defaultItem => {
-    const existing = stored.scenarios?.find(s => s.id === defaultItem.id);
-    return existing ? { ...existing, description: defaultItem.description } : defaultItem;
-  });
-  const customScenarios = (stored.scenarios || []).filter(s => !DEFAULT_KETIK_SETTINGS.scenarios.find(d => d.id === s.id));
+  const mergedScenarios = DEFAULT_KETIK_SETTINGS.scenarios.map(
+    (defaultItem) => {
+      const existing = stored.scenarios?.find((s) => s.id === defaultItem.id);
+      return existing
+        ? { ...existing, description: defaultItem.description }
+        : defaultItem;
+    },
+  );
+  const customScenarios = (stored.scenarios || []).filter(
+    (s) => !DEFAULT_KETIK_SETTINGS.scenarios.find((d) => d.id === s.id),
+  );
 
-  const mergedConsumers = DEFAULT_KETIK_SETTINGS.consumerTypes.map(defaultItem => {
-    const existing = stored.consumerTypes?.find(s => s.id === defaultItem.id);
-    return existing ? { ...existing, description: defaultItem.description } : defaultItem;
-  });
-  const customConsumers = (stored.consumerTypes || []).filter(s => !DEFAULT_KETIK_SETTINGS.consumerTypes.find(d => d.id === s.id));
+  const mergedConsumers = DEFAULT_KETIK_SETTINGS.consumerTypes.map(
+    (defaultItem) => {
+      const existing = stored.consumerTypes?.find(
+        (s) => s.id === defaultItem.id,
+      );
+      return existing
+        ? { ...existing, description: defaultItem.description }
+        : defaultItem;
+    },
+  );
+  const customConsumers = (stored.consumerTypes || []).filter(
+    (s) => !DEFAULT_KETIK_SETTINGS.consumerTypes.find((d) => d.id === s.id),
+  );
 
   return {
     scenarios: [...mergedScenarios, ...customScenarios],
     consumerTypes: [...mergedConsumers, ...customConsumers],
-    quickTemplates: stored.quickTemplates || DEFAULT_KETIK_SETTINGS.quickTemplates,
-    activeConsumerTypeId: stored.activeConsumerTypeId || 'random',
+    quickTemplates:
+      stored.quickTemplates || DEFAULT_KETIK_SETTINGS.quickTemplates,
+    activeConsumerTypeId: stored.activeConsumerTypeId || "random",
     identitySettings: {
-      displayName: stored.identitySettings?.displayName || '',
-      signatureName: stored.identitySettings?.signatureName || '',
-      phoneNumber: stored.identitySettings?.phoneNumber || '',
-      city: stored.identitySettings?.city || '',
+      displayName: stored.identitySettings?.displayName || "",
+      signatureName: stored.identitySettings?.signatureName || "",
+      phoneNumber: stored.identitySettings?.phoneNumber || "",
+      city: stored.identitySettings?.city || "",
     },
     selectedModel: coerceKetikModelId(stored.selectedModel),
     simulationDuration: coerceDuration(stored.simulationDuration),
-    responsePacingMode: stored.responsePacingMode || 'realistic',
+    responsePacingMode: stored.responsePacingMode || "realistic",
   };
 }
 
 export async function getSettings(userId: string): Promise<KetikAppSettings> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient
-    .from('user_settings')
-    .select('settings')
-    .eq('user_id', userId)
+    .from("user_settings")
+    .select("settings")
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data?.settings?.ketik) {
@@ -630,13 +822,16 @@ export async function getSettings(userId: string): Promise<KetikAppSettings> {
   return parseSettings(stored);
 }
 
-export async function saveSettings(userId: string, settings: KetikAppSettings): Promise<void> {
+export async function saveSettings(
+  userId: string,
+  settings: KetikAppSettings,
+): Promise<void> {
   const adminClient = createAdminClient();
 
   const { data: existing } = await adminClient
-    .from('user_settings')
-    .select('settings')
-    .eq('user_id', userId)
+    .from("user_settings")
+    .select("settings")
+    .eq("user_id", userId)
     .maybeSingle();
 
   const updatedSettings = {
@@ -645,38 +840,46 @@ export async function saveSettings(userId: string, settings: KetikAppSettings): 
   };
 
   const { error } = await adminClient
-    .from('user_settings')
+    .from("user_settings")
     .upsert(
-      { user_id: userId, settings: updatedSettings, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' }
+      {
+        user_id: userId,
+        settings: updatedSettings,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
     );
 
   if (error) throw new Error(`Gagal menyimpan pengaturan: ${error.message}`);
 }
 
-export async function getHistory(userId: string): Promise<KetikSessionHistoryItem[]> {
+export async function getHistory(
+  userId: string,
+): Promise<KetikSessionHistoryItem[]> {
   const adminClient = createAdminClient();
 
   let data, error;
-  
+
   // Try 1: specific columns
   const res1 = await adminClient
-    .from('ketik_history')
-    .select('id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, typo_score, compliance_score, review_status')
-    .eq('user_id', userId)
-    .order('date', { ascending: false })
+    .from("ketik_history")
+    .select(
+      "id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, typo_score, compliance_score, review_status",
+    )
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
     .limit(50);
-    
+
   data = res1.data;
   error = res1.error;
 
   // Try 2: wildcard
   if (error) {
     const res2 = await adminClient
-      .from('ketik_history')
-      .select('*')
-      .eq('user_id', userId)
-      .order('date', { ascending: false })
+      .from("ketik_history")
+      .select("*")
+      .eq("user_id", userId)
+      .order("date", { ascending: false })
       .limit(50);
     data = res2.data;
     error = res2.error;
@@ -685,25 +888,25 @@ export async function getHistory(userId: string): Promise<KetikSessionHistoryIte
   // Try 3: results table fallback
   if (error) {
     const res3 = await adminClient
-      .from('results')
-      .select('session_id, created_at, metadata, score, status')
-      .eq('user_id', userId)
-      .eq('module', 'ketik')
-      .order('created_at', { ascending: false })
+      .from("results")
+      .select("session_id, created_at, metadata, score, status")
+      .eq("user_id", userId)
+      .eq("module", "ketik")
+      .order("created_at", { ascending: false })
       .limit(50);
-      
+
     if (!res3.error && res3.data) {
       return res3.data.map((item: any) => ({
         id: item.session_id,
         date: item.created_at,
-        scenarioTitle: item.metadata?.scenario_title || 'Simulation Chat',
-        consumerName: item.metadata?.consumer_name || 'Consumer',
-        consumerPhone: '',
-        consumerCity: '',
+        scenarioTitle: item.metadata?.scenario_title || "Simulation Chat",
+        consumerName: item.metadata?.consumer_name || "Consumer",
+        consumerPhone: "",
+        consumerCity: "",
         messages: [],
         simulationDuration: item.metadata?.simulation_duration,
         finalScore: item.score,
-        reviewStatus: item.status || 'pending',
+        reviewStatus: item.status || "pending",
       }));
     }
     return [];
@@ -712,8 +915,8 @@ export async function getHistory(userId: string): Promise<KetikSessionHistoryIte
   return (data || []).map((item: any) => ({
     id: item.id,
     date: item.date || item.created_at,
-    scenarioTitle: item.scenario_title || 'Simulation Chat',
-    consumerName: item.consumer_name || 'Consumer',
+    scenarioTitle: item.scenario_title || "Simulation Chat",
+    consumerName: item.consumer_name || "Consumer",
     consumerPhone: item.consumer_phone,
     consumerCity: item.consumer_city,
     messages: Array.isArray(item.messages) ? item.messages : [],
@@ -727,14 +930,17 @@ export async function getHistory(userId: string): Promise<KetikSessionHistoryIte
   }));
 }
 
-export async function persistSession(userId: string, params: {
-  scenarioTitle: string;
-  consumerName: string;
-  consumerPhone: string;
-  consumerCity: string;
-  messages: ChatMessage[];
-  simulationDuration?: number;
-}): Promise<KetikSessionHistoryItem> {
+export async function persistSession(
+  userId: string,
+  params: {
+    scenarioTitle: string;
+    consumerName: string;
+    consumerPhone: string;
+    consumerCity: string;
+    messages: ChatMessage[];
+    simulationDuration?: number;
+  },
+): Promise<KetikSessionHistoryItem> {
   const adminClient = createAdminClient();
 
   const sessionData = {
@@ -749,30 +955,33 @@ export async function persistSession(userId: string, params: {
   };
 
   const { data, error } = await adminClient
-    .from('ketik_history')
+    .from("ketik_history")
     .insert([sessionData])
     .select()
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message || 'Gagal menyimpan sesi.');
+    throw new Error(error?.message || "Gagal menyimpan sesi.");
   }
 
   // Dual-write to results table for legacy compatibility
   try {
-    await adminClient.from('results').insert({
+    await adminClient.from("results").insert({
       user_id: userId,
-      module: 'ketik',
+      module: "ketik",
       session_id: data.id,
       created_at: new Date().toISOString(),
       metadata: {
         scenario_title: params.scenarioTitle,
         consumer_name: params.consumerName,
-        simulation_duration: params.simulationDuration
-      }
+        simulation_duration: params.simulationDuration,
+      },
     });
   } catch (err) {
-    console.error(`[KETIK] Failed to dual-write to results table for session ${data.id}:`, err);
+    console.error(
+      `[KETIK] Failed to dual-write to results table for session ${data.id}:`,
+      err,
+    );
   }
 
   return {
@@ -784,23 +993,30 @@ export async function persistSession(userId: string, params: {
     consumerCity: data.consumer_city,
     messages: data.messages || params.messages,
     simulationDuration: data.simulation_duration,
-    reviewStatus: data.review_status || 'pending',
+    reviewStatus: data.review_status || "pending",
   };
 }
 
-export async function deleteSession(sessionId: string, userId: string): Promise<void> {
+export async function deleteSession(
+  sessionId: string,
+  userId: string,
+): Promise<void> {
   const adminClient = createAdminClient();
   const { error } = await adminClient
-    .from('ketik_history')
+    .from("ketik_history")
     .delete()
-    .eq('id', sessionId)
-    .eq('user_id', userId);
+    .eq("id", sessionId)
+    .eq("user_id", userId);
 
   if (error) throw new Error(`Gagal menghapus sesi: ${error.message}`);
 
   // Dual-delete from results
   try {
-    await adminClient.from('results').delete().eq('session_id', sessionId).eq('module', 'ketik');
+    await adminClient
+      .from("results")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("module", "ketik");
   } catch (e) {
     console.error(e);
   }
@@ -809,35 +1025,52 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
 export async function clearHistory(userId: string): Promise<void> {
   const adminClient = createAdminClient();
   const { error } = await adminClient
-    .from('ketik_history')
+    .from("ketik_history")
     .delete()
-    .eq('user_id', userId);
+    .eq("user_id", userId);
 
   if (error) throw new Error(`Gagal menghapus riwayat: ${error.message}`);
 
   // Dual-delete from results
   try {
-    await adminClient.from('results').delete().eq('user_id', userId).eq('module', 'ketik');
+    await adminClient
+      .from("results")
+      .delete()
+      .eq("user_id", userId)
+      .eq("module", "ketik");
   } catch (e) {
     console.error(e);
   }
 }
 
-export async function getReviewDetail(sessionId: string, userId: string): Promise<KetikReviewDetail | null> {
+export async function getReviewDetail(
+  sessionId: string,
+  userId: string,
+): Promise<KetikReviewDetail | null> {
   const adminClient = createAdminClient();
 
   const { data: history, error: historyError } = await adminClient
-    .from('ketik_history')
-    .select('review_status, final_score, empathy_score, probing_score, typo_score, compliance_score')
-    .eq('id', sessionId)
-    .eq('user_id', userId)
+    .from("ketik_history")
+    .select(
+      "review_status, final_score, empathy_score, probing_score, typo_score, compliance_score",
+    )
+    .eq("id", sessionId)
+    .eq("user_id", userId)
     .single();
 
-  if (historyError || !history || history.review_status !== 'completed') return null;
+  if (historyError || !history || history.review_status !== "completed")
+    return null;
 
   const [{ data: reviewData }, { data: typosData }] = await Promise.all([
-    adminClient.from('ketik_session_reviews').select('*').eq('session_id', sessionId).maybeSingle(),
-    adminClient.from('ketik_typo_findings').select('*').eq('session_id', sessionId),
+    adminClient
+      .from("ketik_session_reviews")
+      .select("*")
+      .eq("session_id", sessionId)
+      .maybeSingle(),
+    adminClient
+      .from("ketik_typo_findings")
+      .select("*")
+      .eq("session_id", sessionId),
   ]);
 
   if (!reviewData) return null;
@@ -876,22 +1109,25 @@ export async function getReviewDetail(sessionId: string, userId: string): Promis
   };
 }
 
-export async function processOldestQueuedJob(workerId: string = 'daemon-worker'): Promise<any> {
+export async function processOldestQueuedJob(
+  workerId: string = "daemon-worker",
+): Promise<any> {
   const adminClient = createAdminClient();
-  
+
   const nowIso = new Date().toISOString();
-  
+
   // Find oldest queued or stale processing job
   const { data: job, error } = await adminClient
-    .from('ketik_review_jobs')
-    .select('session_id')
-    .or(`status.eq.queued,and(status.eq.processing,lease_expires_at.lt.${nowIso})`)
-    .order('created_at', { ascending: true })
+    .from("ketik_review_jobs")
+    .select("session_id")
+    .or(
+      `status.eq.queued,and(status.eq.processing,lease_expires_at.lt.${nowIso})`,
+    )
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
-  if (error || !job) return { status: 'no_jobs' };
+  if (error || !job) return { status: "no_jobs" };
 
   return await claimAndProcessKetikReviewJob(job.session_id, workerId);
 }
-

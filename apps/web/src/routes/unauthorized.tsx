@@ -1,5 +1,5 @@
-import { Link } from '@tanstack/react-router';
-import { Home, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Link } from "@tanstack/react-router";
+import { Home, ShieldAlert, ArrowLeft } from "lucide-react";
 
 export default function UnauthorizedPage() {
   return (
@@ -11,9 +11,14 @@ export default function UnauthorizedPage() {
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tight text-gray-900">403</h1>
+          <h1 className="text-4xl font-black tracking-tight text-gray-900">
+            403
+          </h1>
           <h2 className="text-xl font-bold text-gray-900">Akses Ditolak</h2>
-          <p className="text-gray-500">Anda tidak memiliki izin untuk mengakses halaman ini. Hubungi admin jika Anda membutuhkan akses.</p>
+          <p className="text-gray-500">
+            Anda tidak memiliki izin untuk mengakses halaman ini. Hubungi admin
+            jika Anda membutuhkan akses.
+          </p>
         </div>
         <div className="flex items-center justify-center gap-3 pt-4">
           <button

@@ -43,7 +43,7 @@ export interface MigrationReport {
  * Reads migration files from the given directory in ascending filename order.
  */
 export async function getMigrationFiles(
-  migrationsDir: string
+  migrationsDir: string,
 ): Promise<string[]> {
   const entries = await readdir(migrationsDir);
   const sqlFiles = entries
@@ -58,7 +58,7 @@ export async function getMigrationFiles(
  */
 export function getErrorLine(
   sql: string,
-  position: string | undefined
+  position: string | undefined,
 ): number | undefined {
   if (!position) return undefined;
   const pos = parseInt(position, 10);
@@ -73,7 +73,7 @@ export function getErrorLine(
  */
 export function getFailingStatement(
   sql: string,
-  position: string | undefined
+  position: string | undefined,
 ): string | undefined {
   if (!position) return undefined;
   const pos = parseInt(position, 10);
@@ -101,7 +101,7 @@ export async function executeMigration(
   client: Client,
   migrationsDir: string,
   filename: string,
-  timeoutMs: number = 30_000
+  timeoutMs: number = 30_000,
 ): Promise<MigrationResult> {
   const filePath = join(migrationsDir, filename);
   const sql = await readFile(filePath, "utf-8");
@@ -154,7 +154,7 @@ export async function executeMigration(
  */
 export async function validateMigrations(
   dbUrl: string,
-  migrationsDir?: string
+  migrationsDir?: string,
 ): Promise<MigrationReport> {
   const resolvedDir =
     migrationsDir || resolve(process.cwd(), "supabase/migrations");
@@ -212,12 +212,11 @@ export function formatReport(report: MigrationReport): string {
 // ─── CLI Entry Point ──────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const dbUrl =
-    process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
+  const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
 
   if (!dbUrl) {
     console.error(
-      "Error: DATABASE_URL or SUPABASE_DB_URL environment variable is required."
+      "Error: DATABASE_URL or SUPABASE_DB_URL environment variable is required.",
     );
     process.exit(1);
   }
@@ -238,8 +237,8 @@ async function main(): Promise<void> {
           message: error.message,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
     process.exit(1);
   }

@@ -76,6 +76,7 @@ Indikator ini memprioritaskan pertambahan biaya dalam **Rupiah** untuk memberika
 Jika ditemukan data penggunaan (`ai_usage_logs`) pada **bulan berjalan** yang memiliki `estimated_cost_idr = 0` padahal jumlah token positif, sistem mendukung backfill terbatas.
 
 **Aturan Backfill:**
+
 - Hanya berlaku untuk baris pada bulan berjalan (WIB).
 - Hanya menyasar baris dengan `estimated_cost_idr = 0` dan token > 0.
 - Menggunakan harga model dan kurs terbaru saat ini.
@@ -112,12 +113,12 @@ Aturan penting:
 
 Action `usageContext` yang saat ini aktif:
 
-| Modul | Action |
-|---|---|
-| `ketik` | `chat_response`, `session_timeout` |
-| `pdkt` | `init_email`, `evaluate_response` |
-| `telefun` | `voice_live`, `voice_tts`, `chat_response`, `first_message`, `score_generation` |
-| `qa-analyzer` | `report_generation` |
+| Modul         | Action                                                                          |
+| ------------- | ------------------------------------------------------------------------------- |
+| `ketik`       | `chat_response`, `session_timeout`                                              |
+| `pdkt`        | `init_email`, `evaluate_response`                                               |
+| `telefun`     | `voice_live`, `voice_tts`, `chat_response`, `first_message`, `score_generation` |
+| `qa-analyzer` | `report_generation`                                                             |
 
 ## Pricing dan Kurs
 
@@ -144,13 +145,13 @@ Saat kurs baru disimpan:
 
 ## Access Matrix
 
-| Fitur | Admin | Trainer | Leader | Agent |
-|---|---|---|---|---|
-| Monitoring histori lintas akun | Ya | Ya | Ya | Tidak |
-| Monitoring usage lintas akun | Ya | Ya | Ya | Tidak |
-| Editor pricing model | Ya | Ya | Tidak | Tidak |
-| Editor kurs USD/IDR | Ya | Ya | Tidak | Tidak |
-| Quick-view `Usage Bulan Ini` di modul | Ya | Ya | Ya | Ya |
+| Fitur                                 | Admin | Trainer | Leader | Agent |
+| ------------------------------------- | ----- | ------- | ------ | ----- |
+| Monitoring histori lintas akun        | Ya    | Ya      | Ya     | Tidak |
+| Monitoring usage lintas akun          | Ya    | Ya      | Ya     | Tidak |
+| Editor pricing model                  | Ya    | Ya      | Tidak  | Tidak |
+| Editor kurs USD/IDR                   | Ya    | Ya      | Tidak  | Tidak |
+| Quick-view `Usage Bulan Ini` di modul | Ya    | Ya      | Ya     | Ya    |
 
 Catatan:
 

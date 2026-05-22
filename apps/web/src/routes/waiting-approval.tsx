@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { Clock, LogOut } from 'lucide-react';
-import { supabase } from '../lib/supabase';
-import { normalizeProfileStatus } from '../lib/profile';
+import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { Clock, LogOut } from "lucide-react";
+import { supabase } from "../lib/supabase";
+import { normalizeProfileStatus } from "../lib/profile";
 
 type WaitingApprovalProfile = {
   status?: string | null;
@@ -11,60 +11,66 @@ type WaitingApprovalProfile = {
 
 export default function WaitingApprovalPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_profile');
-    localStorage.removeItem('trainers_login_time');
-    localStorage.removeItem('trainers_last_activity');
-    navigate({ to: '/' });
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_profile");
+    localStorage.removeItem("trainers_login_time");
+    localStorage.removeItem("trainers_last_activity");
+    navigate({ to: "/" });
   };
 
   useEffect(() => {
     const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        navigate({ to: '/' });
+        navigate({ to: "/" });
         return;
       }
 
-      setEmail(user.email || '');
+      setEmail(user.email || "");
 
       const primary = await supabase
-        .from('profiles')
-        .select('status, is_deleted')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("status, is_deleted")
+        .eq("id", user.id)
         .maybeSingle();
 
-      const profile = (primary.data as WaitingApprovalProfile | null) ?? (await supabase
-        .from('profiles')
-        .select('status')
-        .eq('id', user.id)
-        .maybeSingle()).data as WaitingApprovalProfile | null;
+      const profile =
+        (primary.data as WaitingApprovalProfile | null) ??
+        ((
+          await supabase
+            .from("profiles")
+            .select("status")
+            .eq("id", user.id)
+            .maybeSingle()
+        ).data as WaitingApprovalProfile | null);
 
       const profileStatus = normalizeProfileStatus(profile?.status);
 
       if (profile?.is_deleted) {
         await supabase.auth.signOut();
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_profile');
-        localStorage.removeItem('trainers_login_time');
-        localStorage.removeItem('trainers_last_activity');
-        navigate({ to: '/' });
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_profile");
+        localStorage.removeItem("trainers_login_time");
+        localStorage.removeItem("trainers_last_activity");
+        navigate({ to: "/" });
         return;
       }
 
-      if (profileStatus === 'active') {
-        navigate({ to: '/dashboard' });
-      } else if (profileStatus === 'inactive') {
+      if (profileStatus === "active") {
+        navigate({ to: "/dashboard" });
+      } else if (profileStatus === "inactive") {
         await supabase.auth.signOut();
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_profile');
-        localStorage.removeItem('trainers_login_time');
-        localStorage.removeItem('trainers_last_activity');
-        navigate({ to: '/' });
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_profile");
+        localStorage.removeItem("trainers_login_time");
+        localStorage.removeItem("trainers_last_activity");
+        navigate({ to: "/" });
       }
     };
 
@@ -77,19 +83,26 @@ export default function WaitingApprovalPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Trainers SuperApp</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Trainers SuperApp
+          </h1>
           <p className="text-sm text-gray-500 mt-1">Workspace internal</p>
         </div>
         <div className="bg-white rounded-2xl border shadow-sm p-6 text-center">
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
             <Clock className="h-8 w-8" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900">Menunggu persetujuan</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Menunggu persetujuan
+          </h2>
           <p className="mt-4 text-sm text-gray-500">
-            Akun {email && <>({email}) </>}berhasil dibuat dan sedang menunggu verifikasi trainer. Halaman ini akan memeriksa status secara berkala.
+            Akun {email && <>({email}) </>}berhasil dibuat dan sedang menunggu
+            verifikasi trainer. Halaman ini akan memeriksa status secara
+            berkala.
           </p>
           <div className="mt-6 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-700">
-            Estimasi normal sekitar 1x24 jam. Jika akses dibutuhkan segera, hubungi trainer atau admin Anda.
+            Estimasi normal sekitar 1x24 jam. Jika akses dibutuhkan segera,
+            hubungi trainer atau admin Anda.
           </div>
           <button
             onClick={handleLogout}

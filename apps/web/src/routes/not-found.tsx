@@ -1,5 +1,5 @@
-import { Link } from '@tanstack/react-router';
-import { Home, AlertCircle } from 'lucide-react';
+import { Link } from "@tanstack/react-router";
+import { Home, AlertCircle } from "lucide-react";
 
 export default function NotFoundPage() {
   return (
@@ -11,9 +11,15 @@ export default function NotFoundPage() {
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tight text-gray-900">404</h1>
-          <h2 className="text-xl font-bold text-gray-900">Halaman Tidak Ditemukan</h2>
-          <p className="text-gray-500">Maaf, halaman yang Anda cari tidak tersedia atau telah dipindahkan.</p>
+          <h1 className="text-4xl font-black tracking-tight text-gray-900">
+            404
+          </h1>
+          <h2 className="text-xl font-bold text-gray-900">
+            Halaman Tidak Ditemukan
+          </h2>
+          <p className="text-gray-500">
+            Maaf, halaman yang Anda cari tidak tersedia atau telah dipindahkan.
+          </p>
         </div>
         <div className="pt-4">
           <Link

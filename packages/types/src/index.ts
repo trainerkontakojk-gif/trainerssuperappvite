@@ -1,12 +1,12 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ── Auth Types ──────────────────────────────────────────
 export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'trainer' | 'leader' | 'agent';
-  status?: 'pending' | 'active' | 'inactive';
+  role: "admin" | "trainer" | "leader" | "agent";
+  status?: "pending" | "active" | "inactive";
   is_deleted?: boolean;
 }
 
@@ -15,14 +15,22 @@ export type ApiResponse<T> =
   | { success: false; error: { code: string; message: string; details?: any } };
 
 // ── SIDAK Types ─────────────────────────────────────────
-export const serviceTypeSchema = z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']);
+export const serviceTypeSchema = z.enum([
+  "call",
+  "chat",
+  "email",
+  "cso",
+  "pencatatan",
+  "bko",
+  "slik",
+]);
 export type ServiceType = z.infer<typeof serviceTypeSchema>;
 export const VALID_SERVICE_TYPES: ServiceType[] = serviceTypeSchema.options;
 
-export const categorySchema = z.enum(['critical', 'non_critical', 'none']);
+export const categorySchema = z.enum(["critical", "non_critical", "none"]);
 export type Category = z.infer<typeof categorySchema>;
 
-export const scoringModeSchema = z.enum(['weighted', 'flat', 'no_category']);
+export const scoringModeSchema = z.enum(["weighted", "flat", "no_category"]);
 export type ScoringMode = z.infer<typeof scoringModeSchema>;
 
 export const qaPeriodSchema = z.object({
@@ -72,12 +80,16 @@ export const createTemuanBatchSchema = z.object({
   period_id: z.string().uuid(),
   service_type: serviceTypeSchema,
   no_tiket: z.string().nullable().optional(),
-  items: z.array(z.object({
-    indicator_id: z.string().uuid(),
-    nilai: z.number().int().min(0).max(3),
-    ketidaksesuaian: z.string().nullable().optional(),
-    sebaiknya: z.string().nullable().optional(),
-  })).min(1),
+  items: z
+    .array(
+      z.object({
+        indicator_id: z.string().uuid(),
+        nilai: z.number().int().min(0).max(3),
+        ketidaksesuaian: z.string().nullable().optional(),
+        sebaiknya: z.string().nullable().optional(),
+      }),
+    )
+    .min(1),
 });
 export type CreateTemuanBatch = z.infer<typeof createTemuanBatchSchema>;
 
@@ -89,7 +101,11 @@ export const serviceWeightSchema = z.object({
 });
 export type ServiceWeight = z.infer<typeof serviceWeightSchema>;
 
-export const ruleVersionStatusSchema = z.enum(['draft', 'published', 'superseded']);
+export const ruleVersionStatusSchema = z.enum([
+  "draft",
+  "published",
+  "superseded",
+]);
 export type RuleVersionStatus = z.infer<typeof ruleVersionStatusSchema>;
 
 export const ruleVersionSchema = z.object({
@@ -120,7 +136,7 @@ export const createRuleVersionSchema = z.object({
   effective_period_id: z.string().uuid(),
   critical_weight: z.number().min(0).max(1).default(0.5),
   non_critical_weight: z.number().min(0).max(1).default(0.5),
-  scoring_mode: scoringModeSchema.default('weighted'),
+  scoring_mode: scoringModeSchema.default("weighted"),
   change_reason: z.string().optional(),
 });
 export type CreateRuleVersion = z.infer<typeof createRuleVersionSchema>;
@@ -166,7 +182,7 @@ export interface AgentDirectoryEntry {
   foto_url?: string | null;
   jabatan?: string | null;
   avgScore: number | null;
-  trend: 'up' | 'down' | 'same' | 'none';
+  trend: "up" | "down" | "same" | "none";
   trendValue: number | null;
   atRisk: boolean;
 }
@@ -200,18 +216,26 @@ export interface ParetoData {
   fullName: string;
   count: number;
   cumulative: number;
-  category: 'critical' | 'non_critical';
+  category: "critical" | "non_critical";
 }
 
 export interface DashboardData {
   periods: QAPeriod[];
   folders: { id: string; name: string }[];
   summary: DashboardSummary | null;
-  serviceData: { name: string; serviceType: string; total: number; severity: string }[];
+  serviceData: {
+    name: string;
+    serviceType: string;
+    total: number;
+    severity: string;
+  }[];
   topAgents: TopAgentData[];
   paretoData: ParetoData[];
   donutData: { critical: number; nonCritical: number; total: number } | null;
-  paramTrend: { labels: string[]; datasets: { label: string; data: number[]; isTotal: boolean }[] };
+  paramTrend: {
+    labels: string[];
+    datasets: { label: string; data: number[]; isTotal: boolean }[];
+  };
   sparklines: Record<string, { label: string; value: number }[]>;
   availableYears: number[];
   currentYear: number;
@@ -222,20 +246,31 @@ export interface AgentDetailData {
   periodSummaries: AgentPeriodSummary[];
   selectedPeriod?: AgentPeriodSummary | null;
   temuan: QATemuan[];
-  personalTrend: { labels: string[]; datasets: { label: string; data: number[]; isTotal: boolean }[] };
+  personalTrend: {
+    labels: string[];
+    datasets: { label: string; data: number[]; isTotal: boolean }[];
+  };
   availableYears?: number[];
-  scoreHistory?: { month: number; year: number; finalScore: number; nonCriticalScore: number; criticalScore: number; sessionCount: number; service_type: ServiceType }[];
+  scoreHistory?: {
+    month: number;
+    year: number;
+    finalScore: number;
+    nonCriticalScore: number;
+    criticalScore: number;
+    sessionCount: number;
+    service_type: ServiceType;
+  }[];
   initialYear: number;
   initialService: ServiceType;
   initialTrendRange: { start: number; end: number };
 }
 
 // ── KETIK Types ────────────────────────────────────────
-export type ChatSender = 'agent' | 'consumer' | 'system';
+export type ChatSender = "agent" | "consumer" | "system";
 
 export interface PacingMeta {
-  mode: 'realistic' | 'training_fast';
-  band: 'short' | 'normal' | 'long' | 'slow' | 'follow_up' | 'greeting_reply';
+  mode: "realistic" | "training_fast";
+  band: "short" | "normal" | "long" | "slow" | "follow_up" | "greeting_reply";
   plannedDelayMs: number;
   timerClamped: boolean;
 }
@@ -261,44 +296,152 @@ export interface KetikAppSettings {
   identitySettings: KetikIdentitySettings;
   selectedModel: string;
   simulationDuration: number;
-  responsePacingMode: 'realistic' | 'training_fast';
+  responsePacingMode: "realistic" | "training_fast";
 }
 
 export const DEFAULT_KETIK_SCENARIOS: KetikScenario[] = [
-  { id: 'pinjol', category: 'Pinjol', title: 'Pinjol Ilegal', description: 'Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.', isActive: true },
-  { id: 'penipuan', category: 'Penipuan', title: 'Penipuan Undian', description: 'Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.', isActive: true },
-  { id: 'slik', category: 'SLIK', title: 'Pengecekan SLIK', description: 'Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.', isActive: true },
-  { id: 'asuransi', category: 'Asuransi', title: 'Klaim Asuransi Ditolak', description: 'Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.', isActive: true },
-  { id: 'investasi', category: 'Investasi', title: 'Investasi Bodong', description: 'Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).', isActive: true },
-  { id: 'kartu-kredit', category: 'Perbankan', title: 'Tagihan Kartu Kredit', description: 'Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.', isActive: true },
+  {
+    id: "pinjol",
+    category: "Pinjol",
+    title: "Pinjol Ilegal",
+    description:
+      "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.",
+    isActive: true,
+  },
+  {
+    id: "penipuan",
+    category: "Penipuan",
+    title: "Penipuan Undian",
+    description:
+      "Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.",
+    isActive: true,
+  },
+  {
+    id: "slik",
+    category: "SLIK",
+    title: "Pengecekan SLIK",
+    description:
+      "Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.",
+    isActive: true,
+  },
+  {
+    id: "asuransi",
+    category: "Asuransi",
+    title: "Klaim Asuransi Ditolak",
+    description:
+      "Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.",
+    isActive: true,
+  },
+  {
+    id: "investasi",
+    category: "Investasi",
+    title: "Investasi Bodong",
+    description:
+      "Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).",
+    isActive: true,
+  },
+  {
+    id: "kartu-kredit",
+    category: "Perbankan",
+    title: "Tagihan Kartu Kredit",
+    description:
+      "Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.",
+    isActive: true,
+  },
 ];
 
 export const DEFAULT_KETIK_CONSUMER_TYPES: KetikConsumerType[] = [
-  { id: 'marah', name: 'Marah & Emosional', description: 'Konsumen sedang sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, dan mudah terpancing bila jawaban agen terasa normatif.', difficulty: 'Sulit' },
-  { id: 'bingung', name: 'Bingung & Gaptek', description: 'Konsumen awam, agak bingung, dan kurang paham istilah teknis atau alur digital.', difficulty: 'Sedang' },
-  { id: 'kritis', name: 'Kritis & Detail', description: 'Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template.', difficulty: 'Sulit' },
-  { id: 'ramah', name: 'Ramah & Kooperatif', description: 'Konsumen sopan, tenang, dan kooperatif. Mau mengikuti arahan agen.', difficulty: 'Mudah' },
-  { id: 'terburu-buru', name: 'Terburu-buru', description: 'Konsumen sedang sempit waktu, ingin jawaban cepat, langsung, dan praktis.', difficulty: 'Sedang' },
-  { id: 'pasrah', name: 'Pasrah & Sedih', description: 'Konsumen lelah dan putus asa karena masalahnya belum selesai.', difficulty: 'Sedang' },
+  {
+    id: "marah",
+    name: "Marah & Emosional",
+    description:
+      "Konsumen sedang sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, dan mudah terpancing bila jawaban agen terasa normatif.",
+    difficulty: "Sulit",
+  },
+  {
+    id: "bingung",
+    name: "Bingung & Gaptek",
+    description:
+      "Konsumen awam, agak bingung, dan kurang paham istilah teknis atau alur digital.",
+    difficulty: "Sedang",
+  },
+  {
+    id: "kritis",
+    name: "Kritis & Detail",
+    description:
+      "Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template.",
+    difficulty: "Sulit",
+  },
+  {
+    id: "ramah",
+    name: "Ramah & Kooperatif",
+    description:
+      "Konsumen sopan, tenang, dan kooperatif. Mau mengikuti arahan agen.",
+    difficulty: "Mudah",
+  },
+  {
+    id: "terburu-buru",
+    name: "Terburu-buru",
+    description:
+      "Konsumen sedang sempit waktu, ingin jawaban cepat, langsung, dan praktis.",
+    difficulty: "Sedang",
+  },
+  {
+    id: "pasrah",
+    name: "Pasrah & Sedih",
+    description:
+      "Konsumen lelah dan putus asa karena masalahnya belum selesai.",
+    difficulty: "Sedang",
+  },
 ];
 
 export const DEFAULT_KETIK_QUICK_TEMPLATES: KetikQuickTemplate[] = [
-  { id: 'qt-selesai', keyword: 'selesai', content: 'Terima kasih telah menghubungi Layanan Kontak OJK 157. Semoga informasi yang kami berikan bermanfaat.' },
-  { id: 'qt-closing', keyword: 'closinghdsi', content: 'Demikian informasi yang dapat kami sampaikan. Jika ada hal lain yang ingin ditanyakan, silakan menghubungi kami kembali.' },
-  { id: 'qt-greeting', keyword: 'greetinghdsi', content: 'Selamat pagi/siang/sore, dengan Layanan Kontak OJK 157. Ada yang bisa kami bantu terkait informasi sektor jasa keuangan?' },
-  { id: 'qt-isiform', keyword: 'isiformhdsi', content: 'Mohon kesediaan Bapak/Ibu untuk melengkapi data diri pada link berikut agar kami dapat memproses laporan Anda lebih lanjut: [LINK_FORM]' },
-  { id: 'qt-tanya-akun', keyword: 'tanyaakun', content: 'Boleh diinformasikan nomor akun atau ID pelanggan yang Bapak/Ibu gunakan untuk layanan tersebut?' },
+  {
+    id: "qt-selesai",
+    keyword: "selesai",
+    content:
+      "Terima kasih telah menghubungi Layanan Kontak OJK 157. Semoga informasi yang kami berikan bermanfaat.",
+  },
+  {
+    id: "qt-closing",
+    keyword: "closinghdsi",
+    content:
+      "Demikian informasi yang dapat kami sampaikan. Jika ada hal lain yang ingin ditanyakan, silakan menghubungi kami kembali.",
+  },
+  {
+    id: "qt-greeting",
+    keyword: "greetinghdsi",
+    content:
+      "Selamat pagi/siang/sore, dengan Layanan Kontak OJK 157. Ada yang bisa kami bantu terkait informasi sektor jasa keuangan?",
+  },
+  {
+    id: "qt-isiform",
+    keyword: "isiformhdsi",
+    content:
+      "Mohon kesediaan Bapak/Ibu untuk melengkapi data diri pada link berikut agar kami dapat memproses laporan Anda lebih lanjut: [LINK_FORM]",
+  },
+  {
+    id: "qt-tanya-akun",
+    keyword: "tanyaakun",
+    content:
+      "Boleh diinformasikan nomor akun atau ID pelanggan yang Bapak/Ibu gunakan untuk layanan tersebut?",
+  },
 ];
 
 export const DEFAULT_KETIK_SETTINGS: KetikAppSettings = {
   scenarios: DEFAULT_KETIK_SCENARIOS,
   consumerTypes: DEFAULT_KETIK_CONSUMER_TYPES,
   quickTemplates: DEFAULT_KETIK_QUICK_TEMPLATES,
-  activeConsumerTypeId: 'random',
-  identitySettings: { displayName: '', signatureName: '', phoneNumber: '', city: '' },
-  selectedModel: 'gemini-3.1-flash-lite',
+  activeConsumerTypeId: "random",
+  identitySettings: {
+    displayName: "",
+    signatureName: "",
+    phoneNumber: "",
+    city: "",
+  },
+  selectedModel: "gemini-3.1-flash-lite",
   simulationDuration: 5,
-  responsePacingMode: 'realistic',
+  responsePacingMode: "realistic",
 };
 
 export interface KetikSessionHistoryItem {
@@ -315,7 +458,7 @@ export interface KetikSessionHistoryItem {
   probingScore?: number;
   typoScore?: number;
   complianceScore?: number;
-  reviewStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  reviewStatus?: "pending" | "processing" | "completed" | "failed";
 }
 
 export interface KetikReviewDetail {
@@ -331,13 +474,11 @@ export interface KetikReviewDetail {
   };
 }
 
-
-
 export interface KetikConsumerType {
   id: string;
   name: string;
   description: string;
-  difficulty: 'Mudah' | 'Sedang' | 'Sulit';
+  difficulty: "Mudah" | "Sedang" | "Sulit";
   isCustom?: boolean;
 }
 
@@ -357,7 +498,7 @@ export interface KetikSessionConfig {
   identity: KetikIdentity;
   selectedModel: string;
   simulationDuration: number;
-  responsePacingMode: 'realistic' | 'training_fast';
+  responsePacingMode: "realistic" | "training_fast";
 }
 
 export interface ChatSession {
@@ -373,7 +514,7 @@ export interface ChatSession {
   probingScore?: number;
   typoScore?: number;
   complianceScore?: number;
-  reviewStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  reviewStatus?: "pending" | "processing" | "completed" | "failed";
 }
 
 export interface KetikSessionReview {
@@ -396,17 +537,26 @@ export interface KetikTypoFinding {
 }
 
 // ── PDKT Types ────────────────────────────────────────
-export type WritingStyleMode = 'realistic' | 'training';
+export type WritingStyleMode = "realistic" | "training";
 
-export type ConsumerNameMentionPattern = 'random' | 'upfront' | 'middle' | 'late' | 'none';
+export type ConsumerNameMentionPattern =
+  | "random"
+  | "upfront"
+  | "middle"
+  | "late"
+  | "none";
 
-export type ResolvedConsumerNameMentionPattern = 'upfront' | 'middle' | 'late' | 'none';
+export type ResolvedConsumerNameMentionPattern =
+  | "upfront"
+  | "middle"
+  | "late"
+  | "none";
 
 export const pdktConsumerTypeSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
-  difficulty: z.enum(['Easy', 'Medium', 'Hard']).optional(),
+  difficulty: z.enum(["Easy", "Medium", "Hard"]).optional(),
   tone: z.string().optional(),
   isCustom: z.boolean().optional(),
 });
@@ -419,10 +569,12 @@ export const pdktScenarioSchema = z.object({
   description: z.string(),
   isActive: z.boolean(),
   script: z.string().optional(),
-  sampleEmailTemplate: z.object({
-    subject: z.string().optional(),
-    body: z.string(),
-  }).optional(),
+  sampleEmailTemplate: z
+    .object({
+      subject: z.string().optional(),
+      body: z.string(),
+    })
+    .optional(),
   alwaysUseSampleEmail: z.boolean().optional(),
   isLicensed: z.boolean().optional(),
   attachmentImages: z.array(z.string()).optional(),
@@ -442,9 +594,11 @@ export const pdktSessionConfigSchema = z.object({
   consumerType: pdktConsumerTypeSchema,
   identity: pdktIdentitySchema,
   enableImageGeneration: z.boolean().default(true),
-  selectedModel: z.string().default('gemini-3.1-flash-lite'),
-  resolvedConsumerNameMentionPattern: z.enum(['upfront', 'middle', 'late', 'none']).default('none'),
-  writingStyleMode: z.enum(['realistic', 'training']).default('training'),
+  selectedModel: z.string().default("gemini-3.1-flash-lite"),
+  resolvedConsumerNameMentionPattern: z
+    .enum(["upfront", "middle", "late", "none"])
+    .default("none"),
+  writingStyleMode: z.enum(["realistic", "training"]).default("training"),
 });
 export type PdktSessionConfig = z.infer<typeof pdktSessionConfigSchema>;
 
@@ -456,7 +610,7 @@ export interface PdktEvaluationResult {
   contentGaps: string[];
 }
 
-export type MailboxStatus = 'open' | 'replied' | 'deleted';
+export type MailboxStatus = "open" | "replied" | "deleted";
 
 export interface PdktMailboxItem {
   id: string;
@@ -485,26 +639,73 @@ export interface PdktMailboxItem {
   source_mailbox_item_id?: string | null;
 }
 
+export interface SpeechSegment {
+  startMs: number;
+  endMs: number;
+  durationMs: number;
+}
+
+export interface SessionMetrics {
+  speechSegments: SpeechSegment[];
+  totalSpeakingMs: number;
+  totalSilenceMs: number;
+  deadAirCount: number;
+  interruptionCount: number;
+  volumeSamples: number[];
+  volumeConsistency: number;
+  inputTranscriptionChunks: string[];
+  sessionDurationMs: number;
+}
+
+export interface VoiceAspectScore {
+  score: number;
+  verdict: string;
+  feedback: string;
+}
+
+export interface VoiceQualityAssessment {
+  overallScore: number;
+  speakingRate: VoiceAspectScore & { wordsPerMinute: number };
+  intonation: VoiceAspectScore;
+  articulation: VoiceAspectScore;
+  fillerWords: VoiceAspectScore & { count: number; examples: string[] };
+  emotionalTone: VoiceAspectScore & { dominant: string };
+  transcript: string;
+  highlights: string[];
+  strengths: string[];
+}
+
 export interface TelefunHistory {
   id: string;
   user_id: string;
-  timestamp: string;
+  scenario_title: string;
+  consumer_name: string;
+  consumer_gender: string;
+  duration_seconds: number;
+  status: "pending" | "active" | "completed" | "failed";
+  score?: number | null;
+  messages?: any[] | null;
+  ai_summary?: string | null;
+  strengths?: string[] | null;
+  weaknesses?: string[] | null;
+  coaching_focus?: string[] | null;
   recording_path?: string | null;
   agent_recording_path?: string | null;
-  voice_assessment?: any | null;
-  session_metrics?: any | null;
+  voice_assessment?: VoiceQualityAssessment | null;
+  session_metrics?: SessionMetrics | null;
   voice_dashboard_metrics?: any | null;
   disruption_config?: any | null;
   disruption_results?: any | null;
   persona_config?: any | null;
   realistic_mode_enabled: boolean;
+  created_at: string;
 }
 
 export interface TelefunCoachingSummary {
   id: string;
   session_id: string;
   user_id: string;
-  recommendations: any;
+  recommendations: Array<{ text: string; priority: number }>;
   generated_at: string;
 }
 
@@ -513,7 +714,11 @@ export interface TelefunReplayAnnotation {
   session_id: string;
   user_id: string;
   timestamp_ms: number;
-  category: 'strength' | 'improvement_area' | 'critical_moment' | 'technique_used';
+  category:
+    | "strength"
+    | "improvement_area"
+    | "critical_moment"
+    | "technique_used";
   moment: string;
   text: string;
   is_manual: boolean;
@@ -526,7 +731,7 @@ export interface PdktSessionHistory {
   config: PdktSessionConfig;
   emails: EmailMessage[];
   evaluation: PdktEvaluationResult | null;
-  evaluationStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  evaluationStatus: "pending" | "processing" | "completed" | "failed";
   evaluationError?: string | null;
   evaluationStartedAt?: string | null;
   evaluationCompletedAt?: string | null;
@@ -534,8 +739,8 @@ export interface PdktSessionHistory {
 }
 
 // ── AI Types ───────────────────────────────────────────
-export type AIModule = 'ketik' | 'pdkt' | 'telefun' | 'qa-analyzer';
-export type AIProvider = 'gemini' | 'openrouter';
+export type AIModule = "ketik" | "pdkt" | "telefun" | "qa-analyzer";
+export type AIProvider = "gemini" | "openrouter";
 
 export interface AiModelInfo {
   id: string;
@@ -565,19 +770,28 @@ export interface AiUsageLog {
 }
 
 // ── Zod Validation Schemas ─────────────────────────────
-export const chatSenderSchema = z.enum(['agent', 'consumer', 'system']);
+export const chatSenderSchema = z.enum(["agent", "consumer", "system"]);
 export const chatMessageSchema = z.object({
   id: z.string(),
   sender: chatSenderSchema,
   text: z.string(),
   timestamp: z.string(),
-  status: z.enum(['sent', 'delivered', 'read']).optional(),
-  pacingMeta: z.object({
-    mode: z.enum(['realistic', 'training_fast']),
-    band: z.enum(['short', 'normal', 'long', 'slow', 'follow_up', 'greeting_reply']),
-    plannedDelayMs: z.number(),
-    timerClamped: z.boolean(),
-  }).optional(),
+  status: z.enum(["sent", "delivered", "read"]).optional(),
+  pacingMeta: z
+    .object({
+      mode: z.enum(["realistic", "training_fast"]),
+      band: z.enum([
+        "short",
+        "normal",
+        "long",
+        "slow",
+        "follow_up",
+        "greeting_reply",
+      ]),
+      plannedDelayMs: z.number(),
+      timerClamped: z.boolean(),
+    })
+    .optional(),
 });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
@@ -586,7 +800,7 @@ export const ketikIdentitySchema = z.object({
   city: z.string(),
   phone: z.string(),
   signatureName: z.string().optional(),
-  gender: z.enum(['male', 'female']).optional(),
+  gender: z.enum(["male", "female"]).optional(),
   voiceName: z.string().optional(),
 });
 export type KetikIdentity = z.infer<typeof ketikIdentitySchema>;
@@ -595,9 +809,11 @@ export const generateMessageSchema = z.object({
   scenarioId: z.string(),
   consumerTypeId: z.string(),
   identity: z.object({ name: z.string(), city: z.string(), phone: z.string() }),
-  selectedModel: z.string().default('gemini-3.1-flash-lite'),
+  selectedModel: z.string().default("gemini-3.1-flash-lite"),
   simulationDuration: z.number().default(5),
-  responsePacingMode: z.enum(['realistic', 'training_fast']).default('realistic'),
+  responsePacingMode: z
+    .enum(["realistic", "training_fast"])
+    .default("realistic"),
   chatHistory: z.array(chatMessageSchema),
 });
 
@@ -606,9 +822,11 @@ export const generateEmailSchema = z.object({
   scenarioDraft: pdktScenarioSchema.optional(),
   consumerTypeId: z.string(),
   identity: pdktIdentitySchema,
-  selectedModel: z.string().default('gemini-3.1-flash-lite'),
-  resolvedConsumerNameMentionPattern: z.enum(['upfront', 'middle', 'late', 'none']).default('none'),
-  writingStyleMode: z.enum(['realistic', 'training']).default('training'),
+  selectedModel: z.string().default("gemini-3.1-flash-lite"),
+  resolvedConsumerNameMentionPattern: z
+    .enum(["upfront", "middle", "late", "none"])
+    .default("none"),
+  writingStyleMode: z.enum(["realistic", "training"]).default("training"),
 });
 
 export const emailMessageSchema = z.object({
@@ -695,8 +913,8 @@ export interface ManagedUser {
   id: string;
   email: string;
   full_name: string | null;
-  role: 'admin' | 'trainer' | 'leader' | 'agent';
-  status: 'active' | 'pending' | 'inactive';
+  role: "admin" | "trainer" | "leader" | "agent";
+  status: "active" | "pending" | "inactive";
   is_deleted: boolean;
   created_at?: string;
 }
@@ -733,7 +951,7 @@ export interface AccessGroupRow {
 export interface AccessGroupItemRow {
   id: string;
   access_group_id: string;
-  field_name: 'peserta_id' | 'batch_name' | 'tim' | 'service_type';
+  field_name: "peserta_id" | "batch_name" | "tim" | "service_type";
   field_value: string;
   is_active: boolean;
   created_at?: string;
@@ -764,43 +982,43 @@ export interface ActivityLog {
 
 // ── Admin Route Validation Schemas ──────────────────────────
 export const updateUserStatusSchema = z.object({
-  status: z.enum(['approved', 'pending', 'rejected'])
+  status: z.enum(["approved", "pending", "rejected"]),
 });
 
 export const updateUserRoleSchema = z.object({
-  role: z.enum(['admin', 'trainer', 'leader', 'agent'])
+  role: z.enum(["admin", "trainer", "leader", "agent"]),
 });
 
 export const createAccessGroupSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional()
+  description: z.string().optional(),
 });
 
 export const updateAccessGroupSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
-  is_active: z.boolean().optional()
+  is_active: z.boolean().optional(),
 });
 
 export const addAccessGroupItemSchema = z.object({
-  fieldName: z.enum(['peserta_id', 'batch_name', 'tim', 'service_type']),
-  fieldValue: z.string().min(1)
+  fieldName: z.enum(["peserta_id", "batch_name", "tim", "service_type"]),
+  fieldValue: z.string().min(1),
 });
 
 export const approveLeaderRequestSchema = z.object({
-  accessGroupIds: z.array(z.string())
+  accessGroupIds: z.array(z.string()),
 });
 
 export const rejectLeaderRequestSchema = z.object({
-  note: z.string().optional()
+  note: z.string().optional(),
 });
 
 export const revokeLeaderRequestSchema = z.object({
-  note: z.string().optional()
+  note: z.string().optional(),
 });
 
 export const reassignLeaderRequestGroupsSchema = z.object({
-  accessGroupIds: z.array(z.string())
+  accessGroupIds: z.array(z.string()),
 });
 
 export const pdktMailboxBatchSchema = z.object({
@@ -821,5 +1039,3 @@ export const pdktMailboxReplySchema = z.object({
   timeTaken: z.number().int().positive(),
 });
 export type PdktMailboxReply = z.infer<typeof pdktMailboxReplySchema>;
-
-

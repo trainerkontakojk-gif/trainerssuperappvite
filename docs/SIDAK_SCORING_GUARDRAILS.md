@@ -9,6 +9,7 @@ Dokumen ini dibuat untuk mencegah regresi SIDAK pada scoring, audited population
 - Pastikan pemanggilan cache atau query indikator selalu membawa konteks `service_type` dan `period_id` saat konteks periode aktif.
 
 Checklist review:
+
 - [ ] Tidak ada pola cache indikator global statis yang dipakai lintas periode.
 - [ ] Endpoint/dashboard/ranking yang butuh versioned indicators mengirim `service_type` + `period_id`.
 
@@ -20,6 +21,7 @@ Checklist review:
 - Jika `rule_version_id` tidak ada, fallback aman ke `qa_indicators` tetap dipertahankan untuk data legacy.
 
 Checklist review:
+
 - [ ] Scoring masih mendukung `rule_indicator_id` + fallback `indicator_id`.
 - [ ] Join/lookup indikator tidak hard-code ke tabel legacy saja.
 
@@ -38,12 +40,14 @@ Aturan turunannya:
 - Jika satu agent-period-service punya row real + phantom sekaligus, scoring dan defect aggregation wajib identik dengan memakai row real saja.
 
 Checklist review:
+
 - [ ] Tidak ada filter phantom global yang dijalankan sebelum data dipartisi ke `auditPresenceRows/scoreRows/findingRows`.
 - [ ] `totalAgents`, `zeroErrorRate`, `complianceRate`, dan `avgAgentScore` memakai populasi audit presence.
 - [ ] `totalDefects`, `findingsCount`, pareto, donut, dan ranking defect hanya memakai `findingRows`.
 - [ ] Mixed real + phantom tetap menghasilkan skor/defect yang sama dengan row real saja.
 
 Catatan khusus report data:
+
 - `/sidak/reports-data` adalah view tabel/export temuan real, bukan sumber scoring atau audit-presence.
 - Jalur ini boleh mengecualikan `is_phantom_padding = true` di query presentation layer, selama jalur dashboard, ranking, detail agent, dan scoring tetap memakai bucket audit-presence di atas.
 
@@ -54,6 +58,7 @@ Catatan khusus report data:
 - Helper menangani: trim + lowercase, passthrough service code langsung, alias tim, dan fallback akhir.
 
 Checklist review:
+
 - [ ] Tidak ada chain `includes()` terpisah atau exact-match lookup di luar helper.
 - [ ] Prefetch temuan di input page membawa argumen `serviceType`.
 - [ ] Saat agent berubah di input page, override service lama dan form state di-reset.
@@ -65,6 +70,7 @@ Checklist review:
 - Grouping untuk audited population ranking minimal harus memisahkan `agent + period`.
 
 Checklist review:
+
 - [ ] Ranking tidak rawan truncation 1000 row.
 - [ ] Key partisi ranking tidak menggabungkan beberapa agent dalam satu period bucket.
 - [ ] Agent phantom-only tetap bisa muncul di ranking dengan `defects = 0` dan `score = 100`.
@@ -76,6 +82,7 @@ Checklist review:
 - `Total Temuan` tetap menjadi seri pertama jika ditampilkan.
 
 Checklist review:
+
 - [ ] Toggle parameter dashboard memakai dataset yang sudah di-sort.
 - [ ] Chart parameter dashboard memakai urutan yang sama dengan toggle.
 
@@ -86,16 +93,18 @@ Checklist review:
 - Tombol `INPUT AUDIT` dari detail agent wajib menuju `/sidak/input`.
 
 Checklist review:
+
 - [ ] Agent excluded membawa `showAll=1` dari detail agent ke input page.
 - [ ] Toggle all-data di input mereset folder, agent, period, temuan, dan form state.
 
 ### 8) Validasi Integritas Pemetaan Parameter & Excel Upload
 
-- **Validasi Unggah Excel:** Seluruh baris temuan yang diunggah wajib memiliki pemetaan indikator aktif yang valid. Jika ada baris dengan `indicator_id` yang tidak terdaftar, pengunggahan harus diblokir (*fail-fast transaction rollback*).
+- **Validasi Unggah Excel:** Seluruh baris temuan yang diunggah wajib memiliki pemetaan indikator aktif yang valid. Jika ada baris dengan `indicator_id` yang tidak terdaftar, pengunggahan harus diblokir (_fail-fast transaction rollback_).
 - **Draft Parameter Baru:** Saat menambahkan parameter baru dalam mode draft, sistem otomatis menjamin pembuatan dan pemetaan legacy indicator yang sah.
 - **Pencegahan Error FK:** Gunakan helper sebelum penyimpanan massal untuk menyinkronkan ID.
 
 Checklist review:
+
 - [ ] Pengunggahan Excel langsung memvalidasi keberadaan `indicator_id` pada rule aktif.
 - [ ] Tidak ada baris yang lolos dengan pemetaan null saat transaksi disimpan.
 - [ ] Pesan kesalahan Foreign Key dinormalisasi menjadi pesan yang ramah bagi pengguna.

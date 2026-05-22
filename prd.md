@@ -867,19 +867,19 @@ Gunakan format konsisten:
 
 ```ts
 type ApiSuccess<T> = {
-  success: true
-  data: T
-  meta?: Record<string, unknown>
-}
+  success: true;
+  data: T;
+  meta?: Record<string, unknown>;
+};
 
 type ApiError = {
-  success: false
+  success: false;
   error: {
-    code: string
-    message: string
-    details?: unknown
-  }
-}
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+};
 ```
 
 Contoh error:

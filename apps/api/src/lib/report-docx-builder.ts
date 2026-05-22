@@ -1,7 +1,16 @@
 import {
-  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  WidthType, ImageRun, HeadingLevel, AlignmentType,
-} from 'docx';
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  ImageRun,
+  HeadingLevel,
+  AlignmentType,
+} from "docx";
 
 function cellPara(text: string, bold = false): Paragraph {
   return new Paragraph({
@@ -11,14 +20,14 @@ function cellPara(text: string, bold = false): Paragraph {
 
 function pngFromBase64(base64: string): Buffer {
   const m = base64.match(/^data:image\/\w+;base64,(.+)$/);
-  return Buffer.from(m ? m[1]! : base64, 'base64');
+  return Buffer.from(m ? m[1]! : base64, "base64");
 }
 
 export async function buildAiReportDocx(input: {
   title: string;
   periodLabel: string;
   serviceLabel: string;
-  mode: 'layanan' | 'individu';
+  mode: "layanan" | "individu";
   agentName?: string;
   totalFindings: number;
   totalRows: number;
@@ -27,7 +36,11 @@ export async function buildAiReportDocx(input: {
   scoreAnalysis: string;
   recommendations: string[];
   priorityAreas: string[];
-  chartImages?: { pareto?: string | null; donut?: string | null; trend?: string | null };
+  chartImages?: {
+    pareto?: string | null;
+    donut?: string | null;
+    trend?: string | null;
+  };
 }): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [];
 
@@ -42,8 +55,9 @@ export async function buildAiReportDocx(input: {
     new Paragraph({
       children: [
         new TextRun({
-          text: `Layanan: ${input.serviceLabel}  •  Periode: ${input.periodLabel}${input.agentName ? `  •  Agen: ${input.agentName}` : ''}`,
-          size: 22, italics: true,
+          text: `Layanan: ${input.serviceLabel}  •  Periode: ${input.periodLabel}${input.agentName ? `  •  Agen: ${input.agentName}` : ""}`,
+          size: 22,
+          italics: true,
         }),
       ],
       alignment: AlignmentType.CENTER,
@@ -54,12 +68,16 @@ export async function buildAiReportDocx(input: {
   // 1. Executive Summary
   children.push(
     new Paragraph({
-      text: '1. Ringkasan Eksekutif',
+      text: "1. Ringkasan Eksekutif",
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 200, after: 120 },
     }),
     new Paragraph({
-      children: [new TextRun({ text: `Total Temuan: ${input.totalFindings} dari ${input.totalRows} data` })],
+      children: [
+        new TextRun({
+          text: `Total Temuan: ${input.totalFindings} dari ${input.totalRows} data`,
+        }),
+      ],
       spacing: { after: 80 },
     }),
     new Paragraph({
@@ -72,7 +90,7 @@ export async function buildAiReportDocx(input: {
   if (input.keyFindings.length > 0) {
     children.push(
       new Paragraph({
-        text: '2. Temuan Utama',
+        text: "2. Temuan Utama",
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 120, after: 120 },
       }),
@@ -81,17 +99,24 @@ export async function buildAiReportDocx(input: {
         rows: [
           new TableRow({
             children: [
-              new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, children: [cellPara('No.', true)] }),
-              new TableCell({ width: { size: 90, type: WidthType.PERCENTAGE }, children: [cellPara('Temuan', true)] }),
+              new TableCell({
+                width: { size: 10, type: WidthType.PERCENTAGE },
+                children: [cellPara("No.", true)],
+              }),
+              new TableCell({
+                width: { size: 90, type: WidthType.PERCENTAGE },
+                children: [cellPara("Temuan", true)],
+              }),
             ],
           }),
-          ...input.keyFindings.map((f, i) =>
-            new TableRow({
-              children: [
-                new TableCell({ children: [cellPara(String(i + 1))] }),
-                new TableCell({ children: [cellPara(f)] }),
-              ],
-            })
+          ...input.keyFindings.map(
+            (f, i) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [cellPara(String(i + 1))] }),
+                  new TableCell({ children: [cellPara(f)] }),
+                ],
+              }),
           ),
         ],
       }),
@@ -104,7 +129,7 @@ export async function buildAiReportDocx(input: {
   if (charts?.pareto) {
     children.push(
       new Paragraph({
-        text: 'Pareto Chart',
+        text: "Pareto Chart",
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 120, after: 120 },
       }),
@@ -112,7 +137,7 @@ export async function buildAiReportDocx(input: {
         alignment: AlignmentType.CENTER,
         children: [
           new ImageRun({
-            type: 'png',
+            type: "png",
             data: pngFromBase64(charts.pareto),
             transformation: { width: 520, height: 300 },
           }),
@@ -125,7 +150,7 @@ export async function buildAiReportDocx(input: {
   if (charts?.donut) {
     children.push(
       new Paragraph({
-        text: 'Distribusi Temuan',
+        text: "Distribusi Temuan",
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 120, after: 120 },
       }),
@@ -133,7 +158,7 @@ export async function buildAiReportDocx(input: {
         alignment: AlignmentType.CENTER,
         children: [
           new ImageRun({
-            type: 'png',
+            type: "png",
             data: pngFromBase64(charts.donut),
             transformation: { width: 400, height: 280 },
           }),
@@ -146,7 +171,7 @@ export async function buildAiReportDocx(input: {
   if (charts?.trend) {
     children.push(
       new Paragraph({
-        text: 'Trend',
+        text: "Trend",
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 120, after: 120 },
       }),
@@ -154,7 +179,7 @@ export async function buildAiReportDocx(input: {
         alignment: AlignmentType.CENTER,
         children: [
           new ImageRun({
-            type: 'png',
+            type: "png",
             data: pngFromBase64(charts.trend),
             transformation: { width: 520, height: 300 },
           }),
@@ -167,7 +192,7 @@ export async function buildAiReportDocx(input: {
   // 3. Score Analysis
   children.push(
     new Paragraph({
-      text: '3. Analisis Skor',
+      text: "3. Analisis Skor",
       heading: HeadingLevel.HEADING_1,
       spacing: { before: 120, after: 120 },
     }),
@@ -181,16 +206,17 @@ export async function buildAiReportDocx(input: {
   if (input.recommendations.length > 0) {
     children.push(
       new Paragraph({
-        text: '4. Rekomendasi',
+        text: "4. Rekomendasi",
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 120, after: 120 },
       }),
-      ...input.recommendations.map(r =>
-        new Paragraph({
-          children: [new TextRun({ text: `• ${r}`, size: 20 })],
-          spacing: { after: 80 },
-          indent: { left: 720 },
-        })
+      ...input.recommendations.map(
+        (r) =>
+          new Paragraph({
+            children: [new TextRun({ text: `• ${r}`, size: 20 })],
+            spacing: { after: 80 },
+            indent: { left: 720 },
+          }),
       ),
       new Paragraph({ spacing: { after: 120 } }),
     );
@@ -200,16 +226,17 @@ export async function buildAiReportDocx(input: {
   if (input.priorityAreas.length > 0) {
     children.push(
       new Paragraph({
-        text: '5. Area Prioritas',
+        text: "5. Area Prioritas",
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 120, after: 120 },
       }),
-      ...input.priorityAreas.map((a, i) =>
-        new Paragraph({
-          children: [new TextRun({ text: `${i + 1}. ${a}`, size: 20 })],
-          spacing: { after: 80 },
-          indent: { left: 720 },
-        })
+      ...input.priorityAreas.map(
+        (a, i) =>
+          new Paragraph({
+            children: [new TextRun({ text: `${i + 1}. ${a}`, size: 20 })],
+            spacing: { after: 80 },
+            indent: { left: 720 },
+          }),
       ),
       new Paragraph({ spacing: { after: 200 } }),
     );
@@ -220,8 +247,10 @@ export async function buildAiReportDocx(input: {
     new Paragraph({
       children: [
         new TextRun({
-          text: 'Dokumen ini dihasilkan secara otomatis oleh AI Trainers SuperApp.',
-          size: 16, italics: true, color: '94A3B8',
+          text: "Dokumen ini dihasilkan secara otomatis oleh AI Trainers SuperApp.",
+          size: 16,
+          italics: true,
+          color: "94A3B8",
         }),
       ],
       spacing: { before: 300 },

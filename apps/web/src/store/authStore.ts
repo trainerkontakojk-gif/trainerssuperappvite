@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { UserProfile } from '@trainers/types';
-import { Session } from '@supabase/supabase-js';
+import { create } from "zustand";
+import { UserProfile } from "@trainers/types";
+import { Session } from "@supabase/supabase-js";
 
 interface AuthState {
   session: Session | null;

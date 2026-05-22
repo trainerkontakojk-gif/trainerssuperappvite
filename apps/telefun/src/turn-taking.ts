@@ -1,14 +1,16 @@
 export enum TurnState {
-  LISTENING = 'listening',
-  PROCESSING = 'processing',
-  SPEAKING = 'speaking',
+  LISTENING = "listening",
+  PROCESSING = "processing",
+  SPEAKING = "speaking",
 }
 
 export class TurnManager {
   private _state: TurnState = TurnState.LISTENING;
   private callbacks: Array<(state: TurnState) => void> = [];
 
-  get state() { return this._state; }
+  get state() {
+    return this._state;
+  }
 
   setState(state: TurnState) {
     if (this._state === state) return;
@@ -21,7 +23,10 @@ export class TurnManager {
   }
 
   canSendToGemini(): boolean {
-    return this._state === TurnState.LISTENING || this._state === TurnState.PROCESSING;
+    return (
+      this._state === TurnState.LISTENING ||
+      this._state === TurnState.PROCESSING
+    );
   }
 
   startUserUtterance() {

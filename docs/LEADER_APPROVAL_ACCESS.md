@@ -10,16 +10,17 @@ Prinsip: **fail closed** — scope kosong, status tidak jelas, atau filter gagal
 
 ### Database Tables
 
-| Table | Purpose |
-|---|---|
-| `access_groups` | Definisi access group (nama, deskripsi, scope_type, is_active) |
-| `access_group_items` | Item scope individual (field_name: `peserta_id`, `batch_name`, `tim`, `service_type`) |
-| `leader_access_requests` | Request approval per leader per module |
-| `leader_access_request_groups` | Join table: satu approved request bisa memiliki >1 access group |
+| Table                          | Purpose                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| `access_groups`                | Definisi access group (nama, deskripsi, scope_type, is_active)                        |
+| `access_group_items`           | Item scope individual (field_name: `peserta_id`, `batch_name`, `tim`, `service_type`) |
+| `leader_access_requests`       | Request approval per leader per module                                                |
+| `leader_access_request_groups` | Join table: satu approved request bisa memiliki >1 access group                       |
 
 ### Scope Semantics (V1)
 
 Access group items adalah **union rules** — peserta masuk scope jika memenuhi minimal satu item field:
+
 - `peserta_id`: match by UUID
 - `batch_name`: match by batch/folder name
 - `tim`: match by team name
@@ -31,19 +32,19 @@ Halaman `/dashboard/access-groups` memakai guided scope builder agar Admin/Train
 
 Builder menyediakan 3 jalur:
 
-| Mode | UI Flow | Stored Item |
-|---|---|---|
-| By Team | Pilih team dari data `profiler_peserta.tim` yang tersedia | `field_name = tim`, `field_value = selected team` |
-| By Service | Pilih service dari daftar SIDAK valid | `field_name = service_type`, `field_value = selected service` |
-| By Name | Pilih Team dulu, lalu pilih Name/agent dari team tersebut | `field_name = peserta_id`, `field_value = selected peserta id` |
+| Mode       | UI Flow                                                   | Stored Item                                                    |
+| ---------- | --------------------------------------------------------- | -------------------------------------------------------------- |
+| By Team    | Pilih team dari data `profiler_peserta.tim` yang tersedia | `field_name = tim`, `field_value = selected team`              |
+| By Service | Pilih service dari daftar SIDAK valid                     | `field_name = service_type`, `field_value = selected service`  |
+| By Name    | Pilih Team dulu, lalu pilih Name/agent dari team tersebut | `field_name = peserta_id`, `field_value = selected peserta id` |
 
 ### Modules
 
-| Module ID | Label | KTP-Relevant Fields | SIDAK-Relevant Fields |
-|---|---|---|---|
-| `ktp` | KTP / Profiler | peserta_id, batch_name, tim | — |
-| `sidak` | SIDAK / QA Analyzer | peserta_id, batch_name, tim | + service_type |
-| `all` | Semua Modul | Same as module-specific | Same as module-specific |
+| Module ID | Label               | KTP-Relevant Fields         | SIDAK-Relevant Fields   |
+| --------- | ------------------- | --------------------------- | ----------------------- |
+| `ktp`     | KTP / Profiler      | peserta_id, batch_name, tim | —                       |
+| `sidak`   | SIDAK / QA Analyzer | peserta_id, batch_name, tim | + service_type          |
+| `all`     | Semua Modul         | Same as module-specific     | Same as module-specific |
 
 ### Access Status Flow
 

@@ -3,6 +3,7 @@
 Dokumen ini adalah ringkasan standar desain visual dan UI yang diterapkan di Trainers SuperApp. Aplikasi ini mengusung estetika **Dark Luxury × Minimalist Clarity**.
 
 ## Prinsip Desain
+
 1. **Presisi**: Setiap elemen UI harus memiliki tujuan fungsional.
 2. **Konsistensi**: Komponen yang sama harus tampil dan berperilaku identik di seluruh modul.
 3. **Kontrol**: Pengguna harus selalu memahami posisi mereka dalam aplikasi (breadcrumbs, active sidebar indicators).
@@ -12,6 +13,7 @@ Dokumen ini adalah ringkasan standar desain visual dan UI yang diterapkan di Tra
 Semua komponen wajib menggunakan sistem token yang didefinisikan di CSS global.
 
 ### Warna Semantik
+
 - `background`: Warna dasar halaman.
 - `foreground`: Warna teks utama.
 - `primary`: Warna aksen (Default: Navy/Slate di Light mode; Amber di Dark mode).
@@ -20,7 +22,9 @@ Semua komponen wajib menggunakan sistem token yang didefinisikan di CSS global.
 - `destructive`: Warna untuk aksi berbahaya atau pesan kesalahan.
 
 ### Warna Identitas Modul
+
 Setiap modul memiliki warna identitas untuk membantu navigasi visual:
+
 - **Profiler / KTP**: `violet-500`
 - **SIDAK / Analisis**: `blue-500`
 - **Statistik/Status**: `emerald-500`
@@ -31,6 +35,7 @@ Warna identitas modul didefinisikan di `apps/web/src/lib/app-config.ts` dalam `A
 ## Tipografi
 
 Menggunakan font sans-serif modern (Inter/System) dengan skala sebagai berikut:
+
 - **Page Title**: `text-4xl font-bold tracking-tight`
 - **Section Title**: `text-3xl font-bold tracking-tight`
 - **Body Text**: `text-sm font-light text-muted-foreground`
@@ -39,11 +44,14 @@ Menggunakan font sans-serif modern (Inter/System) dengan skala sebagai berikut:
 ## Komponen Navigasi
 
 ### 1. Module Header
+
 Setiap modul wajib memiliki header yang konsisten dengan:
+
 - Tombol kembali (Back to Dashboard).
 - Ikon dan nama modul yang jelas.
 
 ### 2. Sidebar
+
 - Sidebar utama di dashboard menggunakan sistem Accordion untuk mengelompokkan modul.
 - Desain sidebar harus responsif (Auto-collapse pada mobile).
 - SIDAK dan Admin memiliki submenu khusus.
@@ -52,11 +60,13 @@ Setiap modul wajib memiliki header yang konsisten dengan:
 ## Animasi & Micro-interactions
 
 Aplikasi menggunakan `framer-motion` untuk meningkatkan pengalaman pengguna:
+
 - **Hover Lift**: Komponen kartu sedikit terangkat saat di-hover.
 - **Fade-Scale**: Transisi halus saat membuka modal atau berpindah tab.
 - **Ambient Glow**: Efek cahaya latar (Ambient background blobs) pada area header untuk kesan premium.
 
 ## Aturan Penulisan Kode UI
+
 - Gunakan variabel CSS (`var(--primary)`) daripada nilai hex langsung.
 - Gunakan komponen `motion.div` untuk elemen yang membutuhkan transisi.
 - Pastikan semua input memiliki state `focus-visible:ring-2` untuk aksesibilitas.

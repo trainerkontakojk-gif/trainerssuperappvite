@@ -1,7 +1,20 @@
-import React from 'react';
-import { Calendar, ChevronRight, XCircle } from 'lucide-react';
+import React from "react";
+import { Calendar, ChevronRight, XCircle } from "lucide-react";
 
-const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const MONTHS = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
 interface MonthRangePickerProps {
   selectedYear: number;
@@ -9,7 +22,7 @@ interface MonthRangePickerProps {
   endMonth: number | null;
   onRangeChange: (start: number | null, end: number | null) => void;
   className?: string;
-  variant?: 'standalone' | 'compact' | 'toolbar';
+  variant?: "standalone" | "compact" | "toolbar";
 }
 
 export function MonthRangePicker({
@@ -18,15 +31,15 @@ export function MonthRangePicker({
   endMonth,
   onRangeChange,
   className = "",
-  variant = "standalone"
+  variant = "standalone",
 }: MonthRangePickerProps) {
   const handleStartChange = (val: string) => {
-    const start = val === '' ? null : parseInt(val);
+    const start = val === "" ? null : parseInt(val);
     onRangeChange(start, endMonth);
   };
 
   const handleEndChange = (val: string) => {
-    const end = val === '' ? null : parseInt(val);
+    const end = val === "" ? null : parseInt(val);
     onRangeChange(startMonth, end);
   };
 
@@ -34,9 +47,10 @@ export function MonthRangePicker({
     onRangeChange(null, null);
   };
 
-  const isInvalidRange = startMonth !== null && endMonth !== null && endMonth < startMonth;
+  const isInvalidRange =
+    startMonth !== null && endMonth !== null && endMonth < startMonth;
 
-  if (variant === 'toolbar') {
+  if (variant === "toolbar") {
     return (
       <div className={`flex flex-col gap-1 ${className}`}>
         <div className="flex items-center gap-2">
@@ -46,13 +60,15 @@ export function MonthRangePicker({
               <Calendar className="h-3.5 w-3.5" />
             </div>
             <select
-              value={startMonth ?? ''}
+              value={startMonth ?? ""}
               onChange={(e) => handleStartChange(e.target.value)}
-              className={`block w-full h-9 pl-8 pr-7 text-sm font-medium bg-card border rounded-lg focus:ring-1 focus:ring-ring focus:outline-none appearance-none cursor-pointer transition-all ${isInvalidRange ? 'border-red-500/50' : 'border-border'}`}
+              className={`block w-full h-9 pl-8 pr-7 text-sm font-medium bg-card border rounded-lg focus:ring-1 focus:ring-ring focus:outline-none appearance-none cursor-pointer transition-all ${isInvalidRange ? "border-red-500/50" : "border-border"}`}
             >
               <option value="">Awal</option>
               {MONTHS.map((name, i) => (
-                <option key={name} value={i + 1}>{name}</option>
+                <option key={name} value={i + 1}>
+                  {name}
+                </option>
               ))}
             </select>
             <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-muted-foreground">
@@ -60,7 +76,9 @@ export function MonthRangePicker({
             </div>
           </div>
 
-          <span className="text-muted-foreground text-xs font-bold shrink-0 uppercase tracking-wider px-1">sampai</span>
+          <span className="text-muted-foreground text-xs font-bold shrink-0 uppercase tracking-wider px-1">
+            sampai
+          </span>
 
           {/* End Month */}
           <div className="relative group/select flex-1">
@@ -68,13 +86,15 @@ export function MonthRangePicker({
               <Calendar className="h-3.5 w-3.5" />
             </div>
             <select
-              value={endMonth ?? ''}
+              value={endMonth ?? ""}
               onChange={(e) => handleEndChange(e.target.value)}
-              className={`block w-full h-9 pl-8 pr-7 text-sm font-medium bg-card border rounded-lg focus:ring-1 focus:ring-ring focus:outline-none appearance-none cursor-pointer transition-all ${isInvalidRange ? 'border-red-500/50' : 'border-border'}`}
+              className={`block w-full h-9 pl-8 pr-7 text-sm font-medium bg-card border rounded-lg focus:ring-1 focus:ring-ring focus:outline-none appearance-none cursor-pointer transition-all ${isInvalidRange ? "border-red-500/50" : "border-border"}`}
             >
               <option value="">Akhir</option>
               {MONTHS.map((name, i) => (
-                <option key={name} value={i + 1}>{name}</option>
+                <option key={name} value={i + 1}>
+                  {name}
+                </option>
               ))}
             </select>
             <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-muted-foreground">
@@ -96,14 +116,16 @@ export function MonthRangePicker({
         {isInvalidRange && (
           <div className="flex items-center gap-1.5 px-2 py-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
             <XCircle className="w-3 h-3 text-red-500" />
-            <span className="text-[10px] text-red-500 font-bold uppercase tracking-tight">Rentang bulan tidak valid</span>
+            <span className="text-[10px] text-red-500 font-bold uppercase tracking-tight">
+              Rentang bulan tidak valid
+            </span>
           </div>
         )}
       </div>
     );
   }
 
-  if (variant === 'compact') {
+  if (variant === "compact") {
     return (
       <div className={`flex items-center gap-3 ${className}`}>
         {/* Start Month */}
@@ -112,13 +134,15 @@ export function MonthRangePicker({
             <Calendar className="h-4 w-4 text-muted-foreground group-focus-within/select:text-primary transition-colors" />
           </div>
           <select
-            value={startMonth ?? ''}
+            value={startMonth ?? ""}
             onChange={(e) => handleStartChange(e.target.value)}
             className="block w-full pl-11 pr-8 py-3.5 text-sm bg-background/50 border-border/50 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none border hover:border-primary/30 font-semibold text-primary"
           >
             <option value="">Bulan Awal</option>
             {MONTHS.map((name, i) => (
-              <option key={name} value={i + 1}>{name}</option>
+              <option key={name} value={i + 1}>
+                {name}
+              </option>
             ))}
           </select>
           <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-muted-foreground">
@@ -126,7 +150,9 @@ export function MonthRangePicker({
           </div>
         </div>
 
-        <span className="text-muted-foreground font-medium text-xs">sampai</span>
+        <span className="text-muted-foreground font-medium text-xs">
+          sampai
+        </span>
 
         {/* End Month */}
         <div className="relative group/select flex-1 min-w-[120px]">
@@ -134,13 +160,15 @@ export function MonthRangePicker({
             <Calendar className="h-4 w-4 text-muted-foreground group-focus-within/select:text-primary transition-colors" />
           </div>
           <select
-            value={endMonth ?? ''}
+            value={endMonth ?? ""}
             onChange={(e) => handleEndChange(e.target.value)}
             className="block w-full pl-11 pr-8 py-3.5 text-sm bg-background/50 border-border/50 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none border hover:border-primary/30 font-semibold text-primary"
           >
             <option value="">Bulan Akhir</option>
             {MONTHS.map((name, i) => (
-              <option key={name} value={i + 1}>{name}</option>
+              <option key={name} value={i + 1}>
+                {name}
+              </option>
             ))}
           </select>
           <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none text-muted-foreground">
@@ -174,13 +202,15 @@ export function MonthRangePicker({
           {/* Start Month */}
           <div className="relative group/select min-w-[140px]">
             <select
-              value={startMonth ?? ''}
+              value={startMonth ?? ""}
               onChange={(e) => handleStartChange(e.target.value)}
               className="block w-full pl-4 pr-10 py-2.5 text-xs bg-background/50 border-border/50 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none border hover:border-primary/30 text-foreground"
             >
               <option value="">Bulan Awal</option>
               {MONTHS.map((name, i) => (
-                <option key={name} value={i + 1}>{name}</option>
+                <option key={name} value={i + 1}>
+                  {name}
+                </option>
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted-foreground">
@@ -193,13 +223,15 @@ export function MonthRangePicker({
           {/* End Month */}
           <div className="relative group/select min-w-[140px]">
             <select
-              value={endMonth ?? ''}
+              value={endMonth ?? ""}
               onChange={(e) => handleEndChange(e.target.value)}
               className="block w-full pl-4 pr-10 py-2.5 text-xs bg-background/50 border-border/50 rounded-xl focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none border hover:border-primary/30 text-foreground"
             >
               <option value="">Bulan Akhir</option>
               {MONTHS.map((name, i) => (
-                <option key={name} value={i + 1}>{name}</option>
+                <option key={name} value={i + 1}>
+                  {name}
+                </option>
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted-foreground">
@@ -225,9 +257,10 @@ export function MonthRangePicker({
           </span>
         )}
       </div>
-      
+
       <p className="text-[10px] text-muted-foreground font-medium ml-4">
-        * Rentang bulan dibatasi dalam tahun {selectedYear}. Ubah tahun di filter untuk tahun lain.
+        * Rentang bulan dibatasi dalam tahun {selectedYear}. Ubah tahun di
+        filter untuk tahun lain.
       </p>
     </div>
   );

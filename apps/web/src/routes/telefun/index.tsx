@@ -1,309 +1,648 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Play, AlertCircle, Settings } from 'lucide-react';
-import { getApi, putApi } from '../../hooks/useApi';
-import { notify } from '../../lib/toast';
-import type { TelefunAppSettings } from './telefunSettings';
-import { DEFAULT_TELEFUN_SETTINGS, VOICE_MODELS } from './telefunSettings';
-import { SettingsModal } from './components/SettingsModal';
+import { useState, useEffect, useRef } from "react";
+import { Phone, Settings, History, PlayCircle, BarChart3 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import type { TelefunAppSettings } from "./telefunSettings";
+import {
+  DEFAULT_TELEFUN_SETTINGS,
+  resolveFinalIdentity,
+  parseTelefunSettings,
+} from "./telefunSettings";
+import { SettingsModal } from "./components/SettingsModal";
+import { PhoneInterface } from "./components/PhoneInterface";
+import { HistoryModal } from "./components/HistoryModal";
+import { ReviewModal } from "./components/ReviewModal";
+import { UsageModal } from "../ketik/components/UsageModal";
+import { postApi, putApi, patchApi } from "../../hooks/useApi";
+import { notify } from "../../lib/toast";
+import { supabase } from "../../lib/supabase";
+import type { CallRecord } from "./types";
 
-const VITE_TELEFUN_WS_URL = import.meta.env.VITE_TELEFUN_WS_URL || 'ws://localhost:3002';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
 
-type CallState = 'idle' | 'connecting' | 'connected' | 'ended';
+function getToken(): string | null {
+  return (
+    localStorage.getItem("auth_token") ?? localStorage.getItem("supabase_token")
+  );
+}
 
 export default function TelefunLanding() {
-  const [callState, setCallState] = useState<CallState>('idle');
-  const [muted, setMuted] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [messages, setMessages] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<TelefunAppSettings>(DEFAULT_TELEFUN_SETTINGS);
+  const [view, setView] = useState<"home" | "chat">("home");
+  const [settings, setSettings] = useState<TelefunAppSettings>(
+    DEFAULT_TELEFUN_SETTINGS,
+  );
   const [settingsLoading, setSettingsLoading] = useState(true);
-  const [transcript, setTranscript] = useState<{ speaker: 'user' | 'ai'; text: string; timestamp: string }[]>([]);
-  const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const durationRef = useRef<number>(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isUsageOpen, setIsUsageOpen] = useState(false);
+  const [reviewRecord, setReviewRecord] = useState<CallRecord | null>(null);
 
+  const [activeSessionConfig, setActiveSessionConfig] =
+    useState<TelefunAppSettings | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeScenario, setActiveScenario] = useState<{
+    title: string;
+    instruction: string;
+  } | null>(null);
+  const [history, setHistory] = useState<CallRecord[]>([]);
+
+  const [sessionDelta, setSessionDelta] = useState<{
+    costIdr: number;
+    totalTokens: number;
+    totalCalls: number;
+  } | null>(null);
+  const sessionBaselineRef = useRef<{
+    total_calls: number;
+    total_tokens: number;
+    total_cost_idr: number;
+  } | null>(null);
+  const sessionRunIdRef = useRef(0);
+  const optimisticRecordIdRef = useRef<string | null>(null);
+
+  // Auto-sync reviewRecord when history updates
   useEffect(() => {
-    getApi<{ success: boolean; settings: TelefunAppSettings | null }>('/telefun/settings')
-      .then(res => {
-        if (res?.settings) {
-          setSettings({
-            ...DEFAULT_TELEFUN_SETTINGS,
-            ...res.settings,
-            scenarios: res.settings.scenarios || DEFAULT_TELEFUN_SETTINGS.scenarios,
-            consumerTypes: res.settings.consumerTypes || DEFAULT_TELEFUN_SETTINGS.consumerTypes,
-          });
-        } else setSettings(DEFAULT_TELEFUN_SETTINGS);
-      })
-      .catch(() => setSettings(DEFAULT_TELEFUN_SETTINGS))
-      .finally(() => setSettingsLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (callState === 'connected') {
-      const interval = setInterval(() => {
-        setDuration(d => d + 1);
-        durationRef.current += 1;
-      }, 1000);
-      return () => clearInterval(interval);
+    if (reviewRecord) {
+      const updated = history.find((r) => r.id === reviewRecord.id);
+      if (updated && updated !== reviewRecord) {
+        setReviewRecord(updated);
+      }
     }
-    if (callState === 'idle') {
-      setDuration(0);
-      durationRef.current = 0;
-      setTranscript([]);
-    }
-  }, [callState]);
+  }, [history, reviewRecord]);
 
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [transcript]);
+    let cancelled = false;
 
-  const cleanup = useCallback(() => {
-    recorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    wsRef.current?.close();
-    audioRef.current?.pause();
-  }, []);
-
-  const startCall = useCallback(async () => {
-    setError(null);
-    setCallState('connecting');
-    setMessages([]);
-
-    const token = localStorage.getItem('auth_token') ?? localStorage.getItem('supabase_token');
-    if (!token) { setError('Token tidak ditemukan. Silakan login terlebih dahulu.'); setCallState('idle'); return; }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const ws = new WebSocket(`${VITE_TELEFUN_WS_URL}/?token=${token}`);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setCallState('connected');
-        setMessages(prev => [...prev, 'Terhubung ke Gemini Live...']);
-
-        const modelPath = settings.selectedModel.startsWith('models/')
-          ? settings.selectedModel
-          : `models/${settings.selectedModel}`;
-
-        ws.send(JSON.stringify({
-          setup: {
-            model: modelPath,
-            systemInstruction: { parts: [{ text: settings.systemInstruction }] },
-            voiceConfig: { voice: { name: settings.voiceName }, prebuiltVoiceConfig: { voiceName: settings.voiceName } },
-            audioOutputConfig: { encoding: 'LINEAR16', sampleRateHertz: 16000 },
-            realtimeInputConfig: {
-              config: {
-                enableVad: true,
-                vadConfig: {
-                  startSensitivity: 2,
-                  endSensitivity: 3,
-                  prefixPaddingMs: 300,
-                  silenceDurationMs: 950,
-                },
-              },
-            },
+    const loadSettings = async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_BASE}/telefun/settings`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-        }));
+        });
+        const json = await res.json();
+        if (cancelled) return;
 
-        const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        recorderRef.current = recorder;
+        if (json?.success && json.settings) {
+          setSettings(parseTelefunSettings(json.settings));
+        } else {
+          setSettings(DEFAULT_TELEFUN_SETTINGS);
+        }
+      } catch {
+        if (!cancelled) {
+          setSettings(DEFAULT_TELEFUN_SETTINGS);
+        }
+      } finally {
+        if (!cancelled) {
+          setSettingsLoading(false);
+        }
+      }
+    };
 
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            event.data.arrayBuffer().then(buf => {
-              ws.send(JSON.stringify({
-                realtimeInput: { mediaChunks: [{ data: btoa(String.fromCharCode(...new Uint8Array(buf))), mimeType: 'audio/webm' }] },
-              }));
-            });
-          }
-        };
+    const loadHistory = async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(`${API_BASE}/telefun/sessions`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        const json = await res.json();
+        if (!cancelled && json?.success) {
+          const dbRecords: CallRecord[] = json.data.map((row: any) => ({
+            id: row.id,
+            date: row.created_at || row.date,
+            url: row.recording_url || "",
+            consumerName: row.consumer_name || "",
+            consumerPhone: row.consumer_phone,
+            consumerCity: row.consumer_city,
+            scenarioTitle: row.scenario_title || "",
+            duration: row.duration || row.duration_seconds || 0,
+            configuredDuration: row.configured_duration || 0,
+            recordingPath: row.recording_path,
+            agentRecordingPath: row.agent_recording_path,
+            score: row.score || row.voice_dashboard_metrics?.score || 0,
+            feedback: row.feedback || undefined,
+            voiceAssessment: row.voice_assessment || null,
+            sessionMetrics: row.session_metrics || null,
+            realisticModeEnabled: row.realistic_mode_enabled,
+            voiceDashboardMetrics: row.voice_dashboard_metrics,
+            personaConfig: row.persona_config,
+            disruptionConfig: row.disruption_config,
+            disruptionResults: row.disruption_results,
+          }));
 
-        recorder.start(100);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.setupComplete) {
-            setMessages(prev => [...prev, 'Siap memulai simulasi.']);
-          } else if (data.serverContent?.modelTurn) {
-            setIsSpeaking(true);
-            for (const part of data.serverContent.modelTurn.parts || []) {
-              if (part.text) {
-                setTranscript(prev => [...prev, { speaker: 'ai', text: part.text, timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }]);
-              }
+          let localRecords: CallRecord[] = [];
+          const savedHistory = localStorage.getItem("telefun_history");
+          if (savedHistory) {
+            try {
+              localRecords = JSON.parse(savedHistory) as CallRecord[];
+            } catch {
+              // ignore
             }
-          } else if (data.serverContent?.turnComplete) {
-            setIsSpeaking(false);
-          } else if (data.serverContent?.audioChunks) {
-            for (const chunk of data.serverContent.modelTurn.parts || []) {
-              if (chunk.inlineData?.data) {
-                const audio = new Audio(`data:audio/wav;base64,${chunk.inlineData.data}`);
-                audioRef.current = audio;
-                audio.play();
-              }
-            }
-          } else if (data.error) {
-            setError(data.error.message || 'Gemini API Error');
           }
-        } catch { /* non-JSON */ }
-      };
 
-      ws.onclose = () => {
-        setCallState('ended');
-        cleanup();
-      };
+          const merged = [
+            ...dbRecords,
+            ...localRecords.filter(
+              (lr) => !new Set(dbRecords.map((r) => r.id)).has(lr.id),
+            ),
+          ].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+          );
 
-      ws.onerror = () => {
-        setError('Gagal terhubung ke server.');
-        setCallState('ended');
-      };
-    } catch {
-      setError('Gagal mengakses mikrofon.');
-      setCallState('ended');
-    }
-  }, [settings, cleanup]);
+          setHistory(merged);
+          if (merged.length > 0) {
+            localStorage.setItem("telefun_history", JSON.stringify(merged));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
 
-  const endCall = useCallback(() => {
-    cleanup();
-    setCallState('ended');
-  }, [cleanup]);
+    loadSettings();
+    loadHistory();
 
-  const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    return () => {
+      cancelled = true;
+    };
+  }, [view]);
 
   const handleSaveSettings = async (newSettings: TelefunAppSettings) => {
     try {
-      await putApi('/telefun/settings', newSettings);
+      await putApi("/telefun/settings", newSettings);
       setSettings(newSettings);
-      notify.success('Pengaturan Telefun berhasil disimpan');
+      notify.success("Pengaturan Telefun berhasil disimpan");
     } catch {
-      notify.error('Gagal menyimpan pengaturan');
+      notify.error("Gagal menyimpan pengaturan");
+    }
+  };
+
+  const startCall = async () => {
+    const token = getToken();
+    if (!token) {
+      notify.error("Token tidak ditemukan. Silakan login terlebih dahulu.");
+      return;
+    }
+
+    const activeScenarios = settings.scenarios.filter((s) => s.isActive);
+    if (activeScenarios.length === 0) {
+      notify.error("Pilih minimal satu skenario di Pengaturan.");
+      setIsSettingsOpen(true);
+      return;
+    }
+
+    const randomScenario =
+      activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
+    setActiveScenario(randomScenario);
+
+    const consumerType =
+      settings.preferredConsumerTypeId === "random"
+        ? settings.consumerTypes[
+            Math.floor(Math.random() * settings.consumerTypes.length)
+          ]
+        : settings.consumerTypes.find(
+            (ct) => ct.id === settings.preferredConsumerTypeId,
+          ) || settings.consumerTypes[0];
+
+    const identity = resolveFinalIdentity(settings.identitySettings);
+    const voiceName = identity.voiceName || settings.voiceName;
+
+    const sessionConfig: TelefunAppSettings = {
+      ...settings,
+      scenarioTitle: randomScenario.title,
+      systemInstruction: randomScenario.instruction,
+      consumerName: identity.name,
+      consumerGender: identity.gender,
+      voiceName,
+    };
+
+    const runId = ++sessionRunIdRef.current;
+    setSessionDelta(null);
+    sessionBaselineRef.current = null;
+
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/ai/usage/summary?module=telefun`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const json = await res.json();
+        if (json?.success && json.data && runId === sessionRunIdRef.current) {
+          sessionBaselineRef.current = {
+            total_calls: json.data.total_calls || 0,
+            total_tokens: json.data.total_tokens || 0,
+            total_cost_idr: json.data.total_cost_idr || 0,
+          };
+        }
+      } catch {
+        // best-effort
+      }
+    })();
+
+    try {
+      const res = await postApi<any>("/telefun/sessions", {
+        scenario_title: randomScenario.title,
+        consumer_name: identity.name,
+        consumer_gender: identity.gender,
+        consumer_phone: identity.phone,
+        consumer_city: identity.city,
+        realistic_mode_enabled: settings.realisticModeEnabled,
+        persona_config: {
+          consumerType: consumerType?.name || consumerType?.id,
+        },
+        disruption_config: settings.realisticModeDisruptionTypes,
+      });
+      if (res?.id) {
+        setActiveSessionId(res.id);
+      }
+    } catch (e) {
+      console.warn("Failed to create session upfront", e);
+    }
+
+    setActiveSessionConfig(sessionConfig);
+    setView("chat");
+  };
+
+  const handleEndCall = () => {
+    setView("home");
+    setActiveSessionConfig(null);
+  };
+
+  const handleRecordingReady = async (
+    url: string | null,
+    consumerName: string,
+    duration: number,
+    fullBlob: Blob | null,
+    agentBlob: Blob | null,
+    metrics: any,
+  ) => {
+    const sessionId = activeSessionId;
+    if (!sessionId) return;
+
+    const finalScenario = activeScenario;
+    const sessionConfig = activeSessionConfig;
+
+    // Generate score and feedback locally
+    let score = 0;
+    let feedback = "";
+
+    try {
+      const scoring = await postApi<{ score: number; feedback: string }>(
+        "/telefun/score/" + sessionId,
+        {},
+      );
+      if (scoring) {
+        score = scoring.score || 0;
+        feedback = scoring.feedback || "";
+      }
+    } catch {
+      console.warn("Scoring failed, proceeding without score");
+    }
+
+    const optimisticId = optimisticRecordIdRef.current || sessionId;
+    optimisticRecordIdRef.current = optimisticId;
+
+    try {
+      let recordingPath: string | undefined;
+      let agentRecordingPath: string | undefined;
+
+      if (fullBlob) {
+        const path = `${sessionId}/full_call.webm`;
+        const { data } = await supabase.storage
+          .from("telefun-recordings")
+          .upload(path, fullBlob, {
+            contentType: "audio/webm",
+            upsert: true,
+          });
+        if (data?.path) recordingPath = data.path;
+      }
+
+      if (agentBlob) {
+        const path = `${sessionId}/agent_only.webm`;
+        const { data } = await supabase.storage
+          .from("telefun-recordings")
+          .upload(path, agentBlob, {
+            contentType: "audio/webm",
+            upsert: true,
+          });
+        if (data?.path) agentRecordingPath = data.path;
+      }
+
+      await patchApi(`/telefun/sessions/${sessionId}`, {
+        status: "completed",
+        duration_seconds: duration,
+        session_metrics: metrics,
+        score,
+        feedback,
+      });
+
+      if (recordingPath || agentRecordingPath) {
+        await postApi("/telefun/finalize-recording", {
+          sessionId,
+          recordingPath,
+          agentRecordingPath,
+        });
+      }
+
+      const newRecord: CallRecord = {
+        id: sessionId,
+        date: new Date().toISOString(),
+        url: url || "",
+        consumerName: sessionConfig?.consumerName || consumerName,
+        scenarioTitle:
+          finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
+        duration,
+        recordingPath,
+        agentRecordingPath,
+        score,
+        feedback,
+        sessionMetrics: metrics,
+        realisticModeEnabled: sessionConfig?.realisticModeEnabled,
+      };
+
+      setHistory((prev) => {
+        const withoutOptimistic = prev.filter((r) => r.id !== optimisticId);
+        const alreadyExists = withoutOptimistic.some((r) => r.id === sessionId);
+        const merged = alreadyExists
+          ? withoutOptimistic
+          : [newRecord, ...withoutOptimistic];
+        localStorage.setItem("telefun_history", JSON.stringify(merged));
+        return merged;
+      });
+
+      setReviewRecord(newRecord);
+      setIsReviewOpen(true);
+    } catch (e) {
+      console.error("Failed to finalize session", e);
+      notify.error("Gagal menyimpan sesi");
+
+      const fallbackRecord: CallRecord = {
+        id: optimisticId,
+        date: new Date().toISOString(),
+        url: url || "",
+        consumerName: sessionConfig?.consumerName || consumerName,
+        scenarioTitle:
+          finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
+        duration,
+      };
+
+      setReviewRecord(fallbackRecord);
+      setIsReviewOpen(true);
+    } finally {
+      setActiveSessionId(null);
+      setActiveScenario(null);
+    }
+
+    const runId = sessionRunIdRef.current;
+    const baseline = sessionBaselineRef.current;
+
+    void (async () => {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        let retries = 5;
+        while (retries > 0 && runId === sessionRunIdRef.current) {
+          try {
+            const token = getToken();
+            const res = await fetch(
+              `${API_BASE}/ai/usage/summary?module=telefun`,
+              {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              },
+            );
+            const json = await res.json();
+            if (json?.success && json.data) {
+              const delta = {
+                totalCalls:
+                  (json.data.total_calls || 0) - (baseline?.total_calls || 0),
+                totalTokens:
+                  (json.data.total_tokens || 0) - (baseline?.total_tokens || 0),
+                costIdr:
+                  (json.data.total_cost_idr || 0) -
+                  (baseline?.total_cost_idr || 0),
+              };
+              if (delta.totalCalls > 0) {
+                setSessionDelta(delta);
+                break;
+              }
+            }
+          } catch {
+            // retry
+          }
+          retries--;
+          if (retries > 0)
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      } catch {
+        // best-effort
+      }
+    })();
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await fetch(`${API_BASE}/telefun/history/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+      setHistory((prev) => {
+        const updated = prev.filter((h) => h.id !== id);
+        localStorage.setItem("telefun_history", JSON.stringify(updated));
+        return updated;
+      });
+      notify.success("Sesi dihapus");
+    } catch {
+      notify.error("Gagal menghapus sesi");
+    }
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await fetch(`${API_BASE}/telefun/history`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+      setHistory([]);
+      localStorage.removeItem("telefun_history");
+      notify.success("Riwayat dibersihkan");
+    } catch {
+      notify.error("Gagal membersihkan riwayat");
+    }
+  };
+
+  const handleReviewSession = (record: CallRecord) => {
+    setReviewRecord(record);
+    setIsReviewOpen(true);
+  };
+
+  const handleAssessmentComplete = (sessionId: string, assessment: any) => {
+    setHistory((prev) => {
+      const updated = prev.map((r) =>
+        r.id === sessionId ? { ...r, voiceAssessment: assessment } : r,
+      );
+      localStorage.setItem("telefun_history", JSON.stringify(updated));
+      return updated;
+    });
+    if (reviewRecord?.id === sessionId) {
+      setReviewRecord((prev) =>
+        prev ? { ...prev, voiceAssessment: assessment } : null,
+      );
     }
   };
 
   return (
     <>
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={handleSaveSettings} />
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-8rem)] gap-8">
-        <div className="bg-white rounded-2xl border shadow-lg p-8 w-full max-w-sm text-center space-y-6">
-          <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center transition-colors ${
-            callState === 'connected' ? 'bg-green-100' : callState === 'connecting' ? 'bg-yellow-100' : 'bg-indigo-100'
-          }`}>
-            <Phone size={36} className={callState === 'connected' ? 'text-green-600' : 'text-indigo-600'} />
-          </div>
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onSave={handleSaveSettings}
+      />
 
-          <div className="flex items-center justify-center gap-3">
-            <div>
-              <h2 className="text-xl font-bold">Telefun</h2>
-              <p className="text-sm text-gray-500">Simulasi Panggilan Voice AI</p>
-            </div>
-            {callState === 'idle' && !settingsLoading && (
-              <button onClick={() => setIsSettingsOpen(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-colors" title="Pengaturan">
-                <Settings size={18} />
-              </button>
-            )}
-          </div>
+      <HistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onDeleteSession={handleDeleteSession}
+        onClearHistory={handleClearHistory}
+        onReviewSession={handleReviewSession}
+      />
 
-          {settingsLoading ? (
-            <div className="flex items-center justify-center py-4">
-              <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : callState === 'idle' && (
-            <div className="text-xs text-gray-400 space-y-1">
-              <p>Model: {VOICE_MODELS.find(m => m.id === settings.selectedModel)?.name || settings.selectedModel}</p>
-              <p>Skema: {settings.scenarioTitle || 'Custom'}</p>
-            </div>
-          )}
+      <ReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        record={reviewRecord}
+        onAssessmentComplete={handleAssessmentComplete}
+      />
 
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
-              <AlertCircle size={16} /> {error}
-            </div>
-          )}
+      <UsageModal
+        isOpen={isUsageOpen}
+        onClose={() => setIsUsageOpen(false)}
+        module="telefun"
+        sessionDelta={sessionDelta}
+      />
 
-          {(callState === 'connected' || callState === 'connecting') && (
-            <div className="flex items-center justify-center gap-4 text-lg font-mono">
-              {isSpeaking && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
-              <span>{formatDuration(duration)}</span>
-            </div>
-          )}
+      <AnimatePresence mode="wait">
+        {view === "home" && (
+          <motion.div
+            key="home"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="min-h-[calc(100dvh-8rem)] w-full bg-[#f6f5f2] px-6 py-8 lg:px-10 lg:py-10"
+          >
+            <div className="mx-auto grid w-full max-w-[1664px] gap-8 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
+              <motion.article
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+                className="flex min-h-[640px] flex-col rounded-[38px] border border-black/5 bg-white p-10 shadow-[0_22px_55px_rgba(16,22,33,0.08)] lg:p-12"
+              >
+                <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-[#eefbf5] px-5 py-2 text-[13px] font-black uppercase tracking-[0.34em] text-[#16b88a]">
+                  Voice Simulation Trainer
+                </span>
 
-          {callState === 'connected' && transcript.length > 0 && (
-            <div className="border-t pt-4">
-              <p className="text-xs font-semibold text-gray-500 mb-2">Transcript</p>
-              <div className="max-h-48 overflow-auto space-y-2 text-left">
-                {transcript.map((entry, i) => (
-                  <div key={i} className={`flex items-start gap-2 ${entry.speaker === 'ai' ? 'justify-start' : 'justify-end'}`}>
-                    {entry.speaker === 'ai' && (
-                      <span className="w-2 h-2 bg-indigo-500 rounded-full mt-1.5 shrink-0" />
-                    )}
-                    <div className={`max-w-[80%] rounded-lg px-3 py-1.5 text-xs ${
-                      entry.speaker === 'ai' ? 'bg-indigo-50 text-indigo-900' : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      <span className="text-[10px] text-gray-400 block">{entry.timestamp}</span>
-                      {entry.text}
-                    </div>
-                  </div>
-                ))}
-                <div ref={transcriptEndRef} />
-              </div>
-            </div>
-          )}
+                <div className="mt-5 flex h-24 w-24 items-center justify-center rounded-[28px] bg-[#dff7f0] text-[#16b88a] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                  <Phone className="h-11 w-11" strokeWidth={1.95} />
+                </div>
 
-          <div className="flex justify-center gap-4">
-            {callState === 'idle' && (
-              <button onClick={startCall}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700">
-                <Phone size={20} /> Mulai Panggilan
-              </button>
-            )}
-            {callState === 'connecting' && (
-              <div className="flex items-center gap-2 px-6 py-3 bg-yellow-100 text-yellow-700 rounded-full">
-                <div className="w-4 h-4 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin" />
-                Menghubungkan...
-              </div>
-            )}
-            {(callState === 'connected') && (
-              <>
-                <button onClick={() => setMuted(!muted)}
-                  className={`p-3 rounded-full ${muted ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
-                  {muted ? <MicOff size={20} /> : <Mic size={20} />}
-                </button>
-                <button onClick={endCall}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-full hover:bg-red-700">
-                  <PhoneOff size={20} /> Akhiri
-                </button>
-              </>
-            )}
-            {callState === 'ended' && (
-              <button onClick={() => setCallState('idle')}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-full hover:bg-indigo-700">
-                <Play size={20} /> Mulai Ulang
-              </button>
-            )}
-          </div>
+                <h1 className="mt-9 max-w-[680px] text-[clamp(54px,4.6vw,74px)] font-black leading-[1.02] tracking-[-0.06em] text-[#1c1b1a]">
+                  Siapkan simulasi telepon dari workspace yang lebih terpadu.
+                </h1>
 
-          {messages.length > 0 && (
-            <div className="border-t pt-4">
-              <div className="max-h-32 overflow-auto space-y-1 text-left">
-                {messages.map((msg, i) => (
-                  <p key={i} className="text-sm text-gray-600">{msg}</p>
-                ))}
-              </div>
+                <p className="mt-8 max-w-[650px] text-[clamp(18px,1.8vw,24px)] leading-[1.45] text-[#7d756f]">
+                  Simulasi panggilan telepon dengan konsumen AI untuk melatih
+                  kemampuan penanganan keluhan.
+                </p>
+              </motion.article>
+
+              <motion.aside
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, ease: "easeOut", delay: 0.05 }}
+                className="flex min-h-[640px] flex-col rounded-[38px] border border-black/5 bg-white p-8 shadow-[0_22px_55px_rgba(16,22,33,0.08)] lg:p-10"
+              >
+                <h2 className="text-[17px] font-black uppercase tracking-[0.36em] text-[#8b8179]">
+                  Workspace Actions
+                </h2>
+
+                <div className="mt-8 grid gap-4">
+                  <button
+                    onClick={startCall}
+                    disabled={settingsLoading}
+                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] bg-[#1f2a42] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-white shadow-[0_14px_26px_rgba(31,42,66,0.24)] transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <PlayCircle className="h-6 w-6" />
+                    <span>Mulai Panggilan</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsSettingsOpen(true)}
+                    disabled={settingsLoading}
+                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] border border-[#d6d8dd] bg-[#eceef2] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-[#1f2a42] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_rgba(31,42,66,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Settings className="h-6 w-6" />
+                    <span>Opsi</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] border border-[#d6d8dd] bg-[#eceef2] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-[#1f2a42] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_rgba(31,42,66,0.12)]"
+                  >
+                    <History className="h-6 w-6" />
+                    <span>Riwayat</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsUsageOpen(true)}
+                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] border border-[#d6d8dd] bg-[#eceef2] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-[#1f2a42] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_rgba(31,42,66,0.12)]"
+                  >
+                    <BarChart3 className="h-6 w-6" />
+                    <span>Usage</span>
+                    {sessionDelta &&
+                      (sessionDelta.costIdr > 0 ||
+                        sessionDelta.totalTokens > 0) && (
+                        <span className="ml-1 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-black tracking-[0.2em] text-[#4b5563]">
+                          +
+                          {sessionDelta.costIdr > 0
+                            ? new Intl.NumberFormat("id-ID", {
+                                style: "currency",
+                                currency: "IDR",
+                                minimumFractionDigits: 0,
+                              }).format(sessionDelta.costIdr)
+                            : `${sessionDelta.totalTokens}t`}
+                        </span>
+                      )}
+                  </button>
+                </div>
+              </motion.aside>
             </div>
-          )}
-        </div>
-      </div>
+          </motion.div>
+        )}
+
+        {view === "chat" && activeSessionConfig && (
+          <motion.div
+            key="chat"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950"
+          >
+            <PhoneInterface
+              config={activeSessionConfig}
+              onEndSession={handleEndCall}
+              onRecordingReady={handleRecordingReady}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

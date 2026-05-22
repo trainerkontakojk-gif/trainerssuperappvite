@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { X, BarChart3, Loader2, TrendingUp } from 'lucide-react';
-import { getApi } from '../../../hooks/useApi';
+import React, { useState, useEffect } from "react";
+import { X, BarChart3, Loader2, TrendingUp } from "lucide-react";
+import { getApi } from "../../../hooks/useApi";
 
 interface UsageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  module: 'ketik' | 'pdkt';
+  module: "ketik" | "pdkt";
   sessionDelta?: {
     totalCalls: number;
     totalTokens: number;
@@ -15,19 +15,24 @@ interface UsageModalProps {
 }
 
 function formatIdr(value: number): string {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function formatTokenCount(value: number): string {
-  return new Intl.NumberFormat('id-ID').format(value);
+  return new Intl.NumberFormat("id-ID").format(value);
 }
 
-export const UsageModal: React.FC<UsageModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  module, 
-  sessionDelta, 
-  sessionDeltaPending 
+export const UsageModal: React.FC<UsageModalProps> = ({
+  isOpen,
+  onClose,
+  module,
+  sessionDelta,
+  sessionDeltaPending,
 }) => {
   const [loading, setLoading] = useState(false);
   const [usage, setUsage] = useState<{
@@ -46,10 +51,12 @@ export const UsageModal: React.FC<UsageModalProps> = ({
     const fetchUsage = async () => {
       setLoading(true);
       try {
-        const response = await getApi<any>(`/ai/usage/summary?module=${module}`);
+        const response = await getApi<any>(
+          `/ai/usage/summary?module=${module}`,
+        );
         setUsage(response);
       } catch (error) {
-        console.error('[UsageModal] Failed to fetch usage:', error);
+        console.error("[UsageModal] Failed to fetch usage:", error);
       } finally {
         setLoading(false);
       }
@@ -60,18 +67,31 @@ export const UsageModal: React.FC<UsageModalProps> = ({
 
   if (!isOpen) return null;
 
-  const moduleLabel = module === 'ketik' ? 'Ketik' : 'PDKT';
-  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-  const periodLabel = usage ? `${months[usage.month - 1]} ${usage.year}` : '';
+  const moduleLabel = module === "ketik" ? "Ketik" : "PDKT";
+  const months = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+  const periodLabel = usage ? `${months[usage.month - 1]} ${usage.year}` : "";
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
         className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
       />
-      
+
       {/* Dialog Shell */}
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 flex flex-col max-h-[85vh] transition-all transform scale-100">
         <header className="px-6 py-5 border-b border-gray-200 flex items-center justify-between shrink-0">
@@ -80,12 +100,16 @@ export const UsageModal: React.FC<UsageModalProps> = ({
               <BarChart3 className="w-5 h-5 text-sky-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Usage Bulan Ini</h3>
-              <p className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-widest font-semibold">Modul {moduleLabel}</p>
+              <h3 className="text-sm font-bold text-gray-900">
+                Usage Bulan Ini
+              </h3>
+              <p className="text-[10px] text-gray-500 mt-0.5 uppercase tracking-widest font-semibold">
+                Modul {moduleLabel}
+              </p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-xl transition-all text-gray-500"
           >
             <X className="w-5 h-5" />
@@ -96,26 +120,34 @@ export const UsageModal: React.FC<UsageModalProps> = ({
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center text-center">
               <Loader2 className="w-8 h-8 text-sky-600 animate-spin mb-3" />
-              <p className="text-xs font-bold text-gray-500">Memuat data usage...</p>
+              <p className="text-xs font-bold text-gray-500">
+                Memuat data usage...
+              </p>
             </div>
           ) : usage ? (
             <>
               <div className="text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{periodLabel}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  {periodLabel}
+                </p>
               </div>
 
               {(sessionDelta || sessionDeltaPending) && (
                 <div className="bg-sky-50/55 border border-sky-100 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-1">
                     <TrendingUp className="w-4 h-4 text-sky-600" />
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Kenaikan setelah sesi terakhir</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700">
+                      Kenaikan setelah sesi terakhir
+                    </p>
                   </div>
                   <p className="text-xl font-bold text-gray-900">
-                    {sessionDelta ? `+${formatIdr(sessionDelta.costIdr)}` : '—'}
+                    {sessionDelta ? `+${formatIdr(sessionDelta.costIdr)}` : "—"}
                   </p>
                   <div className="flex items-center gap-3 mt-1 text-[9px] text-gray-400 font-semibold">
                     {sessionDelta && sessionDelta.totalTokens > 0 && (
-                      <span>+{formatTokenCount(sessionDelta.totalTokens)} token</span>
+                      <span>
+                        +{formatTokenCount(sessionDelta.totalTokens)} token
+                      </span>
                     )}
                     {sessionDelta && sessionDelta.totalCalls > 0 && (
                       <span>+{sessionDelta.totalCalls} call</span>
@@ -129,35 +161,57 @@ export const UsageModal: React.FC<UsageModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-sky-50/20 rounded-xl p-4 col-span-2 border border-sky-100">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-sky-600 mb-1">Estimasi Biaya Bulan Ini</div>
-                  <div className="text-2xl font-bold text-sky-600">{formatIdr(usage.totalCostIdr)}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-sky-600 mb-1">
+                    Estimasi Biaya Bulan Ini
+                  </div>
+                  <div className="text-2xl font-bold text-sky-600">
+                    {formatIdr(usage.totalCostIdr)}
+                  </div>
                 </div>
-                
+
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Total Tokens</div>
-                  <div className="text-lg font-bold text-gray-900">{formatTokenCount(usage.totalTokens)}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                    Total Tokens
+                  </div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {formatTokenCount(usage.totalTokens)}
+                  </div>
                 </div>
-                
+
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Call AI</div>
-                  <div className="text-lg font-bold text-gray-900">{usage.totalCalls}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                    Call AI
+                  </div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {usage.totalCalls}
+                  </div>
                 </div>
-                
+
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Input Tokens</div>
-                  <div className="text-sm font-bold text-gray-700">{formatTokenCount(usage.totalInputTokens)}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                    Input Tokens
+                  </div>
+                  <div className="text-sm font-bold text-gray-700">
+                    {formatTokenCount(usage.totalInputTokens)}
+                  </div>
                 </div>
-                
+
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">Output Tokens</div>
-                  <div className="text-sm font-bold text-gray-700">{formatTokenCount(usage.totalOutputTokens)}</div>
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                    Output Tokens
+                  </div>
+                  <div className="text-sm font-bold text-gray-700">
+                    {formatTokenCount(usage.totalOutputTokens)}
+                  </div>
                 </div>
               </div>
             </>
           ) : (
             <div className="py-12 flex flex-col items-center justify-center text-center">
               <BarChart3 className="w-12 h-12 text-gray-200 mb-3" />
-              <p className="text-xs font-bold text-gray-400 italic">Belum ada data usage untuk bulan ini.</p>
+              <p className="text-xs font-bold text-gray-400 italic">
+                Belum ada data usage untuk bulan ini.
+              </p>
             </div>
           )}
         </div>

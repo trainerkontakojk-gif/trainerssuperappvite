@@ -104,7 +104,9 @@ const TEST_EMAIL_DOMAINS = ["@example.com", "@test.com", "@mailinator.com"];
  * Checks if a name field contains any test/dummy patterns (case-insensitive).
  * Returns the matched pattern or null if no match.
  */
-export function matchesTestNamePattern(name: string | null | undefined): string | null {
+export function matchesTestNamePattern(
+  name: string | null | undefined,
+): string | null {
   if (!name) return null;
   const lower = name.toLowerCase();
   for (const pattern of TEST_NAME_PATTERNS) {
@@ -119,7 +121,9 @@ export function matchesTestNamePattern(name: string | null | undefined): string 
  * Checks if an email contains test domain patterns or "+test" substring.
  * Returns the matched pattern or null if no match.
  */
-export function matchesTestEmailPattern(email: string | null | undefined): string | null {
+export function matchesTestEmailPattern(
+  email: string | null | undefined,
+): string | null {
   if (!email) return null;
   const lower = email.toLowerCase();
 
@@ -143,7 +147,9 @@ export function matchesTestEmailPattern(email: string | null | undefined): strin
  * Examples: "aaa", "x", "bbb", "ZZZZ"
  * Returns the matched pattern or null if no match.
  */
-export function matchesRepeatedCharPattern(name: string | null | undefined): string | null {
+export function matchesRepeatedCharPattern(
+  name: string | null | undefined,
+): string | null {
   if (!name) return null;
   const trimmed = name.trim();
   if (trimmed.length === 0) return null;
@@ -155,7 +161,9 @@ export function matchesRepeatedCharPattern(name: string | null | undefined): str
 
   // All same character (case-insensitive)
   const firstChar = trimmed[0].toLowerCase();
-  const allSame = trimmed.split("").every((ch) => ch.toLowerCase() === firstChar);
+  const allSame = trimmed
+    .split("")
+    .every((ch) => ch.toLowerCase() === firstChar);
   if (allSame) {
     return "repeated character name";
   }
@@ -169,7 +177,9 @@ export function matchesRepeatedCharPattern(name: string | null | undefined): str
  * Normalizes a string for duplicate comparison: trims whitespace and lowercases.
  * Returns null if the input is null/undefined/empty after trimming.
  */
-export function normalizeForComparison(value: string | null | undefined): string | null {
+export function normalizeForComparison(
+  value: string | null | undefined,
+): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
   if (trimmed.length === 0) return null;
@@ -193,11 +203,12 @@ export function countNullFields(record: Record<string, unknown>): number {
  */
 export function determineResolution(
   records: Record<string, unknown>[],
-  differingFields: string[]
+  differingFields: string[],
 ): ResolutionStrategy {
   // Check for inactive status → "archive"
   const hasInactive = records.some(
-    (r) => typeof r.status === "string" && r.status.toLowerCase() === "inactive"
+    (r) =>
+      typeof r.status === "string" && r.status.toLowerCase() === "inactive",
   );
   if (hasInactive) {
     return "archive";
@@ -228,7 +239,7 @@ export function determineResolution(
  */
 export function groupByNormalizedKey<T extends Record<string, unknown>>(
   records: T[],
-  keyFields: string[]
+  keyFields: string[],
 ): Map<string, T[]> {
   const groups = new Map<string, T[]>();
 
@@ -240,7 +251,9 @@ export function groupByNormalizedKey<T extends Record<string, unknown>>(
     const keyParts: string[] = [];
     let skipRecord = false;
     for (const field of keyFields) {
-      const normalized = normalizeForComparison(record[field] as string | null | undefined);
+      const normalized = normalizeForComparison(
+        record[field] as string | null | undefined,
+      );
       if (normalized === null) {
         skipRecord = true;
         break;
@@ -269,7 +282,7 @@ export function buildDuplicateGroups(
   groups: Map<string, Record<string, unknown>[]>,
   table: string,
   matchedFieldNames: string[],
-  differingFieldNames: string[]
+  differingFieldNames: string[],
 ): DuplicateGroup[] {
   const duplicateGroups: DuplicateGroup[] = [];
 
@@ -311,7 +324,12 @@ export function buildDuplicateGroups(
 export interface NameInconsistencyGroup {
   recordIds: string[];
   nameVariants: string[];
-  inconsistencyType: "levenshtein" | "substring" | "whitespace" | "capitalization" | "abbreviation";
+  inconsistencyType:
+    | "levenshtein"
+    | "substring"
+    | "whitespace"
+    | "capitalization"
+    | "abbreviation";
   suggestedCanonical: string;
 }
 
@@ -349,9 +367,9 @@ export function levenshteinDistance(a: string, b: string): number {
     for (let j = 1; j <= lenB; j++) {
       const cost = strA[i - 1] === strB[j - 1] ? 0 : 1;
       currRow[j] = Math.min(
-        prevRow[j] + 1,        // deletion
-        currRow[j - 1] + 1,    // insertion
-        prevRow[j - 1] + cost  // substitution
+        prevRow[j] + 1, // deletion
+        currRow[j - 1] + 1, // insertion
+        prevRow[j - 1] + cost, // substitution
       );
     }
     [prevRow, currRow] = [currRow, prevRow];
@@ -365,7 +383,11 @@ export function levenshteinDistance(a: string, b: string): number {
  * Both strings must be at least `minLength` characters.
  * Returns false for exact matches (not a "substring" inconsistency).
  */
-export function isSubstringMatch(a: string, b: string, minLength: number = 4): boolean {
+export function isSubstringMatch(
+  a: string,
+  b: string,
+  minLength: number = 4,
+): boolean {
   const lowerA = a.toLowerCase().trim();
   const lowerB = b.toLowerCase().trim();
 
@@ -459,7 +481,7 @@ async function checkNames(client: Client): Promise<NameConsistencyReport> {
 
   // 1. Fetch all profiler_peserta names
   const pesertaResult = await client.query(
-    "SELECT id, nama FROM profiler_peserta WHERE nama IS NOT NULL"
+    "SELECT id, nama FROM profiler_peserta WHERE nama IS NOT NULL",
   );
   totalRowsScanned += pesertaResult.rowCount ?? 0;
 
@@ -492,7 +514,7 @@ async function checkNames(client: Client): Promise<NameConsistencyReport> {
      FROM qa_temuan qt
      JOIN profiler_peserta pp ON pp.id = qt.peserta_id
      WHERE pp.nama IS NOT NULL
-     ORDER BY qt.peserta_id`
+     ORDER BY qt.peserta_id`,
   );
   totalRowsScanned += temuanResult.rowCount ?? 0;
 
@@ -564,12 +586,17 @@ async function checkNames(client: Client): Promise<NameConsistencyReport> {
       if (nameA.toLowerCase() === nameB.toLowerCase()) continue;
 
       // Check Levenshtein distance
-      const distance = levenshteinDistance(nameA.toLowerCase(), nameB.toLowerCase());
+      const distance = levenshteinDistance(
+        nameA.toLowerCase(),
+        nameB.toLowerCase(),
+      );
       if (distance <= 3 && distance > 0) {
         const idsA = nameToIds.get(nameA)!;
         const idsB = nameToIds.get(nameB)!;
         const allIds = [...idsA, ...idsB];
-        const canonical = deriveCanonicalForm(nameA.length >= nameB.length ? nameA : nameB);
+        const canonical = deriveCanonicalForm(
+          nameA.length >= nameB.length ? nameA : nameB,
+        );
 
         groups.push({
           recordIds: allIds,
@@ -594,7 +621,9 @@ async function checkNames(client: Client): Promise<NameConsistencyReport> {
         const idsA = nameToIds.get(nameA)!;
         const idsB = nameToIds.get(nameB)!;
         const allIds = [...idsA, ...idsB];
-        const canonical = deriveCanonicalForm(nameA.length >= nameB.length ? nameA : nameB);
+        const canonical = deriveCanonicalForm(
+          nameA.length >= nameB.length ? nameA : nameB,
+        );
 
         groups.push({
           recordIds: allIds,
@@ -619,7 +648,9 @@ async function checkNames(client: Client): Promise<NameConsistencyReport> {
         const idsA = nameToIds.get(nameA)!;
         const idsB = nameToIds.get(nameB)!;
         const allIds = [...idsA, ...idsB];
-        const canonical = deriveCanonicalForm(nameA.length >= nameB.length ? nameA : nameB);
+        const canonical = deriveCanonicalForm(
+          nameA.length >= nameB.length ? nameA : nameB,
+        );
 
         groups.push({
           recordIds: allIds,
@@ -670,7 +701,7 @@ async function checkDummy(client: Client): Promise<IntegrityReport> {
 
   // Scan profiles table: full_name for test patterns, email for test domains
   const profilesResult = await client.query(
-    "SELECT id, full_name, email FROM profiles"
+    "SELECT id, full_name, email FROM profiles",
   );
   totalRowsScanned += profilesResult.rowCount ?? 0;
 
@@ -700,7 +731,7 @@ async function checkDummy(client: Client): Promise<IntegrityReport> {
 
   // Scan profiler_peserta table: nama for test patterns + repeated chars, email_ojk for test domains
   const pesertaResult = await client.query(
-    "SELECT id, nama, email_ojk FROM profiler_peserta"
+    "SELECT id, nama, email_ojk FROM profiler_peserta",
   );
   totalRowsScanned += pesertaResult.rowCount ?? 0;
 
@@ -765,7 +796,7 @@ async function checkDuplicates(client: Client): Promise<DuplicateReport> {
 
   // ── Scan profiler_peserta for duplicates ──
   const pesertaResult = await client.query(
-    "SELECT id, nama, batch_name, tim, created_at, trainer_id, foto_url, is_deleted, status FROM profiler_peserta"
+    "SELECT id, nama, batch_name, tim, created_at, trainer_id, foto_url, is_deleted, status FROM profiler_peserta",
   );
   totalRowsScanned += pesertaResult.rowCount ?? 0;
 
@@ -773,12 +804,15 @@ async function checkDuplicates(client: Client): Promise<DuplicateReport> {
   const pesertaDifferingFields = ["created_at", "trainer_id", "foto_url"];
 
   // Group by (nama, batch_name)
-  const namaBatchGroups = groupByNormalizedKey(pesertaRecords, ["nama", "batch_name"]);
+  const namaBatchGroups = groupByNormalizedKey(pesertaRecords, [
+    "nama",
+    "batch_name",
+  ]);
   const namaBatchDuplicates = buildDuplicateGroups(
     namaBatchGroups,
     "profiler_peserta",
     ["nama", "batch_name"],
-    pesertaDifferingFields
+    pesertaDifferingFields,
   );
   duplicateGroups.push(...namaBatchDuplicates);
 
@@ -795,12 +829,14 @@ async function checkDuplicates(client: Client): Promise<DuplicateReport> {
     namaTimGroups,
     "profiler_peserta",
     ["nama", "tim"],
-    pesertaDifferingFields
+    pesertaDifferingFields,
   );
 
   // Only add groups that contain at least one record not already reported
   for (const group of namaTimDuplicates) {
-    const hasNewRecords = group.recordIds.some((id) => !alreadyReportedIds.has(id));
+    const hasNewRecords = group.recordIds.some(
+      (id) => !alreadyReportedIds.has(id),
+    );
     if (hasNewRecords) {
       duplicateGroups.push(group);
       for (const id of group.recordIds) {
@@ -811,7 +847,7 @@ async function checkDuplicates(client: Client): Promise<DuplicateReport> {
 
   // ── Scan profiles for duplicates ──
   const profilesResult = await client.query(
-    "SELECT id, email, full_name, role, status, is_deleted FROM profiles"
+    "SELECT id, email, full_name, role, status, is_deleted FROM profiles",
   );
   totalRowsScanned += profilesResult.rowCount ?? 0;
 
@@ -823,7 +859,7 @@ async function checkDuplicates(client: Client): Promise<DuplicateReport> {
     emailGroups,
     "profiles",
     ["email"],
-    profileDifferingFields
+    profileDifferingFields,
   );
   duplicateGroups.push(...emailDuplicates);
 
@@ -853,13 +889,16 @@ const FOTO_REQUEST_TIMEOUT_MS = 5_000;
  */
 export async function checkFotoUrl(
   supabaseUrl: string,
-  fotoUrl: string
+  fotoUrl: string,
 ): Promise<{ status: "valid" | "broken" | "unverified"; reason?: string }> {
   const storageUrl = `${supabaseUrl}/storage/v1/object/public/foto-avatar/${fotoUrl}`;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FOTO_REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      FOTO_REQUEST_TIMEOUT_MS,
+    );
 
     const response = await fetch(storageUrl, {
       method: "HEAD",
@@ -895,7 +934,7 @@ async function processBatches<T, R>(
   items: T[],
   batchSize: number,
   processor: (item: T) => Promise<R>,
-  shouldAbort: () => boolean
+  shouldAbort: () => boolean,
 ): Promise<R[]> {
   const results: R[] = [];
 
@@ -919,7 +958,7 @@ export async function checkFotos(client: Client): Promise<FotoReport> {
   const supabaseUrl = process.env.SUPABASE_URL;
   if (!supabaseUrl) {
     throw new Error(
-      "SUPABASE_URL environment variable is required for check-fotos command."
+      "SUPABASE_URL environment variable is required for check-fotos command.",
     );
   }
 
@@ -931,7 +970,7 @@ export async function checkFotos(client: Client): Promise<FotoReport> {
 
   // Fetch all profiler_peserta records with id, nama, foto_url
   const result = await client.query(
-    "SELECT id, nama, foto_url FROM profiler_peserta"
+    "SELECT id, nama, foto_url FROM profiler_peserta",
   );
   const totalRowsScanned = result.rowCount ?? 0;
 
@@ -968,14 +1007,17 @@ export async function checkFotos(client: Client): Promise<FotoReport> {
       if (shouldAbort()) {
         return {
           record,
-          result: { status: "unverified" as const, reason: "overall timeout exceeded" },
+          result: {
+            status: "unverified" as const,
+            reason: "overall timeout exceeded",
+          },
         };
       }
 
       const checkResult = await checkFotoUrl(supabaseUrl, record.foto_url!);
       return { record, result: checkResult };
     },
-    shouldAbort
+    shouldAbort,
   );
 
   // Categorize results
@@ -1024,7 +1066,11 @@ export async function checkFotos(client: Client): Promise<FotoReport> {
 
 // ─── Sub-command Registry ─────────────────────────────────────────────────────
 
-type SubCommand = (client: Client) => Promise<IntegrityReport | DuplicateReport | FotoReport | NameConsistencyReport>;
+type SubCommand = (
+  client: Client,
+) => Promise<
+  IntegrityReport | DuplicateReport | FotoReport | NameConsistencyReport
+>;
 
 const SUB_COMMANDS: Record<string, SubCommand> = {
   "check-dummy": checkDummy,
@@ -1045,7 +1091,7 @@ async function main(): Promise<void> {
         "  check-dummy       Scan for test/dummy data patterns\n" +
         "  check-duplicates  Find duplicate agent/profiler records\n" +
         "  check-names       Detect naming inconsistencies\n" +
-        "  check-fotos       Validate foto/avatar references"
+        "  check-fotos       Validate foto/avatar references",
     );
     process.exit(1);
   }
@@ -1055,7 +1101,7 @@ async function main(): Promise<void> {
     console.error(
       `Unknown sub-command: "${subCommand}"\n\n` +
         "Available sub-commands: " +
-        Object.keys(SUB_COMMANDS).join(", ")
+        Object.keys(SUB_COMMANDS).join(", "),
     );
     process.exit(1);
   }
@@ -1063,7 +1109,7 @@ async function main(): Promise<void> {
   const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
   if (!dbUrl) {
     console.error(
-      "Error: DATABASE_URL or SUPABASE_DB_URL environment variable is required."
+      "Error: DATABASE_URL or SUPABASE_DB_URL environment variable is required.",
     );
     process.exit(1);
   }
@@ -1079,17 +1125,18 @@ async function main(): Promise<void> {
     const report = await handler(client);
     console.log(JSON.stringify(report, null, 2));
 
-    const totalMatches = "totalMatches" in report
-      ? report.totalMatches
-      : report.totalDuplicateGroups;
+    const totalMatches =
+      "totalMatches" in report
+        ? report.totalMatches
+        : report.totalDuplicateGroups;
 
     if (totalMatches === 0) {
       console.error(
-        `\n✓ No matches found. ${report.totalRowsScanned} rows scanned across all tables.`
+        `\n✓ No matches found. ${report.totalRowsScanned} rows scanned across all tables.`,
       );
     } else {
       console.error(
-        `\n⚠ Found ${totalMatches} match(es) in ${report.totalRowsScanned} rows scanned.`
+        `\n⚠ Found ${totalMatches} match(es) in ${report.totalRowsScanned} rows scanned.`,
       );
     }
   } catch (err: unknown) {
@@ -1101,8 +1148,8 @@ async function main(): Promise<void> {
           message: error.message,
         },
         null,
-        2
-      )
+        2,
+      ),
     );
     process.exit(1);
   } finally {

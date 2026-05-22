@@ -1,8 +1,8 @@
-import { createAdminClient } from './supabase';
-import { normalizeModelId } from './ai-models';
+import { createAdminClient } from "./supabase";
+import { normalizeModelId } from "./ai-models";
 
 export interface UsageContext {
-  module: 'ketik' | 'pdkt' | 'telefun' | 'qa-analyzer';
+  module: "ketik" | "pdkt" | "telefun" | "qa-analyzer";
   action: string;
 }
 
@@ -15,18 +15,18 @@ interface TokenUsage {
 export async function logAiUsage(options: {
   requestId: string;
   userId: string;
-  provider: 'gemini' | 'openrouter';
+  provider: "gemini" | "openrouter";
   modelId: string;
   usageContext: UsageContext;
   tokens: TokenUsage;
-  status?: 'success' | 'failed' | 'timeout';
+  status?: "success" | "failed" | "timeout";
   errorMessage?: string | null;
 }): Promise<void> {
   try {
     const admin = createAdminClient();
     const normalizedModelId = normalizeModelId(options.modelId);
-    const requestStatus = options.status ?? 'success';
-    const isFailure = requestStatus === 'failed' || requestStatus === 'timeout';
+    const requestStatus = options.status ?? "success";
+    const isFailure = requestStatus === "failed" || requestStatus === "timeout";
 
     // When status is failed or timeout, token counts are 0
     const inputTokens = isFailure ? 0 : options.tokens.inputTokens;
@@ -37,8 +37,8 @@ export async function logAiUsage(options: {
     let errorMessageValue: string | null = null;
     if (isFailure) {
       const rawMessage = options.errorMessage;
-      if (!rawMessage || rawMessage.trim() === '') {
-        errorMessageValue = 'Unknown error';
+      if (!rawMessage || rawMessage.trim() === "") {
+        errorMessageValue = "Unknown error";
       } else {
         errorMessageValue = rawMessage.slice(0, 1000);
       }
@@ -46,14 +46,14 @@ export async function logAiUsage(options: {
 
     const [{ data: pricing }, { data: billing }] = await Promise.all([
       admin
-        .from('ai_pricing_settings')
-        .select('input_price_usd_per_million, output_price_usd_per_million')
-        .eq('model_id', normalizedModelId)
+        .from("ai_pricing_settings")
+        .select("input_price_usd_per_million, output_price_usd_per_million")
+        .eq("model_id", normalizedModelId)
         .maybeSingle(),
       admin
-        .from('ai_billing_settings')
-        .select('usd_to_idr_rate')
-        .order('created_at', { ascending: false })
+        .from("ai_billing_settings")
+        .select("usd_to_idr_rate")
+        .order("created_at", { ascending: false })
         .limit(1)
         .single(),
     ]);
@@ -62,24 +62,28 @@ export async function logAiUsage(options: {
     let outputPricePerMillion = 0;
     const usdToIdrRate = billing?.usd_to_idr_rate ?? 15000;
 
-    const isLiveModel = normalizedModelId.includes('live');
+    const isLiveModel = normalizedModelId.includes("live");
     const defaultInput = isLiveModel ? 3.0 : 0;
     const defaultOutput = isLiveModel ? 12.0 : 0;
 
     if (!pricing) {
-      console.warn(`[AI Usage] No pricing for "${normalizedModelId}". Using fallback.`);
+      console.warn(
+        `[AI Usage] No pricing for "${normalizedModelId}". Using fallback.`,
+      );
       inputPricePerMillion = defaultInput;
       outputPricePerMillion = defaultOutput;
     } else {
-      inputPricePerMillion = pricing.input_price_usd_per_million ?? defaultInput;
-      outputPricePerMillion = pricing.output_price_usd_per_million ?? defaultOutput;
+      inputPricePerMillion =
+        pricing.input_price_usd_per_million ?? defaultInput;
+      outputPricePerMillion =
+        pricing.output_price_usd_per_million ?? defaultOutput;
     }
 
     const estimatedCostUsd =
       (inputTokens / 1_000_000) * inputPricePerMillion +
       (outputTokens / 1_000_000) * outputPricePerMillion;
 
-    await admin.from('ai_usage_logs').insert({
+    await admin.from("ai_usage_logs").insert({
       request_id: options.requestId,
       user_id: options.userId,
       provider: options.provider,
@@ -99,10 +103,10 @@ export async function logAiUsage(options: {
     });
   } catch (error) {
     const err = error as { code?: string };
-    if (err?.code === '23505') {
+    if (err?.code === "23505") {
       console.warn(`[AI Usage] Duplicate request_id "${options.requestId}".`);
       return;
     }
-    console.error('[AI Usage] Failed to log usage:', error);
+    console.error("[AI Usage] Failed to log usage:", error);
   }
 }

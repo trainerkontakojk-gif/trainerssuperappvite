@@ -1,22 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = "light" | "dark";
 
-const THEME_EVENT = 'themechange';
+const THEME_EVENT = "themechange";
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === "undefined") return "light";
 
-  const saved = localStorage.getItem('theme');
-  if (saved === 'dark' || saved === 'light') return saved;
+  const saved = localStorage.getItem("theme");
+  if (saved === "dark" || saved === "light") return saved;
 
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
 function applyTheme(theme: ThemeMode) {
   const root = window.document.documentElement;
-  root.classList.toggle('dark', theme === 'dark');
-  localStorage.setItem('theme', theme);
+  root.classList.toggle("dark", theme === "dark");
+  localStorage.setItem("theme", theme);
 }
 
 export function useThemeMode() {
@@ -32,11 +34,11 @@ export function useThemeMode() {
     };
 
     window.addEventListener(THEME_EVENT, handleThemeChange);
-    window.addEventListener('storage', handleThemeChange);
+    window.addEventListener("storage", handleThemeChange);
 
     return () => {
       window.removeEventListener(THEME_EVENT, handleThemeChange);
-      window.removeEventListener('storage', handleThemeChange);
+      window.removeEventListener("storage", handleThemeChange);
     };
   }, []);
 

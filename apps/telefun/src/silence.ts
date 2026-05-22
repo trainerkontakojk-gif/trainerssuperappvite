@@ -68,7 +68,7 @@ export class UtteranceBuffer {
       this.flushTimer = null;
     }
     if (this.buffer.length === 0) return;
-    const batched = this.buffer.join('');
+    const batched = this.buffer.join("");
     this.buffer = [];
     for (const cb of this.callbacks) cb(batched);
   }

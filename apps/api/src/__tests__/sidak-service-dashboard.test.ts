@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as fc from 'fast-check';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as fc from "fast-check";
 
 // ─── Mock Setup ────────────────────────────────────────────────────────────────
 
 // Track which table is being queried and what state to simulate
-let mvState: 'returns-data' | 'returns-null' | 'throws-error' = 'returns-data';
+let mvState: "returns-data" | "returns-null" | "throws-error" = "returns-data";
 let mvData: Record<string, any> | null = null;
 let queryCallCount = 0;
 
@@ -13,33 +13,46 @@ function buildQuery(tableName: string, onAwait: () => any) {
     {},
     {
       get(_target, prop) {
-        if (prop === 'then') {
+        if (prop === "then") {
           return (resolve: any) => resolve(onAwait());
         }
         return (..._args: any[]) => q;
       },
-    }
+    },
   );
   return q;
 }
 
 // Default mock data for supporting queries
-const mockPeriods = [{ id: 'period-1', month: 1, year: 2025, label: '01/2025' }];
-const mockFolders = [{ id: 'folder-1', name: 'Folder A' }];
+const mockPeriods = [
+  { id: "period-1", month: 1, year: 2025, label: "01/2025" },
+];
+const mockFolders = [{ id: "folder-1", name: "Folder A" }];
 const mockIndicators = [
-  { id: 'ind-1', name: 'Greeting', category: 'non_critical', service_type: 'call', bobot: 1 },
+  {
+    id: "ind-1",
+    name: "Greeting",
+    category: "non_critical",
+    service_type: "call",
+    bobot: 1,
+  },
 ];
 const mockWeights = [
-  { service_type: 'call', critical_weight: 0.5, non_critical_weight: 0.5, scoring_mode: 'weighted' },
+  {
+    service_type: "call",
+    critical_weight: 0.5,
+    non_critical_weight: 0.5,
+    scoring_mode: "weighted",
+  },
 ];
 
-vi.mock('../lib/supabase', () => ({
+vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
     from: vi.fn((tableName: string) => {
       queryCallCount++;
 
-      if (tableName === 'mv_qa_period_summary') {
-        if (mvState === 'throws-error') {
+      if (tableName === "mv_qa_period_summary") {
+        if (mvState === "throws-error") {
           // Simulate MV throwing an error
           return buildQuery(tableName, () => {
             throw new Error('relation "mv_qa_period_summary" does not exist');
@@ -48,25 +61,37 @@ vi.mock('../lib/supabase', () => ({
         return buildQuery(tableName, () => ({ data: mvData, error: null }));
       }
 
-      if (tableName === 'qa_periods') {
-        return buildQuery(tableName, () => ({ data: mockPeriods, error: null }));
+      if (tableName === "qa_periods") {
+        return buildQuery(tableName, () => ({
+          data: mockPeriods,
+          error: null,
+        }));
       }
-      if (tableName === 'profiler_folders') {
-        return buildQuery(tableName, () => ({ data: mockFolders, error: null }));
+      if (tableName === "profiler_folders") {
+        return buildQuery(tableName, () => ({
+          data: mockFolders,
+          error: null,
+        }));
       }
-      if (tableName === 'qa_indicators') {
-        return buildQuery(tableName, () => ({ data: mockIndicators, error: null }));
+      if (tableName === "qa_indicators") {
+        return buildQuery(tableName, () => ({
+          data: mockIndicators,
+          error: null,
+        }));
       }
-      if (tableName === 'qa_service_weights') {
-        return buildQuery(tableName, () => ({ data: mockWeights, error: null }));
+      if (tableName === "qa_service_weights") {
+        return buildQuery(tableName, () => ({
+          data: mockWeights,
+          error: null,
+        }));
       }
-      if (tableName === 'profiles') {
+      if (tableName === "profiles") {
         return buildQuery(tableName, () => ({ data: [], error: null }));
       }
-      if (tableName === 'qa_dashboard_period_summary') {
+      if (tableName === "qa_dashboard_period_summary") {
         return buildQuery(tableName, () => ({ data: null, error: null }));
       }
-      if (tableName === 'qa_temuan') {
+      if (tableName === "qa_temuan") {
         // Return empty temuan for raw computation fallback
         return buildQuery(tableName, () => ({ data: [], error: null }));
       }
@@ -77,11 +102,11 @@ vi.mock('../lib/supabase', () => ({
   createAdminClient: vi.fn(),
 }));
 
-import * as sidakService from '../services/sidak-service';
+import * as sidakService from "../services/sidak-service";
 
 // ─── Property Test: Dashboard Materialized View Fallback ───────────────────────
 
-describe('Dashboard Materialized View Fallback', () => {
+describe("Dashboard Materialized View Fallback", () => {
   /**
    * **Validates: Requirements 3.2, 3.4**
    *
@@ -94,16 +119,16 @@ describe('Dashboard Materialized View Fallback', () => {
    */
 
   beforeEach(() => {
-    mvState = 'returns-data';
+    mvState = "returns-data";
     mvData = null;
     queryCallCount = 0;
   });
 
   // Arbitrary generators for MV availability states
   const mvStateArb = fc.oneof(
-    fc.constant('returns-data' as const),
-    fc.constant('returns-null' as const),
-    fc.constant('throws-error' as const)
+    fc.constant("returns-data" as const),
+    fc.constant("returns-null" as const),
+    fc.constant("throws-error" as const),
   );
 
   // Generator for valid MV row data
@@ -119,15 +144,15 @@ describe('Dashboard Materialized View Fallback', () => {
 
   // Generator for service types
   const serviceTypeArb = fc.oneof(
-    fc.constant('call'),
-    fc.constant('email'),
-    fc.constant('chat')
+    fc.constant("call"),
+    fc.constant("email"),
+    fc.constant("chat"),
   );
 
   // Generator for period IDs (UUID-like)
   const periodIdArb = fc.uuid();
 
-  it('should always return valid dashboard data regardless of MV state (Property 1)', async () => {
+  it("should always return valid dashboard data regardless of MV state (Property 1)", async () => {
     await fc.assert(
       fc.asyncProperty(
         mvStateArb,
@@ -139,7 +164,7 @@ describe('Dashboard Materialized View Fallback', () => {
           mvState = state;
           queryCallCount = 0;
 
-          if (state === 'returns-data') {
+          if (state === "returns-data") {
             mvData = {
               ...mvRowData,
               period_id: periodId,
@@ -162,13 +187,13 @@ describe('Dashboard Materialized View Fallback', () => {
 
           // Summary must have all required numeric fields
           const summary = result.summary!;
-          expect(typeof summary.totalDefects).toBe('number');
-          expect(typeof summary.avgDefectsPerAudit).toBe('number');
-          expect(typeof summary.zeroErrorRate).toBe('number');
-          expect(typeof summary.avgAgentScore).toBe('number');
-          expect(typeof summary.complianceRate).toBe('number');
-          expect(typeof summary.complianceCount).toBe('number');
-          expect(typeof summary.totalAgents).toBe('number');
+          expect(typeof summary.totalDefects).toBe("number");
+          expect(typeof summary.avgDefectsPerAudit).toBe("number");
+          expect(typeof summary.zeroErrorRate).toBe("number");
+          expect(typeof summary.avgAgentScore).toBe("number");
+          expect(typeof summary.complianceRate).toBe("number");
+          expect(typeof summary.complianceCount).toBe("number");
+          expect(typeof summary.totalAgents).toBe("number");
 
           // No NaN values in summary
           expect(Number.isNaN(summary.totalDefects)).toBe(false);
@@ -183,20 +208,20 @@ describe('Dashboard Materialized View Fallback', () => {
           expect(summary.totalDefects).toBeGreaterThanOrEqual(0);
           expect(summary.totalAgents).toBeGreaterThanOrEqual(0);
           expect(summary.complianceCount).toBeGreaterThanOrEqual(0);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
-  it('should use MV data when MV returns valid rows', async () => {
+  it("should use MV data when MV returns valid rows", async () => {
     await fc.assert(
       fc.asyncProperty(
         mvRowArb,
         serviceTypeArb,
         periodIdArb,
         async (mvRowData, serviceType, periodId) => {
-          mvState = 'returns-data';
+          mvState = "returns-data";
           mvData = {
             ...mvRowData,
             period_id: periodId,
@@ -213,20 +238,22 @@ describe('Dashboard Materialized View Fallback', () => {
           const summary = result.summary!;
           expect(summary.totalDefects).toBe(Number(mvRowData.total_defects));
           expect(summary.totalAgents).toBe(Number(mvRowData.total_agents));
-          expect(summary.complianceCount).toBe(Number(mvRowData.compliance_count));
-        }
+          expect(summary.complianceCount).toBe(
+            Number(mvRowData.compliance_count),
+          );
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
-  it('should never propagate MV errors to caller', async () => {
+  it("should never propagate MV errors to caller", async () => {
     await fc.assert(
       fc.asyncProperty(
         serviceTypeArb,
         periodIdArb,
         async (serviceType, periodId) => {
-          mvState = 'throws-error';
+          mvState = "throws-error";
           mvData = null;
           queryCallCount = 0;
 
@@ -239,21 +266,21 @@ describe('Dashboard Materialized View Fallback', () => {
           // Should still return valid data (from raw computation fallback)
           expect(result).toBeDefined();
           expect(result.summary).toBeDefined();
-          expect(typeof result.summary!.totalDefects).toBe('number');
-          expect(typeof result.summary!.totalAgents).toBe('number');
-        }
+          expect(typeof result.summary!.totalDefects).toBe("number");
+          expect(typeof result.summary!.totalAgents).toBe("number");
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
-  it('should fall back gracefully when MV returns null/no rows', async () => {
+  it("should fall back gracefully when MV returns null/no rows", async () => {
     await fc.assert(
       fc.asyncProperty(
         serviceTypeArb,
         periodIdArb,
         async (serviceType, periodId) => {
-          mvState = 'returns-null';
+          mvState = "returns-null";
           mvData = null;
           queryCallCount = 0;
 
@@ -266,15 +293,14 @@ describe('Dashboard Materialized View Fallback', () => {
           // Should still return valid data (from cache or raw computation)
           expect(result).toBeDefined();
           expect(result.summary).toBeDefined();
-          expect(typeof result.summary!.totalDefects).toBe('number');
-          expect(typeof result.summary!.totalAgents).toBe('number');
-        }
+          expect(typeof result.summary!.totalDefects).toBe("number");
+          expect(typeof result.summary!.totalAgents).toBe("number");
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ─── Property Test: Soft-Delete Dashboard Exclusion ────────────────────────────
 
@@ -293,7 +319,7 @@ describe('Dashboard Materialized View Fallback', () => {
 interface ProfileRecord {
   id: string;
   is_deleted: boolean | null;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
 }
 
 interface PesertaRecord {
@@ -308,43 +334,43 @@ interface PesertaRecord {
 
 function shouldBeExcluded(
   peserta: PesertaRecord,
-  profiles: ProfileRecord[]
+  profiles: ProfileRecord[],
 ): boolean {
   // If user_id is null, the record is NOT excluded (Requirement 12.6)
   if (peserta.user_id === null) return false;
 
   // Find the linked profile
-  const profile = profiles.find(p => p.id === peserta.user_id);
+  const profile = profiles.find((p) => p.id === peserta.user_id);
 
   // If no profile found (join returns null), treat as not deleted (Requirement 12.6)
   if (!profile) return false;
 
   // Excluded if is_deleted = true OR status = 'inactive' (Requirements 12.1, 12.2)
-  return profile.is_deleted === true || profile.status === 'inactive';
+  return profile.is_deleted === true || profile.status === "inactive";
 }
 
 // ─── Simulate the getSoftDeletedPesertaIds logic ──────────────────────────────
 
 function simulateGetSoftDeletedPesertaIds(
   profiles: ProfileRecord[],
-  pesertaRecords: PesertaRecord[]
+  pesertaRecords: PesertaRecord[],
 ): string[] {
   // Step 1: Find profiles with is_deleted = true OR status = 'inactive'
   const deletedProfiles = profiles.filter(
-    p => p.is_deleted === true || p.status === 'inactive'
+    (p) => p.is_deleted === true || p.status === "inactive",
   );
 
   if (deletedProfiles.length === 0) return [];
 
-  const deletedProfileIds = deletedProfiles.map(p => p.id);
+  const deletedProfileIds = deletedProfiles.map((p) => p.id);
 
   // Step 2: Find peserta records whose user_id is in the deleted profile IDs
   // Records with user_id = null will NOT match (they are not excluded)
   const excludedPeserta = pesertaRecords.filter(
-    pp => pp.user_id !== null && deletedProfileIds.includes(pp.user_id)
+    (pp) => pp.user_id !== null && deletedProfileIds.includes(pp.user_id),
   );
 
-  return excludedPeserta.map(pp => pp.id);
+  return excludedPeserta.map((pp) => pp.id);
 }
 
 // ─── Simulate filtering (like getAgents does) ─────────────────────────────────
@@ -352,18 +378,25 @@ function simulateGetSoftDeletedPesertaIds(
 function simulateFilteredResults(
   pesertaRecords: PesertaRecord[],
   excludedIds: string[],
-  showArchived: boolean
+  showArchived: boolean,
 ): PesertaRecord[] {
   if (showArchived) return pesertaRecords;
-  return pesertaRecords.filter(pp => !excludedIds.includes(pp.id));
+  return pesertaRecords.filter((pp) => !excludedIds.includes(pp.id));
 }
 
 // ─── Arbitraries for soft-delete tests ────────────────────────────────────────
 
 const profileArb: fc.Arbitrary<ProfileRecord> = fc.record({
   id: fc.uuid(),
-  is_deleted: fc.oneof(fc.constant(true), fc.constant(false), fc.constant(null)),
-  status: fc.oneof(fc.constant('active' as const), fc.constant('inactive' as const)),
+  is_deleted: fc.oneof(
+    fc.constant(true),
+    fc.constant(false),
+    fc.constant(null),
+  ),
+  status: fc.oneof(
+    fc.constant("active" as const),
+    fc.constant("inactive" as const),
+  ),
 });
 
 function pesertaArb(profileIds: string[]): fc.Arbitrary<PesertaRecord> {
@@ -373,46 +406,57 @@ function pesertaArb(profileIds: string[]): fc.Arbitrary<PesertaRecord> {
     ...(profileIds.length > 0
       ? [fc.constantFrom(...profileIds)]
       : [fc.constant(null)]),
-    fc.uuid() // non-existent profile ID (simulates join returning null)
+    fc.uuid(), // non-existent profile ID (simulates join returning null)
   );
 
   return fc.record({
     id: fc.uuid(),
     user_id: userIdArb,
-    nama: fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
-    tim: fc.constantFrom('Tim A', 'Tim B', 'Tim C'),
-    batch_name: fc.constantFrom('Batch 1', 'Batch 2', 'Batch 3'),
+    nama: fc
+      .string({ minLength: 1, maxLength: 30 })
+      .filter((s) => s.trim().length > 0),
+    tim: fc.constantFrom("Tim A", "Tim B", "Tim C"),
+    batch_name: fc.constantFrom("Batch 1", "Batch 2", "Batch 3"),
   });
 }
 
-describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
+describe("Property 8: Soft-Delete Dashboard Exclusion", () => {
   /**
    * **Validates: Requirements 12.1, 12.2, 12.6**
    *
    * Property: Records linked to deleted/inactive profiles are ALWAYS excluded
    * from dashboard results when showArchived is false.
    */
-  it('excluded records never appear in filtered results', () => {
+  it("excluded records never appear in filtered results", () => {
     fc.assert(
       fc.property(
-        fc.array(profileArb, { minLength: 1, maxLength: 10 }).chain(profiles => {
-          const profileIds = profiles.map(p => p.id);
-          return fc.tuple(
-            fc.constant(profiles),
-            fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 })
-          );
-        }),
+        fc
+          .array(profileArb, { minLength: 1, maxLength: 10 })
+          .chain((profiles) => {
+            const profileIds = profiles.map((p) => p.id);
+            return fc.tuple(
+              fc.constant(profiles),
+              fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 }),
+            );
+          }),
         ([profiles, pesertaRecords]) => {
-          const excludedIds = simulateGetSoftDeletedPesertaIds(profiles, pesertaRecords);
-          const results = simulateFilteredResults(pesertaRecords, excludedIds, false);
+          const excludedIds = simulateGetSoftDeletedPesertaIds(
+            profiles,
+            pesertaRecords,
+          );
+          const results = simulateFilteredResults(
+            pesertaRecords,
+            excludedIds,
+            false,
+          );
 
           // Every record in results must NOT be linked to a deleted/inactive profile
           for (const result of results) {
             expect(shouldBeExcluded(result, profiles)).toBe(false);
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -422,28 +466,39 @@ describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
    * Property: Records with null user_id are ALWAYS included in results
    * (treated as not-deleted).
    */
-  it('null-profile records (user_id = null) are always included', () => {
+  it("null-profile records (user_id = null) are always included", () => {
     fc.assert(
       fc.property(
-        fc.array(profileArb, { minLength: 1, maxLength: 10 }).chain(profiles => {
-          const profileIds = profiles.map(p => p.id);
-          return fc.tuple(
-            fc.constant(profiles),
-            fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 })
-          );
-        }),
+        fc
+          .array(profileArb, { minLength: 1, maxLength: 10 })
+          .chain((profiles) => {
+            const profileIds = profiles.map((p) => p.id);
+            return fc.tuple(
+              fc.constant(profiles),
+              fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 }),
+            );
+          }),
         ([profiles, pesertaRecords]) => {
-          const excludedIds = simulateGetSoftDeletedPesertaIds(profiles, pesertaRecords);
-          const results = simulateFilteredResults(pesertaRecords, excludedIds, false);
+          const excludedIds = simulateGetSoftDeletedPesertaIds(
+            profiles,
+            pesertaRecords,
+          );
+          const results = simulateFilteredResults(
+            pesertaRecords,
+            excludedIds,
+            false,
+          );
 
           // All peserta with user_id = null must appear in results
-          const nullUserIdPeserta = pesertaRecords.filter(pp => pp.user_id === null);
+          const nullUserIdPeserta = pesertaRecords.filter(
+            (pp) => pp.user_id === null,
+          );
           for (const pp of nullUserIdPeserta) {
-            expect(results.some(r => r.id === pp.id)).toBe(true);
+            expect(results.some((r) => r.id === pp.id)).toBe(true);
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -453,29 +508,38 @@ describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
    * Property: Every peserta linked to a profile with is_deleted=true or
    * status='inactive' is excluded from results.
    */
-  it('all peserta linked to deleted/inactive profiles are excluded', () => {
+  it("all peserta linked to deleted/inactive profiles are excluded", () => {
     fc.assert(
       fc.property(
-        fc.array(profileArb, { minLength: 1, maxLength: 10 }).chain(profiles => {
-          const profileIds = profiles.map(p => p.id);
-          return fc.tuple(
-            fc.constant(profiles),
-            fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 })
-          );
-        }),
+        fc
+          .array(profileArb, { minLength: 1, maxLength: 10 })
+          .chain((profiles) => {
+            const profileIds = profiles.map((p) => p.id);
+            return fc.tuple(
+              fc.constant(profiles),
+              fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 }),
+            );
+          }),
         ([profiles, pesertaRecords]) => {
-          const excludedIds = simulateGetSoftDeletedPesertaIds(profiles, pesertaRecords);
-          const results = simulateFilteredResults(pesertaRecords, excludedIds, false);
+          const excludedIds = simulateGetSoftDeletedPesertaIds(
+            profiles,
+            pesertaRecords,
+          );
+          const results = simulateFilteredResults(
+            pesertaRecords,
+            excludedIds,
+            false,
+          );
 
           // Every peserta that should be excluded must NOT appear in results
           for (const pp of pesertaRecords) {
             if (shouldBeExcluded(pp, profiles)) {
-              expect(results.some(r => r.id === pp.id)).toBe(false);
+              expect(results.some((r) => r.id === pp.id)).toBe(false);
             }
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -485,30 +549,40 @@ describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
    * Property: Records where the profile join returns null (user_id points to
    * non-existent profile) are treated as not-deleted and included.
    */
-  it('records with non-existent profile (join returns null) are included', () => {
+  it("records with non-existent profile (join returns null) are included", () => {
     fc.assert(
       fc.property(
-        fc.array(profileArb, { minLength: 1, maxLength: 5 }).chain(profiles => {
-          const profileIds = profiles.map(p => p.id);
-          return fc.tuple(
-            fc.constant(profiles),
-            fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 15 })
-          );
-        }),
+        fc
+          .array(profileArb, { minLength: 1, maxLength: 5 })
+          .chain((profiles) => {
+            const profileIds = profiles.map((p) => p.id);
+            return fc.tuple(
+              fc.constant(profiles),
+              fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 15 }),
+            );
+          }),
         ([profiles, pesertaRecords]) => {
-          const excludedIds = simulateGetSoftDeletedPesertaIds(profiles, pesertaRecords);
-          const results = simulateFilteredResults(pesertaRecords, excludedIds, false);
+          const excludedIds = simulateGetSoftDeletedPesertaIds(
+            profiles,
+            pesertaRecords,
+          );
+          const results = simulateFilteredResults(
+            pesertaRecords,
+            excludedIds,
+            false,
+          );
 
           // Peserta with user_id that doesn't match any profile should be included
           const orphanedPeserta = pesertaRecords.filter(
-            pp => pp.user_id !== null && !profiles.some(p => p.id === pp.user_id)
+            (pp) =>
+              pp.user_id !== null && !profiles.some((p) => p.id === pp.user_id),
           );
           for (const pp of orphanedPeserta) {
-            expect(results.some(r => r.id === pp.id)).toBe(true);
+            expect(results.some((r) => r.id === pp.id)).toBe(true);
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -517,28 +591,37 @@ describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
    *
    * Property: showArchived=true bypasses all exclusion — all records are returned.
    */
-  it('showArchived=true returns all records regardless of deletion status', () => {
+  it("showArchived=true returns all records regardless of deletion status", () => {
     fc.assert(
       fc.property(
-        fc.array(profileArb, { minLength: 1, maxLength: 10 }).chain(profiles => {
-          const profileIds = profiles.map(p => p.id);
-          return fc.tuple(
-            fc.constant(profiles),
-            fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 })
-          );
-        }),
+        fc
+          .array(profileArb, { minLength: 1, maxLength: 10 })
+          .chain((profiles) => {
+            const profileIds = profiles.map((p) => p.id);
+            return fc.tuple(
+              fc.constant(profiles),
+              fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 }),
+            );
+          }),
         ([profiles, pesertaRecords]) => {
-          const excludedIds = simulateGetSoftDeletedPesertaIds(profiles, pesertaRecords);
-          const results = simulateFilteredResults(pesertaRecords, excludedIds, true);
+          const excludedIds = simulateGetSoftDeletedPesertaIds(
+            profiles,
+            pesertaRecords,
+          );
+          const results = simulateFilteredResults(
+            pesertaRecords,
+            excludedIds,
+            true,
+          );
 
           // All records should be present when showArchived is true
           expect(results.length).toBe(pesertaRecords.length);
           for (const pp of pesertaRecords) {
-            expect(results.some(r => r.id === pp.id)).toBe(true);
+            expect(results.some((r) => r.id === pp.id)).toBe(true);
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -548,22 +631,31 @@ describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
    * Property: The set of included + excluded records partition the full input set
    * (no records are lost or duplicated).
    */
-  it('included + excluded records partition the full input set', () => {
+  it("included + excluded records partition the full input set", () => {
     fc.assert(
       fc.property(
-        fc.array(profileArb, { minLength: 1, maxLength: 10 }).chain(profiles => {
-          const profileIds = profiles.map(p => p.id);
-          return fc.tuple(
-            fc.constant(profiles),
-            fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 })
-          );
-        }),
+        fc
+          .array(profileArb, { minLength: 1, maxLength: 10 })
+          .chain((profiles) => {
+            const profileIds = profiles.map((p) => p.id);
+            return fc.tuple(
+              fc.constant(profiles),
+              fc.array(pesertaArb(profileIds), { minLength: 1, maxLength: 20 }),
+            );
+          }),
         ([profiles, pesertaRecords]) => {
-          const excludedIds = simulateGetSoftDeletedPesertaIds(profiles, pesertaRecords);
-          const results = simulateFilteredResults(pesertaRecords, excludedIds, false);
+          const excludedIds = simulateGetSoftDeletedPesertaIds(
+            profiles,
+            pesertaRecords,
+          );
+          const results = simulateFilteredResults(
+            pesertaRecords,
+            excludedIds,
+            false,
+          );
 
           // results + excluded = all records (no loss, no duplication)
-          const includedIds = new Set(results.map(r => r.id));
+          const includedIds = new Set(results.map((r) => r.id));
           const excludedSet = new Set(excludedIds);
 
           for (const pp of pesertaRecords) {
@@ -572,9 +664,9 @@ describe('Property 8: Soft-Delete Dashboard Exclusion', () => {
             // Each record is either included or excluded, not both
             expect(isIncluded !== isExcluded).toBe(true);
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });

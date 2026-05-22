@@ -11,6 +11,7 @@ Konvensi nama modul:
 - **SIDAK** = Sistem Informasi Data Analisis Kualitas
 
 ## 1. Unified Dashboard
+
 Dashboard tunggal yang berfungsi sebagai pusat informasi bagi semua tingkatan user.
 
 - **Fungsi**: Menampilkan KPI ringkasan, grafik tren, dan log aktivitas terbaru.
@@ -28,6 +29,7 @@ Dashboard tunggal yang berfungsi sebagai pusat informasi bagi semua tingkatan us
 - **Catatan Teknis**: Halaman `/dashboard/monitoring` tetap menjadi permukaan terproteksi utama untuk histori simulasi dan usage billing bulanan. Periode default penggunaan token selalu mengikuti WIB / `Asia/Jakarta`, bukan timezone browser.
 
 ## 2. KETIK (Kelas Etika & Trik Komunikasi)
+
 Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
 
 - **Fungsi**: Peserta berinteraksi dengan AI yang berperan sebagai pelanggan dalam berbagai skenario.
@@ -41,6 +43,7 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
 - **Catatan Teknis**: KETIK menyimpan history chat di `ketik_history`. Review AI bersifat manual — user memicu review setelah sesi selesai. Backend API di `/api/v1/ketik/` menangani chat, review, dan history.
 
 ## 3. PDKT (Paham Dulu Kasih Tanggapan)
+
 Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem persistent mailbox.
 
 - **Fungsi**: Simulasi penulisan email balasan untuk keluhan atau pertanyaan pelanggan.
@@ -54,6 +57,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
 - **Catatan Teknis**: PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk. Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
 
 ## 4. TELEFUN (Telephone Fun)
+
 Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon telepon.
 
 - **Fungsi**: Mempersiapkan peserta untuk menangani panggilan telepon melalui simulasi suara berbasis AI.
@@ -68,6 +72,7 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
 - **Catatan Teknis**: Sesi live default memakai model transport `gemini-3.1-flash-live-preview`. Telefun proxy server di `apps/telefun/` menangani WebSocket connection ke Gemini Live API.
 
 ## 5. KTP / Profiler (Kotak Tool Profil)
+
 Sistem manajemen database terstruktur untuk peserta training dan agen aktif.
 
 - **Fungsi**: Penyimpanan terpusat data diri, riwayat training, dan penugasan tim.
@@ -81,6 +86,7 @@ Sistem manajemen database terstruktur untuk peserta training dan agen aktif.
 - **Catatan Teknis**: File peserta/foto memakai Supabase Storage bucket `profiler-foto`. Backend API di `/api/v1/profiler/` (18 endpoints) menangani semua operasi CRUD.
 
 ## 6. SIDAK (Sistem Informasi Data Analisis Kualitas)
+
 Platform analytics kualitas untuk memantau performa agent secara mendalam.
 
 - **Fungsi**: Mengolah data temuan QA menjadi wawasan yang dapat ditindaklanjuti melalui dashboard, ranking, input manual, dan laporan otomatis.

@@ -1,4 +1,5 @@
 # Checklist Audit Trainers SuperApp
+
 ## Next.js Legacy vs Vite Baru
 
 Dokumen ini dipakai untuk mengecek apakah versi **Vite baru** sudah setara atau lebih baik dari versi **Next.js legacy**.
@@ -17,12 +18,12 @@ Fokus audit:
 
 ## Legend Status
 
-| Status | Arti |
-|---|---|
-| `[ ]` | Belum dicek |
-| `[x]` | Sudah sesuai |
-| `[~]` | Sebagian |
-| `[!]` | Bermasalah / perlu fix |
+| Status | Arti                   |
+| ------ | ---------------------- |
+| `[ ]`  | Belum dicek            |
+| `[x]`  | Sudah sesuai           |
+| `[~]`  | Sebagian               |
+| `[!]`  | Bermasalah / perlu fix |
 
 Contoh catatan:
 
@@ -791,11 +792,11 @@ Contoh catatan:
 
 # 6. Format Tabel Audit untuk Agent
 
-| Area | Item | Legacy | Vite Baru | Status | Catatan | File terkait |
-|---|---|---:|---:|---|---|---|
-| SIDAK | Total temuan dashboard | Ada | Belum dicek | `[ ]` | Bandingkan query legacy | `qaService.server.ts` |
-| Auth | Role guard | Ada | Sebagian | `[~]` | Perlu validasi backend | `auth/*` |
-| KETIK | Session history | Ada | Belum ada | `[!]` | Perlu tabel and UI history | `ketik/*` |
+| Area  | Item                   | Legacy |   Vite Baru | Status | Catatan                    | File terkait          |
+| ----- | ---------------------- | -----: | ----------: | ------ | -------------------------- | --------------------- |
+| SIDAK | Total temuan dashboard |    Ada | Belum dicek | `[ ]`  | Bandingkan query legacy    | `qaService.server.ts` |
+| Auth  | Role guard             |    Ada |    Sebagian | `[~]`  | Perlu validasi backend     | `auth/*`              |
+| KETIK | Session history        |    Ada |   Belum ada | `[!]`  | Perlu tabel and UI history | `ketik/*`             |
 
 ---
 

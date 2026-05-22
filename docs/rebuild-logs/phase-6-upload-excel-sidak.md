@@ -3,10 +3,12 @@
 ## What was built
 
 ### Library
+
 - `xlsx` (SheetJS) — client-side Excel parsing (.xlsx/.xls → JSON)
 - `exceljs` — generating structured `.xlsx` templates with dropdowns
 
 ### Excel Utils (`apps/web/src/lib/excel-utils.ts`)
+
 - `generateTemplate()` — creates `.xlsx` with:
   - "Input Temuan" sheet (No Tiket, Indikator with dropdown, Nilai 0-3, Ketidaksesuaian, Sebaiknya)
   - Hidden `_indikator` reference sheet for dropdown validation
@@ -15,6 +17,7 @@
 - `validateImportRows()` — intra-file duplicate detection (no_tiket + indicator_id)
 
 ### SIDAK Input Page — Excel Import UI
+
 - "Import Excel" button toggles import panel
 - "Download Template" generates `.xlsx` per selected service type
 - "Pilih File Excel" uploads and parses

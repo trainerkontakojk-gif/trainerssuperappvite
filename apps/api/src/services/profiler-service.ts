@@ -1,19 +1,24 @@
-import { supabaseAdmin } from '../lib/supabase';
-import type { ProfilerYear, ProfilerFolder, ProfilerPeserta, ProfilerTim } from '@trainers/types';
+import { supabaseAdmin } from "../lib/supabase";
+import type {
+  ProfilerYear,
+  ProfilerFolder,
+  ProfilerPeserta,
+  ProfilerTim,
+} from "@trainers/types";
 
 // ── Years ────────────────────────────────────────────────
 export async function getYears(): Promise<ProfilerYear[]> {
   const { data } = await supabaseAdmin
-    .from('profiler_years')
-    .select('*')
-    .order('year', { ascending: false });
+    .from("profiler_years")
+    .select("*")
+    .order("year", { ascending: false });
   return data ?? [];
 }
 
 export async function createYear(year: number): Promise<ProfilerYear> {
   const label = `Tahun ${year}`;
   const { data, error } = await supabaseAdmin
-    .from('profiler_years')
+    .from("profiler_years")
     .insert({ year, label })
     .select()
     .single();
@@ -22,16 +27,19 @@ export async function createYear(year: number): Promise<ProfilerYear> {
 }
 
 export async function deleteYear(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('profiler_years').delete().eq('id', id);
+  const { error } = await supabaseAdmin
+    .from("profiler_years")
+    .delete()
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 
 // ── Folders ──────────────────────────────────────────────
 export async function getFolders(): Promise<ProfilerFolder[]> {
   const { data } = await supabaseAdmin
-    .from('profiler_folders')
-    .select('*')
-    .order('name');
+    .from("profiler_folders")
+    .select("*")
+    .order("name");
   return data ?? [];
 }
 
@@ -41,19 +49,26 @@ export async function createFolder(params: {
   parent_id?: string;
 }): Promise<ProfilerFolder> {
   const { data, error } = await supabaseAdmin
-    .from('profiler_folders')
-    .insert({ name: params.name, year_id: params.year_id ?? null, parent_id: params.parent_id ?? null })
+    .from("profiler_folders")
+    .insert({
+      name: params.name,
+      year_id: params.year_id ?? null,
+      parent_id: params.parent_id ?? null,
+    })
     .select()
     .single();
   if (error) throw new Error(error.message);
   return data;
 }
 
-export async function renameFolder(id: string, name: string): Promise<ProfilerFolder> {
+export async function renameFolder(
+  id: string,
+  name: string,
+): Promise<ProfilerFolder> {
   const { data, error } = await supabaseAdmin
-    .from('profiler_folders')
+    .from("profiler_folders")
     .update({ name })
-    .eq('id', id)
+    .eq("id", id)
     .select()
     .single();
   if (error) throw new Error(error.message);
@@ -61,21 +76,27 @@ export async function renameFolder(id: string, name: string): Promise<ProfilerFo
 }
 
 export async function deleteFolder(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('profiler_folders').delete().eq('id', id);
+  const { error } = await supabaseAdmin
+    .from("profiler_folders")
+    .delete()
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 
-export async function duplicateFolder(folderId: string, targetYearId: string): Promise<ProfilerFolder> {
+export async function duplicateFolder(
+  folderId: string,
+  targetYearId: string,
+): Promise<ProfilerFolder> {
   const { data: source, error: fetchError } = await supabaseAdmin
-    .from('profiler_folders')
-    .select('*')
-    .eq('id', folderId)
+    .from("profiler_folders")
+    .select("*")
+    .eq("id", folderId)
     .single();
-  if (fetchError) throw new Error('Folder tidak ditemukan');
+  if (fetchError) throw new Error("Folder tidak ditemukan");
 
   const newName = `${source.name} (copy)`;
   const { data, error } = await supabaseAdmin
-    .from('profiler_folders')
+    .from("profiler_folders")
     .insert({ name: newName, year_id: targetYearId })
     .select()
     .single();
@@ -92,14 +113,14 @@ export async function getPeserta(params: {
   offset?: number;
 }): Promise<{ data: ProfilerPeserta[]; total: number }> {
   let query = supabaseAdmin
-    .from('profiler_peserta')
-    .select('*', { count: 'exact' });
+    .from("profiler_peserta")
+    .select("*", { count: "exact" });
 
-  if (params.batch_name) query = query.eq('batch_name', params.batch_name);
-  if (params.tim) query = query.eq('tim', params.tim);
-  if (params.search) query = query.ilike('nama', `%${params.search}%`);
+  if (params.batch_name) query = query.eq("batch_name", params.batch_name);
+  if (params.tim) query = query.eq("tim", params.tim);
+  if (params.search) query = query.ilike("nama", `%${params.search}%`);
 
-  query = query.order('nomor_urut').order('nama');
+  query = query.order("nomor_urut").order("nama");
 
   if (params.limit) {
     const from = params.offset ?? 0;
@@ -113,36 +134,41 @@ export async function getPeserta(params: {
 
 export async function getPesertaById(id: string): Promise<ProfilerPeserta> {
   const { data, error } = await supabaseAdmin
-    .from('profiler_peserta')
-    .select('*')
-    .eq('id', id)
+    .from("profiler_peserta")
+    .select("*")
+    .eq("id", id)
     .single();
-  if (error) throw new Error('Peserta tidak ditemukan');
+  if (error) throw new Error("Peserta tidak ditemukan");
   return data;
 }
 
-export async function getPesertaByBatch(batchName: string): Promise<ProfilerPeserta[]> {
+export async function getPesertaByBatch(
+  batchName: string,
+): Promise<ProfilerPeserta[]> {
   const { data } = await supabaseAdmin
-    .from('profiler_peserta')
-    .select('*')
-    .eq('batch_name', batchName)
-    .order('nomor_urut')
-    .order('nama');
+    .from("profiler_peserta")
+    .select("*")
+    .eq("batch_name", batchName)
+    .order("nomor_urut")
+    .order("nama");
   return data ?? [];
 }
 
-async function checkFotoUrl(fotoUrl: string | null | undefined): Promise<boolean> {
+async function checkFotoUrl(
+  fotoUrl: string | null | undefined,
+): Promise<boolean> {
   if (!fotoUrl) return true;
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseUrl =
+    process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   if (!supabaseUrl) return true;
 
   let filename = fotoUrl;
-  if (fotoUrl.startsWith('http')) {
-    const parts = fotoUrl.split('/foto-avatar/');
+  if (fotoUrl.startsWith("http")) {
+    const parts = fotoUrl.split("/foto-avatar/");
     if (parts.length > 1) {
       filename = parts[1];
     } else {
-      filename = fotoUrl.substring(fotoUrl.lastIndexOf('/') + 1);
+      filename = fotoUrl.substring(fotoUrl.lastIndexOf("/") + 1);
     }
   }
 
@@ -152,8 +178,8 @@ async function checkFotoUrl(fotoUrl: string | null | undefined): Promise<boolean
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal
+      method: "HEAD",
+      signal: controller.signal,
     });
     clearTimeout(id);
 
@@ -169,37 +195,41 @@ async function checkFotoUrl(fotoUrl: string | null | undefined): Promise<boolean
 function cleanEmptyStrings(obj: any) {
   const cleaned: any = {};
   for (const [key, val] of Object.entries(obj)) {
-    cleaned[key] = val === '' ? null : val;
+    cleaned[key] = val === "" ? null : val;
   }
   return cleaned;
 }
 
-export async function createPeserta(peserta: Partial<ProfilerPeserta>): Promise<ProfilerPeserta> {
+export async function createPeserta(
+  peserta: Partial<ProfilerPeserta>,
+): Promise<ProfilerPeserta> {
   const isFotoValid = await checkFotoUrl(peserta.foto_url);
   if (!isFotoValid) {
-    throw new Error('Avatar tidak ditemukan di storage');
+    throw new Error("Avatar tidak ditemukan di storage");
   }
 
   const cleaned = cleanEmptyStrings(peserta);
 
   if (cleaned.batch_name && cleaned.nama) {
     const { data: existing, error: existingError } = await supabaseAdmin
-      .from('profiler_peserta')
-      .select('id')
-      .eq('batch_name', cleaned.batch_name)
-      .eq('nama', cleaned.nama)
+      .from("profiler_peserta")
+      .select("id")
+      .eq("batch_name", cleaned.batch_name)
+      .eq("nama", cleaned.nama)
       .limit(1)
       .maybeSingle();
 
     if (existingError) throw new Error(existingError.message);
     if (existing) {
-      throw new Error(`Peserta dengan nama "${cleaned.nama}" sudah terdaftar di batch "${cleaned.batch_name}"`);
+      throw new Error(
+        `Peserta dengan nama "${cleaned.nama}" sudah terdaftar di batch "${cleaned.batch_name}"`,
+      );
     }
   }
 
   try {
     const { data, error } = await supabaseAdmin
-      .from('profiler_peserta')
+      .from("profiler_peserta")
       .insert({
         batch_name: cleaned.batch_name,
         nomor_urut: cleaned.nomor_urut ?? 0,
@@ -238,18 +268,24 @@ export async function createPeserta(peserta: Partial<ProfilerPeserta>): Promise<
     if (error) throw error;
     return data;
   } catch (error: any) {
-    if (error.code === '23505') {
-      throw new Error(`Peserta dengan nama "${peserta.nama}" sudah terdaftar di batch "${peserta.batch_name}"`, { cause: error });
+    if (error.code === "23505") {
+      throw new Error(
+        `Peserta dengan nama "${peserta.nama}" sudah terdaftar di batch "${peserta.batch_name}"`,
+        { cause: error },
+      );
     }
     throw new Error(error.message || String(error), { cause: error });
   }
 }
 
-export async function updatePeserta(id: string, updates: Partial<ProfilerPeserta>): Promise<ProfilerPeserta> {
-  if (updates && 'foto_url' in updates) {
+export async function updatePeserta(
+  id: string,
+  updates: Partial<ProfilerPeserta>,
+): Promise<ProfilerPeserta> {
+  if (updates && "foto_url" in updates) {
     const isFotoValid = await checkFotoUrl(updates.foto_url);
     if (!isFotoValid) {
-      throw new Error('Avatar tidak ditemukan di storage');
+      throw new Error("Avatar tidak ditemukan di storage");
     }
   }
 
@@ -257,47 +293,57 @@ export async function updatePeserta(id: string, updates: Partial<ProfilerPeserta
 
   try {
     const { data, error } = await supabaseAdmin
-      .from('profiler_peserta')
+      .from("profiler_peserta")
       .update(cleaned)
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
     if (error) throw error;
     return data;
   } catch (error: any) {
-    if (error.code === '23505') {
+    if (error.code === "23505") {
       let nama = updates.nama;
       let batchName = updates.batch_name;
       if (!nama || !batchName) {
         const existing = await getPesertaById(id).catch(() => null);
-        nama = nama || existing?.nama || '';
-        batchName = batchName || existing?.batch_name || '';
+        nama = nama || existing?.nama || "";
+        batchName = batchName || existing?.batch_name || "";
       }
-      throw new Error(`Peserta dengan nama "${nama}" sudah terdaftar di batch "${batchName}"`, { cause: error });
+      throw new Error(
+        `Peserta dengan nama "${nama}" sudah terdaftar di batch "${batchName}"`,
+        { cause: error },
+      );
     }
     throw new Error(error.message || String(error), { cause: error });
   }
 }
 
 export async function deletePeserta(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('profiler_peserta').delete().eq('id', id);
+  const { error } = await supabaseAdmin
+    .from("profiler_peserta")
+    .delete()
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 
-export async function bulkCreatePeserta(items: Partial<ProfilerPeserta>[]): Promise<ProfilerPeserta[]> {
+export async function bulkCreatePeserta(
+  items: Partial<ProfilerPeserta>[],
+): Promise<ProfilerPeserta[]> {
   if (items.length === 0) {
-    throw new Error('Tidak ada data peserta untuk diimpor');
+    throw new Error("Tidak ada data peserta untuk diimpor");
   }
 
-  const batchNames = Array.from(new Set(items.map(item => item.batch_name).filter(Boolean) as string[]));
-  
+  const batchNames = Array.from(
+    new Set(items.map((item) => item.batch_name).filter(Boolean) as string[]),
+  );
+
   const existingNamesByBatch: Record<string, Set<string>> = {};
   if (batchNames.length > 0) {
     const { data: existing } = await supabaseAdmin
-      .from('profiler_peserta')
-      .select('batch_name, nama')
-      .in('batch_name', batchNames);
-    
+      .from("profiler_peserta")
+      .select("batch_name, nama")
+      .in("batch_name", batchNames);
+
     if (existing) {
       for (const p of existing) {
         if (!existingNamesByBatch[p.batch_name]) {
@@ -316,8 +362,9 @@ export async function bulkCreatePeserta(items: Partial<ProfilerPeserta>[]): Prom
     const batch = item.batch_name;
     const name = item.nama;
     const key = `${batch.toLowerCase().trim()}::${name.toLowerCase().trim()}`;
-    
-    const isExistingInDb = existingNamesByBatch[batch]?.has(name.toLowerCase().trim()) ?? false;
+
+    const isExistingInDb =
+      existingNamesByBatch[batch]?.has(name.toLowerCase().trim()) ?? false;
     const isExistingInImport = processedKeys.has(key);
 
     if (!isExistingInDb && !isExistingInImport) {
@@ -327,10 +374,12 @@ export async function bulkCreatePeserta(items: Partial<ProfilerPeserta>[]): Prom
   }
 
   if (uniqueRowsToInsert.length === 0) {
-    throw new Error('Semua peserta dalam daftar sudah terdaftar di batch masing-masing');
+    throw new Error(
+      "Semua peserta dalam daftar sudah terdaftar di batch masing-masing",
+    );
   }
 
-  const rows = uniqueRowsToInsert.map(item => ({
+  const rows = uniqueRowsToInsert.map((item) => ({
     batch_name: item.batch_name,
     nomor_urut: item.nomor_urut ?? 0,
     nama: item.nama,
@@ -364,33 +413,39 @@ export async function bulkCreatePeserta(items: Partial<ProfilerPeserta>[]): Prom
   }));
 
   const { data, error } = await supabaseAdmin
-    .from('profiler_peserta')
+    .from("profiler_peserta")
     .insert(rows)
     .select();
 
   if (error) {
-    if (error.code === '23505') {
-      throw new Error('Ada peserta yang sudah terdaftar di batch');
+    if (error.code === "23505") {
+      throw new Error("Ada peserta yang sudah terdaftar di batch");
     }
     throw new Error(error.message);
   }
   return data ?? [];
 }
 
-export async function copyPesertaToFolder(pesertaIds: string[], targetBatchName: string): Promise<number> {
+export async function copyPesertaToFolder(
+  pesertaIds: string[],
+  targetBatchName: string,
+): Promise<number> {
   const { data: sourcePeserta } = await supabaseAdmin
-    .from('profiler_peserta')
-    .select('*')
-    .in('id', pesertaIds);
+    .from("profiler_peserta")
+    .select("*")
+    .in("id", pesertaIds);
 
-  if (!sourcePeserta || sourcePeserta.length === 0) throw new Error('Peserta tidak ditemukan');
+  if (!sourcePeserta || sourcePeserta.length === 0)
+    throw new Error("Peserta tidak ditemukan");
 
   const { data: existingPeserta } = await supabaseAdmin
-    .from('profiler_peserta')
-    .select('nama')
-    .eq('batch_name', targetBatchName);
-  
-  const existingNames = new Set((existingPeserta || []).map(p => p.nama.toLowerCase().trim()));
+    .from("profiler_peserta")
+    .select("nama")
+    .eq("batch_name", targetBatchName);
+
+  const existingNames = new Set(
+    (existingPeserta || []).map((p) => p.nama.toLowerCase().trim()),
+  );
 
   const uniqueRowsToInsert: typeof sourcePeserta = [];
   const processedNames = new Set<string>();
@@ -404,10 +459,12 @@ export async function copyPesertaToFolder(pesertaIds: string[], targetBatchName:
   }
 
   if (uniqueRowsToInsert.length === 0) {
-    throw new Error(`Semua peserta yang disalin sudah terdaftar di batch "${targetBatchName}"`);
+    throw new Error(
+      `Semua peserta yang disalin sudah terdaftar di batch "${targetBatchName}"`,
+    );
   }
 
-  const rows = uniqueRowsToInsert.map(p => ({
+  const rows = uniqueRowsToInsert.map((p) => ({
     batch_name: targetBatchName,
     nomor_urut: p.nomor_urut,
     nama: p.nama,
@@ -441,12 +498,14 @@ export async function copyPesertaToFolder(pesertaIds: string[], targetBatchName:
   }));
 
   const { data, error } = await supabaseAdmin
-    .from('profiler_peserta')
+    .from("profiler_peserta")
     .insert(rows)
     .select();
   if (error) {
-    if (error.code === '23505') {
-      throw new Error(`Ada peserta yang sudah terdaftar di batch "${targetBatchName}"`);
+    if (error.code === "23505") {
+      throw new Error(
+        `Ada peserta yang sudah terdaftar di batch "${targetBatchName}"`,
+      );
     }
     throw new Error(error.message);
   }
@@ -459,35 +518,39 @@ export async function reorderPeserta(pesertaIds: string[]): Promise<void> {
     nomor_urut: index + 1,
   }));
 
-  const { error } = await supabaseAdmin.rpc('bulk_reorder_profiler_peserta', {
+  const { error } = await supabaseAdmin.rpc("bulk_reorder_profiler_peserta", {
     p_updates: updates,
   });
 
   if (error) {
     for (const update of updates) {
       await supabaseAdmin
-        .from('profiler_peserta')
+        .from("profiler_peserta")
         .update({ nomor_urut: update.nomor_urut })
-        .eq('id', update.id);
+        .eq("id", update.id);
     }
   }
 }
 
-export async function bulkReorderPeserta(updates: { id: string; nomor_urut: number }[]): Promise<void> {
-  const { error } = await supabaseAdmin.rpc('bulk_reorder_profiler_peserta', {
+export async function bulkReorderPeserta(
+  updates: { id: string; nomor_urut: number }[],
+): Promise<void> {
+  const { error } = await supabaseAdmin.rpc("bulk_reorder_profiler_peserta", {
     p_updates: updates,
   });
   if (error) throw new Error(error.message);
 }
 
-export async function getGlobalPesertaPool(excludeBatch?: string): Promise<ProfilerPeserta[]> {
+export async function getGlobalPesertaPool(
+  excludeBatch?: string,
+): Promise<ProfilerPeserta[]> {
   let query = supabaseAdmin
-    .from('profiler_peserta')
-    .select('*')
-    .order('batch_name')
-    .order('nama');
+    .from("profiler_peserta")
+    .select("*")
+    .order("batch_name")
+    .order("nama");
 
-  if (excludeBatch) query = query.neq('batch_name', excludeBatch);
+  if (excludeBatch) query = query.neq("batch_name", excludeBatch);
 
   const { data } = await query;
   return data ?? [];
@@ -496,15 +559,15 @@ export async function getGlobalPesertaPool(excludeBatch?: string): Promise<Profi
 // ── Teams ────────────────────────────────────────────────
 export async function getTeams(): Promise<ProfilerTim[]> {
   const { data } = await supabaseAdmin
-    .from('profiler_tim_list')
-    .select('*')
-    .order('nama');
+    .from("profiler_tim_list")
+    .select("*")
+    .order("nama");
   return data ?? [];
 }
 
 export async function createTeam(nama: string): Promise<ProfilerTim> {
   const { data, error } = await supabaseAdmin
-    .from('profiler_tim_list')
+    .from("profiler_tim_list")
     .insert({ nama })
     .select()
     .single();
@@ -513,15 +576,18 @@ export async function createTeam(nama: string): Promise<ProfilerTim> {
 }
 
 export async function deleteTeam(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('profiler_tim_list').delete().eq('id', id);
+  const { error } = await supabaseAdmin
+    .from("profiler_tim_list")
+    .delete()
+    .eq("id", id);
   if (error) throw new Error(error.message);
 }
 
 // ── Counts ───────────────────────────────────────────────
 export async function getFolderCounts(): Promise<Record<string, number>> {
   const { data } = await supabaseAdmin
-    .from('profiler_peserta')
-    .select('batch_name');
+    .from("profiler_peserta")
+    .select("batch_name");
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
     counts[row.batch_name] = (counts[row.batch_name] ?? 0) + 1;

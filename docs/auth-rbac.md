@@ -6,6 +6,7 @@
 Sistem ini adalah pintu gerbang utama Trainers SuperApp yang memastikan setiap orang yang masuk ke dalam aplikasi dikenali dengan benar dan hanya bisa membuka menu atau fitur yang memang menjadi wewenangnya.
 
 **Kegunaan dan Manfaat Langsung bagi Pengguna:**
+
 - **Masuk dengan Mudah dan Cepat**: Pengguna bisa mendaftar atau masuk menggunakan akun email biasa ataupun **Google SSO (Single Sign-On)** hanya dengan satu klik.
 - **Keamanan Data yang Terjamin**: Sistem secara otomatis menjaga agar data penting akun tidak bisa diubah sembarangan oleh pihak yang tidak bertanggung jawab.
 - **Akses yang Tepat Sasaran**: Memastikan seorang Agen (peserta simulasi) tidak akan salah masuk ke halaman pengaturan manajerial, begitu pula sebaliknya.
@@ -14,18 +15,18 @@ Sistem ini adalah pintu gerbang utama Trainers SuperApp yang memastikan setiap o
 
 ## Panduan Teknis untuk Pengembang & AI Agent
 
-Dokumen ini menjelaskan struktur teknis bagaimana sistem keamanan, pendaftaran, *auto-provisioning* Google OAuth, dan hak akses dikelola di Trainers SuperApp (Monorepo).
+Dokumen ini menjelaskan struktur teknis bagaimana sistem keamanan, pendaftaran, _auto-provisioning_ Google OAuth, dan hak akses dikelola di Trainers SuperApp (Monorepo).
 
 ## Struktur Role
 
 Aplikasi memiliki 4 role utama dengan hierarki akses sebagai berikut:
 
-| Role | Deskripsi | Hak Akses Utama |
-|---|---|---|
-| **Admin** | Pengelola Sistem | Akses penuh seluruh modul, manajemen user (approve/reject/delete), audit logs, & konfigurasi sistem. |
+| Role        | Deskripsi         | Hak Akses Utama                                                                                                            |
+| ----------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Admin**   | Pengelola Sistem  | Akses penuh seluruh modul, manajemen user (approve/reject/delete), audit logs, & konfigurasi sistem.                       |
 | **Trainer** | Operasional Utama | Manajemen data Profiler, input & setting QA (SIDAK), monitoring, editor pricing/kurs usage billing, & audit logs terbatas. |
-| **Leader** | Pengawas Tim | Melihat dashboard tim, monitoring aktivitas tim, monitoring usage billing lintas akun, melihat data Profiler. |
-| **Agent** | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT, Telefun), melihat dashboard pribadi. |
+| **Leader**  | Pengawas Tim      | Melihat dashboard tim, monitoring aktivitas tim, monitoring usage billing lintas akun, melihat data Profiler.              |
+| **Agent**   | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT, Telefun), melihat dashboard pribadi.                                                 |
 
 ## Alur Pendaftaran & Approval
 
@@ -41,12 +42,15 @@ Untuk menjaga keamanan internal, pendaftaran user baru melalui proses approval:
 ## Implementasi Teknis
 
 ### 1. Auth Guard
+
 Sistem menggunakan helper untuk menjaga akses route:
+
 - **Backend (Hono)**: Middleware chain — `authMiddleware` (JWT validation, global via app.ts) + `requireRole()` per-route di 48+ endpoints.
 - **Frontend (Vite)**: Route guards di TanStack Router dengan auth checks di komponen Layout (`apps/web/src/components/Layout.tsx`).
 - **Auth Pages**: Komponen auth di `apps/web/src/routes/` untuk login, register, reset password.
 
 ### 2. Guard Logic
+
 Setiap halaman atau aksi sensitif dilindungi dengan pengecekan role di backend:
 
 ```typescript
@@ -57,14 +61,14 @@ Setiap halaman atau aksi sensitif dilindungi dengan pengecekan role di backend:
 
 Role enforcement coverage per module (Phase B hardening):
 
-| Module | Endpoints | Read Roles | Write Roles |
-|--------|-----------|------------|-------------|
-| **SIDAK** | 15 | admin, trainer, qa, tl, spv, om | admin, trainer, qa |
-| **Profiler** | 23 | admin, trainer, qa, tl, spv, om | admin, trainer, qa |
-| **PDKT** | 16 | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa (AI) |
-| **AI Monitoring** | 5 | admin, trainer (aggregation) | admin, trainer, qa (pricing) |
-| **KETIK** | 4 | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa, tl, spv, om, agent |
-| **Admin** | 8 | admin only | admin only |
+| Module            | Endpoints | Read Roles                             | Write Roles                            |
+| ----------------- | --------- | -------------------------------------- | -------------------------------------- |
+| **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
+| **Profiler**      | 23        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
+| **PDKT**          | 16        | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa (AI)                |
+| **AI Monitoring** | 5         | admin, trainer (aggregation)           | admin, trainer, qa (pricing)           |
+| **KETIK**         | 4         | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa, tl, spv, om, agent |
+| **Admin**         | 8         | admin only                             | admin only                             |
 
 ### 3. Profile Read Contract & Recovery
 
@@ -73,21 +77,21 @@ Role enforcement coverage per module (Phase B hardening):
 - **Pending tetap diarahkan ke waiting approval**: Jika profil berhasil terbaca dan status `pending`, user diarahkan ke `/waiting-approval`.
 - **Transient profile read failure tidak lagi menghancurkan sesi**: Jika pembacaan `profiles` gagal sementara, sistem mempertahankan sesi aktif dan membiarkan recovery lanjut di route normal.
 - **Default post-login path**: Setelah sesi login aktif, mapping: `pending -> /waiting-approval`, `rejected -> signOut() + error`, lainnya -> `/dashboard`.
-- **Proteksi Ghost Profile (*Default-Deny*)**: Jika pengguna memiliki sesi aktif namun baris profilnya tidak ditemukan, sistem menerapkan prinsip *default-deny* dan mengalihkan ke `/waiting-approval`.
+- **Proteksi Ghost Profile (_Default-Deny_)**: Jika pengguna memiliki sesi aktif namun baris profilnya tidak ditemukan, sistem menerapkan prinsip _default-deny_ dan mengalihkan ke `/waiting-approval`.
 - **RLS Hardening**: Tabel `public.profiles` dilindungi oleh kebijakan RLS khusus. Pengguna biasa hanya diizinkan membuat profil miliknya sendiri dalam status `pending`, tanpa role `admin`, dan hanya dapat memperbarui kolom `full_name`.
 - **Mutasi Manajerial via Backend**: Perubahan status, role, dan soft-delete pengguna harus memvalidasi caller terlebih dahulu, lalu melakukan mutasi sensitif menggunakan admin client di backend (Hono API).
 
 ### 4. Access Matrix Ringkas
 
-| Kondisi | Hasil |
-|---|---|
-| Tidak ada sesi | Redirect ke login |
-| `pending` | Redirect ke `/waiting-approval` |
-| `rejected` | Sign-out + redirect ke login |
-| `is_deleted = true` | Sign-out + redirect ke login |
-| Role tidak diizinkan | Redirect ke `/dashboard` |
-| Profil gagal dibaca sementara | Toleran, sesi dipertahankan |
-| Profil tidak ditemukan (*Ghost Profile*) | Redirect ke `/waiting-approval` |
+| Kondisi                                  | Hasil                           |
+| ---------------------------------------- | ------------------------------- |
+| Tidak ada sesi                           | Redirect ke login               |
+| `pending`                                | Redirect ke `/waiting-approval` |
+| `rejected`                               | Sign-out + redirect ke login    |
+| `is_deleted = true`                      | Sign-out + redirect ke login    |
+| Role tidak diizinkan                     | Redirect ke `/dashboard`        |
+| Profil gagal dibaca sementara            | Toleran, sesi dipertahankan     |
+| Profil tidak ditemukan (_Ghost Profile_) | Redirect ke `/waiting-approval` |
 
 ### 5. Role Normalization
 
@@ -111,12 +115,14 @@ Setelah migrasi explicit grants, akses baca ke tabel `public.profiles` membutuhk
 Tanpa lapisan kedua (RLS policy), user `authenticated` akan mendapatkan 0 baris meskipun table grant sudah diberikan.
 
 **Policies SELECT yang wajib ada di `profiles`:**
+
 - `"Users can view own profile"`: `auth.uid() = id`
 - `"Admins can view all profiles"`: `get_auth_role() = 'admin'`
 - `"Trainers can view all profiles"`: `get_auth_role() IN ('trainer', 'trainers')`
 - `"Leaders can view all profiles"`: `get_auth_role() = 'leader'`
 
 **Fungsi pembantu `get_auth_role()`:**
+
 - Didefinisikan sebagai `SECURITY DEFINER STABLE` untuk menghindari rekursi RLS.
 - Mengembalikan `lower(coalesce(role, ''))` — selalu lowercase.
 - Hanya `authenticated` dan `service_role` yang memiliki `EXECUTE` privilege.
@@ -134,14 +140,15 @@ Route `/dashboard` (tab monitoring) memakai guard untuk `trainer`, `leader`, `ad
 
 Kontrak akses untuk fitur monitoring usage billing:
 
-| Permukaan | Admin | Trainer | Leader | Agent |
-|---|---|---|---|---|
-| Histori simulasi lintas akun | Ya | Ya | Ya | Tidak |
-| Tab `Penggunaan Token` lintas akun | Ya | Ya | Ya | Tidak |
-| Tab `Harga & Kurs` | Ya | Ya | Tidak | Tidak |
-| Quick-view `Usage Bulan Ini` di modul | Ya | Ya | Ya | Ya |
+| Permukaan                             | Admin | Trainer | Leader | Agent |
+| ------------------------------------- | ----- | ------- | ------ | ----- |
+| Histori simulasi lintas akun          | Ya    | Ya      | Ya     | Tidak |
+| Tab `Penggunaan Token` lintas akun    | Ya    | Ya      | Ya     | Tidak |
+| Tab `Harga & Kurs`                    | Ya    | Ya      | Tidak  | Tidak |
+| Quick-view `Usage Bulan Ini` di modul | Ya    | Ya      | Ya     | Ya    |
 
 Catatan:
+
 - `leader` tetap dapat melihat agregasi usage lintas akun, tetapi tidak menerima editor pricing/kurs.
 - `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK, PDKT, TELEFUN).
 

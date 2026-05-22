@@ -1,4 +1,9 @@
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 
 interface PaginationProps {
   page: number;
@@ -26,12 +31,12 @@ export function Pagination({
   const endIdx = Math.min(page * pageSize, total);
 
   const range = (start: number, end: number) => {
-    const arr: (number | '...')[] = [];
+    const arr: (number | "...")[] = [];
     for (let i = start; i <= end; i++) arr.push(i);
     return arr;
   };
 
-  const getPageNumbers = (): (number | '...')[] => {
+  const getPageNumbers = (): (number | "...")[] => {
     if (totalPages <= 7) return range(1, totalPages);
 
     const leftSibling = Math.max(2, page - siblingCount);
@@ -41,12 +46,20 @@ export function Pagination({
     const showRightDots = rightSibling < totalPages - 1;
 
     if (!showLeftDots && showRightDots) {
-      return [1, 2, 3, '...', totalPages - 1, totalPages];
+      return [1, 2, 3, "...", totalPages - 1, totalPages];
     }
     if (showLeftDots && !showRightDots) {
-      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+      return [
+        1,
+        "...",
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      ];
     }
-    return [1, '...', ...range(leftSibling, rightSibling), '...', totalPages];
+    return [1, "...", ...range(leftSibling, rightSibling), "...", totalPages];
   };
 
   if (totalPages <= 1) return null;
@@ -55,7 +68,9 @@ export function Pagination({
     <div className="flex items-center justify-between gap-3 flex-wrap">
       <div className="flex items-center gap-3">
         <span className="text-xs text-gray-500">
-          {total === 0 ? 'Tidak ada data' : `Menampilkan ${startIdx}-${endIdx} dari ${total}`}
+          {total === 0
+            ? "Tidak ada data"
+            : `Menampilkan ${startIdx}-${endIdx} dari ${total}`}
         </span>
         {showPageSizeSelector && onPageSizeChange && (
           <select
@@ -91,7 +106,7 @@ export function Pagination({
         </button>
 
         {getPageNumbers().map((p, i) =>
-          p === '...' ? (
+          p === "..." ? (
             <span key={`dots-${i}`} className="px-1 text-gray-400 text-xs">
               ...
             </span>
@@ -101,13 +116,13 @@ export function Pagination({
               onClick={() => onPageChange(p as number)}
               className={`min-w-[28px] h-7 rounded text-xs font-medium transition-colors ${
                 p === page
-                  ? 'bg-indigo-600 text-white'
-                  : 'hover:bg-gray-100 text-gray-700'
+                  ? "bg-indigo-600 text-white"
+                  : "hover:bg-gray-100 text-gray-700"
               }`}
             >
               {p}
             </button>
-          )
+          ),
         )}
 
         <button

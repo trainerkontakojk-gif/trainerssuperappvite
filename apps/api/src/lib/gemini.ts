@@ -1,8 +1,12 @@
-import { Content } from '@google/genai';
-import { randomUUID } from 'crypto';
-import { AI_MODELS, getGeminiClient, getProviderFromModelId } from './ai-models';
-import { logAiUsage, UsageContext } from './ai-usage';
-import { sanitizeAiResponse } from './ai-sanitize';
+import { Content } from "@google/genai";
+import { randomUUID } from "crypto";
+import {
+  AI_MODELS,
+  getGeminiClient,
+  getProviderFromModelId,
+} from "./ai-models";
+import { logAiUsage, UsageContext } from "./ai-usage";
+import { sanitizeAiResponse } from "./ai-sanitize";
 
 export interface GeminiResponse {
   success: boolean;
@@ -14,14 +18,14 @@ function resolveResponseText(response: {
   text?: unknown;
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
 }): string {
-  if (typeof response.text === 'function') {
+  if (typeof response.text === "function") {
     return (response as { text: () => string }).text();
   }
-  if (typeof response.text === 'string') {
+  if (typeof response.text === "string") {
     return response.text;
   }
   const parts = response.candidates?.[0]?.content?.parts ?? [];
-  return parts.map(p => p.text ?? '').join('');
+  return parts.map((p) => p.text ?? "").join("");
 }
 
 export async function generateGeminiContent(options: {
@@ -36,11 +40,13 @@ export async function generateGeminiContent(options: {
 }): Promise<GeminiResponse> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
     const ai = getGeminiClient();
-    const modelName = options.model || 'gemini-3.1-flash-lite';
-    const supportsSystemInstruction = !modelName.includes('gemini-3-flash-preview');
+    const modelName = options.model || "gemini-3.1-flash-lite";
+    const supportsSystemInstruction = !modelName.includes(
+      "gemini-3-flash-preview",
+    );
 
     let systemInstruction: string | undefined;
     let contents = options.contents;
@@ -49,16 +55,23 @@ export async function generateGeminiContent(options: {
       if (supportsSystemInstruction) {
         systemInstruction = options.systemInstruction;
       } else {
-        contents = injectSystemInstructionIntoContents(options.contents, options.systemInstruction);
+        contents = injectSystemInstructionIntoContents(
+          options.contents,
+          options.systemInstruction,
+        );
       }
     }
 
-    const modelInfo = AI_MODELS.find(m => m.id === modelName);
+    const modelInfo = AI_MODELS.find((m) => m.id === modelName);
     const timeoutMs = modelInfo?.timeoutMs ?? 120_000;
 
     const generateWithTimeout = async () => {
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Gemini request timed out after ${timeoutMs}ms`)), timeoutMs)
+        setTimeout(
+          () =>
+            reject(new Error(`Gemini request timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        ),
       );
       return await Promise.race([
         ai.models.generateContent({
@@ -81,13 +94,25 @@ export async function generateGeminiContent(options: {
     } catch (firstError: unknown) {
       const err = firstError as { message?: string };
       if (
-        err?.message?.includes('Developer instruction is not enabled') &&
-        options.systemInstruction && supportsSystemInstruction
+        err?.message?.includes("Developer instruction is not enabled") &&
+        options.systemInstruction &&
+        supportsSystemInstruction
       ) {
-        console.warn(`[Gemini] Model "${modelName}" does not support developer instruction. Injecting into contents.`);
-        contents = injectSystemInstructionIntoContents(options.contents, options.systemInstruction);
+        console.warn(
+          `[Gemini] Model "${modelName}" does not support developer instruction. Injecting into contents.`,
+        );
+        contents = injectSystemInstructionIntoContents(
+          options.contents,
+          options.systemInstruction,
+        );
         const retryTimeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Gemini request timed out after ${timeoutMs}ms`)), timeoutMs)
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Gemini request timed out after ${timeoutMs}ms`),
+              ),
+            timeoutMs,
+          ),
         );
         response = await Promise.race([
           ai.models.generateContent({
@@ -107,17 +132,29 @@ export async function generateGeminiContent(options: {
     }
 
     if (options.usageContext && options.userId) {
-      const usage = (response as { usageMetadata?: Record<string, unknown> })?.usageMetadata;
+      const usage = (response as { usageMetadata?: Record<string, unknown> })
+        ?.usageMetadata;
       if (usage) {
-        const inputTokens = typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : 0;
-        const outputTokens = typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : 0;
-        const totalTokens = typeof usage.totalTokenCount === 'number' ? usage.totalTokenCount : inputTokens + outputTokens;
+        const inputTokens =
+          typeof usage.promptTokenCount === "number"
+            ? usage.promptTokenCount
+            : 0;
+        const outputTokens =
+          typeof usage.candidatesTokenCount === "number"
+            ? usage.candidatesTokenCount
+            : 0;
+        const totalTokens =
+          typeof usage.totalTokenCount === "number"
+            ? usage.totalTokenCount
+            : inputTokens + outputTokens;
 
         if (inputTokens > 0 || outputTokens > 0) {
           await logAiUsage({
             requestId: `gemini-${randomUUID()}`,
             userId: options.userId,
-            provider: getProviderFromModelId(modelName) as 'gemini' | 'openrouter',
+            provider: getProviderFromModelId(modelName) as
+              | "gemini"
+              | "openrouter",
             modelId: modelName,
             usageContext: options.usageContext,
             tokens: { inputTokens, outputTokens, totalTokens },
@@ -129,25 +166,38 @@ export async function generateGeminiContent(options: {
     const rawText = resolveResponseText(response);
     return { success: true, text: sanitizeAiResponse(rawText) };
   } catch (error) {
-    console.error('[Gemini] Error:', error);
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    console.error("[Gemini] Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
-function injectSystemInstructionIntoContents(contents: Content[], systemInstruction?: string): Content[] {
+function injectSystemInstructionIntoContents(
+  contents: Content[],
+  systemInstruction?: string,
+): Content[] {
   if (!systemInstruction) return contents;
-  const boundary = `BLOCK_${randomUUID().replace(/-/g, '')}`;
+  const boundary = `BLOCK_${randomUUID().replace(/-/g, "")}`;
   const instructionText = `\n[SYSTEM_CONTEXT_START:${boundary}]\n${systemInstruction}\n[SYSTEM_CONTEXT_END:${boundary}]\n\n[USER_INPUT_START:${boundary}]\n`;
   const footerText = `\n[USER_INPUT_END:${boundary}]`;
 
   const cloned = [...contents];
-  const firstUserIdx = cloned.findIndex(c => c?.role === 'user' && Array.isArray(c?.parts));
+  const firstUserIdx = cloned.findIndex(
+    (c) => c?.role === "user" && Array.isArray(c?.parts),
+  );
   if (firstUserIdx >= 0) {
     const firstUser = { ...cloned[firstUserIdx] };
     const firstParts = [...(firstUser.parts || [])];
-    const firstTextIdx = firstParts.findIndex(p => typeof p?.text === 'string');
+    const firstTextIdx = firstParts.findIndex(
+      (p) => typeof p?.text === "string",
+    );
     if (firstTextIdx >= 0) {
-      firstParts[firstTextIdx] = { ...firstParts[firstTextIdx], text: `${instructionText}${(firstParts[firstTextIdx].text || '').trim()}${footerText}` };
+      firstParts[firstTextIdx] = {
+        ...firstParts[firstTextIdx],
+        text: `${instructionText}${(firstParts[firstTextIdx].text || "").trim()}${footerText}`,
+      };
     } else {
       firstParts.unshift({ text: instructionText });
       firstParts.push({ text: footerText });
@@ -155,7 +205,10 @@ function injectSystemInstructionIntoContents(contents: Content[], systemInstruct
     firstUser.parts = firstParts;
     cloned[firstUserIdx] = firstUser;
   } else {
-    cloned.unshift({ role: 'user', parts: [{ text: instructionText }, { text: footerText }] });
+    cloned.unshift({
+      role: "user",
+      parts: [{ text: instructionText }, { text: footerText }],
+    });
   }
   return cloned;
 }

@@ -1,20 +1,35 @@
-import { createServer } from 'http';
-import { randomUUID } from 'crypto';
-import { WebSocketServer, WebSocket } from 'ws';
-import { env } from './env.js';
-import { verifyToken } from './auth.js';
-import { parseUsageMetadata, mergeSnapshot, flushLiveUsage, type LiveUsageSnapshot } from './usage.js';
-import { createSession, updateSession } from './db.js';
-import { SilenceDetector, UtteranceBuffer } from './silence.js';
-import { TurnManager, TurnState } from './turn-taking.js';
+import { createServer } from "http";
+import { randomUUID } from "crypto";
+import { WebSocketServer, WebSocket } from "ws";
+import { env } from "./env.js";
+import { verifyToken } from "./auth.js";
+import {
+  parseUsageMetadata,
+  mergeSnapshot,
+  flushLiveUsage,
+  type LiveUsageSnapshot,
+} from "./usage.js";
+import { createSession, updateSession } from "./db.js";
+import { SilenceDetector, UtteranceBuffer } from "./silence.js";
+import { TurnManager, TurnState } from "./turn-taking.js";
 
-process.on('uncaughtException', (err) => console.error('[Telefun] Uncaught:', err));
-process.on('unhandledRejection', (reason) => console.error('[Telefun] Unhandled Rejection:', reason));
+process.on("uncaughtException", (err) =>
+  console.error("[Telefun] Uncaught:", err),
+);
+process.on("unhandledRejection", (reason) =>
+  console.error("[Telefun] Unhandled Rejection:", reason),
+);
 
 const server = createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() }));
+  if (req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "ok",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+      }),
+    );
     return;
   }
   res.writeHead(404);
@@ -24,12 +39,19 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 
 function normalizeOrigin(raw: string): string {
-  try { return `${new URL(raw).protocol}//${new URL(raw).host}`; }
-  catch { return raw.replace(/\/+$/, ''); }
+  try {
+    return `${new URL(raw).protocol}//${new URL(raw).host}`;
+  } catch {
+    return raw.replace(/\/+$/, "");
+  }
 }
 
-const allowedOrigins = env.ALLOWED_ORIGINS === '*'
-  ? [] : env.ALLOWED_ORIGINS.split(',').map(o => normalizeOrigin(o.trim())).filter(Boolean);
+const allowedOrigins =
+  env.ALLOWED_ORIGINS === "*"
+    ? []
+    : env.ALLOWED_ORIGINS.split(",")
+        .map((o) => normalizeOrigin(o.trim()))
+        .filter(Boolean);
 
 const MAX_RECONNECT_ATTEMPTS = 3;
 
@@ -38,20 +60,27 @@ function connectGemini(): WebSocket {
   return new WebSocket(geminiUrl);
 }
 
-wss.on('connection', async (ws, req) => {
+wss.on("connection", async (ws, req) => {
   const pendingMessages: string[] = [];
-  const transcriptMessages: { role: string; text: string; timestamp: number }[] = [];
+  const transcriptMessages: {
+    role: string;
+    text: string;
+    timestamp: number;
+  }[] = [];
   let geminiWs: WebSocket | null = null;
   let isGeminiOpen = false;
   let authed = false;
-  let userId = '';
-  let sessionId = '';
+  let userId = "";
+  let sessionId = "";
   const callStartedAt = Date.now();
   const requestId = `telefun-live-${randomUUID()}`;
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const url = new URL(
+    req.url || "/",
+    `http://${req.headers.host || "localhost"}`,
+  );
   let usageSnapshot: LiveUsageSnapshot | null = null;
   let usageFlushed = false;
-  let activeModelId = 'gemini-3.1-flash-live-preview';
+  let activeModelId = "gemini-3.1-flash-live-preview";
   let reconnectAttempts = 0;
 
   const silence = new SilenceDetector(5000);
@@ -86,17 +115,17 @@ wss.on('connection', async (ws, req) => {
   const setupGeminiWs = () => {
     geminiWs = connectGemini();
 
-    geminiWs.on('open', () => {
+    geminiWs.on("open", () => {
       isGeminiOpen = true;
       reconnectAttempts = 0;
-      console.log('[Telefun] Gemini Live connected');
+      console.log("[Telefun] Gemini Live connected");
       while (pendingMessages.length > 0) {
         const msg = pendingMessages.shift();
         if (msg) geminiWs!.send(msg);
       }
     });
 
-    geminiWs.on('message', (data) => {
+    geminiWs.on("message", (data) => {
       const raw = data.toString();
 
       if (raw.includes('"usageMetadata"')) {
@@ -104,7 +133,9 @@ wss.on('connection', async (ws, req) => {
           const parsed = JSON.parse(raw);
           const meta = parseUsageMetadata(parsed.usageMetadata);
           if (meta) usageSnapshot = mergeSnapshot(usageSnapshot, meta);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
 
       // Extract AI text + detect turn boundaries
@@ -114,32 +145,42 @@ wss.on('connection', async (ws, req) => {
           turnManager.startAiSpeaking();
           for (const part of parsed.serverContent.modelTurn.parts) {
             if (part.text) {
-              transcriptMessages.push({ role: 'ai', text: part.text, timestamp: Date.now() });
+              transcriptMessages.push({
+                role: "ai",
+                text: part.text,
+                timestamp: Date.now(),
+              });
             }
           }
         }
         if (parsed.serverContent?.turnComplete) {
           turnManager.endAiSpeaking();
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
 
       if (ws.readyState === WebSocket.OPEN) ws.send(raw);
     });
 
-    geminiWs.on('error', () => {
-      void saveAndCloseSession('failed').then(() => flushUsage());
-      if (ws.readyState === WebSocket.OPEN) ws.close(1011, 'Gemini API Error');
+    geminiWs.on("error", () => {
+      void saveAndCloseSession("failed").then(() => flushUsage());
+      if (ws.readyState === WebSocket.OPEN) ws.close(1011, "Gemini API Error");
     });
 
-    geminiWs.on('close', (code, reason) => {
-      console.log(`[Telefun] Gemini closed: ${code} (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+    geminiWs.on("close", (code, reason) => {
+      console.log(
+        `[Telefun] Gemini closed: ${code} (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+      );
       isGeminiOpen = false;
 
       // Attempt reconnect on non-clean close
       if (code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
-        console.log(`[Telefun] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
+        console.log(
+          `[Telefun] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`,
+        );
         setTimeout(() => {
           if (ws.readyState === WebSocket.OPEN) {
             setupGeminiWs();
@@ -149,20 +190,28 @@ wss.on('connection', async (ws, req) => {
       }
 
       void flushUsage();
-      const safeCode = (code >= 3000 && code <= 4999) || (code >= 1000 && code <= 1013) ? code : 1011;
-      if (ws.readyState === WebSocket.OPEN) ws.close(safeCode, reason.toString().slice(0, 123));
+      const safeCode =
+        (code >= 3000 && code <= 4999) || (code >= 1000 && code <= 1013)
+          ? code
+          : 1011;
+      if (ws.readyState === WebSocket.OPEN)
+        ws.close(safeCode, reason.toString().slice(0, 123));
     });
   };
 
   // Silence handler: send gentle prompt to user
   silence.onSilence(() => {
-    console.log('[Telefun] Silence detected > 5s');
+    console.log("[Telefun] Silence detected > 5s");
     try {
-      ws.send(JSON.stringify({
-        type: 'silence',
-        message: 'Saya masih mendengarkan. Silakan lanjutkan.',
-      }));
-    } catch { /* ignore */ }
+      ws.send(
+        JSON.stringify({
+          type: "silence",
+          message: "Saya masih mendengarkan. Silakan lanjutkan.",
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
   });
 
   // Utterance buffer flush: send batched audio to Gemini
@@ -174,7 +223,7 @@ wss.on('connection', async (ws, req) => {
   });
 
   // Message handler: use turn buffer and silence detection
-  ws.on('message', (data) => {
+  ws.on("message", (data) => {
     const raw = data.toString();
     silence.ping();
 
@@ -182,7 +231,7 @@ wss.on('connection', async (ws, req) => {
     try {
       const parsed = JSON.parse(raw);
       if (parsed.setup?.model) {
-        activeModelId = parsed.setup.model.replace(/^models\//, '');
+        activeModelId = parsed.setup.model.replace(/^models\//, "");
       }
       // Non-audio messages (setup, clientContent JSON) go directly
       if (parsed.clientContent || parsed.setup || parsed.realtimeInput) {
@@ -195,68 +244,92 @@ wss.on('connection', async (ws, req) => {
           for (const turn of parsed.clientContent.turns) {
             for (const part of turn.parts || []) {
               if (part.text) {
-                transcriptMessages.push({ role: 'user', text: part.text, timestamp: Date.now() });
+                transcriptMessages.push({
+                  role: "user",
+                  text: part.text,
+                  timestamp: Date.now(),
+                });
               }
             }
           }
         }
         return;
       }
-    } catch { /* non-JSON - likely audio binary */ }
+    } catch {
+      /* non-JSON - likely audio binary */
+    }
 
     // Audio binary: buffer short utterances
     utteranceBuffer.push(raw);
   });
 
-  ws.on('close', async () => {
+  ws.on("close", async () => {
     silence.stop();
     utteranceBuffer.flushNow();
-    if (geminiWs && (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING)) {
+    if (
+      geminiWs &&
+      (geminiWs.readyState === WebSocket.OPEN ||
+        geminiWs.readyState === WebSocket.CONNECTING)
+    ) {
       geminiWs.close();
     }
-    await saveAndCloseSession('completed');
+    await saveAndCloseSession("completed");
     setTimeout(() => void flushUsage(), 2000);
   });
 
-  ws.on('error', async () => {
+  ws.on("error", async () => {
     silence.stop();
     utteranceBuffer.clear();
-    if (geminiWs && (geminiWs.readyState === WebSocket.OPEN || geminiWs.readyState === WebSocket.CONNECTING)) {
+    if (
+      geminiWs &&
+      (geminiWs.readyState === WebSocket.OPEN ||
+        geminiWs.readyState === WebSocket.CONNECTING)
+    ) {
       geminiWs.close();
     }
-    await saveAndCloseSession('failed');
+    await saveAndCloseSession("failed");
     setTimeout(() => void flushUsage(), 2000);
   });
 
   // Validate origin
   const origin = req.headers.origin;
-  if (env.ALLOWED_ORIGINS !== '*' && origin && !allowedOrigins.includes(normalizeOrigin(origin))) {
-    ws.close(4003, 'Forbidden Origin');
+  if (
+    env.ALLOWED_ORIGINS !== "*" &&
+    origin &&
+    !allowedOrigins.includes(normalizeOrigin(origin))
+  ) {
+    ws.close(4003, "Forbidden Origin");
     return;
   }
 
-  if (url.pathname !== '/' && url.pathname !== '/ws') {
-    ws.close(4000, 'Invalid Path');
+  if (url.pathname !== "/" && url.pathname !== "/ws") {
+    ws.close(4000, "Invalid Path");
     return;
   }
 
-  const token = url.searchParams.get('token');
-  if (!token) { ws.close(4001, 'Missing Token'); return; }
+  const token = url.searchParams.get("token");
+  if (!token) {
+    ws.close(4001, "Missing Token");
+    return;
+  }
 
   const authResult = await verifyToken(token);
-  if (!authResult.success) { ws.close(4001, 'Unauthorized'); return; }
+  if (!authResult.success) {
+    ws.close(4001, "Unauthorized");
+    return;
+  }
   if (ws.readyState !== WebSocket.OPEN) return;
 
   userId = authResult.user!.id;
   authed = true;
-  console.log('[Telefun] User connected:', authResult.user?.email);
+  console.log("[Telefun] User connected:", authResult.user?.email);
 
   // Create session record
   try {
     sessionId = await createSession(userId);
-    console.log('[Telefun] Session created:', sessionId);
+    console.log("[Telefun] Session created:", sessionId);
   } catch (err) {
-    console.error('[Telefun] Failed to create session:', err);
+    console.error("[Telefun] Failed to create session:", err);
   }
 
   // Start silence detection after auth
@@ -266,9 +339,11 @@ wss.on('connection', async (ws, req) => {
   setupGeminiWs();
 });
 
-server.listen(env.PORT, '0.0.0.0', () => {
+server.listen(env.PORT, "0.0.0.0", () => {
   console.log(`[Telefun] Server running on http://0.0.0.0:${env.PORT}`);
-  console.log(`[Telefun] Gemini API Key: ${env.GEMINI_API_KEY ? '***' + env.GEMINI_API_KEY.slice(-4) : 'MISSING'}`);
+  console.log(
+    `[Telefun] Gemini API Key: ${env.GEMINI_API_KEY ? "***" + env.GEMINI_API_KEY.slice(-4) : "MISSING"}`,
+  );
 });
 
 function gracefulShutdown(signal: string) {
@@ -276,27 +351,27 @@ function gracefulShutdown(signal: string) {
 
   // Stop accepting new connections
   wss.close(() => {
-    console.log('[Telefun] WebSocket server closed');
+    console.log("[Telefun] WebSocket server closed");
   });
 
   // Close all existing WebSocket connections
   for (const ws of wss.clients) {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.close(1001, 'Server shutting down');
+      ws.close(1001, "Server shutting down");
     }
   }
 
   // Close HTTP server with 10s timeout
   server.close(() => {
-    console.log('[Telefun] HTTP server closed');
+    console.log("[Telefun] HTTP server closed");
     process.exit(0);
   });
 
   setTimeout(() => {
-    console.error('[Telefun] Graceful shutdown timeout, forcing exit');
+    console.error("[Telefun] Graceful shutdown timeout, forcing exit");
     process.exit(1);
   }, 10_000);
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

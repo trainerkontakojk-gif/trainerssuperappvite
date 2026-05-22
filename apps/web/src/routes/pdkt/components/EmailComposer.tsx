@@ -1,5 +1,5 @@
-import React from 'react';
-import { ReplyComposer } from './ReplyComposer';
+import React from "react";
+import { ReplyComposer } from "./ReplyComposer";
 
 interface EmailComposerProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ export const EmailComposer: React.FC<EmailComposerProps> = ({
   onSend,
   isLoading,
   recipient,
-  subject
+  subject,
 }) => {
   if (!isOpen) return null;
 

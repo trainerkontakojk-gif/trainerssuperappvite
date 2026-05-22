@@ -1,6 +1,6 @@
-import React from 'react';
-import { X, Play, AlertCircle } from 'lucide-react';
-import type { PdktScenario } from '@trainers/types';
+import React from "react";
+import { X, Play, AlertCircle } from "lucide-react";
+import type { PdktScenario } from "@trainers/types";
 
 interface CreateEmailModalProps {
   isOpen: boolean;
@@ -15,16 +15,16 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
   onClose,
   scenarios,
   onCreate,
-  isLoading
+  isLoading,
 }) => {
   if (!isOpen) return null;
 
-  const activeScenarios = scenarios.filter(s => s.isActive);
+  const activeScenarios = scenarios.filter((s) => s.isActive);
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
         className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
       />
@@ -46,7 +46,8 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
               <p className="text-xs text-gray-500 leading-loose">
-                Tidak ada skenario aktif.<br />
+                Tidak ada skenario aktif.
+                <br />
                 Harap aktifkan skenario di Pengaturan.
               </p>
             </div>
@@ -56,10 +57,13 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                 Pilih Skenario Sesuai Masalah
               </p>
               <p className="text-[10px] text-gray-500 leading-relaxed mb-3">
-                Setiap skenario aktif dibuat sebagai email terpisah. Pilih satu skenario saat Create Email.
+                Setiap skenario aktif dibuat sebagai email terpisah. Pilih satu
+                skenario saat Create Email.
               </p>
               {activeScenarios.map((scenario) => {
-                const isAlways = (scenario as any).alwaysUseSampleEmail && (scenario as any).sampleEmailTemplate?.body;
+                const isAlways =
+                  (scenario as any).alwaysUseSampleEmail &&
+                  (scenario as any).sampleEmailTemplate?.body;
                 const hasTemplate = (scenario as any).sampleEmailTemplate?.body;
 
                 return (
@@ -114,7 +118,9 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
         {isLoading && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-600/30 border-t-sky-600 mb-3" />
-            <span className="text-xs font-bold text-sky-600 animate-pulse">Menghasilkan Email...</span>
+            <span className="text-xs font-bold text-sky-600 animate-pulse">
+              Menghasilkan Email...
+            </span>
           </div>
         )}
       </div>

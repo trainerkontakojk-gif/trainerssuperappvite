@@ -5,16 +5,20 @@ Selamat datang di pusat panduan Trainers SuperApp! Dokumen ini dirancang sebagai
 ---
 
 ## 🌟 Panduan Cepat untuk Pengguna Umum (Human-Readable Reader)
+
 Jika Anda baru mengenal proyek ini atau ingin memahami gambaran besar tanpa pusing dengan kode, silakan mulai dari sini:
+
 - **[README.md](../README.md):** Pengenalan produk, fungsi utama aplikasi, dan cara menjalankan aplikasi di komputer Anda.
 - **[docs/modules.md](modules.md):** Penjelasan fungsional dari masing-masing modul pelatihan (Ketik, PDKT, Telefun, Profiler, dan SIDAK) beserta manfaat nyata bagi pelatih dan peserta.
 
 ---
 
 ## 🛠️ Panduan Teknis untuk Pengembang (Developer & Agent Reader)
-Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan kepatuhan terhadap aturan sistem (*guardrails*) dan prosedur pengujian:
+
+Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan kepatuhan terhadap aturan sistem (_guardrails_) dan prosedur pengujian:
 
 ### Mulai Dari Sini
+
 - `README.md`: Ringkasan produk, setup lokal, env, dan command operasional.
 - `docs/architecture.md`: Arsitektur Monorepo (Vite + Hono + Supabase/AI), struktur folder, pola data flow, dan workflow verifikasi.
 - `docs/modules.md`: Status fitur per modul: Dashboard, KETIK, PDKT, TELEFUN, Profiler/KTP, dan SIDAK.

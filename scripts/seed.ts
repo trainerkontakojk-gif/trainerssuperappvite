@@ -31,7 +31,7 @@ const PRODUCTION_HOST_PATTERNS = [
  */
 export function isProductionEnvironment(
   nodeEnv: string | undefined,
-  dbUrl: string | undefined
+  dbUrl: string | undefined,
 ): boolean {
   // Check NODE_ENV
   if (nodeEnv?.toLowerCase() === "production") {
@@ -89,7 +89,9 @@ export async function applySeed(config: {
 
   try {
     await client.connect();
-    console.log(`Connected to database. Applying ${files.length} seed file(s)...`);
+    console.log(
+      `Connected to database. Applying ${files.length} seed file(s)...`,
+    );
 
     const applied: string[] = [];
 
@@ -121,7 +123,7 @@ async function main(): Promise<void> {
     console.error(
       "ERROR: Seed data cannot be applied to a production environment.\n" +
         "Detected production via NODE_ENV or database URL pattern.\n" +
-        "Aborting."
+        "Aborting.",
     );
     process.exit(1);
   }
@@ -129,7 +131,7 @@ async function main(): Promise<void> {
   if (!dbUrl) {
     console.error(
       "ERROR: No database URL found.\n" +
-        "Set SUPABASE_DB_URL or DATABASE_URL environment variable."
+        "Set SUPABASE_DB_URL or DATABASE_URL environment variable.",
     );
     process.exit(1);
   }
@@ -138,14 +140,14 @@ async function main(): Promise<void> {
     path.dirname(new URL(import.meta.url).pathname),
     "..",
     "supabase",
-    "seeds"
+    "seeds",
   );
 
   try {
     const result = await applySeed({ seedDir, targetDbUrl: dbUrl });
 
     console.log(
-      `\nSeed complete: ${result.applied.length}/${result.totalFiles} file(s) applied.`
+      `\nSeed complete: ${result.applied.length}/${result.totalFiles} file(s) applied.`,
     );
     console.log("Applied files:");
     for (const file of result.applied) {
@@ -160,7 +162,9 @@ async function main(): Promise<void> {
     } else {
       message = String(error);
     }
-    console.error(`\nERROR: Seed failed: ${message || "Unknown connection error"}`);
+    console.error(
+      `\nERROR: Seed failed: ${message || "Unknown connection error"}`,
+    );
     process.exit(1);
   }
 }
