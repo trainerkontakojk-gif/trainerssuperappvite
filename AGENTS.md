@@ -142,7 +142,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
-- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core)
+- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index)
 - `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **report-docx-builder**
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)

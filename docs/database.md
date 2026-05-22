@@ -36,7 +36,7 @@ erDiagram
 
 ## Tabel Utama
 
-**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (10 files, 000-008, fully idempotent):
+**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (12 files, 000-010 + timestamped, fully idempotent):
 - `000_profiles_core.sql` — Profiles & auth tables
 - `001_sidak_core.sql` — SIDAK core + Profiler tables (12 tables, all RLS-enabled)
 - `002_ketik_pdkt_core.sql` — KETIK, PDKT, AI usage tables
@@ -47,6 +47,8 @@ erDiagram
 - `007_report_archives.sql` — Report archives for persistence
 - `008_profile_admin_policies.sql` — Admin/trainer SELECT+UPDATE on profiles (defense-in-depth)
 - `20260520054101_add_is_deleted_to_profiles.sql` — Soft delete flag for profiles
+- `009_storage_rls_policies.sql` — Storage bucket RLS policies for profiler-foto, reports, telefun-recordings
+- `010_activity_logs_index.sql` — Index `activity_logs.created_at` for query performance
 
 ### 1. `public.profiles`
 
@@ -84,7 +86,8 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`profiler_tim_list`**: Daftar tim operasional yang tersedia.
 
 ### 5. Modul SIDAK (QA Analyzer)
-- **`qa_dashboard_period_summary`**: Summary KPI per periode untuk dashboard SIDAK.
+- **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard per periode. Direfresh async via `refreshMaterializedView()` setelah batch upload.
+- **`qa_dashboard_period_summary`**: Summary KPI per periode untuk dashboard SIDAK (fallback jika MV belum tersedia).
 - **`qa_dashboard_indicator_period_summary`**: Breakdown KPI per indikator per periode.
 - **`qa_dashboard_agent_period_summary`**: Skor dan metrik per agent per periode.
 - **`qa_periods`**: Definisi periode audit kualitas.
@@ -94,6 +97,8 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`qa_service_rule_versions`**: Versi rule per service+periode dengan status `draft`, `published`, atau `superseded`.
 - **`qa_service_rule_indicators`**: Snapshot indikator per rule version.
 
+**Soft-delete Exclusion**: Queries dashboard SIDAK (`getDashboardData`, `getAgents`, `getDataReportRows`) secara otomatis mengecualikan peserta yang terhubung ke profile soft-deleted (`is_deleted=true`) atau inactive (`status=inactive`), kecuali `show_archived=true` dikirim sebagai query param.
+
 ### 6. Admin & Access Control
 - **`access_groups`**: Definisi access group (nama, deskripsi, scope_type, is_active).
 - **`access_group_items`**: Item scope individual (field_name: `peserta_id`, `batch_name`, `tim`, `service_type`).
@@ -101,7 +106,8 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`leader_access_request_groups`**: Join table: satu approved request bisa memiliki >1 access group.
 
 ### 7. Monitoring AI Usage & Billing
-- **`ai_usage_logs`**: Log 1 baris per AI call sukses final. Menyimpan `request_id`, `user_id`, `provider`, `model_id`, `module`, `action`, token, harga, kurs, dan estimasi biaya.
+- **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard SIDAK per periode. Diprioritaskan dari pada `qa_dashboard_period_summary` dengan fallback chain: MV → cache → computed.
+- **`ai_usage_logs`**: Log 1 baris per AI call (sukses maupun gagal/timeout). Menyimpan `request_id`, `user_id`, `provider`, `model_id`, `module`, `action`, token, harga, kurs, estimasi biaya, `status` (success/failed/timeout), dan `error_message`.
 - **`ai_pricing_settings`**: Harga token input/output per model kanonik.
 - **`ai_billing_settings`**: Riwayat nilai kurs global USD ke IDR.
 

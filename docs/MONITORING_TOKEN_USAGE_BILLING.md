@@ -90,21 +90,23 @@ Seluruh agregasi bulanan menggunakan WIB / `Asia/Jakarta`:
 
 ## Kontrak Logging
 
-Usage hanya dicatat setelah respons AI sukses final di backend.
+Usage dicatat untuk setiap AI call, baik sukses maupun gagal/timeout di backend.
 
 Yang dicatat pada setiap row `ai_usage_logs`:
 
 - `request_id` unik, `user_id`, `provider`, `model_id`, `module`, `action`
-- `input_tokens`, `output_tokens`, `total_tokens`
+- `status`: `'success'`, `'failed'`, atau `'timeout'`
+- `error_message`: pesan error jika gagal/timeout (maks 1000 char); `null` jika sukses
+- `input_tokens`, `output_tokens`, `total_tokens` (0 jika gagal/timeout)
 - `input_price_usd_per_million`, `output_price_usd_per_million`
-- `usd_to_idr_rate`, `estimated_cost_usd`, `estimated_cost_idr`
+- `usd_to_idr_rate`, `estimated_cost_usd`, `estimated_cost_idr` (0 jika gagal/timeout)
 
 Aturan penting:
 
-- request gagal, timeout, atau `429` final tidak dicatat
-- retry/fallback internal tidak boleh menghasilkan row tambahan
+- request sukses dan gagal/timeout sama-sama dicatat, dengan `status` yang membedakan
+- retry/fallback internal tidak boleh menghasilkan row tambahan (setiap request_id unik)
 - jika provider tidak memberi metadata token, flow user tetap lanjut tetapi usage tidak dicatat
-- jika pricing model belum tersedia, flow user tetap lanjut tetapi usage tidak dicatat
+- jika pricing model belum tersedia, flow user tetap lanjut tetapi usage tidak dicatat (cost 0)
 
 ## Action Map per Modul
 

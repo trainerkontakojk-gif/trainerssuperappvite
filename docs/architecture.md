@@ -72,7 +72,7 @@ Struktur folder monorepo:
 │   ├── app/                    # Next.js App Router (referensi saja)
 │   └── docs/                   # Dokumentasi legacy (referensi)
 ├── supabase/
-│   └── migrations/             # DB schemas (000 profiles, 001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin, 005 carbon copy, 006 user settings, 007 report archives, 008 profile admin policies)
+│   └── migrations/             # DB schemas (000 profiles, 001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin, 005 carbon copy, 006 user settings, 007 report archives, 008 profile admin policies, 009 storage RLS, 010 activity_logs index)
 ├── docs/                       # Dokumentasi teknis sistem
 │   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-18)
 │   └── superpowers/            # Plans dan specs dari superpowers skills
@@ -95,16 +95,19 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - Monitoring lintas akun dan usage billing menggunakan server-side access via admin client, bukan direct browser read terhadap tabel sensitif.
 - History simulasi KETIK/PDKT menggunakan tabel modul masing-masing sebagai sumber utama.
 - Module settings (KETIK, PDKT, Telefun) disimpan namespaced di `user_settings.settings.<module>` agar tidak saling timpa. Setiap modul wajib membaca existing settings sebelum menulis.
+- **SIDAK Dashboard Performance**: Materialized view (`mv_qa_period_summary`) menyediakan ringkasan KPI dengan fallback chain: MV → `qa_dashboard_period_summary` cache → raw computed values. MV direfresh async via `refreshMaterializedView()` setelah `createTemuanBatch()`.
+- **Soft-delete Exclusion**: Semua query SIDAK (dashboard, agents, data reports) otomatis mengecualikan peserta yang terhubung ke profile soft-deleted/inactive, dengan opsi `show_archived=true` untuk override.
 
 ## AI Integration Pattern
 
 - Integrasi AI dipusatkan di backend service wrapper (`apps/api/src/lib/gemini.ts`, `apps/api/src/lib/openrouter.ts`).
 - Pemilihan model dan provider mengikuti canonical mapping di `apps/api/src/lib/ai-models.ts`.
 - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs` via `logAiUsage()`.
+- `logAiUsage()` sekarang menerima parameter `status` (`'success'` | `'failed'` | `'timeout'`) dan `errorMessage`. Jika gagal/timeout, token di-set ke 0 dan error message dicatat.
 - `resolveModelProvider()` mendeteksi Gemini (tanpa `/`) vs OpenRouter (dengan `/`).
 - OpenRouter punya 4-attempt retry dengan backoff untuk 429.
 - Caller modul tidak boleh mengasumsikan bentuk response SDK/provider selalu stabil; ekstraksi `text` harus defensif.
-- Usage AI dicatat server-side setelah request sukses final. Row gagal, timeout, 429 final, atau response tanpa metadata token tidak boleh menghasilkan usage log palsu.
+- Usage AI dicatat server-side setelah request final (sukses maupun gagal). Setiap `request_id` unik — retry/fallback internal tidak menghasilkan row tambahan. Response tanpa metadata token tidak boleh menghasilkan usage log palsu.
 
 ## Environment & Runtime
 

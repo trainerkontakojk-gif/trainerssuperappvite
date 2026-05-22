@@ -95,20 +95,20 @@ Contoh catatan:
   - Catatan: `beforeLoad` guards via `requireRole()` di router.tsx untuk semua protected routes.
 - [x] Route admin/trainer/QA tidak bisa dibuka oleh agent biasa.
   - Catatan: Route-level guards via TanStack Router `beforeLoad` + sidebar filtering di Layout.tsx.
-- [x] Redirect login/logout berjalan normal.
+- [x] Auth login/logout lewat landing modal berjalan normal.
 - [x] Halaman 404, unauthorized, dan error state tersedia.
-  - Catatan: 404 (`not-found.tsx`), unauthorized (`unauthorized.tsx`), ErrorBoundary di `main.tsx`.
+  - Catatan: TanStack Router `notFoundComponent`, `unauthorized.tsx`, dan `ErrorBoundary` di `main.tsx`.
 - [x] Layout utama konsisten di desktop dan mobile.
 - [x] Sidebar/navbar menyesuaikan role user.
-- [x] Login Supabase Auth berjalan.
+- [x] Login Supabase Auth via landing modal berjalan.
 - [x] Logout membersihkan session.
 - [x] Session tetap bertahan setelah refresh.
-- [x] Expired session diarahkan ke login.
-  - Catatan: Layout cek `auth_token` + `auth_profile` di localStorage, redirect ke `/`.
+- [x] Expired session diarahkan ke landing page / modal auth.
+  - Catatan: Layout cek `auth_token` + `auth_profile` di localStorage, lalu redirect ke `/`.
 - [x] User profile dan role terbaca setelah login.
 - [x] Tidak ada service role key atau secret key di frontend.
 - [x] Frontend tidak mengandalkan role dari localStorage saja.
-  - Catatan: Role divalidasi dari database via `fetchProfile()`, auth guard juga cek `auth_profile`.
+  - Catatan: Role divalidasi dari database via `fetchAuthProfile()`, localStorage hanya bootstrap.
 - [x] Role user divalidasi ulang dari backend/database.
 - [x] Design system konsisten: button, card, modal, form, table, badge, toast.
 - [x] Loading state tersedia di semua halaman data.
@@ -149,7 +149,7 @@ Contoh catatan:
 - [x] Tombol selesai simulasi tersedia.
 - [x] Konfirmasi sebelum mengakhiri simulasi tersedia.
 - [x] UI tidak rusak saat AI gagal merespons.
-- [x] History sesi KETIK tersedia.
+- [x] History sesi KETIK tersedia via workspace/modal history.
 - [x] Transcript chat tersimpan dan bisa dibuka ulang.
 - [x] Detail sesi menampilkan scenario, waktu, agent, dan hasil.
 - [x] Evaluasi/feedback tampil jika tersedia.
@@ -353,6 +353,8 @@ Contoh catatan:
 - [x] Agent endpoint hanya mengembalikan data milik agent tersebut.
   - Catatan: SIDAK dashboard di-scope via `getAccessibleAgentIds()`. KETIK/PDKT history sudah scope per user_id.
 - [x] Identity spoofing dicegah.
+- [~] `GET /auth/me` masih ada sebagai compatibility stub dan bukan sumber auth utama.
+  - Catatan: hardcoded test data; flow utama memakai Supabase JWT + `/v1/me`.
 
 ## 2.3 Service Layer `P0`
 
@@ -372,7 +374,7 @@ Contoh catatan:
 ## 2.4 AI Gateway `P0`
 
 - [x] Semua request AI lewat backend.
-- [x] API key OpenRouter/Gemini/OpenAI tidak pernah tampil di frontend.
+- [x] API key Gemini/OpenRouter tidak pernah tampil di frontend; model OpenAI dirutekan via OpenRouter model IDs.
 - [x] Model dipilih dari konfigurasi resmi.
 - [x] Fallback model tersedia.
 - [x] Timeout AI ditangani.
@@ -411,9 +413,9 @@ Contoh catatan:
 
 ## 2.6 Upload Batch QA `P0`
 
-- [x] Endpoint upload Excel tersedia.
+- [x] Endpoint batch temuan tersedia; Excel parsing/preview terjadi di frontend.
   - Catatan: `POST /api/v1/sidak/temuan/batch` — menerima JSON batch, bukan raw Excel.
-- [x] Validasi format file tersedia.
+- [x] Validasi payload batch tersedia.
   - Catatan: `validateTemuanBatch()` di backend memvalidasi semua item (indicator exists, service_type match, rule version compliance, dedup) sebelum insert. Frontend juga memvalidasi via `excel-utils.ts`.
 - [x] Validasi periode tersedia.
 - [x] Validasi service type tersedia.
@@ -422,7 +424,7 @@ Contoh catatan:
 - [x] Mapping parameter QA memakai version yang benar.
   - Catatan: `rule_version_id` dipopulate dari active published version. `legacy_indicator_id` linking untuk cross-validate indicator temuan vs rule indicators.
 - [x] Foreign key error ditangani sebelum insert.
-- [x] Insert batch memakai transaksi.
+- [x] Insert batch atomic via single INSERT statement.
   - Catatan: Single `INSERT INTO ... VALUES (...), (...)` bersifat atomik di PostgreSQL.
 - [x] Jika satu batch gagal, data tidak masuk sebagian tanpa kontrol.
   - Catatan: PostgreSQL atomic INSERT — satu baris FK violation akan rollback seluruh batch.
@@ -459,7 +461,7 @@ Contoh catatan:
 
 ## 2.8 Telefun Backend `P0`
 
-- [x] Server WebSocket tersedia di Railway/VPS/server persistent.
+- [x] Standalone persistent WebSocket server tersedia.
   - Catatan: Standalone server di `apps/telefun/src/server.ts` — port 3002, health check.
 - [x] Server memvalidasi token Supabase.
 - [x] Session Telefun dibuat saat call dimulai.
@@ -488,7 +490,7 @@ Contoh catatan:
 
 ## 3.1 Login sampai Akses Modul `P0`
 
-- [ ] User login.
+- [ ] User auth via landing modal.
 - [ ] Backend memvalidasi token.
 - [ ] Frontend menerima profile and role.
 - [ ] Menu tampil sesuai role.
@@ -506,7 +508,7 @@ Contoh catatan:
 - [ ] Transcript tersimpan.
 - [ ] Token usage tercatat.
 - [ ] Session selesai.
-- [ ] Riwayat muncul di halaman history.
+- [ ] Riwayat muncul di workspace/history modal; route legacy hanya redirect kompatibilitas.
 - [ ] Trainer/QA bisa review sesuai izin.
 - [ ] Agent lain tidak bisa membuka sesi tersebut.
 
@@ -553,8 +555,8 @@ Contoh catatan:
 
 ## 3.6 Flow Upload QA End-to-End `P0`
 
-- [ ] Admin/QA upload Excel.
-- [ ] Frontend menampilkan preview.
+- [ ] Admin/QA upload Excel ke frontend.
+- [ ] Frontend parse dan menampilkan preview batch JSON.
 - [ ] Backend validasi data.
 - [ ] Backend validasi parameter aktif.
 - [ ] Backend validasi indikator.
@@ -609,115 +611,108 @@ Contoh catatan:
 
 ## 4.1 Schema Dasar `P0`
 
-- [ ] Tabel profile/user tersedia.
-- [ ] Tabel role/permission tersedia.
-- [ ] Tabel peserta/profiler tersedia.
-- [ ] Tabel scenario KETIK tersedia.
-- [ ] Tabel session KETIK tersedia.
-- [ ] Tabel scenario PDKT tersedia.
-- [ ] Tabel thread/email PDKT tersedia.
-- [ ] Tabel session Telefun tersedia.
-- [ ] Tabel QA temuan tersedia.
-- [ ] Tabel QA indicators tersedia.
-- [ ] Tabel QA service rule versions tersedia.
-- [ ] Tabel upload logs tersedia.
-- [ ] Tabel AI usage logs tersedia.
-- [ ] Tabel AI pricing settings tersedia.
-- [ ] Tabel report logs/generated reports tersedia jika report disimpan.
-- [ ] Tabel access approval tersedia jika leader gating dipakai.
+- [x] `public.profiles` tersedia untuk profile, role, status, dan soft delete.
+- [x] Role/permission direpresentasikan lewat `profiles.role` + RLS/policies, bukan tabel permission terpisah.
+- [x] `public.profiler_years`, `public.profiler_folders`, `public.profiler_peserta`, dan `public.profiler_tim_list` tersedia.
+- [x] `public.qa_periods`, `public.qa_indicators`, `public.qa_service_weights`, `public.qa_service_rule_versions`, `public.qa_service_rule_indicators`, `public.qa_temuan`, `public.qa_dashboard_period_summary`, dan `public.qa_dashboard_agent_period_summary` tersedia.
+- [x] `public.ketik_history`, `public.ketik_session_reviews`, `public.ketik_typo_findings`, dan `public.ketik_review_jobs` tersedia.
+- [x] `public.pdkt_history` dan `public.pdkt_mailbox_items` tersedia.
+- [x] `public.telefun_history`, `public.telefun_coaching_summary`, dan `public.telefun_replay_annotations` tersedia.
+- [x] `public.activity_logs` tersedia sebagai log operasional.
+- [x] `public.ai_pricing_settings`, `public.ai_billing_settings`, dan `public.ai_usage_logs` tersedia.
+- [x] `public.report_archives` tersedia.
+- [x] `public.access_groups`, `public.access_group_items`, `public.leader_access_requests`, dan `public.leader_access_request_groups` tersedia.
+- [x] `public.user_settings` tersedia untuk penyimpanan setting per user.
+- [x] Setting scenario KETIK/PDKT/Telefun disimpan di `public.user_settings.settings`, bukan tabel scenario terpisah.
 
 ## 4.2 Relasi and Foreign Key `P0`
 
-- [ ] `qa_temuan.agent_id` terhubung ke profiler/user yang benar.
-- [ ] `qa_temuan.indicator_id` terhubung ke `qa_indicators`.
-- [ ] `qa_temuan.period_id/folder_id` valid.
-- [ ] `qa_temuan.service_type` konsisten dengan service di profiler/indicator.
-- [ ] Session KETIK terhubung ke user.
-- [ ] Session PDKT terhubung ke user.
-- [ ] Session Telefun terhubung ke user.
-- [ ] AI usage log terhubung ke user jika authenticated.
-- [ ] Rule version punya relasi ke service type.
-- [ ] Published rule version bisa dilacak dari data upload.
-- [ ] Tidak ada orphan records penting.
-- [ ] Foreign key error dicegah melalui validasi sebelum insert.
+- [x] `profiles.id` terhubung ke `auth.users.id`.
+- [x] `profiler_folders.trainer_id`, `profiler_peserta.trainer_id`, dan `profiler_tim_list.trainer_id` terhubung ke `auth.users.id`.
+- [x] `profiler_folders.year_id` dan `parent_id` terhubung ke tabel year/folder yang benar.
+- [x] `profiler_peserta.batch_name` terhubung ke `profiler_folders.name`.
+- [x] `qa_temuan.peserta_id` terhubung ke `profiler_peserta.id`.
+- [x] `qa_temuan.period_id` terhubung ke `qa_periods.id`.
+- [x] `qa_temuan.indicator_id` terhubung ke `qa_indicators.id`.
+- [x] `qa_temuan.rule_version_id` terhubung ke `qa_service_rule_versions.id`.
+- [x] `qa_temuan.rule_indicator_id` terhubung ke `qa_service_rule_indicators.id`.
+- [x] `qa_service_rule_versions.effective_period_id` terhubung ke `qa_periods.id`.
+- [x] `qa_service_rule_indicators.rule_version_id` terhubung ke `qa_service_rule_versions.id`.
+- [x] `ketik_history.user_id`, `pdkt_history.user_id`, `pdkt_mailbox_items.user_id`, `telefun_history.user_id`, `report_archives.user_id`, `user_settings.user_id`, dan `ai_usage_logs.user_id` terhubung ke `auth.users.id`.
+- [x] `leader_access_requests.leader_user_id` dan `reviewed_by` terhubung ke `profiles.id`.
+- [x] `leader_access_request_groups.request_id` dan `access_group_id` terhubung dengan benar.
+- [x] `access_group_items.access_group_id` terhubung ke `access_groups.id`.
+- [x] Foreign key error dicegah melalui validasi sebelum insert.
 
 ## 4.3 RLS and Security `P0`
 
-- [ ] RLS aktif di tabel yang diakses client.
-- [ ] Agent hanya bisa membaca data miliknya.
-- [ ] Trainer/QA hanya bisa membaca data sesuai cakupan.
-- [ ] TL/SPV/OM hanya bisa membaca data sesuai aturan.
-- [ ] Admin bisa mengelola data sesuai kebutuhan.
-- [ ] Service role hanya dipakai backend.
-- [ ] Policy tidak terlalu longgar dengan `using true`.
-- [ ] Insert/update/delete dibatasi sesuai role.
-- [ ] Data report tidak bisa dibuka lintas user tanpa izin.
-- [ ] Storage foto/avatar punya policy yang aman.
-- [ ] Storage report/export punya policy yang aman.
+- [x] RLS aktif di tabel yang diakses client.
+- [x] Profile, settings, history, dan report archive dibatasi ke owner atau role terkait.
+- [x] Admin/trainer dapat mengelola access group dan leader request.
+- [x] `ai_usage_logs` hanya bisa dibaca owner, sedangkan insert dilakukan backend/service role.
+- [x] Telefun recording bucket memakai policy owner-based.
+- [~] Policy tidak memakai `using true`, tapi beberapa read policy SIDAK masih broad (`authenticated`) karena scoping dilakukan di backend.
+- [x] Service role hanya dipakai backend.
+- [ ] Storage foto/avatar dan export report belum punya policy dedicated.
 
 ## 4.4 Index and Performa `P0`
 
-- [ ] Index untuk `qa_temuan.service_type`.
-- [ ] Index untuk `qa_temuan.period_id`.
-- [ ] Index untuk `qa_temuan.agent_id`.
-- [ ] Index untuk `qa_temuan.indicator_id`.
-- [ ] Index gabungan untuk filter dashboard utama.
-- [ ] Index untuk `created_at` pada session/log.
-- [ ] Index untuk `user_id` pada session KETIK/PDKT/Telefun.
-- [ ] Index untuk AI usage berdasarkan user, module, date.
-- [ ] Query dashboard tidak full scan berlebihan.
-- [ ] Query report individu cepat.
-- [ ] Query report layanan cepat.
-- [ ] Query upload validation tidak lambat.
-- [ ] Summary table/materialized view dipertimbangkan untuk data SIDAK besar.
+- [x] Index `qa_temuan(period_id, service_type)` tersedia untuk filter dashboard.
+- [x] Index `qa_temuan(peserta_id, period_id)` tersedia.
+- [x] Index `qa_temuan(indicator_id)` tersedia.
+- [x] Index `qa_temuan(rule_version_id)` tersedia.
+- [x] Index `qa_indicators(service_type)` tersedia.
+- [x] Index `profiler_peserta(batch_name)` dan `profiler_peserta(tim)` tersedia.
+- [x] Index `ketik_history.user_id` dan `ketik_history.date` tersedia.
+- [x] Index `pdkt_history.user_id` dan `pdkt_history.timestamp` tersedia.
+- [x] Index `pdkt_mailbox_items.user_id` dan `pdkt_mailbox_items.status` tersedia.
+- [x] Index `telefun_history.user_id` dan `telefun_history.created_at` tersedia.
+- [x] Index `ai_usage_logs.user_id`, `ai_usage_logs.module`, `ai_usage_logs.created_at`, dan `ai_usage_logs.model_id` tersedia.
+- [x] Index `report_archives.user_id`, `report_archives.created_at`, dan `report_archives.report_type` tersedia.
+- [ ] Index `activity_logs.created_at` belum ada.
+- [x] Summary cache table `qa_dashboard_period_summary` dan `qa_dashboard_agent_period_summary` dipakai.
+- [x] Materialized view `mv_qa_period_summary` sudah dipakai, dengan fallback chain ke cache table → raw computed.
 
 ## 4.5 Migration `P0`
 
-- [ ] Semua perubahan schema ada di migration file.
-- [ ] Migration bisa dijalankan dari database kosong.
-- [ ] Migration bisa dijalankan di database existing tanpa merusak data.
-- [ ] Ada rollback plan untuk perubahan besar.
-- [ ] Seed data tersedia untuk local/dev.
-- [ ] Enum service type konsisten.
-- [ ] Default value jelas.
-- [ ] Constraint tidak bertabrakan dengan data lama.
-- [ ] Migration tidak menghapus data legacy tanpa backup.
-- [ ] Perubahan RLS diuji setelah migration.
+- [x] Semua perubahan schema ada di migration file.
+- [x] Migration dibuat idempotent dengan `IF NOT EXISTS` / `DROP IF EXISTS`.
+- [x] Migration diberi nomor berurutan dan gampang dilacak.
+- [ ] Migration dari database kosong belum divalidasi end-to-end di checklist ini.
+- [ ] Migration existing database belum punya rollback plan tertulis per file.
+- [ ] Seed data local/dev belum dipisah formal.
+- [x] Enum/service type konsisten dengan backend dan shared types.
+- [x] Default value jelas.
+- [ ] Perubahan RLS masih perlu uji ulang setelah migration.
 
 ## 4.6 QA Parameter Versioning `P1`
 
 - [x] Tabel rule version punya `version_number`.
 - [x] Ada status: draft, published, superseded.
-  - Catatan: 'archived' belum diimplementasikan.
 - [x] Ada `change_reason`.
-- [x] Ada `created_by`.
-- [x] Ada `updated_by`.
-- [x] Ada `published_at`.
-- [x] Ada `superseded_at`.
-- [x] Ada `superseded_by_version_id`.
+- [x] Ada `created_by`, `updated_by`, dan `published_by`.
+- [x] Ada `published_at` dan `superseded_at`.
+- [x] Ada `superseded_by`, `superseded_by_version_id`, dan `created_from_version_id`.
 - [x] Hanya satu published version aktif per service.
-  - Catatan: `publishRuleVersion()` auto-supersede semua published version untuk service_type yang sama.
-- [ ] Publish dilakukan lewat RPC/transaksi.
+- [x] Publish dikelola lewat backend service/route, bukan RPC DB.
 - [x] Publish otomatis supersede version lama.
-  - Catatan: Diimplementasikan di `publishRuleVersion()` — query published versions untuk service_type yang sama, update status jadi superseded dengan `superseded_by_version_id` merujuk ke version baru.
 - [x] Draft bisa diedit.
-  - Catatan: Edit modal via `PUT /sidak/rule-versions/:id`. Field: scoring_mode, weights, change_reason.
 - [x] Published tidak diedit langsung.
-  - Catatan: `updateRuleVersion()` me-reject jika status bukan draft.
 - [x] Revision membuat version baru.
-  - Catatan: `version_number` auto-increment via `MAX(version_number) + 1` per service_type.
-- [ ] Upload QA memakai rule version yang benar.
-  - Catatan: `qa_temuan.rule_version_id` masih NULL. Lihat item #5 di plan untuk implementasi linkage.
+- [x] Upload QA memakai rule version yang benar. Catatan: `createTemuanBatch()` mengisi `qa_temuan.rule_version_id` dari published version aktif, dan `validateTemuanBatch()` menolak indikator yang tidak cocok dengan versi aktif.
 
 ## 4.7 RPC / Database Function `P1`
 
-- [ ] RPC publish rule version tersedia.
-- [ ] RPC validasi upload batch tersedia jika dibutuhkan.
-- [ ] RPC dashboard aggregate tersedia jika query terlalu berat di API.
-- [ ] RPC memakai security definer dengan hati-hati.
-- [ ] RPC tetap memvalidasi role/permission.
-- [ ] RPC punya error message yang jelas.
-- [ ] RPC diuji untuk edge case.
+- [x] RPC `submit_pdkt_mailbox_batch` tersedia.
+- [x] RPC `submit_pdkt_mailbox_reply` tersedia.
+- [x] RPC `bulk_reorder_profiler_peserta` tersedia.
+- [x] RPC `upsert_telefun_coaching_summary` tersedia.
+- [x] Publish rule version dikelola lewat backend service/route, bukan RPC DB.
+- [x] Dashboard aggregate dipenuhi oleh summary table, bukan RPC DB.
+- [x] Function memakai `SECURITY DEFINER` dengan `search_path` dibatasi.
+- [x] Function tetap memvalidasi ownership/role sebelum mutasi data.
+- [x] Error message function cukup jelas untuk client.
+- [x] RPC tambahan untuk validasi upload batch belum diperlukan karena validasi ada di service backend.
 
 ## 4.8 Data Integrity `P0`
 
@@ -725,28 +720,28 @@ Contoh catatan:
 - [ ] Tidak ada duplikasi agent/profiler.
 - [ ] Nama agent konsisten.
 - [ ] Foto/avatar profiler valid.
-- [ ] Service type profiler konsisten.
-- [ ] Data periode konsisten.
-- [ ] Data indikator tidak duplicate ambigu.
-- [ ] Data temuan punya referensi indikator valid.
-- [ ] Nilai/skor berada dalam range yang benar.
-- [ ] Tanggal upload and periode penilaian tidak tertukar.
-- [ ] Deleted/archived data tidak ikut dashboard aktif kecuali diminta.
+- [x] `qa_temuan.indicator_id` dan `period_id` dijaga lewat FK.
+- [x] `qa_temuan.service_type` divalidasi terhadap indikator aktif sebelum insert.
+- [x] Duplikasi temuan per peserta/periode/indikator dicegah di service layer.
+- [x] Nilai (`nilai`) dibatasi di range 0-3.
+- [x] `rule_version_id` dicatat pada temuan batch baru.
+- [x] Record history dan report terhubung ke user yang benar.
+- [x] Deleted/archived data otomatis tidak ikut dashboard aktif. Soft-delete exclusion di `getDashboardData`, `getAgents`, `getDataReportRows` via `getSoftDeletedPesertaIds()`. Opsi `show_archived=true` untuk override.
 
 ## 4.9 AI Usage and Pricing `P0`
 
-- [ ] Tabel AI usage mencatat module: KETIK, PDKT, Telefun, Report.
-- [ ] Tabel mencatat user_id.
-- [ ] Tabel mencatat model.
-- [ ] Tabel mencatat input token.
-- [ ] Tabel mencatat output token.
-- [ ] Tabel mencatat total token.
-- [ ] Tabel mencatat estimated cost.
-- [ ] Tabel mencatat request status.
-- [ ] Tabel mencatat error jika gagal.
-- [ ] Pricing setting tersedia per model.
-- [ ] Missing pricing tidak membuat log gagal.
-- [ ] Dashboard usage bisa membaca data dengan benar.
+- [x] `ai_usage_logs` mencatat module `ketik`, `pdkt`, `telefun`, dan `qa-analyzer`.
+- [x] Tabel mencatat `user_id`.
+- [x] Tabel mencatat `provider` dan `model_id`.
+- [x] Tabel mencatat `input_tokens`, `output_tokens`, dan `total_tokens`.
+- [x] Tabel mencatat pricing snapshot dan estimated cost.
+- [x] `request_id` unik tersedia untuk dedup log.
+- [x] Tabel mencatat request status (`success`, `failed`, `timeout`).
+- [x] Tabel mencatat `error_message` jika gagal/timeout (maks 1000 char).
+- [x] `ai_pricing_settings` tersedia per model.
+- [x] `ai_billing_settings` tersedia untuk kurs USD/IDR.
+- [x] Missing pricing tidak membuat log gagal.
+- [x] Dashboard usage membaca data log dengan benar.
 
 ---
 
