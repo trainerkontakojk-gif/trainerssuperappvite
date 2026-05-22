@@ -1,8 +1,17 @@
+export enum ConsumerDifficulty {
+  Easy = "Easy",
+  Medium = "Medium",
+  Hard = "Hard",
+  Random = "Random",
+}
+
 export interface TelefunScenario {
   id: string;
   title: string;
   instruction: string;
   isActive: boolean;
+  category?: string;
+  script?: string;
 }
 
 export interface TelefunConsumerType {
@@ -10,6 +19,7 @@ export interface TelefunConsumerType {
   name: string;
   gender: string;
   description: string;
+  difficulty?: ConsumerDifficulty;
 }
 
 export interface TelefunIdentitySettings {

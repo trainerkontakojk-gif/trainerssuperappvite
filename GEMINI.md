@@ -88,15 +88,14 @@ Baca file terbaru, buat patch minimal, dan terapkan. Hindari overwrite penuh jik
 Setiap memulai pekerjaan baru (fitur, bug fix, refactor), WAJIB menerapkan **Spec-Driven Development (SDD)**:
 
 1. Tulis spec terlebih dahulu: tujuan, acceptance criteria, edge cases, dan constraint teknis.
-2. Buat plan implementasi dalam 2 format (lihat aturan #6) sebelum menulis kode.
+2. Buat plan implementasi (lihat aturan #6) sebelum menulis kode.
 3. Jangan memulai coding sebelum plan diverifikasi / disetujui.
 
-### 6. Plan Wajib Dibuat dalam 2 Format (wajib di folder `plan/`)
+### 6. Plan Wajib Dibuat (wajib di folder `plan/`)
 
-Setiap plan implementasi WAJIB dibuat dalam 2 format dan **WAJIB** disimpan di folder `plan/` (bukan di folder lain):
+Setiap plan implementasi **WAJIB** dibuat dan disimpan di folder `plan/markdown/<nama-fitur>.md` dalam format **Markdown** — gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block.
 
-- **Format HTML** (file: `plan/html/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser.
-- **Format Markdown** (file: `plan/markdown/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block.
+Format **HTML** (`plan/html/<nama-fitur>.html`) bersifat **opsional** — buat hanya jika ada perubahan visual signifikan dan perlu menampilkan mockup visual. Gunakan styling HTML + CSS inline agar mudah dibuka di browser.
 
 Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
 

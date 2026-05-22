@@ -461,6 +461,8 @@ telefun.put(
               title: z.string(),
               instruction: z.string(),
               isActive: z.boolean(),
+              category: z.string().optional(),
+              script: z.string().optional(),
             }),
           )
           .optional(),
@@ -471,6 +473,7 @@ telefun.put(
               name: z.string(),
               gender: z.string(),
               description: z.string(),
+              difficulty: z.string().optional(),
             }),
           )
           .optional(),

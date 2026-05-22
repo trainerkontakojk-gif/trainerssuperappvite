@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Phone, Settings, History, PlayCircle, BarChart3 } from "lucide-react";
+import { Phone, Settings, History, Play, BarChart3 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { TelefunAppSettings } from "./telefunSettings";
 import {
@@ -16,6 +16,20 @@ import { postApi, putApi, patchApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
 import { supabase } from "../../lib/supabase";
 import type { CallRecord } from "./types";
+import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
+
+const accentClassName = "text-violet-600";
+const accentSoftClassName = "bg-violet-100";
+
+function formatCompactIdr(value: number): string {
+  if (value >= 1_000_000) return `Rp${(value / 1_000_000).toFixed(1)}jt`;
+  if (value >= 1_000) return `Rp${(value / 1_000).toFixed(0)}rb`;
+  return `Rp${value}`;
+}
+
+function formatUsageDeltaLabel(delta: { costIdr: number; totalTokens: number; totalCalls: number }): string {
+  return `+${formatCompactIdr(delta.costIdr)}`;
+}
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
 
@@ -535,95 +549,71 @@ export default function TelefunLanding() {
             key="home"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="min-h-[calc(100dvh-8rem)] w-full bg-[#f6f5f2] px-6 py-8 lg:px-10 lg:py-10"
+            exit={{ opacity: 0, y: -12 }}
+            className="relative z-10 py-6"
           >
-            <div className="mx-auto grid w-full max-w-[1664px] gap-8 xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
-              <motion.article
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-                className="flex min-h-[640px] flex-col rounded-[38px] border border-black/5 bg-white p-10 shadow-[0_22px_55px_rgba(16,22,33,0.08)] lg:p-12"
-              >
-                <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-[#eefbf5] px-5 py-2 text-[13px] font-black uppercase tracking-[0.34em] text-[#16b88a]">
-                  Voice Simulation Trainer
-                </span>
-
-                <div className="mt-5 flex h-24 w-24 items-center justify-center rounded-[28px] bg-[#dff7f0] text-[#16b88a] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-                  <Phone className="h-11 w-11" strokeWidth={1.95} />
-                </div>
-
-                <h1 className="mt-9 max-w-[680px] text-[clamp(54px,4.6vw,74px)] font-black leading-[1.02] tracking-[-0.06em] text-[#1c1b1a]">
-                  Siapkan simulasi telepon dari workspace yang lebih terpadu.
-                </h1>
-
-                <p className="mt-8 max-w-[650px] text-[clamp(18px,1.8vw,24px)] leading-[1.45] text-[#7d756f]">
-                  Simulasi panggilan telepon dengan konsumen AI untuk melatih
-                  kemampuan penanganan keluhan.
-                </p>
-              </motion.article>
-
-              <motion.aside
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: "easeOut", delay: 0.05 }}
-                className="flex min-h-[640px] flex-col rounded-[38px] border border-black/5 bg-white p-8 shadow-[0_22px_55px_rgba(16,22,33,0.08)] lg:p-10"
-              >
-                <h2 className="text-[17px] font-black uppercase tracking-[0.36em] text-[#8b8179]">
-                  Workspace Actions
-                </h2>
-
-                <div className="mt-8 grid gap-4">
-                  <button
+            <ModuleWorkspaceIntro
+              eyebrow="Voice Simulation Trainer"
+              title="Latih penanganan keluhan telepon dalam workspace yang fokus."
+              description="Mulai simulasi panggilan telepon dengan konsumen bertenaga AI untuk menguji dan melatih kemampuan penanganan keluhan secara langsung."
+              accentClassName={accentClassName}
+              accentSoftClassName={accentSoftClassName}
+              icon={<Phone className="h-8 w-8 text-violet-600" />}
+              actions={
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={startCall}
                     disabled={settingsLoading}
-                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] bg-[#1f2a42] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-white shadow-[0_14px_26px_rgba(31,42,66,0.24)] transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all bg-violet-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-600/20"
                   >
-                    <PlayCircle className="h-6 w-6" />
-                    <span>Mulai Panggilan</span>
-                  </button>
-
-                  <button
+                    {settingsLoading ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    ) : (
+                      <Play className="h-4 w-4 fill-current" />
+                    )}
+                    <span>{settingsLoading ? "Memulai..." : "Mulai Panggilan"}</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={() => setIsSettingsOpen(true)}
                     disabled={settingsLoading}
-                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] border border-[#d6d8dd] bg-[#eceef2] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-[#1f2a42] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_rgba(31,42,66,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
                   >
-                    <Settings className="h-6 w-6" />
-                    <span>Opsi</span>
-                  </button>
-
-                  <button
+                    <Settings className="h-4 w-4 opacity-60" />
+                    <span>Pengaturan</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={() => setIsHistoryOpen(true)}
-                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] border border-[#d6d8dd] bg-[#eceef2] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-[#1f2a42] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_rgba(31,42,66,0.12)]"
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
                   >
-                    <History className="h-6 w-6" />
+                    <History className="h-4 w-4 opacity-60" />
                     <span>Riwayat</span>
-                  </button>
-
-                  <button
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.01, y: -1 }}
+                    whileTap={{ scale: 0.99 }}
                     onClick={() => setIsUsageOpen(true)}
-                    className="flex h-20 items-center justify-center gap-4 rounded-[24px] border border-[#d6d8dd] bg-[#eceef2] px-6 text-[18px] font-black uppercase tracking-[0.16em] text-[#1f2a42] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_26px_rgba(31,42,66,0.12)]"
+                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
                   >
-                    <BarChart3 className="h-6 w-6" />
-                    <span>Usage</span>
+                    <BarChart3 className="h-4 w-4 opacity-60" />
+                    <span>Usage Bulan Ini</span>
                     {sessionDelta &&
                       (sessionDelta.costIdr > 0 ||
-                        sessionDelta.totalTokens > 0) && (
-                        <span className="ml-1 rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-black tracking-[0.2em] text-[#4b5563]">
-                          +
-                          {sessionDelta.costIdr > 0
-                            ? new Intl.NumberFormat("id-ID", {
-                                style: "currency",
-                                currency: "IDR",
-                                minimumFractionDigits: 0,
-                              }).format(sessionDelta.costIdr)
-                            : `${sessionDelta.totalTokens}t`}
+                        sessionDelta.totalTokens > 0 ||
+                        sessionDelta.totalCalls > 0) && (
+                        <span className="ml-auto text-[10px] font-black text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">
+                          {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
                         </span>
                       )}
-                  </button>
-                </div>
-              </motion.aside>
-            </div>
+                  </motion.button>
+                </>
+              }
+            />
           </motion.div>
         )}
 
