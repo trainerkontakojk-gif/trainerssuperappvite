@@ -50,9 +50,9 @@ Contoh catatan:
 - [x] KETIK session tersimpan.
 - [x] Telefun berjalan dengan server realtime.
 - [x] RLS dan permission aman.
-  - Catatan: 32 tabel RLS-enabled (all). Policy gaps di-close: write_trainer untuk dashboard summary tables, admin SELECT+UPDATE untuk profiles. API role enforcement ditambahkan di 48 endpoint (23 profiler, 16 PDKT, 5 AI, 1 KETIK, 3 admin). Dead code 'trainers' role di-cleanup.
+  - Catatan: 32 tabel RLS-enabled (all). Policy gaps di-close: write_trainer untuk dashboard summary tables, admin SELECT+UPDATE untuk profiles (Restricted: users cannot change own role/status). RLS SIDAK/Profiler diperketat di 015 (admin/trainer only for read, agents own only). Migration 016 me-revoke broad grants. API role enforcement ditambahkan di 48 endpoint.
 - [x] Migration database aman.
-  - Catatan: 10 migration files (000-008). Semua 9 migration diverifikasi idempotent: 82 re-run failures di-fix (DROP IF EXISTS + CREATE IF NOT EXISTS pattern). Dependency broken is_deleted resolved via conditional. Migration 008 adds admin profiles policies.
+  - Catatan: 16 migration files (000-016). Semua migration diverifikasi idempotent. Migration 014 memastikan bucket storage dibuat. Migration 015-016 memperketat RLS dan privesc protection.
 
 ## P1 — Penting untuk operasional
 
@@ -108,7 +108,7 @@ Contoh catatan:
 - [x] User profile dan role terbaca setelah login.
 - [x] Tidak ada service role key atau secret key di frontend.
 - [x] Frontend tidak mengandalkan role dari localStorage saja.
-  - Catatan: Role divalidasi dari database via `fetchAuthProfile()`, localStorage hanya bootstrap.
+  - Catatan: Role divalidasi ulang secara ASYNC dari database via `fetchAuthProfile()` pada SETIAP route transition (requireRole guard di router.tsx), localStorage hanya bootstrap awal.
 - [x] Role user divalidasi ulang dari backend/database.
 - [x] Design system konsisten: button, card, modal, form, table, badge, toast.
 - [x] Loading state tersedia di semua halaman data.
@@ -346,15 +346,16 @@ Contoh catatan:
 - [x] Backend mengambil role dari database/profile.
 - [x] Backend menolak request tanpa token untuk route protected.
 - [x] Backend menolak akses role yang tidak sesuai.
-  - Catatan: `requireRole()` dipasang di semua route SIDAK (mutation: admin/trainer/qa; read: +tl/spv/om), worker route KETIK, review trigger KETIK.
+  - Catatan: `requireRole()` dipasang di semua route SIDAK & Profiler (mutation: admin/trainer; read: +leader), worker route KETIK, review trigger KETIK. QA role dihapus dari mutation endpoints — hardening phase.
 - [x] Admin endpoint hanya bisa diakses admin.
-- [x] Trainer/QA endpoint hanya bisa diakses role terkait.
-  - Catatan: Via `requireRole()` di SIDAK, KETIK, dan PDKT route mutation endpoints.
+  - Catatan: Admin routes menggunakan `adminOnly` middleware (tidak lagi `managerOnly` yang mengizinkan trainer). Trainer tidak bisa akses admin endpoints.
+- [x] Trainer/QA endpoint dibatasi sesuai role.
+  - Catatan: Mutation routes SIDAK/Profiler: admin+trainer only. Read routes: +leader. KETIK/PDKT mutation masih mengizinkan QA via `requireRole()` terpisah.
 - [x] Agent endpoint hanya mengembalikan data milik agent tersebut.
   - Catatan: SIDAK dashboard di-scope via `getAccessibleAgentIds()`. KETIK/PDKT history sudah scope per user_id.
 - [x] Identity spoofing dicegah.
-- [~] `GET /auth/me` masih ada sebagai compatibility stub dan bukan sumber auth utama.
-  - Catatan: hardcoded test data; flow utama memakai Supabase JWT + `/v1/me`.
+- [x] `GET /auth/me` sudah dihapus dan digantikan 410 Gone (Deprecation message).
+  - Catatan: Flow utama memakai Supabase JWT + `/v1/me`.
 
 ## 2.3 Service Layer `P0`
 
@@ -651,9 +652,9 @@ Contoh catatan:
 - [x] Admin/trainer dapat mengelola access group dan leader request.
 - [x] `ai_usage_logs` hanya bisa dibaca owner, sedangkan insert dilakukan backend/service role.
 - [x] Telefun recording bucket memakai policy owner-based.
-- [~] Policy tidak memakai `using true`, tapi beberapa read policy SIDAK masih broad (`authenticated`) karena scoping dilakukan di backend.
+- [x] Policy tidak memakai `using true`. RLS SIDAK/profiler diperketat di 015 (admin/trainer/agent-own only).
 - [x] Service role hanya dipakai backend.
-- [ ] Storage foto/avatar dan export report belum punya policy dedicated.
+- [x] Storage foto/avatar dan export report sudah punya policy dedicated dan bucket dibuat via migration 014.
 
 ## 4.4 Index and Performa `P0`
 
@@ -669,7 +670,7 @@ Contoh catatan:
 - [x] Index `telefun_history.user_id` dan `telefun_history.created_at` tersedia.
 - [x] Index `ai_usage_logs.user_id`, `ai_usage_logs.module`, `ai_usage_logs.created_at`, dan `ai_usage_logs.model_id` tersedia.
 - [x] Index `report_archives.user_id`, `report_archives.created_at`, dan `report_archives.report_type` tersedia.
-- [ ] Index `activity_logs.created_at` belum ada.
+- [x] Index `activity_logs.created_at` sudah ada (Migration 010).
 - [x] Summary cache table `qa_dashboard_period_summary` dan `qa_dashboard_agent_period_summary` dipakai.
 - [x] Materialized view `mv_qa_period_summary` sudah dipakai, dengan fallback chain ke cache table → raw computed.
 

@@ -14,12 +14,12 @@ type Variables = { user: User; profile: any };
 const sidak = new Hono<{ Variables: Variables }>();
 
 // ── Periods ────────────────────────────────────────────
-sidak.get('/periods', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/periods', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const periods = await sidakService.getPeriods();
   return c.json({ success: true, data: periods });
 });
 
-sidak.post('/periods', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/periods', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     month: z.number().int().min(1).max(12),
@@ -33,13 +33,13 @@ sidak.post('/periods', requireRole('admin', 'trainer', 'qa'), async (c) => {
 });
 
 // ── Indicators ─────────────────────────────────────────
-sidak.get('/indicators', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/indicators', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const serviceType = c.req.query('service_type');
   const indicators = await sidakService.getIndicators(serviceType);
   return c.json({ success: true, data: indicators });
 });
 
-sidak.post('/indicators', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/indicators', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     service_type: z.enum(['call', 'chat', 'email', 'cso', 'pencatatan', 'bko', 'slik']),
@@ -56,7 +56,7 @@ sidak.post('/indicators', requireRole('admin', 'trainer', 'qa'), async (c) => {
 });
 
 // ── Temuan (Findings) ──────────────────────────────────
-sidak.get('/temuan', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/temuan', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const peserta_id = c.req.query('peserta_id');
@@ -70,7 +70,7 @@ sidak.get('/temuan', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), a
   return c.json({ success: true, data: { items: result.data, total: result.total } });
 });
 
-sidak.post('/temuan/batch', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/temuan/batch', requireRole('admin', 'trainer'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const body = await c.req.json();
@@ -86,7 +86,7 @@ sidak.post('/temuan/batch', requireRole('admin', 'trainer', 'qa'), async (c) => 
   }
 });
 
-sidak.post('/temuan/batch/preview', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/temuan/batch/preview', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = createTemuanBatchSchema.safeParse(body);
   if (!parsed.success) {
@@ -100,7 +100,7 @@ sidak.post('/temuan/batch/preview', requireRole('admin', 'trainer', 'qa'), async
   }
 });
 
-sidak.put('/temuan/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.put('/temuan/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const parsed = z.object({
@@ -119,7 +119,7 @@ sidak.put('/temuan/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
   }
 });
 
-sidak.delete('/temuan/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.delete('/temuan/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   try {
     await sidakService.deleteTemuan(id);
@@ -130,18 +130,19 @@ sidak.delete('/temuan/:id', requireRole('admin', 'trainer', 'qa'), async (c) => 
 });
 
 // ── Agents ─────────────────────────────────────────────
-sidak.get('/agents', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/agents', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const batch_name = c.req.query('batch_name');
   const tim = c.req.query('tim');
   const search = c.req.query('search');
+  const showArchived = c.req.query('show_archived') === 'true';
   const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  const agents = await sidakService.getAgents({ batch_name, tim, search, agent_ids: accessibleIds ?? undefined });
+  const agents = await sidakService.getAgents({ batch_name, tim, search, agent_ids: accessibleIds ?? undefined, showArchived });
   return c.json({ success: true, data: agents });
 });
 
-sidak.get('/agents/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/agents/:id', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const id = c.req.param('id');
@@ -160,20 +161,21 @@ sidak.get('/agents/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'
 });
 
 // ── Dashboard ──────────────────────────────────────────
-sidak.get('/dashboard', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
+sidak.get('/dashboard', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const period_ids = c.req.query('period_ids')?.split(',');
   const service_type = c.req.query('service_type');
   const folder_ids = c.req.query('folder_ids')?.split(',');
   const year = c.req.query('year') ? parseInt(c.req.query('year')!) : undefined;
+  const showArchived = c.req.query('show_archived') === 'true';
 
   const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
-  const data = await sidakService.getDashboardData({ period_ids, service_type, folder_ids, year, agent_ids: accessibleIds ?? undefined });
+  const data = await sidakService.getDashboardData({ period_ids, service_type, folder_ids, year, agent_ids: accessibleIds ?? undefined, showArchived });
   return c.json({ success: true, data });
 });
 
-sidak.post('/dashboard/refresh-summary', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/dashboard/refresh-summary', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     periodId: z.string().uuid(),
@@ -189,12 +191,12 @@ sidak.post('/dashboard/refresh-summary', requireRole('admin', 'trainer', 'qa'), 
 });
 
 // ── Service Weights ────────────────────────────────────
-sidak.get('/service-weights', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/service-weights', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const weights = await sidakService.getServiceWeights();
   return c.json({ success: true, data: weights });
 });
 
-sidak.put('/service-weights/:serviceType', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.put('/service-weights/:serviceType', requireRole('admin', 'trainer'), async (c) => {
   const serviceType = c.req.param('serviceType');
   const body = await c.req.json();
   const parsed = z.object({
@@ -214,7 +216,7 @@ sidak.put('/service-weights/:serviceType', requireRole('admin', 'trainer', 'qa')
 });
 
 // ── Folders ────────────────────────────────────────────
-sidak.get('/folders', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/folders', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const { data } = await (await import('../lib/supabase')).supabaseAdmin
     .from('profiler_folders')
     .select('id, name')
@@ -223,7 +225,7 @@ sidak.get('/folders', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), 
 });
 
 // ── Reports ──────────────────────────────────────────────
-sidak.post('/reports/data', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.post('/reports/data', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const body = await c.req.json();
@@ -235,6 +237,7 @@ sidak.post('/reports/data', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', '
     folderId: z.string().optional(),
     pesertaId: z.string().optional(),
     indicatorId: z.string().optional(),
+    showArchived: z.boolean().optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Filter tidak valid' } }, 400);
   const accessibleIds = await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '');
@@ -246,7 +249,7 @@ sidak.post('/reports/data', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', '
   }
 });
 
-sidak.post('/reports/ai/generate', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), aiRateLimitMiddleware, async (c: any) => {
+sidak.post('/reports/ai/generate', requireRole('admin', 'trainer', 'leader'), aiRateLimitMiddleware, async (c: any) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const body = await c.req.json();
@@ -358,7 +361,7 @@ Buat laporan dengan format JSON:
   }
 });
 
-sidak.get('/dashboard/available-years', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/dashboard/available-years', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const accessibleIds = profile ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? '') : null;
@@ -370,7 +373,7 @@ sidak.get('/dashboard/available-years', requireRole('admin', 'trainer', 'qa', 't
   }
 });
 
-sidak.get('/dashboard/trend', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/dashboard/trend', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const yearQuery = c.req.query('year');
@@ -400,7 +403,7 @@ sidak.get('/dashboard/trend', requireRole('admin', 'trainer', 'qa', 'tl', 'spv',
 });
 
 // ── QA Rule Versions ────────────────────────────────────
-sidak.get('/rule-versions', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/rule-versions', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const serviceType = c.req.query('service_type');
   try {
     const versions = await sidakService.getRuleVersions(serviceType || undefined);
@@ -410,7 +413,7 @@ sidak.get('/rule-versions', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', '
   }
 });
 
-sidak.post('/rule-versions', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/rule-versions', requireRole('admin', 'trainer'), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const parsed = z.object({
@@ -432,7 +435,7 @@ sidak.post('/rule-versions', requireRole('admin', 'trainer', 'qa'), async (c) =>
   }
 });
 
-sidak.put('/rule-versions/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.put('/rule-versions/:id', requireRole('admin', 'trainer'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -453,7 +456,7 @@ sidak.put('/rule-versions/:id', requireRole('admin', 'trainer', 'qa'), async (c)
   }
 });
 
-sidak.post('/rule-versions/:id/publish', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/rule-versions/:id/publish', requireRole('admin', 'trainer'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -471,7 +474,7 @@ sidak.post('/rule-versions/:id/publish', requireRole('admin', 'trainer', 'qa'), 
   }
 });
 
-sidak.post('/rule-versions/:id/supersede', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/rule-versions/:id/supersede', requireRole('admin', 'trainer'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -489,7 +492,7 @@ sidak.post('/rule-versions/:id/supersede', requireRole('admin', 'trainer', 'qa')
   }
 });
 
-sidak.get('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.get('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const id = c.req.param('id');
   try {
     const indicators = await sidakService.getRuleVersionIndicators(id);
@@ -499,7 +502,7 @@ sidak.get('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'qa',
   }
 });
 
-sidak.post('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.post('/rule-versions/:id/indicators', requireRole('admin', 'trainer'), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const body = await c.req.json();
@@ -524,7 +527,7 @@ sidak.post('/rule-versions/:id/indicators', requireRole('admin', 'trainer', 'qa'
   }
 });
 
-sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', requireRole('admin', 'trainer', 'qa'), async (c) => {
+sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', requireRole('admin', 'trainer'), async (c) => {
   const indicatorId = c.req.param('indicatorId');
   try {
     await sidakService.deleteRuleVersionIndicator(indicatorId);
@@ -534,7 +537,7 @@ sidak.delete('/rule-versions/:versionId/indicators/:indicatorId', requireRole('a
   }
 });
 
-sidak.post('/reports/ai/export-docx', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.post('/reports/ai/export-docx', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     title: z.string().default('Laporan Analisis QA'),
@@ -569,7 +572,7 @@ sidak.post('/reports/ai/export-docx', requireRole('admin', 'trainer', 'qa', 'tl'
   }
 });
 
-sidak.post('/reports/ai/export-html', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.post('/reports/ai/export-html', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     title: z.string().default('Laporan Analisis QA'),
@@ -599,7 +602,7 @@ sidak.post('/reports/ai/export-html', requireRole('admin', 'trainer', 'qa', 'tl'
   }
 });
 
-sidak.post('/reports/ai/chart-data', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.post('/reports/ai/chart-data', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const body = await c.req.json();
@@ -624,7 +627,7 @@ sidak.post('/reports/ai/chart-data', requireRole('admin', 'trainer', 'qa', 'tl',
 });
 
 // ── Report Archives ─────────────────────────────────
-sidak.post('/reports/ai/save', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.post('/reports/ai/save', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const parsed = z.object({
@@ -648,14 +651,14 @@ sidak.post('/reports/ai/save', requireRole('admin', 'trainer', 'qa', 'tl', 'spv'
   return c.json({ success: true, data: result }, 201);
 });
 
-sidak.get('/reports/archives', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
+sidak.get('/reports/archives', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const data = await sidakService.getReportArchives(user.id, profile?.role ?? '');
   return c.json({ success: true, data });
 });
 
-sidak.get('/reports/archives/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
+sidak.get('/reports/archives/:id', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const id = c.req.param('id');
@@ -666,7 +669,7 @@ sidak.get('/reports/archives/:id', requireRole('admin', 'trainer', 'qa', 'tl', '
   return c.json({ success: true, data: result });
 });
 
-sidak.delete('/reports/archives/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om', 'agent'), async (c) => {
+sidak.delete('/reports/archives/:id', requireRole('admin', 'trainer', 'leader', 'agent'), async (c) => {
   const user = c.get('user');
   const profile = c.get('profile');
   const id = c.req.param('id');
@@ -674,7 +677,7 @@ sidak.delete('/reports/archives/:id', requireRole('admin', 'trainer', 'qa', 'tl'
   return c.json({ success: true, data: null });
 });
 
-sidak.post('/reports/ai/export-pdf', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+sidak.post('/reports/ai/export-pdf', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     title: z.string().default('Laporan Analisis QA'),

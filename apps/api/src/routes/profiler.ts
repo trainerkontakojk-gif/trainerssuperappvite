@@ -6,12 +6,12 @@ import * as profilerService from '../services/profiler-service';
 const profiler = new Hono();
 
 // ── Years ────────────────────────────────────────────────
-profiler.get('/years', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/years', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const years = await profilerService.getYears();
   return c.json({ success: true, data: years });
 });
 
-profiler.post('/years', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/years', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({ year: z.number().int().min(2000).max(2100) }).safeParse(body);
   if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Tahun tidak valid' } }, 400);
@@ -19,7 +19,7 @@ profiler.post('/years', requireRole('admin', 'trainer', 'qa'), async (c) => {
   return c.json({ success: true, data: year }, 201);
 });
 
-profiler.delete('/years/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.delete('/years/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   try {
     await profilerService.deleteYear(id);
@@ -30,12 +30,12 @@ profiler.delete('/years/:id', requireRole('admin', 'trainer', 'qa'), async (c) =
 });
 
 // ── Folders ──────────────────────────────────────────────
-profiler.get('/folders', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/folders', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const folders = await profilerService.getFolders();
   return c.json({ success: true, data: folders });
 });
 
-profiler.post('/folders', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/folders', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     name: z.string().min(1),
@@ -47,7 +47,7 @@ profiler.post('/folders', requireRole('admin', 'trainer', 'qa'), async (c) => {
   return c.json({ success: true, data: folder }, 201);
 });
 
-profiler.put('/folders/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.put('/folders/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const parsed = z.object({ name: z.string().min(1) }).safeParse(body);
@@ -60,7 +60,7 @@ profiler.put('/folders/:id', requireRole('admin', 'trainer', 'qa'), async (c) =>
   }
 });
 
-profiler.delete('/folders/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.delete('/folders/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   try {
     await profilerService.deleteFolder(id);
@@ -70,7 +70,7 @@ profiler.delete('/folders/:id', requireRole('admin', 'trainer', 'qa'), async (c)
   }
 });
 
-profiler.post('/folders/duplicate', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/folders/duplicate', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     folder_id: z.string().uuid(),
@@ -86,13 +86,13 @@ profiler.post('/folders/duplicate', requireRole('admin', 'trainer', 'qa'), async
 });
 
 // ── Counts ───────────────────────────────────────────────
-profiler.get('/counts', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/counts', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const counts = await profilerService.getFolderCounts();
   return c.json({ success: true, data: counts });
 });
 
 // ── Peserta ──────────────────────────────────────────────
-profiler.get('/peserta', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/peserta', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const batch_name = c.req.query('batch_name');
   const tim = c.req.query('tim');
   const search = c.req.query('search');
@@ -103,19 +103,19 @@ profiler.get('/peserta', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'
   return c.json({ success: true, data: { items: result.data, total: result.total } });
 });
 
-profiler.get('/peserta/global-pool', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/peserta/global-pool', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const excludeBatch = c.req.query('exclude_batch');
   const pool = await profilerService.getGlobalPesertaPool(excludeBatch);
   return c.json({ success: true, data: pool });
 });
 
-profiler.get('/peserta/batch/:batchName', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/peserta/batch/:batchName', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const batchName = c.req.param('batchName');
   const peserta = await profilerService.getPesertaByBatch(batchName);
   return c.json({ success: true, data: peserta });
 });
 
-profiler.get('/peserta/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/peserta/:id', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const id = c.req.param('id');
   try {
     const peserta = await profilerService.getPesertaById(id);
@@ -125,7 +125,7 @@ profiler.get('/peserta/:id', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 
   }
 });
 
-profiler.post('/peserta', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/peserta', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     batch_name: z.string().min(1),
@@ -165,7 +165,7 @@ profiler.post('/peserta', requireRole('admin', 'trainer', 'qa'), async (c) => {
   }
 });
 
-profiler.put('/peserta/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.put('/peserta/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   try {
@@ -176,7 +176,7 @@ profiler.put('/peserta/:id', requireRole('admin', 'trainer', 'qa'), async (c) =>
   }
 });
 
-profiler.delete('/peserta/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.delete('/peserta/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   try {
     await profilerService.deletePeserta(id);
@@ -186,7 +186,7 @@ profiler.delete('/peserta/:id', requireRole('admin', 'trainer', 'qa'), async (c)
   }
 });
 
-profiler.post('/peserta/bulk', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/peserta/bulk', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     items: z.array(z.object({
@@ -205,7 +205,7 @@ profiler.post('/peserta/bulk', requireRole('admin', 'trainer', 'qa'), async (c) 
   }
 });
 
-profiler.post('/peserta/copy', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/peserta/copy', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     peserta_ids: z.array(z.string().uuid()).min(1),
@@ -220,7 +220,7 @@ profiler.post('/peserta/copy', requireRole('admin', 'trainer', 'qa'), async (c) 
   }
 });
 
-profiler.put('/peserta/reorder', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.put('/peserta/reorder', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     peserta_ids: z.array(z.string().uuid()),
@@ -234,7 +234,7 @@ profiler.put('/peserta/reorder', requireRole('admin', 'trainer', 'qa'), async (c
   }
 });
 
-profiler.post('/peserta/bulk-reorder', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/peserta/bulk-reorder', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({
     updates: z.array(z.object({
@@ -252,12 +252,12 @@ profiler.post('/peserta/bulk-reorder', requireRole('admin', 'trainer', 'qa'), as
 });
 
 // ── Teams ────────────────────────────────────────────────
-profiler.get('/teams', requireRole('admin', 'trainer', 'qa', 'tl', 'spv', 'om'), async (c) => {
+profiler.get('/teams', requireRole('admin', 'trainer', 'leader'), async (c) => {
   const teams = await profilerService.getTeams();
   return c.json({ success: true, data: teams });
 });
 
-profiler.post('/teams', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.post('/teams', requireRole('admin', 'trainer'), async (c) => {
   const body = await c.req.json();
   const parsed = z.object({ nama: z.string().min(1) }).safeParse(body);
   if (!parsed.success) return c.json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Nama tim tidak valid' } }, 400);
@@ -269,7 +269,7 @@ profiler.post('/teams', requireRole('admin', 'trainer', 'qa'), async (c) => {
   }
 });
 
-profiler.delete('/teams/:id', requireRole('admin', 'trainer', 'qa'), async (c) => {
+profiler.delete('/teams/:id', requireRole('admin', 'trainer'), async (c) => {
   const id = c.req.param('id');
   try {
     await profilerService.deleteTeam(id);

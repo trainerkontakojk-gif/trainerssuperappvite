@@ -6,8 +6,8 @@ import type {
   AgentPeriodSummary, TopAgentData, ParetoData,
 } from '@trainers/types';
 
-const TRAINER_ROLES = ['admin', 'trainer', 'qa'] as const;
-const LEADER_ROLES = ['tl', 'spv', 'om'] as const;
+const TRAINER_ROLES = ['admin', 'trainer'] as const;
+const LEADER_ROLES = ['leader'] as const;
 
 export async function getAccessibleAgentIds(userId: string, role: string): Promise<string[] | null> {
   if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
@@ -342,9 +342,25 @@ export async function createTemuanBatch(
     refreshDashboardSummary(items.period_id, items.service_type).catch(err => {
       console.error('Summary refresh failed:', err);
     });
+
+    // Refresh materialized view concurrently (Requirement 3.3)
+    refreshMaterializedView().catch(err => {
+      console.error('Materialized view refresh failed:', err);
+    });
   }
 
   return { inserted: data?.length ?? 0, skipped: validation.stats.skipped_count, total: items.items.length };
+}
+
+/**
+ * Refreshes the mv_qa_period_summary materialized view concurrently.
+ * Logs failures without throwing (Requirement 3.4).
+ */
+export async function refreshMaterializedView(): Promise<void> {
+  const { error } = await supabaseAdmin.rpc('refresh_mv_qa_period_summary');
+  if (error) {
+    throw new Error(`MV refresh error: ${error.message}`);
+  }
 }
 
 export async function refreshDashboardSummary(
@@ -497,6 +513,31 @@ export async function deleteTemuan(id: string) {
   if (error) throw new Error(`Gagal hapus temuan: ${error.message}`);
 }
 
+// ── Soft-Delete Helpers ─────────────────────────────────────
+
+/**
+ * Returns peserta IDs linked to soft-deleted or inactive profiles.
+ * Used to exclude these from dashboard queries at the database level.
+ * Records where profiler_peserta.user_id is NULL are NOT excluded (treated as not-deleted).
+ */
+async function getSoftDeletedPesertaIds(): Promise<string[]> {
+  const { data: deletedProfiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .or('is_deleted.eq.true,status.eq.inactive');
+
+  if (!deletedProfiles || deletedProfiles.length === 0) return [];
+
+  const profileIds = deletedProfiles.map(p => p.id);
+
+  const { data: pesertaRows } = await supabaseAdmin
+    .from('profiler_peserta')
+    .select('id')
+    .in('user_id', profileIds);
+
+  return (pesertaRows ?? []).map(p => p.id);
+}
+
 // ── Agents ─────────────────────────────────────────────────
 
 export async function getAgents(params: {
@@ -504,7 +545,11 @@ export async function getAgents(params: {
   tim?: string;
   search?: string;
   agent_ids?: string[];
+  showArchived?: boolean;
 }): Promise<any[]> {
+  // Get soft-deleted peserta IDs for exclusion (unless showing archived)
+  const excludedIds = params.showArchived ? [] : await getSoftDeletedPesertaIds();
+
   let query = supabaseAdmin
     .from('profiler_peserta')
     .select('id, nama, tim, batch_name, foto_url, jabatan')
@@ -514,6 +559,11 @@ export async function getAgents(params: {
   if (params.tim) query = query.eq('tim', params.tim);
   if (params.search) query = query.ilike('nama', `%${params.search}%`);
   if (params.agent_ids && params.agent_ids.length > 0) query = query.in('id', params.agent_ids);
+
+  // Apply soft-delete exclusion at database level
+  if (excludedIds.length > 0) {
+    query = query.not('id', 'in', `(${excludedIds.join(',')})`);
+  }
 
   const { data } = await query;
   return data ?? [];
@@ -592,6 +642,7 @@ export async function getDashboardData(params: {
   year?: number;
   peserta_id?: string;
   agent_ids?: string[];
+  showArchived?: boolean;
 }): Promise<DashboardData> {
   const [periods, folders, indicators, weights] = await Promise.all([
     getPeriods(),
@@ -599,6 +650,9 @@ export async function getDashboardData(params: {
     getIndicators(),
     supabaseAdmin.from('qa_service_weights').select('*'),
   ]);
+
+  // Get soft-deleted peserta IDs for exclusion (unless showing archived)
+  const excludedIds = params.showArchived ? [] : await getSoftDeletedPesertaIds();
 
   let query = supabaseAdmin
     .from('qa_temuan')
@@ -618,6 +672,11 @@ export async function getDashboardData(params: {
   }
   if (params.agent_ids && params.agent_ids.length > 0) {
     query = query.in('peserta_id', params.agent_ids);
+  }
+
+  // Apply soft-delete exclusion at database level
+  if (excludedIds.length > 0) {
+    query = query.not('peserta_id', 'in', `(${excludedIds.join(',')})`);
   }
 
   const { data: allTemuan } = await query;
@@ -710,28 +769,48 @@ export async function getDashboardData(params: {
     totalAgents,
   };
 
-  // Cache override: when single period + specific service type, use pre-computed summary
+  // Materialized view override: when single period + specific service type, prefer MV data
   if (params.period_ids?.length === 1 && params.service_type && params.service_type !== 'all') {
     try {
-      const { data: cachedPeriod } = await supabaseAdmin
-        .from('qa_dashboard_period_summary')
+      // Try materialized view first (Requirement 3.2)
+      const { data: mvRow } = await supabaseAdmin
+        .from('mv_qa_period_summary')
         .select('*')
         .eq('period_id', params.period_ids[0])
         .eq('service_type', params.service_type)
         .maybeSingle();
-      if (cachedPeriod) {
+      if (mvRow) {
         summary = {
-          totalDefects: cachedPeriod.total_defects,
-          avgDefectsPerAudit: Number(cachedPeriod.avg_defects_per_audit),
-          zeroErrorRate: Number(cachedPeriod.zero_error_rate),
-          avgAgentScore: Number(cachedPeriod.avg_agent_score),
-          complianceRate: Number(cachedPeriod.compliance_rate),
-          complianceCount: cachedPeriod.compliance_count,
-          totalAgents: cachedPeriod.total_agents,
+          totalDefects: Number(mvRow.total_defects),
+          avgDefectsPerAudit: Number(mvRow.avg_defects_per_audit),
+          zeroErrorRate: Number(mvRow.zero_error_rate) * 100,
+          avgAgentScore: Number(mvRow.avg_agent_score),
+          complianceRate: Number(mvRow.compliance_rate) * 100,
+          complianceCount: Number(mvRow.compliance_count),
+          totalAgents: Number(mvRow.total_agents),
         };
+      } else {
+        // MV returned no rows — fall back to qa_dashboard_period_summary cache
+        const { data: cachedPeriod } = await supabaseAdmin
+          .from('qa_dashboard_period_summary')
+          .select('*')
+          .eq('period_id', params.period_ids[0])
+          .eq('service_type', params.service_type)
+          .maybeSingle();
+        if (cachedPeriod) {
+          summary = {
+            totalDefects: cachedPeriod.total_defects,
+            avgDefectsPerAudit: Number(cachedPeriod.avg_defects_per_audit),
+            zeroErrorRate: Number(cachedPeriod.zero_error_rate),
+            avgAgentScore: Number(cachedPeriod.avg_agent_score),
+            complianceRate: Number(cachedPeriod.compliance_rate),
+            complianceCount: cachedPeriod.compliance_count,
+            totalAgents: cachedPeriod.total_agents,
+          };
+        }
       }
     } catch {
-      // Cache unavailable — use computed values
+      // MV unavailable (Requirement 3.4) — fall back to raw computed values above
     }
   }
 
@@ -810,7 +889,11 @@ export async function getDataReportRows(params: {
   pesertaId?: string;
   indicatorId?: string;
   agent_ids?: string[];
+  showArchived?: boolean;
 }): Promise<any[]> {
+  // Get soft-deleted peserta IDs for exclusion (unless showing archived)
+  const excludedIds = params.showArchived ? [] : await getSoftDeletedPesertaIds();
+
   let query = supabaseAdmin
     .from('qa_temuan')
     .select('*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan), qa_indicators!inner(id, name, category), qa_periods!inner(id, month, year)');
@@ -820,6 +903,11 @@ export async function getDataReportRows(params: {
   if (params.pesertaId) query = query.eq('peserta_id', params.pesertaId);
   if (params.indicatorId) query = query.eq('indicator_id', params.indicatorId);
   if (params.agent_ids && params.agent_ids.length > 0) query = query.in('peserta_id', params.agent_ids);
+
+  // Apply soft-delete exclusion at database level
+  if (excludedIds.length > 0) {
+    query = query.not('peserta_id', 'in', `(${excludedIds.join(',')})`);
+  }
 
   if (params.startMonth && params.year) {
     const startPeriod = await supabaseAdmin

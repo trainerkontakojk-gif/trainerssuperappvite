@@ -768,7 +768,7 @@ export const updateUserStatusSchema = z.object({
 });
 
 export const updateUserRoleSchema = z.object({
-  role: z.string().min(1)
+  role: z.enum(['admin', 'trainer', 'leader', 'agent'])
 });
 
 export const createAccessGroupSchema = z.object({

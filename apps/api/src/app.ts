@@ -49,15 +49,10 @@ app.notFound((c) => {
 const routes = app
   .get('/health', (c) => c.json({ status: 'ok' }))
   .get('/auth/me', (c) => {
-    return c.json<ApiResponse<UserProfile>>({
-      success: true,
-      data: {
-        id: '1',
-        email: 'test@example.com',
-        full_name: 'Test User',
-        role: 'admin',
-      },
-    });
+    return c.json<ApiResponse<never>>({
+      success: false,
+      error: { code: 'DEPRECATED', message: 'Endpoint ini sudah tidak digunakan. Gunakan /v1/me dengan autentikasi.' },
+    }, 410);
   })
   .use('/v1/*', authMiddleware)
   .get('/v1/me', (c) => {

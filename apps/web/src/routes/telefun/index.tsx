@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Play, Square, AlertCircle, Settings } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Play, AlertCircle, Settings } from 'lucide-react';
 import { getApi, putApi } from '../../hooks/useApi';
 import { notify } from '../../lib/toast';
 import type { TelefunAppSettings } from './telefunSettings';
@@ -76,7 +76,7 @@ export default function TelefunLanding() {
     setCallState('connecting');
     setMessages([]);
 
-    const token = localStorage.getItem('supabase_token');
+    const token = localStorage.getItem('auth_token') ?? localStorage.getItem('supabase_token');
     if (!token) { setError('Token tidak ditemukan. Silakan login terlebih dahulu.'); setCallState('idle'); return; }
 
     try {
@@ -167,7 +167,7 @@ export default function TelefunLanding() {
         setError('Gagal terhubung ke server.');
         setCallState('ended');
       };
-    } catch (err) {
+    } catch {
       setError('Gagal mengakses mikrofon.');
       setCallState('ended');
     }

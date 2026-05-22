@@ -2,6 +2,8 @@ import { createRouter, createRoute, createRootRoute, redirect } from '@tanstack/
 import { lazy } from 'react';
 import { DashboardLayout } from './components/Layout';
 import { isRoleAllowed } from './lib/app-config';
+import { supabase } from './lib/supabase';
+import { fetchAuthProfile } from './lib/fetchAuthProfile';
 
 const IndexPage = lazy(() => import('./routes/index'));
 const DashboardPage = lazy(() => import('./routes/dashboard'));
@@ -302,18 +304,31 @@ const unauthorizedRoute = createRoute({
 });
 
 function requireRole(allowedRoles: string[]) {
-  return () => {
-    const profileJson = localStorage.getItem('auth_profile');
-    if (!profileJson) {
+  return async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
       throw redirect({ to: '/' });
     }
+
     try {
-      const profile = JSON.parse(profileJson);
-      if (!isRoleAllowed(profile?.role, allowedRoles)) {
+      // Revalidate profile from server to prevent spoofing
+      const profile = await fetchAuthProfile(session.user.id);
+      
+      if (!profile) {
+        throw redirect({ to: '/' });
+      }
+
+      if (profile.is_deleted || profile.status === 'inactive') {
+        throw redirect({ to: '/waiting-approval' });
+      }
+
+      if (!isRoleAllowed(profile.role, allowedRoles)) {
         throw redirect({ to: '/unauthorized' });
       }
-    } catch {
-      throw redirect({ to: '/' });
+    } catch (error) {
+      console.error('Auth revalidation error:', error);
+      // On network error or other failure, default deny
+      throw redirect({ to: '/unauthorized' });
     }
   };
 }

@@ -86,8 +86,13 @@ Setiap memulai pekerjaan baru (fitur, bug fix, refactor), WAJIB menerapkan **Spe
 
 ### 6. Plan Wajib Dibuat dalam 2 Format (wajib di folder `plan/`)
 Setiap plan implementasi WAJIB dibuat dalam 2 format dan **WAJIB** disimpan di folder `plan/` (bukan di folder lain):
-- **Format HTML** (file: `plan/html/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline estimasi, dependensi, risk register.
-- **Format Markdown** (file: `plan/markdown/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block. Sertakan: spec references, file affected, test strategy, rollback plan.
+- **Format HTML** (file: `plan/html/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser.
+- **Format Markdown** (file: `plan/markdown/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block.
+
+Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
+1. **Requirement** — Tujuan, acceptance criteria, edge cases, constraint teknis, dan spec references.
+2. **Design** — Arsitektur, alur data, component tree, interface changes, dan keputusan teknis.
+3. **Tasklist** — Langkah-langkah implementasi terperinci, file affected, test strategy, timeline estimasi, dependensi, risk register, dan rollback plan.
 
 ### 7. Selalu Referensi Context7 + Superpowers untuk Dokumentasi
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
@@ -139,6 +144,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 17. KETIK Carbon Copy (DONE)
 18. PDKT Carbon Copy (DONE)
 19. Frontend Checklist Fixes — Toast, route guards, pagination, transcript export, draft autosave, Telefun settings, QA versioning (DONE)
+20. Audit Gaps Fix — Telefun replay HTTP layer, profiler duplicate integrity, annotation deletion policy (DONE)
+21. Role Hardening + AI Logging — QA removed from mutation endpoints, adminOnly middleware, AI usage status/error logging, showArchived filter (DONE)
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP

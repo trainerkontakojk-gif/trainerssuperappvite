@@ -50,7 +50,7 @@ export default function ProfilerAdd() {
     setSaving(true);
     setError(null);
     try {
-      await profilerApi.createPeserta(form as any);
+      await profilerApi.createPeserta({ ...form, batch_name: batchName } as any);
       window.location.href = `/profiler/table${qs({ batch: batchName })}`;
     } catch (e: any) {
       setError(e.message);

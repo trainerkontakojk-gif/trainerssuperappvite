@@ -19,10 +19,30 @@ export async function logAiUsage(options: {
   modelId: string;
   usageContext: UsageContext;
   tokens: TokenUsage;
+  status?: 'success' | 'failed' | 'timeout';
+  errorMessage?: string | null;
 }): Promise<void> {
   try {
     const admin = createAdminClient();
     const normalizedModelId = normalizeModelId(options.modelId);
+    const requestStatus = options.status ?? 'success';
+    const isFailure = requestStatus === 'failed' || requestStatus === 'timeout';
+
+    // When status is failed or timeout, token counts are 0
+    const inputTokens = isFailure ? 0 : options.tokens.inputTokens;
+    const outputTokens = isFailure ? 0 : options.tokens.outputTokens;
+    const totalTokens = isFailure ? 0 : options.tokens.totalTokens;
+
+    // Determine error_message value
+    let errorMessageValue: string | null = null;
+    if (isFailure) {
+      const rawMessage = options.errorMessage;
+      if (!rawMessage || rawMessage.trim() === '') {
+        errorMessageValue = 'Unknown error';
+      } else {
+        errorMessageValue = rawMessage.slice(0, 1000);
+      }
+    }
 
     const [{ data: pricing }, { data: billing }] = await Promise.all([
       admin
@@ -56,8 +76,8 @@ export async function logAiUsage(options: {
     }
 
     const estimatedCostUsd =
-      (options.tokens.inputTokens / 1_000_000) * inputPricePerMillion +
-      (options.tokens.outputTokens / 1_000_000) * outputPricePerMillion;
+      (inputTokens / 1_000_000) * inputPricePerMillion +
+      (outputTokens / 1_000_000) * outputPricePerMillion;
 
     await admin.from('ai_usage_logs').insert({
       request_id: options.requestId,
@@ -66,14 +86,16 @@ export async function logAiUsage(options: {
       model_id: normalizedModelId,
       module: options.usageContext.module,
       action: options.usageContext.action,
-      input_tokens: options.tokens.inputTokens,
-      output_tokens: options.tokens.outputTokens,
-      total_tokens: options.tokens.totalTokens,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      total_tokens: totalTokens,
       input_price_usd_per_million: inputPricePerMillion,
       output_price_usd_per_million: outputPricePerMillion,
       usd_to_idr_rate: usdToIdrRate,
       estimated_cost_usd: Math.round(estimatedCostUsd * 1_000_000) / 1_000_000,
       estimated_cost_idr: Math.round(estimatedCostUsd * usdToIdrRate),
+      status: requestStatus,
+      error_message: errorMessageValue,
     });
   } catch (error) {
     const err = error as { code?: string };

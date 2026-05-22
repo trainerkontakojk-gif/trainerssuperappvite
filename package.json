@@ -6,15 +6,21 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "test": "turbo test",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "seed": "tsx scripts/seed.ts",
+    "validate-migrations": "tsx scripts/validate-migrations.ts",
+    "check-integrity": "tsx scripts/data-integrity-checker.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/pg": "^8.20.0",
     "eslint": "^10.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "pg": "^8.21.0",
     "prettier": "^3.0.0",
+    "tsx": "^4.0.0",
     "turbo": "^2.0.0",
     "typescript-eslint": "^8.59.4"
   },

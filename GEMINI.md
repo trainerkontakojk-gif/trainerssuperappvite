@@ -86,8 +86,13 @@ Setiap memulai pekerjaan baru (fitur, bug fix, refactor), WAJIB menerapkan **Spe
 
 ### 6. Plan Wajib Dibuat dalam 2 Format (wajib di folder `plan/`)
 Setiap plan implementasi WAJIB dibuat dalam 2 format dan **WAJIB** disimpan di folder `plan/` (bukan di folder lain):
-- **Format HTML** (file: `plan/html/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser. Sertakan: tujuan, langkah-langkah, timeline estimasi, dependensi, risk register.
-- **Format Markdown** (file: `plan/markdown/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block. Sertakan: spec references, file affected, test strategy, rollback plan.
+- **Format HTML** (file: `plan/html/<nama-fitur>.html`) — Untuk dibaca manusia. Gunakan styling HTML + CSS inline agar mudah dibuka di browser.
+- **Format Markdown** (file: `plan/markdown/<nama-fitur>.md`) — Untuk dibaca AI agent. Gunakan struktur terstruktur dengan heading, tabel, checklist, dan code block.
+
+Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
+1. **Requirement** — Tujuan, acceptance criteria, edge cases, constraint teknis, dan spec references.
+2. **Design** — Arsitektur, alur data, component tree, interface changes, dan keputusan teknis.
+3. **Tasklist** — Langkah-langkah implementasi terperinci, file affected, test strategy, timeline estimasi, dependensi, risk register, dan rollback plan.
 
 ### 7. Selalu Referensi Context7 + Superpowers untuk Dokumentasi
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
@@ -142,8 +147,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 ## Relevant Files
 - `opencode.json` — project-level opencode config with context7 MCP
-- `prd.md` — Original project requirements
-- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core)
+- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index)
 - `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **report-docx-builder**
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)
@@ -156,6 +160,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
+- `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
 - `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils)
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
@@ -168,8 +173,6 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
 - `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-19)
-- `docs/superpowers/specs/` — Detailed architecture and design specs
-- `docs/superpowers/plans/` — Step-by-step implementation plans
 
 ## Routes Reference (apps/web)
 

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, UserPlus, XCircle, Search, Users, CheckCircle2, KeyRound, Settings2, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { useApi, postApi, putApi, deleteApi } from '../../hooks/useApi';
+import { useApi, putApi, deleteApi } from '../../hooks/useApi';
+import { supabase } from '../../lib/supabase';
 import { notify } from '../../lib/toast';
 import { Pagination } from '../../components/ui/Pagination';
 
@@ -137,8 +138,14 @@ export default function UsersPage() {
 
     setUpdating(userId);
     try {
-      // In this vite framework, we can post to backend admin API or send reset request
-      await postApi(`/ai/reset-password-request`, { email: userEmail }); // Using shared API endpoint if any, or general reset request. Wait, the backend has /v1/ai/reset-password or auth reset. Let's see if we have reset-password api. In reference, they called `/api/admin/reset-password`. In our backend we have `/api/v1/auth/reset-password` or similar if any. Let's just mock/provide a consistent call.
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(userEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) {
+        throw resetError;
+      }
+
       setResetSuccess(userId);
       setTimeout(() => setResetSuccess(null), 3000);
     } catch (err: any) {

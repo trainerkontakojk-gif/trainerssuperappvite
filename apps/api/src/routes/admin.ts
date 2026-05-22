@@ -25,18 +25,6 @@ type Variables = {
 
 const admin = new Hono<{ Variables: Variables }>();
 
-// Middleware to assert caller is admin or trainer
-const managerOnly = async (c: any, next: any) => {
-  const profile = c.get('profile');
-  if (profile?.role !== 'admin' && profile?.role !== 'trainer') {
-    return c.json(
-      { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak: Hanya Admin atau Trainer yang memiliki akses' } },
-      403
-    );
-  }
-  await next();
-};
-
 // Middleware to assert caller is admin only
 const adminOnly = async (c: any, next: any) => {
   const profile = c.get('profile');
@@ -49,8 +37,8 @@ const adminOnly = async (c: any, next: any) => {
   await next();
 };
 
-// Apply managerOnly to all routes in this sub-router (except possibly some logs if needed, but logs should be managerOnly too)
-admin.use('/*', managerOnly);
+// Apply adminOnly to all routes in this sub-router
+admin.use('/*', adminOnly);
 
 // ── User Management Endpoints ──────────────────────────────
 admin.get('/users', async (c) => {
@@ -89,7 +77,7 @@ admin.put('/users/:id/role', zValidator('json', updateUserRoleSchema), async (c)
   }
 });
 
-admin.delete('/users/:id', adminOnly, async (c) => {
+admin.delete('/users/:id', async (c) => {
   const userId = c.req.param('id');
   const user = c.get('user');
 
