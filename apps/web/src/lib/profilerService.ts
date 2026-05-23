@@ -1,4 +1,5 @@
 import { postApi, putApi, deleteApi } from "../hooks/useApi";
+import { supabase } from "./supabase";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -42,10 +43,10 @@ export const profilerApi = {
     putApi<ProfilerFolder>(`${BASE}/folders/${id}`, { name }),
   deleteFolder: (id: string) => deleteApi(`${BASE}/folders/${id}`),
   duplicateFolder: (folder_id: string, target_year_id: string) =>
-    postApi<ProfilerFolder>(`${BASE}/folders/duplicate`, {
-      folder_id,
-      target_year_id,
-    }),
+    postApi<{ folder: ProfilerFolder; participants: ProfilerPeserta[] }>(
+      `${BASE}/folders/duplicate`,
+      { folder_id, target_year_id },
+    ),
 
   // Counts
   getFolderCounts: () => fetchApi<Record<string, number>>(`${BASE}/counts`),
@@ -78,8 +79,13 @@ export const profilerApi = {
   deletePeserta: (id: string) => deleteApi(`${BASE}/peserta/${id}`),
   bulkCreatePeserta: (items: Partial<ProfilerPeserta>[]) =>
     postApi<ProfilerPeserta[]>(`${BASE}/peserta/bulk`, { items }),
-  copyPeserta: (peserta_ids: string[], target_batch_name: string) =>
-    postApi<{ copied: number }>(`${BASE}/peserta/copy`, {
+  copyPesertaToFolder: (peserta_ids: string[], target_batch_name: string) =>
+    postApi<ProfilerPeserta[]>(`${BASE}/peserta/copy`, {
+      peserta_ids,
+      target_batch_name,
+    }),
+  movePesertaToBatch: (peserta_ids: string[], target_batch_name: string) =>
+    postApi<{ moved: number }>(`${BASE}/peserta/move`, {
       peserta_ids,
       target_batch_name,
     }),
@@ -87,7 +93,7 @@ export const profilerApi = {
     putApi<void>(`${BASE}/peserta/reorder`, { peserta_ids }),
   bulkReorderPeserta: (updates: { id: string; nomor_urut: number }[]) =>
     postApi<void>(`${BASE}/peserta/bulk-reorder`, { updates }),
-  getGlobalPool: (excludeBatch?: string) => {
+  getGlobalPesertaPool: (excludeBatch?: string) => {
     const q = excludeBatch
       ? `?exclude_batch=${encodeURIComponent(excludeBatch)}`
       : "";
@@ -98,4 +104,23 @@ export const profilerApi = {
   getTeams: () => fetchApi<ProfilerTim[]>(`${BASE}/teams`),
   createTeam: (nama: string) => postApi<ProfilerTim>(`${BASE}/teams`, { nama }),
   deleteTeam: (id: string) => deleteApi(`${BASE}/teams/${id}`),
+
+  // File Upload
+  uploadFoto: async (file: File, pesertaId: string): Promise<string> => {
+    const fileExt = file.name.split(".").pop();
+    const filePath = `${pesertaId}.${fileExt}`;
+    const { data, error } = await supabase.storage
+      .from("profiler-assets")
+      .upload(filePath, file, { upsert: true });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("profiler-assets")
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
+  },
 };

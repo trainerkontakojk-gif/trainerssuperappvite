@@ -13,7 +13,8 @@ import type {
   PdktConsumerType,
   PdktIdentity,
 } from "@trainers/types";
-import { Loader2, Plus } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Loader2, Plus, ArrowLeft } from "lucide-react";
 import { notify } from "../../lib/toast";
 import {
   type PdktAppSettings,
@@ -66,7 +67,11 @@ const defaultConsumerTypes: PdktConsumerType[] = [
   },
 ];
 
-export default function PdktSimulation() {
+interface PdktSimulationProps {
+  onBack?: () => void;
+}
+
+export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -613,7 +618,36 @@ export default function PdktSimulation() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm relative">
+    <div className="flex flex-col h-screen w-full bg-slate-50 relative">
+      {/* Top Header Bar */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shrink-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
+          {onBack ? (
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center"
+              title="Kembali ke Laman Utama"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </button>
+          ) : (
+            <Link
+              to="/pdkt"
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center"
+              title="Kembali ke Laman Utama"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </Link>
+          )}
+          <h1 className="font-semibold text-slate-800 text-lg">
+            Simulasi PDKT
+          </h1>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-1 overflow-hidden p-4 gap-4">
+        <div className="flex-1 flex bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm relative">
       <MailboxSidebar
         items={mailboxItems || []}
         selectedId={selectedId}
@@ -714,6 +748,8 @@ export default function PdktSimulation() {
         sessionDelta={sessionDelta}
         sessionDeltaPending={sessionDeltaPending}
       />
+        </div>
+      </div>
     </div>
   );
 }

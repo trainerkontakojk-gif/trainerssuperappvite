@@ -908,6 +908,35 @@ export interface ProfilerTim {
   created_at?: string;
 }
 
+export type JabatanKey =
+  | "operation_manager"
+  | "spv"
+  | "team_leader"
+  | "trainer"
+  | "wfm"
+  | "qa"
+  | "cca_senior"
+  | "cca"
+  | "cso";
+
+export const labelJabatan: Record<string, string> = {
+  operation_manager: "Operation Manager",
+  spv: "Supervisor",
+  team_leader: "Team Leader",
+  trainer: "Trainer",
+  wfm: "WFM",
+  qa: "QA",
+  cca_senior: "CCA Senior",
+  cca: "CCA",
+  cso: "CSO",
+};
+
+export const labelTim: Record<string, string> = {
+  telepon: "Tim Telepon",
+  chat: "Tim Chat",
+  email: "Tim Email",
+};
+
 // ── Admin Management Types ──────────────────────────────────
 export interface ManagedUser {
   id: string;

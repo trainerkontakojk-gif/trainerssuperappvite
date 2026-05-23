@@ -128,11 +128,11 @@ profiler.post(
         400,
       );
     try {
-      const folder = await profilerService.duplicateFolder(
+      const result = await profilerService.duplicateFolder(
         parsed.data.folder_id,
         parsed.data.target_year_id,
       );
-      return c.json({ success: true, data: folder }, 201);
+      return c.json({ success: true, data: result }, 201);
     } catch (e: any) {
       return c.json(
         { success: false, error: { code: "COPY_ERROR", message: e.message } },
@@ -227,6 +227,7 @@ profiler.post("/peserta", requireRole("admin", "trainer"), async (c) => {
       tim: z.string().min(1),
       jabatan: z.string().min(1),
       nomor_urut: z.number().int().optional(),
+      trainer_id: z.string().optional(),
       foto_url: z.string().nullable().optional(),
       nik_ojk: z.string().nullable().optional(),
       bergabung_date: z.string().nullable().optional(),
@@ -355,19 +356,56 @@ profiler.post("/peserta/copy", requireRole("admin", "trainer"), async (c) => {
       },
       400,
     );
-  try {
-    const count = await profilerService.copyPesertaToFolder(
-      parsed.data.peserta_ids,
-      parsed.data.target_batch_name,
-    );
-    return c.json({ success: true, data: { copied: count } }, 201);
-  } catch (e: any) {
+    try {
+      const peserta = await profilerService.copyPesertaToFolder(
+        parsed.data.peserta_ids,
+        parsed.data.target_batch_name,
+      );
+      return c.json({ success: true, data: peserta }, 201);
+    } catch (e: any) {
     return c.json(
       { success: false, error: { code: "COPY_ERROR", message: e.message } },
       400,
     );
   }
 });
+
+profiler.post(
+  "/peserta/move",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        peserta_ids: z.array(z.string().uuid()).min(1),
+        target_batch_name: z.string().min(1),
+      })
+      .safeParse(body);
+    if (!parsed.success)
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    try {
+      const moved = await profilerService.movePesertaToBatch(
+        parsed.data.peserta_ids,
+        parsed.data.target_batch_name,
+      );
+      return c.json({ success: true, data: { moved } });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "MOVE_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
 
 profiler.put("/peserta/reorder", requireRole("admin", "trainer"), async (c) => {
   const body = await c.req.json();

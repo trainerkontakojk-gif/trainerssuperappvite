@@ -324,10 +324,10 @@ export default function PdktLanding() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden transition-colors duration-500 bg-background"
+            className="fixed inset-0 z-[100] flex flex-col overflow-hidden transition-colors duration-500 bg-background"
           >
-            <div className="w-full max-w-6xl h-full md:max-h-[92vh] md:rounded-[2rem] overflow-hidden relative flex flex-col shadow-2xl shadow-black/10 border border-border/50 bg-card">
-              <PdktSimulation />
+            <div className="w-full h-full relative flex flex-col bg-card">
+              <PdktSimulation onBack={() => setView("home")} />
             </div>
           </motion.div>
         )}

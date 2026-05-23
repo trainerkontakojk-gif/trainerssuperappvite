@@ -1,38 +1,33 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderHook } from "@testing-library/react";
+
+const mockedUseLocation = vi.fn(() => ({ searchStr: "", pathname: "/" }));
+
+vi.mock("@tanstack/react-router", () => ({
+  useLocation: () => mockedUseLocation(),
+}));
+
 import { useQueryParams } from "../hooks/useQueryParams";
 
 describe("useQueryParams", () => {
-  const originalLocation = window.location;
-
   beforeEach(() => {
-    Object.defineProperty(window, "location", {
-      value: { ...originalLocation, search: "" },
-      writable: true,
-    });
-  });
-
-  afterEach(() => {
-    Object.defineProperty(window, "location", {
-      value: originalLocation,
-      writable: true,
-    });
+    mockedUseLocation.mockReturnValue({ searchStr: "", pathname: "/" });
   });
 
   it("returns empty object when no params", () => {
-    window.location.search = "";
+    mockedUseLocation.mockReturnValue({ searchStr: "", pathname: "/" });
     const { result } = renderHook(() => useQueryParams());
     expect(result.current).toEqual({});
   });
 
   it("parses single param", () => {
-    window.location.search = "?batch=Batch+1";
+    mockedUseLocation.mockReturnValue({ searchStr: "?batch=Batch+1", pathname: "/" });
     const { result } = renderHook(() => useQueryParams());
     expect(result.current).toEqual({ batch: "Batch 1" });
   });
 
   it("parses multiple params", () => {
-    window.location.search = "?year=2025&month=3&service=call";
+    mockedUseLocation.mockReturnValue({ searchStr: "?year=2025&month=3&service=call", pathname: "/" });
     const { result } = renderHook(() => useQueryParams());
     expect(result.current).toEqual({
       year: "2025",
@@ -42,7 +37,7 @@ describe("useQueryParams", () => {
   });
 
   it("handles encoded values", () => {
-    window.location.search = "?name=Budi%20Santoso";
+    mockedUseLocation.mockReturnValue({ searchStr: "?name=Budi%20Santoso", pathname: "/" });
     const { result } = renderHook(() => useQueryParams());
     expect(result.current).toEqual({ name: "Budi Santoso" });
   });

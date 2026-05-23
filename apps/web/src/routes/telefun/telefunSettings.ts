@@ -75,13 +75,26 @@ export type TelefunAppSettings = {
 
 export const VOICE_MODELS = [
   {
-    id: "gemini-3.1-flash-live-preview",
-    name: "Gemini 3.1 Flash Live (Preview)",
+    id: 'gemini-3.1-flash-live-preview',
+    name: 'Gemini 3.1 Flash Live',
+    telefunTransport: 'gemini-live',
+    description: 'Generasi terbaru dengan pemahaman konteks terbaik.',
+    disabled: false
   },
   {
-    id: "gemini-3.0-flash-live-preview",
-    name: "Gemini 3.0 Flash Live (Preview)",
+    id: 'gemini-3.0-flash-live-preview',
+    name: 'Gemini 3.0 Flash Live',
+    telefunTransport: 'gemini-live',
+    description: 'Stabil dan optimal untuk latensi rendah.',
+    disabled: false
   },
+  {
+    id: 'openai-gpt4o-realtime',
+    name: 'GPT-4o Realtime',
+    telefunTransport: 'openai-audio',
+    description: 'Model OpenAI dengan kapabilitas audio native.',
+    disabled: true
+  }
 ];
 
 export const MALE_VOICES = [
@@ -369,75 +382,105 @@ export const CONSUMER_GENDERS = [
 ];
 
 export const DISRUPTION_TYPES = [
-  { id: "background_noise", name: "Kebisingan Latar" },
-  { id: "interruption", name: "Interupsi Konsumen" },
-  { id: "stuttering", name: "Gagap/Ragu" },
-  { id: "bad_connection", name: "Koneksi Buruk" },
+  { id: "technical_term_confusion", name: "Bingung Istilah Teknis" },
+  { id: "repeated_question", name: "Pertanyaan Berulang" },
+  { id: "misunderstanding", name: "Salah Paham" },
+  { id: "interruption", name: "Interupsi" },
+  { id: "incomplete_data", name: "Data Tidak Lengkap" },
+  { id: "unclear_voice", name: "Suara Tidak Jelas" },
+  { id: "emotional_escalation", name: "Eskalasi Emosional" },
 ];
 
 export const DEFAULT_CONSUMER_TYPES: TelefunConsumerType[] = [
   {
-    id: "default-male",
-    name: "Budi Santoso",
-    gender: "male",
-    description: "Konsumen pria dewasa, sopan dan kooperatif.",
+    id: 'marah',
+    name: 'Marah & Emosional',
+    gender: 'random',
+    description: 'Konsumen sangat marah, nada bicara tinggi, emosional, dan tidak sabaran. Merasa dirugikan dan menuntut solusi instan. Sering meninggikan suara, memotong pembicaraan agen, dan menggunakan kalimat pendek yang tegas. Tetap terdengar seperti orang sungguhan yang sedang komplain via telepon, bukan karakter fiksi.',
+    difficulty: ConsumerDifficulty.Hard
   },
   {
-    id: "default-female",
-    name: "Siti Rahma",
-    gender: "female",
-    description: "Konsumen wanita dewasa, ramah namun teliti.",
+    id: 'bingung',
+    name: 'Bingung & Gaptek',
+    gender: 'random',
+    description: 'Konsumen awam, agak bingung, dan kurang paham istilah teknis atau alur prosedur. Sering minta penjelasan ulang dengan bahasa sederhana, banyak jeda dan gumaman ("ehm", "anu", "begitu ya?"). Tetap terasa natural seperti orang yang benar-benar butuh dibantu, bukan dibuat bodoh-bodohan.',
+    difficulty: ConsumerDifficulty.Medium
   },
   {
-    id: "angry-male",
-    name: "Rudi Hartono",
-    gender: "male",
-    description: "Konsumen pria yang sedang kesal dan mudah terpancing emosi.",
+    id: 'kritis',
+    name: 'Kritis & Detail',
+    gender: 'random',
+    description: 'Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template atau normatif. Suka meminta dasar aturan, alur resmi, atau SOP yang relevan. Tetap bicara sebagai konsumen yang cerdas dan hati-hati, bukan seperti auditor atau pegawai internal. Pertanyaan spesifik dan terstruktur.',
+    difficulty: ConsumerDifficulty.Hard
   },
   {
-    id: "confused-female",
-    name: "Dewi Lestari",
-    gender: "female",
-    description:
-      "Konsumen wanita yang bingung dan kurang paham istilah teknis.",
+    id: 'ramah',
+    name: 'Ramah & Kooperatif',
+    gender: 'random',
+    description: 'Konsumen sopan, tenang, dan kooperatif. Mau mengikuti arahan agen dan memberikan data yang diminta, tetapi tetap punya masalah yang ingin diselesaikan. Gaya bicara hangat dan wajar, tidak terlalu formal. Sering mengucapkan terima kasih dan menghargai bantuan agen.',
+    difficulty: ConsumerDifficulty.Easy
   },
+  {
+    id: 'terburu-buru',
+    name: 'Terburu-buru',
+    gender: 'random',
+    description: 'Konsumen sedang sempit waktu, misalnya di jalan atau di sela kerja. Ingin jawaban cepat, langsung, dan praktis. Mudah memotong pembicaraan yang terlalu panjang, tetapi tetap realistis dan tidak asal marah. Cenderung memberi respons singkat dan mendesak.',
+    difficulty: ConsumerDifficulty.Medium
+  },
+  {
+    id: 'pasrah',
+    name: 'Pasrah & Sedih',
+    gender: 'random',
+    description: 'Konsumen lelah dan putus asa karena masalahnya belum selesai. Nada bicara sedih, khawatir, dan penuh harap saat menghubungi OJK. Tetap manusiawi, tidak melodramatis, dan cenderung mencari kepastian langkah berikutnya. Sering menghela napas atau bicara pelan.',
+    difficulty: ConsumerDifficulty.Medium
+  }
 ];
 
-export const SCENARIO_PRESETS = [
-  {
-    title: "Pengaduan Pinjol Ilegal",
-    instruction:
-      "Anda adalah konsumen yang menjadi korban pinjaman online ilegal. Anda merasa dirugikan dan ingin melaporkan ke OJK. Anda kesal karena diancam debt collector dan bunga membengkak.",
-  },
-  {
-    title: "Laporan Investasi Bodong",
-    instruction:
-      "Anda adalah konsumen yang tertipu investasi bodong berkedok forex. Anda kehilangan Rp50 juta dan ingin melaporkan ke OJK. Anda panik dan ingin tahu langkah hukum.",
-  },
-  {
-    title: "Klaim Asuransi Ditolak",
-    instruction:
-      "Anda adalah nasabah asuransi yang klaimnya ditolak dengan alasan tidak jelas. Anda sudah memiliki polis selama 3 tahun dan merasa kecewa. Anda ingin mengadu ke OJK.",
-  },
-  {
-    title: "Layanan Customer Service Bank",
-    instruction:
-      "Anda adalah nasabah bank yang kartu ATM-nya ditelan mesin dan tidak mendapat bantuan dari CS. Anda frustrasi dan ingin melaporkan bank ke OJK.",
-  },
-  {
-    title: "Konsultasi Produk Keuangan",
-    instruction:
-      "Anda adalah konsumen awam yang ingin bertanya tentang produk keuangan syariah. Anda ramah namun bingung dengan istilah-istilah perbankan.",
-  },
-];
+
 
 export const DEFAULT_SCENARIOS: TelefunScenario[] = [
-  ...SCENARIO_PRESETS.map((p, i) => ({
-    id: `preset-${i}`,
-    title: p.title,
-    instruction: p.instruction,
+  {
+    id: 'pinjol',
+    category: 'Pinjol',
+    title: 'Pinjol Ilegal',
+    instruction: 'Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.',
     isActive: true,
-  })),
+  },
+  {
+    id: 'penipuan',
+    category: 'Penipuan',
+    title: 'Penipuan Undian',
+    instruction: 'Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.',
+    isActive: true,
+  },
+  {
+    id: 'slik',
+    category: 'SLIK',
+    title: 'Pengecekan SLIK',
+    instruction: 'Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.',
+    isActive: true,
+  },
+  {
+    id: 'asuransi',
+    category: 'Asuransi',
+    title: 'Klaim Asuransi Ditolak',
+    instruction: 'Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.',
+    isActive: true,
+  },
+  {
+    id: 'investasi',
+    category: 'Investasi',
+    title: 'Investasi Bodong',
+    instruction: 'Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).',
+    isActive: true,
+  },
+  {
+    id: 'kartu-kredit',
+    category: 'Perbankan',
+    title: 'Tagihan Kartu Kredit',
+    instruction: 'Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.',
+    isActive: true,
+  }
 ];
 
 export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
@@ -453,7 +496,7 @@ export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
   responsePacingMode: "realistic",
   realisticModeEnabled: false,
   realisticModeDisruptionTypes: [],
-  preferredConsumerTypeId: "default-male",
+  preferredConsumerTypeId: "marah",
   identitySettings: {
     displayName: "",
     gender: "random",

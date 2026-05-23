@@ -147,6 +147,7 @@ export function DashboardLayout() {
   const isPublicRoute = ["/", "/waiting-approval", "/reset-password"].includes(
     pathname,
   );
+  const isStandaloneRoute = ["/pdkt/simulation"].includes(pathname);
 
   // Redirect unauthorized users trying to access private dashboard routes
   useEffect(() => {
@@ -179,7 +180,7 @@ export function DashboardLayout() {
     };
   }, [mobileMenuOpen]);
 
-  if (isPublicRoute) {
+  if (isPublicRoute || isStandaloneRoute) {
     return (
       <Suspense
         fallback={
@@ -446,39 +447,41 @@ export function DashboardLayout() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Sticky Glass Header */}
-        <header className="sticky top-0 z-30 border-b border-border/40 bg-background/70 backdrop-blur-xl shrink-0">
-          <div className="flex h-16 items-center justify-between px-6 lg:px-10">
-            <div className="flex items-center">
-              <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="lg:hidden p-2 rounded-xl text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors mr-3"
-              >
-                <PanelLeftOpen className="h-5 w-5" />
-              </button>
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground leading-none">
-                  {headerContent.eyebrow}
-                </p>
-                <h1 className="font-display mt-1 text-base font-semibold tracking-tight text-foreground leading-none">
-                  {headerContent.title}
-                </h1>
+        {!pathname.startsWith("/profiler") && (
+          <header className="sticky top-0 z-30 border-b border-border/40 bg-background/70 backdrop-blur-xl shrink-0">
+            <div className="flex h-16 items-center justify-between px-6 lg:px-10">
+              <div className="flex items-center">
+                <button
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="lg:hidden p-2 rounded-xl text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors mr-3"
+                >
+                  <PanelLeftOpen className="h-5 w-5" />
+                </button>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-muted-foreground leading-none">
+                    {headerContent.eyebrow}
+                  </p>
+                  <h1 className="font-display mt-1 text-base font-semibold tracking-tight text-foreground leading-none">
+                    {headerContent.title}
+                  </h1>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-3">
-              <ThemeToggle />
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary"
-                title={profile?.full_name || "User"}
-              >
-                {userInitial}
+              <div className="flex items-center gap-3">
+                <ThemeToggle />
+                <div
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary"
+                  title={profile?.full_name || "User"}
+                >
+                  {userInitial}
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* Scrollable Workspace Content */}
-        <section className="flex-1 overflow-y-auto min-w-0">
+        <section className={`flex-1 min-w-0 ${pathname === "/profiler" || pathname === "/profiler/" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
           <Suspense
             fallback={
               <div className="flex items-center justify-center h-full text-gray-400">

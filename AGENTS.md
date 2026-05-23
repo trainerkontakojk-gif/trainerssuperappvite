@@ -159,6 +159,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 20. Audit Gaps Fix — Telefun replay HTTP layer, profiler duplicate integrity, annotation deletion policy (DONE)
 21. Role Hardening + AI Logging — QA removed from mutation endpoints, adminOnly middleware, AI usage status/error logging, showArchived filter (DONE)
 22. Telefun Parity & Advanced Voice Metrics — Realistic mode, voice assessment AI, high-fidelity UI (DONE)
+23. Profiler Parity Fixes — Backend cascade/rename-sync/batch-move, labelJabatan expansion, 2 new modal components, useQueryParams bug fix, html2canvas-tailwind-fix, isReadOnly auth context, label consistency (DONE)
 
 ## Relevant Files
 
@@ -174,6 +175,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/lib/profilerService.ts` — typed Profiler API client
 - `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes, and `dashboard/users`, `dashboard/access-groups`, `dashboard/access-approval`, `dashboard/activities`)
 - `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
+- `apps/web/src/hooks/useProfilerAccess.ts` — profiler role/isReadOnly hook via Supabase auth
+- `apps/web/src/lib/html2canvas-tailwind-fix.ts` — Tailwind v4 oklch() fix for html2canvas exports
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)

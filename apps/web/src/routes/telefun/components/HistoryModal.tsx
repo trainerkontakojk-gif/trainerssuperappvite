@@ -169,140 +169,123 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="absolute inset-0 bg-background/80 backdrop-blur-md"
           />
-
-          <motion.div
+          
+            <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-slate-950/10 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950"
+            className="relative w-full max-w-2xl bg-card border border-border rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
           >
-            <div className="flex items-center justify-between border-b border-slate-950/10 bg-slate-950/[0.02] p-6 dark:border-white/10 dark:bg-white/5">
+            {/* Header */}
+            <div className="p-6 border-b border-border flex items-center justify-between shrink-0 bg-foreground/[0.02]">
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
-                  <HistoryIcon className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+                  <HistoryIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Riwayat Panggilan
-                  </h2>
-                  <p className="text-xs font-mono uppercase tracking-widest text-slate-400 dark:text-white/40">
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground">Riwayat Panggilan</h2>
+                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">
                     {history.length} Rekaman Tersimpan
                   </p>
                 </div>
               </div>
-
               <div className="flex items-center gap-3">
                 {history.length > 0 && (
                   <>
-                    <button
-                      type="button"
+                    <button 
                       onClick={() => exportToCSV(history)}
-                      className="rounded-xl border border-emerald-500/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-600 transition hover:bg-emerald-500/10 dark:text-emerald-400"
+                      className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all border border-emerald-500/20"
                       title="Ekspor ke CSV"
                     >
-                      <FileDown className="h-4 w-4" />
+                      <FileDown className="w-4 h-4" />
                     </button>
-                    <button
-                      type="button"
+                    <button 
                       onClick={handleClear}
                       disabled={isClearing}
-                      className="rounded-xl border border-red-500/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-red-500 transition hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isClearing ? "Menghapus..." : "Hapus Semua"}
+                      {isClearing ? 'Menghapus...' : 'Hapus Semua'}
                     </button>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-full border border-slate-950/10 p-2 transition hover:bg-slate-950/5 dark:border-white/10 dark:hover:bg-white/5"
+                <button 
+                  onClick={onClose} 
+                  className="p-2 hover:bg-foreground/5 rounded-full transition-colors border border-border"
                 >
-                  <X className="h-6 w-6 text-slate-500 dark:text-white/55" />
+                  <X className="w-6 h-6 text-muted-foreground" />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              {sortedHistory.length === 0 ? (
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
+              {history.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
-                  <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-slate-950/10 bg-slate-950/[0.03] dark:border-white/10 dark:bg-white/5">
-                    <Clock className="h-10 w-10 text-slate-400 dark:text-white/35" />
+                  <div className="w-20 h-20 bg-foreground/5 rounded-full flex items-center justify-center mb-6 border border-border">
+                    <Clock className="w-10 h-10 text-muted-foreground" />
                   </div>
-                  <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">
-                    Belum Ada Rekaman
-                  </h3>
-                  <p className="mx-auto max-w-xs text-sm text-slate-500 dark:text-white/55">
-                    Selesaikan simulasi panggilan pertama Anda untuk melihat
-                    rekaman di sini.
+                  <h3 className="text-xl font-bold mb-2 text-foreground">Belum Ada Rekaman</h3>
+                  <p className="text-muted-foreground text-sm max-w-xs mx-auto font-light">
+                    Selesaikan simulasi panggilan pertama Anda untuk melihat rekaman di sini.
                   </p>
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  {sortedHistory.map((record) => (
+                  {sortedHistory.map(rec => (
                     <motion.div
-                      key={record.id}
-                      whileHover={{
-                        scale: 1.01,
-                        backgroundColor: "rgba(0,0,0,0.03)",
-                      }}
-                      className="group relative rounded-3xl border border-slate-950/10 bg-slate-950/[0.02] p-5 transition-all dark:border-white/10 dark:bg-white/5"
+                      key={rec.id}
+                      whileHover={{ scale: 1.01, backgroundColor: 'rgba(var(--foreground),0.03)' }}
+                      className="group relative bg-foreground/[0.02] border border-border rounded-3xl p-5 transition-all"
                     >
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex min-w-0 items-center gap-5">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/5">
-                            <Phone className="h-6 w-6 text-emerald-600/60 dark:text-emerald-400/60" />
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-5">
+                          <div className="w-12 h-12 bg-emerald-500/5 rounded-2xl flex items-center justify-center border border-emerald-500/10">
+                            <Phone className="w-6 h-6 text-emerald-600/60 dark:text-emerald-400/60" />
                           </div>
-                          <div className="min-w-0">
-                            <h4 className="text-sm font-bold leading-tight text-slate-900 dark:text-white">
-                              {record.scenarioTitle}
-                            </h4>
-                            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/40">
-                              {record.consumerName} · {formatDate(record.date)}
-                              {record.configuredDuration
-                                ? ` · Limit: ${record.configuredDuration}m`
-                                : ""}
+                          <div>
+                            <h4 className="text-sm font-bold text-foreground leading-tight">{rec.scenarioTitle}</h4>
+                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">
+                              {rec.consumerName} · {formatDate(rec.date)}
+                              {rec.configuredDuration ? ` · Limit: ${rec.configuredDuration}m` : ''}
                             </p>
                           </div>
                         </div>
-
+                        
                         <div className="flex items-center gap-2">
                           {onReviewSession && (
-                            <button
-                              type="button"
-                              onClick={() => onReviewSession(record)}
-                              className="rounded-xl border border-slate-950/10 bg-white p-3 text-emerald-600 transition hover:bg-slate-950/5 dark:border-white/10 dark:bg-slate-950/20 dark:text-emerald-400 dark:hover:bg-white/5"
+                            <button 
+                              onClick={() => onReviewSession(rec)}
+                              className="p-3 bg-foreground/5 hover:bg-foreground/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-border transition-all"
                               title="Lihat Detail"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => handleDownload(record)}
-                            disabled={downloadingId === record.id}
-                            className="rounded-xl border border-slate-950/10 bg-white p-3 text-emerald-600 transition hover:bg-slate-950/5 disabled:opacity-50 dark:border-white/10 dark:bg-slate-950/20 dark:text-emerald-400 dark:hover:bg-white/5"
+                          <button 
+                            onClick={() => handleDownload(rec)}
+                            disabled={downloadingId === rec.id}
+                            className="p-3 bg-foreground/5 hover:bg-foreground/10 text-emerald-600 dark:text-emerald-400 rounded-xl border border-border transition-all disabled:opacity-50"
                             title="Unduh Rekaman"
                           >
-                            {downloadingId === record.id ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500" />
+                            {downloadingId === rec.id ? (
+                              <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
                             ) : (
-                              <Download className="h-4 w-4" />
+                              <Download className="w-4 h-4" />
                             )}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(record.id)}
-                            disabled={processingId === record.id}
-                            className="rounded-xl border border-red-500/10 bg-red-500/5 p-3 text-red-500 transition hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                          <button 
+                            onClick={() => handleDelete(rec.id)}
+                            disabled={processingId === rec.id}
+                            className="p-3 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl border border-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Hapus"
                           >
-                            {processingId === record.id ? (
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-500/30 border-t-red-500" />
+                            {processingId === rec.id ? (
+                              <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
                             ) : (
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="w-4 h-4" />
                             )}
                           </button>
                         </div>

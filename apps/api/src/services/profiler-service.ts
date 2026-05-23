@@ -65,6 +65,17 @@ export async function renameFolder(
   id: string,
   name: string,
 ): Promise<ProfilerFolder> {
+  // 1. Get old name first
+  const { data: folder, error: fetchError } = await supabaseAdmin
+    .from("profiler_folders")
+    .select("name")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw new Error("Folder tidak ditemukan");
+
+  const oldName = folder.name;
+
+  // 2. Update folder name
   const { data, error } = await supabaseAdmin
     .from("profiler_folders")
     .update({ name })
@@ -72,10 +83,34 @@ export async function renameFolder(
     .select()
     .single();
   if (error) throw new Error(error.message);
+
+  // 3. Sync batch_name on all peserta in this folder
+  const { error: pesertaErr } = await supabaseAdmin
+    .from("profiler_peserta")
+    .update({ batch_name: name })
+    .eq("batch_name", oldName);
+  if (pesertaErr) console.error("Gagal update batch_name peserta:", pesertaErr.message);
+
   return data;
 }
 
 export async function deleteFolder(id: string): Promise<void> {
+  // 1. Get folder name for peserta lookup
+  const { data: folder, error: fetchError } = await supabaseAdmin
+    .from("profiler_folders")
+    .select("name")
+    .eq("id", id)
+    .single();
+  if (fetchError) throw new Error("Folder tidak ditemukan");
+
+  // 2. Hapus semua peserta di folder ini
+  const { error: pesertaErr } = await supabaseAdmin
+    .from("profiler_peserta")
+    .delete()
+    .eq("batch_name", folder.name);
+  if (pesertaErr) throw new Error("Gagal menghapus data peserta: " + pesertaErr.message);
+
+  // 3. Hapus folder
   const { error } = await supabaseAdmin
     .from("profiler_folders")
     .delete()
@@ -86,7 +121,7 @@ export async function deleteFolder(id: string): Promise<void> {
 export async function duplicateFolder(
   folderId: string,
   targetYearId: string,
-): Promise<ProfilerFolder> {
+): Promise<{ folder: ProfilerFolder; participants: ProfilerPeserta[] }> {
   const { data: source, error: fetchError } = await supabaseAdmin
     .from("profiler_folders")
     .select("*")
@@ -94,14 +129,75 @@ export async function duplicateFolder(
     .single();
   if (fetchError) throw new Error("Folder tidak ditemukan");
 
-  const newName = `${source.name} (copy)`;
-  const { data, error } = await supabaseAdmin
+  // Handle name conflict in target year
+  let newName = source.name;
+  const { data: existing } = await supabaseAdmin
+    .from("profiler_folders")
+    .select("name")
+    .eq("year_id", targetYearId)
+    .eq("name", newName);
+
+  if (existing && existing.length > 0) {
+    newName = `${source.name} (Copy)`;
+  }
+
+  const { data: folder, error } = await supabaseAdmin
     .from("profiler_folders")
     .insert({ name: newName, year_id: targetYearId })
     .select()
     .single();
   if (error) throw new Error(error.message);
-  return data;
+
+  // Copy participants
+  const { data: participants } = await supabaseAdmin
+    .from("profiler_peserta")
+    .select("*")
+    .eq("batch_name", source.name);
+
+  const newParticipants: ProfilerPeserta[] = [];
+  if (participants && participants.length > 0) {
+    const rows = participants.map((p) => ({
+      batch_name: newName,
+      nomor_urut: p.nomor_urut,
+      nama: p.nama,
+      tim: p.tim,
+      jabatan: p.jabatan,
+      foto_url: p.foto_url,
+      nik_ojk: p.nik_ojk,
+      bergabung_date: p.bergabung_date,
+      email_ojk: p.email_ojk,
+      no_telepon: p.no_telepon,
+      no_telepon_darurat: p.no_telepon_darurat,
+      nama_kontak_darurat: p.nama_kontak_darurat,
+      hubungan_kontak_darurat: p.hubungan_kontak_darurat,
+      jenis_kelamin: p.jenis_kelamin,
+      agama: p.agama,
+      tgl_lahir: p.tgl_lahir,
+      status_perkawinan: p.status_perkawinan,
+      pendidikan: p.pendidikan,
+      no_ktp: p.no_ktp,
+      no_npwp: p.no_npwp,
+      nomor_rekening: p.nomor_rekening,
+      nama_bank: p.nama_bank,
+      alamat_tinggal: p.alamat_tinggal,
+      status_tempat_tinggal: p.status_tempat_tinggal,
+      nama_lembaga: p.nama_lembaga,
+      jurusan: p.jurusan,
+      previous_company: p.previous_company,
+      pengalaman_cc: p.pengalaman_cc,
+      catatan_tambahan: p.catatan_tambahan,
+      keterangan: p.keterangan,
+    }));
+    const { data: inserted, error: insErr } = await supabaseAdmin
+      .from("profiler_peserta")
+      .insert(rows)
+      .select();
+    if (!insErr && inserted) {
+      newParticipants.push(...inserted);
+    }
+  }
+
+  return { folder, participants: newParticipants };
 }
 
 // ── Peserta ──────────────────────────────────────────────
@@ -429,7 +525,7 @@ export async function bulkCreatePeserta(
 export async function copyPesertaToFolder(
   pesertaIds: string[],
   targetBatchName: string,
-): Promise<number> {
+): Promise<ProfilerPeserta[]> {
   const { data: sourcePeserta } = await supabaseAdmin
     .from("profiler_peserta")
     .select("*")
@@ -509,7 +605,7 @@ export async function copyPesertaToFolder(
     }
     throw new Error(error.message);
   }
-  return data?.length ?? 0;
+  return data ?? [];
 }
 
 export async function reorderPeserta(pesertaIds: string[]): Promise<void> {
@@ -539,6 +635,19 @@ export async function bulkReorderPeserta(
     p_updates: updates,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function movePesertaToBatch(
+  pesertaIds: string[],
+  targetBatchName: string,
+): Promise<number> {
+  if (pesertaIds.length === 0) return 0;
+  const { error } = await supabaseAdmin
+    .from("profiler_peserta")
+    .update({ batch_name: targetBatchName })
+    .in("id", pesertaIds);
+  if (error) throw new Error("Gagal memindahkan peserta: " + error.message);
+  return pesertaIds.length;
 }
 
 export async function getGlobalPesertaPool(

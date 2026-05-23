@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  RouterProvider,
+  createRouter,
+  createRootRoute,
+  createRoute,
+} from "@tanstack/react-router";
 import PdktSimulation from "../routes/pdkt/simulation";
 import { EmailDetailPane } from "../routes/pdkt/components/EmailDetailPane";
 import * as useApiModule from "../hooks/useApi";
@@ -44,8 +50,16 @@ describe("PDKT Mailbox UX", () => {
   });
 
   it("renders mailbox list items", async () => {
-    render(<PdktSimulation />);
-    expect(screen.getAllByText("Sender One").length).toBeGreaterThan(0);
+    const rootRoute = createRootRoute();
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: PdktSimulation,
+    });
+    const routeTree = rootRoute.addChildren([indexRoute]);
+    const router = createRouter({ routeTree });
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByText("Sender One")).toBeDefined();
     expect(screen.getAllByText("Subject One").length).toBeGreaterThan(0);
   });
 });

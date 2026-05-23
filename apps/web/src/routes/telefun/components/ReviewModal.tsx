@@ -276,366 +276,252 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     link.click();
   };
 
+  const showRealisticTabs = record?.realisticModeEnabled;
+
   if (!isOpen || !record) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[220] flex items-center justify-center p-3 sm:p-4 md:p-6">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        />
+      {isOpen && record && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 md:p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="absolute inset-0 bg-background/80 backdrop-blur-md"
+          />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 20 }}
-          className="relative flex w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-slate-950/10 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-950 max-h-[92vh]"
-        >
-          <header className="flex items-start justify-between gap-4 border-b border-slate-950/10 px-6 py-5 dark:border-white/10">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
-                <Phone className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                  Review Telefun
-                </h2>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-white/40">
-                  {record.scenarioTitle}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full border border-slate-950/10 p-2 transition hover:bg-slate-950/5 dark:border-white/10 dark:hover:bg-white/5"
-            >
-              <X className="h-5 w-5 text-slate-500 dark:text-white/55" />
-            </button>
-          </header>
-
-          <div className="flex border-b border-slate-950/10 px-4 sm:px-6 dark:border-white/10 overflow-x-auto">
-            {(
-              [
-                { id: "details", label: "Detail", icon: FileText },
-                { id: "assessment", label: "Assessment", icon: Sparkles },
-                {
-                  id: "voice_dashboard",
-                  label: "Dashboard Suara",
-                  icon: BarChart3,
-                },
-                { id: "replay", label: "Replay", icon: MessageSquare },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center gap-2 px-4 py-4 text-sm font-bold tracking-tight transition whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-slate-500 hover:text-slate-900 dark:text-white/55 dark:hover:text-white"
-                }`}
-              >
-                <tab.icon className="h-4 w-4" />
-                {tab.label}
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId="telefun-review-tab"
-                    className="absolute inset-x-4 bottom-0 h-1 rounded-t-full bg-emerald-500"
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-            {activeTab === "details" && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <StatCard
-                    label="Tanggal"
-                    value={formatDateLabel(record.date)}
-                    icon={Calendar}
-                  />
-                  <StatCard
-                    label="Durasi"
-                    value={formatDuration(record.duration)}
-                    icon={Clock}
-                  />
-                  <StatCard
-                    label="Skor"
-                    value={
-                      record.score != null
-                        ? `${record.score}/100`
-                        : "Belum dinilai"
-                    }
-                    icon={Star}
-                  />
-                  <StatCard
-                    label="Mode"
-                    value={
-                      record.realisticModeEnabled ? "Realistic" : "Standar"
-                    }
-                    icon={Sparkles}
-                  />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-2xl bg-card border border-border rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+          >
+            <div className="p-6 border-b border-border flex items-center justify-between shrink-0 bg-foreground/[0.02]">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+                  <Phone className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
                 </div>
+                <div>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground leading-tight">
+                    {record.scenarioTitle}
+                  </h2>
+                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">
+                    Detail Sesi
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-foreground/5 rounded-full transition-colors border border-border"
+              >
+                <X className="w-6 h-6 text-muted-foreground" />
+              </button>
+            </div>
 
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.9fr]">
-                  <div className="rounded-3xl border border-slate-950/10 bg-slate-950/[0.02] p-5 dark:border-white/10 dark:bg-white/5">
-                    <div className="mb-4 flex items-center gap-2">
-                      <User className="h-4 w-4 text-emerald-500" />
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-                        Ringkasan Sesi
-                      </h3>
-                    </div>
-                    <div className="space-y-3 text-sm text-slate-700 dark:text-white/75">
-                      <p>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          Konsumen:
-                        </span>{" "}
-                        {record.consumerName}
-                      </p>
-                      <p>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          Durasi Limit:
-                        </span>{" "}
-                        {record.configuredDuration
-                          ? `${record.configuredDuration} menit`
-                          : "Tidak dibatasi"}
-                      </p>
-                      <p>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          Scenario:
-                        </span>{" "}
-                        {record.scenarioTitle}
-                      </p>
-                      <p>
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          Recording:
-                        </span>{" "}
-                        {recordingLoading
-                          ? "Memuat tautan..."
-                          : recordingUrl
-                            ? "Tersedia"
-                            : recordingError || "Tidak tersedia"}
-                      </p>
+            {/* Tab Navigation */}
+            <div className="px-6 pt-4 flex gap-4 border-b border-border bg-foreground/[0.01] overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('details')}
+                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'details' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Detail Sesi
+                {activeTab === 'details' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
+              </button>
+              <button
+                onClick={() => setActiveTab('assessment')}
+                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'assessment' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Kualitas Suara Agen
+                {activeTab === 'assessment' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
+              </button>
+              {showRealisticTabs && (
+                <>
+                  <button
+                    onClick={() => setActiveTab('voice_dashboard')}
+                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'voice_dashboard' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Evaluasi Suara
+                    {activeTab === 'voice_dashboard' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('replay')}
+                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'replay' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    Anotasi Replay
+                    {activeTab === 'replay' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <AnimatePresence mode="wait">
+                {activeTab === 'details' && (
+                  <motion.div
+                    key="details"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="space-y-6"
+                  >
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <User className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Konsumen</span>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">{record.consumerName}</p>
+                      </div>
+
+                      <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Calendar className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Tanggal</span>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">
+                          {formatDateLabel(record.date)}
+                        </p>
+                      </div>
+
+                      <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Durasi</span>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">
+                          {formatDuration(record.duration)}
+                          {record.configuredDuration ? <span className="text-xs text-muted-foreground font-normal ml-1">/ limit {record.configuredDuration}m</span> : ''}
+                        </p>
+                      </div>
+
+                      <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Star className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Skor</span>
+                        </div>
+                        <p className="text-sm font-bold text-foreground">
+                          {record.score != null ? `${record.score}/100` : '—'}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="mt-5 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={downloadRecording}
-                        disabled={!recordingUrl}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Download className="h-4 w-4" />
-                        Unduh Rekaman
-                      </button>
-                      {recordingError && (
-                        <button
-                          type="button"
-                          onClick={() => setRecordingError(null)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-950/10 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-950/5 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                          Coba Lagi
-                        </button>
+                    {/* Feedback */}
+                    {record.feedback && (
+                      <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Feedback</span>
+                        </div>
+                        <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                          {record.feedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Recording */}
+                    <div className="bg-foreground/[0.02] border border-border rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Mic2 className="w-4 h-4 text-emerald-600/60 dark:text-emerald-400/60" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rekaman Sesi</span>
+                        </div>
+                        {recordingLoading && <div className="w-3 h-3 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />}
+                      </div>
+
+                      {recordingUrl ? (
+                        <div className="space-y-4">
+                          <audio controls className="w-full h-10" src={recordingUrl}>
+                            Browser Anda tidak mendukung pemutaran audio.
+                          </audio>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={downloadRecording}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 rounded-xl border border-emerald-500/10 transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Unduh Rekaman
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center border border-dashed border-border rounded-xl">
+                          <p className="text-xs text-muted-foreground">{recordingError || 'Rekaman tidak tersedia atau telah dihapus.'}</p>
+                          {recordingError && (
+                            <button
+                              onClick={() => setRecordingError(null)}
+                              className="mt-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                            >
+                              Coba Lagi
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-3xl border border-slate-950/10 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-                      <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-                        Catatan AI
-                      </h3>
-                      <p className="text-sm leading-relaxed text-slate-700 dark:text-white/75">
-                        {record.feedback ||
-                          "Belum ada feedback AI untuk sesi ini."}
-                      </p>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-950/10 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-                      <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-                        Status Data
-                      </h3>
-                      <ul className="space-y-2 text-sm text-slate-700 dark:text-white/75">
-                        <li>
-                          Assessment:{" "}
-                          {effectiveAssessment ? "Ada" : "Belum ada"}
-                        </li>
-                        <li>
-                          Dashboard suara:{" "}
-                          {effectiveVoiceMetrics ? "Ada" : "Belum ada"}
-                        </li>
-                        <li>Anotasi replay: {mappedAnnotations.length}</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {effectiveAssessment && (
-                  <div className="rounded-3xl border border-slate-950/10 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-                    <div className="mb-4 flex items-center gap-2">
-                      <Mic2 className="h-4 w-4 text-emerald-500" />
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-                        Snapshot Assessment
-                      </h3>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <MiniMetric
-                        label="Overall"
-                        value={`${effectiveAssessment.overallScore}/10`}
-                      />
-                      <MiniMetric
-                        label="Kecepatan"
-                        value={`${effectiveAssessment.speakingRate.score}/10`}
-                      />
-                      <MiniMetric
-                        label="Intonasi"
-                        value={`${effectiveAssessment.intonation.score}/10`}
-                      />
-                      <MiniMetric
-                        label="Artikulasi"
-                        value={`${effectiveAssessment.articulation.score}/10`}
-                      />
-                    </div>
-                  </div>
+                  </motion.div>
                 )}
-              </div>
-            )}
 
-            {activeTab === "assessment" && (
-              <div className="space-y-4">
-                <VoiceAssessmentSection
-                  sessionId={record.id}
-                  initialAssessment={effectiveAssessment}
-                  hasAgentRecording={Boolean(
-                    record.agentRecordingPath ||
-                    record.recordingPath ||
-                    recordingUrl,
-                  )}
-                  onAssessmentUpdate={handleAssessmentUpdate}
-                />
-
-                {effectiveAssessment && (
-                  <div className="rounded-3xl border border-slate-950/10 bg-white p-5 dark:border-white/10 dark:bg-slate-900">
-                    <div className="mb-4 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-emerald-500" />
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-                        Ringkasan Cepat
-                      </h3>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-                      <MiniMetric
-                        label="Overall"
-                        value={`${effectiveAssessment.overallScore}/10`}
-                      />
-                      <MiniMetric
-                        label="WPM"
-                        value={`${effectiveAssessment.speakingRate.wordsPerMinute}`}
-                      />
-                      <MiniMetric
-                        label="Intonasi"
-                        value={effectiveAssessment.intonation.verdict}
-                      />
-                      <MiniMetric
-                        label="Artikulasi"
-                        value={effectiveAssessment.articulation.verdict}
-                      />
-                      <MiniMetric
-                        label="Emosi"
-                        value={effectiveAssessment.emotionalTone.dominant}
-                      />
-                    </div>
-                  </div>
+                {activeTab === 'assessment' && (
+                  <motion.div
+                    key="assessment"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                  >
+                    <VoiceAssessmentSection
+                      sessionId={record.id}
+                      initialAssessment={assessment || undefined}
+                      hasAgentRecording={Boolean(record.agentRecordingPath)}
+                      onAssessmentUpdate={handleAssessmentUpdate}
+                    />
+                  </motion.div>
                 )}
-              </div>
-            )}
 
-            {activeTab === "voice_dashboard" && (
-              <VoiceEvaluationDashboard
-                sessionId={record.id}
-                metrics={effectiveVoiceMetrics}
-                isLoading={false}
-                notice={
-                  record.realisticModeEnabled
-                    ? "Metrik suara belum tersedia pada sesi ini."
-                    : "Realistic mode belum aktif pada sesi ini."
-                }
-                onRetry={() => {
-                  setVoiceDashboardMetrics(
-                    record.voiceDashboardMetrics
-                      ? (record.voiceDashboardMetrics as VoiceDashboardMetrics)
-                      : null,
-                  );
-                }}
-              />
-            )}
+                {activeTab === 'voice_dashboard' && showRealisticTabs && (
+                  <motion.div
+                    key="voice_dashboard"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                  >
+                    <VoiceEvaluationDashboard
+                      sessionId={record.id}
+                      metrics={effectiveVoiceMetrics}
+                      isLoading={false}
+                      error={undefined}
+                      notice={undefined}
+                      onRetry={() => {}}
+                    />
+                  </motion.div>
+                )}
 
-            {activeTab === "replay" && (
-              <ReplayAnnotator
-                sessionId={record.id}
-                annotations={mappedAnnotations}
-                recommendations={recommendations}
-                isLoading={summaryLoading || annotationsLoading}
-                error={summaryError || annotationsError || undefined}
-                onRetry={() => {
-                  void refetchSummary();
-                  void refetchAnnotations();
-                }}
-                onAddAnnotation={handleAddAnnotation}
-                onDeleteAnnotation={handleDeleteAnnotation}
-                sessionDurationMs={sessionDurationMs}
-              />
-            )}
-          </div>
-        </motion.div>
-      </div>
+                {activeTab === 'replay' && showRealisticTabs && (
+                  <motion.div
+                    key="replay"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                  >
+                    <ReplayAnnotator
+                      sessionId={record.id}
+                      annotations={mappedAnnotations}
+                      recommendations={[]}
+                      isLoading={annotationsLoading}
+                      error={annotationsError ? String(annotationsError) : undefined}
+                      onRetry={() => {}}
+                      onAddAnnotation={handleAddAnnotation}
+                      onDeleteAnnotation={handleDeleteAnnotation}
+                      sessionDurationMs={record.duration * 1000}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </AnimatePresence>
   );
 };
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-950/10 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
-      <div className="mb-3 flex items-center gap-2">
-        <div className="rounded-lg bg-emerald-500/10 p-1.5">
-          <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
-          {label}
-        </span>
-      </div>
-      <p className="text-sm font-bold text-slate-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-950/5 bg-slate-950/[0.03] p-4 dark:border-white/10 dark:bg-white/5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-white/35">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
-        {value}
-      </p>
-    </div>
-  );
-}
