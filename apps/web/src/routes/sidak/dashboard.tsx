@@ -1,448 +1,405 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useApi } from "../../hooks/useApi";
-import type { DashboardData } from "@trainers/types";
+import type { DashboardData, ParetoData } from "@trainers/types";
 import {
   BarChart3,
-  TrendingDown,
-  Users,
-  CheckCircle2,
+  RefreshCw,
+  Loader2,
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
+  LineChart,
+  Info,
+  ArrowRight,
+  PieChart,
+  Search,
+  Target,
+  Sparkles,
+  ArrowUp,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+import KpiCard from "../../components/sidak/KpiCard";
+import ParamTrendChart from "../../components/sidak/ParamTrendChart";
+import ParetoChart from "../../components/sidak/ParetoChart";
+import FatalDonutChart from "../../components/sidak/FatalDonutChart";
+import ServiceBarChart from "../../components/sidak/ServiceBarChart";
+import TopAgentsTable from "../../components/sidak/TopAgentsTable";
+import DashboardFilters from "../../components/sidak/DashboardFilters";
 
-const SERVICE_LABELS: Record<string, string> = {
-  call: "Call",
-  chat: "Chat",
-  email: "Email",
-  cso: "CSO",
-  pencatatan: "Pencatatan",
-  bko: "BKO",
-  slik: "SLIK",
-};
+function DashboardSkeleton() {
+  return (
+    <div
+      data-testid="sidak-dashboard-skeleton"
+      className="space-y-6 animate-pulse"
+    >
+      <div className="rounded-[2rem] border border-border/70 bg-card p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="h-[120px] rounded-[1.5rem] bg-muted/40" />
+      </div>
 
-const SERVICE_COLORS: Record<string, string> = {
-  call: "#3B82F6",
-  chat: "#10B981",
-  email: "#F59E0B",
-  cso: "#8B5CF6",
-  pencatatan: "#EC4899",
-  bko: "#06B6D4",
-  slik: "#F97316",
-};
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="min-h-[286px] rounded-[2rem] border border-border/70 bg-card p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          >
+            <div className="flex items-start justify-between">
+              <div className="h-12 w-12 rounded-full bg-muted/60" />
+              <div className="h-8 w-20 rounded-full bg-muted/60" />
+            </div>
+            <div className="mt-6 space-y-3">
+              <div className="h-3 w-32 rounded-full bg-muted/60" />
+              <div className="h-12 w-40 rounded-full bg-muted/60" />
+              <div className="h-4 w-48 rounded-full bg-muted/60" />
+            </div>
+            <div className="mt-8 h-16 rounded-b-[1.5rem] bg-muted/40" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <div className="h-[560px] rounded-[2rem] border border-border/70 bg-card" />
+          <div className="h-[420px] rounded-[2rem] border border-border/70 bg-card" />
+        </div>
+        <div className="space-y-6">
+          <div className="h-[520px] rounded-[2rem] border border-border/70 bg-card" />
+          <div className="h-[360px] rounded-[2rem] border border-border/70 bg-card" />
+          <div className="h-[320px] rounded-[2rem] border border-border/70 bg-card" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SidakDashboardPage() {
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [serviceType, setServiceType] = useState<string>("all");
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [selectedService, setSelectedService] = useState("call");
+  const [selectedFolder, setSelectedFolder] = useState("ALL");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [startMonth, setStartMonth] = useState<number | null>(1);
+  const [endMonth, setEndMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [hiddenParams, setHiddenParams] = useState<Set<string> | null>(null);
+
+  const queryParams = useMemo(() => {
+    const p = new URLSearchParams();
+    p.set("year", String(selectedYear));
+    p.set("service_type", selectedService);
+    if (selectedFolder !== "ALL") p.set("folder_ids", selectedFolder);
+    if (startMonth !== null) p.set("startMonth", String(startMonth));
+    if (endMonth !== null) p.set("endMonth", String(endMonth));
+    return p.toString();
+  }, [selectedService, selectedFolder, selectedYear, startMonth, endMonth]);
 
   const { data, loading, refetch } = useApi<DashboardData>(
-    `/sidak/dashboard?year=${year}${serviceType !== "all" ? `&service_type=${serviceType}` : ""}`,
+    `/sidak/dashboard?${queryParams}`,
   );
 
-  const { data: yearsData } = useApi<{ years: number[] }>(
-    "/sidak/dashboard/available-years",
-  );
+  const paramTrendDatasets = data?.paramTrend?.datasets;
+  const defaultHiddenParams = useMemo(() => {
+    const next = new Set<string>();
+    for (const ds of paramTrendDatasets ?? []) {
+      if (!ds.isTotal) next.add(ds.label);
+    }
+    return next;
+  }, [paramTrendDatasets]);
+
+  const activeHiddenParams = hiddenParams ?? defaultHiddenParams;
+
+  const hasVisibleParam =
+    data?.paramTrend?.datasets?.some(
+      (ds) => !ds.isTotal && !activeHiddenParams.has(ds.label),
+    ) ?? false;
 
   useEffect(() => {
-    setPage(1);
-  }, [year, serviceType]);
+    setHiddenParams(null);
+  }, [queryParams]);
 
-  const years = yearsData?.years || [new Date().getFullYear()];
-  const s = data?.summary;
-  const hasData = data && (s?.totalAgents ?? 0) > 0;
-  const hasNoPeriods =
-    data && (s?.totalAgents ?? 0) === 0 && (s?.totalDefects ?? 0) === 0;
+  const handleReset = useCallback(() => {
+    setSelectedService("call");
+    setSelectedFolder("ALL");
+    setSelectedYear(new Date().getFullYear());
+    setStartMonth(1);
+    setEndMonth(new Date().getMonth() + 1);
+    setHiddenParams(null);
+  }, []);
 
-  const topAgents = data?.topAgents || [];
-  const paginatedAgents = topAgents.slice(
-    (page - 1) * pageSize,
-    page * pageSize,
-  );
-  const totalPages = Math.ceil(topAgents.length / pageSize);
+  const summary = data?.summary;
+  const hasSummary = summary && summary.totalAgents > 0;
+  const hasNoData = !data && !loading;
+  const hasNoPeriods = data && !hasSummary && !loading;
 
-  const paretoData = (data?.paretoData || [])
-    .sort((a: { count: number }, b: { count: number }) => b.count - a.count)
-    .slice(0, 8)
-    .map(
-      (
-        p: { name: string; count: number; cumulative: number },
-        i: number,
-        arr: { count: number }[],
-      ) => {
-        const total = arr.reduce(
-          (sum: number, x: { count: number }) => sum + x.count,
-          0,
-        );
+  const paretoSource = data?.paretoData;
+  const sortedPareto = useMemo(() => {
+    if (!paretoSource) return [];
+    return [...paretoSource]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12)
+      .map((p: ParetoData, _i: number, arr: ParetoData[]) => {
+        const total = arr.reduce((s: number, x: ParetoData) => s + x.count, 0);
         return {
-          name: p.name.length > 20 ? p.name.slice(0, 20) + "..." : p.name,
+          name: p.name.length > 15 ? p.name.slice(0, 15) + "..." : p.name,
+          fullName: p.fullName || p.name,
           count: p.count,
           cumulative: total > 0 ? Math.round((p.cumulative / total) * 100) : 0,
+          category: p.category,
         };
-      },
-    );
+      });
+  }, [paretoSource]);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-xl border shadow-sm p-4">
-              <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse" />
-              <div className="mt-3 h-4 w-20 bg-gray-200 rounded animate-pulse" />
-              <div className="mt-2 h-6 w-12 bg-gray-200 rounded animate-pulse" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const availableYears = data?.availableYears ?? [new Date().getFullYear()];
+  const folders = (data?.folders ?? []).map((f: any) => ({
+    id: f.id ?? "",
+    nama: f.name ?? f.nama ?? "",
+  }));
 
-  if (!data) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <BarChart3 className="h-16 w-16 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700">
-          Gagal memuat dashboard
-        </h3>
-        <p className="text-sm text-gray-500 mt-1">
-          Terjadi kesalahan saat mengambil data. Silakan coba lagi.
-        </p>
-        <button
-          onClick={() => refetch()}
-          className="mt-4 px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition-colors"
-        >
-          Coba Lagi
-        </button>
-      </div>
-    );
-  }
+  const sparklines = data?.sparklines ?? {};
+  const calcDelta = (id: string, invert: boolean): number | null => {
+    const points = sparklines[id];
+    if (!points || points.length < 2) return null;
+    const prev = points[points.length - 2].value;
+    const curr = points[points.length - 1].value;
+    if (prev === 0) return null;
+    const delta = ((curr - prev) / prev) * 100;
+    return invert ? -delta : delta;
+  };
 
-  if (hasNoPeriods) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Filter className="h-16 w-16 text-gray-300 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-700">
-          Belum ada periode audit
-        </h3>
-        <p className="text-sm text-gray-500 mt-1 max-w-md">
-          Data SIDAK akan muncul setelah periode audit dibuat dan data temuan
-          diupload. Hubungi admin untuk membuat periode baru.
-        </p>
-      </div>
-    );
-  }
+  const complianceLabel = startMonth !== endMonth ? "Rata-rata Kepatuhan" : "Tingkat Kepatuhan";
+
+  const KPI_CARDS = [
+    { id: "total-defects", label: "Total Temuan QA", value: summary?.totalDefects ?? 0, icon: Search, color: "orange" as const, desc: "Kumulatif temuan parameter", invertDelta: true },
+    { id: "avg-defects", label: "Rata-rata Temuan per Agen", value: (summary?.avgDefectsPerAudit ?? 0).toFixed(1), icon: Target, color: "red" as const, desc: "Rasio temuan / sesi audit", invertDelta: true },
+    { id: "avg-score", label: "Rata-rata Skor", value: `${(summary?.avgAgentScore ?? 0).toFixed(1)}%`, icon: BarChart3, color: "blue" as const, desc: "Kualitas performa rata-rata", invertDelta: false },
+    { id: "compliance", label: complianceLabel, value: `${(summary?.complianceRate ?? 0).toFixed(1)}%`, icon: Sparkles, color: "emerald" as const, desc: `${summary?.complianceCount ?? 0} agen dengan skor ≥ 95`, invertDelta: false },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Header + Filters */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Dashboard QA</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Ringkasan hasil audit kualitas per layanan dan periode.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-gray-600">Tahun</label>
-            <select
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value))}
-              className="rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-gray-600">Layanan</label>
-            <select
-              value={serviceType}
-              onChange={(e) => setServiceType(e.target.value)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
-            >
-              <option value="all">Semua</option>
-              {Object.entries(SERVICE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+    <div className="bg-background min-h-full overflow-x-hidden">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 w-full space-y-6">
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard
-          icon={Users}
-          label="Total Agent"
-          value={s?.totalAgents ?? 0}
-          color="text-blue-600"
-          bg="bg-blue-50"
+        {/* Filter Bar */}
+        <DashboardFilters
+          selectedService={selectedService}
+          onServiceChange={setSelectedService}
+          selectedFolder={selectedFolder}
+          onFolderChange={setSelectedFolder}
+          selectedYear={selectedYear}
+          onYearChange={setSelectedYear}
+          startMonth={startMonth}
+          endMonth={endMonth}
+          onMonthRangeChange={(s, e) => { setStartMonth(s); setEndMonth(e); }}
+          folders={folders}
+          availableYears={availableYears}
         />
-        <MetricCard
-          icon={AlertTriangle}
-          label="Total Temuan"
-          value={s?.totalDefects ?? 0}
-          color="text-red-600"
-          bg="bg-red-50"
-        />
-        <MetricCard
-          icon={CheckCircle2}
-          label="Zero Error Rate"
-          value={`${s?.zeroErrorRate?.toFixed(1) ?? 0}%`}
-          color="text-green-600"
-          bg="bg-green-50"
-        />
-        <MetricCard
-          icon={TrendingDown}
-          label="Avg Score"
-          value={s?.avgAgentScore?.toFixed(1) ?? "0"}
-          color="text-amber-600"
-          bg="bg-amber-50"
-        />
-      </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Score Overview */}
-        <div className="bg-white rounded-xl border shadow-sm p-6">
-          <h3 className="font-semibold mb-4">Overview Skor</h3>
-          {hasData ? (
-            <div className="space-y-3">
-              <ScoreBar label="Avg Agent Score" value={s?.avgAgentScore ?? 0} />
-              <ScoreBar
-                label="Compliance Rate"
-                value={s?.complianceRate ?? 0}
-              />
-              <div className="text-sm text-gray-500 mt-2">
-                {s?.complianceCount ?? 0} agent comply (skor &ge;95)
-              </div>
+        {/* Loading (initial) */}
+        {loading && !data && <DashboardSkeleton />}
+
+        {/* Error */}
+        {hasNoData && (
+          <div className="flex flex-col items-center justify-center py-32 bg-card rounded-2xl border border-border shadow-sm">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-          ) : (
-            <EmptyChart message="Belum ada data untuk periode yang dipilih." />
-          )}
-        </div>
+            <h2 className="text-lg font-bold mb-2">Gagal memuat data</h2>
+            <p className="text-muted-foreground text-sm max-w-sm text-center px-6">Terjadi kesalahan. Silakan coba lagi.</p>
+            <button onClick={() => refetch()} className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" /> Coba Lagi
+            </button>
+          </div>
+        )}
 
-        {/* Pareto Chart */}
-        <div className="bg-white rounded-xl border shadow-sm p-6">
-          <h3 className="font-semibold mb-4">Pareto Temuan</h3>
-          {paretoData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={paretoData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 10 }}
-                  interval={0}
-                  angle={-30}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                  formatter={(value: unknown, name: unknown) => {
-                    const n = String(name || "");
-                    return [
-                      n === "count" ? `${value} temuan` : `${value}%`,
-                      n === "count" ? "Jumlah" : "Kumulatif",
-                    ];
-                  }}
-                />
-                <Bar dataKey="count" fill="#f43f5e" radius={[4, 4, 0, 0]}>
-                  {paretoData.map((_: unknown, i: number) => (
-                    <Cell
-                      key={i}
-                      fill={i < 3 ? "#f43f5e" : i < 5 ? "#f59e0b" : "#3b82f6"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyChart message="Belum ada data parameter untuk pareto." />
-          )}
-        </div>
-      </div>
+        {/* No Data */}
+        {hasNoPeriods && (
+          <div className="flex flex-col items-center justify-center py-32 bg-card rounded-2xl border border-border shadow-sm">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-bold mb-2">Data Tidak Ditemukan</h2>
+            <p className="text-muted-foreground text-sm max-w-sm text-center px-6">Tidak ada rekaman QA untuk filter yang Anda pilih.</p>
+            <button onClick={handleReset} className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" /> Reset Filter
+            </button>
+          </div>
+        )}
 
-      {/* Service Comparison */}
-      <div className="bg-white rounded-xl border shadow-sm p-6">
-        <h3 className="font-semibold mb-4">Perbandingan Layanan</h3>
-        {data.serviceData.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.serviceData.map((svc) => (
-              <div
-                key={svc.serviceType}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
-              >
-                <span className="text-sm font-medium">{svc.name}</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full"
-                      style={{
-                        width: `${Math.min(100, (svc.total / Math.max(...data.serviceData.map((d) => d.total), 1)) * 100)}%`,
-                        backgroundColor:
-                          SERVICE_COLORS[svc.serviceType] || "#6b7280",
-                      }}
-                    />
+        {data && hasSummary && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+            {/* Loading overlay during re-fetch */}
+            {loading && data && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Memperbarui data...</span>
+              </div>
+            )}
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {KPI_CARDS.map((kpi) => (
+                <KpiCard
+                  key={kpi.id}
+                  label={kpi.label}
+                  value={kpi.value}
+                  icon={kpi.icon}
+                  color={kpi.color}
+                  delta={calcDelta(kpi.id, kpi.invertDelta)}
+                  invertDelta={kpi.invertDelta}
+                  desc={kpi.desc}
+                  sparklineData={sparklines[kpi.id]}
+                />
+              ))}
+            </div>
+
+            {/* Analysis Workspace */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+              {/* Left Lane (2/3) */}
+              <div className="lg:col-span-2 space-y-6 lg:space-y-8">
+                {/* Trend Section */}
+                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <LineChart className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold">Tren Kualitas & Parameter</h2>
+                        <p className="text-sm text-muted-foreground">Fluktuasi temuan berdasarkan parameter QA</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-xl border border-border/50">
+                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Mode Awal: Total Temuan</span>
+                    </div>
                   </div>
-                  <span className="font-medium text-sm w-6 text-right">
-                    {svc.total}
-                  </span>
+
+                  {(!data.paramTrend || !data.paramTrend.labels?.length) ? (
+                    <div className="h-[400px] flex flex-col items-center justify-center bg-muted/20 rounded-xl border border-dashed">
+                      <p className="text-sm text-muted-foreground font-medium">Data tren tidak tersedia untuk filter ini</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-center gap-1.5 pb-2">
+                        <span className="text-xs font-bold text-muted-foreground mr-2 uppercase tracking-tighter">Parameter:</span>
+                        {data.paramTrend.datasets.filter((ds) => !ds.isTotal).map((ds) => {
+                          const isHidden = activeHiddenParams.has(ds.label);
+                          return (
+                            <button
+                              key={ds.label}
+                              onClick={() => {
+                                setHiddenParams((prev) => {
+                                  const next = new Set(prev ?? defaultHiddenParams);
+                                  if (next.has(ds.label)) next.delete(ds.label);
+                                  else next.add(ds.label);
+                                  return next;
+                                });
+                              }}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all ${isHidden ? "bg-transparent border-transparent text-muted-foreground hover:bg-muted" : "border-border shadow-sm scale-105 z-10"}`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : ""}`} />
+                              <span className="max-w-[120px] truncate">{ds.label}</span>
+                            </button>
+                          );
+                        })}
+                        <button
+                          onClick={() => setHiddenParams(new Set())}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest ml-auto"
+                        >
+                          Tampilkan Semua <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <div className="h-[360px] w-full mt-2">
+                        <ParamTrendChart
+                          labels={data.paramTrend.labels}
+                          datasets={data.paramTrend.datasets}
+                          showParameters={true}
+                          hiddenKeys={activeHiddenParams}
+                          hideTotal={hasVisibleParam}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Pareto */}
+                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-orange-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold">Root Cause Analysis</h2>
+                      <p className="text-sm text-muted-foreground">Prinsip Pareto: 80% temuan biasanya berasal dari 20% kategori utama</p>
+                    </div>
+                  </div>
+                  {sortedPareto.length > 0 ? (
+                    <ParetoChart data={sortedPareto} />
+                  ) : (
+                    <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
+                      <p className="text-sm text-muted-foreground font-medium">Data kategori temuan belum tersedia</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyChart message="Tidak ada data layanan untuk filter yang dipilih." />
-        )}
-      </div>
 
-      {/* Top Agents Table */}
-      <div className="bg-white rounded-xl border shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Agent dengan Defect Terbanyak</h3>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-xs text-gray-500">
-                {page} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+              {/* Right Lane (1/3) */}
+              <div className="space-y-8">
+                {/* Top Agents */}
+                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+                  <TopAgentsTable
+                    agents={data.topAgents.slice(0, 5)}
+                    serviceType={selectedService}
+                    selectedYear={selectedYear}
+                  />
+                </div>
+
+                {/* Severity Donut */}
+                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                      <PieChart className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold">Komposisi Severity</h3>
+                      <p className="text-xs text-muted-foreground">Parameter Kritikal vs Non-Kritikal</p>
+                    </div>
+                  </div>
+                  {data.donutData && data.donutData.total > 0 ? (
+                    <FatalDonutChart critical={data.donutData.critical} nonCritical={data.donutData.nonCritical} total={data.donutData.total} />
+                  ) : (
+                    <div className="h-64 flex flex-col items-center justify-center text-center p-6 grayscale opacity-60">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                        <PieChart className="w-6 h-6 text-muted-foreground/40" />
+                      </div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Belum Ada Data</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Service Distribution */}
+                <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
+                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-primary rounded-full" />
+                    Distribusi per Layanan
+                  </h3>
+                  {data.serviceData.length > 0 ? (
+                    <div className="h-[280px] w-full">
+                      <ServiceBarChart data={data.serviceData} />
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
+                      <p className="text-sm text-muted-foreground font-medium">Data temuan per layanan belum tersedia</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-        {paginatedAgents.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-gray-500">
-                  <th className="pb-2 font-medium">#</th>
-                  <th className="pb-2 font-medium">Agent</th>
-                  <th className="pb-2 font-medium">Batch</th>
-                  <th className="pb-2 font-medium text-right">Defect</th>
-                  <th className="pb-2 font-medium text-right">Skor</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedAgents.map((agent, idx) => (
-                  <tr key={agent.agentId} className="border-b last:border-0">
-                    <td className="py-2 text-gray-400">
-                      {(page - 1) * pageSize + idx + 1}
-                    </td>
-                    <td className="py-2 font-medium">{agent.nama}</td>
-                    <td className="py-2 text-gray-500">{agent.batch}</td>
-                    <td
-                      className={`py-2 text-right font-medium ${agent.defects > 0 ? "text-red-600" : "text-green-600"}`}
-                    >
-                      {agent.defects}
-                    </td>
-                    <td className="py-2 text-right">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${agent.score >= 85 ? "bg-green-100 text-green-700" : agent.score >= 70 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}
-                      >
-                        {agent.score}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        ) : (
-          <EmptyChart message="Belum ada data agent." />
         )}
       </div>
-    </div>
-  );
-}
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  color,
-  bg,
-}: {
-  icon: any;
-  label: string;
-  value: string | number;
-  color: string;
-  bg: string;
-}) {
-  return (
-    <div className="bg-white rounded-xl border shadow-sm p-4">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center`}
-        >
-          <Icon size={20} className={color} />
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">{label}</p>
-          <p className={`text-xl font-bold ${color}`}>{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  const color =
-    value >= 85 ? "bg-green-500" : value >= 70 ? "bg-amber-500" : "bg-red-500";
-  return (
-    <div>
-      <div className="flex justify-between text-sm mb-1">
-        <span>{label}</span>
-        <span className="font-medium">{value.toFixed(1)}</span>
-      </div>
-      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${Math.min(100, value)}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function EmptyChart({ message }: { message: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-10 text-center">
-      <BarChart3 className="h-10 w-10 text-gray-200 mb-2" />
-      <p className="text-sm text-gray-400">{message}</p>
+      {/* Mobile FAB */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed bottom-6 right-6 z-[100] md:hidden w-14 h-14 rounded-2xl bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+      >
+        <ArrowUp className="w-6 h-6" />
+      </button>
     </div>
   );
 }

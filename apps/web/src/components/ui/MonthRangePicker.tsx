@@ -52,17 +52,16 @@ export function MonthRangePicker({
 
   if (variant === "toolbar") {
     return (
-      <div className={`flex flex-col gap-1 ${className}`}>
-        <div className="flex items-center gap-2">
-          {/* Start Month */}
-          <div className="relative group/select flex-1">
-            <div className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none text-muted-foreground group-focus-within/select:text-foreground transition-colors">
-              <Calendar className="h-3.5 w-3.5" />
+      <div className={`flex flex-col gap-1.5 ${className}`}>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-0 flex-1 group/select">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground transition-colors group-focus-within/select:text-foreground">
+              <Calendar className="h-4 w-4" />
             </div>
             <select
               value={startMonth ?? ""}
               onChange={(e) => handleStartChange(e.target.value)}
-              className={`block w-full h-9 pl-8 pr-7 text-sm font-medium bg-card border rounded-lg focus:ring-1 focus:ring-ring focus:outline-none appearance-none cursor-pointer transition-all ${isInvalidRange ? "border-red-500/50" : "border-border"}`}
+              className={`h-11 w-full appearance-none rounded-[1.2rem] border bg-card px-4 pl-10 pr-9 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-primary/10 ${isInvalidRange ? "border-red-500/50" : "border-border/70"}`}
             >
               <option value="">Awal</option>
               {MONTHS.map((name, i) => (
@@ -71,24 +70,23 @@ export function MonthRangePicker({
                 </option>
               ))}
             </select>
-            <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-muted-foreground">
-              <ChevronRight className="w-3 h-3 rotate-90" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground">
+              <ChevronRight className="h-4 w-4 rotate-90" />
             </div>
           </div>
 
-          <span className="text-muted-foreground text-xs font-bold shrink-0 uppercase tracking-wider px-1">
-            sampai
+          <span className="shrink-0 px-1 text-xs font-black uppercase tracking-[0.28em] text-muted-foreground">
+            S/D
           </span>
 
-          {/* End Month */}
-          <div className="relative group/select flex-1">
-            <div className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none text-muted-foreground group-focus-within/select:text-foreground transition-colors">
-              <Calendar className="h-3.5 w-3.5" />
+          <div className="relative min-w-0 flex-1 group/select">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground transition-colors group-focus-within/select:text-foreground">
+              <Calendar className="h-4 w-4" />
             </div>
             <select
               value={endMonth ?? ""}
               onChange={(e) => handleEndChange(e.target.value)}
-              className={`block w-full h-9 pl-8 pr-7 text-sm font-medium bg-card border rounded-lg focus:ring-1 focus:ring-ring focus:outline-none appearance-none cursor-pointer transition-all ${isInvalidRange ? "border-red-500/50" : "border-border"}`}
+              className={`h-11 w-full appearance-none rounded-[1.2rem] border bg-card px-4 pl-10 pr-9 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-primary/10 ${isInvalidRange ? "border-red-500/50" : "border-border/70"}`}
             >
               <option value="">Akhir</option>
               {MONTHS.map((name, i) => (
@@ -97,26 +95,25 @@ export function MonthRangePicker({
                 </option>
               ))}
             </select>
-            <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-muted-foreground">
-              <ChevronRight className="w-3 h-3 rotate-90" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground">
+              <ChevronRight className="h-4 w-4 rotate-90" />
             </div>
           </div>
 
-          {/* Reset Button */}
           {(startMonth !== null || endMonth !== null) && (
             <button
               onClick={handleReset}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all shrink-0"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.2rem] border border-border/70 bg-card text-muted-foreground shadow-sm transition-all hover:bg-muted hover:text-foreground"
               title="Reset Range"
             >
-              <XCircle className="w-4 h-4" />
+              <XCircle className="h-4 w-4" />
             </button>
           )}
         </div>
         {isInvalidRange && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 animate-in fade-in slide-in-from-top-1 duration-200">
-            <XCircle className="w-3 h-3 text-red-500" />
-            <span className="text-[10px] text-red-500 font-bold uppercase tracking-tight">
+          <div className="flex items-center gap-1.5 px-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+            <XCircle className="h-3 w-3 text-red-500" />
+            <span className="text-[10px] font-bold uppercase tracking-tight text-red-500">
               Rentang bulan tidak valid
             </span>
           </div>

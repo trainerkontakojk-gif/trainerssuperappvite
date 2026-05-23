@@ -1,465 +1,1194 @@
-import { useState, useRef, useEffect } from "react";
-import { useApi, getApi, postApi } from "../../hooks/useApi";
-import type { QAIndicator, QAPeriod } from "@trainers/types";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useApi, getApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
+import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus,
-  Trash2,
-  Save,
-  Upload,
-  Download,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
+  FolderOpen, User as UserIcon, CalendarDays, Plus, Trash2,
+  Pencil, Upload, Download, Check, X, ChevronRight,
+  Loader2, AlertCircle, ShieldCheck, ArrowLeft,
 } from "lucide-react";
-import {
-  generateTemplate,
-  parseExcel,
-  validateImportRows,
-  type ParsedRow,
-} from "../../lib/excel-utils";
+import QaStatePanel from "../../components/sidak/QaStatePanel";
+import NilaiBadge from "../../components/sidak/NilaiBadge";
+import IndicatorDropdown from "../../components/sidak/IndicatorDropdown";
+import TemuanGroupCard from "../../components/sidak/TemuanGroupCard";
+
+const MONTHS = [
+  "Januari", "Februari", "Maret", "April",
+  "Mei", "Juni", "Juli", "Agustus",
+  "September", "Oktober", "November", "Desember",
+];
+
+type Step = "folder" | "agent" | "period" | "list";
+
+const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"];
+const SERVICE_LABELS: Record<string, string> = {
+  call: "Call", chat: "Chat", email: "Email", cso: "CSO",
+  pencatatan: "Pencatatan", bko: "BKO", slik: "SLIK",
+};
+
+const NILAI_OPTIONS = [
+  { v: 0, sub: "Sangat Tidak Sesuai", active: "bg-rose-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
+  { v: 1, sub: "Tidak Sesuai", active: "bg-orange-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
+  { v: 2, sub: "Perlu Perbaikan", active: "bg-amber-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
+  { v: 3, sub: "Sesuai", active: "bg-green-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
+];
+
+function newEntry() {
+  return { uid: Math.random().toString(36).slice(2), indicator_id: "", nilai: 3, ketidaksesuaian: "", sebaiknya: "" };
+}
+
+interface ParsedImportRow {
+  rowNum: number;
+  no_tiket: string;
+  paramName: string;
+  indicator_id: string | null;
+  nilai: number | null;
+  ketidaksesuaian: string;
+  sebaiknya: string;
+  error: string;
+}
+
+interface AgentEntry {
+  id: string;
+  nama: string;
+  batch_name?: string | null;
+  tim?: string | null;
+  jabatan?: string | null;
+}
 
 export default function SidakInputPage() {
-  const { data: periods } = useApi<QAPeriod[]>("/sidak/periods");
-  const { data: agents } = useApi<any[]>("/sidak/agents");
-  const { data: indicators } = useApi<QAIndicator[]>("/sidak/indicators");
-  const [selectedAgent, setSelectedAgent] = useState("");
-  const [selectedPeriod, setSelectedPeriod] = useState("");
+  const [step, setStep] = useState<Step>("folder");
+  const [showAllData, setShowAllData] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<AgentEntry | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<QAPeriod | null>(null);
   const [selectedService, setSelectedService] = useState("call");
+
+  const { data: folders } = useApi<{ id: string; name: string }[]>("/sidak/folders");
+  const { data: periods } = useApi<QAPeriod[]>("/sidak/periods");
+  const { data: indicators, refetch: refetchIndicators } = useApi<QAIndicator[]>(
+    selectedService ? `/sidak/indicators?service_type=${selectedService}` : null,
+  );
+  const [agents, setAgents] = useState<AgentEntry[]>([]);
+  const [temuan, setTemuan] = useState<QATemuan[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [showForm, setShowForm] = useState(false);
   const [noTiket, setNoTiket] = useState("");
-  const [items, setItems] = useState<
-    Array<{
-      indicator_id: string;
-      nilai: number;
-      ketidaksesuaian: string;
-      sebaiknya: string;
-    }>
-  >([]);
+  const [entries, setEntries] = useState([newEntry()]);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editNilai, setEditNilai] = useState(3);
+  const [editKetidaksesuaian, setEditKetidaksesuaian] = useState("");
+  const [editSebaiknya, setEditSebaiknya] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [showImport, setShowImport] = useState(false);
+  const [importTab, setImportTab] = useState<"download" | "upload">("download");
+  const [importRows, setImportRows] = useState<ParsedImportRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [generatingTemplate, setGeneratingTemplate] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Import state
-  const [showImport, setShowImport] = useState(false);
-  const [importRows, setImportRows] = useState<ParsedRow[]>([]);
-  const [importing, setImporting] = useState(false);
+  const indicatorLookup = useMemo(() => {
+    const map = new Map<string, QAIndicator>();
+    (indicators ?? []).forEach((i) => map.set(i.id, i));
+    return map;
+  }, [indicators]);
 
-  // Draft warning
-  const [draftCount, setDraftCount] = useState(0);
+  const indicatorLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    (indicators ?? []).forEach((i) => map.set(i.id, i.name));
+    return map;
+  }, [indicators]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getApi<{ success: boolean; data: any[] }>(
-      `/sidak/rule-versions?service_type=${selectedService}`,
-    )
-      .then((res) => {
-        if (!cancelled)
-          setDraftCount(
-            res.data?.filter((v: any) => v.status === "draft").length ?? 0,
-          );
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedService]);
+  const displayFolders = folders ?? [];
 
-  const filteredIndicators =
-    indicators?.filter((i) => i.service_type === selectedService) ?? [];
+  const handleAgentClick = async (agent: AgentEntry) => {
+    setSelectedAgent(agent);
+    setSelectedPeriod(null);
+    setTemuan([]);
+    setLoading(true);
+    setErrorMsg(null);
 
-  const addItem = () => {
-    if (filteredIndicators.length === 0) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        indicator_id: filteredIndicators[0].id,
-        nilai: 3,
-        ketidaksesuaian: "",
-        sebaiknya: "",
-      },
-    ]);
+    try {
+      const serviceFromTeam: Record<string, string> = {
+        Telepon: "call", Chat: "chat", Email: "email",
+        Mix: "cso", BKO: "bko", "Tim BKO": "bko", SLIK: "slik",
+      };
+      const agentService = serviceFromTeam[agent.tim ?? ""] || "call";
+      setSelectedService(agentService);
+      await refetchIndicators();
+      setStep("period");
+    } catch {
+      setErrorMsg("Gagal memuat data");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateItem = (index: number, field: string, value: any) => {
-    setItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+  const handlePeriodClick = async (period: QAPeriod) => {
+    if (!selectedAgent) return;
+    setSelectedPeriod(period);
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const result = await getApi<{ items: QATemuan[]; total: number }>(
+        `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${period.id}&service_type=${selectedService}&limit=200`,
+      );
+      setTemuan(result.items ?? []);
+      setStep("list");
+    } catch {
+      setErrorMsg("Gagal memuat temuan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFolderClick = async (folder: string) => {
+    setSelectedFolder(folder);
+    setSelectedAgent(null);
+    setSelectedPeriod(null);
+    setTemuan([]);
+    setLoading(true);
+
+    try {
+      const result = await getApi<AgentEntry[]>(
+        `/sidak/agents?batch_name=${encodeURIComponent(folder)}&show_archived=false`,
+      );
+      setAgents(result ?? []);
+      setStep("agent");
+    } catch {
+      setErrorMsg("Gagal memuat agen");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateEntry = (uid: string, patch: Record<string, any>) => {
+    setEntries((prev) =>
+      prev.map((e) => (e.uid === uid ? { ...e, ...patch } : e)),
     );
   };
 
-  const removeItem = (index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
+  const resetForm = () => {
+    setNoTiket("");
+    setEntries([newEntry()]);
+    setShowForm(false);
+    setErrorMsg(null);
   };
 
-  const handleSubmit = async () => {
-    if (!selectedAgent || !selectedPeriod || items.length === 0) {
-      setMessage({ type: "error", text: "Lengkapi semua field" });
+  const handleSave = async () => {
+    if (!selectedAgent || !selectedPeriod) return;
+    if (entries.some((e) => !e.indicator_id)) {
+      setErrorMsg("Semua parameter wajib dipilih.");
       return;
     }
+    if (!noTiket.trim()) {
+      const ok = window.confirm(
+        "No. Tiket kosong. Setiap temuan tanpa no. tiket dihitung sebagai sesi terpisah. Lanjutkan?",
+      );
+      if (!ok) return;
+    }
     setSaving(true);
-    setMessage(null);
+    setErrorMsg(null);
     try {
-      await postApi("/sidak/temuan/batch", {
-        peserta_id: selectedAgent,
-        period_id: selectedPeriod,
+      const normalizedTicket = noTiket.trim();
+      const temuanList = entries.map((entry) => ({
+        indicator_id: entry.indicator_id,
+        no_tiket: normalizedTicket || undefined,
+        nilai: entry.nilai,
+        ketidaksesuaian: entry.ketidaksesuaian || undefined,
+        sebaiknya: entry.sebaiknya || undefined,
+      }));
+      const created = await postApi<QATemuan[]>("/sidak/temuan/batch", {
+        peserta_id: selectedAgent.id,
+        period_id: selectedPeriod.id,
         service_type: selectedService,
-        no_tiket: noTiket || null,
-        items: items.map((i) => ({
-          indicator_id: i.indicator_id,
-          nilai: i.nilai,
-          ketidaksesuaian: i.ketidaksesuaian || null,
-          sebaiknya: i.sebaiknya || null,
-        })),
+        no_tiket: normalizedTicket || null,
+        items: temuanList,
       });
-      setMessage({ type: "success", text: "Temuan berhasil disimpan!" });
-      setItems([]);
-      setNoTiket("");
+      setTemuan((prev) => [...(created ?? []).reverse(), ...prev]);
+      resetForm();
+      setSuccessMsg(`${created?.length ?? 0} temuan berhasil disimpan!`);
+      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+      setErrorMsg(e.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDownloadTemplate = async () => {
-    if (!indicators) return;
-    const buf = await generateTemplate(indicators, selectedService);
-    const blob = new Blob([buf], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  const startEdit = (item: { id: string; nilai: number; ketidaksesuaian?: string | null; sebaiknya?: string | null }) => {
+    setEditingId(item.id);
+    setEditNilai(item.nilai);
+    setEditKetidaksesuaian(item.ketidaksesuaian ?? "");
+    setEditSebaiknya(item.sebaiknya ?? "");
+    setDeletingId(null);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const handleSaveEdit = async (id: string) => {
+    setSavingEdit(true);
+    setErrorMsg(null);
+    try {
+      await putApi(`/sidak/temuan/${id}`, {
+        nilai: editNilai,
+        ketidaksesuaian: editKetidaksesuaian || null,
+        sebaiknya: editSebaiknya || null,
+      });
+      setTemuan((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? { ...t, nilai: editNilai, ketidaksesuaian: editKetidaksesuaian, sebaiknya: editSebaiknya }
+            : t,
+        ),
+      );
+      setEditingId(null);
+      setSuccessMsg("Temuan berhasil diperbarui!");
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e: any) {
+      setErrorMsg(e.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (deletingId !== id) {
+      setDeletingId(id);
+      setEditingId(null);
+      return;
+    }
+    try {
+      await deleteApi(`/sidak/temuan/${id}`);
+      setTemuan((prev) => prev.filter((t) => t.id !== id));
+      setDeletingId(null);
+      setSuccessMsg("Temuan berhasil dihapus!");
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e: any) {
+      setErrorMsg(e.message);
+      setDeletingId(null);
+    }
+  };
+
+  const groupedTemuan = useMemo(() => {
+    const groups: { key: string; label: string | null; items: QATemuan[] }[] = [];
+    const keyToGroup = new Map<string, number>();
+    temuan.forEach((t) => {
+      const key = t.no_tiket?.trim() || `__solo_${t.id}`;
+      if (!keyToGroup.has(key)) {
+        keyToGroup.set(key, groups.length);
+        groups.push({ key, label: t.no_tiket?.trim() || null, items: [] });
+      }
+      groups[keyToGroup.get(key)!].items.push(t);
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `template-temuan-${selectedService}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return groups;
+  }, [temuan]);
+
+  const handleDownloadTemplate = async () => {
+    if (!indicators || !selectedAgent || !selectedPeriod) return;
+    setGeneratingTemplate(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "SIDAK";
+      wb.created = new Date();
+
+      const HEADER_FILL: any = { type: "pattern", pattern: "solid", fgColor: { argb: "FF7C3AED" } };
+      const HEADER_FONT: any = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+
+      const wsParams = wb.addWorksheet("_Params");
+      wsParams.state = "veryHidden";
+      indicators.forEach((ind, i) => {
+        wsParams.getCell(`A${i + 1}`).value = ind.name;
+      });
+
+      const ws = wb.addWorksheet("Input Temuan");
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+      ws.columns = [
+        { key: "tiket", header: "No. Tiket", width: 18 },
+        { key: "param", header: "Parameter", width: 48 },
+        { key: "nilai", header: "Nilai (0-3)", width: 13 },
+        { key: "ktdk", header: "Ketidaksesuaian", width: 42 },
+        { key: "sbknya", header: "Sebaiknya", width: 42 },
+      ];
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell((cell: any) => {
+        cell.fill = HEADER_FILL;
+        cell.font = HEADER_FONT;
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+      });
+
+      indicators.slice(0, 3).forEach((ind, i) => {
+        ws.addRow({
+          tiket: `L${selectedPeriod.year}${String(selectedPeriod.month).padStart(2, "0")}${String(i + 1).padStart(2, "0")}`,
+          param: ind.name,
+          nilai: i === 0 ? 2 : i === 1 ? 1 : 0,
+          ktdk: i === 0 ? "Contoh ketidaksesuaian" : "",
+          sbknya: i === 0 ? "Contoh perbaikan" : "",
+        });
+      });
+
+      const paramCount = indicators.length;
+      for (let r = 2; r <= 101; r++) {
+        ws.getCell(`B${r}`).dataValidation = {
+          type: "list",
+          allowBlank: true,
+          formulae: [`_Params!$A$1:$A$${paramCount}`],
+        };
+        ws.getCell(`C${r}`).dataValidation = {
+          type: "whole",
+          operator: "between",
+          allowBlank: true,
+          formulae: [0, 3],
+        };
+      }
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Template_SIDAK_${selectedAgent.nama.replace(/\s/g, "_")}_${MONTHS[selectedPeriod.month - 1]}_${selectedPeriod.year}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErrorMsg("Gagal membuat template Excel.");
+    } finally {
+      setGeneratingTemplate(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !indicators) return;
+    setParsing(true);
     try {
-      const rows = await parseExcel(file, indicators, selectedService);
-      setImportRows(rows);
-    } catch (err) {
-      setMessage({ type: "error", text: "Gagal membaca file Excel." });
+      const XLSX = await import("xlsx");
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = new Uint8Array(event.target!.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: "array" });
+          const sheetName = wb.SheetNames.find((n: string) => n === "Input Temuan") ?? wb.SheetNames[0];
+          const ws = wb.Sheets[sheetName];
+          const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+          const paramMap = new Map(indicators.map((i) => [i.name.toLowerCase().trim(), i]));
+          const result: ParsedImportRow[] = [];
+
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || (Array.isArray(row) && row.every((c) => c === "" || c === null || c === undefined)))
+              continue;
+            const no_tiket = String(row[0] ?? "").trim();
+            const paramName = String(row[1] ?? "").trim();
+            const nilaiRaw = row[2];
+            const ketidaksesuaian = String(row[3] ?? "").trim();
+            const sebaiknya = String(row[4] ?? "").trim();
+            let error = "";
+            let indicator_id: string | null = null;
+            let nilai: number | null = null;
+
+            const matched = paramMap.get(paramName.toLowerCase());
+            if (!paramName) error = "Parameter kosong";
+            else if (!matched) error = `Parameter "${paramName}" tidak dikenali`;
+            else indicator_id = matched.id;
+
+            const nilaiNum = Number(nilaiRaw);
+            if (nilaiRaw === "" || nilaiRaw === null || nilaiRaw === undefined) {
+              nilai = 3;
+            } else if (isNaN(nilaiNum) || ![0, 1, 2, 3].includes(nilaiNum)) {
+              error = `Nilai "${nilaiRaw}" tidak valid (harus 0-3)`;
+            } else {
+              nilai = nilaiNum;
+            }
+
+            result.push({
+              rowNum: i + 1,
+              no_tiket,
+              paramName,
+              indicator_id,
+              nilai,
+              ketidaksesuaian,
+              sebaiknya,
+              error,
+            });
+          }
+
+          setImportRows(result);
+          setImportTab("upload");
+        } catch {
+          setErrorMsg("Gagal membaca file Excel.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch {
+      setErrorMsg("Gagal membaca file.");
+    } finally {
+      setParsing(false);
     }
   };
 
-  const handleImport = async () => {
+  const handleImportSave = async () => {
     if (!selectedAgent || !selectedPeriod || importRows.length === 0) return;
-    setImporting(true);
-    setMessage(null);
-
-    const { valid, invalid } = validateImportRows(importRows);
-    if (valid.length === 0) {
-      setMessage({
-        type: "error",
-        text: "Tidak ada data valid untuk diimport.",
-      });
-      setImporting(false);
+    const invalid = importRows.filter((r) => r.error);
+    if (invalid.length > 0) {
+      setErrorMsg("Terdapat baris dengan error. Perbaiki semua error terlebih dahulu.");
       return;
     }
-
+    if (importRows.some((r) => !r.indicator_id)) {
+      setErrorMsg("Terdapat baris dengan parameter tidak valid.");
+      return;
+    }
+    setImporting(true);
+    setErrorMsg(null);
     try {
-      await postApi("/sidak/temuan/batch", {
-        peserta_id: selectedAgent,
-        period_id: selectedPeriod,
+      const valid = importRows.filter((r) => !r.error && r.indicator_id && r.nilai !== null);
+      const created = await postApi<QATemuan[]>("/sidak/temuan/batch", {
+        peserta_id: selectedAgent.id,
+        period_id: selectedPeriod.id,
         service_type: selectedService,
+        no_tiket: null,
         items: valid.map((r) => ({
           indicator_id: r.indicator_id!,
-          nilai: r.nilai,
+          nilai: r.nilai!,
           ketidaksesuaian: r.ketidaksesuaian || null,
           sebaiknya: r.sebaiknya || null,
         })),
       });
-      setMessage({
-        type: "success",
-        text: `${valid.length} temuan berhasil diimport!${invalid.length > 0 ? ` ${invalid.length} dilewati.` : ""}`,
-      });
-      setImportRows([]);
+      setTemuan((prev) => [...(created ?? []).reverse(), ...prev]);
       setShowImport(false);
+      setImportRows([]);
+      setSuccessMsg(`${created?.length ?? 0} temuan berhasil diimport!`);
+      setTimeout(() => setSuccessMsg(null), 4000);
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message });
+      setErrorMsg(e.message);
     } finally {
       setImporting(false);
     }
   };
 
-  const { valid: validRows, invalid: invalidRows } =
-    validateImportRows(importRows);
+  const resetToStep = (target: Step) => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    resetForm();
+    setDeletingId(null);
+    setEditingId(null);
+    if (target === "folder") {
+      setSelectedFolder(null);
+      setSelectedAgent(null);
+      setSelectedPeriod(null);
+      setTemuan([]);
+    } else if (target === "agent") {
+      setSelectedAgent(null);
+      setSelectedPeriod(null);
+      setTemuan([]);
+    } else if (target === "period") {
+      setSelectedPeriod(null);
+      setTemuan([]);
+    }
+    setStep(target);
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Input Audit</h2>
-        <button
-          onClick={() => setShowImport(!showImport)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
-        >
-          <Upload size={16} /> Import Excel
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`p-3 rounded-lg text-sm ${message.type === "success" ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}
-        >
-          {message.text}
-        </div>
-      )}
-
-      {draftCount > 0 && (
-        <div className="flex items-start gap-2 p-3 rounded-lg text-sm bg-amber-50 text-amber-800 border border-amber-200">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <div>
-            <span className="font-semibold">
-              Draft parameter belum dipublish.
-            </span>{" "}
-            Ada {draftCount} draft versi aturan untuk layanan ini yang belum
-            dipublish. Upload akan menggunakan parameter yang sudah published.
-          </div>
-        </div>
-      )}
-
-      {showImport && (
-        <div className="bg-white rounded-xl border shadow-sm p-6 space-y-4">
-          <h3 className="font-semibold">Import Excel</h3>
-          <div className="flex gap-3">
-            <button
-              onClick={handleDownloadTemplate}
-              className="flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-600 rounded-lg text-sm hover:bg-indigo-50"
-            >
-              <Download size={16} /> Download Template
-            </button>
-            <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 cursor-pointer">
-              <Upload size={16} /> Pilih File Excel
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-          </div>
-
-          {importRows.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-sm text-green-600">
-                  <CheckCircle size={14} /> {validRows.length} Valid
-                </span>
-                <span className="flex items-center gap-1 text-sm text-red-600">
-                  <XCircle size={14} /> {invalidRows.length} Invalid
-                </span>
-              </div>
-              <div className="max-h-60 overflow-auto border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="p-2 text-left">No Tiket</th>
-                      <th className="p-2 text-left">Indikator</th>
-                      <th className="p-2 text-center">Nilai</th>
-                      <th className="p-2 text-left">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importRows.map((r, i) => (
-                      <tr
-                        key={i}
-                        className={`border-t ${r.error ? "bg-red-50" : ""}`}
-                      >
-                        <td className="p-2">{r.no_tiket}</td>
-                        <td className="p-2">{r.indicator_name}</td>
-                        <td className="p-2 text-center">{r.nilai}</td>
-                        <td className="p-2">
-                          {r.error ? (
-                            <span className="text-xs text-red-600">
-                              {r.error}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-green-600">OK</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <button
-                onClick={handleImport}
-                disabled={importing || validRows.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50"
-              >
-                <Upload size={16} />{" "}
-                {importing
-                  ? "Mengimport..."
-                  : `Import ${validRows.length} Temuan`}
-              </button>
+    <main className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* BREADCRUMB */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 text-sm"
+          >
+            <div className="p-2 bg-primary/10 rounded-xl">
+              <ShieldCheck className="w-4 h-4 text-primary" />
             </div>
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-white rounded-xl border shadow-sm p-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Agent
-          </label>
-          <select
-            className="w-full border rounded-lg p-2"
-            value={selectedAgent}
-            onChange={(e) => setSelectedAgent(e.target.value)}
-          >
-            <option value="">Pilih Agent</option>
-            {(agents ?? []).map((a: any) => (
-              <option key={a.id} value={a.id}>
-                {a.nama} - {a.batch_name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Periode
-          </label>
-          <select
-            className="w-full border rounded-lg p-2"
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-          >
-            <option value="">Pilih Periode</option>
-            {(periods ?? []).map((p: any) => (
-              <option key={p.id} value={p.id}>
-                {p.month}/{p.year}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Service
-          </label>
-          <select
-            className="w-full border rounded-lg p-2"
-            value={selectedService}
-            onChange={(e) => {
-              setSelectedService(e.target.value);
-              setImportRows([]);
-            }}
-          >
-            {["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].map(
-              (s) => (
-                <option key={s} value={s}>
-                  {s.toUpperCase()}
-                </option>
-              ),
-            )}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            No Tiket
-          </label>
-          <input
-            className="w-full border rounded-lg p-2"
-            value={noTiket}
-            onChange={(e) => setNoTiket(e.target.value)}
-            placeholder="Opsional"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border shadow-sm p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold">Indikator</h3>
-          <button
-            onClick={addItem}
-            className="flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700"
-          >
-            <Plus size={16} /> Tambah Indikator
-          </button>
-        </div>
-
-        {items.length === 0 ? (
-          <p className="text-gray-400 text-sm py-4 text-center">
-            Belum ada indikator. Klik "Tambah Indikator" untuk mulai.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((item, i) => {
-              const ind = filteredIndicators.find(
-                (ind) => ind.id === item.indicator_id,
-              );
+            <span className="text-muted-foreground">SIDAK</span>
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+            {(["folder", "agent", "period", "list"] as Step[]).map((s, idx) => {
+              const isActive = step === s;
+              const isPast = ["folder", "agent", "period", "list"].indexOf(step) > idx;
               return (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
-                >
-                  <select
-                    className="flex-1 border rounded-lg p-2 text-sm"
-                    value={item.indicator_id}
-                    onChange={(e) =>
-                      updateItem(i, "indicator_id", e.target.value)
-                    }
-                  >
-                    {filteredIndicators.map((ind) => (
-                      <option key={ind.id} value={ind.id}>
-                        {ind.name} ({ind.category})
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="w-20 border rounded-lg p-2 text-sm"
-                    value={item.nilai}
-                    onChange={(e) =>
-                      updateItem(i, "nilai", parseInt(e.target.value))
-                    }
-                  >
-                    {[0, 1, 2, 3].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="flex-1 border rounded-lg p-2 text-sm"
-                    placeholder="Ketidaksesuaian"
-                    value={item.ketidaksesuaian}
-                    onChange={(e) =>
-                      updateItem(i, "ketidaksesuaian", e.target.value)
-                    }
-                  />
-                  <input
-                    className="flex-1 border rounded-lg p-2 text-sm"
-                    placeholder="Sebaiknya"
-                    value={item.sebaiknya}
-                    onChange={(e) => updateItem(i, "sebaiknya", e.target.value)}
-                  />
+                <span key={s} className="flex items-center gap-2">
+                  {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" />}
                   <button
-                    onClick={() => removeItem(i)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                    type="button"
+                    onClick={() => isPast && resetToStep(s)}
+                    className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+                      isActive
+                        ? "text-primary"
+                        : isPast
+                          ? "text-muted-foreground hover:text-primary"
+                          : "text-muted-foreground/40"
+                    }`}
                   >
-                    <Trash2 size={16} />
+                    {s === "folder" ? "Folder" : s === "agent" ? "Agen" : s === "period" ? "Periode" : "Temuan"}
                   </button>
-                </div>
+                </span>
               );
             })}
-          </div>
-        )}
+          </motion.div>
 
-        {items.length > 0 && (
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <Save size={18} /> {saving ? "Menyimpan..." : "Simpan Temuan"}
-          </button>
-        )}
+          {/* MESSAGES */}
+          <AnimatePresence>
+            {errorMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {errorMsg}
+              </motion.div>
+            )}
+            {successMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 text-sm flex items-center gap-2"
+              >
+                <Check className="w-4 h-4 shrink-0" />
+                {successMsg}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* STEP 1: FOLDER SELECTION */}
+          {step === "folder" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
+                    Pilih Folder
+                  </h1>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Pilih folder/tim untuk memulai input temuan audit.
+                  </p>
+                </div>
+              </div>
+
+              {displayFolders.length === 0 ? (
+                <QaStatePanel
+                  type="empty"
+                  title="Belum ada folder"
+                  description="Tidak ada folder yang tersedia untuk input temuan."
+                />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {displayFolders.map((f, i) => (
+                    <motion.button
+                      key={f.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      type="button"
+                      onClick={() => handleFolderClick(f.name)}
+                      className="group relative p-4 rounded-2xl bg-card/50 border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
+                          <FolderOpen className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-center text-foreground/80 leading-tight">
+                          {f.name}
+                        </span>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* STEP 2: AGENT SELECTION */}
+          {step === "agent" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => resetToStep("folder")}
+                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
+                      Pilih Agen
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground text-sm mt-1 ml-9">
+                    Folder: <span className="font-semibold text-foreground/70">{selectedFolder}</span>
+                  </p>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-4 rounded-2xl bg-card/50 border border-border animate-pulse">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-foreground/10" />
+                        <div className="h-3 w-20 bg-foreground/10 rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : agents.length === 0 ? (
+                <QaStatePanel
+                  type="empty"
+                  title="Tidak ada agen"
+                  description={`Tidak ditemukan agen untuk folder "${selectedFolder}".`}
+                />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {agents.map((agent, i) => (
+                    <motion.button
+                      key={agent.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      type="button"
+                      onClick={() => handleAgentClick(agent)}
+                      className="group relative p-4 rounded-2xl bg-card/50 border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
+                          {agent.nama.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-xs font-bold text-center text-foreground/80 leading-tight">
+                          {agent.nama}
+                        </span>
+                        {agent.batch_name && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {agent.batch_name}
+                          </span>
+                        )}
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* STEP 3: PERIOD SELECTION */}
+          {step === "period" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => resetToStep("agent")}
+                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
+                      Pilih Periode
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground text-sm mt-1 ml-9">
+                    Agen: <span className="font-semibold text-foreground/70">{selectedAgent?.nama}</span>
+                    {" · "}
+                    Layanan: <span className="font-semibold text-foreground/70">{SERVICE_LABELS[selectedService]}</span>
+                  </p>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="p-4 rounded-2xl bg-card/50 border border-border animate-pulse">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-4 w-16 bg-foreground/10 rounded" />
+                        <div className="h-3 w-12 bg-foreground/10 rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : !periods || periods.length === 0 ? (
+                <QaStatePanel
+                  type="empty"
+                  title="Belum ada periode"
+                  description="Tidak ada periode audit yang tersedia."
+                />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {periods.map((p, i) => (
+                    <motion.button
+                      key={p.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      type="button"
+                      onClick={() => handlePeriodClick(p)}
+                      className="group relative p-4 rounded-2xl bg-card/50 border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+                          <CalendarDays className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-foreground/80">
+                          {MONTHS[p.month - 1]}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {p.year}
+                        </span>
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+
+              {/* Service override */}
+              <div className="p-4 rounded-2xl bg-card/50 border border-border">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-2">
+                  Override Layanan
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {SERVICE_TYPES.map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => {
+                        setSelectedService(st);
+                        refetchIndicators();
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                        selectedService === st
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-muted-foreground border-border hover:border-primary/30"
+                      }`}
+                    >
+                      {SERVICE_LABELS[st]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* STEP 4: TEMUAN LIST */}
+          {step === "list" && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => resetToStep("period")}
+                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
+                      Daftar Temuan
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground text-sm mt-1 ml-9">
+                    {selectedAgent?.nama}
+                    {" · "}
+                    {selectedPeriod && `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`}
+                    {" · "}
+                    {SERVICE_LABELS[selectedService]}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowImport(!showImport);
+                      setImportTab("download");
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> Import
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForm(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Tambah
+                  </button>
+                </div>
+              </div>
+
+              {/* Info bar */}
+              <div className="p-3 rounded-xl bg-card/50 border border-border text-sm text-muted-foreground flex items-center gap-3">
+                <span>Total temuan: <strong className="text-foreground">{temuan.length}</strong></span>
+                <span className="text-muted-foreground/30">|</span>
+                <span>Group: <strong className="text-foreground">{groupedTemuan.length}</strong></span>
+              </div>
+
+              {/* ADD FORM */}
+              <AnimatePresence>
+                {showForm && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-5 rounded-2xl bg-card/50 border border-border space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-foreground/90">
+                          Tambah Temuan Baru
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setEntries((prev) => [...prev, newEntry()])}
+                          className="flex items-center gap-1 text-xs font-bold text-primary hover:opacity-80"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Baris
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
+                            No Tiket
+                          </label>
+                          <input
+                            value={noTiket}
+                            onChange={(e) => setNoTiket(e.target.value)}
+                            placeholder="Contoh: L2503001"
+                            className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                          />
+                        </div>
+                        <div className="flex-1" />
+                      </div>
+
+                      {entries.map((entry, idx) => (
+                        <div key={entry.uid} className="p-3 rounded-xl bg-foreground/5 border border-border space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Parameter #{idx + 1}
+                            </span>
+                            {entries.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEntries((prev) => prev.filter((e) => e.uid !== entry.uid))
+                                }
+                                className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <IndicatorDropdown
+                            value={entry.indicator_id}
+                            indicators={indicators ?? []}
+                            onChange={(id) => updateEntry(entry.uid, { indicator_id: id })}
+                          />
+
+                          <div>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">
+                              Nilai
+                            </label>
+                            <div className="flex gap-1.5">
+                              {NILAI_OPTIONS.map((opt) => (
+                                <button
+                                  key={opt.v}
+                                  type="button"
+                                  onClick={() => updateEntry(entry.uid, { nilai: opt.v })}
+                                  className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                                    entry.nilai === opt.v ? opt.active : opt.inactive
+                                  }`}
+                                  title={opt.sub}
+                                >
+                                  {opt.v}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
+                                Ketidaksesuaian
+                              </label>
+                              <textarea
+                                value={entry.ketidaksesuaian}
+                                onChange={(e) =>
+                                  updateEntry(entry.uid, { ketidaksesuaian: e.target.value })
+                                }
+                                className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                rows={2}
+                                placeholder="Deskripsi ketidaksesuaian..."
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
+                                Sebaiknya
+                              </label>
+                              <textarea
+                                value={entry.sebaiknya}
+                                onChange={(e) =>
+                                  updateEntry(entry.uid, { sebaiknya: e.target.value })
+                                }
+                                className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                rows={2}
+                                placeholder="Saran perbaikan..."
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                      >
+                        {saving ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
+                        ) : (
+                          <><Check className="w-4 h-4" /> Simpan Temuan</>
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* IMPORT PANEL */}
+              <AnimatePresence>
+                {showImport && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-5 rounded-2xl bg-card/50 border border-border space-y-4">
+                      <div className="flex items-center gap-2 border-b border-border pb-3">
+                        <button
+                          type="button"
+                          onClick={() => setImportTab("download")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                            importTab === "download"
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Download className="w-3 h-3 inline mr-1" />
+                          Download Template
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setImportTab("upload")}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                            importTab === "upload"
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Upload className="w-3 h-3 inline mr-1" />
+                          Upload & Preview
+                        </button>
+                      </div>
+
+                      {importTab === "download" ? (
+                        <div className="text-center py-6">
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Download template Excel untuk mengisi temuan secara offline.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleDownloadTemplate}
+                            disabled={generatingTemplate}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20 disabled:opacity-50 transition-colors"
+                          >
+                            {generatingTemplate ? (
+                              <><Loader2 className="w-4 h-4 animate-spin" /> Membuat template...</>
+                            ) : (
+                              <><Download className="w-4 h-4" /> Download Template</>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <label className="flex items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed border-border bg-foreground/5 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
+                            <Upload className="w-6 h-6 text-muted-foreground" />
+                            <div>
+                              <p className="text-sm font-medium text-foreground/80">
+                                Pilih file Excel
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                .xlsx atau .xls
+                              </p>
+                            </div>
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept=".xlsx,.xls"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+
+                          {parsing && (
+                            <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Memproses file...
+                            </div>
+                          )}
+
+                          {importRows.length > 0 && !parsing && (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3 text-xs">
+                                <span className="text-green-600 font-bold">
+                                  {importRows.filter((r) => !r.error).length} Valid
+                                </span>
+                                {importRows.filter((r) => r.error).length > 0 && (
+                                  <span className="text-red-600 font-bold">
+                                    {importRows.filter((r) => r.error).length} Invalid
+                                  </span>
+                                )}
+                              </div>
+                              <div className="max-h-48 overflow-auto border border-border rounded-xl">
+                                <table className="w-full text-xs">
+                                  <thead className="bg-card sticky top-0">
+                                    <tr>
+                                      <th className="p-2 text-left text-muted-foreground font-bold">#</th>
+                                      <th className="p-2 text-left text-muted-foreground font-bold">Tiket</th>
+                                      <th className="p-2 text-left text-muted-foreground font-bold">Parameter</th>
+                                      <th className="p-2 text-center text-muted-foreground font-bold">Nilai</th>
+                                      <th className="p-2 text-left text-muted-foreground font-bold">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {importRows.map((r, i) => (
+                                      <tr
+                                        key={i}
+                                        className={`border-t border-border ${r.error ? "bg-red-500/5" : ""}`}
+                                      >
+                                        <td className="p-2 text-muted-foreground">{r.rowNum}</td>
+                                        <td className="p-2">{r.no_tiket}</td>
+                                        <td className="p-2">{r.paramName}</td>
+                                        <td className="p-2 text-center">{r.nilai ?? "-"}</td>
+                                        <td className="p-2">
+                                          {r.error ? (
+                                            <span className="text-red-500">{r.error}</span>
+                                          ) : (
+                                            <span className="text-green-600">OK</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleImportSave}
+                                disabled={
+                                  importing || importRows.filter((r) => !r.error).length === 0
+                                }
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                              >
+                                {importing ? (
+                                  <><Loader2 className="w-4 h-4 animate-spin" /> Mengimport...</>
+                                ) : (
+                                  <><Upload className="w-4 h-4" /> Import {importRows.filter((r) => !r.error).length} Temuan</>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* TEMUAN LIST */}
+              {loading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-24 rounded-2xl bg-card/50 border border-border animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : groupedTemuan.length === 0 ? (
+                <QaStatePanel
+                  type="empty"
+                  title="Belum ada temuan"
+                  description="Belum ada data temuan untuk agen ini pada periode dan layanan yang dipilih."
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setShowForm(true)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Tambah Temuan
+                    </button>
+                  }
+                />
+              ) : (
+                <div className="space-y-3">
+                  {groupedTemuan.map((group) => (
+                    <TemuanGroupCard
+                      key={group.key}
+                      group={group as any}
+                      indicatorLabelMap={indicatorLabelMap}
+                      editingId={editingId}
+                      editNilai={editNilai}
+                      editKetidaksesuaian={editKetidaksesuaian}
+                      editSebaiknya={editSebaiknya}
+                      deletingId={deletingId}
+                      onStartEdit={startEdit}
+                      onCancelEdit={cancelEdit}
+                      onSaveEdit={handleSaveEdit}
+                      onDelete={handleDelete}
+                      setEditNilai={setEditNilai}
+                      setEditKetidaksesuaian={setEditKetidaksesuaian}
+                      setEditSebaiknya={setEditSebaiknya}
+                    />
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

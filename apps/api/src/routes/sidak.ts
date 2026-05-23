@@ -47,6 +47,22 @@ sidak.post("/periods", requireRole("admin", "trainer"), async (c) => {
   return c.json({ success: true, data: period }, 201);
 });
 
+sidak.delete("/periods/:id", requireRole("admin", "trainer"), async (c) => {
+  const id = c.req.param("id");
+  try {
+    const period = await sidakService.deletePeriod(id);
+    return c.json({ success: true, data: period });
+  } catch (e: any) {
+    return c.json(
+      {
+        success: false,
+        error: { code: "DELETE_ERROR", message: e.message },
+      },
+      400,
+    );
+  }
+});
+
 // ── Indicators ─────────────────────────────────────────
 sidak.get(
   "/indicators",
@@ -236,22 +252,20 @@ sidak.delete("/temuan/:id", requireRole("admin", "trainer"), async (c) => {
 sidak.get("/agents", requireRole("admin", "trainer", "leader"), async (c) => {
   const user = c.get("user");
   const profile = c.get("profile");
-  const batch_name = c.req.query("batch_name");
-  const tim = c.req.query("tim");
-  const search = c.req.query("search");
-  const showArchived = c.req.query("show_archived") === "true";
+  const year = c.req.query("year")
+    ? parseInt(c.req.query("year")!)
+    : new Date().getFullYear();
+  const showAll = c.req.query("show_all") === "true";
   const accessibleIds = await sidakService.getAccessibleAgentIds(
     user.id,
     profile?.role ?? "",
   );
-  const agents = await sidakService.getAgents({
-    batch_name,
-    tim,
-    search,
-    agent_ids: accessibleIds ?? undefined,
-    showArchived,
-  });
-  return c.json({ success: true, data: agents });
+  const result = await sidakService.getAgentDirectorySummary(
+    year,
+    accessibleIds ?? undefined,
+    showAll,
+  );
+  return c.json({ success: true, data: result });
 });
 
 sidak.get(
@@ -265,6 +279,12 @@ sidak.get(
       ? parseInt(c.req.query("year")!)
       : undefined;
     const serviceType = c.req.query("service_type") || undefined;
+    const startMonth = c.req.query("startMonth")
+      ? parseInt(c.req.query("startMonth")!)
+      : undefined;
+    const endMonth = c.req.query("endMonth")
+      ? parseInt(c.req.query("endMonth")!)
+      : undefined;
     const accessibleIds = await sidakService.getAccessibleAgentIds(
       user.id,
       profile?.role ?? "",
@@ -282,7 +302,7 @@ sidak.get(
       );
     }
     try {
-      const detail = await sidakService.getAgentDetail(id, year, serviceType);
+      const detail = await sidakService.getAgentDetail(id, year, serviceType, startMonth, endMonth);
       return c.json({ success: true, data: detail });
     } catch (e: any) {
       return c.json(
@@ -306,6 +326,12 @@ sidak.get(
     const year = c.req.query("year")
       ? parseInt(c.req.query("year")!)
       : undefined;
+    const startMonth = c.req.query("startMonth")
+      ? parseInt(c.req.query("startMonth")!)
+      : undefined;
+    const endMonth = c.req.query("endMonth")
+      ? parseInt(c.req.query("endMonth")!)
+      : undefined;
     const showArchived = c.req.query("show_archived") === "true";
 
     const accessibleIds = await sidakService.getAccessibleAgentIds(
@@ -317,6 +343,8 @@ sidak.get(
       service_type,
       folder_ids,
       year,
+      startMonth,
+      endMonth,
       agent_ids: accessibleIds ?? undefined,
       showArchived,
     });
@@ -416,6 +444,80 @@ sidak.get("/folders", requireRole("admin", "trainer", "leader"), async (c) => {
     .order("name");
   return c.json({ success: true, data: data ?? [] });
 });
+
+// ── Agents by Folder ────────────────────────────────────
+sidak.get(
+  "/folders/:folder/agents",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const folder = c.req.param("folder");
+    const { data } = await (await import("../lib/supabase")).supabaseAdmin
+      .from("profiler_peserta")
+      .select("id, nama")
+      .eq("batch_name", folder)
+      .order("nama");
+    return c.json({ success: true, data: data ?? [] });
+  },
+);
+
+// ── Ranking ──────────────────────────────────────────────
+sidak.get(
+  "/ranking",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const period = c.req.query("period") || "ytd";
+    const service_type = c.req.query("service_type") || "call";
+    const year = c.req.query("year")
+      ? parseInt(c.req.query("year")!)
+      : new Date().getFullYear();
+    const folder = c.req.query("folder") || "ALL";
+
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+
+    try {
+      const { supabaseAdmin } = await import("../lib/supabase");
+
+      const [dashboardData, periods, folders, availableYears] =
+        await Promise.all([
+          sidakService.getDashboardData({
+            service_type,
+            folder_ids: folder !== "ALL" ? [folder] : undefined,
+            year,
+            agent_ids: accessibleIds ?? undefined,
+          }),
+          sidakService.getPeriods(),
+          supabaseAdmin.from("profiler_folders").select("id, name").order("name"),
+          sidakService.getAvailableYears(accessibleIds ?? undefined),
+        ]);
+
+      return c.json({
+        success: true,
+        data: {
+          rankings: dashboardData.topAgents,
+          periods,
+          folders: (folders?.data ?? []).map((f: any) => ({
+            id: f.id,
+            name: f.name,
+          })),
+          availableYears,
+        },
+      });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "SERVER_ERROR", message: e.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 // ── Reports ──────────────────────────────────────────────
 sidak.post(
@@ -660,6 +762,7 @@ sidak.get(
     const yearQuery = c.req.query("year");
     const startMonthQuery = c.req.query("startMonth");
     const endMonthQuery = c.req.query("endMonth");
+    const service_type = c.req.query("service_type");
     const accessibleIds = profile
       ? await sidakService.getAccessibleAgentIds(user.id, profile?.role ?? "")
       : null;
@@ -674,12 +777,14 @@ sidak.get(
           startMonth,
           endMonth,
           accessibleIds ?? undefined,
+          service_type,
         );
         return c.json({ success: true, data: trend });
       } else {
         const trendAll = await sidakService.getServiceTrendForDashboard(
           "all",
           accessibleIds ?? undefined,
+          service_type,
         );
         const trendMap = {
           "3m": sidakService.sliceTrendData(trendAll, 3),

@@ -187,6 +187,11 @@ export interface AgentDirectoryEntry {
   atRisk: boolean;
 }
 
+export interface AgentDirectoryResponse {
+  agents: AgentDirectoryEntry[];
+  batches: string[];
+}
+
 export interface AgentPeriodSummary {
   id: string;
   month: number;
@@ -250,8 +255,8 @@ export interface AgentDetailData {
     labels: string[];
     datasets: { label: string; data: number[]; isTotal: boolean }[];
   };
-  availableYears?: number[];
-  scoreHistory?: {
+  availableYears: number[];
+  scoreHistory: {
     month: number;
     year: number;
     finalScore: number;
@@ -263,6 +268,15 @@ export interface AgentDetailData {
   initialYear: number;
   initialService: ServiceType;
   initialTrendRange: { start: number; end: number };
+  peserta: {
+    id: string;
+    nama: string;
+    tim: string;
+    batch_name: string;
+    jabatan: string | null;
+    foto_url: string | null;
+    bergabung_date: string | null;
+  };
 }
 
 // ── KETIK Types ────────────────────────────────────────
