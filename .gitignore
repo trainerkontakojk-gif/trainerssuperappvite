@@ -1,20 +1,31 @@
+# ── Environment ──
 .env.local
-node_modules
-.turbo
-dist
-.superpowers
-reference-repo
-.vscode/
-*.log
-.DS_Store
-.env.migration
 .env.local.old_project
-local-backups/
-scratch/
-supabase/.temp/
+.env.migration
+
+# ── Dependencies ──
+node_modules
 .pnpm-store/
+
+# ── Build Output ──
+dist
+.turbo
+
+# ── Editor / OS ──
+.vscode/
+.DS_Store
+*.log
+
+# ── Tooling / Config Agents ──
 .antigravitycli/
+.kiro/
+.superpowers
 docs/superpowers/
 plan/
+
+# ── Project-specific ──
 apps/api/src/inspect_db.ts
-.kiro/
+local-backups/
+reference-repo
+scratch/
+supabase/.temp/

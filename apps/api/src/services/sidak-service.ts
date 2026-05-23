@@ -3,6 +3,9 @@ import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
   SERVICE_LABELS,
+  VALID_SERVICE_TYPES,
+  isServiceType,
+  resolveServiceTypeFromTeam,
 } from "../lib/scoring";
 import type {
   QAIndicator,
@@ -13,6 +16,7 @@ import type {
   DashboardData,
   AgentDetailData,
   AgentPeriodSummary,
+  AgentDirectoryEntry,
   TopAgentData,
   ParetoData,
 } from "@trainers/types";
@@ -147,6 +151,27 @@ export async function createPeriod(
     .single();
   if (error) throw new Error(`Failed to create period: ${error.message}`);
   return { ...data, label };
+}
+
+export async function deletePeriod(id: string): Promise<{ success: boolean }> {
+  // Check if period has temuan data
+  const { count, error: checkError } = await supabaseAdmin
+    .from("qa_temuan")
+    .select("*", { count: "exact", head: true })
+    .eq("period_id", id);
+
+  if (checkError) throw new Error("Gagal memverifikasi status periode.");
+  if ((count ?? 0) > 0)
+    throw new Error(
+      "Periode ini sudah memiliki data temuan dan tidak bisa dihapus.",
+    );
+
+  const { error } = await supabaseAdmin
+    .from("qa_periods")
+    .delete()
+    .eq("id", id);
+  if (error) throw new Error(`Failed to delete period: ${error.message}`);
+  return { success: true };
 }
 
 // ── Indicators ─────────────────────────────────────────────
@@ -678,6 +703,27 @@ async function getSoftDeletedPesertaIds(): Promise<string[]> {
 
 // ── Agents ─────────────────────────────────────────────────
 
+const EXCLUDED_FOLDERS = ["tim om", "tim qa", "tim spv", "tim da & konten"];
+const EXCLUDED_JABATAN = [
+  "qa", "trainer", "wfm", "team leader", "team_leader", "supervisor",
+  "spv", "operational manager", "operation_manager", "operation manager",
+];
+
+function isAgentExcluded(
+  tim?: string | null,
+  batchName?: string | null,
+  jabatan?: string | null,
+): boolean {
+  const t = (tim ?? "").toLowerCase().trim();
+  const b = (batchName ?? "").toLowerCase().trim();
+  const j = (jabatan ?? "").toLowerCase().trim();
+  return (
+    EXCLUDED_FOLDERS.includes(t) ||
+    EXCLUDED_FOLDERS.includes(b) ||
+    EXCLUDED_JABATAN.includes(j)
+  );
+}
+
 export async function getAgents(params: {
   batch_name?: string;
   tim?: string;
@@ -710,10 +756,167 @@ export async function getAgents(params: {
   return data ?? [];
 }
 
+export async function getAgentDirectorySummary(
+  year: number = new Date().getFullYear(),
+  agentIds?: string[],
+  includeExcluded?: boolean,
+): Promise<{ agents: AgentDirectoryEntry[]; batches: string[] }> {
+  const { data: agentData } = await supabaseAdmin
+    .from("profiler_peserta")
+    .select("id, nama, tim, batch_name, foto_url, jabatan")
+    .order("nama");
+
+  let agents = agentData ?? [];
+
+  if (agentIds) {
+    const idSet = new Set(agentIds);
+    agents = agents.filter((a: any) => idSet.has(a.id));
+  }
+
+  if (!includeExcluded) {
+    agents = agents.filter(
+      (a: any) => !isAgentExcluded(a.tim, a.batch_name, a.jabatan),
+    );
+  }
+
+  const batches = [
+    ...new Set(agents.map((a: any) => a.batch_name).filter(Boolean)),
+  ] as string[];
+
+  let allTemuan: any[] = [];
+  let from = 0;
+  const step = 1000;
+  let finished = false;
+  while (!finished) {
+    const { data } = await supabaseAdmin
+      .from("qa_temuan")
+      .select(
+        "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
+      )
+      .eq("tahun", year)
+      .range(from, from + step - 1);
+    if (!data || data.length === 0) {
+      finished = true;
+    } else {
+      allTemuan = allTemuan.concat(data);
+      if (data.length < step) finished = true;
+      else from += step;
+    }
+  }
+
+  const periods = await getPeriods();
+  const periodsMap = new Map(periods.map((p) => [p.id, p]));
+
+  const temuanByAgent = new Map<string, any[]>();
+  for (const t of allTemuan) {
+    if (!temuanByAgent.has(t.peserta_id))
+      temuanByAgent.set(t.peserta_id, []);
+    temuanByAgent.get(t.peserta_id)!.push(t);
+  }
+
+  const indicatorCache = new Map<string, QAIndicator[]>();
+  for (const st of VALID_SERVICE_TYPES) {
+    indicatorCache.set(st, await getIndicators(st));
+  }
+
+  const entries: AgentDirectoryEntry[] = agents.map((a: any) => ({
+    id: a.id,
+    nama: a.nama,
+    tim: a.tim ?? "",
+    batch: a.batch_name ?? "",
+    batch_name: a.batch_name ?? "",
+    foto_url: a.foto_url,
+    jabatan: a.jabatan,
+    avgScore: null,
+    trend: "none" as const,
+    trendValue: null,
+    atRisk: false,
+  }));
+
+  for (const agent of entries) {
+    const agentTemuan = temuanByAgent.get(agent.id) || [];
+    if (agentTemuan.length === 0) continue;
+
+    try {
+      const pSvcMap = new Map<string, any[]>();
+      for (const t of agentTemuan) {
+        if (!periodsMap.has(t.period_id)) continue;
+        const period = periodsMap.get(t.period_id)!;
+        const activeService = (
+          t.service_type || resolveServiceTypeFromTeam(agent.tim)
+        ).toLowerCase();
+        const key = `${period.year}-${String(period.month).padStart(2, "0")}-${activeService}`;
+        if (!pSvcMap.has(key)) pSvcMap.set(key, []);
+        pSvcMap.get(key)!.push(t);
+      }
+
+      const sortedKeys = [...pSvcMap.keys()].sort((a, b) =>
+        b.localeCompare(a),
+      );
+      const latestKey = sortedKeys[0];
+      if (!latestKey) continue;
+
+      const latestTemuan = pSvcMap.get(latestKey)!;
+      const activeService = (
+        latestTemuan[0]?.service_type || resolveServiceTypeFromTeam(agent.tim)
+      ).toLowerCase();
+      const st = isServiceType(activeService)
+        ? (activeService as ServiceType)
+        : ("call" as ServiceType);
+
+      const indicators = indicatorCache.get(st) || [];
+      if (indicators.length === 0) continue;
+
+      const weight = DEFAULT_SERVICE_WEIGHTS[st] || DEFAULT_SERVICE_WEIGHTS.call;
+
+      const score = calculateQAScoreFromTemuan(
+        indicators,
+        latestTemuan,
+        weight,
+      );
+
+      const roundedScore = Math.round(score.finalScore * 100) / 100;
+      agent.avgScore = roundedScore;
+      agent.atRisk = roundedScore < 95;
+
+      const prevKey =
+        sortedKeys.find(
+          (k, i) => i > 0 && k.endsWith(st),
+        ) || sortedKeys[1];
+      if (prevKey && prevKey !== latestKey) {
+        const prevTemuan = pSvcMap.get(prevKey)!;
+        const prevIndicators = indicatorCache.get(st) || [];
+        const prevScore = calculateQAScoreFromTemuan(
+          prevIndicators,
+          prevTemuan,
+          weight,
+        );
+
+        agent.trendValue =
+          Math.round(
+            (score.finalScore - prevScore.finalScore) * 100,
+          ) / 100;
+        agent.trend =
+          agent.trendValue > 0
+            ? "up"
+            : agent.trendValue < 0
+              ? "down"
+              : "same";
+      }
+    } catch (_e) {
+      // leave defaults for agents that fail scoring
+    }
+  }
+
+  return { agents: entries, batches };
+}
+
 export async function getAgentDetail(
   agentId: string,
   year?: number,
   serviceType?: string,
+  startMonth?: number,
+  endMonth?: number,
 ): Promise<AgentDetailData> {
   const [peserta, indicators, periods] = await Promise.all([
     supabaseAdmin
@@ -764,7 +967,7 @@ export async function getAgentDetail(
       month: period.month,
       year: period.year,
       label: `${String(period.month).padStart(2, "0")}/${period.year}`,
-      serviceType: (serviceType as ServiceType) ?? "call",
+      serviceType: (serviceType as ServiceType) ?? (periodRows[0]?.service_type as ServiceType) ?? "call",
       finalScore: roundTo(score.finalScore, 2),
       nonCriticalScore: roundTo(score.nonCriticalScore, 2),
       criticalScore: roundTo(score.criticalScore, 2),
@@ -783,17 +986,91 @@ export async function getAgentDetail(
     service_type: s.serviceType,
   }));
 
+  const sortedSummaries = summaries.sort(
+    (a, b) => b.year - a.year || b.month - a.month,
+  );
+
+  // ── Personal Trend Computation ──
+  const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+  const trendPeriods = periods
+    .filter((p: any) => p.year === currentYear)
+    .filter((p: any) => !startMonth || p.month >= startMonth)
+    .filter((p: any) => !endMonth || p.month <= endMonth)
+    .sort((a: any, b: any) => a.month - b.month);
+
+  let personalTrend: { labels: string[]; datasets: { label: string; data: number[]; isTotal: boolean }[] };
+
+  if (trendPeriods.length > 0 && rows.length > 0) {
+    const validPeriodIds = new Set(trendPeriods.map((p: any) => p.id));
+    const paramCounts: Record<string, Record<string, number>> = {};
+    const totalFindingsByPeriod: Record<string, number> = {};
+
+    for (const row of rows) {
+      if (!validPeriodIds.has(row.period_id)) continue;
+      if (!isCountableFinding(row)) continue;
+      if (serviceType && row.service_type !== serviceType) continue;
+      const pid = row.period_id;
+      totalFindingsByPeriod[pid] = (totalFindingsByPeriod[pid] || 0) + 1;
+      const indicator = indicators.find((i: any) => i.id === row.indicator_id);
+      const paramName = indicator?.name || 'Unknown';
+      if (!paramCounts[paramName]) paramCounts[paramName] = {};
+      paramCounts[paramName][pid] = (paramCounts[paramName][pid] || 0) + 1;
+    }
+
+    const topParams = Object.entries(paramCounts)
+      .map(([name, periodCounts]) => ({
+        name,
+        total: Object.values(periodCounts).reduce((a: number, b: number) => a + b, 0),
+      }))
+      .sort((a, b) => b.total - a.total)
+      .map((p) => p.name);
+
+    const labels = trendPeriods.map((p: any) =>
+      `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`
+    );
+
+    const datasets = [
+      {
+        label: 'Total Temuan',
+        data: trendPeriods.map((p: any) => totalFindingsByPeriod[p.id] || 0),
+        isTotal: true,
+      },
+      ...topParams.map((name) => ({
+        label: name,
+        data: trendPeriods.map((p: any) => paramCounts[name][p.id] || 0),
+        isTotal: false,
+      })),
+    ];
+
+    personalTrend = { labels, datasets };
+  } else {
+    personalTrend = { labels: [], datasets: [] };
+  }
+
+  const availableYears = [
+    ...new Set(rows.map((r) => r.tahun).filter(Boolean)),
+  ].sort((a, b) => b - a) as number[];
+  if (availableYears.length === 0) availableYears.push(currentYear);
+
   return {
     indicators,
-    periodSummaries: summaries.sort(
-      (a, b) => b.year - a.year || b.month - a.month,
-    ),
+    periodSummaries: sortedSummaries,
     temuan: rows.filter((r) => !r.is_phantom_padding),
-    personalTrend: { labels: [], datasets: [] },
+    personalTrend,
     scoreHistory,
     initialYear: currentYear,
     initialService: (serviceType as ServiceType) ?? "call",
-    initialTrendRange: { start: 1, end: 12 },
+    initialTrendRange: { start: startMonth ?? 1, end: endMonth ?? 12 },
+    availableYears,
+    peserta: {
+      id: peserta.data.id,
+      nama: peserta.data.nama ?? 'Unknown',
+      tim: peserta.data.tim ?? '',
+      batch_name: peserta.data.batch_name ?? '',
+      jabatan: peserta.data.jabatan ?? null,
+      foto_url: peserta.data.foto_url ?? null,
+      bergabung_date: peserta.data.bergabung_date ?? null,
+    },
   };
 }
 
@@ -807,6 +1084,8 @@ export async function getDashboardData(params: {
   peserta_id?: string;
   agent_ids?: string[];
   showArchived?: boolean;
+  startMonth?: number;
+  endMonth?: number;
 }): Promise<DashboardData> {
   const [periods, folders, indicators, weights] = await Promise.all([
     getPeriods(),
@@ -1084,8 +1363,135 @@ export async function getDashboardData(params: {
       nonCritical: nonCriticalCount,
       total: criticalCount + nonCriticalCount,
     },
-    paramTrend: { labels: [], datasets: [] },
-    sparklines: {},
+    // ── Trend Computation ──
+    ...(() => {
+      const trendYear = params.year ?? new Date().getFullYear();
+      let filteredPeriods = periods
+        .filter((p: any) => p.year === trendYear)
+        .filter((p: any) => !params.startMonth || p.month >= params.startMonth)
+        .filter((p: any) => !params.endMonth || p.month <= params.endMonth)
+        .sort((a: any, b: any) => a.month - b.month);
+
+      const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
+
+      if (filteredPeriods.length > 0 && rows.length > 0) {
+        const validPeriodIds = new Set(filteredPeriods.map((p: any) => p.id));
+
+        const rowsByPeriod = new Map<string, any[]>();
+        for (const row of rows) {
+          if (validPeriodIds.has(row.period_id)) {
+            if (!rowsByPeriod.has(row.period_id)) rowsByPeriod.set(row.period_id, []);
+            rowsByPeriod.get(row.period_id)!.push(row);
+          }
+        }
+
+        // Filter periods to only include those with data for the selected service
+        filteredPeriods = filteredPeriods.filter((p: any) => rowsByPeriod.has(p.id));
+
+        const agentPeriodGroups = new Map<string, any[]>();
+        for (const [pid, periodRows] of rowsByPeriod) {
+          const agentGroups = new Map<string, any[]>();
+          for (const row of periodRows) {
+            const key = `${pid}:${row.peserta_id}`;
+            if (!agentGroups.has(key)) agentGroups.set(key, []);
+            agentGroups.get(key)!.push(row);
+          }
+          for (const [key, agentRows] of agentGroups) {
+            agentPeriodGroups.set(key, agentRows);
+          }
+        }
+
+        const periodMetrics = filteredPeriods.map((period: any) => {
+          const periodRows = rowsByPeriod.get(period.id) ?? [];
+          const periodAgentKeys = [...agentPeriodGroups.keys()].filter(
+            (k: string) => k.startsWith(period.id + ':')
+          );
+
+          const totalAudited = periodAgentKeys.length;
+          const totalFindings = periodRows.filter((r: any) => isCountableFinding(r)).length;
+
+          let zeroCount = 0;
+          let complianceCount = 0;
+          let totalScore = 0;
+
+          for (const agentKey of periodAgentKeys) {
+            const agentRows = agentPeriodGroups.get(agentKey)!;
+            const svc = agentRows[0]?.service_type ?? 'call';
+            const weight = weightMap[svc] ?? DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ?? DEFAULT_SERVICE_WEIGHTS['call'];
+            const realRows = agentRows.filter((r: any) => r.is_phantom_padding !== true);
+            const scoreRows = realRows.length > 0 ? realRows : agentRows;
+            const score = calculateQAScoreFromTemuan(indicators, scoreRows, weight);
+
+            const findingRows = agentRows.filter((r: any) => isCountableFinding(r));
+            if (findingRows.length === 0) zeroCount++;
+            if (score.finalScore >= 95) complianceCount++;
+            totalScore += score.finalScore;
+          }
+
+          return {
+            periodId: period.id,
+            label: `${MONTHS_SHORT[period.month - 1]} ${String(period.year).slice(-2)}`,
+            total: totalFindings,
+            avg: totalAudited > 0 ? roundTo(totalFindings / totalAudited, 1) : 0,
+            zero: totalAudited > 0 ? roundTo((zeroCount / totalAudited) * 100, 1) : 0,
+            compliance: complianceCount,
+            avgAgentScore: totalAudited > 0 ? roundTo(totalScore / totalAudited, 1) : 0,
+            totalAudited,
+          };
+        });
+
+        const paramCounts: Record<string, Record<string, number>> = {};
+        const totalFindingsByPeriod: Record<string, number> = {};
+
+        for (const [pid, periodRows] of rowsByPeriod) {
+          for (const row of periodRows) {
+            if (!isCountableFinding(row)) continue;
+            totalFindingsByPeriod[pid] = (totalFindingsByPeriod[pid] || 0) + 1;
+
+            const indicator = indicators.find((i: any) => i.id === row.indicator_id);
+            const paramName = indicator?.name || 'Unknown';
+            if (!paramCounts[paramName]) paramCounts[paramName] = {};
+            paramCounts[paramName][pid] = (paramCounts[paramName][pid] || 0) + 1;
+          }
+        }
+
+        const topParams = Object.entries(paramCounts)
+          .map(([name, periodCounts]) => ({
+            name,
+            total: Object.values(periodCounts).reduce((a: number, b: number) => a + b, 0),
+          }))
+          .sort((a, b) => b.total - a.total)
+          .map((p) => p.name);
+
+        const labels = filteredPeriods.map((p: any) =>
+          `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`
+        );
+
+        const datasets = [
+          {
+            label: 'Total Temuan',
+            data: filteredPeriods.map((p: any) => totalFindingsByPeriod[p.id] || 0),
+            isTotal: true,
+          },
+          ...topParams.map((name) => ({
+            label: name,
+            data: filteredPeriods.map((p: any) => paramCounts[name][p.id] || 0),
+            isTotal: false,
+          })),
+        ];
+
+        const sparklines = {
+          'total-defects': periodMetrics.map(m => ({ label: m.label, value: m.total })),
+          'avg-defects': periodMetrics.map(m => ({ label: m.label, value: m.avg })),
+          'avg-score': periodMetrics.map(m => ({ label: m.label, value: m.avgAgentScore })),
+          'compliance': periodMetrics.map(m => ({ label: m.label, value: m.compliance })),
+        };
+
+        return { paramTrend: { labels, datasets }, sparklines };
+      }
+
+      return { paramTrend: { labels: [], datasets: [] }, sparklines: {} };
+    })(),
     availableYears,
     currentYear,
   };
@@ -1350,6 +1756,7 @@ export async function calculateTopParameters(temuan: any[]) {
 export async function getServiceTrendForDashboard(
   timeframe: "3m" | "6m" | "all" = "3m",
   agent_ids?: string[],
+  service_type?: string,
 ) {
   const limitMap = { "3m": 3, "6m": 6, all: 12 };
   const limit = limitMap[timeframe] || 3;
@@ -1385,7 +1792,10 @@ export async function getServiceTrendForDashboard(
     (p) => `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`,
   );
 
-  const temuan = await fetchPaginatedTrendData(pIds, undefined, agent_ids);
+  let temuan = await fetchPaginatedTrendData(pIds, undefined, agent_ids);
+  if (service_type) {
+    temuan = temuan.filter((t) => t.service_type === service_type);
+  }
   const topParameters = await calculateTopParameters(temuan);
 
   if (!temuan || temuan.length === 0) {
@@ -1498,6 +1908,7 @@ export async function getServiceTrendForDashboardByRange(
   startMonth: number,
   endMonth: number,
   agent_ids?: string[],
+  service_type?: string,
 ) {
   const allPeriods = await getPeriods();
   const sortedPeriods = allPeriods
@@ -1528,7 +1939,10 @@ export async function getServiceTrendForDashboardByRange(
     };
   }
 
-  const temuan = await fetchPaginatedTrendData(pIds, year, agent_ids);
+  let temuan = await fetchPaginatedTrendData(pIds, year, agent_ids);
+  if (service_type) {
+    temuan = temuan.filter((t) => t.service_type === service_type);
+  }
   const topParameters = await calculateTopParameters(temuan);
 
   if (!temuan || temuan.length === 0) {

@@ -27,7 +27,7 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint` (ESLint 9 flat config — `eslint.config.mjs` di root)
 - **Lint (single workspace):** `pnpm --filter @trainers/web lint`
-- **Test:** `pnpm test` (vitest — 299+ tests covering API services + frontend hooks/components)
+- **Test:** `pnpm test` (vitest — 300+ tests covering API services + frontend hooks/components)
 - **Test (api only):** `pnpm --filter @trainers/api test`
 - **Test (web only):** `pnpm --filter @trainers/web test`
 - **Format:** `pnpm format`
@@ -191,7 +191,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-23)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-25)
+- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`
 
 ## Routes Reference (apps/web)
 
@@ -206,7 +207,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | 7   | `/sidak/settings`            | CRUD         | Service weights configuration                            |
 | 8   | `/sidak/periods`             | Manager      | Create/view audit periods                                |
 | 9   | `/sidak/agents`              | Directory    | Searchable agent list                                    |
-| 10  | `/sidak/agents/$id`          | Detail       | Score history + findings table                           |
+| 10  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service |
 | 11  | `/ketik`                     | Landing      | Chat simulation intro                                    |
 | 12  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                      |
 | 13  | `/ketik/history`             | Placeholder  | Session history                                          |
