@@ -2,10 +2,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 const useApiMock = vi.hoisted(() => vi.fn());
+const getApiMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
-  getApi: vi.fn(),
+  getApi: (...args: unknown[]) => getApiMock(...args),
   putApi: vi.fn(),
   postApi: vi.fn(),
   deleteApi: vi.fn(),
@@ -53,10 +54,42 @@ const mockVersions = [
   },
 ];
 
+const mockRuleIndicators = [
+  {
+    id: "ri-1",
+    rule_version_id: "v-draft",
+    service_type: "call",
+    name: "Greeting Opening",
+    category: "critical",
+    bobot: 0.3,
+    has_na: true,
+    threshold: 2,
+    sort_order: 1,
+    legacy_indicator_id: "gi-1",
+    created_by: null,
+    created_at: "2026-05-24T00:00:00Z",
+  },
+  {
+    id: "ri-2",
+    rule_version_id: "v-draft",
+    service_type: "call",
+    name: "Closing Script",
+    category: "non_critical",
+    bobot: 0.7,
+    has_na: false,
+    threshold: null,
+    sort_order: 2,
+    legacy_indicator_id: null,
+    created_by: null,
+    created_at: "2026-05-24T00:00:00Z",
+  },
+];
+
 describe("Sidak settings page legacy parity", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-24T00:00:00Z"));
+    window.scrollTo = vi.fn() as any;
   });
 
   afterEach(() => {
@@ -111,5 +144,77 @@ describe("Sidak settings page legacy parity", () => {
     // Published version should show Create Revision button
     expect(screen.getByRole("button", { name: /Create Revision/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Hapus Draft$/i })).not.toBeInTheDocument();
+  });
+
+  it("renders legacy parity fields (threshold, sort_order, linked) in indicator list", async () => {
+    vi.useRealTimers();
+
+    useApiMock.mockImplementation((path: string) => {
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
+    });
+
+    getApiMock.mockImplementation((path: string) => {
+      if (path.includes("/indicators")) {
+        return Promise.resolve(mockRuleIndicators);
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<SidakSettingsPage />);
+
+    const draftCard = screen.getAllByRole("button").find(
+      (btn) => btn.textContent?.includes("v2") && btn.textContent?.includes("draft")
+    );
+    expect(draftCard).toBeDefined();
+
+    fireEvent.click(draftCard!);
+
+    // Wait for indicators to load
+    await screen.findByText("Greeting Opening", {}, { timeout: 3000 });
+
+    // Legacy parity field badges should be visible
+    expect(screen.getByText("Th: 2")).toBeInTheDocument();
+    expect(screen.getByText("#1")).toBeInTheDocument();
+    expect(screen.getByText("Linked")).toBeInTheDocument();
+
+    vi.useFakeTimers();
+  });
+
+  it("shows CTA Create Revision from Published when draft is empty but published has indicators", async () => {
+    vi.useRealTimers();
+
+    useApiMock.mockImplementation((path: string) => {
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
+    });
+
+    getApiMock.mockImplementation((path: string) => {
+      if (path.includes("/indicators")) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<SidakSettingsPage />);
+
+    // Draft is selected by default; indicators are empty
+    await screen.findByText("Belum ada parameter di versi ini.", {}, { timeout: 3000 });
+
+    // CTA should appear because published version exists and has indicators in mock data
+    expect(screen.getByText(/Versi published/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Create Revision dari Published/i })).toBeInTheDocument();
+
+    vi.useFakeTimers();
   });
 });

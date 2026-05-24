@@ -166,6 +166,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 27. SIDAK Agent Detail Findings Parity — Local score badges, month accordion, ticket grouping, and role-based action permission (DONE)
 28. SIDAK Ranking Fatal Legacy Parity — Strict `nilai===0` + critical predicate for `hasCritical`, phantom-padding exclusion, API + frontend regression tests (DONE)
 29. SIDAK Agent Directory Load-More Copy — Dynamic next-batch copy for `/sidak/agents`, accurate remaining-count label, and regression test (DONE)
+30. SIDAK Input Stability & QA Baseline Recovery — Fixed agents.map crash via defensive response parsing, added draft-empty CTA warning/CTA, unlinked indicator guard on save/import, and improved validation messaging (DONE)
 
 ## Relevant Files
 
@@ -187,7 +188,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
-- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, sidak-agent-detail-temuan-parity, sidak-ranking-fatal-parity, sidak-agents-load-more-copy, useAgentDetail)
+- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, sidak-agent-detail-temuan-parity, sidak-ranking-fatal-parity, sidak-agents-load-more-copy, sidak-input-agents-shape, useAgentDetail)
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests
@@ -198,8 +199,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-29)
-- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-30)
+- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`, `sidak-input-agents-map-and-qa-baseline-fix.md`
 
 ## Routes Reference (apps/web)
 

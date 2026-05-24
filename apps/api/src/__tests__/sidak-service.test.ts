@@ -64,6 +64,45 @@ describe("sidak-service", () => {
     });
   });
 
+  describe("deletePeriod", () => {
+    it("blocks delete when temuan exist", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { count: 5, error: null };
+        return { data: null, error: null };
+      };
+      await expect(sidakService.deletePeriod("pid")).rejects.toThrow(
+        "Periode ini sudah memiliki data temuan dan tidak bisa dihapus.",
+      );
+    });
+
+    it("blocks delete when rule versions reference the period", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { count: 0, error: null };
+        if (callCount === 2) return { count: 3, error: null };
+        return { data: null, error: null };
+      };
+      await expect(sidakService.deletePeriod("pid")).rejects.toThrow(
+        "Periode ini masih digunakan oleh versi aturan QA",
+      );
+    });
+
+    it("deletes when no references exist", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { count: 0, error: null };
+        if (callCount === 2) return { count: 0, error: null };
+        return { data: null, error: null };
+      };
+      const r = await sidakService.deletePeriod("pid");
+      expect(r.success).toBe(true);
+    });
+  });
+
   describe("getIndicators", () => {
     it("filters by service type", async () => {
       pendingResolve = () => ({ data: [{ id: "1" }], error: null });
@@ -408,6 +447,60 @@ describe("sidak-service", () => {
       });
       expect(r.stats.skipped_count).toBe(1);
       expect(r.stats.valid_count).toBe(0);
+    });
+
+    it("mentions Settings QA when indicator not in active rule version", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: { id: "v-active" }, error: null };
+        if (callCount === 2)
+          return {
+            data: [{ id: "i1", name: "Test", service_type: "call" }],
+            error: null,
+          };
+        if (callCount === 3) return { data: [], error: null };
+        return {
+          data: [{ legacy_indicator_id: "gi-other" }],
+          error: null,
+        };
+      };
+      const r = await sidakService.validateTemuanBatch({
+        peserta_id: "p1",
+        period_id: "per1",
+        service_type: "call",
+        items: [{ indicator_id: "i1", nilai: 2 }],
+      });
+      expect(r.stats.invalid_count).toBe(1);
+      expect(r.invalid[0].error).toMatch(/Settings QA/);
+    });
+  });
+
+  describe("resolveActivePublishedRuleVersion", () => {
+    it("returns published version id", async () => {
+      pendingResolve = () => ({ data: { id: "v1" }, error: null });
+      const r = await sidakService.resolveActivePublishedRuleVersion("call");
+      expect(r).toEqual({ id: "v1" });
+    });
+
+    it("returns null when no published version", async () => {
+      pendingResolve = () => ({ data: null, error: null });
+      const r = await sidakService.resolveActivePublishedRuleVersion("call");
+      expect(r).toBeNull();
+    });
+  });
+
+  describe("hasDraftRuleVersion", () => {
+    it("returns true when draft exists", async () => {
+      pendingResolve = () => ({ count: 2, error: null });
+      const r = await sidakService.hasDraftRuleVersion("call");
+      expect(r).toBe(true);
+    });
+
+    it("returns false when no draft", async () => {
+      pendingResolve = () => ({ count: 0, error: null });
+      const r = await sidakService.hasDraftRuleVersion("call");
+      expect(r).toBe(false);
     });
   });
 });

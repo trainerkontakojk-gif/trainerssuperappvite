@@ -7,7 +7,7 @@ import {
   GitBranch, X, Loader2, Pencil
 } from "lucide-react";
 import { notify } from "../../lib/toast";
-import type { ServiceType, RuleVersion } from "@trainers/types";
+import type { ServiceType, RuleVersion, QARuleIndicator } from "@trainers/types";
 
 const TEAMS: ServiceType[] = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"];
 
@@ -45,7 +45,7 @@ const formatPeriodLabel = (month?: number, year?: number) => {
 export default function SidakSettingsPage() {
   const [activeTeam, setActiveTeam] = useState<ServiceType>("call");
   const [selectedVersion, setSelectedVersion] = useState<RuleVersion | null>(null);
-  const [draftIndicators, setDraftIndicators] = useState<any[]>([]);
+  const [draftIndicators, setDraftIndicators] = useState<QARuleIndicator[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
 
   const [isPublishing, setIsPublishing] = useState(false);
@@ -59,16 +59,21 @@ export default function SidakSettingsPage() {
   const [newCategory, setNewCategory] = useState<"critical" | "non_critical" | "none">("non_critical");
   const [newBobot, setNewBobot] = useState("10");
   const [newHasNa, setNewHasNa] = useState(false);
+  const [newThreshold, setNewThreshold] = useState("");
+  const [newSortOrder, setNewSortOrder] = useState("0");
   const [savingNew, setSavingNew] = useState(false);
 
   const [editIndId, setEditIndId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<{ name: string; category: "critical" | "non_critical" | "none"; bobot: string; has_na: boolean } | null>(null);
+  const [editState, setEditState] = useState<{
+    name: string; category: "critical" | "non_critical" | "none";
+    bobot: string; has_na: boolean; threshold: string; sort_order: string;
+  } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const { data: versions, loading: versionsLoading, refetch: refetchVersions } = useApi<RuleVersion[]>(
     `/sidak/rule-versions?service_type=${activeTeam}`
   );
-  const { data: periods } = useApi<any[]>("/sidak/periods");
+  const { data: periods } = useApi<{ id: string; month: number; year: number }[]>("/sidak/periods");
 
   // Selection logic: Draft first, then published, then latest version
   useEffect(() => {
@@ -90,7 +95,7 @@ export default function SidakSettingsPage() {
   const fetchVersionIndicators = useCallback(async (versionId: string) => {
     setLoadingIndicators(true);
     try {
-      const res = await getApi<any[]>(`/sidak/rule-versions/${versionId}/indicators`);
+      const res = await getApi<QARuleIndicator[]>(`/sidak/rule-versions/${versionId}/indicators`);
       setDraftIndicators(res ?? []);
     } catch {
       setDraftIndicators([]);
@@ -183,10 +188,14 @@ export default function SidakSettingsPage() {
         category: categoryVal,
         bobot: bobotVal,
         has_na: newHasNa,
+        threshold: newThreshold ? parseFloat(newThreshold) : undefined,
+        sort_order: parseInt(newSortOrder) || 0,
       });
       notify.success("Parameter berhasil ditambahkan ke draft.");
       setNewName("");
       setNewHasNa(false);
+      setNewThreshold("");
+      setNewSortOrder("0");
       setShowAddForm(false);
       fetchVersionIndicators(selectedVersion.id);
       refetchVersions();
@@ -207,6 +216,8 @@ export default function SidakSettingsPage() {
         category: categoryVal,
         bobot: parseFloat(editState.bobot) / 100,
         has_na: editState.has_na,
+        threshold: editState.threshold ? parseFloat(editState.threshold) : undefined,
+        sort_order: parseInt(editState.sort_order) || 0,
       });
       notify.success("Parameter berhasil diperbarui.");
       setEditIndId(null);
@@ -233,6 +244,10 @@ export default function SidakSettingsPage() {
   };
 
   const isDraft = selectedVersion?.status === "draft";
+
+  const publishedWhenDraftEmpty = isDraft && draftIndicators.length === 0
+    ? versions?.find((v) => v.status === "published")
+    : null;
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -446,8 +461,30 @@ export default function SidakSettingsPage() {
                           </span>
                         </div>
                       </div>
-                    </div>
-                    <button
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Threshold</label>
+                    <input
+                      type="number"
+                      value={newThreshold}
+                      onChange={(e) => setNewThreshold(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Urutan (sort_order)</label>
+                    <input
+                      type="number"
+                      value={newSortOrder}
+                      onChange={(e) => setNewSortOrder(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
+                    />
+                  </div>
+                </div>
+                <button
                       onClick={() => setShowAddForm(true)}
                       className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition"
                     >
@@ -535,9 +572,23 @@ export default function SidakSettingsPage() {
                   ) : (
                     <div className="bg-card rounded-[2.5rem] border border-border overflow-hidden shadow-sm divide-y divide-border">
                       {draftIndicators.length === 0 ? (
-                        <div className="p-12 text-center">
-                          <Info className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
+                        <div className="p-12 text-center space-y-4">
+                          <Info className="w-12 h-12 text-muted-foreground/20 mx-auto" />
                           <p className="text-sm font-bold text-muted-foreground">Belum ada parameter di versi ini.</p>
+                          {publishedWhenDraftEmpty && (
+                            <div className="inline-flex flex-col items-center gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                              <p className="text-xs text-amber-600/80">
+                                Versi published <span className="font-black">v{publishedWhenDraftEmpty.version_number}</span> sudah memiliki parameter.
+                              </p>
+                              <button
+                                onClick={() => handleCreateDraft(publishedWhenDraftEmpty.id)}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all"
+                              >
+                                <GitBranch className="w-3.5 h-3.5" />
+                                Create Revision dari Published
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         draftIndicators.map((ind) => (
@@ -555,6 +606,15 @@ export default function SidakSettingsPage() {
                                     {CAT_LABEL[ind.category as any] ? CAT_LABEL[ind.category as any].replace(" Error", "") : ind.category}
                                   </span>
                                   {ind.has_na && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-foreground/5 text-muted-foreground border border-border">N/A</span>}
+                                  {ind.sort_order != null && ind.sort_order > 0 && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 border border-purple-500/20">#{ind.sort_order}</span>
+                                  )}
+                                  {ind.threshold != null && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">Th: {ind.threshold}</span>
+                                  )}
+                                  {ind.legacy_indicator_id && (
+                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Linked</span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -568,6 +628,8 @@ export default function SidakSettingsPage() {
                                       category: ind.category,
                                       bobot: String(Math.round(ind.bobot * 100)),
                                       has_na: ind.has_na,
+                                      threshold: ind.threshold != null ? String(ind.threshold) : "",
+                                      sort_order: String(ind.sort_order ?? 0),
                                     });
                                   }}
                                   className="p-2 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded-xl transition"
@@ -720,6 +782,28 @@ export default function SidakSettingsPage() {
                       type="number"
                       value={editState.bobot}
                       onChange={(e) => setEditState({ ...editState, bobot: e.target.value })}
+                      className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Threshold</label>
+                    <input
+                      type="number"
+                      value={editState.threshold}
+                      onChange={(e) => setEditState({ ...editState, threshold: e.target.value })}
+                      placeholder="0"
+                      className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Urutan (sort_order)</label>
+                    <input
+                      type="number"
+                      value={editState.sort_order}
+                      onChange={(e) => setEditState({ ...editState, sort_order: e.target.value })}
+                      placeholder="0"
                       className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
                     />
                   </div>

@@ -154,16 +154,24 @@ export async function createPeriod(
 }
 
 export async function deletePeriod(id: string): Promise<{ success: boolean }> {
-  // Check if period has temuan data
-  const { count, error: checkError } = await supabaseAdmin
-    .from("qa_temuan")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id);
+  const [{ count: temuanCount }, { count: ruleCount }] = await Promise.all([
+    supabaseAdmin
+      .from("qa_temuan")
+      .select("*", { count: "exact", head: true })
+      .eq("period_id", id),
+    supabaseAdmin
+      .from("qa_service_rule_versions")
+      .select("*", { count: "exact", head: true })
+      .eq("effective_period_id", id),
+  ]);
 
-  if (checkError) throw new Error("Gagal memverifikasi status periode.");
-  if ((count ?? 0) > 0)
+  if (temuanCount !== null && (temuanCount ?? 0) > 0)
     throw new Error(
       "Periode ini sudah memiliki data temuan dan tidak bisa dihapus.",
+    );
+  if (ruleCount !== null && (ruleCount ?? 0) > 0)
+    throw new Error(
+      "Periode ini masih digunakan oleh versi aturan QA. Hapus atau pindahkan versi aturan terlebih dahulu.",
     );
 
   const { error } = await supabaseAdmin
@@ -172,6 +180,33 @@ export async function deletePeriod(id: string): Promise<{ success: boolean }> {
     .eq("id", id);
   if (error) throw new Error(`Failed to delete period: ${error.message}`);
   return { success: true };
+}
+
+// ── Rule Version Helpers ─────────────────────────────────────
+
+export async function resolveActivePublishedRuleVersion(
+  serviceType: string,
+): Promise<{ id: string } | null> {
+  const { data } = await supabaseAdmin
+    .from("qa_service_rule_versions")
+    .select("id")
+    .eq("service_type", serviceType)
+    .eq("status", "published")
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
+export async function hasDraftRuleVersion(
+  serviceType: string,
+): Promise<boolean> {
+  const { count } = await supabaseAdmin
+    .from("qa_service_rule_versions")
+    .select("*", { count: "exact", head: true })
+    .eq("service_type", serviceType)
+    .eq("status", "draft");
+  return (count ?? 0) > 0;
 }
 
 // ── Indicators ─────────────────────────────────────────────
@@ -267,14 +302,7 @@ export async function validateTemuanBatch(items: {
   }[];
 }): Promise<PreviewResult> {
   const [activeVersion, validIndicators, existing] = await Promise.all([
-    supabaseAdmin
-      .from("qa_service_rule_versions")
-      .select("id")
-      .eq("service_type", items.service_type)
-      .eq("status", "published")
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    resolveActivePublishedRuleVersion(items.service_type),
     supabaseAdmin
       .from("qa_indicators")
       .select("id, name, service_type")
@@ -298,11 +326,11 @@ export async function validateTemuanBatch(items: {
 
   let validLegacyIds: Set<string> | null = null;
 
-  if (activeVersion?.data) {
+  if (activeVersion) {
     const { data: ruleIndicators } = await supabaseAdmin
       .from("qa_service_rule_indicators")
       .select("legacy_indicator_id")
-      .eq("rule_version_id", activeVersion.data.id)
+      .eq("rule_version_id", activeVersion.id)
       .not("legacy_indicator_id", "is", null);
     if (ruleIndicators && ruleIndicators.length > 0) {
       validLegacyIds = new Set(
@@ -335,7 +363,7 @@ export async function validateTemuanBatch(items: {
     if (validLegacyIds && !validLegacyIds.has(item.indicator_id)) {
       invalid.push({
         indicator_id: item.indicator_id,
-        error: `Indikator "${ind.name}" tidak termasuk dalam versi aturan aktif`,
+        error: `Indikator "${ind.name}" tidak termasuk dalam versi aturan QA yang sedang aktif. Periksa parameter di halaman Settings QA.`,
       });
       continue;
     }
@@ -394,17 +422,8 @@ export async function createTemuanBatch(
     };
   }
 
-  // Resolve rule version id again for insert
-  let ruleVersionId: string | null = null;
-  const { data: activeVersion } = await supabaseAdmin
-    .from("qa_service_rule_versions")
-    .select("id")
-    .eq("service_type", items.service_type)
-    .eq("status", "published")
-    .order("version_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (activeVersion) ruleVersionId = activeVersion.id;
+  const activeVersion = await resolveActivePublishedRuleVersion(items.service_type);
+  const ruleVersionId = activeVersion?.id ?? null;
 
   const rows = validation.valid.map((item) => ({
     peserta_id: items.peserta_id,

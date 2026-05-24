@@ -141,6 +141,22 @@ export const ruleVersionSchema = z.object({
 });
 export type RuleVersion = z.infer<typeof ruleVersionSchema>;
 
+export const ruleIndicatorSchema = z.object({
+  id: z.string().uuid(),
+  rule_version_id: z.string().uuid(),
+  service_type: serviceTypeSchema,
+  name: z.string(),
+  category: categorySchema,
+  bobot: z.number(),
+  has_na: z.boolean(),
+  threshold: z.number().nullable().optional(),
+  sort_order: z.number().int().optional().default(0),
+  legacy_indicator_id: z.string().uuid().nullable().optional(),
+  created_by: z.string().uuid().nullable().optional(),
+  created_at: z.string().optional(),
+});
+export type QARuleIndicator = z.infer<typeof ruleIndicatorSchema>;
+
 export const createRuleVersionSchema = z.object({
   service_type: serviceTypeSchema,
   effective_period_id: z.string().uuid(),

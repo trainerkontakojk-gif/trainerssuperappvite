@@ -1,11 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useApi, getApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
-import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
+import type { QAIndicator, QAPeriod, QATemuan, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FolderOpen, User as UserIcon, CalendarDays, Plus, Trash2,
   Pencil, Upload, Download, Check, X, ChevronRight,
   Loader2, AlertCircle, ShieldCheck, ArrowLeft,
+  AlertTriangle, FileWarning,
 } from "lucide-react";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import NilaiBadge from "../../components/sidak/NilaiBadge";
@@ -56,6 +57,14 @@ interface AgentEntry {
   jabatan?: string | null;
 }
 
+export function normalizeAgentsResponse(raw: unknown): AgentEntry[] {
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+  if (Array.isArray(obj.agents)) return obj.agents as AgentEntry[];
+  if (Array.isArray(raw)) return raw as AgentEntry[];
+  return [];
+}
+
 export default function SidakInputPage() {
   const [step, setStep] = useState<Step>("folder");
   const [showAllData, setShowAllData] = useState(false);
@@ -95,17 +104,96 @@ export default function SidakInputPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Rule version snapshot for input
+  const [activeRuleVersionId, setActiveRuleVersionId] = useState<string | null>(null);
+  const [hasDraftVersion, setHasDraftVersion] = useState(false);
+  const [ruleIndicatorsRaw, setRuleIndicatorsRaw] = useState<any[]>([]);
+  const [loadingRuleIndicators, setLoadingRuleIndicators] = useState(false);
+  const [previewResult, setPreviewResult] = useState<any>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  const fetchRuleVersionIndicators = useCallback(async (svc: string) => {
+    setLoadingRuleIndicators(true);
+    setActiveRuleVersionId(null);
+    setHasDraftVersion(false);
+    setRuleIndicatorsRaw([]);
+    try {
+      const versions = await getApi<RuleVersion[]>(`/sidak/rule-versions?service_type=${svc}`);
+      const published = versions?.find((v) => v.status === "published");
+      const draft = versions?.find((v) => v.status === "draft");
+      if (draft) setHasDraftVersion(true);
+      if (published) {
+        setActiveRuleVersionId(published.id);
+        const allIndicators: QAIndicator[] = indicators ?? [];
+        const rawInds = await getApi<any[]>(`/sidak/rule-versions/${published.id}/indicators`);
+        if (rawInds && rawInds.length > 0) {
+          const mapping = rawInds.map((ri: any) => {
+            const legacyIndicator = ri.legacy_indicator_id
+              ? allIndicators.find((gi) => gi.id === ri.legacy_indicator_id)
+              : allIndicators.find((gi) => gi.name === ri.name);
+            return {
+              ruleIndicatorId: ri.id,
+              name: ri.name,
+              category: ri.category,
+              bobot: ri.bobot,
+              has_na: ri.has_na,
+              legacyIndicatorId: legacyIndicator?.id ?? ri.legacy_indicator_id,
+              threshold: ri.threshold,
+              sort_order: ri.sort_order,
+            };
+          });
+          setRuleIndicatorsRaw(mapping);
+        }
+      }
+    } catch {
+      // fallback to global indicators
+    } finally {
+      setLoadingRuleIndicators(false);
+    }
+  }, [indicators]);
+
+  useEffect(() => {
+    if (selectedService) {
+      fetchRuleVersionIndicators(selectedService);
+    }
+  }, [selectedService, fetchRuleVersionIndicators]);
+
+  const activeIndicators = useMemo(() => {
+    if (ruleIndicatorsRaw.length > 0) {
+      return ruleIndicatorsRaw.map((ri) => ({
+        id: ri.legacyIndicatorId || ri.ruleIndicatorId,
+        service_type: selectedService,
+        name: ri.name,
+        category: ri.category,
+        bobot: ri.bobot,
+        has_na: ri.has_na,
+        ruleIndicatorId: ri.ruleIndicatorId,
+        legacyIndicatorId: ri.legacyIndicatorId,
+      })) as QAIndicator[];
+    }
+    return indicators ?? [];
+  }, [ruleIndicatorsRaw, indicators, selectedService]);
+
   const indicatorLookup = useMemo(() => {
     const map = new Map<string, QAIndicator>();
-    (indicators ?? []).forEach((i) => map.set(i.id, i));
+    activeIndicators.forEach((i) => map.set(i.id, i));
     return map;
-  }, [indicators]);
+  }, [activeIndicators]);
 
   const indicatorLabelMap = useMemo(() => {
     const map = new Map<string, string>();
-    (indicators ?? []).forEach((i) => map.set(i.id, i.name));
+    activeIndicators.forEach((i) => map.set(i.id, i.name));
     return map;
-  }, [indicators]);
+  }, [activeIndicators]);
+
+  const unlinkedIndicatorIds = useMemo(() => {
+    if (ruleIndicatorsRaw.length === 0) return new Set<string>();
+    return new Set(
+      ruleIndicatorsRaw
+        .filter((ri: any) => !ri.legacyIndicatorId)
+        .map((ri: any) => ri.ruleIndicatorId as string),
+    );
+  }, [ruleIndicatorsRaw]);
 
   const displayFolders = folders ?? [];
 
@@ -159,10 +247,15 @@ export default function SidakInputPage() {
     setLoading(true);
 
     try {
-      const result = await getApi<AgentEntry[]>(
-        `/sidak/agents?batch_name=${encodeURIComponent(folder)}&show_archived=false`,
+      const year = new Date().getFullYear();
+      const result = await getApi<AgentDirectoryResponse>(
+        `/sidak/agents?year=${year}`,
       );
-      setAgents(result ?? []);
+      const allAgents = normalizeAgentsResponse(result);
+      const folderAgents = allAgents.filter(
+        (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
+      );
+      setAgents(folderAgents);
       setStep("agent");
     } catch {
       setErrorMsg("Gagal memuat agen");
@@ -190,13 +283,17 @@ export default function SidakInputPage() {
       setErrorMsg("Semua parameter wajib dipilih.");
       return;
     }
+    if (unlinkedIndicatorIds.size > 0 && entries.some((e) => unlinkedIndicatorIds.has(e.indicator_id))) {
+      setErrorMsg("Beberapa parameter yang dipilih belum terhubung ke database global. Gunakan parameter yang sudah dilink di halaman Settings QA.");
+      return;
+    }
     if (!noTiket.trim()) {
       const ok = window.confirm(
         "No. Tiket kosong. Setiap temuan tanpa no. tiket dihitung sebagai sesi terpisah. Lanjutkan?",
       );
       if (!ok) return;
     }
-    setSaving(true);
+    setPreviewing(true);
     setErrorMsg(null);
     try {
       const normalizedTicket = noTiket.trim();
@@ -207,6 +304,27 @@ export default function SidakInputPage() {
         ketidaksesuaian: entry.ketidaksesuaian || undefined,
         sebaiknya: entry.sebaiknya || undefined,
       }));
+      const preview = await postApi<any>("/sidak/temuan/batch/preview", {
+        peserta_id: selectedAgent.id,
+        period_id: selectedPeriod.id,
+        service_type: selectedService,
+        no_tiket: normalizedTicket || null,
+        items: temuanList,
+      });
+      if (preview.stats.invalid_count > 0) {
+        setPreviewResult(preview);
+        setErrorMsg(
+          `${preview.stats.invalid_count} parameter tidak valid. Periksa preview dan perbaiki.`
+        );
+        return;
+      }
+      if (preview.stats.skipped_count > 0) {
+        const ok = window.confirm(
+          `${preview.stats.skipped_count} parameter sudah ada (duplikat) dan akan di-skip. ${preview.stats.valid_count} akan disimpan. Lanjutkan?`
+        );
+        if (!ok) return;
+      }
+      setSaving(true);
       const created = await postApi<QATemuan[]>("/sidak/temuan/batch", {
         peserta_id: selectedAgent.id,
         period_id: selectedPeriod.id,
@@ -216,12 +334,14 @@ export default function SidakInputPage() {
       });
       setTemuan((prev) => [...(created ?? []).reverse(), ...prev]);
       resetForm();
+      setPreviewResult(null);
       setSuccessMsg(`${created?.length ?? 0} temuan berhasil disimpan!`);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e: any) {
       setErrorMsg(e.message);
     } finally {
       setSaving(false);
+      setPreviewing(false);
     }
   };
 
@@ -294,7 +414,7 @@ export default function SidakInputPage() {
   }, [temuan]);
 
   const handleDownloadTemplate = async () => {
-    if (!indicators || !selectedAgent || !selectedPeriod) return;
+    if (activeIndicators.length === 0 || !selectedAgent || !selectedPeriod) return;
     setGeneratingTemplate(true);
     try {
       const ExcelJS = (await import("exceljs")).default;
@@ -307,7 +427,7 @@ export default function SidakInputPage() {
 
       const wsParams = wb.addWorksheet("_Params");
       wsParams.state = "veryHidden";
-      indicators.forEach((ind, i) => {
+      activeIndicators.forEach((ind, i) => {
         wsParams.getCell(`A${i + 1}`).value = ind.name;
       });
 
@@ -327,7 +447,7 @@ export default function SidakInputPage() {
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
 
-      indicators.slice(0, 3).forEach((ind, i) => {
+      activeIndicators.slice(0, 3).forEach((ind, i) => {
         ws.addRow({
           tiket: `L${selectedPeriod.year}${String(selectedPeriod.month).padStart(2, "0")}${String(i + 1).padStart(2, "0")}`,
           param: ind.name,
@@ -337,7 +457,7 @@ export default function SidakInputPage() {
         });
       });
 
-      const paramCount = indicators.length;
+      const paramCount = activeIndicators.length;
       for (let r = 2; r <= 101; r++) {
         ws.getCell(`B${r}`).dataValidation = {
           type: "list",
@@ -371,7 +491,7 @@ export default function SidakInputPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !indicators) return;
+    if (!file || activeIndicators.length === 0) return;
     setParsing(true);
     try {
       const XLSX = await import("xlsx");
@@ -383,7 +503,7 @@ export default function SidakInputPage() {
           const sheetName = wb.SheetNames.find((n: string) => n === "Input Temuan") ?? wb.SheetNames[0];
           const ws = wb.Sheets[sheetName];
           const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-          const paramMap = new Map(indicators.map((i) => [i.name.toLowerCase().trim(), i]));
+          const paramMap = new Map(activeIndicators.map((i) => [i.name.toLowerCase().trim(), i]));
           const result: ParsedImportRow[] = [];
 
           for (let i = 1; i < rows.length; i++) {
@@ -450,21 +570,45 @@ export default function SidakInputPage() {
       setErrorMsg("Terdapat baris dengan parameter tidak valid.");
       return;
     }
+    if (unlinkedIndicatorIds.size > 0 && importRows.some((r) => r.indicator_id && unlinkedIndicatorIds.has(r.indicator_id))) {
+      setErrorMsg("Terdapat parameter yang belum terhubung ke database global. Gunakan parameter yang sudah dilink di halaman Settings QA.");
+      return;
+    }
     setImporting(true);
     setErrorMsg(null);
     try {
       const valid = importRows.filter((r) => !r.error && r.indicator_id && r.nilai !== null);
+      const importItems = valid.map((r) => ({
+        indicator_id: r.indicator_id!,
+        nilai: r.nilai!,
+        ketidaksesuaian: r.ketidaksesuaian || null,
+        sebaiknya: r.sebaiknya || null,
+      }));
+      const preview = await postApi<any>("/sidak/temuan/batch/preview", {
+        peserta_id: selectedAgent.id,
+        period_id: selectedPeriod.id,
+        service_type: selectedService,
+        no_tiket: null,
+        items: importItems,
+      });
+      if (preview.stats.invalid_count > 0) {
+        setErrorMsg(
+          `${preview.stats.invalid_count} parameter tidak valid di server. Periksa kembali data import.`
+        );
+        return;
+      }
+      if (preview.stats.skipped_count > 0) {
+        const ok = window.confirm(
+          `${preview.stats.skipped_count} baris sudah ada (duplikat) dan akan di-skip. ${preview.stats.valid_count} akan diimport. Lanjutkan?`
+        );
+        if (!ok) return;
+      }
       const created = await postApi<QATemuan[]>("/sidak/temuan/batch", {
         peserta_id: selectedAgent.id,
         period_id: selectedPeriod.id,
         service_type: selectedService,
         no_tiket: null,
-        items: valid.map((r) => ({
-          indicator_id: r.indicator_id!,
-          nilai: r.nilai!,
-          ketidaksesuaian: r.ketidaksesuaian || null,
-          sebaiknya: r.sebaiknya || null,
-        })),
+        items: importItems,
       });
       setTemuan((prev) => [...(created ?? []).reverse(), ...prev]);
       setShowImport(false);
@@ -845,6 +989,18 @@ export default function SidakInputPage() {
                 </div>
               </div>
 
+              {/* Draft warning banner */}
+              {hasDraftVersion && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm flex items-center gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Ada draft parameter yang belum dipublikasikan. Input temuan saat ini menggunakan parameter versi terakhir yang published.
+                </motion.div>
+              )}
+
               {/* Info bar */}
               <div className="p-3 rounded-xl bg-card/50 border border-border text-sm text-muted-foreground flex items-center gap-3">
                 <span>Total temuan: <strong className="text-foreground">{temuan.length}</strong></span>
@@ -911,7 +1067,7 @@ export default function SidakInputPage() {
 
                           <IndicatorDropdown
                             value={entry.indicator_id}
-                            indicators={indicators ?? []}
+                            indicators={activeIndicators}
                             onChange={(id) => updateEntry(entry.uid, { indicator_id: id })}
                           />
 
@@ -972,11 +1128,13 @@ export default function SidakInputPage() {
                       <button
                         type="button"
                         onClick={handleSave}
-                        disabled={saving}
+                        disabled={saving || previewing}
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
                       >
                         {saving ? (
                           <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
+                        ) : previewing ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Memeriksa...</>
                         ) : (
                           <><Check className="w-4 h-4" /> Simpan Temuan</>
                         )}
