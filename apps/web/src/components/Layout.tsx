@@ -16,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import {
   APP_MODULES,
   isRoleAllowed,
@@ -25,6 +25,8 @@ import {
 import { supabase } from "../lib/supabase";
 import { ThemeToggle } from "./ThemeToggle";
 import { useThemeMode } from "../hooks/useThemeMode";
+import { TelefunWarningProvider, useTelefunWarning } from "../context/TelefunWarningContext";
+import { MaintenanceModal } from "../routes/telefun/components/MaintenanceModal";
 
 const SIDAK_CHILDREN = [
   { to: "/sidak", label: "Beranda SIDAK", exactMatch: true },
@@ -132,11 +134,31 @@ function getHeaderContent(pathname: string) {
   return { eyebrow: "Trainers SuperApp", title: "Pusat Kendali" };
 }
 
-export function DashboardLayout() {
+export function DashboardLayoutContent() {
   const profile = useAuthStore((s) => s.profile);
   const session = useAuthStore((s) => s.session);
   const { pathname } = useLocation();
   const { theme, setTheme } = useThemeMode();
+
+  const {
+    isMaintenanceOpen,
+    openMaintenance,
+    hasTelefunAccess,
+    revokeTelefunAccess,
+  } = useTelefunWarning();
+  const prevPathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    if (pathname.startsWith("/telefun") && !hasTelefunAccess && profile) {
+      openMaintenance();
+    }
+
+    if (prevPathnameRef.current.startsWith("/telefun") && !pathname.startsWith("/telefun")) {
+      revokeTelefunAccess();
+    }
+
+    prevPathnameRef.current = pathname;
+  }, [pathname, hasTelefunAccess, openMaintenance, revokeTelefunAccess, profile]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
@@ -310,7 +332,13 @@ export function DashboardLayout() {
                 key={module.id}
                 to={module.href as any}
                 className={navItemClass(pathname === module.href)}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={(e) => {
+                  if (module.id === "telefun" && !hasTelefunAccess) {
+                    e.preventDefault();
+                    openMaintenance();
+                  }
+                  setMobileMenuOpen(false);
+                }}
               >
                 <module.icon className="h-4 w-4 shrink-0" />
                 {!effectiveIsCollapsed && <span>{module.shortTitle}</span>}
@@ -482,17 +510,33 @@ export function DashboardLayout() {
 
         {/* Scrollable Workspace Content */}
         <section className={`flex-1 min-w-0 ${pathname === "/profiler" || pathname === "/profiler/" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center h-full text-gray-400">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            }
-          >
-            <Outlet />
-          </Suspense>
+          {pathname.startsWith("/telefun") && !hasTelefunAccess ? (
+            <div className="flex items-center justify-center h-full text-gray-400">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          )}
         </section>
       </main>
+
+      <MaintenanceModal isOpen={isMaintenanceOpen} role={profile?.role} />
     </div>
+  );
+}
+
+export function DashboardLayout() {
+  return (
+    <TelefunWarningProvider>
+      <DashboardLayoutContent />
+    </TelefunWarningProvider>
   );
 }

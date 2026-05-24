@@ -20,6 +20,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { useTelefunWarning } from "../context/TelefunWarningContext";
 import {
   APP_MODULES,
   isRoleAllowed,
@@ -157,6 +158,7 @@ const getModuleColors = (moduleId: string) => {
 
 export default function DashboardPage() {
   const profile = useAuthStore((s) => s.profile);
+  const { hasTelefunAccess, openMaintenance } = useTelefunWarning();
   const displayName = profile?.full_name || "User";
   const userRole = profile?.role?.toLowerCase() || "";
 
@@ -613,6 +615,12 @@ export default function DashboardPage() {
                 <Link
                   to={module.href}
                   className="group flex h-full flex-col rounded-[2rem] border border-border/50 bg-card/70 p-5 backdrop-blur-md transition hover:-translate-y-1 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5"
+                  onClick={(e) => {
+                    if (module.id === "telefun" && !hasTelefunAccess) {
+                      e.preventDefault();
+                      openMaintenance();
+                    }
+                  }}
                 >
                   <div className="mb-5 flex items-start justify-between gap-4">
                     <div

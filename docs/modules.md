@@ -69,6 +69,7 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
   - **Voice Assessment**: Analisis otomatis kualitas suara agen.
   - **Realistic Mode**: Mode realistik dengan hold consent, rude hold penalty, dan WPM analysis.
   - **Expanded Voices**: Opsi suara Gemini Live dinamis dengan gender consistency guards.
+  - **Maintenance Warning Gate**: Entry to Telefun dari sidebar, dashboard card, atau URL direct `/telefun` dilindungi oleh modal warning gate in-memory runtime. User dengan role trainer/admin melihat copy "Modul Dalam Pengembangan" dan dapat melanjutkan ke Telefun atau berpindah ke App Lite. User dengan role lain melihat copy "Akses Dibatasi" dan hanya bisa kembali ke dashboard. Status akses di-reset otomatis saat meninggalkan modul Telefun.
 - **Catatan Teknis**: Sesi live default memakai model transport `gemini-3.1-flash-live-preview`. Telefun proxy server di `apps/telefun/` menangani WebSocket connection ke Gemini Live API.
 
 ## 5. KTP / Profiler (Kotak Tool Profil)
