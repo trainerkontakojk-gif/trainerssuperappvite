@@ -18,13 +18,13 @@ export default function SidakAgentsPage() {
     `/sidak/agents?year=${year}&show_all=${showAll}`,
   );
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, selectedBatch, showAll]);
-
   function setPage(_n: number) {
     setVisibleCount(INITIAL_VISIBLE);
   }
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedBatch, showAll]);
 
   const filtered = useMemo(() => {
     const agents = data?.agents ?? [];
