@@ -9,18 +9,12 @@ import {
   Shield,
   Activity,
   HelpCircle,
+  Trash2,
 } from "lucide-react";
-import { useApi } from "../../hooks/useApi";
+import { useApi, deleteApi } from "../../hooks/useApi";
+import { notify } from "../../lib/toast";
 import { Pagination } from "../../components/ui/Pagination";
-
-interface ActivityLog {
-  id: string;
-  action_type: string;
-  target_user_email: string | null;
-  actor_email: string;
-  details: any;
-  created_at: string;
-}
+import type { ActivityLog } from "@trainers/types";
 
 export default function ActivitiesPage() {
   const {
@@ -37,21 +31,17 @@ export default function ActivitiesPage() {
     setPage(1);
   }, [searchTerm, selectedActionType]);
 
+  const [deleting, setDeleting] = useState<string | null>(null);
+
   const filteredLogs = (logs || []).filter((log) => {
     const matchesSearch =
-      log.actor_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.target_user_email &&
-        log.target_user_email
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase())) ||
-      log.action_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.details &&
-        JSON.stringify(log.details)
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()));
+      (log.user_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.action || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.type || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.module || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesAction =
-      selectedActionType === "ALL" || log.action_type === selectedActionType;
+      selectedActionType === "ALL" || (log.type || log.action) === selectedActionType;
 
     return matchesSearch && matchesAction;
   });
@@ -76,28 +66,30 @@ export default function ActivitiesPage() {
     return "bg-slate-50 text-slate-700 border-slate-100";
   };
 
-  const getActionLabel = (action: string) => {
-    const act = action.toUpperCase();
-    if (act === "APPROVE_LEADER") return "Approve Leader";
-    if (act === "REJECT_LEADER") return "Tolak Leader";
-    if (act === "REVOKE_LEADER") return "Cabut Akses Leader";
-    if (act === "REASSIGN_LEADER_GROUPS") return "Update Grup Leader";
-    if (act === "UPDATE_USER_ROLE") return "Update Role User";
-    if (act === "UPDATE_USER_STATUS") return "Update Status User";
-    if (act === "DELETE_USER") return "Hapus Akun";
-    return action;
+  const handleDelete = async (logId: string) => {
+    if (!confirm("Hapus log aktivitas ini?")) return;
+    setDeleting(logId);
+    try {
+      await deleteApi(`/admin/activity-logs/${logId}`);
+      notify.success("Log berhasil dihapus");
+      refetch();
+    } catch (err: any) {
+      notify.error(err.message || "Gagal menghapus log");
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const exportLogsToCsv = () => {
     if (filteredLogs.length === 0) return;
 
-    const headers = ["Waktu", "Aktor", "Aksi", "Target Email", "Detail"];
+    const headers = ["Waktu", "Aktor", "Aksi", "Tipe", "Modul"];
     const rows = filteredLogs.map((log) => [
       new Date(log.created_at).toLocaleString("id-ID"),
-      log.actor_email,
-      log.action_type,
-      log.target_user_email || "-",
-      JSON.stringify(log.details || {}).replace(/"/g, '""'),
+      log.user_name || "-",
+      log.action,
+      log.type || "-",
+      log.module || "-",
     ]);
 
     const csvContent =
@@ -117,9 +109,9 @@ export default function ActivitiesPage() {
     document.body.removeChild(link);
   };
 
-  // Distinct action types
+  // Distinct action types for filter
   const actionTypes = Array.from(
-    new Set((logs || []).map((l) => l.action_type)),
+    new Set((logs || []).map((l) => l.type || l.action)),
   );
 
   return (
@@ -185,7 +177,7 @@ export default function ActivitiesPage() {
             <option value="ALL">Semua Jenis Aksi</option>
             {actionTypes.map((t) => (
               <option key={t} value={t}>
-                {getActionLabel(t)}
+                {t}
               </option>
             ))}
           </select>
@@ -216,10 +208,11 @@ export default function ActivitiesPage() {
                 <thead>
                   <tr className="border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     <th className="px-6 py-4">Waktu</th>
-                    <th className="px-6 py-4">Aktor (Admin)</th>
-                    <th className="px-6 py-4">Jenis Aksi</th>
-                    <th className="px-6 py-4">Target User</th>
-                    <th className="px-6 py-4">Detail Perubahan</th>
+                    <th className="px-6 py-4">Aktor</th>
+                    <th className="px-6 py-4">Aksi</th>
+                    <th className="px-6 py-4">Tipe</th>
+                    <th className="px-6 py-4">Modul</th>
+                    <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y text-xs text-gray-700">
@@ -232,40 +225,30 @@ export default function ActivitiesPage() {
                         {new Date(log.created_at).toLocaleString("id-ID")}
                       </td>
                       <td className="px-6 py-4 font-semibold text-gray-900">
-                        {log.actor_email}
+                        {log.user_name || "-"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex rounded border px-2 py-0.5 font-bold uppercase tracking-wide text-[10px] ${getActionColor(log.action_type)}`}
+                          className={`inline-flex rounded border px-2 py-0.5 font-bold uppercase tracking-wide text-[10px] ${getActionColor(log.action)}`}
                         >
-                          {getActionLabel(log.action_type)}
+                          {log.action}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-indigo-700">
-                        {log.target_user_email || "-"}
+                      <td className="px-6 py-4 text-gray-500">
+                        {log.type || "-"}
                       </td>
-                      <td
-                        className="px-6 py-4 max-w-xs md:max-w-md truncate text-gray-500"
-                        title={JSON.stringify(log.details)}
-                      >
-                        {log.details ? (
-                          <div className="space-y-1">
-                            {Object.entries(log.details).map(([key, val]) => (
-                              <div key={key} className="flex gap-1.5">
-                                <span className="font-semibold text-gray-400">
-                                  {key}:
-                                </span>
-                                <span className="truncate">
-                                  {typeof val === "object"
-                                    ? JSON.stringify(val)
-                                    : String(val)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
+                      <td className="px-6 py-4 text-gray-500">
+                        {log.module || "-"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleDelete(log.id)}
+                          disabled={deleting === log.id}
+                          className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                          title="Hapus log"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}

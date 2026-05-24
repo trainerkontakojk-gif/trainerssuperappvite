@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Layers,
   Plus,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
+import type { AccessScopeOptions, AccessGroupItemRow } from "@trainers/types";
 
 interface AccessGroup {
   id: string;
@@ -31,10 +32,14 @@ interface GroupItem {
   created_at: string;
 }
 
-interface ScopeOptions {
-  fields: string[];
-  distinctValues: Record<string, string[]>;
-}
+type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
+
+const RULE_TYPE_LABELS: Record<RuleType, string> = {
+  tim: "Team",
+  service_type: "Service",
+  batch_name: "Batch",
+  peserta_id: "Specific Agent",
+};
 
 export default function AccessGroupsPage() {
   const {
@@ -42,7 +47,7 @@ export default function AccessGroupsPage() {
     loading: loadingGroups,
     refetch: refetchGroups,
   } = useApi<AccessGroup[]>("/admin/access-groups");
-  const { data: scopeOptions } = useApi<ScopeOptions>(
+  const { data: scopeOptions } = useApi<AccessScopeOptions>(
     "/admin/access-scope-options",
   );
 
@@ -66,9 +71,10 @@ export default function AccessGroupsPage() {
   const [groupIsActive, setGroupIsActive] = useState(true);
   const [savingGroup, setSavingGroup] = useState(false);
 
-  // New Rule State
-  const [newFieldName, setNewFieldName] = useState("");
-  const [newFieldValue, setNewFieldValue] = useState("");
+  // New Rule State — guided builder
+  const [ruleType, setRuleType] = useState<RuleType>("tim");
+  const [ruleValue, setRuleValue] = useState("");
+  const [filterTeam, setFilterTeam] = useState("");
   const [addingRule, setAddingRule] = useState(false);
 
   // Select first group automatically when groups load
@@ -77,25 +83,6 @@ export default function AccessGroupsPage() {
       setSelectedGroupId(groups[0].id);
     }
   }, [groups, selectedGroupId]);
-
-  // Set field default value when options load
-  useEffect(() => {
-    if (scopeOptions?.fields && scopeOptions.fields.length > 0) {
-      setNewFieldName(scopeOptions.fields[0]);
-    }
-  }, [scopeOptions]);
-
-  // Set default field value option when fieldName changes
-  useEffect(() => {
-    if (scopeOptions && newFieldName) {
-      const vals = scopeOptions.distinctValues[newFieldName] || [];
-      if (vals.length > 0) {
-        setNewFieldValue(vals[0]);
-      } else {
-        setNewFieldValue("");
-      }
-    }
-  }, [newFieldName, scopeOptions]);
 
   const handleOpenCreateModal = () => {
     setEditingGroup(null);
@@ -145,15 +132,15 @@ export default function AccessGroupsPage() {
 
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedGroupId || !newFieldName || !newFieldValue) return;
+    if (!selectedGroupId || !ruleType || !ruleValue) return;
 
     setAddingRule(true);
     try {
       await postApi(`/admin/access-groups/${selectedGroupId}/items`, {
-        fieldName: newFieldName,
-        fieldValue: newFieldValue,
+        fieldName: ruleType,
+        fieldValue: ruleValue,
       });
-      setNewFieldValue("");
+      setRuleValue("");
       await refetchItems();
     } catch (err: any) {
       notify.error(err.message || "Gagal menambahkan aturan akses.");
@@ -181,7 +168,36 @@ export default function AccessGroupsPage() {
   );
 
   const selectedGroup = (groups || []).find((g) => g.id === selectedGroupId);
-  const possibleValues = scopeOptions?.distinctValues[newFieldName] || [];
+
+  const agentList = scopeOptions?.agentsByTeam[filterTeam] || [];
+
+  const ruleValueOptions: string[] = useMemo(() => {
+    if (ruleType === "tim") return scopeOptions?.teams || [];
+    if (ruleType === "service_type")
+      return (scopeOptions?.services || []).map((s) => s.value);
+    if (ruleType === "peserta_id") {
+      if (filterTeam) return agentList.map((a) => a.id);
+      return Object.values(scopeOptions?.agentsByTeam || {})
+        .flat()
+        .map((a) => a.id);
+    }
+    return [];
+  }, [ruleType, filterTeam, scopeOptions, agentList]);
+
+  const getRuleValueLabel = (type: string, val: string): string => {
+    if (type === "peserta_id") {
+      for (const agents of Object.values(scopeOptions?.agentsByTeam || {})) {
+        const found = agents.find((a) => a.id === val);
+        if (found) return found.name;
+      }
+      return val;
+    }
+    if (type === "service_type") {
+      const svc = (scopeOptions?.services || []).find((s) => s.value === val);
+      return svc?.label || val;
+    }
+    return val;
+  }; 
 
   return (
     <div className="space-y-8">
@@ -339,13 +355,13 @@ export default function AccessGroupsPage() {
                         <div className="flex items-center gap-2.5">
                           <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">
                             <Filter className="h-3 w-3" />
-                            {item.field_name}
+                            {RULE_TYPE_LABELS[item.field_name as RuleType] || item.field_name}
                           </span>
                           <span className="text-xs text-gray-400 font-medium">
                             =
                           </span>
                           <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-800">
-                            {item.field_value}
+                            {getRuleValueLabel(item.field_name, item.field_value)}
                           </span>
                         </div>
                         <button
@@ -372,49 +388,74 @@ export default function AccessGroupsPage() {
                       Tambah Aturan Baru
                     </h5>
                     <p className="text-[11px] text-indigo-700 mt-0.5">
-                      Pilih kriteria kolom data beserta nilainya.
+                      Pilih tipe aturan dan nilainya.
                     </p>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
                     <div>
                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                        Kolom
+                        Tipe
                       </label>
                       <select
-                        value={newFieldName}
-                        onChange={(e) => setNewFieldName(e.target.value)}
+                        value={ruleType}
+                        onChange={(e) => {
+                          setRuleType(e.target.value as RuleType);
+                          setRuleValue("");
+                        }}
                         className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
                       >
-                        {scopeOptions.fields.map((field) => (
-                          <option key={field} value={field}>
-                            {field}
-                          </option>
-                        ))}
+                        <option value="tim">Team</option>
+                        <option value="service_type">Service</option>
+                        <option value="peserta_id">Specific Agent</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                        Nilai Parameter
+                        {ruleType === "tim" ? "Pilih Team" : ruleType === "service_type" ? "Pilih Service" : "Pilih Agent"}
                       </label>
+                      {ruleType === "peserta_id" ? (
+                        <select
+                          value={filterTeam}
+                          onChange={(e) => {
+                            setFilterTeam(e.target.value);
+                            setRuleValue("");
+                          }}
+                          className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 mb-1"
+                        >
+                          <option value="">Semua Team</option>
+                          {(scopeOptions?.teams || []).map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      ) : null}
                       <select
-                        value={newFieldValue}
-                        onChange={(e) => setNewFieldValue(e.target.value)}
+                        value={ruleValue}
+                        onChange={(e) => setRuleValue(e.target.value)}
                         className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
                       >
-                        {possibleValues.map((val) => (
-                          <option key={val} value={val}>
-                            {val}
-                          </option>
-                        ))}
+                        <option value="">Pilih nilai...</option>
+                        {ruleType === "tim"
+                          ? (scopeOptions?.teams || []).map((v) => (
+                              <option key={v} value={v}>{v}</option>
+                            ))
+                          : ruleType === "service_type"
+                          ? (scopeOptions?.services || []).map((s) => (
+                              <option key={s.value} value={s.value}>{s.label}</option>
+                            ))
+                          : ruleValueOptions.map((id) => (
+                              <option key={id} value={id}>
+                                {getRuleValueLabel("peserta_id", id)}
+                              </option>
+                            ))}
                       </select>
                     </div>
 
                     <div className="flex items-end">
                       <button
                         type="submit"
-                        disabled={addingRule || !newFieldValue}
+                        disabled={addingRule || !ruleValue}
                         className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" />

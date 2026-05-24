@@ -167,6 +167,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 28. SIDAK Ranking Fatal Legacy Parity — Strict `nilai===0` + critical predicate for `hasCritical`, phantom-padding exclusion, API + frontend regression tests (DONE)
 29. SIDAK Agent Directory Load-More Copy — Dynamic next-batch copy for `/sidak/agents`, accurate remaining-count label, and regression test (DONE)
 30. SIDAK Input Stability & QA Baseline Recovery — Fixed agents.map crash via defensive response parsing, added draft-empty CTA warning/CTA, unlinked indicator guard on save/import, and improved validation messaging (DONE)
+31. Dashboard User Management Legacy Parity — Restored trainer+admin role parity in admin routes, deleted-user filtering in getUsers, server-side reset password flow, guided access-group builder (Team/Service/Agent), aligned access-approval contract, synced activity log schema with delete action, and rollback-safe reassign for leader access (DONE)
 
 ## Relevant Files
 
@@ -199,8 +200,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-30)
-- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`, `sidak-input-agents-map-and-qa-baseline-fix.md`
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-31)
+- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`, `sidak-input-agents-map-and-qa-baseline-fix.md`, `dashboard-user-management-legacy-parity.md`
 
 ## Routes Reference (apps/web)
 

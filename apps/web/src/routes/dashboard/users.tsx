@@ -11,20 +11,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import { useApi, putApi, deleteApi } from "../../hooks/useApi";
-import { supabase } from "../../lib/supabase";
+import { useApi, putApi, postApi, deleteApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
 import { Pagination } from "../../components/ui/Pagination";
-
-interface ManagedUser {
-  id: string;
-  email: string | null;
-  full_name: string | null;
-  role: string | null;
-  status: string | null;
-  created_at: string;
-  is_deleted?: boolean | null;
-}
+import type { ManagedUser } from "@trainers/types";
 
 type ManagerRole = "trainer" | "admin";
 type UserStatus = "approved" | "pending" | "rejected";
@@ -166,17 +156,7 @@ export default function UsersPage() {
 
     setUpdating(userId);
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        userEmail,
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        },
-      );
-
-      if (resetError) {
-        throw resetError;
-      }
-
+      await postApi(`/admin/users/${userId}/reset-password`, { email: userEmail });
       setResetSuccess(userId);
       setTimeout(() => setResetSuccess(null), 3000);
     } catch (err: any) {
@@ -383,7 +363,7 @@ export default function UsersPage() {
                           <span>•</span>
                           <span>
                             Daftar:{" "}
-                            {new Date(entry.created_at).toLocaleDateString(
+                            {new Date(entry.created_at ?? "").toLocaleDateString(
                               "id-ID",
                             )}
                           </span>

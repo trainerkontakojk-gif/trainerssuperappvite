@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import * as adminService from "../services/admin-service";
+import { requireRole } from "../middleware/role";
 import {
   updateUserStatusSchema,
   updateUserRoleSchema,
@@ -25,29 +27,8 @@ type Variables = {
 
 const admin = new Hono<{ Variables: Variables }>();
 
-// Middleware to assert caller is admin only
-const adminOnly = async (c: any, next: any) => {
-  const profile = c.get("profile");
-  if (profile?.role !== "admin") {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "FORBIDDEN",
-          message: "Akses ditolak: Hanya Admin yang memiliki akses",
-        },
-      },
-      403,
-    );
-  }
-  await next();
-};
-
-// Apply adminOnly to all routes in this sub-router
-admin.use("/*", adminOnly);
-
 // ── User Management Endpoints ──────────────────────────────
-admin.get("/users", async (c) => {
+admin.get("/users", requireRole("admin", "trainer"), async (c) => {
   try {
     const data = await adminService.getUsers();
     return c.json({ success: true, data });
@@ -64,6 +45,7 @@ admin.get("/users", async (c) => {
 
 admin.put(
   "/users/:id/status",
+  requireRole("admin", "trainer"),
   zValidator("json", updateUserStatusSchema),
   async (c) => {
     const userId = c.req.param("id");
@@ -92,6 +74,7 @@ admin.put(
 
 admin.put(
   "/users/:id/role",
+  requireRole("admin", "trainer"),
   zValidator("json", updateUserRoleSchema),
   async (c) => {
     const userId = c.req.param("id");
@@ -120,12 +103,13 @@ admin.put(
   },
 );
 
-admin.delete("/users/:id", async (c) => {
+admin.delete("/users/:id", requireRole("admin", "trainer"), async (c) => {
   const userId = c.req.param("id");
   const user = c.get("user");
+  const profile = c.get("profile");
 
   try {
-    await adminService.deleteUser(userId, user.id, user.email || "System");
+    await adminService.deleteUser(userId, user.id, user.email || "System", profile?.role);
     return c.json({ success: true, data: null });
   } catch (error: any) {
     return c.json(
@@ -139,7 +123,7 @@ admin.delete("/users/:id", async (c) => {
 });
 
 // ── Access Groups Endpoints ─────────────────────────────────
-admin.get("/access-groups", async (c) => {
+admin.get("/access-groups", requireRole("admin", "trainer"), async (c) => {
   try {
     const data = await adminService.getAccessGroups();
     return c.json({ success: true, data });
@@ -156,6 +140,7 @@ admin.get("/access-groups", async (c) => {
 
 admin.post(
   "/access-groups",
+  requireRole("admin", "trainer"),
   zValidator("json", createAccessGroupSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -179,6 +164,7 @@ admin.post(
 
 admin.put(
   "/access-groups/:id",
+  requireRole("admin", "trainer"),
   zValidator("json", updateAccessGroupSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -198,7 +184,7 @@ admin.put(
   },
 );
 
-admin.get("/access-groups/:id/items", async (c) => {
+admin.get("/access-groups/:id/items", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
   try {
     const data = await adminService.getAccessGroupItems(id);
@@ -216,6 +202,7 @@ admin.get("/access-groups/:id/items", async (c) => {
 
 admin.post(
   "/access-groups/:id/items",
+  requireRole("admin", "trainer"),
   zValidator("json", addAccessGroupItemSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -239,7 +226,7 @@ admin.post(
   },
 );
 
-admin.delete("/access-groups/items/:itemId", async (c) => {
+admin.delete("/access-groups/items/:itemId", requireRole("admin", "trainer"), async (c) => {
   const itemId = c.req.param("itemId");
   try {
     await adminService.removeAccessGroupItem(itemId);
@@ -255,7 +242,7 @@ admin.delete("/access-groups/items/:itemId", async (c) => {
   }
 });
 
-admin.get("/access-scope-options", async (c) => {
+admin.get("/access-scope-options", requireRole("admin", "trainer"), async (c) => {
   try {
     const data = await adminService.getAccessScopeOptions();
     return c.json({ success: true, data });
@@ -271,7 +258,7 @@ admin.get("/access-scope-options", async (c) => {
 });
 
 // ── Leader Request Endpoints ─────────────────────────────────
-admin.get("/leader-requests/pending", async (c) => {
+admin.get("/leader-requests/pending", requireRole("admin", "trainer"), async (c) => {
   try {
     const data = await adminService.getPendingLeaderRequests();
     return c.json({ success: true, data });
@@ -286,7 +273,7 @@ admin.get("/leader-requests/pending", async (c) => {
   }
 });
 
-admin.get("/leader-requests/approved", async (c) => {
+admin.get("/leader-requests/approved", requireRole("admin", "trainer"), async (c) => {
   try {
     const data = await adminService.getApprovedLeaderRequests();
     return c.json({ success: true, data });
@@ -303,6 +290,7 @@ admin.get("/leader-requests/approved", async (c) => {
 
 admin.post(
   "/leader-requests/:id/approve",
+  requireRole("admin", "trainer"),
   zValidator("json", approveLeaderRequestSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -325,6 +313,7 @@ admin.post(
 
 admin.post(
   "/leader-requests/:id/reject",
+  requireRole("admin", "trainer"),
   zValidator("json", rejectLeaderRequestSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -347,6 +336,7 @@ admin.post(
 
 admin.post(
   "/leader-requests/:id/revoke",
+  requireRole("admin", "trainer"),
   zValidator("json", revokeLeaderRequestSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -369,6 +359,7 @@ admin.post(
 
 admin.put(
   "/leader-requests/:id/groups",
+  requireRole("admin", "trainer"),
   zValidator("json", reassignLeaderRequestGroupsSchema),
   async (c) => {
     const id = c.req.param("id");
@@ -393,7 +384,32 @@ admin.put(
   },
 );
 
-admin.get("/activity-logs", async (c) => {
+// ── Password Reset ────────────────────────────────────────────
+admin.post(
+  "/users/:id/reset-password",
+  requireRole("admin", "trainer"),
+  zValidator("json", z.object({ email: z.string().email() })),
+  async (c) => {
+    const userId = c.req.param("id");
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    try {
+      await adminService.resetUserPassword(userId, body.email, user.id, user.email || "System");
+      return c.json({ success: true, data: null });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "BAD_REQUEST", message: error.message },
+        },
+        400,
+      );
+    }
+  },
+);
+
+// ── Activity Logs ────────────────────────────────────────────
+admin.get("/activity-logs", requireRole("admin", "trainer"), async (c) => {
   try {
     const data = await adminService.getActivityLogs();
     return c.json({ success: true, data });
@@ -408,7 +424,7 @@ admin.get("/activity-logs", async (c) => {
   }
 });
 
-admin.delete("/activity-logs/:id", async (c) => {
+admin.delete("/activity-logs/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
   try {
     await adminService.deleteActivity(id);

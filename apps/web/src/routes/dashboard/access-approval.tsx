@@ -16,19 +16,7 @@ import {
 } from "lucide-react";
 import { useApi, postApi, putApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
-
-interface LeaderRequest {
-  id: string;
-  user_id: string;
-  email: string | null;
-  full_name: string | null;
-  status: "pending" | "approved" | "rejected" | "revoked";
-  note: string | null;
-  requested_at: string;
-  actioned_at: string | null;
-  actioned_by_email?: string | null;
-  assigned_groups?: { group_id: string; name: string }[] | null;
-}
+import type { PendingLeaderRequest, ApprovedLeaderAccess } from "@trainers/types";
 
 interface AccessGroup {
   id: string;
@@ -45,14 +33,14 @@ export default function AccessApprovalPage() {
     data: pendingRequests,
     loading: loadingPending,
     refetch: refetchPending,
-  } = useApi<LeaderRequest[]>(
+  } = useApi<PendingLeaderRequest[]>(
     activeTab === "pending" ? "/admin/leader-requests/pending" : null,
   );
   const {
     data: approvedRequests,
     loading: loadingApproved,
     refetch: refetchApproved,
-  } = useApi<LeaderRequest[]>(
+  } = useApi<ApprovedLeaderAccess[]>(
     activeTab === "approved" ? "/admin/leader-requests/approved" : null,
   );
   const { data: groups } = useApi<AccessGroup[]>("/admin/access-groups");
@@ -72,8 +60,8 @@ export default function AccessApprovalPage() {
 
   const filteredRequests = requests.filter(
     (r) =>
-      r.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.full_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+      ("leader_email" in r ? r.leader_email?.toLowerCase().includes(searchTerm.toLowerCase()) : false) ||
+      ("leader_name" in r ? r.leader_name?.toLowerCase().includes(searchTerm.toLowerCase()) : false),
   );
 
   const selectedReq = requests.find((r) => r.id === selectedReqId);
@@ -81,12 +69,12 @@ export default function AccessApprovalPage() {
   // Sync checkboxes when selectedReq changes
   useEffect(() => {
     if (selectedReq) {
-      if (selectedReq.assigned_groups) {
-        setSelectedGroupIds(selectedReq.assigned_groups.map((g) => g.group_id));
+      if ("access_group_ids" in selectedReq && selectedReq.access_group_ids) {
+        setSelectedGroupIds(selectedReq.access_group_ids);
       } else {
         setSelectedGroupIds([]);
       }
-      setActionNote(selectedReq.note || "");
+      setActionNote("");
     } else {
       setSelectedGroupIds([]);
       setActionNote("");
@@ -229,7 +217,7 @@ export default function AccessApprovalPage() {
                 <p className="text-xs font-semibold">Tidak ada permintaan</p>
               </div>
             ) : (
-              filteredRequests.map((r) => (
+              filteredRequests.map((r: any) => (
                 <button
                   key={r.id}
                   onClick={() => setSelectedReqId(r.id)}
@@ -241,23 +229,23 @@ export default function AccessApprovalPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-sm truncate">
-                      {r.full_name || "Tanpa Nama"}
+                      {r.leader_name || "Tanpa Nama"}
                     </span>
                     <span className="text-[10px] text-gray-400">
-                      {new Date(r.requested_at).toLocaleDateString("id-ID")}
+                      {new Date("created_at" in r ? r.created_at : r.approved_at).toLocaleDateString("id-ID")}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-gray-400 truncate font-normal">
-                    {r.email}
+                    {r.leader_email}
                   </p>
-                  {r.assigned_groups && r.assigned_groups.length > 0 && (
+                  {r.access_group_names && r.access_group_names.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {r.assigned_groups.map((g) => (
+                      {r.access_group_names.map((name: string, i: number) => (
                         <span
-                          key={g.group_id}
+                          key={i}
                           className="rounded bg-indigo-100/50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700"
                         >
-                          {g.name}
+                          {name}
                         </span>
                       ))}
                     </div>
@@ -276,28 +264,36 @@ export default function AccessApprovalPage() {
               <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">
-                    {selectedReq.full_name || "Tanpa Nama"}
+                    {(selectedReq as any).leader_name || "Tanpa Nama"}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    {selectedReq.email}
+                    {(selectedReq as any).leader_email}
                   </p>
                   <p className="mt-2 text-xs text-gray-400">
-                    Diminta pada:{" "}
-                    {new Date(selectedReq.requested_at).toLocaleString("id-ID")}
+                    {"created_at" in selectedReq
+                      ? `Diminta pada: ${new Date((selectedReq as any).created_at).toLocaleString("id-ID")}`
+                      : `Disetujui pada: ${new Date((selectedReq as any).approved_at).toLocaleString("id-ID")}`
+                    }
                   </p>
                 </div>
                 <div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
-                      selectedReq.status === "pending"
-                        ? "bg-amber-100 text-amber-800"
-                        : selectedReq.status === "approved"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {selectedReq.status}
-                  </span>
+                  {"status" in selectedReq ? (
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                        (selectedReq as any).status === "pending"
+                          ? "bg-amber-100 text-amber-800"
+                          : (selectedReq as any).status === "approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {(selectedReq as any).status}
+                    </span>
+                  ) : (
+                    <span className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                      Approved
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -324,7 +320,7 @@ export default function AccessApprovalPage() {
                         onClick={() => handleToggleGroup(group.id)}
                         disabled={
                           processing ||
-                          (selectedReq.status !== "pending" &&
+                          ((selectedReq as any).status !== "pending" &&
                             actionType !== "update_groups")
                         }
                         className={`flex items-start text-left gap-3 rounded-xl border p-4 transition-all ${
@@ -362,7 +358,7 @@ export default function AccessApprovalPage() {
 
               {/* Action Box */}
               <div className="rounded-xl border bg-gray-50/50 p-5 space-y-4">
-                {selectedReq.status === "pending" ? (
+                {(selectedReq as any).status === "pending" ? (
                   <>
                     <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide">
                       <ShieldAlert className="h-4 w-4 text-amber-500" />
@@ -406,39 +402,14 @@ export default function AccessApprovalPage() {
                   </>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                          Penyetuju
-                        </p>
-                        <p className="text-xs font-semibold text-gray-700">
-                          {selectedReq.actioned_by_email || "System"}
-                        </p>
-                      </div>
-                      {selectedReq.actioned_at && (
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                            Waktu Aksi
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(selectedReq.actioned_at).toLocaleString(
-                              "id-ID",
-                            )}
-                          </p>
-                        </div>
-                      )}
+                    <div className="flex items-center justify-between border-b pb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Modul: {(selectedReq as any).module || "-"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Disetujui: {new Date((selectedReq as any).approved_at).toLocaleString("id-ID")}
+                      </p>
                     </div>
-
-                    {selectedReq.note && (
-                      <div className="bg-white border rounded-lg p-3">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                          Catatan
-                        </p>
-                        <p className="text-xs text-gray-600 mt-0.5 italic">
-                          "{selectedReq.note}"
-                        </p>
-                      </div>
-                    )}
 
                     <div className="flex flex-wrap gap-3">
                       {actionType === "update_groups" ? (
@@ -454,13 +425,8 @@ export default function AccessApprovalPage() {
                           <button
                             onClick={() => {
                               setActionType(null);
-                              if (selectedReq.assigned_groups) {
-                                setSelectedGroupIds(
-                                  selectedReq.assigned_groups.map(
-                                    (g) => g.group_id,
-                                  ),
-                                );
-                              }
+                              const ids = (selectedReq as any).access_group_ids;
+                              if (ids) setSelectedGroupIds(ids);
                             }}
                             className="rounded-lg border bg-white px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors"
                           >
@@ -477,25 +443,23 @@ export default function AccessApprovalPage() {
                             Ubah Grup Akses
                           </button>
 
-                          {selectedReq.status === "approved" && (
-                            <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                              <input
-                                type="text"
-                                placeholder="Alasan cabut akses (Wajib)..."
-                                value={actionNote}
-                                onChange={(e) => setActionNote(e.target.value)}
-                                className="flex-1 rounded-lg border bg-white px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
-                              />
-                              <button
-                                onClick={() => handleAction("revoke")}
-                                disabled={processing || !actionNote.trim()}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50 shrink-0"
-                              >
-                                <UserMinus className="h-3.5 w-3.5" />
-                                Cabut Akses
-                              </button>
-                            </div>
-                          )}
+                          <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                            <input
+                              type="text"
+                              placeholder="Alasan cabut akses (Wajib)..."
+                              value={actionNote}
+                              onChange={(e) => setActionNote(e.target.value)}
+                              className="flex-1 rounded-lg border bg-white px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                              onClick={() => handleAction("revoke")}
+                              disabled={processing || !actionNote.trim()}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50 shrink-0"
+                            >
+                              <UserMinus className="h-3.5 w-3.5" />
+                              Cabut Akses
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>

@@ -35,6 +35,7 @@ export async function getUsers(): Promise<ManagedUser[]> {
   const { data, error } = await supabaseAdmin
     .from("profiles")
     .select("*")
+    .is("is_deleted", false)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -114,9 +115,22 @@ export async function deleteUser(
   userId: string,
   callerId: string,
   callerEmail: string,
+  callerRole?: string,
 ): Promise<void> {
   if (userId === callerId) {
     throw new Error("Akun Anda sendiri tidak dapat dihapus dari panel ini");
+  }
+
+  // Trainer cannot delete admin accounts
+  if (callerRole === "trainer") {
+    const { data: target } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .single();
+    if (target?.role === "admin") {
+      throw new Error("Anda tidak memiliki izin untuk menghapus akun admin");
+    }
   }
 
   const { error } = await supabaseAdmin
@@ -132,6 +146,27 @@ export async function deleteUser(
     action: `Menonaktifkan Pengguna ID: ${userId}`,
     module: "USER_MGMT",
     type: "delete",
+  });
+}
+
+export async function resetUserPassword(
+  userId: string,
+  email: string,
+  callerId: string,
+  callerEmail: string,
+): Promise<void> {
+  const { error } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+  });
+  if (error) throw new Error(`Gagal generate link reset password: ${error.message}`);
+
+  await logActivity({
+    userId: callerId,
+    userName: callerEmail,
+    action: `Generate reset password untuk user ${userId} (${email})`,
+    module: "USER_MGMT",
+    type: "reset_password",
   });
 }
 
@@ -534,6 +569,16 @@ export async function reassignLeaderRequestGroups(
     throw new Error("Access group tidak valid atau sudah nonaktif");
   }
 
+  // Save existing links for rollback
+  const { data: oldLinks, error: fetchError } = await supabaseAdmin
+    .from("leader_access_request_groups")
+    .select("access_group_id")
+    .eq("request_id", requestId);
+
+  if (fetchError) throw new Error("Gagal membaca access group lama");
+
+  const oldGroupIds = (oldLinks || []).map((l: any) => l.access_group_id);
+
   // Clear existing links
   const { error: deleteError } = await supabaseAdmin
     .from("leader_access_request_groups")
@@ -552,7 +597,16 @@ export async function reassignLeaderRequestGroups(
     .from("leader_access_request_groups")
     .insert(groupRows);
 
-  if (insertError) throw new Error("Gagal menyimpan access group baru");
+  if (insertError) {
+    // Rollback: restore old links
+    await supabaseAdmin
+      .from("leader_access_request_groups")
+      .insert(oldGroupIds.map((gid: string) => ({
+        request_id: requestId,
+        access_group_id: gid,
+      })));
+    throw new Error("Gagal menyimpan access group baru. Perubahan dibatalkan.");
+  }
 
   await supabaseAdmin
     .from("leader_access_requests")
@@ -566,7 +620,7 @@ export async function getActivityLogs(): Promise<ActivityLog[]> {
     .from("activity_logs")
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(500);
 
   if (error) throw new Error(error.message);
   return data ?? [];
