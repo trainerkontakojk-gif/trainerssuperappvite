@@ -163,7 +163,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 24. SIDAK Dashboard Legacy Parity — Restored legacy defaults, filter bar, KPI cards, trend panel, leaderboard, parity test (DONE)
 25. SIDAK Agent Service Pill Stability — Service pills from raw temuan rows, regression test for refresh collapse (DONE)
 26. SIDAK Parameter Legacy Parity — Rebuilt versioned settings shell, history picker, weights slider, parameters list card view, and publish flow (DONE)
-26. SIDAK Parameter Legacy Parity — Rebuilt versioned settings shell, history picker, weights slider, parameters list card view, and publish flow (DONE)
+27. SIDAK Agent Detail Findings Parity — Local score badges, month accordion, ticket grouping, and role-based action permission (DONE)
 
 ## Relevant Files
 
@@ -185,7 +185,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
-- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, useAgentDetail)
+- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, sidak-agent-detail-temuan-parity, useAgentDetail)
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests
@@ -196,8 +196,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-26)
-- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-27)
+- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`
 
 ## Routes Reference (apps/web)
 
@@ -212,7 +212,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | 7   | `/sidak/settings`            | CRUD         | Service weights configuration                            |
 | 8   | `/sidak/periods`             | Manager      | Create/view audit periods                                |
 | 9   | `/sidak/agents`              | Directory    | Searchable agent list                                    |
-| 10  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service |
+| 10  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service, score badges in temuan history |
 | 11  | `/ketik`                     | Landing      | Chat simulation intro                                    |
 | 12  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                      |
 | 13  | `/ketik/history`             | Placeholder  | Session history                                          |

@@ -1,8 +1,8 @@
 import { useParams, Link } from "@tanstack/react-router";
 import { useAgentDetail } from "../../hooks/useAgentDetail";
 import {
-  ArrowLeft, Loader2, AlertTriangle, RefreshCw,
-  BarChart2, BarChart3, ClipboardList, ShieldCheck, Activity,
+  ArrowLeft, AlertTriangle, RefreshCw,
+  BarChart2, ShieldCheck, Activity,
 } from "lucide-react";
 import AgentProfileBar from "../../components/sidak/AgentProfileBar";
 import ContextControlBar from "../../components/sidak/ContextControlBar";
@@ -96,7 +96,6 @@ export default function SidakAgentDetailPage() {
     );
   }
 
-  const isStaff = role === "trainer" || role === "admin" || role === "leader";
   const activeLabel = latestPeriod && selectedMonth
     ? `${monthsFull[selectedMonth - 1]?.slice(0, 3) ?? ""} ${selectedYear}`
     : undefined;
@@ -274,10 +273,11 @@ export default function SidakAgentDetailPage() {
           </div>
           {temuanMounted ? (
             <AgentTemuanTab
+              key={`${selectedYear}-${selectedService}`}
               items={temuanDisplayItems}
               loading={loading}
               deletingId={deletingId}
-              canEdit={isStaff}
+              canEdit={role === "trainer" || role === "admin"}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
