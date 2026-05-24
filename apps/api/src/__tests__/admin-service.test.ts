@@ -183,4 +183,200 @@ describe("admin-service", () => {
       expect(res.name).toBe("New Group");
     });
   });
+
+  describe("approveLeaderRequest", () => {
+    it("self-approve guard", async () => {
+      pendingResolve = () => ({
+        data: {
+          id: "req-1",
+          status: "pending",
+          leader_user_id: "caller-id",
+        },
+        error: null,
+      });
+      await expect(
+        adminService.approveLeaderRequest("req-1", ["g1"], "caller-id"),
+      ).rejects.toThrow(
+        "Anda tidak dapat menyetujui request akses milik sendiri",
+      );
+    });
+
+    it("approves request with group linking and rollback on link failure", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1)
+          return {
+            data: {
+              id: "req-1",
+              status: "pending",
+              leader_user_id: "other-user",
+            },
+            error: null,
+          };
+        if (callCount === 2)
+          return { data: [{ id: "g1" }], error: null };
+        if (callCount === 3)
+          return { error: null };
+        if (callCount === 4)
+          return { error: { message: "link failed" } };
+        return { error: null };
+      };
+      await expect(
+        adminService.approveLeaderRequest("req-1", ["g1"], "caller-id"),
+      ).rejects.toThrow("Gagal menautkan access group");
+      expect(
+        updateCalls.some(
+          (call) =>
+            call.method === "update" &&
+            call.payload?.status === "pending" &&
+            call.payload?.reviewed_by === null,
+        ),
+      ).toBe(true);
+    });
+  });
+
+  describe("reassignLeaderRequestGroups", () => {
+    it("self-reassign guard", async () => {
+      pendingResolve = () => ({
+        data: {
+          id: "req-1",
+          status: "approved",
+          leader_user_id: "caller-id",
+        },
+        error: null,
+      });
+      await expect(
+        adminService.reassignLeaderRequestGroups(
+          "req-1",
+          ["g1"],
+          "caller-id",
+        ),
+      ).rejects.toThrow("Anda tidak dapat mengubah akses milik sendiri");
+    });
+
+    it("re-check throws when request no longer approved", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1)
+          return {
+            data: {
+              id: "req-1",
+              status: "approved",
+              leader_user_id: "other-user",
+            },
+            error: null,
+          };
+        if (callCount === 2)
+          return { data: [{ id: "g1" }], error: null };
+        if (callCount === 3)
+          return {
+            data: [{ access_group_id: "old-g" }],
+            error: null,
+          };
+        if (callCount === 4)
+          return { data: null, error: { message: "not found" } };
+        return { error: null };
+      };
+      await expect(
+        adminService.reassignLeaderRequestGroups(
+          "req-1",
+          ["g1"],
+          "caller-id",
+        ),
+      ).rejects.toThrow(
+        "Akses sudah tidak aktif. Permintaan mungkin sudah dicabut.",
+      );
+    });
+
+    it("rolls back old links when insert fails", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1)
+          return {
+            data: {
+              id: "req-1",
+              status: "approved",
+              leader_user_id: "other-user",
+            },
+            error: null,
+          };
+        if (callCount === 2)
+          return { data: [{ id: "g1" }], error: null };
+        if (callCount === 3)
+          return {
+            data: [{ access_group_id: "old-g" }],
+            error: null,
+          };
+        if (callCount === 4)
+          return {
+            data: { id: "req-1", status: "approved" },
+            error: null,
+          };
+        if (callCount === 5)
+          return { error: null };
+        if (callCount === 6)
+          return { error: { message: "insert failed" } };
+        return { error: null };
+      };
+      await expect(
+        adminService.reassignLeaderRequestGroups(
+          "req-1",
+          ["g1"],
+          "caller-id",
+        ),
+      ).rejects.toThrow("Gagal menyimpan access group baru. Perubahan dibatalkan.");
+      const rollbackInserts = updateCalls.filter(
+        (call) =>
+          call.method === "insert" &&
+          Array.isArray(call.payload) &&
+          call.payload.some(
+            (item: any) => item?.access_group_id === "old-g",
+          ),
+      );
+      expect(rollbackInserts.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("completes reassign successfully", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1)
+          return {
+            data: {
+              id: "req-1",
+              status: "approved",
+              leader_user_id: "other-user",
+            },
+            error: null,
+          };
+        if (callCount === 2)
+          return { data: [{ id: "g1" }], error: null };
+        if (callCount === 3)
+          return {
+            data: [{ access_group_id: "old-g" }],
+            error: null,
+          };
+        if (callCount === 4)
+          return {
+            data: { id: "req-1", status: "approved" },
+            error: null,
+          };
+        if (callCount === 5)
+          return { error: null };
+        if (callCount === 6)
+          return { error: null };
+        return { error: null };
+      };
+      await expect(
+        adminService.reassignLeaderRequestGroups(
+          "req-1",
+          ["g1"],
+          "caller-id",
+        ),
+      ).resolves.toBeUndefined();
+    });
+  });
 });

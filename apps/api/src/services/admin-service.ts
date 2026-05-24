@@ -579,6 +579,20 @@ export async function reassignLeaderRequestGroups(
 
   const oldGroupIds = (oldLinks || []).map((l: any) => l.access_group_id);
 
+  // Re-verify request is still approved before mutating groups
+  const { data: recheckReq, error: recheckError } = await supabaseAdmin
+    .from("leader_access_requests")
+    .select("id, status")
+    .eq("id", requestId)
+    .eq("status", "approved")
+    .single();
+
+  if (recheckError || !recheckReq) {
+    throw new Error(
+      "Akses sudah tidak aktif. Permintaan mungkin sudah dicabut.",
+    );
+  }
+
   // Clear existing links
   const { error: deleteError } = await supabaseAdmin
     .from("leader_access_request_groups")
@@ -608,10 +622,18 @@ export async function reassignLeaderRequestGroups(
     throw new Error("Gagal menyimpan access group baru. Perubahan dibatalkan.");
   }
 
-  await supabaseAdmin
+  const { error: auditError } = await supabaseAdmin
     .from("leader_access_requests")
     .update({ reviewed_by: reviewerId })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("status", "approved");
+
+  if (auditError) {
+    console.error(
+      "[AdminService] Warning: Failed to update reviewed_by audit field:",
+      auditError.message,
+    );
+  }
 }
 
 // ── Activity Logs ────────────────────────────────────────────

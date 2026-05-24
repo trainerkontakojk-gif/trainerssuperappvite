@@ -177,9 +177,7 @@ export default function AccessGroupsPage() {
       return (scopeOptions?.services || []).map((s) => s.value);
     if (ruleType === "peserta_id") {
       if (filterTeam) return agentList.map((a) => a.id);
-      return Object.values(scopeOptions?.agentsByTeam || {})
-        .flat()
-        .map((a) => a.id);
+      return [];
     }
     return [];
   }, [ruleType, filterTeam, scopeOptions, agentList]);
@@ -416,40 +414,54 @@ export default function AccessGroupsPage() {
                         {ruleType === "tim" ? "Pilih Team" : ruleType === "service_type" ? "Pilih Service" : "Pilih Agent"}
                       </label>
                       {ruleType === "peserta_id" ? (
-                        <select
-                          value={filterTeam}
-                          onChange={(e) => {
-                            setFilterTeam(e.target.value);
-                            setRuleValue("");
-                          }}
-                          className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 mb-1"
-                        >
-                          <option value="">Semua Team</option>
-                          {(scopeOptions?.teams || []).map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
-                      ) : null}
-                      <select
-                        value={ruleValue}
-                        onChange={(e) => setRuleValue(e.target.value)}
-                        className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                      >
-                        <option value="">Pilih nilai...</option>
-                        {ruleType === "tim"
-                          ? (scopeOptions?.teams || []).map((v) => (
-                              <option key={v} value={v}>{v}</option>
-                            ))
-                          : ruleType === "service_type"
-                          ? (scopeOptions?.services || []).map((s) => (
-                              <option key={s.value} value={s.value}>{s.label}</option>
-                            ))
-                          : ruleValueOptions.map((id) => (
+                        <>
+                          <select
+                            value={filterTeam}
+                            onChange={(e) => {
+                              setFilterTeam(e.target.value);
+                              setRuleValue("");
+                            }}
+                            className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 mb-1"
+                          >
+                            <option value="">Pilih Team terlebih dahulu</option>
+                            {(scopeOptions?.teams || []).map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={ruleValue}
+                            onChange={(e) => setRuleValue(e.target.value)}
+                            disabled={!filterTeam}
+                            className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <option value="">
+                              {filterTeam
+                                ? "Pilih Name"
+                                : "Pilih Team terlebih dahulu"}
+                            </option>
+                            {ruleValueOptions.map((id) => (
                               <option key={id} value={id}>
                                 {getRuleValueLabel("peserta_id", id)}
                               </option>
                             ))}
-                      </select>
+                          </select>
+                        </>
+                      ) : (
+                        <select
+                          value={ruleValue}
+                          onChange={(e) => setRuleValue(e.target.value)}
+                          className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="">Pilih nilai...</option>
+                          {ruleType === "tim"
+                            ? (scopeOptions?.teams || []).map((v) => (
+                                <option key={v} value={v}>{v}</option>
+                              ))
+                            : (scopeOptions?.services || []).map((s) => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                              ))}
+                        </select>
+                      )}
                     </div>
 
                     <div className="flex items-end">
@@ -463,6 +475,11 @@ export default function AccessGroupsPage() {
                       </button>
                     </div>
                   </div>
+                  <p className="text-xs text-gray-400">
+                    {ruleType === "peserta_id"
+                      ? "Pilih Team terlebih dahulu untuk menampilkan Name yang tersedia di team tersebut."
+                      : "Dropdown hanya menampilkan data yang tersedia saat halaman dibuka."}
+                  </p>
                 </form>
               )}
             </div>
