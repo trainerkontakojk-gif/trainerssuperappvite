@@ -14,9 +14,7 @@ export default function SidakAgentsPage() {
   const [showAll, setShowAll] = useState(false);
   const year = new Date().getFullYear();
 
-  const { data, loading, refetch } = useApi<AgentDirectoryResponse>(
-    `/sidak/agents?year=${year}&show_all=${showAll}`,
-  );
+  const { data, loading } = useApi<AgentDirectoryResponse>(`/sidak/agents?year=${year}&show_all=${showAll}`);
 
   function setPage(_n: number) {
     setVisibleCount(INITIAL_VISIBLE);
@@ -45,6 +43,7 @@ export default function SidakAgentsPage() {
 
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
+  const nextLoadCount = Math.min(INITIAL_VISIBLE, filtered.length - visibleCount);
   const batches = data?.batches ?? [];
 
   return (
@@ -184,7 +183,7 @@ export default function SidakAgentsPage() {
                   onClick={() => setVisibleCount((s) => s + INITIAL_VISIBLE)}
                   className="rounded-2xl border border-border/50 bg-background px-8 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all hover:bg-muted/50"
                 >
-                  Muat {INITIAL_VISIBLE} Agent Lagi
+                  Muat {nextLoadCount} Agent Lagi
                 </button>
               </div>
             )}
