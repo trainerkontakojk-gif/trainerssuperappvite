@@ -10,8 +10,13 @@ import {
   Phone,
   MessageCircle,
   Mail,
+  Sparkles,
+  Clock,
+  Target,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
+import { getApi, putApi, postApi } from "../hooks/useApi";
+import { notify } from "../lib/toast";
 
 type UsageAggregation = {
   user_id: string;
@@ -92,14 +97,46 @@ function formatDate(iso: string): string {
 function getModuleIcon(module: string) {
   switch (module) {
     case "ketik":
-      return <MessageCircle size={14} className="text-blue-500" />;
+      return <MessageCircle size={14} className="text-module-ketik" />;
     case "pdkt":
-      return <Mail size={14} className="text-orange-500" />;
+      return <Mail size={14} className="text-module-pdkt" />;
     case "telefun":
-      return <Phone size={14} className="text-green-500" />;
+      return <Phone size={14} className="text-module-telefun" />;
     default:
       return null;
   }
+}
+
+function getModuleBadgeClasses(module: string) {
+  switch (module) {
+    case "ketik":
+      return "bg-module-ketik/10 text-module-ketik border border-module-ketik/20";
+    case "pdkt":
+      return "bg-module-pdkt/10 text-module-pdkt border border-module-pdkt/20";
+    case "telefun":
+      return "bg-module-telefun/10 text-module-telefun border border-module-telefun/20";
+    default:
+      return "bg-muted text-muted-foreground border border-border";
+  }
+}
+
+function getScoreColor(score: number | null): string {
+  if (score === null) return "text-muted-foreground";
+  if (score >= 80) return "text-emerald-500";
+  if (score >= 60) return "text-amber-500";
+  return "text-red-500";
+}
+
+function mapError(err: unknown): string {
+  if (err instanceof Error) {
+    const msg = err.message;
+    if (msg === "Unauthorized" || msg === "Invalid token") {
+      return "Sesi Anda telah berakhir. Silakan login kembali.";
+    }
+    if (msg?.includes("tidak memiliki akses")) return msg;
+    return msg === "API Error" ? "Gagal memuat data. Silakan coba lagi." : msg;
+  }
+  return "Terjadi kesalahan koneksi. Periksa jaringan Anda.";
 }
 
 export default function MonitoringPage() {
@@ -133,14 +170,12 @@ export default function MonitoringPage() {
       const moduleParam = aggregationModule
         ? `&module=${aggregationModule}`
         : "";
-      const res = await fetch(
-        `/api/v1/ai/monitoring/aggregation?year=${year}&month=${month}${moduleParam}`,
+      const data = await getApi<UsageAggregation[]>(
+        `/ai/monitoring/aggregation?year=${year}&month=${month}${moduleParam}`,
       );
-      const json = await res.json();
-      if (json.success) setAggregation(json.data || []);
-      else setError(json.error?.message || "Gagal memuat data agregasi");
+      setAggregation(data);
     } catch (err) {
-      setError("Terjadi kesalahan koneksi.");
+      setError(mapError(err));
       console.error("Fetch aggregation error:", err);
     } finally {
       setLoading(false);
@@ -151,12 +186,12 @@ export default function MonitoringPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/ai/monitoring/history");
-      const json = await res.json();
-      if (json.success) setHistoryData(json.data || []);
-      else setError(json.error?.message || "Gagal memuat riwayat monitoring");
+      const data = await getApi<UnifiedHistoryEntry[]>(
+        "/ai/monitoring/history",
+      );
+      setHistoryData(data);
     } catch (err) {
-      setError("Terjadi kesalahan koneksi.");
+      setError(mapError(err));
       console.error("Fetch history error:", err);
     } finally {
       setLoading(false);
@@ -167,17 +202,14 @@ export default function MonitoringPage() {
     if (!canEditPricing) return;
     setError(null);
     try {
-      const [pRes, bRes] = await Promise.all([
-        fetch("/api/v1/ai/monitoring/pricing"),
-        fetch("/api/v1/ai/monitoring/billing"),
+      const [pData, bData] = await Promise.all([
+        getApi<PricingEntry[]>("/ai/monitoring/pricing"),
+        getApi<{ usd_to_idr_rate: number }>("/ai/monitoring/billing"),
       ]);
-      const pJson = await pRes.json();
-      const bJson = await bRes.json();
-      if (pJson.success) setPricing(pJson.data || []);
-      else setError(pJson.error?.message || "Gagal memuat data pricing");
-      if (bJson.success) setBillingRate(bJson.data?.usd_to_idr_rate ?? 15000);
+      setPricing(pData);
+      setBillingRate(bData?.usd_to_idr_rate ?? 15000);
     } catch (err) {
-      setError("Terjadi kesalahan koneksi.");
+      setError(mapError(err));
       console.error("Fetch pricing error:", err);
     }
   };
@@ -189,20 +221,26 @@ export default function MonitoringPage() {
   }, [tab, year, month, aggregationModule]);
 
   const handleSavePricing = async (entry: PricingEntry) => {
-    await fetch("/api/v1/ai/monitoring/pricing", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entry),
-    });
-    fetchPricing();
+    try {
+      await putApi("/ai/monitoring/pricing", entry);
+      notify.success("Harga berhasil disimpan.");
+      fetchPricing();
+    } catch (err) {
+      notify.error("Gagal menyimpan harga.", mapError(err));
+      console.error("Save pricing error:", err);
+    }
   };
 
   const handleSaveBilling = async () => {
-    await fetch("/api/v1/ai/monitoring/billing", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ usd_to_idr_rate: billingRate }),
-    });
+    try {
+      await postApi("/ai/monitoring/billing", {
+        usd_to_idr_rate: billingRate,
+      });
+      notify.success("Kurs berhasil disimpan.");
+    } catch (err) {
+      notify.error("Gagal menyimpan kurs.", mapError(err));
+      console.error("Save billing error:", err);
+    }
   };
 
   const filteredAgg = useMemo(() => {
@@ -239,7 +277,13 @@ export default function MonitoringPage() {
   const allModels = useMemo(() => {
     const map = new Map<
       string,
-      { model_id: string; module: string; calls: number; total_tokens: number; cost_idr: number }
+      {
+        model_id: string;
+        module: string;
+        calls: number;
+        total_tokens: number;
+        cost_idr: number;
+      }
     >();
     for (const agg of aggregation) {
       for (const m of agg.models) {
@@ -250,7 +294,13 @@ export default function MonitoringPage() {
           existing.total_tokens += m.total_tokens;
           existing.cost_idr += m.cost_idr;
         } else {
-          map.set(key, { model_id: m.model_id, module: m.module, calls: m.calls, total_tokens: m.total_tokens, cost_idr: m.cost_idr });
+          map.set(key, {
+            model_id: m.model_id,
+            module: m.module,
+            calls: m.calls,
+            total_tokens: m.total_tokens,
+            cost_idr: m.cost_idr,
+          });
         }
       }
     }
@@ -262,56 +312,137 @@ export default function MonitoringPage() {
     setShowDetail(true);
   };
 
+  const historyKpi = useMemo(() => {
+    const totalSessions = historyData.length;
+    const uniqueUsers = new Set(historyData.map((h) => h.user_id)).size;
+    const moduleCounts = { ketik: 0, pdkt: 0, telefun: 0 };
+    historyData.forEach((h) => {
+      if (h.module in moduleCounts) moduleCounts[h.module]++;
+    });
+    const topModule =
+      (Object.entries(moduleCounts).sort(([, a], [, b]) => b - a)[0]?.[0] as
+        | string
+        | undefined) ?? "-";
+    const topModuleLabel =
+      topModule === "ketik"
+        ? "KETIK"
+        : topModule === "pdkt"
+          ? "PDKT"
+          : topModule === "telefun"
+            ? "Telefun"
+            : topModule;
+    return { totalSessions, uniqueUsers, topModuleLabel };
+  }, [historyData]);
+
   return (
     <div className="space-y-6">
+      {/* Hero Header */}
+      <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-sm">
+        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-primary mb-4">
+          <Sparkles size={12} />
+          SIMULATION MONITORING
+        </div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+          Pantau histori simulasi dari satu pusat observasi.
+        </h1>
+        <p className="max-w-3xl text-sm md:text-base leading-relaxed text-muted-foreground mt-3">
+          Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian
+          lintas modul tanpa kehilangan konteks platform.
+        </p>
+      </div>
+
+      {/* Tab Strip */}
+      <div className="flex gap-2 mb-2 border-b border-border">
+        <button
+          onClick={() => setTab("history")}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${
+            tab === "history"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Eye size={16} />
+          Riwayat Simulasi
+        </button>
+        <button
+          onClick={() => setTab("usage")}
+          className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${
+            tab === "usage"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <BarChart3 size={16} />
+          Penggunaan Token
+        </button>
+        {canEditPricing && (
+          <button
+            onClick={() => setTab("pricing")}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${
+              tab === "pricing"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <DollarSign size={16} />
+            Harga & Kurs
+          </button>
+        )}
+      </div>
+
+      {/* Error Banner */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 text-sm rounded-lg border border-red-200">
+        <div className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">
           <AlertCircle size={14} />
           <span>{error}</span>
           <button
-            className="ml-auto text-xs underline"
+            className="ml-auto text-xs underline hover:opacity-80"
             onClick={() => setError(null)}
           >
             Tutup
           </button>
         </div>
       )}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Monitoring AI Usage</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTab("history")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "history" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-          >
-            <History size={16} className="inline mr-1" />
-            Riwayat Simulasi
-          </button>
-          <button
-            onClick={() => setTab("usage")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "usage" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-          >
-            <BarChart3 size={16} className="inline mr-1" />
-            Penggunaan Token
-          </button>
-          {canEditPricing && (
-            <button
-              onClick={() => setTab("pricing")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "pricing" ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-            >
-              <DollarSign size={16} className="inline mr-1" />
-              Harga & Kurs
-            </button>
-          )}
-        </div>
-      </div>
 
+      {/* Loading Indicator */}
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          Memuat data...
+        </div>
+      )}
+
+      {/* Tab: Riwayat Simulasi */}
       {tab === "history" && (
         <>
+          {/* KPI Summary */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                Total Sesi
+              </span>
+              <p className="text-3xl font-black">{historyKpi.totalSessions}</p>
+            </div>
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                Pengguna Aktif
+              </span>
+              <p className="text-3xl font-black">{historyKpi.uniqueUsers}</p>
+            </div>
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                Modul Terpopuler
+              </span>
+              <p className="text-3xl font-black">{historyKpi.topModuleLabel}</p>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
           <div className="flex items-center gap-4">
             <select
               value={historyModule}
               onChange={(e) => setHistoryModule(e.target.value)}
-              className="p-2 border rounded-lg text-sm"
+              className="px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             >
               {MODULE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -322,73 +453,90 @@ export default function MonitoringPage() {
             <div className="relative flex-1 max-w-xs">
               <Search
                 size={16}
-                className="absolute left-3 top-2.5 text-gray-400"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <input
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
                 placeholder="Cari riwayat..."
-                className="w-full pl-9 p-2 border rounded-lg text-sm"
+                className="w-full pl-12 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
           </div>
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+
+          {/* History Table */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-3 text-left font-medium">Modul</th>
-                  <th className="p-3 text-left font-medium">Skenario</th>
-                  <th className="p-3 text-left font-medium">Pengguna</th>
-                  <th className="p-3 text-left font-medium">Waktu</th>
-                  <th className="p-3 text-right font-medium">Durasi</th>
-                  <th className="p-3 text-center font-medium">Skor</th>
-                  <th className="p-3 text-center font-medium">Aksi</th>
+              <thead>
+                <tr className="bg-foreground/[0.02] border-b border-border">
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Modul
+                  </th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Skenario
+                  </th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Pengguna
+                  </th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Waktu
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Durasi
+                  </th>
+                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Skor
+                  </th>
+                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Aksi
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {filteredHistory.map((h) => (
-                  <tr key={`${h.module}-${h.id}`} className="border-t hover:bg-gray-50">
-                    <td className="p-3">
+                  <tr
+                    key={`${h.module}-${h.id}`}
+                    className="hover:bg-foreground/[0.02] transition-colors group"
+                  >
+                    <td className="px-6 py-4">
                       <span className="flex items-center gap-1.5">
                         {getModuleIcon(h.module)}
                         <span
-                          className={`text-xs px-2 py-0.5 rounded ${
-                            h.module === "ketik"
-                              ? "bg-blue-100 text-blue-700"
-                              : h.module === "pdkt"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-green-100 text-green-700"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] ${getModuleBadgeClasses(h.module)}`}
                         >
-                          {h.module.toUpperCase()}
+                          {h.module}
                         </span>
                       </span>
                     </td>
-                    <td className="p-3 max-w-xs truncate">
+                    <td className="px-6 py-4 max-w-xs truncate font-medium">
                       {h.scenario_title}
                     </td>
-                    <td className="p-3 text-xs text-gray-500">
+                    <td className="px-6 py-4 text-xs text-muted-foreground">
                       {h.user_email || "-"}
                     </td>
-                    <td className="p-3 text-xs text-gray-500">
+                    <td className="px-6 py-4 text-xs text-muted-foreground">
                       {formatDate(h.created_at)}
                     </td>
-                    <td className="p-3 text-right text-xs">
+                    <td className="px-6 py-4 text-right text-xs">
                       {formatDuration(h.duration_seconds)}
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       {h.score !== null ? (
-                        <span className="text-xs font-medium">
+                        <span
+                          className={`text-sm font-black ${getScoreColor(h.score)}`}
+                        >
                           {h.score}
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-300">-</span>
+                        <span className="text-xs text-muted-foreground/40">
+                          -
+                        </span>
                       )}
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="px-6 py-4 text-center">
                       <button
                         onClick={() => handleViewDetail(h)}
-                        className="text-xs px-2 py-1 bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200"
+                        className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-foreground/5 hover:bg-primary hover:text-primary-foreground text-muted-foreground transition-all border border-border group-hover:border-primary"
                       >
                         <Eye size={12} className="inline mr-1" />
                         Detail
@@ -396,10 +544,14 @@ export default function MonitoringPage() {
                     </td>
                   </tr>
                 ))}
-                {filteredHistory.length === 0 && (
+                {filteredHistory.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-gray-400">
-                      Belum ada riwayat simulasi.
+                    <td
+                      colSpan={7}
+                      className="px-6 py-16 text-center text-muted-foreground"
+                    >
+                      <History size={32} className="mx-auto mb-3 opacity-20" />
+                      <p className="text-sm">Belum ada riwayat simulasi.</p>
                     </td>
                   </tr>
                 )}
@@ -409,36 +561,51 @@ export default function MonitoringPage() {
         </>
       )}
 
+      {/* Tab: Penggunaan Token */}
       {tab === "usage" && (
         <>
+          {/* KPI Summary */}
           <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-xl border shadow-sm">
-              <span className="text-xs text-gray-500">Total Calls</span>
-              <p className="text-xl font-bold">{totalSummary.calls}</p>
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                <Target size={12} className="inline mr-1" />
+                Total Calls
+              </span>
+              <p className="text-2xl font-black">{totalSummary.calls.toLocaleString()}</p>
             </div>
-            <div className="bg-white p-4 rounded-xl border shadow-sm">
-              <span className="text-xs text-gray-500">Total Tokens</span>
-              <p className="text-xl font-bold">
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                <BarChart3 size={12} className="inline mr-1" />
+                Total Tokens
+              </span>
+              <p className="text-2xl font-black">
                 {totalSummary.tokens.toLocaleString()}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-xl border shadow-sm">
-              <span className="text-xs text-gray-500">Total Biaya</span>
-              <p className="text-xl font-bold text-indigo-600">
-                Rp {totalSummary.cost.toLocaleString()}
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                <DollarSign size={12} className="inline mr-1" />
+                Total Biaya
+              </span>
+              <p className="text-2xl font-black text-primary">
+                Rp {Math.round(totalSummary.cost).toLocaleString()}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-xl border shadow-sm">
-              <span className="text-xs text-gray-500">Pengguna Aktif</span>
-              <p className="text-xl font-bold">{aggregation.length}</p>
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
+                <Clock size={12} className="inline mr-1" />
+                Pengguna Aktif
+              </span>
+              <p className="text-2xl font-black">{aggregation.length}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Filter Bar */}
+          <div className="flex items-center gap-4 flex-wrap">
             <select
               value={month}
               onChange={(e) => setMonth(Number(e.target.value))}
-              className="p-2 border rounded-lg text-sm"
+              className="px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             >
               {Array.from({ length: 12 }, (_, i) => (
                 <option key={i + 1} value={i + 1}>
@@ -449,7 +616,7 @@ export default function MonitoringPage() {
             <select
               value={year}
               onChange={(e) => setYear(Number(e.target.value))}
-              className="p-2 border rounded-lg text-sm"
+              className="px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             >
               {[2025, 2026, 2027].map((y) => (
                 <option key={y} value={y}>
@@ -460,7 +627,7 @@ export default function MonitoringPage() {
             <select
               value={aggregationModule}
               onChange={(e) => setAggregationModule(e.target.value)}
-              className="p-2 border rounded-lg text-sm"
+              className="px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             >
               {MODULE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -471,76 +638,99 @@ export default function MonitoringPage() {
             <div className="relative flex-1 max-w-xs">
               <Search
                 size={16}
-                className="absolute left-3 top-2.5 text-gray-400"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Cari pengguna..."
-                className="w-full pl-9 p-2 border rounded-lg text-sm"
+                className="w-full pl-12 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
             {selectedUser && (
               <button
                 onClick={() => setSelectedUser(null)}
-                className="text-xs text-indigo-600 underline"
+                className="text-xs text-primary font-bold underline hover:opacity-80"
               >
                 Semua Pengguna
               </button>
             )}
           </div>
 
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          {/* Usage Table */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-3 text-left font-medium">Pengguna</th>
-                  <th className="p-3 text-right font-medium">Call</th>
-                  <th className="p-3 text-right font-medium">Input</th>
-                  <th className="p-3 text-right font-medium">Output</th>
-                  <th className="p-3 text-right font-medium">Total Token</th>
-                  <th className="p-3 text-right font-medium">Biaya (Rp)</th>
+              <thead>
+                <tr className="bg-foreground/[0.02] border-b border-border">
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Pengguna
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Call
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Input
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Output
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Total Token
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Biaya (Rp)
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {filteredAgg.map((a) => (
-                  <tr key={a.user_id} className="border-t hover:bg-gray-50">
-                    <td className="p-3">
-                      <button
-                        onClick={() =>
-                          setSelectedUser(
-                            selectedUser === a.user_id ? null : a.user_id,
-                          )
-                        }
-                        className="text-left"
+                  <tr
+                    key={a.user_id}
+                    className="hover:bg-foreground/[0.02] transition-colors cursor-pointer"
+                    onClick={() =>
+                      setSelectedUser(
+                        selectedUser === a.user_id ? null : a.user_id,
+                      )
+                    }
+                  >
+                    <td className="px-6 py-4">
+                      <span
+                        className={`font-bold ${selectedUser === a.user_id ? "text-primary" : ""}`}
                       >
-                        <span className={`font-medium ${selectedUser === a.user_id ? "text-indigo-600" : ""}`}>
-                          {a.user_name || "Unknown"}
-                        </span>
-                        <span className="text-gray-400 ml-2 text-xs">
-                          {a.user_email}
-                        </span>
-                      </button>
+                        {a.user_name || "Unknown"}
+                      </span>
+                      <span className="text-muted-foreground ml-2 text-xs">
+                        {a.user_email}
+                      </span>
                     </td>
-                    <td className="p-3 text-right">{a.total_calls}</td>
-                    <td className="p-3 text-right">
+                    <td className="px-6 py-4 text-right">{a.total_calls}</td>
+                    <td className="px-6 py-4 text-right">
                       {a.total_input_tokens.toLocaleString()}
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="px-6 py-4 text-right">
                       {a.total_output_tokens.toLocaleString()}
                     </td>
-                    <td className="p-3 text-right font-medium">
+                    <td className="px-6 py-4 text-right font-bold">
                       {a.total_tokens.toLocaleString()}
                     </td>
-                    <td className="p-3 text-right text-indigo-600 font-medium">
+                    <td className="px-6 py-4 text-right text-primary font-bold">
                       {formatIdr(a.total_cost_idr)}
                     </td>
                   </tr>
                 ))}
-                {filteredAgg.length === 0 && (
+                {filteredAgg.length === 0 && !loading && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-gray-400">
-                      Belum ada data penggunaan.
+                    <td
+                      colSpan={6}
+                      className="px-6 py-16 text-center text-muted-foreground"
+                    >
+                      <BarChart3
+                        size={32}
+                        className="mx-auto mb-3 opacity-20"
+                      />
+                      <p className="text-sm">
+                        Belum ada data penggunaan.
+                      </p>
                     </td>
                   </tr>
                 )}
@@ -548,22 +738,35 @@ export default function MonitoringPage() {
             </table>
           </div>
 
+          {/* Per-User Breakdown */}
           {selectedUser && (
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b bg-gray-50">
-                <span className="text-sm font-medium">Breakdown per Model</span>
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-border bg-foreground/[0.02]">
+                <span className="text-sm font-black tracking-tight">
+                  Breakdown per Model
+                </span>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr>
-                    <th className="p-3 text-left font-medium">Model</th>
-                    <th className="p-3 text-left font-medium">Modul</th>
-                    <th className="p-3 text-right font-medium">Call</th>
-                    <th className="p-3 text-right font-medium">Token</th>
-                    <th className="p-3 text-right font-medium">Biaya</th>
+                  <tr className="bg-foreground/[0.02] border-b border-border">
+                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Model
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Modul
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Call
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Token
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Biaya
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {filteredAgg
                     .flatMap((a) =>
                       a.models.map((m) => ({
@@ -575,18 +778,27 @@ export default function MonitoringPage() {
                       })),
                     )
                     .map((m, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="p-3 text-xs font-mono">{m.model_id}</td>
-                        <td className="p-3 text-xs">
-                          <span className="text-xs px-2 py-0.5 rounded bg-gray-100">
+                      <tr
+                        key={i}
+                        className="hover:bg-foreground/[0.02] transition-colors"
+                      >
+                        <td className="px-6 py-4 text-xs font-mono font-bold">
+                          {m.model_id}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-foreground/5`}
+                          >
                             {m.module}
                           </span>
                         </td>
-                        <td className="p-3 text-right text-xs">{m.calls}</td>
-                        <td className="p-3 text-right text-xs">
+                        <td className="px-6 py-4 text-right text-xs">
+                          {m.calls}
+                        </td>
+                        <td className="px-6 py-4 text-right text-xs">
                           {m.total_tokens.toLocaleString()}
                         </td>
-                        <td className="p-3 text-right text-xs text-indigo-600">
+                        <td className="px-6 py-4 text-right text-xs text-primary font-bold">
                           {formatIdr(m.cost_idr)}
                         </td>
                       </tr>
@@ -596,35 +808,55 @@ export default function MonitoringPage() {
             </div>
           )}
 
+          {/* All Models Overview */}
           {!selectedUser && allModels.length > 0 && (
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b bg-gray-50">
-                <span className="text-sm font-medium">Keseluruhan per Model</span>
+            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-border bg-foreground/[0.02]">
+                <span className="text-sm font-black tracking-tight">
+                  Keseluruhan per Model
+                </span>
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr>
-                    <th className="p-3 text-left font-medium">Model</th>
-                    <th className="p-3 text-left font-medium">Modul</th>
-                    <th className="p-3 text-right font-medium">Call</th>
-                    <th className="p-3 text-right font-medium">Token</th>
-                    <th className="p-3 text-right font-medium">Biaya</th>
+                  <tr className="bg-foreground/[0.02] border-b border-border">
+                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Model
+                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Modul
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Call
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Token
+                    </th>
+                    <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Biaya
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {allModels.map((m, i) => (
-                    <tr key={i} className="border-t">
-                      <td className="p-3 text-xs font-mono">{m.model_id}</td>
-                      <td className="p-3 text-xs">
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-100">
+                    <tr
+                      key={i}
+                      className="hover:bg-foreground/[0.02] transition-colors"
+                    >
+                      <td className="px-6 py-4 text-xs font-mono font-bold">
+                        {m.model_id}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-foreground/5">
                           {m.module}
                         </span>
                       </td>
-                      <td className="p-3 text-right text-xs">{m.calls}</td>
-                      <td className="p-3 text-right text-xs">
+                      <td className="px-6 py-4 text-right text-xs">
+                        {m.calls}
+                      </td>
+                      <td className="px-6 py-4 text-right text-xs">
                         {m.total_tokens.toLocaleString()}
                       </td>
-                      <td className="p-3 text-right text-xs text-indigo-600">
+                      <td className="px-6 py-4 text-right text-xs text-primary font-bold">
                         {formatIdr(m.cost_idr)}
                       </td>
                     </tr>
@@ -636,39 +868,66 @@ export default function MonitoringPage() {
         </>
       )}
 
+      {/* Tab: Harga & Kurs */}
       {tab === "pricing" && canEditPricing && (
         <div className="space-y-6">
-          <div className="bg-white rounded-xl border shadow-sm p-6">
-            <h2 className="font-semibold mb-4">Kurs USD ke IDR</h2>
-            <div className="flex items-center gap-3 max-w-sm">
-              <input
-                type="number"
-                value={billingRate}
-                onChange={(e) => setBillingRate(Number(e.target.value))}
-                className="flex-1 p-2 border rounded-lg text-sm"
-                min={1}
-              />
-              <button
-                onClick={handleSaveBilling}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
-              >
-                Simpan
-              </button>
+          {/* Billing / Kurs Editor */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-border bg-foreground/[0.02]">
+              <h2 className="text-sm font-black tracking-tight">
+                Kurs USD ke IDR
+              </h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-3 max-w-sm">
+                <input
+                  type="number"
+                  value={billingRate}
+                  onChange={(e) => setBillingRate(Number(e.target.value))}
+                  className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  min={1}
+                />
+                <button
+                  onClick={handleSaveBilling}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
+                >
+                  Simpan
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3">
+                Kurs aktif: Rp {billingRate.toLocaleString()} per USD
+              </p>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          {/* Pricing Editor */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-border bg-foreground/[0.02]">
+              <h2 className="text-sm font-black tracking-tight">
+                Harga per Model (USD / 1M tokens)
+              </h2>
+            </div>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="p-3 text-left font-medium">Model</th>
-                  <th className="p-3 text-left font-medium">Provider</th>
-                  <th className="p-3 text-right font-medium">Input ($/jt)</th>
-                  <th className="p-3 text-right font-medium">Output ($/jt)</th>
-                  <th className="p-3 text-center font-medium">Aksi</th>
+              <thead>
+                <tr className="bg-foreground/[0.02] border-b border-border">
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Model
+                  </th>
+                  <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Provider
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Input ($/jt)
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Output ($/jt)
+                  </th>
+                  <th className="px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Aksi
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border">
                 {pricing.map((p) => (
                   <PricingRow
                     key={p.model_id}
@@ -682,6 +941,7 @@ export default function MonitoringPage() {
         </div>
       )}
 
+      {/* Detail Modal */}
       {showDetail && detailEntry && (
         <TranscriptModal
           entry={detailEntry}
@@ -715,72 +975,118 @@ function TranscriptModal({
     }
   };
 
+  const getModuleEmoji = (m: string) => {
+    switch (m) {
+      case "ketik":
+        return "💬";
+      case "pdkt":
+        return "📧";
+      case "telefun":
+        return "📞";
+      default:
+        return "";
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-semibold">{getModuleLabel(entry.module)}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="bg-card border border-border w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-foreground/[0.02]">
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] ${getModuleBadgeClasses(entry.module)}`}
+            >
+              {getModuleEmoji(entry.module)} {entry.module}
+            </span>
+            <h2 className="font-bold text-sm tracking-tight">
+              {entry.scenario_title}
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="w-9 h-9 rounded-full hover:bg-foreground/5 flex items-center justify-center transition-colors"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
+
+        {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1">
+          {/* Metadata */}
           <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
             <div>
-              <span className="text-gray-500">Skenario:</span>{" "}
-              {entry.scenario_title}
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Skenario
+              </span>
+              <p className="font-bold mt-0.5">{entry.scenario_title}</p>
             </div>
             <div>
-              <span className="text-gray-500">Pengguna:</span>{" "}
-              {entry.user_email || "-"}
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Pengguna
+              </span>
+              <p className="font-bold mt-0.5">{entry.user_email || "-"}</p>
             </div>
             <div>
-              <span className="text-gray-500">Waktu:</span>{" "}
-              {formatDate(entry.created_at)}
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Waktu
+              </span>
+              <p className="font-bold mt-0.5">
+                {formatDate(entry.created_at)}
+              </p>
             </div>
             <div>
-              <span className="text-gray-500">Durasi:</span>{" "}
-              {formatDuration(entry.duration_seconds)}
-            </div>
-            <div>
-              <span className="text-gray-500">Skor:</span>{" "}
-              {entry.score !== null ? entry.score : "-"}
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Durasi
+              </span>
+              <p className="font-bold mt-0.5">
+                {formatDuration(entry.duration_seconds)}
+              </p>
             </div>
           </div>
 
+          {/* Chat History (KETIK) */}
           {entry.module === "ketik" && Array.isArray(entry.history) && (
             <div className="space-y-3">
               {entry.history.map((msg: any, i: number) => (
                 <div
                   key={i}
-                  className={`p-3 rounded-lg text-sm ${msg.role === "user" ? "bg-indigo-50 ml-8" : "bg-gray-100 mr-8"}`}
+                  className={`p-4 rounded-xl text-sm ${
+                    msg.role === "user"
+                      ? "bg-primary/5 ml-8 border border-primary/10"
+                      : "bg-muted mr-8 border border-border"
+                  }`}
                 >
-                  <div className="text-xs font-medium mb-1 text-gray-400">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-40">
                     {msg.role === "user" ? "USER" : "AI"}
                   </div>
-                  <div className="whitespace-pre-wrap">{msg.text || msg.content || "(empty)"}</div>
+                  <div className="whitespace-pre-wrap leading-relaxed">
+                    {msg.text || msg.content || "(empty)"}
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
+          {/* Email History (PDKT) */}
           {entry.module === "pdkt" && Array.isArray(entry.history) && (
             <div className="space-y-3">
               {entry.history.map((email: any, i: number) => (
                 <div
                   key={i}
-                  className={`p-3 rounded-lg text-sm ${email.type !== "received" ? "bg-indigo-50 ml-8" : "bg-gray-100 mr-8"}`}
+                  className={`p-4 rounded-xl text-sm ${
+                    email.type !== "received"
+                      ? "bg-primary/5 ml-8 border border-primary/10"
+                      : "bg-muted mr-8 border border-border"
+                  }`}
                 >
-                  <div className="text-xs font-medium mb-1 text-gray-400">
+                  <div className="text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-40">
                     {email.type !== "received" ? "RESPONSE" : "INCOMING"}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground mb-1">
                     {email.subject || "(no subject)"}
                   </div>
-                  <div className="whitespace-pre-wrap mt-1">
+                  <div className="whitespace-pre-wrap leading-relaxed">
                     {email.body || email.content || "(empty)"}
                   </div>
                 </div>
@@ -788,15 +1094,18 @@ function TranscriptModal({
             </div>
           )}
 
+          {/* Recording (TELEFUN) */}
           {entry.module === "telefun" && typeof entry.history === "string" && (
-            <div className="text-center p-8 text-gray-500">
-              <Phone size={32} className="mx-auto mb-2 text-gray-300" />
-              <p>Rekaman suara tersedia di:</p>
+            <div className="text-center p-8">
+              <Phone size={40} className="mx-auto mb-3 text-muted-foreground/30" />
+              <p className="text-sm font-bold mb-2">
+                Rekaman suara tersedia
+              </p>
               <a
                 href={entry.history}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-indigo-600 text-sm break-all"
+                className="text-primary text-xs font-bold break-all hover:underline"
               >
                 {entry.history}
               </a>
@@ -806,10 +1115,42 @@ function TranscriptModal({
           {entry.module === "telefun" &&
             typeof entry.history !== "string" &&
             !Array.isArray(entry.history) && (
-              <div className="text-center p-8 text-gray-400 text-sm">
+              <div className="text-center p-8 text-muted-foreground text-sm">
+                <Phone
+                  size={32}
+                  className="mx-auto mb-3 opacity-20"
+                />
                 Tidak ada transkrip tersedia.
               </div>
             )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="px-6 py-4 border-t border-border bg-foreground/[0.02] flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+                Durasi
+              </span>
+              <span className="text-lg font-black">
+                {formatDuration(entry.duration_seconds)}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
+                Skor
+              </span>
+              <span className={`text-lg font-black ${getScoreColor(entry.score)}`}>
+                {entry.score !== null ? entry.score : "-"}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-foreground text-background rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
+          >
+            Tutup Detail
+          </button>
         </div>
       </div>
     </div>
@@ -837,56 +1178,62 @@ function PricingRow({
   };
 
   return (
-    <tr className="border-t hover:bg-gray-50">
-      <td className="p-3">
-        <span className="font-medium">{entry.model_name}</span>
-        <span className="text-gray-400 ml-2 text-xs">{entry.model_id}</span>
+    <tr className="hover:bg-foreground/[0.02] transition-colors">
+      <td className="px-6 py-4">
+        <span className="font-bold text-sm">{entry.model_name}</span>
+        <span className="text-muted-foreground ml-2 text-[10px] font-mono">
+          {entry.model_id}
+        </span>
       </td>
-      <td className="p-3">
+      <td className="px-6 py-4">
         <span
-          className={`text-xs px-2 py-1 rounded ${entry.provider === "gemini" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700"}`}
+          className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] ${
+            entry.provider === "gemini"
+              ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+              : "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+          }`}
         >
           {entry.provider}
         </span>
       </td>
-      <td className="p-3 text-right">
+      <td className="px-6 py-4 text-right">
         {editing ? (
           <input
             type="number"
             value={input}
             onChange={(e) => setInput(Number(e.target.value))}
-            className="w-24 p-1 border rounded text-right text-sm"
+            className="w-24 px-2 py-1 bg-background border border-border rounded-lg text-right text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             step={0.01}
           />
         ) : (
-          input
+          <span className="font-bold">{input}</span>
         )}
       </td>
-      <td className="p-3 text-right">
+      <td className="px-6 py-4 text-right">
         {editing ? (
           <input
             type="number"
             value={output}
             onChange={(e) => setOutput(Number(e.target.value))}
-            className="w-24 p-1 border rounded text-right text-sm"
+            className="w-24 px-2 py-1 bg-background border border-border rounded-lg text-right text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             step={0.01}
           />
         ) : (
-          output
+          <span className="font-bold">{output}</span>
         )}
       </td>
-      <td className="p-3 text-center">
+      <td className="px-6 py-4 text-center">
         {editing ? (
-          <div className="flex gap-1 justify-center">
+          <div className="flex gap-1.5 justify-center">
             <button
               onClick={handleSave}
-              className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded"
+              className="px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
             >
               Simpan
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded"
+              className="px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-muted/80 transition-all"
             >
               Batal
             </button>
@@ -894,7 +1241,7 @@ function PricingRow({
         ) : (
           <button
             onClick={() => setEditing(true)}
-            className="text-xs px-2 py-1 bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200"
+            className="px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all"
           >
             Edit
           </button>
