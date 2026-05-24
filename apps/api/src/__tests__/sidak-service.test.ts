@@ -65,6 +65,20 @@ describe("sidak-service", () => {
   });
 
   describe("deletePeriod", () => {
+    it("fails closed when verification query returns error", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1)
+          return { count: null, error: { message: "timeout" } };
+        if (callCount === 2) return { count: 0, error: null };
+        return { data: null, error: null };
+      };
+      await expect(sidakService.deletePeriod("pid")).rejects.toThrow(
+        "Gagal memverifikasi status periode.",
+      );
+    });
+
     it("blocks delete when temuan exist", async () => {
       let callCount = 0;
       pendingResolve = () => {

@@ -154,7 +154,10 @@ export async function createPeriod(
 }
 
 export async function deletePeriod(id: string): Promise<{ success: boolean }> {
-  const [{ count: temuanCount }, { count: ruleCount }] = await Promise.all([
+  const [
+    { count: temuanCount, error: temuanCheckError },
+    { count: ruleCount, error: ruleCheckError },
+  ] = await Promise.all([
     supabaseAdmin
       .from("qa_temuan")
       .select("*", { count: "exact", head: true })
@@ -164,6 +167,11 @@ export async function deletePeriod(id: string): Promise<{ success: boolean }> {
       .select("*", { count: "exact", head: true })
       .eq("effective_period_id", id),
   ]);
+
+  // Fail closed: never delete a period if validation checks are uncertain.
+  if (temuanCheckError || ruleCheckError) {
+    throw new Error("Gagal memverifikasi status periode.");
+  }
 
   if (temuanCount !== null && (temuanCount ?? 0) > 0)
     throw new Error(
