@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import { logActivity } from "./activity-log-service";
 import type {
   ManagedUser,
   PendingLeaderRequest,
@@ -9,26 +10,6 @@ import type {
   ActivityLog,
   AccessScopeAgentOption,
 } from "@trainers/types";
-
-// ── Activity Logging Helper ─────────────────────────────────
-export async function logActivity(params: {
-  userId: string;
-  userName: string;
-  action: string;
-  module: string;
-  type: string;
-}): Promise<void> {
-  const { error } = await supabaseAdmin.from("activity_logs").insert({
-    user_id: params.userId,
-    user_name: params.userName,
-    action: params.action,
-    module: params.module,
-    type: params.type,
-  });
-  if (error) {
-    console.error("[AdminService] Failed to log activity:", error.message);
-  }
-}
 
 // ── User Management ──────────────────────────────────────────
 export async function getUsers(): Promise<ManagedUser[]> {
@@ -43,12 +24,12 @@ export async function getUsers(): Promise<ManagedUser[]> {
 }
 
 export async function updateUserStatus(
-  userId: string,
+  user_id: string,
   status: "approved" | "pending" | "rejected",
   callerId: string,
   callerEmail: string,
 ): Promise<void> {
-  if (userId === callerId) {
+  if (user_id === callerId) {
     throw new Error(
       "Anda tidak dapat mengubah status akun Anda sendiri dari panel ini",
     );
@@ -64,27 +45,27 @@ export async function updateUserStatus(
   const { error } = await supabaseAdmin
     .from("profiles")
     .update({ status: dbStatus })
-    .eq("id", userId);
+    .eq("id", user_id);
 
   if (error) throw new Error(error.message);
 
   await logActivity({
-    userId: callerId,
-    userName: callerEmail,
-    action: `Mengubah status user ${userId} menjadi ${dbStatus}`,
+    user_id: callerId,
+    user_name: callerEmail,
+    action: `Mengubah status user ${user_id} menjadi ${dbStatus}`,
     module: "USER_MGMT",
     type: "update_status",
   });
 }
 
 export async function updateUserRole(
-  userId: string,
+  user_id: string,
   role: string,
   callerId: string,
   callerEmail: string,
   callerRole: string,
 ): Promise<void> {
-  if (userId === callerId) {
+  if (user_id === callerId) {
     throw new Error(
       "Anda tidak dapat mengubah role akun Anda sendiri dari panel ini",
     );
@@ -98,26 +79,26 @@ export async function updateUserRole(
   const { error } = await supabaseAdmin
     .from("profiles")
     .update({ role: role.toLowerCase() })
-    .eq("id", userId);
+    .eq("id", user_id);
 
   if (error) throw new Error(error.message);
 
   await logActivity({
-    userId: callerId,
-    userName: callerEmail,
-    action: `Mengubah role user ${userId} menjadi ${role}`,
+    user_id: callerId,
+    user_name: callerEmail,
+    action: `Mengubah role user ${user_id} menjadi ${role}`,
     module: "USER_MGMT",
     type: "update_role",
   });
 }
 
 export async function deleteUser(
-  userId: string,
+  user_id: string,
   callerId: string,
   callerEmail: string,
   callerRole?: string,
 ): Promise<void> {
-  if (userId === callerId) {
+  if (user_id === callerId) {
     throw new Error("Akun Anda sendiri tidak dapat dihapus dari panel ini");
   }
 
@@ -126,7 +107,7 @@ export async function deleteUser(
     const { data: target } = await supabaseAdmin
       .from("profiles")
       .select("role")
-      .eq("id", userId)
+      .eq("id", user_id)
       .single();
     if (target?.role === "admin") {
       throw new Error("Anda tidak memiliki izin untuk menghapus akun admin");
@@ -136,21 +117,21 @@ export async function deleteUser(
   const { error } = await supabaseAdmin
     .from("profiles")
     .update({ is_deleted: true })
-    .eq("id", userId);
+    .eq("id", user_id);
 
   if (error) throw new Error(error.message);
 
   await logActivity({
-    userId: callerId,
-    userName: callerEmail,
-    action: `Menonaktifkan Pengguna ID: ${userId}`,
+    user_id: callerId,
+    user_name: callerEmail,
+    action: `Menonaktifkan Pengguna ID: ${user_id}`,
     module: "USER_MGMT",
     type: "delete",
   });
 }
 
 export async function resetUserPassword(
-  userId: string,
+  user_id: string,
   email: string,
   callerId: string,
   callerEmail: string,
@@ -162,9 +143,9 @@ export async function resetUserPassword(
   if (error) throw new Error(`Gagal generate link reset password: ${error.message}`);
 
   await logActivity({
-    userId: callerId,
-    userName: callerEmail,
-    action: `Generate reset password untuk user ${userId} (${email})`,
+    user_id: callerId,
+    user_name: callerEmail,
+    action: `Generate reset password untuk user ${user_id} (${email})`,
     module: "USER_MGMT",
     type: "reset_password",
   });

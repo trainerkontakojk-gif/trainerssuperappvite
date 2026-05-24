@@ -11,6 +11,8 @@ import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenRouterContent } from "../lib/openrouter";
 import { requireRole } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
+import { getWibMonthBounds } from "../lib/timezone";
+import { getMonitoringHistory } from "../services/monitoring-history-service";
 
 type Variables = { user: User; profile: any };
 
@@ -179,10 +181,33 @@ ai.get("/usage/summary", async (c) => {
   }
 });
 
+// ── Monitoring History ──────────────────────────────
+ai.get(
+  "/monitoring/history",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    try {
+      const data = await getMonitoringHistory();
+      return c.json({ success: true, data });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "DB_ERROR",
+            message: error?.message || "Gagal memuat riwayat monitoring.",
+          },
+        },
+        500,
+      );
+    }
+  },
+);
+
 // ── Usage Aggregation ──────────────────────────────────
 ai.get(
   "/monitoring/aggregation",
-  requireRole("admin", "trainer"),
+  requireRole("admin", "trainer", "leader"),
   async (c) => {
     const admin = createAdminClient();
     const year = parseInt(
@@ -195,16 +220,15 @@ ai.get(
     );
     const module = c.req.query("module");
 
-    const monthStart = new Date(Date.UTC(year, month - 1, 1));
-    const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    const { start: monthStart, end: monthEnd } = getWibMonthBounds(year, month);
 
     let query = admin
       .from("ai_usage_logs")
       .select(
         "user_id, model_id, module, input_tokens, output_tokens, total_tokens, estimated_cost_idr",
       )
-      .gte("created_at", monthStart.toISOString())
-      .lte("created_at", monthEnd.toISOString());
+      .gte("created_at", monthStart)
+      .lte("created_at", monthEnd);
 
     if (module) query = query.eq("module", module);
 
@@ -284,7 +308,7 @@ ai.get(
 // ── Pricing CRUD ──────────────────────────────────────
 ai.get(
   "/monitoring/pricing",
-  requireRole("admin", "trainer", "qa"),
+  requireRole("admin", "trainer"),
   async (c) => {
     const admin = createAdminClient();
     const { data, error } = await admin

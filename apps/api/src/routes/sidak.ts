@@ -4,6 +4,7 @@ import { User } from "@supabase/supabase-js";
 import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import * as sidakService from "../services/sidak-service";
+import { logActivity } from "../services/activity-log-service";
 import { createTemuanBatchSchema } from "@trainers/types";
 import { buildAiReportDocx } from "../lib/report-docx-builder";
 import { buildHtmlReport } from "../lib/report-html-builder";
@@ -44,6 +45,13 @@ sidak.post("/periods", requireRole("admin", "trainer"), async (c) => {
     parsed.data.month,
     parsed.data.year,
   );
+  await logActivity({
+    user_id: c.get("user").id,
+    user_name: c.get("user").email ?? "",
+    action: `Membuat Periode: ${period.label}`,
+    module: "SIDAK",
+    type: "add",
+  });
   return c.json({ success: true, data: period }, 201);
 });
 
@@ -51,6 +59,13 @@ sidak.delete("/periods/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
   try {
     const period = await sidakService.deletePeriod(id);
+    await logActivity({
+      user_id: c.get("user").id,
+      user_name: c.get("user").email ?? "",
+      action: `Menghapus Periode ID: ${id}`,
+      module: "SIDAK",
+      type: "delete",
+    });
     return c.json({ success: true, data: period });
   } catch (e: any) {
     return c.json(
@@ -239,6 +254,13 @@ sidak.delete("/temuan/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
   try {
     await sidakService.deleteTemuan(id);
+    await logActivity({
+      user_id: c.get("user").id,
+      user_name: c.get("user").email ?? "",
+      action: `Menghapus Temuan SIDAK ID: ${id}`,
+      module: "SIDAK",
+      type: "delete",
+    });
     return c.json({ success: true, data: null });
   } catch (e: any) {
     return c.json(
@@ -955,6 +977,13 @@ sidak.post(
         parsed.data.change_reason,
         parsed.data.effective_period_id,
       );
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Mempublikasi QA Rule Version ID: ${id}`,
+        module: "SIDAK",
+        type: "publish",
+      });
       return c.json({ success: true, data: version });
     } catch (error: any) {
       return c.json(
@@ -999,6 +1028,13 @@ sidak.post(
         user.id,
         parsed.data.change_reason,
       );
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Superseding QA Rule Version ID: ${id}`,
+        module: "SIDAK",
+        type: "publish",
+      });
       return c.json({ success: true, data: version });
     } catch (error: any) {
       return c.json(
@@ -1095,8 +1131,16 @@ sidak.delete(
   requireRole("admin", "trainer"),
   async (c) => {
     const indicatorId = c.req.param("indicatorId");
+    const user = c.get("user");
     try {
       await sidakService.deleteRuleVersionIndicator(indicatorId);
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Menghapus Rule Version Indicator ID: ${indicatorId}`,
+        module: "SIDAK",
+        type: "delete",
+      });
       return c.json({ success: true, message: "Indikator berhasil dihapus" });
     } catch (error: any) {
       return c.json(
@@ -1354,6 +1398,13 @@ sidak.post(
       reportData: parsed.data.reportData,
       reportHtml: parsed.data.reportHtml,
     });
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Menyimpan Report SIDAK: ${parsed.data.title}`,
+      module: "SIDAK",
+      type: "add",
+    });
     return c.json({ success: true, data: result }, 201);
   },
 );
@@ -1408,6 +1459,13 @@ sidak.delete(
     const profile = c.get("profile");
     const id = c.req.param("id");
     await sidakService.deleteReportArchive(id, user.id, profile?.role ?? "");
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Menghapus Report SIDAK ID: ${id}`,
+      module: "SIDAK",
+      type: "delete",
+    });
     return c.json({ success: true, data: null });
   },
 );

@@ -170,14 +170,15 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 31. Dashboard User Management Legacy Parity — Restored trainer+admin role parity in admin routes, deleted-user filtering in getUsers, server-side reset password flow, guided access-group builder (Team/Service/Agent), aligned access-approval contract, synced activity log schema with delete action, and rollback-safe reassign for leader access (DONE)
 32. SIDAK Period Delete Fail-Closed Guard — Hardened `deletePeriod()` to abort when verification queries fail, preventing fail-open cascade deletion risk; added API regression test for verification-error path (DONE)
 33. Access Approval & Access Group Legacy Parity Hardening — Added re-check `status=approved` before delete in reassign, guarded `reviewed_by` audit update, locked builder Specific Agent to team-first flow, added 6 API + 3 web regression tests (DONE)
+34. Monitoring & Activity Logs Legacy Parity — 3-tab monitoring (history/usage/pricing), WIB boundary, unified history endpoint, role matrix (trainer/leader/admin), sidebar link fix, shared logActivity helper, activity logging coverage for SIDAK (8 events) and Profiler (10 events) (DONE)
 
 ## Relevant Files
 
 - `opencode.json` — project-level opencode config with context7 MCP
 - `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index)
-- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **report-docx-builder**
-- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
+- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**, **monitoring-history-service**, **activity-log-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)
+- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
 - `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (37 routes, all React.lazy())
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
@@ -202,8 +203,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-33)
-- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`, `sidak-input-agents-map-and-qa-baseline-fix.md`, `dashboard-user-management-legacy-parity.md`, `access-approval-access-group-legacy-parity-reaudit.md`
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-34)
+- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`, `sidak-input-agents-map-and-qa-baseline-fix.md`, `dashboard-user-management-legacy-parity.md`, `access-approval-access-group-legacy-parity-reaudit.md`, `monitoring-activity-logs-legacy-parity.md`
 
 ## Routes Reference (apps/web)
 

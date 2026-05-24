@@ -91,6 +91,8 @@ Seluruh agregasi bulanan menggunakan WIB / `Asia/Jakarta`:
 
 ## Kontrak Logging
 
+### Usage (AI Calls)
+
 Usage dicatat untuk setiap AI call, baik sukses maupun gagal/timeout di backend.
 
 Yang dicatat pada setiap row `ai_usage_logs`:
@@ -108,6 +110,20 @@ Aturan penting:
 - retry/fallback internal tidak boleh menghasilkan row tambahan (setiap request_id unik)
 - jika provider tidak memberi metadata token, flow user tetap lanjut tetapi usage tidak dicatat
 - jika pricing model belum tersedia, flow user tetap lanjut tetapi usage tidak dicatat (cost 0)
+
+### Activity Logs (Audit Trail)
+
+Mutasi penting di setiap modul dicatat ke tabel `activity_logs` via shared helper `logActivity()` di `apps/api/src/services/activity-log-service.ts`.
+
+Format: `{ user_id, user_name, action, module, type }`
+
+Cakupan per modul:
+
+| Modul   | Events Tercatat                                                                        |
+| ------- | -------------------------------------------------------------------------------------- |
+| SIDAK   | create/delete period, delete temuan, publish/supersede rule version, save/delete report archive, upload batch temuan |
+| KTP     | create/delete year, create/delete folder, create/update/delete peserta, move peserta, create/delete team |
+| USER_MGMT | update status/role, delete user, reset password, access approval mutations            |
 
 ## Action Map per Modul
 
@@ -171,7 +187,7 @@ Catatan:
 ## Batasan v1
 
 - tidak ada backfill histori lama
-- tidak ada export CSV/XLSX usage
+- tidak ada export CSV/XLSX untuk tab usage token; CSV export tersedia di `/dashboard/activities` untuk activity logs
 - quick-view tersedia untuk KETIK, PDKT, dan TELEFUN; QA Analyzer hanya lewat monitoring pusat
 - jika model belum punya pricing atau provider tidak memberi metadata token, request user tetap berjalan tetapi usage tidak tercatat
 

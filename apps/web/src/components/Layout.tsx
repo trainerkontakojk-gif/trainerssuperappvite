@@ -75,7 +75,7 @@ const MANAGEMENT_LINKS = [
     allowedRoles: ["trainer", "admin"],
   },
   {
-    to: "/dashboard/monitoring",
+    to: "/monitoring",
     label: "Monitoring",
     icon: Activity,
     allowedRoles: ["trainer", "leader", "admin"],

@@ -273,6 +273,7 @@ const pdktHistoryRoute = createRoute({
 const monitoringRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/monitoring",
+  beforeLoad: requireRole(["trainer", "leader", "admin"]),
   component: MonitoringPage,
 });
 

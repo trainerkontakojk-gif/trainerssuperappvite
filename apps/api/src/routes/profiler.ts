@@ -1,9 +1,13 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { User } from "@supabase/supabase-js";
 import { requireRole } from "../middleware/role";
 import * as profilerService from "../services/profiler-service";
+import { logActivity } from "../services/activity-log-service";
 
-const profiler = new Hono();
+type Variables = { user: User; profile: any };
+
+const profiler = new Hono<{ Variables: Variables }>();
 
 // ── Years ────────────────────────────────────────────────
 profiler.get("/years", requireRole("admin", "trainer", "leader"), async (c) => {
@@ -25,13 +29,28 @@ profiler.post("/years", requireRole("admin", "trainer"), async (c) => {
       400,
     );
   const year = await profilerService.createYear(parsed.data.year);
+  await logActivity({
+    user_id: c.get("user").id,
+    user_name: c.get("user").email ?? "",
+    action: `Membuat Folder Tahun: ${parsed.data.year}`,
+    module: "KTP",
+    type: "add",
+  });
   return c.json({ success: true, data: year }, 201);
 });
 
 profiler.delete("/years/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
+  const user = c.get("user");
   try {
     await profilerService.deleteYear(id);
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Menghapus Folder Tahun ID: ${id}`,
+      module: "KTP",
+      type: "delete",
+    });
     return c.json({ success: true, data: null });
   } catch (e: any) {
     return c.json(
@@ -69,6 +88,13 @@ profiler.post("/folders", requireRole("admin", "trainer"), async (c) => {
       400,
     );
   const folder = await profilerService.createFolder(parsed.data);
+  await logActivity({
+    user_id: c.get("user").id,
+    user_name: c.get("user").email ?? "",
+    action: `Membuat Folder KTP: ${parsed.data.name}`,
+    module: "KTP",
+    type: "add",
+  });
   return c.json({ success: true, data: folder }, 201);
 });
 
@@ -97,8 +123,16 @@ profiler.put("/folders/:id", requireRole("admin", "trainer"), async (c) => {
 
 profiler.delete("/folders/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
+  const user = c.get("user");
   try {
     await profilerService.deleteFolder(id);
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Menghapus Folder KTP ID: ${id}`,
+      module: "KTP",
+      type: "delete",
+    });
     return c.json({ success: true, data: null });
   } catch (e: any) {
     return c.json(
@@ -266,6 +300,13 @@ profiler.post("/peserta", requireRole("admin", "trainer"), async (c) => {
     );
   try {
     const peserta = await profilerService.createPeserta(parsed.data);
+    await logActivity({
+      user_id: c.get("user").id,
+      user_name: c.get("user").email ?? "",
+      action: `Menambah Peserta: ${parsed.data.nama || "(tanpa nama)"}`,
+      module: "KTP",
+      type: "add",
+    });
     return c.json({ success: true, data: peserta }, 201);
   } catch (e: any) {
     return c.json(
@@ -278,8 +319,16 @@ profiler.post("/peserta", requireRole("admin", "trainer"), async (c) => {
 profiler.put("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
+  const user = c.get("user");
   try {
     const peserta = await profilerService.updatePeserta(id, body);
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Mengupdate Peserta ID: ${id}`,
+      module: "KTP",
+      type: "edit",
+    });
     return c.json({ success: true, data: peserta });
   } catch (e: any) {
     return c.json(
@@ -291,8 +340,16 @@ profiler.put("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
 
 profiler.delete("/peserta/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
+  const user = c.get("user");
   try {
     await profilerService.deletePeserta(id);
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Menghapus Peserta ID: ${id}`,
+      module: "KTP",
+      type: "delete",
+    });
     return c.json({ success: true, data: null });
   } catch (e: any) {
     return c.json(
@@ -394,6 +451,13 @@ profiler.post(
         parsed.data.peserta_ids,
         parsed.data.target_batch_name,
       );
+      await logActivity({
+        user_id: c.get("user").id,
+        user_name: c.get("user").email ?? "",
+        action: `Memindahkan ${parsed.data.peserta_ids.length} peserta ke batch: ${parsed.data.target_batch_name}`,
+        module: "KTP",
+        type: "edit",
+      });
       return c.json({ success: true, data: { moved } });
     } catch (e: any) {
       return c.json(
@@ -492,6 +556,13 @@ profiler.post("/teams", requireRole("admin", "trainer"), async (c) => {
     );
   try {
     const team = await profilerService.createTeam(parsed.data.nama);
+    await logActivity({
+      user_id: c.get("user").id,
+      user_name: c.get("user").email ?? "",
+      action: `Membuat Tim: ${parsed.data.nama}`,
+      module: "KTP",
+      type: "add",
+    });
     return c.json({ success: true, data: team }, 201);
   } catch (e: any) {
     return c.json(
@@ -503,8 +574,16 @@ profiler.post("/teams", requireRole("admin", "trainer"), async (c) => {
 
 profiler.delete("/teams/:id", requireRole("admin", "trainer"), async (c) => {
   const id = c.req.param("id");
+  const user = c.get("user");
   try {
     await profilerService.deleteTeam(id);
+    await logActivity({
+      user_id: user.id,
+      user_name: user.email ?? "",
+      action: `Menghapus Tim ID: ${id}`,
+      module: "KTP",
+      type: "delete",
+    });
     return c.json({ success: true, data: null });
   } catch (e: any) {
     return c.json(

@@ -66,7 +66,7 @@ Role enforcement coverage per module (Phase B hardening):
 | **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
 | **Profiler**      | 23        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
 | **PDKT**          | 16        | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa (AI)                |
-| **AI Monitoring** | 5         | admin, trainer (aggregation)           | admin, trainer, qa (pricing)           |
+| **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history) | admin, trainer (pricing)           |
 | **KETIK**         | 4         | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa, tl, spv, om, agent |
 | **Admin**         | 8         | admin only                             | admin only                             |
 
