@@ -842,13 +842,14 @@ sidak.post("/rule-versions", requireRole("admin", "trainer"), async (c) => {
         "bko",
         "slik",
       ]),
-      effective_period_id: z.string().uuid(),
-      critical_weight: z.number().min(0).max(1).default(0.5),
-      non_critical_weight: z.number().min(0).max(1).default(0.5),
+      effective_period_id: z.string().uuid().optional(),
+      critical_weight: z.number().min(0).max(1).optional(),
+      non_critical_weight: z.number().min(0).max(1).optional(),
       scoring_mode: z
         .enum(["weighted", "flat", "no_category"])
-        .default("weighted"),
+        .optional(),
       change_reason: z.string().optional(),
+      source_version_id: z.string().uuid().optional(),
     })
     .safeParse(body);
   if (!parsed.success) {
@@ -931,6 +932,7 @@ sidak.post(
     const parsed = z
       .object({
         change_reason: z.string().optional(),
+        effective_period_id: z.string().uuid().optional(),
       })
       .safeParse(body);
     if (!parsed.success) {
@@ -951,6 +953,7 @@ sidak.post(
         id,
         user.id,
         parsed.data.change_reason,
+        parsed.data.effective_period_id,
       );
       return c.json({ success: true, data: version });
     } catch (error: any) {
@@ -1095,6 +1098,53 @@ sidak.delete(
     try {
       await sidakService.deleteRuleVersionIndicator(indicatorId);
       return c.json({ success: true, message: "Indikator berhasil dihapus" });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
+
+sidak.put(
+  "/rule-versions/:versionId/indicators/:indicatorId",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const indicatorId = c.req.param("indicatorId");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        name: z.string().min(1).optional(),
+        category: z.enum(["critical", "non_critical", "none"]).optional(),
+        bobot: z.number().positive().optional(),
+        has_na: z.boolean().optional(),
+        threshold: z.number().optional(),
+        sort_order: z.number().int().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data indikator tidak valid",
+            details: parsed.error,
+          },
+        },
+        400,
+      );
+    }
+    try {
+      const indicator = await sidakService.updateRuleVersionIndicator(
+        indicatorId,
+        parsed.data,
+      );
+      return c.json({ success: true, data: indicator });
     } catch (error: any) {
       return c.json(
         {

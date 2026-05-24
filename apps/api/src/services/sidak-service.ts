@@ -2138,7 +2138,7 @@ export async function getRuleVersions(serviceType?: string) {
   let query = supabaseAdmin
     .from("qa_service_rule_versions")
     .select(
-      "*, created_by_user:created_by(full_name), published_by_user:published_by(full_name)",
+      "*, created_by_user:created_by(full_name), published_by_user:published_by(full_name), qa_periods(id, month, year)",
     )
     .order("version_number", { ascending: false });
 
@@ -2171,40 +2171,150 @@ export async function getRuleVersions(serviceType?: string) {
 export async function createRuleVersion(
   data: {
     service_type: string;
-    effective_period_id: string;
-    critical_weight: number;
-    non_critical_weight: number;
-    scoring_mode: string;
+    effective_period_id?: string;
+    critical_weight?: number;
+    non_critical_weight?: number;
+    scoring_mode?: string;
     change_reason?: string;
+    source_version_id?: string;
   },
   userId: string,
 ) {
+  const serviceType = data.service_type;
+
+  // 1. Get base data from source or current weights
+  let baseWeights: { critical_weight: number; non_critical_weight: number; scoring_mode: string };
+  let baseIndicators: any[] = [];
+  let effectivePeriodId: string;
+
+  if (data.source_version_id) {
+    const { data: sourceVer, error: verErr } = await supabaseAdmin
+      .from("qa_service_rule_versions")
+      .select("*")
+      .eq("id", data.source_version_id)
+      .single();
+    if (verErr) throw new Error(`Source version not found: ${verErr.message}`);
+    if (sourceVer.status !== "published") {
+      throw new Error("Revisi hanya bisa dibuat dari versi yang sudah dipublikasikan (published)");
+    }
+
+    baseWeights = {
+      critical_weight: Number(sourceVer.critical_weight),
+      non_critical_weight: Number(sourceVer.non_critical_weight),
+      scoring_mode: sourceVer.scoring_mode,
+    };
+    effectivePeriodId = data.effective_period_id || sourceVer.effective_period_id;
+
+    const { data: sourceInds, error: indsErr } = await supabaseAdmin
+      .from("qa_service_rule_indicators")
+      .select("*")
+      .eq("rule_version_id", data.source_version_id);
+    if (indsErr) throw new Error(`Failed to load source indicators: ${indsErr.message}`);
+    baseIndicators = sourceInds || [];
+  } else {
+    // Determine effective_period_id
+    if (data.effective_period_id) {
+      effectivePeriodId = data.effective_period_id;
+    } else {
+      const periods = await getPeriods();
+      if (periods.length === 0) {
+        throw new Error("Belum ada periode audit. Silakan buat periode terlebih dahulu.");
+      }
+      effectivePeriodId = periods[0].id;
+    }
+
+    // Check if published version already exists for this service and period
+    const { data: existingPublished } = await supabaseAdmin
+      .from("qa_service_rule_versions")
+      .select("id")
+      .eq("service_type", serviceType)
+      .eq("effective_period_id", effectivePeriodId)
+      .eq("status", "published")
+      .maybeSingle();
+
+    if (existingPublished) {
+      throw new Error("Versi published untuk periode ini sudah ada. Gunakan Create Revision.");
+    }
+
+    // Get weights
+    const { data: weights } = await supabaseAdmin
+      .from("qa_service_weights")
+      .select("*")
+      .eq("service_type", serviceType)
+      .maybeSingle();
+
+    baseWeights = {
+      critical_weight: data.critical_weight ?? Number(weights?.critical_weight ?? 0.5),
+      non_critical_weight: data.non_critical_weight ?? Number(weights?.non_critical_weight ?? 0.5),
+      scoring_mode: data.scoring_mode ?? weights?.scoring_mode ?? "weighted",
+    };
+
+    // Get active indicators from qa_indicators
+    const { data: inds } = await supabaseAdmin
+      .from("qa_indicators")
+      .select("*")
+      .eq("service_type", serviceType);
+    baseIndicators = inds || [];
+  }
+
+  // 2. Compute version number (MAX + 1 for this service and period)
   const { data: versions } = await supabaseAdmin
     .from("qa_service_rule_versions")
     .select("version_number")
-    .eq("service_type", data.service_type)
+    .eq("service_type", serviceType)
+    .eq("effective_period_id", effectivePeriodId)
     .order("version_number", { ascending: false })
     .limit(1);
 
   const versionNumber = (versions?.[0]?.version_number ?? 0) + 1;
 
+  // 3. Create Draft Version
   const { data: result, error } = await supabaseAdmin
     .from("qa_service_rule_versions")
     .insert({
-      service_type: data.service_type,
-      effective_period_id: data.effective_period_id,
+      service_type: serviceType,
+      effective_period_id: effectivePeriodId,
       status: "draft",
-      critical_weight: data.critical_weight,
-      non_critical_weight: data.non_critical_weight,
-      scoring_mode: data.scoring_mode,
+      critical_weight: baseWeights.critical_weight,
+      non_critical_weight: baseWeights.non_critical_weight,
+      scoring_mode: baseWeights.scoring_mode,
       version_number: versionNumber,
       change_reason: data.change_reason,
       created_by: userId,
+      created_from_version_id: data.source_version_id || null,
     })
     .select()
     .single();
 
   if (error) throw new Error(`Gagal membuat versi aturan: ${error.message}`);
+
+  // 4. Copy Indicators
+  if (baseIndicators.length > 0) {
+    const newInds = baseIndicators.map((ind) => ({
+      rule_version_id: result.id,
+      service_type: serviceType,
+      name: ind.name,
+      category: ind.category,
+      bobot: Number(ind.bobot),
+      has_na: ind.has_na || false,
+      threshold: ind.threshold || null,
+      sort_order: ind.sort_order || 0,
+      legacy_indicator_id: data.source_version_id
+        ? (ind.legacy_indicator_id || null)
+        : (ind.id || ind.legacy_indicator_id || null),
+      created_by: userId,
+    }));
+
+    const { error: copyErr } = await supabaseAdmin
+      .from("qa_service_rule_indicators")
+      .insert(newInds);
+    if (copyErr) {
+      // rollback draft version if copy failed
+      await supabaseAdmin.from("qa_service_rule_versions").delete().eq("id", result.id);
+      throw new Error(`Gagal menduplikasi parameter: ${copyErr.message}`);
+    }
+  }
+
   return result;
 }
 
@@ -2243,10 +2353,11 @@ export async function publishRuleVersion(
   id: string,
   userId: string,
   change_reason?: string,
+  effective_period_id?: string,
 ) {
   const { data: existing } = await supabaseAdmin
     .from("qa_service_rule_versions")
-    .select("status, service_type")
+    .select("status, service_type, effective_period_id, version_number")
     .eq("id", id)
     .single();
 
@@ -2255,6 +2366,21 @@ export async function publishRuleVersion(
     throw new Error("Hanya versi draft yang bisa dipublikasikan");
 
   const now = new Date().toISOString();
+  let targetPeriodId = effective_period_id || existing.effective_period_id;
+  let targetVersionNumber = existing.version_number;
+
+  // If effective period is changed, compute version_number for target period
+  if (effective_period_id && effective_period_id !== existing.effective_period_id) {
+    const { data: versions } = await supabaseAdmin
+      .from("qa_service_rule_versions")
+      .select("version_number")
+      .eq("service_type", existing.service_type)
+      .eq("effective_period_id", effective_period_id)
+      .order("version_number", { ascending: false })
+      .limit(1);
+
+    targetVersionNumber = (versions?.[0]?.version_number ?? 0) + 1;
+  }
 
   // auto-supersede other published versions for the same service_type
   const { data: publishedVersions } = await supabaseAdmin
@@ -2288,6 +2414,8 @@ export async function publishRuleVersion(
     status: "published",
     published_by: userId,
     published_at: now,
+    effective_period_id: targetPeriodId,
+    version_number: targetVersionNumber,
   };
   if (change_reason !== undefined) updates.change_reason = change_reason;
 
@@ -2379,6 +2507,28 @@ export async function deleteRuleVersionIndicator(id: string) {
     .eq("id", id);
 
   if (error) throw new Error(`Gagal menghapus indikator: ${error.message}`);
+}
+
+export async function updateRuleVersionIndicator(
+  id: string,
+  data: {
+    name?: string;
+    category?: "critical" | "non_critical" | "none";
+    bobot?: number;
+    has_na?: boolean;
+    threshold?: number;
+    sort_order?: number;
+  },
+) {
+  const { data: result, error } = await supabaseAdmin
+    .from("qa_service_rule_indicators")
+    .update(data)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Gagal memperbarui indikator: ${error.message}`);
+  return result;
 }
 
 type ReportArchiveInput = {

@@ -126,8 +126,18 @@ export const ruleVersionSchema = z.object({
   published_at: z.string().datetime().nullable().optional(),
   superseded_by: z.string().uuid().nullable().optional(),
   superseded_at: z.string().datetime().nullable().optional(),
+  superseded_by_version_id: z.string().uuid().nullable().optional(),
+  created_from_version_id: z.string().uuid().nullable().optional(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime().nullable().optional(),
+  qa_periods: z
+    .object({
+      id: z.string().uuid(),
+      month: z.number(),
+      year: z.number(),
+    })
+    .nullable()
+    .optional(),
 });
 export type RuleVersion = z.infer<typeof ruleVersionSchema>;
 

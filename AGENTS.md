@@ -162,6 +162,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 23. Profiler Parity Fixes — Backend cascade/rename-sync/batch-move, labelJabatan expansion, 2 new modal components, useQueryParams bug fix, html2canvas-tailwind-fix, isReadOnly auth context, label consistency (DONE)
 24. SIDAK Dashboard Legacy Parity — Restored legacy defaults, filter bar, KPI cards, trend panel, leaderboard, parity test (DONE)
 25. SIDAK Agent Service Pill Stability — Service pills from raw temuan rows, regression test for refresh collapse (DONE)
+26. SIDAK Parameter Legacy Parity — Rebuilt versioned settings shell, history picker, weights slider, parameters list card view, and publish flow (DONE)
+26. SIDAK Parameter Legacy Parity — Rebuilt versioned settings shell, history picker, weights slider, parameters list card view, and publish flow (DONE)
 
 ## Relevant Files
 
@@ -194,8 +196,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-25)
-- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-26)
+- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`
 
 ## Routes Reference (apps/web)
 
