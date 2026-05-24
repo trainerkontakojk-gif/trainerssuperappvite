@@ -184,6 +184,26 @@ Catatan:
 - Jalankan pembuatan narasi laporan QA Analyzer, lalu cek usage muncul untuk modul `qa-analyzer`
 - Login sebagai `leader`; pastikan tab `Penggunaan Token` ada, tetapi tab `Harga & Kurs` tidak ada
 
+## Transport Auth & Error Handling (v35 hardening)
+
+Semua API call monitoring di frontend (`apps/web/src/routes/monitoring.tsx`) menggunakan helper `getApi`/`putApi`/`postApi` dari `apps/web/src/hooks/useApi.ts` yang otomatis menginjeksi `Authorization: Bearer <token>` dari `localStorage.auth_token`. Tidak ada raw `fetch()` tanpa auth header.
+
+### Error Mapping
+
+Error dari backend dimap ke pesan human-friendly:
+
+| Backend Error | Pesan User |
+| --- | --- |
+| `Unauthorized` / `Invalid token` | Sesi Anda telah berakhir. Silakan login kembali. |
+| Pesan lain | Ditampilkan apa adanya |
+| Network error | Terjadi kesalahan koneksi. Periksa jaringan Anda. |
+
+### Toast Feedback
+
+Operasi save pricing dan billing memberikan feedback via sonner toast:
+- Sukses: "Harga berhasil disimpan." / "Kurs berhasil disimpan."
+- Gagal: "Gagal menyimpan harga." / "Gagal menyimpan kurs." + pesan error.
+
 ## Batasan v1
 
 - tidak ada backfill histori lama
@@ -195,6 +215,9 @@ Catatan:
 
 - `apps/api/src/lib/ai-models.ts` — Model registry
 - `apps/api/src/lib/ai-usage.ts` — Usage logging
+- `apps/web/src/hooks/useApi.ts` — Authenticated API helper (inject bearer token)
+- `apps/web/src/routes/monitoring.tsx` — Monitoring page (3 tab, legacy visual parity)
+- `apps/web/src/__tests__/monitoring-unauthorized-parity.test.tsx` — Regression tests (20 tests)
 - `docs/modules.md`
 - `docs/database.md`
 - `docs/auth-rbac.md`

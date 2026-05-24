@@ -171,6 +171,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 32. SIDAK Period Delete Fail-Closed Guard — Hardened `deletePeriod()` to abort when verification queries fail, preventing fail-open cascade deletion risk; added API regression test for verification-error path (DONE)
 33. Access Approval & Access Group Legacy Parity Hardening — Added re-check `status=approved` before delete in reassign, guarded `reviewed_by` audit update, locked builder Specific Agent to team-first flow, added 6 API + 3 web regression tests (DONE)
 34. Monitoring & Activity Logs Legacy Parity — 3-tab monitoring (history/usage/pricing), WIB boundary, unified history endpoint, role matrix (trainer/leader/admin), sidebar link fix, shared logActivity helper, activity logging coverage for SIDAK (8 events) and Profiler (10 events) (DONE)
+35. Monitoring Unauthorized & Visual Legacy Parity Fix — Replaced raw unauthenticated fetch() with getApi/putApi/postApi helpers, added human-friendly error mapping, applied legacy visual patterns (hero header, tab strip, refined cards), added toast feedback for pricing saves, 20 regression tests (DONE)
+35. Dashboard Post-Login Legacy Parity — Auth-aware data fetching (Bearer token on all protected API calls), recent activity parity (5 items), analytics lazy loading (Recharts split from main bundle with Suspense skeleton) (DONE)
 
 ## Relevant Files
 
@@ -184,7 +186,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
 - `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
 - `apps/web/src/lib/profilerService.ts` — typed Profiler API client
-- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes, and `dashboard/users`, `dashboard/access-groups`, `dashboard/access-approval`, `dashboard/activities`)
+- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes, `dashboard/DashboardTrendPanel.tsx` (lazy analytics), and `dashboard/users`, `dashboard/access-groups`, `dashboard/access-approval`, `dashboard/activities`)
 - `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
 - `apps/web/src/hooks/useAgentDetail.ts` — agent detail hook with multi-service support
 - `apps/web/src/hooks/useProfilerAccess.ts` — profiler role/isReadOnly hook via Supabase auth
@@ -192,7 +194,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
-- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, sidak-agent-detail-temuan-parity, sidak-ranking-fatal-parity, sidak-agents-load-more-copy, sidak-input-agents-shape, useAgentDetail, access-groups-parity)
+- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, sidak-agent-detail-temuan-parity, sidak-ranking-fatal-parity, sidak-agents-load-more-copy, sidak-input-agents-shape, useAgentDetail, access-groups-parity, **dashboard-post-login-parity**, **monitoring-unauthorized-parity**)
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests
@@ -204,7 +206,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
 - `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-34)
-- `plan/markdown/` — implementation plans including `sidak-multiservice-spec.md`, `sidak-multiservice-fix.md`, `sidak-parameter-legacy-parity.md`, `sidak-agent-detail-temuan-history-parity.md`, `sidak-ranking-fatal-legacy-parity.md`, `sidak-agent-directory-load-more-copy.md`, `sidak-input-agents-map-and-qa-baseline-fix.md`, `dashboard-user-management-legacy-parity.md`, `access-approval-access-group-legacy-parity-reaudit.md`, `monitoring-activity-logs-legacy-parity.md`
+- `plan/markdown/` — implementation plans including `dashboard-post-login-legacy-parity-reaudit.md`, `monitoring-activity-logs-legacy-parity.md`, `sidak-multiservice-spec.md`, ...
 
 ## Routes Reference (apps/web)
 

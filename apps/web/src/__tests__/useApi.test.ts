@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useApi, postApi } from "../hooks/useApi";
+import { useApi, postApi, fetchApi } from "../hooks/useApi";
 
 function mockLocalStorage() {
   const store = new Map<string, string>();
@@ -125,5 +125,37 @@ describe("postApi", () => {
       ),
     );
     await expect(postApi("/test", {})).rejects.toThrow("Bad request");
+  });
+});
+
+describe("fetchApi auth header", () => {
+  beforeEach(() => {
+    mockLocalStorage();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ success: true, data: "ok" }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sends Authorization Bearer header when token exists", async () => {
+    localStorage.setItem("auth_token", "test-token-123");
+    await fetchApi("/protected");
+    const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const calledOptions = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(calledOptions.headers.Authorization).toBe("Bearer test-token-123");
+    expect(calledUrl).toContain("/protected");
+  });
+
+  it("does not send Authorization header when no token exists", async () => {
+    localStorage.removeItem("auth_token");
+    await fetchApi("/public");
+    const calledOptions = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(calledOptions.headers.Authorization).toBeUndefined();
   });
 });
