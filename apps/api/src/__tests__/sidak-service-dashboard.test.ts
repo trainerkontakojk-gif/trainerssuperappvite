@@ -36,6 +36,13 @@ const mockIndicators = [
     service_type: "call",
     bobot: 1,
   },
+  {
+    id: "ind-2",
+    name: "Critical Point",
+    category: "critical",
+    service_type: "call",
+    bobot: 1,
+  },
 ];
 const mockWeights = [
   {
@@ -45,6 +52,7 @@ const mockWeights = [
     scoring_mode: "weighted",
   },
 ];
+let mockTemuan: any[] = [];
 
 vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
@@ -92,8 +100,7 @@ vi.mock("../lib/supabase", () => ({
         return buildQuery(tableName, () => ({ data: null, error: null }));
       }
       if (tableName === "qa_temuan") {
-        // Return empty temuan for raw computation fallback
-        return buildQuery(tableName, () => ({ data: [], error: null }));
+        return buildQuery(tableName, () => ({ data: mockTemuan, error: null }));
       }
 
       return buildQuery(tableName, () => ({ data: [], error: null }));
@@ -668,5 +675,157 @@ describe("Property 8: Soft-Delete Dashboard Exclusion", () => {
       ),
       { numRuns: 100 },
     );
+  });
+});
+
+describe("hasCritical Parity Validation", () => {
+  beforeEach(() => {
+    mvState = "returns-null";
+    mvData = null;
+    mockTemuan = [];
+  });
+
+  it("should return hasCritical: false if agent only has non-critical findings", async () => {
+    mockTemuan = [
+      {
+        id: "t-1",
+        peserta_id: "agent-1",
+        indicator_id: "ind-1", // non_critical
+        nilai: 0,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "agent-1",
+          nama: "Agent One",
+          batch_name: "Batch 1",
+          tim: "Tim A",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      period_ids: ["period-1"],
+      service_type: "call",
+      year: 2025,
+    });
+
+    const agent = result.topAgents.find((a) => a.agentId === "agent-1");
+    expect(agent).toBeDefined();
+    expect(agent?.hasCritical).toBe(false);
+  });
+
+  it("should return hasCritical: false if critical finding has nilai > 0 (1 or 2)", async () => {
+    mockTemuan = [
+      {
+        id: "t-2",
+        peserta_id: "agent-2",
+        indicator_id: "ind-2", // critical
+        nilai: 1,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "agent-2",
+          nama: "Agent Two",
+          batch_name: "Batch 1",
+          tim: "Tim A",
+          jabatan: "Agent",
+        },
+      },
+      {
+        id: "t-3",
+        peserta_id: "agent-3",
+        indicator_id: "ind-2", // critical
+        nilai: 2,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "agent-3",
+          nama: "Agent Three",
+          batch_name: "Batch 1",
+          tim: "Tim A",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      period_ids: ["period-1"],
+      service_type: "call",
+      year: 2025,
+    });
+
+    const agent2 = result.topAgents.find((a) => a.agentId === "agent-2");
+    const agent3 = result.topAgents.find((a) => a.agentId === "agent-3");
+    expect(agent2?.hasCritical).toBe(false);
+    expect(agent3?.hasCritical).toBe(false);
+  });
+
+  it("should return hasCritical: false if critical finding has nilai = 0 but is phantom padding", async () => {
+    mockTemuan = [
+      {
+        id: "t-4",
+        peserta_id: "agent-4",
+        indicator_id: "ind-2", // critical
+        nilai: 0,
+        is_phantom_padding: true,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "agent-4",
+          nama: "Agent Four",
+          batch_name: "Batch 1",
+          tim: "Tim A",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      period_ids: ["period-1"],
+      service_type: "call",
+      year: 2025,
+    });
+
+    const agent = result.topAgents.find((a) => a.agentId === "agent-4");
+    expect(agent?.hasCritical).toBe(false);
+  });
+
+  it("should return hasCritical: true if critical finding has nilai = 0 and is not phantom padding", async () => {
+    mockTemuan = [
+      {
+        id: "t-5",
+        peserta_id: "agent-5",
+        indicator_id: "ind-2", // critical
+        nilai: 0,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "agent-5",
+          nama: "Agent Five",
+          batch_name: "Batch 1",
+          tim: "Tim A",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      period_ids: ["period-1"],
+      service_type: "call",
+      year: 2025,
+    });
+
+    const agent = result.topAgents.find((a) => a.agentId === "agent-5");
+    expect(agent?.hasCritical).toBe(true);
   });
 });

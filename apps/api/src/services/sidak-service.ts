@@ -1304,7 +1304,9 @@ export async function getDashboardData(params: {
         jabatan: agent.jabatan,
         defects: findingRows.length,
         score: roundTo(score.finalScore, 2),
-        hasCritical: findingRows.some((r) => {
+        hasCritical: agent.rows.some((r) => {
+          if (r.is_phantom_padding === true) return false;
+          if (r.nilai === null || r.nilai === undefined || Number(r.nilai) !== 0) return false;
           const ind = indicators.find((i) => i.id === r.indicator_id);
           return ind?.category === "critical";
         }),
@@ -2184,7 +2186,7 @@ export async function createRuleVersion(
 
   // 1. Get base data from source or current weights
   let baseWeights: { critical_weight: number; non_critical_weight: number; scoring_mode: string };
-  let baseIndicators: any[] = [];
+  let baseIndicators: any[];
   let effectivePeriodId: string;
 
   if (data.source_version_id) {
@@ -2366,7 +2368,7 @@ export async function publishRuleVersion(
     throw new Error("Hanya versi draft yang bisa dipublikasikan");
 
   const now = new Date().toISOString();
-  let targetPeriodId = effective_period_id || existing.effective_period_id;
+  const targetPeriodId = effective_period_id || existing.effective_period_id;
   let targetVersionNumber = existing.version_number;
 
   // If effective period is changed, compute version_number for target period
