@@ -330,8 +330,9 @@ export class LiveSession {
 
       const isSilent = vol <= 10;
 
-      // Dead Air Detection (only when NOT held and NOT muted)
-      if (!this.isHeld && !this.isMuted) {
+      // Dead Air Detection (only when NOT held, NOT muted, and NOT in realistic mode)
+      // Realistic mode: prolongued silence handler in orchestrator manages this
+      if (!this.isHeld && !this.isMuted && !this.orchestrator) {
         if (isSilent) {
           this.deadAirSilenceMs += 4096 / (16000 / 1000); // ms per frame
           const nowMs = Date.now();
