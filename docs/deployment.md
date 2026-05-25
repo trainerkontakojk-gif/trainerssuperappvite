@@ -13,27 +13,107 @@
    ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
    │  apps/web   │   │  apps/api   │   │ apps/telefun │
    │  Vite SPA   │──▶│  Hono HTTP  │   │ WS Server    │
-   │ (Vercel/CF) │   │ (Railway)   │   │ (Railway)    │
+   │  (Railway)  │   │  (Railway)  │   │ (Railway)    │
    └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
+Semua 3 service dideploy di Railway sebagai service terpisah dari monorepo yang sama.
+
 ## Service Overview
 
-| Service        | Port | Stack                   | Deploy Target             |
-| -------------- | ---- | ----------------------- | ------------------------- |
-| `apps/web`     | 3000 | Vite SPA (static files) | Vercel / Cloudflare Pages |
-| `apps/api`     | 3001 | Hono (Node.js HTTP)     | Railway / Fly.io / VPS    |
-| `apps/telefun` | 3002 | WebSocket (persistent)  | Railway / Fly.io / VPS    |
+| Service        | Port      | Stack                   | Deploy Target |
+| -------------- | --------- | ----------------------- | ------------- |
+| `apps/web`     | `$PORT`   | Vite SPA → `serve dist` | Railway       |
+| `apps/api`     | `$PORT`   | Hono (Node.js HTTP)     | Railway       |
+| `apps/telefun` | `$PORT`   | WebSocket (persistent)  | Railway       |
 
 ## Prerequisites
 
-- Node.js >= 18
+- Node.js >= 22
 - pnpm >= 9
 - Supabase project (with all migrations applied)
 
-## Environment Variables
+## Railway Service Settings (per service)
 
-### Root `.env.local` (development)
+Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi build/start command eksplisit. **Jangan gunakan `pnpm start` default root untuk production** — script root sekarang mengunci ke web saja.
+
+| Setting          | Web                     | API                      | Telefun                  |
+| ---------------- | ----------------------- | ------------------------ | ------------------------ |
+| Root Directory   | repo root               | repo root                | repo root                |
+| Build Command    | `pnpm run build:web`    | `pnpm run build:api`     | `pnpm run build:telefun` |
+| Start Command    | `pnpm run start:web`    | `pnpm run start:api`     | `pnpm run start:telefun` |
+| Healthcheck Path | `/`                     | `/api/health`            | `/health`                |
+
+## Railway Environment Variables
+
+### Web Service
+
+**Wajib di-set SEBELUM build** karena Vite embed `VITE_*` di compile time (`import.meta.env.VITE_*` diganti string literal).
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `VITE_SUPABASE_URL` | `https://<project>.supabase.co` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Supabase anon key |
+| `VITE_API_URL` | `https://<api-url>.up.railway.app/api/v1` | **Harus suffix `/api/v1`** — lihat catatan penting di bawah |
+| `VITE_TELEFUN_WS_URL` | `wss://<telefun-url>.up.railway.app` | WebSocket secure untuk production |
+
+### API Service
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `PORT` | `$PORT` | Railway auto-inject |
+| `NODE_ENV` | `production` | **Wajib** — tanpa ini, CORS fallback ke `localhost:3000` dan `ALLOWED_ORIGINS` diabaikan |
+| `VITE_SUPABASE_URL` | `https://<project>.supabase.co` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Service role key |
+| `GEMINI_API_KEY` | `AI...` | Google Gemini API key |
+| `OPENROUTER_API_KEY` | `sk-or...` | OpenRouter API key |
+| `ALLOWED_ORIGINS` | `https://<web-url>.up.railway.app` | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir |
+
+### Telefun Service
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `PORT` | `$PORT` | Railway auto-inject |
+| `NODE_ENV` | `production` | |
+| `SUPABASE_URL` | `https://<project>.supabase.co` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | `eyJ...` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` | Service role key |
+| `GEMINI_API_KEY` | `AI...` | Google Gemini API key |
+| `ALLOWED_ORIGINS` | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all |
+
+### Catatan Penting: VITE_API_URL
+
+**VITE_API_URL harus suffix `/api/v1`**, bukan hanya domain API. Alasan:
+
+- API routes di-prefix `basePath("/api")` + route `/v1/sidak/...`
+- Frontend menggunakan pattern: `fetch(ApiBase + "/sidak/dashboard/...")` = `VITE_API_URL + "/sidak/dashboard/..."`
+- Jika `VITE_API_URL = https://api.up.railway.app` saja → request ke `https://api.up.railway.app/sidak/...` → **404** (tanpa prefix `/api/v1`)
+- Jika `VITE_API_URL = https://api.up.railway.app/api/v1` → request ke `https://api.up.railway.app/api/v1/sidak/...` → **OK**
+
+## Root Package Scripts
+
+| Script | Command | Purpose |
+|--------|---------|---------|
+| `start` | `pnpm run start:web` | Default Railway start (web only) |
+| `start:web` | `pnpm --filter @trainers/web start` | Web production via `serve` |
+| `build:web` | `pnpm turbo run build --filter @trainers/web` | Build web (TSC + Vite) |
+| `start:api` | `pnpm --filter @trainers/api start` | API production via `tsx` |
+| `build:api` | `pnpm turbo run build --filter @trainers/api` | Build API (TSC) |
+| `start:telefun` | `pnpm --filter @trainers/telefun start` | Telefun production via `node` |
+| `build:telefun` | `pnpm turbo run build --filter @trainers/telefun` | Build Telefun (TSC) |
+| `start:all` | `turbo run start` | Local multi-service (not deploy) |
+
+## Healthcheck Smoke Test
+
+```bash
+node scripts/deployment/railway-web-healthcheck-smoke.mjs
+```
+
+Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`.
+
+## Development (Local)
+
+### Root `.env.local`
 
 ```env
 # Supabase
@@ -49,156 +129,66 @@ OPENROUTER_API_KEY=your_openrouter_key
 VITE_TELEFUN_WS_URL=ws://localhost:3002
 
 # API
-VITE_API_URL=http://localhost:3001
+VITE_API_URL=http://localhost:3001/api/v1
 PORT=3001
 
 # MCP
 CONTEXT7_API_KEY=your_context7_key
 ```
 
-### Production Env Vars (per service)
+### Commands
 
-**apps/api:**
-
-- `PORT` — HTTP port (default 3001)
-- `VITE_SUPABASE_URL` — Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` — Service role key (DO NOT expose to frontend)
-- `GEMINI_API_KEY` — Google Gemini API key
-- `OPENROUTER_API_KEY` — OpenRouter API key
-- `ALLOWED_ORIGINS` — Comma-separated CORS origins (e.g. `https://app.example.com`)
-- `NODE_ENV` — `production`
-
-**apps/web (build-time):**
-
-- `VITE_SUPABASE_URL` — Supabase project URL
-- `VITE_SUPABASE_ANON_KEY` — Supabase anon key
-- `VITE_TELEFUN_WS_URL` — WebSocket URL (e.g. `wss://telefun.example.com`)
-- `VITE_API_URL` — API base URL (e.g. `https://api.example.com`)
-
-**apps/telefun:**
-
-- `PORT` — WS port (default 3002)
-- `SUPABASE_URL` — Supabase project URL
-- `SUPABASE_ANON_KEY` — Supabase anon key
-- `SUPABASE_SERVICE_ROLE_KEY` — Service role key
-- `GEMINI_API_KEY` — Google Gemini API key
-- `ALLOWED_ORIGINS` — Comma-separated allowed origins (or `*`)
-- `NODE_ENV` — `production`
+```bash
+pnpm install
+pnpm dev          # Semua 3 service paralel
+pnpm build        # Build semua
+pnpm test         # Vitest
+```
 
 ## Supabase Migrations
-
-Apply migrations in order:
 
 ```bash
 supabase migration up
 ```
 
-Migration files:
-
 1. `000_profiles_core.sql` — profiles table + auto-create trigger
-2. `001_sidak_core.sql` — SIDAK tables (periods, indicators, temuan, agents, etc.)
-3. `002_ketik_pdkt_core.sql` — KETIK/PDKT tables + AI usage logging + pricing
-4. `003_telefun_core.sql` — Telefun history table
-5. `004_admin_core.sql` — Admin panel tables (access_groups, access_group_items, leader_access_requests, activity_logs)
+2. `001_sidak_core.sql` — SIDAK tables
+3. `002_ketik_pdkt_core.sql` — KETIK/PDKT + AI usage logging + pricing
+4. `003_telefun_core.sql` — Telefun history
+5. `004_admin_core.sql` — Admin panel tables
 
-## Build & Run
+## Troubleshooting
 
-```bash
-# Install dependencies
-pnpm install
+### Web Service OOM / Exit 137
 
-# Build all packages
-pnpm build
+Jika log Railway menampilkan `@trainers/web dev`, `> vite`, atau `Exit status 137`, service masih menjalankan start command development (`vite`). Periksa Railway Web service settings (tabel di atas) — override manual Start Command ke `pnpm run start:web`.
 
-# Run in development (all 3 services)
-pnpm dev
-```
+Repo memiliki guard (`scripts/deployment/guard-no-railway-dev.mjs`) yang memblokir `pnpm --filter @trainers/web dev` jika env Railway terdeteksi.
 
-### Production (Docker)
+### CORS "Missing Allow Origin"
 
-Each service has its own start command:
+1. **Pastikan `NODE_ENV=production`** di-set di API Railway service. Tanpa ini, CORS cuma allow `localhost:3000`.
+2. **Pastikan `ALLOWED_ORIGINS`** di-set di API Railway service (nilai: URL Web service).
+3. **Redeploy API** setelah mengubah env vars.
 
-```bash
-# API
-cd apps/api && node dist/index.js
+### API Returns 404
 
-# Web (static files served by CDN)
-cd apps/web && npx serve dist
+Request dari browser menuju domain API tanpa prefix `/api/v1`. Pastikan `VITE_API_URL` di Web Railway service suffix-nya `/api/v1`. Contoh: `https://api-xxx.up.railway.app/api/v1`.
 
-# Telefun
-cd apps/telefun && node dist/server.js
-```
+### Telefun WebSocket Tidak Connect
 
-## Railway Settings
-
-Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi build/start command eksplisit. **Jangan gunakan `pnpm start` default root untuk production** — script root sekarang mengunci ke web saja.
-
-| Service        | Build Command                    | Start Command                   | Healthcheck Path  |
-| -------------- | -------------------------------- | ------------------------------- | ----------------- |
-| Web            | `pnpm run build:web`             | `pnpm run start:web`            | `/`               |
-| API            | `pnpm run build:api`             | `pnpm run start:api`            | `/api/health`     |
-| Telefun        | `pnpm run build:telefun`         | `pnpm run start:telefun`        | `/health`         |
-
-### Root Package Scripts (Production-Ready)
-
-| Script          | Command                                              | Purpose                                |
-| --------------- | ---------------------------------------------------- | -------------------------------------- |
-| `start`         | `pnpm run start:web`                                 | Default Railway start (web only)       |
-| `start:web`     | `pnpm --filter @trainers/web start`                  | Web production via `serve`             |
-| `build:web`     | `pnpm turbo run build --filter @trainers/web`        | Build web (TSC + Vite)                 |
-| `start:api`     | `pnpm --filter @trainers/api start`                  | API production via `tsx`               |
-| `build:api`     | `pnpm turbo run build --filter @trainers/api`        | Build API (TSC)                        |
-| `start:telefun` | `pnpm --filter @trainers/telefun start`              | Telefun production via `node`          |
-| `build:telefun` | `pnpm turbo run build --filter @trainers/telefun`    | Build Telefun (TSC)                    |
-| `start:all`     | `turbo run start`                                    | Local manual multi-service (not deploy) |
-
-### Healthcheck Smoke Test
-
-Verifikasi web healthcheck sebelum deployment:
-
-```bash
-node scripts/deployment/railway-web-healthcheck-smoke.mjs
-```
-
-Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`.
-
-### Troubleshooting: Web Service OOM / Exit 137
-
-Jika log Railway menampilkan `@trainers/web dev`, `> vite`, atau `Exit status 137`, service masih menjalankan start command development (`vite`) yang memicu Vite optimizer dependency pre-bundling dan menyebabkan container OOM. Perbaiki konfigurasi Railway Web service:
-
-| Setting          | Value                          |
-| ---------------- | ------------------------------ |
-| Root Directory   | repo root (`.` / kosong, bukan `apps/web`) |
-| Build Command    | `pnpm run build:web`           |
-| Start Command    | `pnpm run start:web`           |
-| Healthcheck Path | `/`                            |
-
-Setelah mengubah service settings, trigger **"Deploy Latest Commit"** (bukan redeploy image lama). Log deploy yang benar harus menampilkan:
-
-```text
-> @trainers/web@0.0.0 start /app/apps/web
-> serve dist -s -l tcp://0.0.0.0:${PORT:-3005}
-```
-
-Log deploy **tidak boleh** mengandung:
-
-```text
-@trainers/web@0.0.0 dev
-> vite
-[vite] (client) [optimizer] bundling dependencies...
-```
-
-Repo ini juga memiliki guard (`scripts/deployment/guard-no-railway-dev.mjs`) yang memblokir `pnpm --filter @trainers/web dev` jika env Railway terdeteksi, memberikan pesan eksplisit.
+1. Cek URL WebSocket: `wss://<telefun-url>.up.railway.app` (bukan `ws://`).
+2. Cek `ALLOWED_ORIGINS` di Telefun service mencakup Web URL.
+3. Cek Telefun service status di Railway dashboard — harus Active.
 
 ## Deployment Checklist
 
 - [ ] Apply all Supabase migrations
-- [ ] Build all packages (`pnpm build`)
-- [ ] Set production env vars for each service
-- [ ] Set Railway custom build/start commands per service (lihat tabel Railway Settings di atas)
+- [ ] Deploy 3 Railway service dari repo yang sama (Web, API, Telefun)
+- [ ] Set Railway custom build/start commands per service (lihat tabel Railway Service Settings)
+- [ ] Set Railway env vars per service (lihat tabel Railway Environment Variables)
+- [ ] Verifikasi koneksi: `VITE_API_URL` suffix `/api/v1`, `NODE_ENV=production`, `ALLOWED_ORIGINS` di-set
 - [ ] Run smoke test: `node scripts/deployment/railway-web-healthcheck-smoke.mjs`
-- [ ] Verify API health: `GET /api/health`
-- [ ] Verify WebSocket: wss://telefun.example.com
-- [ ] Configure CORS in production
+- [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
+- [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
 - [ ] Set up monitoring / alerting
-- [ ] Enable rate limiting (already configured in dev)
