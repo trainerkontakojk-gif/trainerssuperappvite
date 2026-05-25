@@ -22,7 +22,7 @@ Replaced `vite` (dev server) with `vite preview` (production static file server)
 
 | File | Change |
 |------|--------|
-| `apps/web/vite.config.ts` | `port: Number(process.env.PORT) \|\| 3005` — respect Railway `PORT` env |
+| `apps/web/vite.config.ts` | Shared `appPort = Number(process.env.PORT) \|\| 3005` for dev server and `vite preview`; preview binds `0.0.0.0`, uses `strictPort`, and respects Railway `PORT` |
 | `apps/web/package.json` | Added `"start": "vite preview --host 0.0.0.0"` for production |
 | `package.json` | Added `"start": "turbo run start"` root script |
 | `turbo.json` | Added `"start"` task with `dependsOn: ["^build"]`, `cache: false`, `persistent: true` |
@@ -41,4 +41,24 @@ Replaced `vite` (dev server) with `vite preview` (production static file server)
 - Local dev (`pnpm dev`) unaffected — still uses `vite` dev server
 - `railway.toml` tells Railway to build first, then serve with `vite preview`
 - `--host 0.0.0.0` ensures the server listens on all interfaces (required for Railway)
-- `PORT` env support ensures compatibility with Railway's dynamic port assignment
+- `preview.port` uses Railway's dynamic `PORT`; `server.port` alone is not enough because production runs `vite preview`
+
+## Follow-up Healthcheck Fix
+
+After the OOM fix, Railway could still stall at `Starting Healthcheck` with `service unavailable` because `vite preview` defaulted to port `4173` while Railway healthchecked the dynamic `$PORT`.
+
+The fix is to configure Vite's `preview` block explicitly:
+
+```ts
+preview: {
+  host: "0.0.0.0",
+  port: appPort,
+  strictPort: true,
+}
+```
+
+Local reproduction before the fix:
+
+- `PORT=4567 pnpm --filter @trainers/web start` opened `http://localhost:4173/`
+- `curl http://127.0.0.1:4567/` failed to connect
+- `curl http://127.0.0.1:4173/` returned `200`
