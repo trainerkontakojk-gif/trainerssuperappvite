@@ -129,11 +129,46 @@ cd apps/web && npx serve dist
 cd apps/telefun && node dist/server.js
 ```
 
+## Railway Settings
+
+Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi build/start command eksplisit. **Jangan gunakan `pnpm start` default root untuk production** — script root sekarang mengunci ke web saja.
+
+| Service        | Build Command                    | Start Command                   | Healthcheck Path  |
+| -------------- | -------------------------------- | ------------------------------- | ----------------- |
+| Web            | `pnpm run build:web`             | `pnpm run start:web`            | `/`               |
+| API            | `pnpm run build:api`             | `pnpm run start:api`            | `/api/health`     |
+| Telefun        | `pnpm run build:telefun`         | `pnpm run start:telefun`        | `/health`         |
+
+### Root Package Scripts (Production-Ready)
+
+| Script          | Command                                              | Purpose                                |
+| --------------- | ---------------------------------------------------- | -------------------------------------- |
+| `start`         | `pnpm run start:web`                                 | Default Railway start (web only)       |
+| `start:web`     | `pnpm --filter @trainers/web start`                  | Web production via `serve`             |
+| `build:web`     | `pnpm turbo run build --filter @trainers/web`        | Build web (TSC + Vite)                 |
+| `start:api`     | `pnpm --filter @trainers/api start`                  | API production via `tsx`               |
+| `build:api`     | `pnpm turbo run build --filter @trainers/api`        | Build API (TSC)                        |
+| `start:telefun` | `pnpm --filter @trainers/telefun start`              | Telefun production via `node`          |
+| `build:telefun` | `pnpm turbo run build --filter @trainers/telefun`    | Build Telefun (TSC)                    |
+| `start:all`     | `turbo run start`                                    | Local manual multi-service (not deploy) |
+
+### Healthcheck Smoke Test
+
+Verifikasi web healthcheck sebelum deployment:
+
+```bash
+node scripts/deployment/railway-web-healthcheck-smoke.mjs
+```
+
+Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`.
+
 ## Deployment Checklist
 
 - [ ] Apply all Supabase migrations
 - [ ] Build all packages (`pnpm build`)
 - [ ] Set production env vars for each service
+- [ ] Set Railway custom build/start commands per service (lihat tabel Railway Settings di atas)
+- [ ] Run smoke test: `node scripts/deployment/railway-web-healthcheck-smoke.mjs`
 - [ ] Verify API health: `GET /api/health`
 - [ ] Verify WebSocket: wss://telefun.example.com
 - [ ] Configure CORS in production
