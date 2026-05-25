@@ -171,16 +171,7 @@ export function DashboardLayoutContent() {
   );
   const isStandaloneRoute = ["/pdkt/simulation"].includes(pathname);
 
-  // Redirect unauthorized users trying to access private dashboard routes
-  useEffect(() => {
-    if (!isPublicRoute) {
-      const token = localStorage.getItem("auth_token");
-      const profileJson = localStorage.getItem("auth_profile");
-      if (!token || !profileJson) {
-        window.location.assign("/");
-      }
-    }
-  }, [isPublicRoute, pathname]);
+
 
   useEffect(() => {
     if (pathname.startsWith("/sidak")) {
@@ -259,6 +250,7 @@ export function DashboardLayoutContent() {
     useAuthStore.getState().setSession(null);
     useAuthStore.getState().setProfile(null);
     await supabase.auth.signOut();
+    window.location.href = "/";
   };
 
   return (

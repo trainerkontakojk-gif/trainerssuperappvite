@@ -65,6 +65,7 @@ const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dashboard",
   component: DashboardPage,
+  beforeLoad: requireAuth(),
 });
 
 const dashboardUsersRoute = createRoute({
@@ -232,6 +233,7 @@ const ketikRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ketik",
   component: KetikLanding,
+  beforeLoad: requireAuth(),
 });
 
 const ketikSimulationRoute = createRoute({
@@ -254,12 +256,14 @@ const pdktRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt",
   component: PdktLanding,
+  beforeLoad: requireAuth(),
 });
 
 const pdktSimulationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt/simulation",
   component: PdktSimulation,
+  beforeLoad: requireAuth(),
 });
 
 const pdktHistoryRoute = createRoute({
@@ -281,18 +285,21 @@ const telefunRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/telefun",
   component: TelefunLanding,
+  beforeLoad: requireAuth(),
 });
 
 const telefunReplayRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/telefun/replay/$id",
   component: lazy(() => import("./routes/telefun/replay")),
+  beforeLoad: requireAuth(),
 });
 
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account",
   component: AccountPage,
+  beforeLoad: requireAuth(),
 });
 
 const waitingApprovalRoute = createRoute({
@@ -312,6 +319,17 @@ const unauthorizedRoute = createRoute({
   path: "/unauthorized",
   component: UnauthorizedPage,
 });
+
+function requireAuth() {
+  return async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/" });
+    }
+  };
+}
 
 function requireRole(allowedRoles: string[]) {
   return async () => {
