@@ -283,14 +283,16 @@ export interface RealisticModeConfig {
   disruptionTypes?: string[];
 }
 
-const CONSUMER_TYPE_TO_PERSONA: Record<
+const CONSUMER_TYPE_ID_TO_PERSONA: Record<
   string,
   RealisticModeConfig["personaType"]
 > = {
-  "angry-male": "angry",
-  "confused-female": "confused",
-  "default-male": "cooperative",
-  "default-female": "cooperative",
+  marah: "angry",
+  bingung: "confused",
+  kritis: "critical",
+  ramah: "cooperative",
+  "terburu-buru": "rushed",
+  pasrah: "passive",
 };
 
 const FALLBACK_PERSONA: RealisticModeConfig["personaType"] = "cooperative";
@@ -298,14 +300,17 @@ const FALLBACK_PERSONA: RealisticModeConfig["personaType"] = "cooperative";
 export function resolveTelefunRealisticModeConfig(
   config: any,
 ): RealisticModeConfig {
-  if (!config.realisticModeEnabled) {
+  if (!config || !config.realisticModeEnabled) {
     return { enabled: false, personaType: FALLBACK_PERSONA };
   }
+
+  const consumerTypeId: string | undefined =
+    config.consumerType?.id || config.activeConsumerType?.id;
 
   return {
     enabled: true,
     personaType:
-      CONSUMER_TYPE_TO_PERSONA[config.consumerName] ?? FALLBACK_PERSONA,
+      CONSUMER_TYPE_ID_TO_PERSONA[consumerTypeId ?? ""] ?? FALLBACK_PERSONA,
     disruptionTypes: config.realisticModeDisruptionTypes || [],
   };
 }

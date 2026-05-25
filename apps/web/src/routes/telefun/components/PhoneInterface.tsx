@@ -23,6 +23,7 @@ interface PhoneInterfaceProps {
     agentBlob: Blob | null,
     metrics: SessionMetrics,
   ) => void;
+  onSessionCreated?: (sessionId: string) => void;
 }
 
 function getInitials(name: string): string {
@@ -39,6 +40,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   config,
   onEndSession,
   onRecordingReady,
+  onSessionCreated,
 }) => {
   const [status, setStatus] = useState("Menghubungkan...");
   const [duration, setDuration] = useState(0);
@@ -69,6 +71,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     mountedRef.current = true;
     const session = new LiveSession(config);
     sessionRef.current = session;
+
+    session.onSessionCreated = (sessionId) => {
+      if (onSessionCreated) {
+        onSessionCreated(sessionId);
+      }
+    };
 
     session.onStatusChange = (nextStatus) => {
       if (!mountedRef.current) return;
@@ -227,9 +235,24 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
               {config.consumerName}
             </h2>
-            <p className="text-sm font-medium text-slate-500 dark:text-white/55 mt-1">
-              {status}
-            </p>
+            {config.resolvedIdentity && (
+              <p className="text-xs font-semibold text-slate-400 dark:text-white/40 mt-1">
+                {config.resolvedIdentity.phone} • {config.resolvedIdentity.city}
+              </p>
+            )}
+            <div className="text-sm font-medium text-slate-500 dark:text-white/55 mt-2 flex items-center justify-center gap-2">
+              <span>{status}</span>
+              {isHeld && (
+                <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/40 px-2.5 py-0.5 text-xs font-bold text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/30 animate-pulse">
+                  HOLD
+                </span>
+              )}
+              {isMuted && (
+                <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-950/40 px-2.5 py-0.5 text-xs font-bold text-red-800 dark:text-red-300 border border-red-200 dark:border-red-900/30">
+                  MUTED
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

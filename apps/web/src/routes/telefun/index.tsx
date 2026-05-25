@@ -147,6 +147,9 @@ export default function TelefunLanding() {
             personaConfig: row.persona_config,
             disruptionConfig: row.disruption_config,
             disruptionResults: row.disruption_results,
+            responsePacingMode: row.response_pacing_mode || undefined,
+            telefunModelId: row.telefun_model_id || undefined,
+            telefunTransport: row.telefun_transport || undefined,
           }));
 
           let localRecords: CallRecord[] = [];
@@ -272,6 +275,10 @@ export default function TelefunLanding() {
           consumerType: consumerType?.name || consumerType?.id,
         },
         disruption_config: settings.realisticModeDisruptionTypes,
+        configured_duration: settings.maxCallDuration * 60,
+        response_pacing_mode: settings.responsePacingMode,
+        telefun_model_id: settings.telefunModelId,
+        telefun_transport: settings.telefunTransport,
       });
       if (res?.id) {
         setActiveSessionId(res.id);
@@ -316,6 +323,10 @@ export default function TelefunLanding() {
             consumerType: sessionConfig?.activeConsumerType?.name || sessionConfig?.activeConsumerType?.id,
           },
           disruption_config: sessionConfig?.realisticModeDisruptionTypes || [],
+          configured_duration: (sessionConfig?.maxCallDuration || 0) * 60,
+          response_pacing_mode: sessionConfig?.responsePacingMode,
+          telefun_model_id: sessionConfig?.telefunModelId,
+          telefun_transport: sessionConfig?.telefunTransport,
         });
         if (res?.id) {
           sessionId = res.id;
@@ -612,6 +623,12 @@ export default function TelefunLanding() {
               config={activeSessionConfig}
               onEndSession={handleEndCall}
               onRecordingReady={handleRecordingReady}
+              onSessionCreated={(id) => {
+                setActiveSessionId(id);
+                if (activeSessionConfig) {
+                  activeSessionConfig.sessionId = id;
+                }
+              }}
             />
           </motion.div>
         )}

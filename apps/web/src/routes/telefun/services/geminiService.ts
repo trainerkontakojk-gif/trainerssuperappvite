@@ -60,6 +60,7 @@ export class LiveSession {
   public onAiSpeaking: (speaking: boolean) => void = () => {};
   public onVolumeChange: (volume: number) => void = () => {};
   public onTimelineEvent: (event: TelefunTimelineEvent) => void = () => {};
+  public onSessionCreated: (sessionId: string) => void = () => {};
   public onRecordingComplete: (
     url: string | null,
     fullBlob: Blob | null,
@@ -174,6 +175,11 @@ export class LiveSession {
   }
 
   private handleJsonMessage(msg: any) {
+    if (msg.type === "session_created" && msg.sessionId) {
+      this.config.sessionId = msg.sessionId;
+      this.onSessionCreated(msg.sessionId);
+    }
+
     if (msg.setupComplete) {
       this.isSetupComplete = true;
       this.setSessionState("ready");

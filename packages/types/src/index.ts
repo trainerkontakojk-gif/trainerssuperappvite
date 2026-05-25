@@ -738,6 +738,10 @@ export interface TelefunHistory {
   disruption_results?: any | null;
   persona_config?: any | null;
   realistic_mode_enabled: boolean;
+  configured_duration?: number | null;
+  response_pacing_mode?: string | null;
+  telefun_model_id?: string | null;
+  telefun_transport?: string | null;
   created_at: string;
 }
 

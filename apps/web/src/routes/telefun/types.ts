@@ -20,6 +20,9 @@ export interface CallRecord {
   personaConfig?: any | null;
   disruptionConfig?: string[] | null;
   disruptionResults?: any[] | null;
+  responsePacingMode?: string;
+  telefunModelId?: string;
+  telefunTransport?: string;
 }
 
 export type TelefunSessionState =

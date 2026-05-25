@@ -57,6 +57,10 @@ export function buildTelefunSessionInsertPayload(params: {
     realistic_mode_enabled?: boolean;
     persona_config?: any;
     disruption_config?: any;
+    configured_duration?: number;
+    response_pacing_mode?: string;
+    telefun_model_id?: string;
+    telefun_transport?: string;
   };
 }) {
   return {
@@ -70,6 +74,10 @@ export function buildTelefunSessionInsertPayload(params: {
     persona_config: params.body.persona_config,
     disruption_config: params.body.disruption_config,
     status: "active",
+    configured_duration: params.body.configured_duration || null,
+    response_pacing_mode: params.body.response_pacing_mode || null,
+    telefun_model_id: params.body.telefun_model_id || null,
+    telefun_transport: params.body.telefun_transport || null,
   };
 }
 
@@ -86,6 +94,10 @@ telefun.post(
       realistic_mode_enabled: z.boolean().default(false),
       persona_config: z.any().optional(),
       disruption_config: z.any().optional(),
+      configured_duration: z.number().optional(),
+      response_pacing_mode: z.string().optional(),
+      telefun_model_id: z.string().optional(),
+      telefun_transport: z.string().optional(),
     }),
   ),
   async (c) => {
@@ -134,6 +146,10 @@ export function buildTelefunSessionUpdatePayload(body: {
   realistic_mode_enabled?: boolean;
   score?: number;
   feedback?: string;
+  configured_duration?: number;
+  response_pacing_mode?: string;
+  telefun_model_id?: string;
+  telefun_transport?: string;
 }) {
   return {
     ...(body.status !== undefined ? { status: body.status } : {}),
@@ -148,6 +164,10 @@ export function buildTelefunSessionUpdatePayload(body: {
     ...(body.realistic_mode_enabled !== undefined ? { realistic_mode_enabled: body.realistic_mode_enabled } : {}),
     ...(body.score !== undefined ? { score: body.score } : {}),
     ...(body.feedback !== undefined ? { feedback: body.feedback } : {}),
+    ...(body.configured_duration !== undefined ? { configured_duration: body.configured_duration } : {}),
+    ...(body.response_pacing_mode !== undefined ? { response_pacing_mode: body.response_pacing_mode } : {}),
+    ...(body.telefun_model_id !== undefined ? { telefun_model_id: body.telefun_model_id } : {}),
+    ...(body.telefun_transport !== undefined ? { telefun_transport: body.telefun_transport } : {}),
   };
 }
 
@@ -180,6 +200,10 @@ telefun.patch(
       realistic_mode_enabled: z.boolean().optional(),
       score: z.number().optional(),
       feedback: z.string().optional(),
+      configured_duration: z.number().optional(),
+      response_pacing_mode: z.string().optional(),
+      telefun_model_id: z.string().optional(),
+      telefun_transport: z.string().optional(),
     }),
   ),
   async (c) => {

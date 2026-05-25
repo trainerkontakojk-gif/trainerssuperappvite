@@ -61,6 +61,10 @@ describe("telefun API payload and security validators", () => {
       persona_config: { consumerType: "Marah & Emosional" },
       disruption_config: ["interruption"],
       status: "active",
+      configured_duration: null,
+      response_pacing_mode: null,
+      telefun_model_id: null,
+      telefun_transport: null,
     });
   });
 

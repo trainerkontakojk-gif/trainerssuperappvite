@@ -371,6 +371,9 @@ wss.on("connection", async (ws, req) => {
     try {
       sessionId = await createSession(userId);
       console.log("[Telefun] Session created:", sessionId);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "session_created", sessionId }));
+      }
     } catch (err) {
       console.error("[Telefun] Failed to create session:", err);
     }

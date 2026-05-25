@@ -8,15 +8,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function hasRequiredAspectFields(data: unknown): data is VoiceAspectScore {
-  return (
-    isRecord(data) &&
-    typeof data.score === "number" &&
-    typeof data.verdict === "string" &&
-    typeof data.feedback === "string"
-  );
-}
-
 function validateAspectScore(
   data: unknown,
   defaultVerdict = "Neutral",

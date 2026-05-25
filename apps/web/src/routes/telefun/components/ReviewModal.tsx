@@ -99,6 +99,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         ? (record.voiceDashboardMetrics as VoiceDashboardMetrics)
         : null,
     );
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   const summaryPath =
     isOpen && record ? `/telefun/coaching-summary/${record.id}` : null;
@@ -127,7 +128,10 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       return;
     }
 
-    setActiveTab("details");
+    // Only reset activeTab to details when opening, not on retry Trigger
+    if (retryTrigger === 0) {
+      setActiveTab("details");
+    }
     setAssessment(record.voiceAssessment ?? null);
     setVoiceDashboardMetrics(
       record.voiceDashboardMetrics
@@ -137,7 +141,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     setRecordingError(null);
     setRecordingLoading(false);
 
-    if (record.url) {
+    if (record.url && retryTrigger === 0) {
       setRecordingUrl(record.url);
       return;
     }
@@ -192,7 +196,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, record]);
+  }, [isOpen, record, retryTrigger]);
 
   const mappedAnnotations = useMemo(
     () => (annotationRows || []).map(mapAnnotation),
@@ -433,7 +437,15 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
                       {recordingUrl ? (
                         <div className="space-y-4">
-                          <audio controls className="w-full h-10" src={recordingUrl}>
+                          <audio
+                            controls
+                            className="w-full h-10"
+                            src={recordingUrl}
+                            onError={() => {
+                              console.warn("Audio element failed to load recording. Attempting to refresh signed URL.");
+                              setRetryTrigger((prev) => prev + 1);
+                            }}
+                          >
                             Browser Anda tidak mendukung pemutaran audio.
                           </audio>
                           <div className="flex gap-2">
@@ -451,7 +463,10 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                           <p className="text-xs text-muted-foreground">{recordingError || 'Rekaman tidak tersedia atau telah dihapus.'}</p>
                           {recordingError && (
                             <button
-                              onClick={() => setRecordingError(null)}
+                              onClick={() => {
+                                setRecordingError(null);
+                                setRetryTrigger((prev) => prev + 1);
+                              }}
                               className="mt-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
                             >
                               Coba Lagi
@@ -507,7 +522,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     <ReplayAnnotator
                       sessionId={record.id}
                       annotations={mappedAnnotations}
-                      recommendations={[]}
+                       recommendations={recommendations}
                       isLoading={annotationsLoading}
                       error={annotationsError ? String(annotationsError) : undefined}
                       onRetry={() => {}}
