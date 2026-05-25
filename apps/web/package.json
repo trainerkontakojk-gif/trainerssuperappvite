@@ -10,7 +10,7 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
-    "start": "vite preview --host 0.0.0.0"
+    "start": "serve dist -s -l tcp://0.0.0.0:${PORT:-3005}"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
@@ -28,6 +28,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
+    "serve": "^14.2.6",
     "sonner": "^2.0.7",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.3"
