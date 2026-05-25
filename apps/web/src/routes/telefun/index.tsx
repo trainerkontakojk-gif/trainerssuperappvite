@@ -625,9 +625,9 @@ export default function TelefunLanding() {
               onRecordingReady={handleRecordingReady}
               onSessionCreated={(id) => {
                 setActiveSessionId(id);
-                if (activeSessionConfig) {
-                  activeSessionConfig.sessionId = id;
-                }
+                setActiveSessionConfig((prev) =>
+                  prev ? { ...prev, sessionId: id } : prev,
+                );
               }}
             />
           </motion.div>

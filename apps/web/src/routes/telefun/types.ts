@@ -59,6 +59,7 @@ export type TelefunTimelineEventName =
   | "dead_air_prompt_sent"
   | "interruption_prompt_sent"
   | "stalled_response_detected"
+  | "stalled_response_watchdog"
   | "no_model_response_after_audio_end"
   | "recovering"
   | "disconnect"

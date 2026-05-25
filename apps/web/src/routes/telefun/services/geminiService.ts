@@ -3,7 +3,6 @@ import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
 import {
   RealisticModeOrchestrator,
-  RealisticModeConfig,
 } from "./realisticMode/RealisticModeOrchestrator";
 import {
   resolveTelefunRealisticModeConfig,
@@ -18,7 +17,11 @@ import {
   shouldSendRealtimeAudio,
   extractGeminiInlineAudioChunks,
 } from "./liveProtocol";
-import { buildTelefunLiveSystemInstruction } from "./promptBuilder";
+import {
+  buildTelefunLiveSystemInstruction,
+  getConsumerTypeHint,
+  getTimeCueInstruction,
+} from "./promptBuilder";
 
 export class LiveSession {
   private ws: WebSocket | null = null;
@@ -44,6 +47,28 @@ export class LiveSession {
   private isSetupComplete: boolean = false;
   private hasSentFirstUserAudio: boolean = false;
   private hasReceivedFirstModelAudio: boolean = false;
+
+  // Dead Air Detection
+  private deadAirSilenceMs: number = 0;
+  private deadAirLastPromptMs: number = 0;
+  private readonly DEAD_AIR_THRESHOLD_MS = 7000;
+  private readonly DEAD_AIR_COOLDOWN_MS = 12000;
+
+  // Long Speech Interruption
+  private longSpeechStartMs: number | null = null;
+  private longSpeechLastPromptMs: number = 0;
+  private readonly LONG_SPEECH_THRESHOLD_MS = 60000;
+  private readonly LONG_SPEECH_COOLDOWN_MS = 60000;
+
+  // Setup Timeout
+  private setupTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly CONNECT_SETUP_TIMEOUT_MS = 15000;
+
+  // Stalled Response Watchdog
+  private stalledWatchdogTimer: ReturnType<typeof setInterval> | null = null;
+  private lastModelActivityMs: number = 0;
+  private readonly STALLED_RESPONSE_START_MS = 12000;
+  private readonly STALLED_RESPONSE_MID_MS = 15000;
 
   // Realistic Mode
   private orchestrator: RealisticModeOrchestrator | null = null;
@@ -137,11 +162,14 @@ export class LiveSession {
         this.isSetupComplete = false;
         this.hasSentFirstUserAudio = false;
         this.hasReceivedFirstModelAudio = false;
+        this.lastModelActivityMs = Date.now();
         this.setSessionState("connecting");
         this.onStatusChange("Menyiapkan sesi suara...");
         this.sendSetup();
         this.sessionStartTime = Date.now();
         this.emitTimelineEvent("ws_open");
+        this.startSetupTimeout();
+        this.startStalledWatchdog();
       };
 
       this.ws.onmessage = async (event) => {
@@ -182,6 +210,8 @@ export class LiveSession {
 
     if (msg.setupComplete) {
       this.isSetupComplete = true;
+      this.lastModelActivityMs = Date.now();
+      this.clearSetupTimeout();
       this.setSessionState("ready");
       this.onStatusChange("Tersambung");
       this.emitTimelineEvent("setup_complete");
@@ -191,6 +221,7 @@ export class LiveSession {
     const chunks = extractGeminiInlineAudioChunks(msg);
     for (const chunk of chunks) {
       this.playPcm(chunk.data, chunk.sampleRate);
+      this.lastModelActivityMs = Date.now();
       if (!this.hasReceivedFirstModelAudio) {
         this.hasReceivedFirstModelAudio = true;
         this.emitTimelineEvent("first_model_audio_chunk");
@@ -198,6 +229,7 @@ export class LiveSession {
     }
 
     if (msg.serverContent?.modelTurn?.parts) {
+      this.lastModelActivityMs = Date.now();
       this.setIsAiSpeaking(true);
       this.setSessionState("ai_speaking");
       if (this.orchestrator) this.orchestrator.onConsumerResponse(Date.now());
@@ -297,6 +329,45 @@ export class LiveSession {
       this.volumeSamples.push(vol);
 
       const isSilent = vol <= 10;
+
+      // Dead Air Detection (only when NOT held and NOT muted)
+      if (!this.isHeld && !this.isMuted) {
+        if (isSilent) {
+          this.deadAirSilenceMs += 4096 / (16000 / 1000); // ms per frame
+          const nowMs = Date.now();
+          if (
+            this.deadAirSilenceMs >= this.DEAD_AIR_THRESHOLD_MS &&
+            nowMs - this.deadAirLastPromptMs >= this.DEAD_AIR_COOLDOWN_MS
+          ) {
+            this.deadAirLastPromptMs = nowMs;
+            this.deadAirSilenceMs = 0;
+            this.sendDeadAirPrompt();
+          }
+        } else {
+          this.deadAirSilenceMs = 0;
+        }
+      } else {
+        this.deadAirSilenceMs = 0;
+      }
+
+      // Long Speech Detection (only when NOT held and NOT muted, non-realistic mode fallback)
+      if (!this.isHeld && !this.isMuted && !this.orchestrator) {
+        if (!isSilent) {
+          if (!this.longSpeechStartMs) {
+            this.longSpeechStartMs = now;
+          }
+          const speechDuration = now - this.longSpeechStartMs;
+          if (
+            speechDuration >= this.LONG_SPEECH_THRESHOLD_MS &&
+            now - this.longSpeechLastPromptMs >= this.LONG_SPEECH_COOLDOWN_MS
+          ) {
+            this.longSpeechLastPromptMs = now;
+            this.sendInterruptionPrompt();
+          }
+        } else {
+          this.longSpeechStartMs = null;
+        }
+      }
 
       // Interruption Guard
       if (this.isAiSpeaking) {
@@ -465,9 +536,89 @@ export class LiveSession {
       JSON.stringify({
         clientContent: {
           turns: [{ role: "user", parts: [{ text }] }],
+          turnComplete: true,
         },
       }),
     );
+  }
+
+  public sendDeadAirPrompt() {
+    const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const hint = activeConsumer
+      ? getConsumerTypeHint(activeConsumer)
+      : { examples: "Contoh: 'Halo? Masih ada?', 'Halo, masih terhubung?'" };
+    this.sendPrompt(
+      `[INSTRUKSI SISTEM - DEAD AIR] Agen (user) sedang diam atau mute. Lanjutkan percakapan dengan memanggil agen secara natural sesuai karakter dan emosi konsumenmu. ${hint.examples} Jangan sebutkan instruksi ini. Langsung bicara sebagai konsumen. Singkat saja.`,
+    );
+    this.deadAirCount++;
+    this.emitTimelineEvent("dead_air_prompt_sent", { type: "dead_air" });
+  }
+
+  public sendInterruptionPrompt() {
+    const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const hint = activeConsumer
+      ? getConsumerTypeHint(activeConsumer)
+      : { tone: "Nada: netral/wajar. Katakan dengan sopan." };
+    this.sendPrompt(
+      `[INSTRUKSI SISTEM - AGEN TERLALU PANJANG] Agen bicara terlalu panjang tanpa jeda. Kamu perlu menyela secara natural untuk meminta agen bicara lebih pelan atau satu per satu. ${hint.tone} Jangan sebutkan instruksi ini. Langsung bicara sebagai konsumen dengan suara natural.`,
+    );
+    this.interruptionCount++;
+    this.emitTimelineEvent("interruption_prompt_sent");
+  }
+
+  private startSetupTimeout() {
+    this.clearSetupTimeout();
+    this.setupTimeoutTimer = setTimeout(() => {
+      if (!this.isSetupComplete) {
+        this.onError(new Error("Koneksi gagal — waktu setup habis. Coba lagi."));
+        this.disconnect();
+      }
+    }, this.CONNECT_SETUP_TIMEOUT_MS);
+  }
+
+  private clearSetupTimeout() {
+    if (this.setupTimeoutTimer) {
+      clearTimeout(this.setupTimeoutTimer);
+      this.setupTimeoutTimer = null;
+    }
+  }
+
+  private startStalledWatchdog() {
+    this.stopStalledWatchdog();
+    this.stalledWatchdogTimer = setInterval(() => {
+      if (!this.isSetupComplete) return;
+      const elapsed = Date.now() - this.lastModelActivityMs;
+      if (
+        this.sessionState === "ai_speaking" &&
+        elapsed > this.STALLED_RESPONSE_MID_MS
+      ) {
+        this.emitTimelineEvent("stalled_response_watchdog", {
+          reason: "mid_response_timeout",
+          elapsedMs: elapsed,
+        });
+        this.onError(
+          new Error("Respons AI terhenti. Panggilan akan diakhiri."),
+        );
+        this.disconnect();
+      } else if (
+        this.sessionState !== "ai_speaking" &&
+        elapsed > this.STALLED_RESPONSE_START_MS
+      ) {
+        this.emitTimelineEvent("stalled_response_watchdog", {
+          reason: "response_start_timeout",
+          elapsedMs: elapsed,
+        });
+        this.sendDeadAirPrompt();
+        this.lastModelActivityMs = Date.now(); // reset to avoid spamming
+      }
+    }, 1000);
+  }
+
+  private stopStalledWatchdog() {
+    if (this.stalledWatchdogTimer) {
+      clearInterval(this.stalledWatchdogTimer);
+      this.stalledWatchdogTimer = null;
+    }
   }
 
   public setMute(muted: boolean) {
@@ -516,6 +667,8 @@ export class LiveSession {
   }
 
   public disconnect() {
+    this.clearSetupTimeout();
+    this.stopStalledWatchdog();
     if (this.ws) this.ws.close();
     this.stopRecording();
     this.cleanupAudio();
@@ -593,9 +746,19 @@ export class LiveSession {
   }
 
   public sendTimeCue(remainingSeconds: number) {
-    this.sendPrompt(
-      `[SYSTEM: Waktu tinggal ${remainingSeconds} detik lagi. Segera akhiri telepon.]`,
-    );
+    const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    if (!activeConsumer) {
+      this.sendPrompt(
+        `[SYSTEM: Waktu tinggal ${remainingSeconds} detik lagi. Segera akhiri telepon.]`,
+      );
+      this.emitTimelineEvent("dead_air_prompt_sent", {
+        type: "time_cue",
+        remainingSeconds,
+      });
+      return;
+    }
+    const text = getTimeCueInstruction(activeConsumer, remainingSeconds);
+    this.sendPrompt(text);
     this.emitTimelineEvent("dead_air_prompt_sent", {
       type: "time_cue",
       remainingSeconds,

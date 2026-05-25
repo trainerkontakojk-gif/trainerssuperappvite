@@ -20,6 +20,13 @@ export type ReplayAnnotationCategory =
   | "critical_moment"
   | "technique_used";
 
+export type AnnotationMoment =
+  | "missed_empathy"
+  | "good_de_escalation"
+  | "long_pause"
+  | "interruption"
+  | "technique_usage";
+
 export interface ReplayAnnotationItem {
   id: string;
   timestampMs: number;
@@ -46,6 +53,8 @@ export interface ReplayAnnotatorProps {
     annotation: Omit<ReplayAnnotationItem, "id" | "isManual" | "createdBy">,
   ) => Promise<void>;
   onDeleteAnnotation?: (annotationId: string) => Promise<void>;
+  onGenerateAi?: () => void;
+  isGenerating?: boolean;
   sessionDurationMs?: number;
 }
 
@@ -81,6 +90,16 @@ const CATEGORY_STYLES: Record<
     border: "border-blue-200 dark:border-blue-800",
   },
 };
+
+const MOMENT_LABELS: Record<AnnotationMoment, string> = {
+  missed_empathy: "Empati Terlewat",
+  good_de_escalation: "De-eskalasi Baik",
+  long_pause: "Jeda Panjang",
+  interruption: "Interupsi",
+  technique_usage: "Penggunaan Teknik",
+};
+
+const MAX_CHAR_COUNT = 500;
 
 function formatTimestamp(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -213,13 +232,19 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
   onRetry,
   onAddAnnotation,
   onDeleteAnnotation,
+  onGenerateAi,
+  isGenerating,
   sessionDurationMs,
 }) => {
   const [text, setText] = useState("");
   const [category, setCategory] =
     useState<ReplayAnnotationCategory>("strength");
+  const [moment, setMoment] = useState<AnnotationMoment>("missed_empathy");
   const [timestampMs, setTimestampMs] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const charCount = text.length;
+  const charLimitReached = charCount > MAX_CHAR_COUNT;
 
   const sortedAnnotations = useMemo(
     () => [...annotations].sort((a, b) => a.timestampMs - b.timestampMs),
@@ -232,16 +257,17 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
       : 5 * 60 * 1000;
 
   const handleSubmit = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || charLimitReached) return;
     setIsSubmitting(true);
     try {
       await onAddAnnotation({
         timestampMs,
         category,
-        moment: formatTimestamp(timestampMs),
+        moment,
         text: text.trim(),
       });
       setText("");
+      setMoment("missed_empathy");
     } catch (_error) {
       // Parent component already surfaces errors; keep the form open.
     } finally {
@@ -288,9 +314,26 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
               {sortedAnnotations.length} anotasi tersimpan
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-white/35">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>{formatTimestamp(timestampMs)}</span>
+          <div className="flex items-center gap-3">
+            {onGenerateAi && (
+              <button
+                type="button"
+                onClick={onGenerateAi}
+                disabled={isGenerating}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {isGenerating ? "Menganalisis..." : "Analisis AI"}
+              </button>
+            )}
+            <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-white/35">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{formatTimestamp(timestampMs)}</span>
+            </div>
           </div>
         </div>
 
@@ -382,17 +425,57 @@ export const ReplayAnnotator: React.FC<ReplayAnnotatorProps> = ({
             ))}
           </div>
 
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Tulis catatan singkat untuk momen ini..."
-            className="h-24 w-full resize-none rounded-xl border border-slate-950/10 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
-          />
+          <div>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-white/45">
+              Tipe Momen
+            </span>
+            <select
+              value={moment}
+              onChange={(e) => setMoment(e.target.value as AnnotationMoment)}
+              className="w-full rounded-xl border border-slate-950/10 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
+            >
+              {(
+                Object.entries(MOMENT_LABELS) as [
+                  AnnotationMoment,
+                  string,
+                ][]
+              ).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <textarea
+              value={text.slice(0, MAX_CHAR_COUNT)}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Tulis catatan singkat untuk momen ini..."
+              className="h-24 w-full resize-none rounded-xl border border-slate-950/10 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 dark:border-white/10 dark:bg-slate-950/20 dark:text-white"
+            />
+            <div className="mt-1 flex items-center justify-between text-[10px]">
+              <span
+                className={
+                  charCount > MAX_CHAR_COUNT * 0.9
+                    ? "font-bold text-red-500"
+                    : "text-slate-400 dark:text-white/35"
+                }
+              >
+                {charCount}/{MAX_CHAR_COUNT} karakter
+              </span>
+              {charLimitReached && (
+                <span className="font-bold text-red-500">
+                  Maksimal {MAX_CHAR_COUNT} karakter
+                </span>
+              )}
+            </div>
+          </div>
 
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || !text.trim()}
+            disabled={isSubmitting || !text.trim() || charLimitReached}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? (
