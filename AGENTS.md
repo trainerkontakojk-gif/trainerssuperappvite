@@ -175,7 +175,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 36. Dashboard Post-Login Legacy Parity — Auth-aware data fetching (Bearer token on all protected API calls), recent activity parity (5 items), analytics lazy loading (Recharts split from main bundle with Suspense skeleton) (DONE)
 37. Database Legacy Parity Audit — Read-only audit terhadap hosted target (ruosnjmtywcrghjgqugz). 13 tabel hilang, 29 fungsi hilang, 10+ tabel data kosong. App smoke tests lulus (258/258) tapi data parity tidak tercapai dari sisi live database. (DONE)
 38. Database Legacy Parity Remediation — May qa_temuan incremental sync (144 rows, 0 conflicts), QA Parameter recovery (rule-version parity + baseline-aware UI empty state), dashboard summary function fix (Vite schema compatible), MV contract restored (29 rows, concurrent refresh OK), summary backfill (29 period + 320 agent rows). Scripts + migrations + tests + docs. (DONE)
-39. Railway Deployment OOM Fix — Replaced `vite` dev server with `vite preview` in production (Railway). Exit 137/OOM caused by Vite dependency pre-bundling in dev mode. Added `railway.toml` for explicit build/start commands, `--host 0.0.0.0` flag, `PORT` env support in vite.config.ts, and turbo `start` task with `dependsOn: ^build`. (DONE)
+39. Railway Deployment OOM Fix — Replaced `vite` dev server with `vite preview` in production (Railway). Exit 137/OOM caused by Vite dependency pre-bundling in dev mode. Added `railway.toml` for explicit build/start commands, `--host 0.0.0.0` flag, `PORT` env support in vite.config.ts, `turbo` `start` task with `dependsOn: ^build`, and `.node-version` pinning Node.js 22 (Vite 8.0.13 requires >=22, Nixpacks defaulted to 18). (DONE)
 
 ## Relevant Files
 
@@ -199,6 +199,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
 - `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-dashboard-parity, sidak-agent-detail-temuan-parity, sidak-ranking-fatal-parity, sidak-agents-load-more-copy, sidak-input-agents-shape, useAgentDetail, access-groups-parity, **dashboard-post-login-parity**, **monitoring-unauthorized-parity**)
 - `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
+- `railway.toml` — Railway production deployment config (build/start commands, healthcheck)
+- `.node-version` — Node.js version pinning for Railway/Nixpacks (22, required by Vite 8)
 - `apps/web/vite.config.ts` — Vite config (PORT env, API proxy, Tw v4, react plugin)
 - `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
 - `apps/api/vitest.config.ts` — Vitest config for API service tests

@@ -27,10 +27,12 @@ Replaced `vite` (dev server) with `vite preview` (production static file server)
 | `package.json` | Added `"start": "turbo run start"` root script |
 | `turbo.json` | Added `"start"` task with `dependsOn: ["^build"]`, `cache: false`, `persistent: true` |
 | `railway.toml` | **New** — explicit build (`pnpm build`) + start (`pnpm start`) commands, healthcheck at `/` |
+| `.node-version` | **New** — pins Node.js to v22 (Vite 8.0.13 requires >=22, Nixpacks defaulted to 18)
 
 ## Root Cause
 
-Vite dev server performs dependency pre-bundling/optimization on startup. With 10+ heavy libraries, this consumes 500+ MB of memory, exceeding Railway's container limits.
+1. **OOM Kill**: Vite dev server performs dependency pre-bundling/optimization on startup. With 10+ heavy libraries, this consumes 500+ MB of memory, exceeding Railway's container limits.
+2. **Node.js Version Mismatch**: No `.node-version` was pinned in the repo. Nixpacks defaulted to Node.js 18.20.5, which is incompatible with Vite 8.0.13 (requires >=22). This caused a `ReferenceError: CustomEvent is not defined` crash on startup.
 
 `vite preview` serves pre-built static assets without any optimization step, reducing memory usage to <100 MB.
 
