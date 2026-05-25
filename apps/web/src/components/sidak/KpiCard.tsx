@@ -103,7 +103,7 @@ export default function KpiCard({ label, value, icon: Icon, color, delta, invert
       {sparklineData && sparklineData.length > 0 && (
         <div className="relative z-10 mt-auto pt-4">
           <div className="h-14 w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={0}>
               <AreaChart data={sparklineData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient

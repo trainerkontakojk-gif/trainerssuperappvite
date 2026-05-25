@@ -18,7 +18,7 @@ export default function ParetoChart({ data }: Props) {
   return (
     <div className="h-96 w-full flex flex-col">
       <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minHeight={0}>
           <ComposedChart data={data} margin={{ top: 20, right: 10, bottom: 20, left: -10 }}>
             <CartesianGrid strokeDasharray="5 5" vertical={false} stroke="currentColor" opacity={0.05} />
             <XAxis

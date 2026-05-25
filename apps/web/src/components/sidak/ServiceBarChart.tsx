@@ -36,7 +36,7 @@ export default function ServiceBarChart({ data }: Props) {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minHeight={0}>
           <BarChart data={sorted} layout="vertical" margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
             <CartesianGrid strokeDasharray="5 5" horizontal={true} vertical={false} stroke="currentColor" opacity={0.05} />
             <XAxis type="number" hide />

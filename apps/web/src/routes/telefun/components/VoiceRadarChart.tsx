@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Radar,
   RadarChart,
@@ -16,6 +16,13 @@ interface VoiceRadarChartProps {
 export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = ({
   assessment,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
   const data = [
     {
       subject: "Speaking Rate",
@@ -44,9 +51,13 @@ export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = ({
     },
   ];
 
+  if (!mounted) {
+    return <div className="h-[300px] w-full min-w-0 min-h-0" />;
+  }
+
   return (
-    <div className="h-[300px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-[300px] w-full min-w-0 min-h-0">
+      <ResponsiveContainer width="100%" height="100%" minHeight={0}>
         <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
           <PolarGrid stroke="#94a3b8" strokeOpacity={0.2} />
           <PolarAngleAxis
@@ -71,3 +82,4 @@ export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = ({
     </div>
   );
 };
+
