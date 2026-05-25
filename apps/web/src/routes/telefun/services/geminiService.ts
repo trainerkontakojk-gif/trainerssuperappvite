@@ -10,6 +10,13 @@ import {
   updateInterruptionGuard,
   InterruptionGuardState,
 } from "./guards";
+import {
+  normalizeTelefunWebSocketUrl,
+  mapTelefunCloseEvent,
+  buildTelefunLiveSetupMessage,
+  buildRealtimeAudioMessage,
+} from "./liveProtocol";
+import { buildTelefunLiveSystemInstruction } from "./promptBuilder";
 
 export class LiveSession {
   private ws: WebSocket | null = null;
@@ -101,10 +108,23 @@ export class LiveSession {
       // 5. Connect WebSocket
       const token =
         localStorage.getItem("supabase-auth-token") ||
-        localStorage.getItem("auth_token");
-      const wsUrl = `${import.meta.env.VITE_TELEFUN_WS_URL || "ws://localhost:3002"}/ws?token=${token}`;
+        localStorage.getItem("auth_token") ||
+        localStorage.getItem("supabase-token");
+      if (!token) {
+        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
+      }
+      if (this.config.telefunTransport === "openai-audio") {
+        throw new Error("OpenAI Audio transport belum diimplementasi. Gunakan Gemini Live.");
+      }
+      const wsBase = normalizeTelefunWebSocketUrl(import.meta.env.VITE_TELEFUN_WS_URL);
+      const wsUrl = new URL(wsBase);
+      wsUrl.pathname = wsUrl.pathname.endsWith("/ws") ? wsUrl.pathname : "/ws";
+      wsUrl.searchParams.set("token", token);
+      if (this.config.sessionId) {
+        wsUrl.searchParams.set("sessionId", this.config.sessionId);
+      }
 
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket(wsUrl.toString());
       this.ws.binaryType = "arraybuffer";
 
       this.ws.onopen = () => {
@@ -132,11 +152,13 @@ export class LiveSession {
         this.onError(new Error("WebSocket Error"));
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
+        const mapped = mapTelefunCloseEvent(event);
         this.setSessionState("ended");
         this.onStatusChange("Terputus");
+        this.onError(new Error(mapped.message));
         this.stopRecording();
-        this.emitTimelineEvent("ws_close");
+        this.emitTimelineEvent("ws_close", { code: event.code, reason: event.reason });
       };
     } catch (err) {
       this.onError(err as Error);
@@ -330,7 +352,7 @@ export class LiveSession {
       for (let i = 0; i < inputData.length; i++) {
         pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
       }
-      this.ws.send(pcm16.buffer);
+      this.ws.send(JSON.stringify(buildRealtimeAudioMessage(pcm16.buffer)));
     };
 
     this.processor.connect(this.audioContext.destination);
@@ -374,22 +396,28 @@ export class LiveSession {
   private sendSetup() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
-    const setup = {
-      setup: {
-        model: `models/${this.config.selectedModel}`,
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: this.config.voiceName },
-            },
-          },
-        },
-        systemInstruction: {
-          parts: [{ text: this.config.systemInstruction }],
-        },
-      },
+    const resolvedIdentity = this.config.resolvedIdentity || {
+      name: this.config.consumerName,
+      gender: this.config.consumerGender === "male" ? "male" : "female" as "male" | "female",
+      phone: this.config.identitySettings?.phoneNumber || "08123456789",
+      city: this.config.identitySettings?.city || "Jakarta",
+      voiceName: this.config.voiceName,
+      signatureName: this.config.identitySettings?.signatureName || "",
     };
+
+    const systemInstructionText = buildTelefunLiveSystemInstruction({
+      identity: resolvedIdentity,
+      scenario: this.config.activeScenario ?? this.config.scenarios[0],
+      consumerType: this.config.activeConsumerType ?? this.config.consumerTypes[0],
+      responsePacingMode: this.config.responsePacingMode || "realistic",
+      maxCallDuration: this.config.maxCallDuration || 0,
+    });
+
+    const setup = buildTelefunLiveSetupMessage({
+      telefunModelId: this.config.telefunModelId || "gemini-3.1-flash-live-preview",
+      voiceName: this.config.voiceName,
+      systemInstruction: systemInstructionText,
+    });
 
     this.ws.send(JSON.stringify(setup));
     this.emitTimelineEvent("setup_sent");

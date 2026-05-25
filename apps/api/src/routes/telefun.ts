@@ -46,6 +46,33 @@ telefun.get("/sessions", async (c) => {
   }
 });
 
+export function buildTelefunSessionInsertPayload(params: {
+  userId: string;
+  body: {
+    scenario_title: string;
+    consumer_name: string;
+    consumer_gender?: string;
+    consumer_phone?: string;
+    consumer_city?: string;
+    realistic_mode_enabled?: boolean;
+    persona_config?: any;
+    disruption_config?: any;
+  };
+}) {
+  return {
+    user_id: params.userId,
+    scenario_title: params.body.scenario_title,
+    consumer_name: params.body.consumer_name,
+    consumer_gender: params.body.consumer_gender || "female",
+    consumer_phone: params.body.consumer_phone || null,
+    consumer_city: params.body.consumer_city || null,
+    realistic_mode_enabled: params.body.realistic_mode_enabled || false,
+    persona_config: params.body.persona_config,
+    disruption_config: params.body.disruption_config,
+    status: "active",
+  };
+}
+
 telefun.post(
   "/sessions",
   zValidator(
@@ -67,20 +94,13 @@ telefun.post(
     const body = c.req.valid("json");
 
     try {
+      const insertPayload = buildTelefunSessionInsertPayload({
+        userId: user.id,
+        body,
+      });
       const { data, error } = await adminClient
         .from("telefun_history")
-        .insert({
-          user_id: user.id,
-          scenario_title: body.scenario_title,
-          consumer_name: body.consumer_name,
-          consumer_gender: body.consumer_gender || "female",
-          consumer_phone: body.consumer_phone || null,
-          consumer_city: body.consumer_city || null,
-          realistic_mode_enabled: body.realistic_mode_enabled,
-          persona_config: body.persona_config,
-          disruption_config: body.disruption_config,
-          status: "active",
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -150,6 +170,21 @@ telefun.patch(
   },
 );
 
+export function isTelefunRecordingPathOwnedBySession(params: {
+  path: string;
+  userId: string;
+  sessionId: string;
+  type: "full_call" | "agent_only";
+}): boolean {
+  const parts = params.path.split("/");
+  return (
+    parts.length === 3 &&
+    parts[0] === params.userId &&
+    parts[1] === params.sessionId &&
+    parts[2] === `${params.type}.webm`
+  );
+}
+
 telefun.post(
   "/finalize-recording",
   zValidator(
@@ -167,7 +202,12 @@ telefun.post(
       c.req.valid("json");
 
     try {
-      if (recordingPath && !recordingPath.includes(sessionId)) {
+      if (recordingPath && !isTelefunRecordingPathOwnedBySession({
+        path: recordingPath,
+        userId: user.id,
+        sessionId,
+        type: "full_call"
+      })) {
         return c.json(
           {
             success: false,
@@ -176,7 +216,12 @@ telefun.post(
           400,
         );
       }
-      if (agentRecordingPath && !agentRecordingPath.includes(sessionId)) {
+      if (agentRecordingPath && !isTelefunRecordingPathOwnedBySession({
+        path: agentRecordingPath,
+        userId: user.id,
+        sessionId,
+        type: "agent_only"
+      })) {
         return c.json(
           {
             success: false,
@@ -442,6 +487,22 @@ telefun.get("/settings", async (c) => {
   }
 });
 
+export function buildTelefunSettingsUpsertPayload(params: {
+  userId: string;
+  existingSettings: any;
+  telefunSettings: any;
+  now: string;
+}) {
+  return {
+    user_id: params.userId,
+    settings: {
+      ...(params.existingSettings || {}),
+      telefun: params.telefunSettings,
+    },
+    updated_at: params.now,
+  };
+}
+
 telefun.put(
   "/settings",
   zValidator(
@@ -500,21 +561,16 @@ telefun.put(
         .eq("user_id", user.id)
         .maybeSingle();
 
-      const updatedSettings = {
-        ...(existing?.settings || {}),
-        telefun: body,
-      };
+      const upsertPayload = buildTelefunSettingsUpsertPayload({
+        userId: user.id,
+        existingSettings: existing?.settings,
+        telefunSettings: body,
+        now: new Date().toISOString(),
+      });
 
       const { error } = await adminClient
         .from("user_settings")
-        .upsert(
-          {
-            user_id: user.id,
-            settings: updatedSettings,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        );
+        .upsert(upsertPayload, { onConflict: "user_id" });
 
       if (error) throw error;
       return c.json({

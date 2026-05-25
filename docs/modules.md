@@ -70,7 +70,11 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
   - **Realistic Mode**: Mode realistik dengan hold consent, rude hold penalty, dan WPM analysis.
   - **Expanded Voices**: Opsi suara Gemini Live dinamis dengan gender consistency guards.
   - **Maintenance Warning Gate**: Entry to Telefun dari sidebar, dashboard card, atau URL direct `/telefun` dilindungi oleh modal warning gate in-memory runtime. User dengan role trainer/admin melihat copy "Modul Dalam Pengembangan" dan dapat melanjutkan ke Telefun atau berpindah ke App Lite. User dengan role lain melihat copy "Akses Dibatasi" dan hanya bisa kembali ke dashboard. Status akses di-reset otomatis saat meninggalkan modul Telefun.
-- **Catatan Teknis**: Sesi live default memakai model transport `gemini-3.1-flash-live-preview`. Telefun proxy server di `apps/telefun/` menangani WebSocket connection ke Gemini Live API.
+  - **Gemini Live JSON Protocol**: Menggunakan format JSON terstruktur untuk setup dan pengiriman chunk audio base64 (MIME `audio/pcm;rate=16000`), menggantikan transfer data binary mentah yang rentan force close.
+  - **WebSocket Close-Code Mapping**: Menampilkan pesan error terperinci untuk error status koneksi (seperti token login kadaluarsa `4001`, origin ditolak `4003`, Gemini API error `1011`, atau network terputus `1006`).
+  - **Auto Hangup & Time Cues**: Durasi panggilan dibatasi sesuai `maxCallDuration` dengan reminder audio/text cue 30 detik & 20 detik sebelum menutup koneksi secara otomatis.
+  - **Recording Path RLS Security**: Mengunggah file rekaman ke storage Supabase memakai struktur direktori terproteksi RLS `<user_id>/<session_id>/(full_call|agent_only).webm` dan divalidasi ketat oleh API backend.
+- **Catatan Teknis**: Sesi live default memakai model transport `gemini-3.1-flash-live-preview` (menggunakan parameter `telefunModelId`). Telefun proxy server di `apps/telefun/` memvalidasi origin/JWT, memverifikasi kepemilikan session ID, dan meneruskan JSON secara aman ke Gemini Live API. Sesi WebSocket melekat langsung ke session row yang dibuat API frontend untuk mencegah data duplikat.
 
 ## 5. KTP / Profiler (Kotak Tool Profil)
 

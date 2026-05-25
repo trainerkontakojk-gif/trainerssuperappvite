@@ -9,9 +9,10 @@ import {
   flushLiveUsage,
   type LiveUsageSnapshot,
 } from "./usage.js";
-import { createSession, updateSession } from "./db.js";
+import { createSession, updateSession, getOwnedSessionId } from "./db.js";
 import { SilenceDetector, UtteranceBuffer } from "./silence.js";
 import { TurnManager, TurnState } from "./turn-taking.js";
+import { isGeminiForwardableMessage } from "./server-protocol.js";
 
 process.on("uncaughtException", (err) =>
   console.error("[Telefun] Uncaught:", err),
@@ -214,53 +215,48 @@ wss.on("connection", async (ws, req) => {
     }
   });
 
-  // Utterance buffer flush: send batched audio to Gemini
-  utteranceBuffer.onFlush((batched) => {
-    if (turnManager.canSendToGemini()) {
-      turnManager.sendToGemini();
-      sendToGemini(batched);
-    }
-  });
-
-  // Message handler: use turn buffer and silence detection
+  // Message handler: validate and forward structured JSON to Gemini Live
   ws.on("message", (data) => {
-    const raw = data.toString();
     silence.ping();
+    if (typeof data !== "string" && !Buffer.isBuffer(data)) {
+      console.warn("[Telefun] Unsupported binary message type");
+      return;
+    }
 
-    // Detect if this is an audio chunk (binary or structured JSON)
+    const raw = data.toString();
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(raw);
-      if (parsed.setup?.model) {
-        activeModelId = parsed.setup.model.replace(/^models\//, "");
-      }
-      // Non-audio messages (setup, clientContent JSON) go directly
-      if (parsed.clientContent || parsed.setup || parsed.realtimeInput) {
-        if (turnManager.canSendToGemini() || parsed.setup) {
-          turnManager.startUserUtterance();
-          sendToGemini(raw);
-        }
-        // Extract user text for transcript
-        if (parsed.clientContent?.turns) {
-          for (const turn of parsed.clientContent.turns) {
-            for (const part of turn.parts || []) {
-              if (part.text) {
-                transcriptMessages.push({
-                  role: "user",
-                  text: part.text,
-                  timestamp: Date.now(),
-                });
-              }
-            }
+      parsed = JSON.parse(raw);
+    } catch {
+      console.warn("[Telefun] Dropping non-JSON client message");
+      return;
+    }
+
+    if (!isGeminiForwardableMessage(parsed)) {
+      console.warn("[Telefun] Dropping unsupported client JSON message");
+      return;
+    }
+
+    if ((parsed as any).setup?.model) {
+      activeModelId = (parsed as any).setup.model.replace(/^models\//, "");
+    }
+
+    // Extract user text for transcript
+    if ((parsed as any).clientContent?.turns) {
+      for (const turn of (parsed as any).clientContent.turns) {
+        for (const part of turn.parts || []) {
+          if (part.text) {
+            transcriptMessages.push({
+              role: "user",
+              text: part.text,
+              timestamp: Date.now(),
+            });
           }
         }
-        return;
       }
-    } catch {
-      /* non-JSON - likely audio binary */
     }
 
-    // Audio binary: buffer short utterances
-    utteranceBuffer.push(raw);
+    sendToGemini(JSON.stringify(parsed));
   });
 
   ws.on("close", async () => {
@@ -324,12 +320,29 @@ wss.on("connection", async (ws, req) => {
   authed = true;
   console.log("[Telefun] User connected:", authResult.user?.email);
 
-  // Create session record
-  try {
-    sessionId = await createSession(userId);
-    console.log("[Telefun] Session created:", sessionId);
-  } catch (err) {
-    console.error("[Telefun] Failed to create session:", err);
+  // Create or attach session record
+  const requestedSessionId = url.searchParams.get("sessionId");
+  if (requestedSessionId) {
+    try {
+      const owned = await getOwnedSessionId(requestedSessionId, userId);
+      if (!owned) {
+        ws.close(4001, "Invalid Session");
+        return;
+      }
+      sessionId = owned;
+      console.log("[Telefun] Session attached:", sessionId);
+    } catch (err) {
+      console.error("[Telefun] Failed to attach session:", err);
+      ws.close(4001, "Invalid Session Check");
+      return;
+    }
+  } else {
+    try {
+      sessionId = await createSession(userId);
+      console.log("[Telefun] Session created:", sessionId);
+    } catch (err) {
+      console.error("[Telefun] Failed to create session:", err);
+    }
   }
 
   // Start silence detection after auth

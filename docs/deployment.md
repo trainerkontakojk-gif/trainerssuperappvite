@@ -111,6 +111,27 @@ node scripts/deployment/railway-web-healthcheck-smoke.mjs
 
 Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`.
 
+### Telefun Production Smoke Test
+
+```bash
+WEB_URL=https://<web-domain>.up.railway.app API_URL=https://<api-domain>.up.railway.app/api/v1 TELEFUN_WS_URL=wss://<telefun-domain>.up.railway.app node scripts/deployment/telefun-railway-smoke.mjs
+```
+
+Ekspektasi: `web, api, and telefun health return HTTP 200` and `All health checks passed!`.
+
+### Telefun Production WebSocket Manual Smoke
+
+1. Web service env before build:
+   - `VITE_TELEFUN_WS_URL=wss://<telefun-service>.up.railway.app`
+   - `VITE_API_URL=https://<api-service>.up.railway.app/api/v1`
+2. Telefun service env:
+   - `ALLOWED_ORIGINS=https://<web-service>.up.railway.app`
+   - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`
+3. Redeploy Web after changing any `VITE_*` value.
+4. Login, open `/telefun`, start call, allow mic, speak one sentence, wait for AI response, end call.
+5. Verify no close code `4001` (Unauthorized/Token invalid), `4003` (Forbidden Origin), `1006` (Connection drop), or `1011` (Gemini API error) in browser UI.
+6. Verify session appears in history and review opens.
+
 ## Development (Local)
 
 ### Root `.env.local`

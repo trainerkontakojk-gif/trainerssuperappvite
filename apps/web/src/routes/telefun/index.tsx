@@ -17,6 +17,7 @@ import { notify } from "../../lib/toast";
 import { supabase } from "../../lib/supabase";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
+import { buildTelefunRecordingPath } from "./recordingPath";
 
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
@@ -228,11 +229,14 @@ export default function TelefunLanding() {
 
     const sessionConfig: TelefunAppSettings = {
       ...settings,
+      activeScenario: randomScenario,
+      activeConsumerType: consumerType,
       scenarioTitle: randomScenario.title,
       systemInstruction: randomScenario.instruction,
       consumerName: identity.name,
       consumerGender: identity.gender,
       voiceName,
+      resolvedIdentity: identity,
     };
 
     const runId = ++sessionRunIdRef.current;
@@ -272,6 +276,7 @@ export default function TelefunLanding() {
       });
       if (res?.id) {
         setActiveSessionId(res.id);
+        sessionConfig.sessionId = res.id;
       }
     } catch (e) {
       console.warn("Failed to create session upfront", e);
@@ -321,11 +326,17 @@ export default function TelefunLanding() {
     optimisticRecordIdRef.current = optimisticId;
 
     try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) {
+        throw new Error("Sesi login tidak ditemukan untuk upload rekaman.");
+      }
+
       let recordingPath: string | undefined;
       let agentRecordingPath: string | undefined;
 
       if (fullBlob) {
-        const path = `${sessionId}/full_call.webm`;
+        const path = buildTelefunRecordingPath({ userId, sessionId, type: "full_call" });
         const { data } = await supabase.storage
           .from("telefun-recordings")
           .upload(path, fullBlob, {
@@ -336,7 +347,7 @@ export default function TelefunLanding() {
       }
 
       if (agentBlob) {
-        const path = `${sessionId}/agent_only.webm`;
+        const path = buildTelefunRecordingPath({ userId, sessionId, type: "agent_only" });
         const { data } = await supabase.storage
           .from("telefun-recordings")
           .upload(path, agentBlob, {

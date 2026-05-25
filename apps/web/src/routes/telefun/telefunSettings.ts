@@ -71,7 +71,14 @@ export type TelefunAppSettings = {
   identitySettings: TelefunIdentitySettings;
   telefunModelId: string;
   telefunTransport?: "gemini-live" | "openai-audio";
+  activeScenario?: TelefunScenario;
+  activeConsumerType?: TelefunConsumerType;
+  sessionId?: string;
+  resolvedIdentity?: TelefunIdentity;
 };
+
+
+
 
 export const VOICE_MODELS = [
   {

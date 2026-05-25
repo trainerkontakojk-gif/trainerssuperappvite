@@ -40,3 +40,14 @@ export async function updateSession(
     console.error("[Telefun DB] Failed to update session:", error);
   }
 }
+
+export async function getOwnedSessionId(sessionId: string, userId: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from("telefun_history")
+    .select("id")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(`Gagal memeriksa session: ${error.message}`);
+  return data?.id ?? null;
+}

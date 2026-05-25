@@ -10,6 +10,7 @@ import {
 import type { SessionMetrics } from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
 import { LiveSession } from "../services/geminiService";
+import { getTelefunTimeCueThreshold } from "../services/timingGuards";
 
 interface PhoneInterfaceProps {
   config: TelefunAppSettings;
@@ -54,6 +55,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const mountedRef = useRef(true);
   const durationRef = useRef(0);
   const timerStartedRef = useRef(false);
+
+  const timeCue30Sent = useRef(false);
+  const timeCue20Sent = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -139,6 +143,32 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   useEffect(() => {
     sessionRef.current?.setHold(isHeld);
   }, [isHeld]);
+
+  useEffect(() => {
+    const maxMinutes = config.maxCallDuration || 0;
+    if (maxMinutes <= 0 || callState !== "connected") return;
+    const totalSeconds = maxMinutes * 60;
+    const remaining = totalSeconds - duration;
+    const cue = getTelefunTimeCueThreshold({
+      totalSeconds,
+      elapsedSeconds: duration,
+      cue30Sent: timeCue30Sent.current,
+      cue20Sent: timeCue20Sent.current,
+    });
+    if (cue === "30s") {
+      timeCue30Sent.current = true;
+      sessionRef.current?.sendTimeCue(remaining);
+    }
+    if (cue === "20s") {
+      timeCue20Sent.current = true;
+      sessionRef.current?.sendTimeCue(remaining);
+    }
+    if (duration >= totalSeconds) {
+      sessionRef.current?.disconnect();
+      setCallState("ended");
+      onEndSession("timeout");
+    }
+  }, [callState, config.maxCallDuration, duration, onEndSession]);
 
   const endCall = () => {
     sessionRef.current?.disconnect();
