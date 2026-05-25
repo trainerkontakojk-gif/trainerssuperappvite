@@ -30,3 +30,5 @@ local-backups/
 reference-repo
 scratch/
 supabase/.temp/
+supabase/config.toml
+supabase/.gitignore
