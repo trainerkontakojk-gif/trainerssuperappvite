@@ -3,5 +3,5 @@ builder = "nixpacks"
 buildCommand = "pnpm build"
 
 [deploy]
-startCommand = "pnpm start"
+startCommand = "pnpm --filter @trainers/web start"
 healthcheckPath = "/"
