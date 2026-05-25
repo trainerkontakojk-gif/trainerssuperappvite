@@ -2167,7 +2167,7 @@ export async function getRuleVersions(serviceType?: string) {
   let query = supabaseAdmin
     .from("qa_service_rule_versions")
     .select(
-      "*, created_by_user:created_by(full_name), published_by_user:published_by(full_name), qa_periods(id, month, year)",
+      "*, qa_periods(id, month, year)",
     )
     .order("version_number", { ascending: false });
 
@@ -2176,12 +2176,26 @@ export async function getRuleVersions(serviceType?: string) {
   if (error) throw new Error(`Gagal memuat versi aturan: ${error.message}`);
 
   if (data && data.length > 0) {
+    const userIds = [...new Set(data.map((v: any) => v.created_by).filter(Boolean))];
+    const profileMap = new Map<string, string>();
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      if (profiles) {
+        for (const p of profiles) {
+          profileMap.set(p.id, p.full_name ?? "");
+        }
+      }
+    }
+
     const { data: indicatorRows } = await supabaseAdmin
       .from("qa_service_rule_indicators")
       .select("rule_version_id")
       .in(
         "rule_version_id",
-        data.map((v) => v.id),
+        data.map((v: any) => v.id),
       );
 
     const countMap: Record<string, number> = {};
@@ -2191,7 +2205,11 @@ export async function getRuleVersions(serviceType?: string) {
           (countMap[row.rule_version_id] || 0) + 1;
       }
     }
-    return data.map((v) => ({ ...v, indicator_count: countMap[v.id] || 0 }));
+    return data.map((v: any) => ({
+      ...v,
+      created_by_user: profileMap.get(v.created_by) ?? null,
+      indicator_count: countMap[v.id] || 0,
+    }));
   }
 
   return data ?? [];
@@ -2458,6 +2476,33 @@ export async function publishRuleVersion(
   if (error)
     throw new Error(`Gagal mempublikasikan versi aturan: ${error.message}`);
   return result;
+}
+
+export async function getRuleVersionMeta(serviceType: string) {
+  const [indicatorResult, weightResult, versionResult] = await Promise.all([
+    supabaseAdmin
+      .from("qa_indicators")
+      .select("id", { count: "exact", head: true })
+      .eq("service_type", serviceType),
+    supabaseAdmin
+      .from("qa_service_weights")
+      .select("service_type")
+      .eq("service_type", serviceType)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("qa_service_rule_versions")
+      .select("id, status")
+      .eq("service_type", serviceType),
+  ]);
+
+  const versions = versionResult.data ?? [];
+  return {
+    service_type: serviceType,
+    indicator_count: indicatorResult.count ?? 0,
+    has_weight: Boolean(weightResult.data),
+    draft_count: versions.filter((v) => v.status === "draft").length,
+    published_count: versions.filter((v) => v.status === "published").length,
+  };
 }
 
 export async function supersedeRuleVersion(

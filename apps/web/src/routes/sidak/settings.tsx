@@ -9,6 +9,14 @@ import {
 import { notify } from "../../lib/toast";
 import type { ServiceType, RuleVersion, QARuleIndicator } from "@trainers/types";
 
+interface RuleVersionMeta {
+  service_type: string;
+  indicator_count: number;
+  has_weight: boolean;
+  draft_count: number;
+  published_count: number;
+}
+
 const TEAMS: ServiceType[] = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"];
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -47,6 +55,7 @@ export default function SidakSettingsPage() {
   const [selectedVersion, setSelectedVersion] = useState<RuleVersion | null>(null);
   const [draftIndicators, setDraftIndicators] = useState<QARuleIndicator[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
+  const [meta, setMeta] = useState<RuleVersionMeta | null>(null);
 
   const [isPublishing, setIsPublishing] = useState(false);
   const [changeReason, setChangeReason] = useState("");
@@ -77,7 +86,8 @@ export default function SidakSettingsPage() {
 
   // Selection logic: Draft first, then published, then latest version
   useEffect(() => {
-    if (versions && versions.length > 0) {
+    if (versions && (versions as RuleVersion[]).length > 0) {
+      setMeta(null);
       const stillExists = selectedVersion ? versions.find(v => v.id === selectedVersion.id) : null;
       if (stillExists) {
         setSelectedVersion(stillExists);
@@ -90,7 +100,19 @@ export default function SidakSettingsPage() {
     } else {
       setSelectedVersion(null);
     }
-  }, [versions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions?.length, activeTeam]);
+
+  useEffect(() => {
+    if (!versionsLoading && (!versions || versions.length === 0)) {
+      let cancelled = false;
+      getApi<RuleVersionMeta>(`/sidak/rule-versions/meta?service_type=${activeTeam}`)
+        .then((result) => { if (!cancelled) setMeta(result); })
+        .catch(() => { if (!cancelled) setMeta(null); });
+      return () => { cancelled = true; };
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTeam, versionsLoading, versions?.length]);
 
   const fetchVersionIndicators = useCallback(async (versionId: string) => {
     setLoadingIndicators(true);
@@ -334,7 +356,18 @@ export default function SidakSettingsPage() {
                 </div>
               ) : !versions || versions.length === 0 ? (
                 <div className="p-4 text-center border-2 border-dashed border-border rounded-2xl">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Belum ada versi</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                    Belum ada versi untuk {SERVICE_LABELS[activeTeam]}
+                  </p>
+                  {meta?.indicator_count ? (
+                    <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+                      Baseline tersedia: {meta.indicator_count} parameter. Buat baseline untuk menampilkan detail versi.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
+                      Belum ada parameter baseline untuk service ini.
+                    </p>
+                  )}
                   <button onClick={() => handleCreateDraft()} className="mt-2 text-[10px] font-black text-primary uppercase underline">
                     Buat Baseline
                   </button>

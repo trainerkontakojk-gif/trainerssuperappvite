@@ -850,6 +850,25 @@ sidak.get(
   },
 );
 
+sidak.get(
+  "/rule-versions/meta",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const serviceType = c.req.query("service_type");
+    if (!serviceType || !["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(serviceType)) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Service type tidak valid" },
+        },
+        400,
+      );
+    }
+    const meta = await sidakService.getRuleVersionMeta(serviceType);
+    return c.json({ success: true, data: meta });
+  },
+);
+
 sidak.post("/rule-versions", requireRole("admin", "trainer"), async (c) => {
   const user = c.get("user");
   const body = await c.req.json();

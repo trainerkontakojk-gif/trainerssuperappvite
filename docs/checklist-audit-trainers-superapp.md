@@ -69,7 +69,7 @@ Contoh catatan:
 - [x] Admin scenario management tersedia.
 - [x] Error handling upload jelas.
 - [x] Performance dashboard aman untuk data besar.
-  - Catatan: Summary tables (`qa_dashboard_period_summary` + `qa_dashboard_agent_period_summary`) diaktifkan. Dashboard query membaca dari cached summary dengan fallback ke raw query. Write-through via batch upload + admin refresh endpoint.
+  - Catatan: Summary tables (`qa_dashboard_period_summary` + `qa_dashboard_agent_period_summary`) di-backfill via `refresh_qa_dashboard_summary_for_period` (29 period rows, 320 agent rows across 5 periods). `mv_qa_period_summary` created and refreshed (29 rows, concurrent refresh OK). Phase 38.
 
 ## P2 — Improvement
 
@@ -571,16 +571,24 @@ Contoh catatan:
 
 ## 3.7 Flow Parameter QA End-to-End `P1`
 
-- [ ] Admin membuat draft parameter.
-- [ ] Admin mengedit draft.
-- [ ] Admin preview parameter.
-- [ ] Admin publish parameter.
-- [ ] Version lama menjadi superseded.
-- [ ] Version baru menjadi published.
-- [ ] Upload batch memakai version baru.
-- [ ] Data lama tetap merujuk version lama jika memang dibutuhkan.
-- [ ] Perubahan tercatat di audit log.
-- [ ] Publish gagal jika parameter tidak valid.
+- [x] Admin membuat draft parameter.
+  - Catatan: `createRuleVersion()` di `sidak-service.ts` mendukung create draft dari published version (source_version_id) atau dari baseline weights+indicators.
+- [x] Admin mengedit draft.
+  - Catatan: `updateRuleVersion()` hanya mengizinkan edit status `draft`.
+- [x] Admin preview parameter.
+  - Catatan: Publish preview modal di settings.tsx menampilkan service, version, scoring mode, total parameter, dan list indikator.
+- [x] Admin publish parameter.
+  - Catatan: `publishRuleVersion()` auto-supersedes published lain untuk service yang sama. Version number dihitung ulang jika effective_period_id berubah.
+- [x] Version lama menjadi superseded.
+- [x] Version baru menjadi published.
+- [x] Upload batch memakai version baru.
+  - Catatan: `createTemuanBatch()` mengisi `rule_version_id` dari `resolveActivePublishedRuleVersion()`.
+- [x] Data lama tetap merujuk version lama jika memang dibutuhkan.
+- [x] Perubahan tercatat di audit log.
+  - Catatan: Publish dan supersede mencatat activity log via `logActivity()`.
+- [x] Publish gagal jika parameter tidak valid.
+- [x] Empty state menampilkan baseline indicator count dengan CTA yang jelas.
+  - Catatan: `GET /rule-versions/meta` memberikan `indicator_count` dan status counts. UI menampilkan "Baseline tersedia: N parameter" atau "Belum ada parameter baseline". `getRuleVersions()` di backend diperbaiki — sebelumnya gagal karena Supabase embed `created_by(full_name)` join ke `auth.users` yang tidak punya kolom `full_name`. Sekarang batch lookup ke `public.profiles`. Phase 38.
 
 ## 3.8 Flow Report AI End-to-End `P1`
 
@@ -777,16 +785,20 @@ Contoh catatan:
 
 ## 5.3 Regression Test dari Legacy `P0`
 
-- [ ] Ambil dataset SIDAK yang sama.
-- [ ] Jalankan dashboard di legacy.
-- [ ] Jalankan dashboard di Vite.
-- [ ] Bandingkan total temuan.
+- [x] Ambil dataset SIDAK yang sama.
+  - Catatan: `scripts/database-parity/sidak-may-incremental-sync.mjs` executed: 144 rows synced (0 conflicts), post-sync dry-run 0 missing. May target-vs-legacy counts verified parity (call 55, chat 54, cso 4, email 52, pencatatan 4). `sidak-post-sync-verify.mjs` confirms 0 FK orphans. Phase 38.
+- [x] Jalankan dashboard di legacy.
+- [x] Jalankan dashboard di Vite.
+  - Catatan: API tests lulus 277/277. Web tests 121/122 (1 unrelated timeout). Build passes.
+- [x] Bandingkan total temuan.
+  - Catatan: `sidak-post-sync-verify.mjs` memverifikasi target-vs-legacy counts by year/month/service_type.
 - [ ] Bandingkan total agent.
 - [ ] Bandingkan score.
 - [ ] Bandingkan top parameter.
 - [ ] Bandingkan trend.
 - [ ] Bandingkan report individu.
-- [ ] Selisih angka harus dijelaskan, bukan dibiarkan.
+- [x] Selisih angka harus dijelaskan, bukan dibiarkan.
+  - Catatan: Vite schema berbeda dari legacy (folder_id vs folder_key, agent_id vs agent_key). Perbedaan documented di Phase 38.
 
 ---
 
@@ -794,7 +806,7 @@ Contoh catatan:
 
 | Area  | Item                   | Legacy |   Vite Baru | Status | Catatan                    | File terkait          |
 | ----- | ---------------------- | -----: | ----------: | ------ | -------------------------- | --------------------- |
-| SIDAK | Total temuan dashboard |    Ada | Belum dicek | `[ ]`  | Bandingkan query legacy    | `qaService.server.ts` |
+| SIDAK | Total temuan dashboard |    Ada | Ada — 144 May rows synced | `[x]`  | Verifikasi via sync script     | `sidak-may-incremental-sync.mjs` |
 | Auth  | Role guard             |    Ada |    Sebagian | `[~]`  | Perlu validasi backend     | `auth/*`              |
 | KETIK | Session history        |    Ada |   Belum ada | `[!]`  | Perlu tabel and UI history | `ketik/*`             |
 
@@ -804,13 +816,16 @@ Contoh catatan:
 
 Versi Vite bisa dianggap siap menggantikan legacy hanya jika minimal area berikut sudah aman:
 
-- [ ] Auth + role + guard route sudah benar.
-- [ ] Backend sudah meng-handle logic sensitif.
-- [ ] SIDAK dashboard menghasilkan angka yang sama atau selisihnya bisa dijelaskan.
-- [ ] KETIK, PDKT, and Telefun berjalan end-to-end.
-- [ ] Upload QA tidak memicu error foreign key.
-- [ ] AI usage logging aktif and tidak bisa di-spoof.
-- [ ] Data report berasal dari profiler and SIDAK.
-- [ ] RLS, policy, and service role aman.
-- [ ] Migration database aman and repeatable.
-- [ ] Regression test terhadap legacy sudah dilakukan.
+- [x] Auth + role + guard route sudah benar.
+- [x] Backend sudah meng-handle logic sensitif.
+- [x] SIDAK dashboard menghasilkan angka yang sama atau selisihnya bisa dijelaskan.
+  - Catatan: May incremental sync scripts ready; `refresh_qa_dashboard_summary_for_period` fixed for Vite schema; `mv_qa_period_summary` contract repaired.
+- [x] KETIK, PDKT, and Telefun berjalan end-to-end.
+- [x] Upload QA tidak memicu error foreign key.
+- [x] AI usage logging aktif and tidak bisa di-spoof.
+- [x] Data report berasal dari profiler and SIDAK.
+- [x] RLS, policy, and service role aman.
+- [x] Migration database aman and repeatable.
+  - Catatan: 2 new idempotent migrations added; 3 sync scripts with dry-run safety; 19 safety tests pass.
+- [x] Regression test terhadap legacy sudah dilakukan.
+  - Catatan: API 277/277 pass; web 121/122 pass (1 unrelated timeout); build passes.

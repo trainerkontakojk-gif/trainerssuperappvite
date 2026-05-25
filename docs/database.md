@@ -38,7 +38,7 @@ erDiagram
 
 ## Tabel Utama
 
-**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (12 files, 000-010 + timestamped, fully idempotent):
+**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (14 files, fully idempotent):
 
 - `000_profiles_core.sql` — Profiles & auth tables
 - `001_sidak_core.sql` — SIDAK core + Profiler tables (12 tables, all RLS-enabled)
@@ -48,10 +48,14 @@ erDiagram
 - `005_carbon_copy_parity.sql` — KETIK/PDKT carbon copy parity features
 - `006_create_user_settings.sql` — User settings table
 - `007_report_archives.sql` — Report archives for persistence
-- `008_profile_admin_policies.sql` — Admin/trainer SELECT+UPDATE on profiles (defense-in-depth)
-- `20260520054101_add_is_deleted_to_profiles.sql` — Soft delete flag for profiles
-- `009_storage_rls_policies.sql` — Storage bucket RLS policies for profiler-foto, reports, telefun-recordings
-- `010_activity_logs_index.sql` — Index `activity_logs.created_at` for query performance
+- `008_profile_admin_policies.sql` — Admin/trainer SELECT+UPDATE on profiles
+- `009_storage_rls_policies.sql` — Storage bucket RLS policies
+- `010_activity_logs_index.sql` — Index `activity_logs.created_at`
+- `011_materialized_view_dashboard.sql` — Materialized view `mv_qa_period_summary`
+- `012_ai_usage_status_error.sql` — AI usage status/error columns
+- `013_refresh_mv_function.sql` — RPC `refresh_mv_qa_period_summary()`
+- `20260525000100_sidak_dashboard_summary_vite_schema_refresh.sql` — Target-schema-compatible `refresh_qa_dashboard_summary_for_period`
+- `20260525000200_restore_mv_qa_period_summary_contract.sql` — Idempotent MV + refresh function contract repair
 
 ### 1. `public.profiles`
 
@@ -95,16 +99,17 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 
 ### 5. Modul SIDAK (QA Analyzer)
 
-- **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard per periode. Direfresh async via `refreshMaterializedView()` setelah batch upload.
-- **`qa_dashboard_period_summary`**: Summary KPI per periode untuk dashboard SIDAK (fallback jika MV belum tersedia).
-- **`qa_dashboard_indicator_period_summary`**: Breakdown KPI per indikator per periode.
-- **`qa_dashboard_agent_period_summary`**: Skor dan metrik per agent per periode.
+- **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard per periode. Dibuat via `011_materialized_view_dashboard.sql` dan dijamin kontraknya via `20260525000200_restore_mv_qa_period_summary_contract.sql`. Direfresh via `refresh_mv_qa_period_summary()`.
+- **`qa_dashboard_period_summary`**: Summary KPI per periode per service per folder untuk dashboard SIDAK (Vite cache, menggunakan `folder_id` bukan `folder_key`). Dihasilkan oleh `refresh_qa_dashboard_summary_for_period()`.
+- **`qa_dashboard_agent_period_summary`**: Skor dan metrik per agent per periode per service (Vite cache, menggunakan `agent_id`). Dihasilkan oleh `refresh_qa_dashboard_summary_for_period()`.
 - **`qa_periods`**: Definisi periode audit kualitas.
 - **`qa_temuan`**: Data utama audit (Agent, Tim, Temuan, Status).
 - **`qa_indicators`**: Daftar parameter penilaian audit.
-- **`qa_categories`**: Pengelompokan indikator temuan (Pareto mapping).
+- **`qa_service_weights`**: Bobot default per service type.
 - **`qa_service_rule_versions`**: Versi rule per service+periode dengan status `draft`, `published`, atau `superseded`.
 - **`qa_service_rule_indicators`**: Snapshot indikator per rule version.
+
+**Dashboard Summary Refresh**: Fungsi `refresh_qa_dashboard_summary_for_period(p_period_id, p_folder_key)` didesain ulang agar kompatibel dengan Vite schema — menggunakan `folder_id` dan `agent_id` pada cache tables. Fungsi ini juga diinvoke oleh `scripts/database-parity/sidak-post-sync-verify.mjs --refresh-summaries` untuk backfill summary seluruh periode.
 
 **Soft-delete Exclusion**: Queries dashboard SIDAK (`getDashboardData`, `getAgents`, `getDataReportRows`) secara otomatis mengecualikan peserta yang terhubung ke profile soft-deleted (`is_deleted=true`) atau inactive (`status=inactive`), kecuali `show_archived=true` dikirim sebagai query param.
 

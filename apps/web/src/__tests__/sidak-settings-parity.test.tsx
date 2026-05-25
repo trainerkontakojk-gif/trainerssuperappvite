@@ -217,4 +217,72 @@ describe("Sidak settings page legacy parity", () => {
 
     vi.useFakeTimers();
   });
+
+  it("shows baseline-aware empty state when no rule version exists", async () => {
+    vi.useRealTimers();
+
+    useApiMock.mockImplementation((path: string) => {
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: [], loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
+    });
+
+    getApiMock.mockImplementation((path: string) => {
+      if (path.includes("/rule-versions/meta")) {
+        return Promise.resolve({
+          service_type: "call",
+          indicator_count: 12,
+          has_weight: true,
+          draft_count: 0,
+          published_count: 0,
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<SidakSettingsPage />);
+
+    await screen.findByText(/Baseline tersedia: 12 parameter/, {}, { timeout: 3000 });
+    expect(screen.getByText("Buat Baseline")).toBeInTheDocument();
+
+    vi.useFakeTimers();
+  });
+
+  it("shows no-baseline empty state when meta has zero indicators", async () => {
+    vi.useRealTimers();
+
+    useApiMock.mockImplementation((path: string) => {
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: [], loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
+    });
+
+    getApiMock.mockImplementation((path: string) => {
+      if (path.includes("/rule-versions/meta")) {
+        return Promise.resolve({
+          service_type: "call",
+          indicator_count: 0,
+          has_weight: false,
+          draft_count: 0,
+          published_count: 0,
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<SidakSettingsPage />);
+
+    await screen.findByText("Belum ada parameter baseline untuk service ini.", {}, { timeout: 3000 });
+    expect(screen.getByText("Buat Baseline")).toBeInTheDocument();
+
+    vi.useFakeTimers();
+  });
 });
