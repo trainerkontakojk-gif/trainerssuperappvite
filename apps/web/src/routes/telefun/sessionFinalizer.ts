@@ -49,10 +49,11 @@ export async function finalizeTelefunSession(params: {
   scenarioTitle: string;
   consumerName: string;
   dependencies?: Partial<FinalizerDependencies>;
-}): Promise<{ record: CallRecord; scoringFailed: boolean; saveFailed: boolean }> {
+}): Promise<{ record: CallRecord; scoringFailed: boolean; saveFailed: boolean; uploadFailed: boolean }> {
   const deps = { ...defaultDependencies, ...params.dependencies };
   let scoringFailed = false;
   let saveFailed = false;
+  let uploadFailed = false;
 
   let userId: string | undefined;
   try {
@@ -69,17 +70,29 @@ export async function finalizeTelefunSession(params: {
       try {
         const path = buildTelefunRecordingPath({ userId, sessionId: params.sessionId, type: "full_call" });
         recordingPath = await deps.uploadRecording({ path, blob: params.fullBlob, type: "full_call" });
+        if (!recordingPath) {
+          uploadFailed = true;
+        }
       } catch (err) {
         console.error("Full recording upload failed:", err);
+        uploadFailed = true;
       }
     }
     if (params.agentBlob) {
       try {
         const path = buildTelefunRecordingPath({ userId, sessionId: params.sessionId, type: "agent_only" });
         agentRecordingPath = await deps.uploadRecording({ path, blob: params.agentBlob, type: "agent_only" });
+        if (!agentRecordingPath) {
+          uploadFailed = true;
+        }
       } catch (err) {
         console.error("Agent recording upload failed:", err);
+        uploadFailed = true;
       }
+    }
+  } else {
+    if (params.fullBlob || params.agentBlob) {
+      uploadFailed = true;
     }
   }
 
@@ -157,5 +170,6 @@ export async function finalizeTelefunSession(params: {
     record,
     scoringFailed,
     saveFailed,
+    uploadFailed,
   };
 }

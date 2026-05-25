@@ -47,9 +47,15 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [volume, setVolume] = useState(0);
   const [callState, setCallState] = useState<
-    "connecting" | "connected" | "ended"
+    "connecting" | "connected" | "finalizing" | "ended"
   >("connecting");
   const [error, setError] = useState<string | null>(null);
+
+  const callStateRef = useRef<"connecting" | "connected" | "finalizing" | "ended">("connecting");
+  const setCallStateWithRef = (nextState: "connecting" | "connected" | "finalizing" | "ended") => {
+    callStateRef.current = nextState;
+    setCallState(nextState);
+  };
 
   const sessionRef = useRef<LiveSession | null>(null);
   const mountedRef = useRef(true);
@@ -68,16 +74,26 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       if (!mountedRef.current) return;
       setStatus(nextStatus);
       if (nextStatus === "Terputus") {
-        setCallState("ended");
-        onEndSession("disconnected");
+        if (callStateRef.current === "connected") {
+          setCallStateWithRef("finalizing");
+          setStatus("Sedang menyimpan rekaman...");
+        } else if (callStateRef.current === "connecting") {
+          setCallStateWithRef("ended");
+          onEndSession("disconnected");
+        }
       }
     };
 
     session.onError = (err) => {
       if (!mountedRef.current) return;
-      setError(err.message);
-      setCallState("ended");
-      onEndSession(err.message);
+      if (callStateRef.current === "connected") {
+        setCallStateWithRef("finalizing");
+        setStatus("Sedang menyimpan rekaman...");
+      } else if (callStateRef.current === "connecting") {
+        setError(err.message);
+        setCallStateWithRef("ended");
+        onEndSession(err.message);
+      }
     };
 
     session.onAiSpeaking = (speaking) => {
@@ -90,39 +106,45 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       setVolume(nextVolume);
     };
 
-    session.onRecordingComplete = (url, fullBlob, agentBlob, metrics) => {
-      if (!mountedRef.current) return;
-      onRecordingReady?.(
-        url,
-        config.consumerName,
-        durationRef.current,
-        fullBlob,
-        agentBlob,
-        metrics,
-      );
+    session.onRecordingComplete = async (url, fullBlob, agentBlob, metrics) => {
+      if (onRecordingReady) {
+        try {
+          await onRecordingReady(
+            url,
+            config.consumerName,
+            durationRef.current,
+            fullBlob,
+            agentBlob,
+            metrics,
+          );
+        } catch (err) {
+          console.error("onRecordingReady failed:", err);
+        }
+      }
+      if (mountedRef.current) {
+        setCallStateWithRef("ended");
+        onEndSession("completed");
+      }
     };
 
     session
       .connect()
       .then(() => {
         if (!mountedRef.current) return;
-        setCallState("connected");
-        if (!timerStartedRef.current) {
-          timerStartedRef.current = true;
-        }
+        setCallStateWithRef("connected");
       })
       .catch((err) => {
         if (!mountedRef.current) return;
         setError(
           err instanceof Error ? err.message : "Gagal memulai panggilan.",
         );
-        setCallState("ended");
+        setCallStateWithRef("ended");
         onEndSession("connect_failed");
       });
 
     const timer = window.setInterval(() => {
       if (!mountedRef.current) return;
-      if (callState === "connected" || timerStartedRef.current) {
+      if (callStateRef.current === "connected") {
         durationRef.current += 1;
         setDuration(durationRef.current);
       }
@@ -165,15 +187,15 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     }
     if (duration >= totalSeconds) {
       sessionRef.current?.disconnect();
-      setCallState("ended");
-      onEndSession("timeout");
+      setCallStateWithRef("finalizing");
+      setStatus("Sedang menyimpan rekaman...");
     }
   }, [callState, config.maxCallDuration, duration, onEndSession]);
 
   const endCall = () => {
     sessionRef.current?.disconnect();
-    setCallState("ended");
-    onEndSession("manual");
+    setCallStateWithRef("finalizing");
+    setStatus("Sedang menyimpan rekaman...");
   };
 
   const initials = getInitials(config.consumerName);
@@ -186,12 +208,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           <div className="relative">
             <div
               className={`flex h-24 w-24 items-center justify-center rounded-full text-3xl font-black text-white ${
-                callState === "connecting"
+                callState === "connecting" || callState === "finalizing"
                   ? "bg-emerald-400 animate-pulse"
                   : "bg-emerald-500"
               } shadow-xl shadow-emerald-500/20`}
             >
-              {callState === "connecting" ? (
+              {callState === "connecting" || callState === "finalizing" ? (
                 <PhoneIcon className="h-10 w-10" />
               ) : (
                 <User className="h-10 w-10" />
@@ -271,7 +293,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           <button
             type="button"
             onClick={() => setIsMuted((v) => !v)}
-            disabled={callState === "connecting"}
+            disabled={callState === "connecting" || callState === "finalizing"}
             className={`inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-bold transition-all disabled:opacity-40 ${
               isMuted
                 ? "bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/20"
@@ -289,7 +311,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           <button
             type="button"
             onClick={() => setIsHeld((v) => !v)}
-            disabled={callState === "connecting"}
+            disabled={callState === "connecting" || callState === "finalizing"}
             className={`inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-sm font-bold transition-all disabled:opacity-40 ${
               isHeld
                 ? "bg-amber-500 text-white hover:bg-amber-600 shadow-lg shadow-amber-500/20"
@@ -303,11 +325,15 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           <button
             type="button"
             onClick={endCall}
-            disabled={callState === "connecting"}
+            disabled={callState === "connecting" || callState === "finalizing"}
             className="inline-flex items-center gap-2 rounded-full bg-red-600 px-6 py-3.5 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-40 shadow-lg shadow-red-600/20"
           >
-            <PhoneOff className="h-4 w-4" />
-            Akhiri
+            {callState === "finalizing" ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            ) : (
+              <PhoneOff className="h-4 w-4" />
+            )}
+            {callState === "finalizing" ? "Menyimpan..." : "Akhiri"}
           </button>
         </div>
       </div>

@@ -298,17 +298,40 @@ export default function TelefunLanding() {
     agentBlob: Blob | null,
     metrics: any,
   ) => {
-    const sessionId = activeSessionId;
-    if (!sessionId) return;
-
+    let sessionId = activeSessionId;
     const finalScenario = activeScenario;
     const sessionConfig = activeSessionConfig;
-    const optimisticId = optimisticRecordIdRef.current || sessionId;
+
+    if (!sessionId) {
+      console.warn("No activeSessionId found during finalization. Attempting fallback session creation.");
+      try {
+        const res = await postApi<any>("/telefun/sessions", {
+          scenario_title: finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
+          consumer_name: sessionConfig?.consumerName || consumerName || "Konsumen",
+          consumer_gender: sessionConfig?.consumerGender || "female",
+          consumer_phone: sessionConfig?.resolvedIdentity?.phone || "08123456789",
+          consumer_city: sessionConfig?.resolvedIdentity?.city || "Jakarta",
+          realistic_mode_enabled: sessionConfig?.realisticModeEnabled || false,
+          persona_config: {
+            consumerType: sessionConfig?.activeConsumerType?.name || sessionConfig?.activeConsumerType?.id,
+          },
+          disruption_config: sessionConfig?.realisticModeDisruptionTypes || [],
+        });
+        if (res?.id) {
+          sessionId = res.id;
+        }
+      } catch (err) {
+        console.error("Failed to create fallback session:", err);
+      }
+    }
+
+    const finalSessionId = sessionId || `offline-${Date.now()}`;
+    const optimisticId = optimisticRecordIdRef.current || finalSessionId;
     optimisticRecordIdRef.current = optimisticId;
 
     try {
-      const { record, scoringFailed, saveFailed } = await finalizeTelefunSession({
-        sessionId,
+      const { record, scoringFailed, saveFailed, uploadFailed } = await finalizeTelefunSession({
+        sessionId: finalSessionId,
         fullBlob,
         agentBlob,
         duration,
@@ -324,13 +347,17 @@ export default function TelefunLanding() {
         throw new Error("Save session failed");
       }
 
+      if (uploadFailed) {
+        notify.warning("Rekaman gagal diunggah, tetapi sesi tetap tersimpan.");
+      }
+
       if (scoringFailed) {
         notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
       }
 
       setHistory((prev) => {
         const withoutOptimistic = prev.filter((r) => r.id !== optimisticId);
-        const alreadyExists = withoutOptimistic.some((r) => r.id === sessionId);
+        const alreadyExists = withoutOptimistic.some((r) => r.id === finalSessionId);
         const merged = alreadyExists
           ? withoutOptimistic
           : [record, ...withoutOptimistic];
@@ -363,6 +390,8 @@ export default function TelefunLanding() {
     } finally {
       setActiveSessionId(null);
       setActiveScenario(null);
+      setView("home");
+      setActiveSessionConfig(null);
     }
 
     const runId = sessionRunIdRef.current;
