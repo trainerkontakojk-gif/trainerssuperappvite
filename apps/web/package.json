@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node ../../scripts/deployment/guard-no-railway-dev.mjs && vite",
     "build": "tsc && vite build",
     "test": "vitest run",
     "test:e2e": "playwright test",

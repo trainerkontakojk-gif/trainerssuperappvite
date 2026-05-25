@@ -162,6 +162,34 @@ node scripts/deployment/railway-web-healthcheck-smoke.mjs
 
 Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`.
 
+### Troubleshooting: Web Service OOM / Exit 137
+
+Jika log Railway menampilkan `@trainers/web dev`, `> vite`, atau `Exit status 137`, service masih menjalankan start command development (`vite`) yang memicu Vite optimizer dependency pre-bundling dan menyebabkan container OOM. Perbaiki konfigurasi Railway Web service:
+
+| Setting          | Value                          |
+| ---------------- | ------------------------------ |
+| Root Directory   | repo root (`.` / kosong, bukan `apps/web`) |
+| Build Command    | `pnpm run build:web`           |
+| Start Command    | `pnpm run start:web`           |
+| Healthcheck Path | `/`                            |
+
+Setelah mengubah service settings, trigger **"Deploy Latest Commit"** (bukan redeploy image lama). Log deploy yang benar harus menampilkan:
+
+```text
+> @trainers/web@0.0.0 start /app/apps/web
+> serve dist -s -l tcp://0.0.0.0:${PORT:-3005}
+```
+
+Log deploy **tidak boleh** mengandung:
+
+```text
+@trainers/web@0.0.0 dev
+> vite
+[vite] (client) [optimizer] bundling dependencies...
+```
+
+Repo ini juga memiliki guard (`scripts/deployment/guard-no-railway-dev.mjs`) yang memblokir `pnpm --filter @trainers/web dev` jika env Railway terdeteksi, memberikan pesan eksplisit.
+
 ## Deployment Checklist
 
 - [ ] Apply all Supabase migrations
