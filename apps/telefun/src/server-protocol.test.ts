@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isGeminiForwardableMessage } from "./server-protocol.js";
+import {
+  isGeminiForwardableMessage,
+  isGeminiSetupMessage,
+  hasGeminiSetupComplete,
+} from "./server-protocol.js";
 
 describe("telefun proxy protocol", () => {
   it("accepts setup, realtimeInput, and clientContent messages only", () => {
@@ -7,5 +11,21 @@ describe("telefun proxy protocol", () => {
     expect(isGeminiForwardableMessage({ realtimeInput: { audioStreamEnd: true } })).toBe(true);
     expect(isGeminiForwardableMessage({ clientContent: { turns: [] } })).toBe(true);
     expect(isGeminiForwardableMessage({ random: true })).toBe(false);
+  });
+
+  it("detects setup messages", () => {
+    expect(isGeminiSetupMessage({ setup: { model: "models/gemini-3.1-flash-live-preview" } })).toBe(true);
+    expect(isGeminiSetupMessage({ realtimeInput: { text: "halo" } })).toBe(false);
+  });
+
+  it("detects setupComplete messages", () => {
+    expect(hasGeminiSetupComplete({ setupComplete: {} })).toBe(true);
+    expect(hasGeminiSetupComplete({ serverContent: {} })).toBe(false);
+  });
+
+  it("keeps current forwardable message contract", () => {
+    expect(isGeminiForwardableMessage({ setup: {} })).toBe(true);
+    expect(isGeminiForwardableMessage({ realtimeInput: { audioStreamEnd: true } })).toBe(true);
+    expect(isGeminiForwardableMessage({ unknown: true })).toBe(false);
   });
 });

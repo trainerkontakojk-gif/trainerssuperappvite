@@ -117,3 +117,52 @@ export function buildAudioStreamEndMessage() {
     },
   };
 }
+
+export function parsePcmSampleRate(mimeType: string | undefined, fallback = 24000): number {
+  const match = mimeType?.match(/rate=(\d+)/i);
+  const parsed = match ? Number(match[1]) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const decodeBase64 =
+  typeof atob === "function"
+    ? atob
+    : (value: string) => Buffer.from(value, "base64").toString("binary");
+
+export function base64ToUint8Array(value: string): Uint8Array {
+  const binary = decodeBase64(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export function extractGeminiInlineAudioChunks(message: unknown): Array<{
+  data: Uint8Array;
+  sampleRate: number;
+}> {
+  const parts = (message as any)?.serverContent?.modelTurn?.parts;
+  if (!Array.isArray(parts)) return [];
+
+  return parts
+    .map((part) => {
+      const inlineData = part?.inlineData;
+      if (!inlineData?.data || typeof inlineData.data !== "string") return null;
+      return {
+        data: base64ToUint8Array(inlineData.data),
+        sampleRate: parsePcmSampleRate(inlineData.mimeType),
+      };
+    })
+    .filter(Boolean) as Array<{ data: Uint8Array; sampleRate: number }>;
+}
+
+export function shouldSendRealtimeAudio(params: {
+  wsReady: boolean;
+  setupComplete: boolean;
+  muted: boolean;
+  held: boolean;
+}): boolean {
+  return params.wsReady && params.setupComplete && !params.muted && !params.held;
+}
+

@@ -12,12 +12,11 @@ import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
 import { ReviewModal } from "./components/ReviewModal";
 import { UsageModal } from "../ketik/components/UsageModal";
-import { postApi, putApi, patchApi } from "../../hooks/useApi";
+import { postApi, putApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
-import { supabase } from "../../lib/supabase";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
-import { buildTelefunRecordingPath } from "./recordingPath";
+import { finalizeTelefunSession } from "./sessionFinalizer";
 
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
@@ -304,106 +303,50 @@ export default function TelefunLanding() {
 
     const finalScenario = activeScenario;
     const sessionConfig = activeSessionConfig;
-
-    // Generate score and feedback locally
-    let score = 0;
-    let feedback = "";
-
-    try {
-      const scoring = await postApi<{ score: number; feedback: string }>(
-        "/telefun/score/" + sessionId,
-        {},
-      );
-      if (scoring) {
-        score = scoring.score || 0;
-        feedback = scoring.feedback || "";
-      }
-    } catch {
-      console.warn("Scoring failed, proceeding without score");
-    }
-
     const optimisticId = optimisticRecordIdRef.current || sessionId;
     optimisticRecordIdRef.current = optimisticId;
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData.user?.id;
-      if (!userId) {
-        throw new Error("Sesi login tidak ditemukan untuk upload rekaman.");
-      }
-
-      let recordingPath: string | undefined;
-      let agentRecordingPath: string | undefined;
-
-      if (fullBlob) {
-        const path = buildTelefunRecordingPath({ userId, sessionId, type: "full_call" });
-        const { data } = await supabase.storage
-          .from("telefun-recordings")
-          .upload(path, fullBlob, {
-            contentType: "audio/webm",
-            upsert: true,
-          });
-        if (data?.path) recordingPath = data.path;
-      }
-
-      if (agentBlob) {
-        const path = buildTelefunRecordingPath({ userId, sessionId, type: "agent_only" });
-        const { data } = await supabase.storage
-          .from("telefun-recordings")
-          .upload(path, agentBlob, {
-            contentType: "audio/webm",
-            upsert: true,
-          });
-        if (data?.path) agentRecordingPath = data.path;
-      }
-
-      await patchApi(`/telefun/sessions/${sessionId}`, {
-        status: "completed",
-        duration_seconds: duration,
-        session_metrics: metrics,
-        score,
-        feedback,
+      const { record, scoringFailed, saveFailed } = await finalizeTelefunSession({
+        sessionId,
+        fullBlob,
+        agentBlob,
+        duration,
+        metrics,
+        localUrl: url,
+        sessionConfig,
+        scenarioTitle: finalScenario?.title || "Custom",
+        consumerName,
       });
 
-      if (recordingPath || agentRecordingPath) {
-        await postApi("/telefun/finalize-recording", {
-          sessionId,
-          recordingPath,
-          agentRecordingPath,
-        });
+      if (saveFailed) {
+        notify.error("Gagal menyimpan sesi. Coba ulangi dari riwayat atau hubungi admin.");
+        throw new Error("Save session failed");
       }
 
-      const newRecord: CallRecord = {
-        id: sessionId,
-        date: new Date().toISOString(),
-        url: url || "",
-        consumerName: sessionConfig?.consumerName || consumerName,
-        scenarioTitle:
-          finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
-        duration,
-        recordingPath,
-        agentRecordingPath,
-        score,
-        feedback,
-        sessionMetrics: metrics,
-        realisticModeEnabled: sessionConfig?.realisticModeEnabled,
-      };
+      if (scoringFailed) {
+        notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
+      }
 
       setHistory((prev) => {
         const withoutOptimistic = prev.filter((r) => r.id !== optimisticId);
         const alreadyExists = withoutOptimistic.some((r) => r.id === sessionId);
         const merged = alreadyExists
           ? withoutOptimistic
-          : [newRecord, ...withoutOptimistic];
+          : [record, ...withoutOptimistic];
         localStorage.setItem("telefun_history", JSON.stringify(merged));
         return merged;
       });
 
-      setReviewRecord(newRecord);
+      setReviewRecord(record);
       setIsReviewOpen(true);
     } catch (e) {
       console.error("Failed to finalize session", e);
-      notify.error("Gagal menyimpan sesi");
+      if (e instanceof Error && e.message === "Save session failed") {
+        // Already handled by toast above
+      } else {
+        notify.error("Gagal menyimpan sesi");
+      }
 
       const fallbackRecord: CallRecord = {
         id: optimisticId,

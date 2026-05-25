@@ -57,6 +57,7 @@ erDiagram
 - `20260525000100_sidak_dashboard_summary_vite_schema_refresh.sql` — Target-schema-compatible `refresh_qa_dashboard_summary_for_period`
 - `20260525000200_restore_mv_qa_period_summary_contract.sql` — Idempotent MV + refresh function contract repair
 - `20260525000300_telefun_history_add_consumer_contact_columns.sql` — Add consumer_phone and consumer_city columns to telefun_history
+- `20260525000400_telefun_history_add_feedback.sql` — Add feedback column to telefun_history for API patch compatibility
 
 ### 1. `public.profiles`
 

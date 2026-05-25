@@ -15,6 +15,8 @@ import {
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
   buildRealtimeAudioMessage,
+  shouldSendRealtimeAudio,
+  extractGeminiInlineAudioChunks,
 } from "./liveProtocol";
 import { buildTelefunLiveSystemInstruction } from "./promptBuilder";
 
@@ -39,6 +41,9 @@ export class LiveSession {
   private sessionStartTime: number = 0;
   private isAiSpeaking: boolean = false;
   private sessionState: TelefunSessionState = "idle";
+  private isSetupComplete: boolean = false;
+  private hasSentFirstUserAudio: boolean = false;
+  private hasReceivedFirstModelAudio: boolean = false;
 
   // Realistic Mode
   private orchestrator: RealisticModeOrchestrator | null = null;
@@ -128,8 +133,11 @@ export class LiveSession {
       this.ws.binaryType = "arraybuffer";
 
       this.ws.onopen = () => {
-        this.setSessionState("ready");
-        this.onStatusChange("Tersambung");
+        this.isSetupComplete = false;
+        this.hasSentFirstUserAudio = false;
+        this.hasReceivedFirstModelAudio = false;
+        this.setSessionState("connecting");
+        this.onStatusChange("Menyiapkan sesi suara...");
         this.sendSetup();
         this.sessionStartTime = Date.now();
         this.emitTimelineEvent("ws_open");
@@ -137,7 +145,7 @@ export class LiveSession {
 
       this.ws.onmessage = async (event) => {
         if (event.data instanceof ArrayBuffer) {
-          this.playPcm(new Uint8Array(event.data));
+          this.playPcm(new Uint8Array(event.data), 24000);
         } else {
           try {
             const msg = JSON.parse(event.data);
@@ -166,6 +174,23 @@ export class LiveSession {
   }
 
   private handleJsonMessage(msg: any) {
+    if (msg.setupComplete) {
+      this.isSetupComplete = true;
+      this.setSessionState("ready");
+      this.onStatusChange("Tersambung");
+      this.emitTimelineEvent("setup_complete");
+      this.emitTimelineEvent("setup_complete_received");
+    }
+
+    const chunks = extractGeminiInlineAudioChunks(msg);
+    for (const chunk of chunks) {
+      this.playPcm(chunk.data, chunk.sampleRate);
+      if (!this.hasReceivedFirstModelAudio) {
+        this.hasReceivedFirstModelAudio = true;
+        this.emitTimelineEvent("first_model_audio_chunk");
+      }
+    }
+
     if (msg.serverContent?.modelTurn?.parts) {
       this.setIsAiSpeaking(true);
       this.setSessionState("ai_speaking");
@@ -340,25 +365,30 @@ export class LiveSession {
         if (this.orchestrator) this.orchestrator.onAgentStopSpeaking(now);
       }
 
-      if (
-        this.isMuted ||
-        this.isHeld ||
-        !this.ws ||
-        this.ws.readyState !== WebSocket.OPEN
-      )
-        return;
+      const canSend = shouldSendRealtimeAudio({
+        wsReady: !!(this.ws && this.ws.readyState === WebSocket.OPEN),
+        setupComplete: this.isSetupComplete,
+        muted: this.isMuted,
+        held: this.isHeld,
+      });
+
+      if (!canSend) return;
 
       const pcm16 = new Int16Array(inputData.length);
       for (let i = 0; i < inputData.length; i++) {
         pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
       }
-      this.ws.send(JSON.stringify(buildRealtimeAudioMessage(pcm16.buffer)));
+      this.ws!.send(JSON.stringify(buildRealtimeAudioMessage(pcm16.buffer)));
+      if (!this.hasSentFirstUserAudio) {
+        this.hasSentFirstUserAudio = true;
+        this.emitTimelineEvent("first_user_audio_chunk_sent");
+      }
     };
 
     this.processor.connect(this.audioContext.destination);
   }
 
-  private playPcm(data: Uint8Array) {
+  private playPcm(data: Uint8Array, sampleRate = 24000) {
     if (!this.audioContext || !this.recordingDestination || this.isHeld) return;
 
     const float32 = new Float32Array(data.length / 2);
@@ -367,7 +397,7 @@ export class LiveSession {
       float32[i] = view.getInt16(i * 2, true) / 32768.0;
     }
 
-    const buffer = this.audioContext.createBuffer(1, float32.length, 16000);
+    const buffer = this.audioContext.createBuffer(1, float32.length, sampleRate);
     buffer.getChannelData(0).set(float32);
 
     const source = this.audioContext.createBufferSource();

@@ -177,6 +177,7 @@ supabase migration up
 3. `002_ketik_pdkt_core.sql` — KETIK/PDKT + AI usage logging + pricing
 4. `003_telefun_core.sql` — Telefun history
 5. `004_admin_core.sql` — Admin panel tables
+6. `20260525000400_telefun_history_add_feedback.sql` — Add feedback column to telefun_history for API patch compatibility
 
 ## Troubleshooting
 

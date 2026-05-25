@@ -121,6 +121,48 @@ telefun.post(
   },
 );
 
+export function buildTelefunSessionUpdatePayload(body: {
+  status?: "pending" | "active" | "completed" | "failed";
+  duration_seconds?: number;
+  messages?: any[];
+  recording_path?: string;
+  agent_recording_path?: string;
+  session_metrics?: any;
+  voice_dashboard_metrics?: any;
+  disruption_results?: any;
+  persona_config?: any;
+  realistic_mode_enabled?: boolean;
+  score?: number;
+  feedback?: string;
+}) {
+  return {
+    ...(body.status !== undefined ? { status: body.status } : {}),
+    ...(body.duration_seconds !== undefined ? { duration_seconds: body.duration_seconds } : {}),
+    ...(body.messages !== undefined ? { messages: body.messages } : {}),
+    ...(body.recording_path !== undefined ? { recording_path: body.recording_path } : {}),
+    ...(body.agent_recording_path !== undefined ? { agent_recording_path: body.agent_recording_path } : {}),
+    ...(body.session_metrics !== undefined ? { session_metrics: body.session_metrics } : {}),
+    ...(body.voice_dashboard_metrics !== undefined ? { voice_dashboard_metrics: body.voice_dashboard_metrics } : {}),
+    ...(body.disruption_results !== undefined ? { disruption_results: body.disruption_results } : {}),
+    ...(body.persona_config !== undefined ? { persona_config: body.persona_config } : {}),
+    ...(body.realistic_mode_enabled !== undefined ? { realistic_mode_enabled: body.realistic_mode_enabled } : {}),
+    ...(body.score !== undefined ? { score: body.score } : {}),
+    ...(body.feedback !== undefined ? { feedback: body.feedback } : {}),
+  };
+}
+
+export function buildTelefunFeedbackSummary(assessment: any): string {
+  if (!assessment) return "";
+  const parts = [
+    assessment.speakingRate?.feedback,
+    assessment.intonation?.feedback,
+    assessment.articulation?.feedback,
+    assessment.fillerWords?.feedback,
+    assessment.emotionalTone?.feedback,
+  ].filter(Boolean);
+  return parts.slice(0, 3).join("\n\n");
+}
+
 telefun.patch(
   "/sessions/:id",
   zValidator(
@@ -147,9 +189,10 @@ telefun.patch(
     const body = c.req.valid("json");
 
     try {
+      const updatePayload = buildTelefunSessionUpdatePayload(body);
       const { error } = await adminClient
         .from("telefun_history")
-        .update(body)
+        .update(updatePayload)
         .eq("id", id)
         .eq("user_id", user.id);
 
@@ -344,7 +387,15 @@ telefun.post("/score/:id", async (c) => {
     // Also trigger coaching summary generation in background/sequentially
     await generateCoachingSummary(id, user.id);
 
-    return c.json({ success: true, data: result.assessment });
+    const assessment = result.assessment;
+    return c.json({
+      success: true,
+      data: {
+        score: assessment?.overallScore ?? 0,
+        feedback: assessment ? buildTelefunFeedbackSummary(assessment) : "",
+        assessment: assessment,
+      },
+    });
   } catch (error: any) {
     return c.json(
       {

@@ -12,7 +12,11 @@ import {
 import { createSession, updateSession, getOwnedSessionId } from "./db.js";
 import { SilenceDetector, UtteranceBuffer } from "./silence.js";
 import { TurnManager, TurnState } from "./turn-taking.js";
-import { isGeminiForwardableMessage } from "./server-protocol.js";
+import {
+  isGeminiForwardableMessage,
+  isGeminiSetupMessage,
+  hasGeminiSetupComplete,
+} from "./server-protocol.js";
 
 process.on("uncaughtException", (err) =>
   console.error("[Telefun] Uncaught:", err),
@@ -83,6 +87,8 @@ wss.on("connection", async (ws, req) => {
   let usageFlushed = false;
   let activeModelId = "gemini-3.1-flash-live-preview";
   let reconnectAttempts = 0;
+  let geminiSetupComplete = false;
+  const postSetupQueue: string[] = [];
 
   const silence = new SilenceDetector(5000);
   const utteranceBuffer = new UtteranceBuffer(500, 1000);
@@ -122,7 +128,18 @@ wss.on("connection", async (ws, req) => {
       console.log("[Telefun] Gemini Live connected");
       while (pendingMessages.length > 0) {
         const msg = pendingMessages.shift();
-        if (msg) geminiWs!.send(msg);
+        if (msg) {
+          try {
+            const parsed = JSON.parse(msg);
+            if (isGeminiSetupMessage(parsed) || geminiSetupComplete) {
+              geminiWs!.send(msg);
+            } else {
+              postSetupQueue.push(msg);
+            }
+          } catch {
+            geminiWs!.send(msg);
+          }
+        }
       }
     });
 
@@ -142,6 +159,14 @@ wss.on("connection", async (ws, req) => {
       // Extract AI text + detect turn boundaries
       try {
         const parsed = JSON.parse(raw);
+        if (hasGeminiSetupComplete(parsed)) {
+          console.log("[Telefun] Gemini Setup Complete received, opening gate");
+          geminiSetupComplete = true;
+          while (postSetupQueue.length > 0) {
+            const msg = postSetupQueue.shift();
+            if (msg) sendToGemini(msg);
+          }
+        }
         if (parsed.serverContent?.modelTurn?.parts) {
           turnManager.startAiSpeaking();
           for (const part of parsed.serverContent.modelTurn.parts) {
@@ -174,6 +199,8 @@ wss.on("connection", async (ws, req) => {
         `[Telefun] Gemini closed: ${code} (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
       );
       isGeminiOpen = false;
+      geminiSetupComplete = false;
+      postSetupQueue.length = 0;
 
       // Attempt reconnect on non-clean close
       if (code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
@@ -256,7 +283,11 @@ wss.on("connection", async (ws, req) => {
       }
     }
 
-    sendToGemini(JSON.stringify(parsed));
+    if (isGeminiSetupMessage(parsed) || geminiSetupComplete) {
+      sendToGemini(JSON.stringify(parsed));
+    } else {
+      postSetupQueue.push(JSON.stringify(parsed));
+    }
   });
 
   ws.on("close", async () => {

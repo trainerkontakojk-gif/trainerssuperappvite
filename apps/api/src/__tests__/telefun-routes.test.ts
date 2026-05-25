@@ -3,6 +3,8 @@ import {
   buildTelefunSettingsUpsertPayload,
   buildTelefunSessionInsertPayload,
   isTelefunRecordingPathOwnedBySession,
+  buildTelefunSessionUpdatePayload,
+  buildTelefunFeedbackSummary,
 } from "../routes/telefun";
 
 describe("telefun API payload and security validators", () => {
@@ -107,5 +109,37 @@ describe("telefun API payload and security validators", () => {
         type: "agent_only",
       }),
     ).toBe(true);
+  });
+
+  it("keeps feedback in the explicit telefun session update payload", () => {
+    expect(
+      buildTelefunSessionUpdatePayload({
+        status: "completed",
+        score: 87,
+        feedback: "Artikulasi baik, tempo perlu lebih stabil.",
+      }),
+    ).toEqual({
+      status: "completed",
+      score: 87,
+      feedback: "Artikulasi baik, tempo perlu lebih stabil.",
+    });
+  });
+
+  it("builds an Indonesian feedback summary from voice assessment sections", () => {
+    const summary = buildTelefunFeedbackSummary({
+      overallScore: 8,
+      speakingRate: { score: 8, wordsPerMinute: 145, verdict: "Baik", feedback: "Tempo bicara stabil." },
+      intonation: { score: 7, verdict: "Cukup", feedback: "Intonasi perlu lebih hangat." },
+      articulation: { score: 8, verdict: "Baik", feedback: "Artikulasi jelas." },
+      fillerWords: { score: 9, count: 1, examples: ["eee"], verdict: "Baik", feedback: "Kata pengisi minim." },
+      emotionalTone: { score: 7, dominant: "tenang", verdict: "Cukup", feedback: "Empati perlu lebih eksplisit." },
+      transcript: "",
+      highlights: [],
+      strengths: [],
+    });
+
+    expect(summary).toContain("Tempo bicara stabil.");
+    expect(summary).toContain("Intonasi perlu lebih hangat.");
+    expect(summary).toContain("Artikulasi jelas.");
   });
 });

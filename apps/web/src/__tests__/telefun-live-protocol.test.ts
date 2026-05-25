@@ -4,6 +4,9 @@ import {
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
   buildRealtimeAudioMessage,
+  extractGeminiInlineAudioChunks,
+  parsePcmSampleRate,
+  shouldSendRealtimeAudio,
 } from "../routes/telefun/services/liveProtocol";
 
 describe("telefun live protocol", () => {
@@ -63,5 +66,47 @@ describe("telefun live protocol", () => {
       systemInstruction: "test",
     });
     expect(message.setup.model).not.toBe("models/openai-audio");
+  });
+
+  it("extracts Gemini inline audio chunks from JSON server messages", () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const b64 = Buffer.from(bytes).toString("base64");
+
+    const chunks = extractGeminiInlineAudioChunks({
+      serverContent: {
+        modelTurn: {
+          parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: b64 } }],
+        },
+      },
+    });
+
+    expect(chunks).toHaveLength(1);
+    expect(Array.from(chunks[0].data)).toEqual([1, 2, 3, 4]);
+    expect(chunks[0].sampleRate).toBe(24000);
+  });
+
+  it("defaults Gemini output PCM sample rate to 24000", () => {
+    expect(parsePcmSampleRate(undefined)).toBe(24000);
+    expect(parsePcmSampleRate("audio/pcm;rate=16000")).toBe(16000);
+  });
+
+  it("does not send realtime audio before setupComplete", () => {
+    expect(
+      shouldSendRealtimeAudio({
+        wsReady: true,
+        setupComplete: false,
+        muted: false,
+        held: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldSendRealtimeAudio({
+        wsReady: true,
+        setupComplete: true,
+        muted: false,
+        held: false,
+      }),
+    ).toBe(true);
   });
 });
