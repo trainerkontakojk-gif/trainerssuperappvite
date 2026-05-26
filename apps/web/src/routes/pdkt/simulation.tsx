@@ -417,18 +417,22 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
     } else if (session.config && session.emails && session.emails.length > 0) {
       const firstInbound = session.emails.find((e: any) => !e.isAgent);
       const syntheticId = "replay_" + session.id;
+      const ts = typeof session.timestamp === "string"
+        ? session.timestamp
+        : (session.timestamp instanceof Date ? session.timestamp.toISOString() : new Date().toISOString());
+      const cfg = session.config as any;
       const syntheticItem: PdktMailboxItem = {
         id: syntheticId,
         user_id: "",
         status: "replied",
-        created_at: session.timestamp || new Date().toISOString(),
-        sender_name: session.config.identity?.name || "Konsumen",
-        sender_email: session.config.identity?.email || "",
+        created_at: ts,
+        sender_name: cfg.identity?.name || "Konsumen",
+        sender_email: cfg.identity?.email || "",
         subject: (firstInbound as any)?.subject || "",
-        snippet: (firstInbound as any)?.body?.substring(0, 100) || "",
-        scenario_snapshot: session.config.scenarios?.[0] || ({} as PdktScenario),
-        config_snapshot: session.config,
-        inbound_email: firstInbound || {
+        snippet: ((firstInbound as any)?.body as string)?.substring(0, 100) || "",
+        scenario_snapshot: cfg.scenarios?.[0] || ({} as PdktScenario),
+        config_snapshot: cfg as any,
+        inbound_email: (firstInbound || {
           id: "msg_replay",
           from: "",
           to: "",
@@ -436,11 +440,11 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
           body: "",
           timestamp: new Date().toISOString(),
           isAgent: false,
-        },
-        emails_thread: session.emails,
+        }) as any,
+        emails_thread: session.emails as any,
         history_id: session.id,
-        last_activity_at: session.timestamp || new Date().toISOString(),
-        time_taken: session.timeTaken,
+        last_activity_at: ts,
+        time_taken: session.timeTaken ?? null,
       };
 
       setEvaluations((prev) => {
