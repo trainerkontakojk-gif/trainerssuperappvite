@@ -256,14 +256,14 @@ const pdktRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt",
   component: PdktLanding,
-  beforeLoad: requireRole(["trainer", "qa", "admin"]),
+  beforeLoad: requireRole(["trainer", "leader", "admin"]),
 });
 
 const pdktSimulationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt/simulation",
   component: PdktSimulation,
-  beforeLoad: requireRole(["trainer", "qa", "admin"]),
+  beforeLoad: requireRole(["trainer", "leader", "admin"]),
 });
 
 const pdktHistoryRoute = createRoute({

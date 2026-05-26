@@ -32,7 +32,7 @@ const pdkt = new Hono<{ Variables: Variables }>();
 
 pdkt.get(
   "/scenarios",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   (c) => {
     return c.json({ success: true, data: pdktService.getScenarios() });
   },
@@ -40,7 +40,7 @@ pdkt.get(
 
 pdkt.get(
   "/consumer-types",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   (c) => {
     return c.json({ success: true, data: pdktService.getConsumerTypes() });
   },
@@ -48,7 +48,7 @@ pdkt.get(
 
 pdkt.post(
   "/generate-identity",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   (c) => {
     return c.json({
       success: true,
@@ -59,7 +59,7 @@ pdkt.post(
 
 pdkt.post(
   "/generate-template",
-  requireRole("admin", "trainer", "qa"),
+  requireRole("admin", "trainer", "leader"),
   aiRateLimitMiddleware,
   zValidator("json", generateEmailSchema),
   async (c) => {
@@ -129,7 +129,7 @@ pdkt.post(
 
 pdkt.post(
   "/evaluate",
-  requireRole("admin", "trainer", "qa"),
+  requireRole("admin", "trainer", "leader"),
   aiRateLimitMiddleware,
   zValidator("json", evaluateSchema),
   async (c) => {
@@ -172,7 +172,7 @@ pdkt.post(
 
 pdkt.get(
   "/mailbox",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
     const authHeader = c.req.header("Authorization");
@@ -199,7 +199,7 @@ pdkt.get(
 
 pdkt.post(
   "/mailbox/batch",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   zValidator("json", pdktMailboxBatchSchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -227,7 +227,7 @@ pdkt.post(
 
 pdkt.delete(
   "/mailbox/:id",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
@@ -255,7 +255,7 @@ pdkt.delete(
 
 pdkt.post(
   "/mailbox/reply",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   zValidator("json", pdktMailboxReplySchema),
   async (c) => {
     const body = c.req.valid("json");
@@ -295,7 +295,7 @@ pdkt.post(
 
 pdkt.get(
   "/history/eval/:id",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
@@ -342,7 +342,7 @@ pdkt.get(
 
 pdkt.post(
   "/history/retry-eval",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     try {
       const body = await c.req.json();
@@ -410,7 +410,7 @@ pdkt.post(
 
 pdkt.get(
   "/settings",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
     const authHeader = c.req.header("Authorization");
@@ -447,7 +447,7 @@ pdkt.get(
 
 pdkt.post(
   "/settings",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
     const authHeader = c.req.header("Authorization");
@@ -502,7 +502,7 @@ pdkt.post(
 
 pdkt.get(
   "/history",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
     const authHeader = c.req.header("Authorization");
@@ -536,7 +536,7 @@ pdkt.get(
 
 pdkt.delete(
   "/history",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
     const adminClient = createAdminClient();
@@ -567,7 +567,7 @@ pdkt.delete(
 
 pdkt.delete(
   "/history/:id",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");

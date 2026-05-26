@@ -125,11 +125,11 @@ describe("LeaderAccessGate", () => {
           <div data-testid="child">Content</div>
         </LeaderAccessGate>,
       );
-      expect(screen.getByText("Anda belum mengajukan akses")).toBeDefined();
+      expect(screen.getByText("Akses Belum Tersedia")).toBeDefined();
       expect(screen.getByText("Ajukan Akses")).toBeDefined();
     });
 
-    it("shows pending status with disabled button", () => {
+    it("shows pending status with info message", () => {
       mockUseAccessStatus.mockReturnValue({
         status: "pending",
         createdAt: "2025-01-01",
@@ -144,9 +144,11 @@ describe("LeaderAccessGate", () => {
         </LeaderAccessGate>,
       );
       expect(
-        screen.getByText("Request Anda sedang dalam proses review"),
+        screen.getByText("Menunggu Persetujuan"),
       ).toBeDefined();
-      expect(screen.getByText("Menunggu Approval")).toBeDefined();
+      expect(
+        screen.getByText(/Estimasi normal sekitar 1x24 jam/),
+      ).toBeDefined();
     });
 
     it("shows rejected status with ajukan lagi button", () => {
@@ -164,7 +166,7 @@ describe("LeaderAccessGate", () => {
         </LeaderAccessGate>,
       );
       expect(
-        screen.getByText("Request akses Anda telah ditolak"),
+        screen.getByText("Akses Ditolak"),
       ).toBeDefined();
       expect(screen.getByText("Ajukan Akses Lagi")).toBeDefined();
     });
@@ -183,7 +185,7 @@ describe("LeaderAccessGate", () => {
           <div data-testid="child">Content</div>
         </LeaderAccessGate>,
       );
-      expect(screen.getByText("Akses Anda telah dicabut")).toBeDefined();
+      expect(screen.getByText("Akses Dicabut")).toBeDefined();
       expect(screen.getByText("Ajukan Akses Lagi")).toBeDefined();
     });
 
