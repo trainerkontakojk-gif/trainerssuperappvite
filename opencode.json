@@ -10,6 +10,7 @@
       }
     }
   },
+  "plugin": ["ecc-universal"],
   "permission": {
     "*": "allow"
   }

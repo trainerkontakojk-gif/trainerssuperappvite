@@ -22,6 +22,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/pg": "^8.20.0",
+    "ecc-universal": "^1.10.0",
     "eslint": "^10.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

@@ -14,9 +14,20 @@
 - Gunakan subagent untuk tugas yang memerlukan eksplorasi codebase mendalam atau riset multi-step.
 - Berikan instruksi yang spesifik tentang arsitektur monorepo (apps/web, apps/api, packages/types).
 
-## Superpowers Skills
+## ECC Plugin
 
-**WAJIB** panggil `Skill` tool di setiap task — cek apakah ada skill yang relevan sebelum memulai pekerjaan. Skill tersedia untuk: brainstorming, writing-plans, TDD, customize-opencode, dll. Ikuti workflow skill secara disiplin.
+**WAJIB** gunakan plugin **ECC (Everything Claude Code)** (`ecc-universal`) di setiap task. ECC menyediakan 48 specialized agents, 183 skills, dan 79 commands. Pilih agent/skill yang sesuai dengan konteks task:
+
+- Fitur kompleks / refactoring → **planner** agent
+- Bug fix / fitur baru → **tdd-guide** agent
+- Arsitektur / system design → **architect** agent
+- Setelah menulis kode → **code-reviewer** agent
+- Kode sensitif / security → **security-reviewer** agent
+- Build error → **build-error-resolver** agent
+- Cek dokumentasi library → **docs-lookup** agent (Context7)
+- Autonomous loop / monitoring → **loop-operator** agent
+
+ECS agents bisa dipanggil via `Task` tool dengan `subagent_type` yang sesuai.
 
 ## Commands (Monorepo)
 
@@ -103,11 +114,11 @@ Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
 2. **Design** — Arsitektur, alur data, component tree, interface changes, dan keputusan teknis.
 3. **Tasklist** — Langkah-langkah implementasi terperinci, file affected, test strategy, timeline estimasi, dependensi, risk register, dan rollback plan.
 
-### 7. Selalu Referensi Context7 + Superpowers untuk Dokumentasi
+### 7. Selalu Referensi Context7 + ECC untuk Dokumentasi
 
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
 
-1. Panggil `Skill` tool untuk cek apakah ada superpower skill yang relevan.
+1. Panggil ECC **docs-lookup** agent (via `Task` tool) untuk cek dokumentasi terbaru library.
 2. Gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
    - Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
    - Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
