@@ -106,13 +106,30 @@ export default function ProfilerAnalytics() {
       return;
     }
 
+    if (folders.length > 0) {
+      const folderNames = new Set(folders.map((f) => f.name));
+      if (!folderNames.has(selectedBatch)) {
+        const firstFolder = folders[0];
+        if (firstFolder?.name) {
+          navigate({
+            to: "/profiler/analytics",
+            search: { batch: firstFolder.name },
+            replace: true,
+          });
+        } else {
+          navigate({ to: "/profiler", replace: true });
+        }
+        return;
+      }
+    }
+
     setLoading(true);
     profilerApi
       .getPesertaByBatch(selectedBatch)
       .then(setPeserta)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [selectedBatch]);
+  }, [selectedBatch, folders]);
 
   const handleBatchChange = (newBatch: string) => {
     if (newBatch === selectedBatch) {

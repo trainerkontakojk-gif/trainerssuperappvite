@@ -270,6 +270,7 @@ export interface DashboardData {
   sparklines: Record<string, { label: string; value: number }[]>;
   availableYears: number[];
   currentYear: number;
+  availableServices: ServiceType[];
 }
 
 export interface AgentDetailData {

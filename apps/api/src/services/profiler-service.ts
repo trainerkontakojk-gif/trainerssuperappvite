@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
-import { getApprovedRequestIds } from "./leader-access-service";
+import { getLeaderScopeSnapshot } from "./leader-access-service";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -26,63 +26,43 @@ export async function getAccessiblePesertaIds(
   }
 
   if ((LEADER_ROLES as readonly string[]).includes(role)) {
-    const requestIds = await getApprovedRequestIds(userId, "ktp");
-
-    if (!requestIds || requestIds.length === 0) return [];
-
-    const { data: groupLinks } = await supabaseAdmin
-      .from("leader_access_request_groups")
-      .select("access_group_id")
-      .in("request_id", requestIds);
-
-    if (!groupLinks || groupLinks.length === 0) return [];
-    const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
-
-    const { data: items } = await supabaseAdmin
-      .from("access_group_items")
-      .select("field_name, field_value")
-      .in("access_group_id", groupIds)
-      .eq("is_active", true);
-
-    if (!items || items.length === 0) return [];
-
-    const directIds: string[] = [];
-    const batchNames: string[] = [];
-    const tims: string[] = [];
-
-    for (const item of items) {
-      if (item.field_name === "peserta_id") directIds.push(item.field_value);
-      else if (item.field_name === "batch_name")
-        batchNames.push(item.field_value);
-      else if (item.field_name === "tim") tims.push(item.field_value);
-    }
-
-    const resolvedIds = [...directIds];
-
-    if (batchNames.length > 0) {
-      const { data: batchData } = await supabaseAdmin
-        .from("profiler_peserta")
-        .select("id")
-        .in("batch_name", batchNames);
-      if (batchData) resolvedIds.push(...batchData.map((b) => b.id));
-    }
-
-    if (tims.length > 0) {
-      const { data: timData } = await supabaseAdmin
-        .from("profiler_peserta")
-        .select("id")
-        .in("tim", tims);
-      if (timData) resolvedIds.push(...timData.map((t) => t.id));
-    }
-
-    return [...new Set(resolvedIds)];
+    const snapshot = await getLeaderScopeSnapshot(userId, "ktp");
+    return snapshot.pesertaIds;
   }
 
   return [];
 }
 
 // ── Years ────────────────────────────────────────────────
-export async function getYears(): Promise<ProfilerYear[]> {
+export async function getYears(
+  accessibleIds?: string[] | null,
+): Promise<ProfilerYear[]> {
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return [];
+    const { data: scopedBatchRows } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("batch_name")
+      .in("id", accessibleIds);
+    const scopedBatches = [
+      ...new Set((scopedBatchRows ?? []).map((r) => r.batch_name).filter(Boolean)),
+    ] as string[];
+    if (scopedBatches.length === 0) return [];
+    const { data: scopedFolders } = await supabaseAdmin
+      .from("profiler_folders")
+      .select("year_id")
+      .in("name", scopedBatches);
+    const scopedYearIds = [
+      ...new Set((scopedFolders ?? []).map((f) => f.year_id).filter(Boolean)),
+    ] as string[];
+    if (scopedYearIds.length === 0) return [];
+    const { data } = await supabaseAdmin
+      .from("profiler_years")
+      .select("*")
+      .in("id", scopedYearIds)
+      .order("year", { ascending: false });
+    return data ?? [];
+  }
+
   const { data } = await supabaseAdmin
     .from("profiler_years")
     .select("*")
@@ -110,7 +90,27 @@ export async function deleteYear(id: string): Promise<void> {
 }
 
 // ── Folders ──────────────────────────────────────────────
-export async function getFolders(): Promise<ProfilerFolder[]> {
+export async function getFolders(
+  accessibleIds?: string[] | null,
+): Promise<ProfilerFolder[]> {
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return [];
+    const { data: scopedBatchRows } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("batch_name")
+      .in("id", accessibleIds);
+    const scopedBatches = [
+      ...new Set((scopedBatchRows ?? []).map((r) => r.batch_name).filter(Boolean)),
+    ] as string[];
+    if (scopedBatches.length === 0) return [];
+    const { data } = await supabaseAdmin
+      .from("profiler_folders")
+      .select("*")
+      .in("name", scopedBatches)
+      .order("name");
+    return data ?? [];
+  }
+
   const { data } = await supabaseAdmin
     .from("profiler_folders")
     .select("*")
@@ -774,7 +774,26 @@ export async function getGlobalPesertaPool(
 }
 
 // ── Teams ────────────────────────────────────────────────
-export async function getTeams(): Promise<ProfilerTim[]> {
+export async function getTeams(
+  accessibleIds?: string[] | null,
+): Promise<ProfilerTim[]> {
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return [];
+    const { data: scopedTimRows } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("tim")
+      .in("id", accessibleIds);
+    const scopedTims = [
+      ...new Set((scopedTimRows ?? []).map((r) => r.tim).filter(Boolean)),
+    ] as string[];
+    const { data } = await supabaseAdmin
+      .from("profiler_tim_list")
+      .select("*")
+      .in("nama", scopedTims)
+      .order("nama");
+    return data ?? [];
+  }
+
   const { data } = await supabaseAdmin
     .from("profiler_tim_list")
     .select("*")

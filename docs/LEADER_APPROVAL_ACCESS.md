@@ -85,12 +85,51 @@ Leader opens KTP/SIDAK page
 |----------|------|--------|---------|
 | `getAccessibleAgentIds(userId, role)` | `apps/api/src/services/sidak-service.ts:27` | SIDAK | All SIDAK read routes |
 | `getAccessiblePesertaIds(userId, role)` | `apps/api/src/services/profiler-service.ts:12` | KTP | All Profiler read routes |
+| `getAccessibleSidakFilters(userId, role)` | `apps/api/src/services/sidak-service.ts:60` | SIDAK | SIDAK metadata + service enforcement |
+| `getLeaderScopeSnapshot(userId, module)` | `apps/api/src/services/leader-access-service.ts:100` | Shared | Centralized scope resolution (shared by KTP+SIDAK) |
 
-Both functions follow the same logic:
-1. Admin/Trainer → returns `null` (no filter, full access)
-2. Agent → returns own peserta ID or empty
-3. Leader → delegates to `getApprovedRequestIds(userId, module)` from shared helper, then resolves scope from approved `leader_access_request_groups` + `access_group_items`; returns `string[]` or `[]` (fail-closed)
-4. Other roles → returns `[]` (deny)
+Both `getAccessibleAgentIds` and `getAccessiblePesertaIds` now delegate to the **shared** `getLeaderScopeSnapshot()` helper which extracts `pesertaIds`, `batchNames`, `tims`, and `serviceTypes` from approved access group items in a single normalized snapshot. This eliminates duplicate parsing logic that was previously in both services.
+
+`getAccessibleSidakFilters()` extends this for SIDAK by additionally resolving allowed folder names and service types for UI filtering.
+
+### Metadata Scoping (V2 — Hardened)
+
+Starting from this hardening, **metadata endpoints are scoped** for leaders:
+
+| Endpoint | Leader Behavior | Admin/Trainer |
+|----------|----------------|---------------|
+| `GET /profiler/years` | Only years containing folders with scoped participants | All years |
+| `GET /profiler/folders` | Only folders containing scoped participants | All folders |
+| `GET /profiler/teams` | Only teams appearing in scoped participants | All teams |
+| `GET /profiler/counts` | Already scoped (was scoped before) | All counts |
+| `GET /sidak/folders` | Only folders containing scoped agents | All folders |
+| `GET /sidak/folders/:folder/agents` | Only scoped agents in that folder; empty if folder not in scope | All agents |
+
+### SIDAK Service Type Enforcement
+
+`service_type` items from access groups are now **first-class enforcement**, not just UI labels:
+
+1. **Dashboard**: `availableServices` field in response, data filtered by allowed services
+2. **Ranking**: `availableServices` in response, folders scoped by leader's allowed agents
+3. **Agent Directory (`getAgentDirectorySummary`)**: Only loads temuan and indicators for allowed services
+4. **Agent Detail (`getAgentDetail`)**: Only queries temuan in allowed service types
+5. **Request validation**: If a leader requests a service outside their allowed set, the backend returns empty results with the correct allowed services in metadata
+
+### SIDAK Folder Filter Enforcement
+
+- `folder_ids` parameter in `getDashboardData()` is now **actually enforced** — batch names are resolved from folder IDs and the temuan query filters on `profiler_peserta.batch_name`
+- Previously, `folder_ids` was only cosmetic (folders in UI unchanged when selected)
+- Non-leader users can still filter by any folder as before
+
+### Frontend Normalization
+
+To prevent stale/confusing state when a leader's scope changes:
+
+- **Dashboard**: Invalid `selectedService` auto-resets to first available; invalid folder resets to ALL
+- **Ranking**: Same normalization for service and folder selections
+- **Agent Detail**: Service list derived from actual agent data; team switcher uses scoped `/sidak/folders`
+- **KTP Table/Slides/Analytics/Export**: If the batch query param is not in scoped folder results, auto-redirect to first valid batch or back to workspace
+- **KTP Landing**: If selected batch disappears from folder list, selection auto-clears
 
 ### Shared Helper: Approal Resolution
 
@@ -198,6 +237,12 @@ Leader submits request via Supabase client RLS INSERT into `leader_access_reques
 13. Leader with `module = "all"` approval → has access to both KTP and SIDAK, scope resolver works for both.
 14. Leader non-approved deep-links to `/sidak/dashboard` or `/profiler/table` → redirected to landing page.
 15. Leader re-opens blocked tab → status refetches and reflects latest approval/revoke.
+16. **Leader KTP metadata**: Year/folder/team dropdowns only show options with participants in scope.
+17. **Leader SIDAK folders**: Dashboard and ranking folder selector only shows folders with scoped agents.
+18. **Leader SIDAK service_type**: If approved for only `chat`, dashboard/ranking only shows `chat` option, not `call`/`email`/etc.
+19. **Leader SIDAK agent detail**: Trend and temuan only reflect allowed service types (no `call` data when leader only allowed `chat`).
+20. **Leader URL normalization**: Opening a stale URL with out-of-scope batch/folder/service auto-resets to a valid option.
+21. **Admin/trainer metadata**: All years, folders, teams, and services still visible (no regressions).
 
 ### Regression Commands
 

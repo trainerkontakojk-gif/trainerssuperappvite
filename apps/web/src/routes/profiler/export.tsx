@@ -91,6 +91,20 @@ export default function ProfilerExport() {
       profilerApi.getPesertaByBatch(selectedBatch),
     ])
       .then(([y, f, p]) => {
+        const folderNames = new Set(f.map((folder: any) => folder.name));
+        if (selectedBatch && f.length > 0 && !folderNames.has(selectedBatch)) {
+          const firstFolder = f[0];
+          if (firstFolder?.name) {
+            navigate({
+              to: "/profiler/export",
+              search: { batch: firstFolder.name },
+              replace: true,
+            });
+          } else {
+            navigate({ to: "/profiler", replace: true });
+          }
+          return;
+        }
         setInitialYears(y);
         setInitialFolders(f);
         setPeserta(p);

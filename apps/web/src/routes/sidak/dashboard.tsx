@@ -90,6 +90,35 @@ export default function SidakDashboardPage() {
     `/sidak/dashboard?${queryParams}`,
   );
 
+  const availableServices = data?.availableServices ?? [];
+  const availableYears = data?.availableYears ?? [new Date().getFullYear()];
+  const folders = (data?.folders ?? []).map((f: any) => ({
+    id: f.id ?? "",
+    nama: f.name ?? f.nama ?? "",
+  }));
+
+  // Normalize invalid selections
+  useEffect(() => {
+    if (loading || !data) return;
+    if (availableServices.length > 0 && !availableServices.includes(selectedService)) {
+      setSelectedService(availableServices[0]);
+    }
+  }, [availableServices, selectedService, loading, data]);
+
+  useEffect(() => {
+    if (loading || !data) return;
+    if (selectedFolder !== "ALL" && folders.length > 0) {
+      const valid = folders.some((f) => f.id === selectedFolder);
+      if (!valid) setSelectedFolder("ALL");
+    }
+  }, [folders, selectedFolder, loading, data]);
+
+  // Compute leader locked service
+  const leaderLockedService = useMemo(() => {
+    if (availableServices.length === 1) return availableServices[0];
+    return null;
+  }, [availableServices]);
+
   const paramTrendDatasets = data?.paramTrend?.datasets;
   const defaultHiddenParams = useMemo(() => {
     const next = new Set<string>();
@@ -142,12 +171,6 @@ export default function SidakDashboardPage() {
       });
   }, [paretoSource]);
 
-  const availableYears = data?.availableYears ?? [new Date().getFullYear()];
-  const folders = (data?.folders ?? []).map((f: any) => ({
-    id: f.id ?? "",
-    nama: f.name ?? f.nama ?? "",
-  }));
-
   const sparklines = data?.sparklines ?? {};
   const calcDelta = (id: string, invert: boolean): number | null => {
     const points = sparklines[id];
@@ -185,6 +208,8 @@ export default function SidakDashboardPage() {
           onMonthRangeChange={(s, e) => { setStartMonth(s); setEndMonth(e); }}
           folders={folders}
           availableYears={availableYears}
+          leaderLockedService={leaderLockedService}
+          availableServices={availableServices}
         />
 
         {/* Loading (initial) */}

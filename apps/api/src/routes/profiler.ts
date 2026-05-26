@@ -17,7 +17,8 @@ async function resolveKtpScope(c: any): Promise<string[] | null> {
 
 // ── Years ────────────────────────────────────────────────
 profiler.get("/years", requireRole("admin", "trainer", "leader"), async (c) => {
-  const years = await profilerService.getYears();
+  const scope = await resolveKtpScope(c);
+  const years = await profilerService.getYears(scope);
   return c.json({ success: true, data: years });
 });
 
@@ -71,7 +72,8 @@ profiler.get(
   "/folders",
   requireRole("admin", "trainer", "leader"),
   async (c) => {
-    const folders = await profilerService.getFolders();
+    const scope = await resolveKtpScope(c);
+    const folders = await profilerService.getFolders(scope);
     return c.json({ success: true, data: folders });
   },
 );
@@ -553,7 +555,8 @@ profiler.post(
 
 // ── Teams ────────────────────────────────────────────────
 profiler.get("/teams", requireRole("admin", "trainer", "leader"), async (c) => {
-  const teams = await profilerService.getTeams();
+  const scope = await resolveKtpScope(c);
+  const teams = await profilerService.getTeams(scope);
   return c.json({ success: true, data: teams });
 });
 

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import type { ServiceType } from "@trainers/types";
 
 export type ApprovalStatus =
   | "none"
@@ -19,6 +20,14 @@ export interface LeaderAccessStatusItem {
   status: ApprovalStatus;
   module: string;
   created_at: string | null;
+}
+
+export interface LeaderScopeSnapshot {
+  requestIds: string[];
+  pesertaIds: string[];
+  batchNames: string[];
+  tims: string[];
+  serviceTypes: ServiceType[];
 }
 
 export async function fetchLeaderModuleRequests(
@@ -96,4 +105,80 @@ export async function getApprovedRequestIds(
         (r.module === module || r.module === "all"),
     )
     .map((r) => r.id);
+}
+
+export async function getLeaderScopeSnapshot(
+  userId: string,
+  module: string,
+): Promise<LeaderScopeSnapshot> {
+  const requestIds = await getApprovedRequestIds(userId, module);
+  const empty: LeaderScopeSnapshot = {
+    requestIds: [],
+    pesertaIds: [],
+    batchNames: [],
+    tims: [],
+    serviceTypes: [],
+  };
+
+  if (!requestIds || requestIds.length === 0) return empty;
+
+  const { data: groupLinks } = await supabaseAdmin
+    .from("leader_access_request_groups")
+    .select("access_group_id")
+    .in("request_id", requestIds);
+
+  if (!groupLinks || groupLinks.length === 0) return { ...empty, requestIds };
+
+  const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
+
+  const { data: items } = await supabaseAdmin
+    .from("access_group_items")
+    .select("field_name, field_value")
+    .in("access_group_id", groupIds)
+    .eq("is_active", true);
+
+  if (!items || items.length === 0) return { ...empty, requestIds };
+
+  const rawPesertaIds: string[] = [];
+  const batchNames: string[] = [];
+  const tims: string[] = [];
+  const serviceTypes: string[] = [];
+
+  for (const item of items) {
+    if (item.field_name === "peserta_id") rawPesertaIds.push(item.field_value);
+    else if (item.field_name === "batch_name") batchNames.push(item.field_value);
+    else if (item.field_name === "tim") tims.push(item.field_value);
+    else if (item.field_name === "service_type") serviceTypes.push(item.field_value);
+  }
+
+  const resolvedIds = [...rawPesertaIds];
+
+  if (batchNames.length > 0) {
+    const { data: batchData } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("id")
+      .in("batch_name", batchNames);
+    if (batchData) resolvedIds.push(...batchData.map((b) => b.id));
+  }
+
+  if (tims.length > 0) {
+    const { data: timData } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("id")
+      .in("tim", tims);
+    if (timData) resolvedIds.push(...timData.map((t) => t.id));
+  }
+
+  const validServiceTypes = serviceTypes.filter(
+    (s): s is ServiceType =>
+      ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(s),
+  );
+
+  return {
+    requestIds,
+    pesertaIds: [...new Set(resolvedIds)],
+    batchNames: [...new Set(batchNames)],
+    tims: [...new Set(tims)],
+    serviceTypes: [...new Set(validServiceTypes)],
+  };
 }

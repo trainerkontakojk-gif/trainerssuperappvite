@@ -24,6 +24,7 @@ interface Props {
   folders: { id: string; nama: string }[];
   availableYears: number[];
   leaderLockedService?: string | null;
+  availableServices?: string[];
 }
 
 export default function DashboardFilters({
@@ -39,7 +40,21 @@ export default function DashboardFilters({
   folders,
   availableYears,
   leaderLockedService,
+  availableServices,
 }: Props) {
+  const serviceOptions = availableServices?.length
+    ? availableServices
+    : Object.entries(SERVICE_LABELS).map(([k]) => k);
+
+  const serviceLabels: Record<string, string> = availableServices?.length
+    ? Object.fromEntries(
+        availableServices.map((svc) => [
+          svc,
+          SERVICE_LABELS[svc] || svc,
+        ]),
+      )
+    : SERVICE_LABELS;
+
   return (
     <div className="flex flex-col gap-3 rounded-[2rem] border border-border/70 bg-card px-3 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:flex-row lg:items-center lg:gap-4">
       <div className="flex shrink-0 items-center gap-3 px-2 py-1">
@@ -71,12 +86,12 @@ export default function DashboardFilters({
             >
               {leaderLockedService ? (
                 <option value={leaderLockedService}>
-                  {SERVICE_LABELS[leaderLockedService] || leaderLockedService}
+                  {serviceLabels[leaderLockedService] || leaderLockedService}
                 </option>
               ) : (
-                Object.entries(SERVICE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
+                serviceOptions.map((svc) => (
+                  <option key={svc} value={svc}>
+                    {serviceLabels[svc] || svc}
                   </option>
                 ))
               )}

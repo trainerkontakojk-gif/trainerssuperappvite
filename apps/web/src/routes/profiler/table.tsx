@@ -611,10 +611,25 @@ export default function ProfilerTable() {
       profilerApi.getYears(),
       profilerApi.getTeams()
     ]).then(([p, f, y, t]) => {
+      // Normalize: if batch not in scoped folders, redirect
+      const folderNames = new Set(f.map((folder: any) => folder.name));
+      if (batchName && f.length > 0 && !folderNames.has(batchName)) {
+        const firstFolder = f[0];
+        if (firstFolder?.name) {
+          router.navigate({
+            to: "/profiler/table",
+            search: { batch: firstFolder.name },
+            replace: true,
+          });
+        } else {
+          router.navigate({ to: "/profiler" });
+        }
+        return;
+      }
       setPeserta(p);
       setInitialFolders(f);
       setInitialYears(y);
-      setInitialTimList(t.map(team => team.nama));
+      setInitialTimList(t.map((team: any) => team.nama));
       setLoading(false);
     }).catch(err => {
       console.error(err);

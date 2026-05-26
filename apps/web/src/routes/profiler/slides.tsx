@@ -160,6 +160,20 @@ export default function ProfilerSlides() {
       profilerApi.getPesertaByBatch(batchName),
     ])
       .then(([y, f, pList]) => {
+        const folderNames = new Set(f.map((folder: any) => folder.name));
+        if (batchName && f.length > 0 && !folderNames.has(batchName)) {
+          const firstFolder = f[0];
+          if (firstFolder?.name) {
+            navigate({
+              to: "/profiler/slides",
+              search: { batch: firstFolder.name },
+              replace: true,
+            });
+          } else {
+            navigate({ to: "/profiler", replace: true });
+          }
+          return;
+        }
         setInitialYears(y);
         setInitialFolders(f);
         setPeserta(pList);

@@ -103,9 +103,11 @@ export function useAgentDetail(agentId: string) {
 
   // Init selectedService to first available service once data loads
   useEffect(() => {
-    if (!data || selectedService) return;
+    if (!data || !data.periodSummaries) return;
     const svcs = [...new Set((data.periodSummaries ?? []).map((s) => s.serviceType))];
-    if (svcs.length > 0) setSelectedService(svcs[0]);
+    if (svcs.length === 0) return;
+    if (selectedService && svcs.includes(selectedService)) return;
+    setSelectedService(svcs[0]);
   }, [data, selectedService]);
 
   // Init selectedTeam from peserta data once loaded

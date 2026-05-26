@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
-import { getApprovedRequestIds } from "./leader-access-service";
+import { getLeaderScopeSnapshot } from "./leader-access-service";
 import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
@@ -41,59 +41,115 @@ export async function getAccessibleAgentIds(
   }
 
   if ((LEADER_ROLES as readonly string[]).includes(role)) {
-    const requestIds = await getApprovedRequestIds(userId, "sidak");
-
-    if (!requestIds || requestIds.length === 0) return [];
-
-    const { data: groupLinks } = await supabaseAdmin
-      .from("leader_access_request_groups")
-      .select("access_group_id")
-      .in("request_id", requestIds);
-
-    if (!groupLinks || groupLinks.length === 0) return [];
-    const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
-
-    const { data: items } = await supabaseAdmin
-      .from("access_group_items")
-      .select("field_name, field_value")
-      .in("access_group_id", groupIds)
-      .eq("is_active", true);
-
-    if (!items || items.length === 0) return [];
-
-    const directIds: string[] = [];
-    const batchNames: string[] = [];
-    const tims: string[] = [];
-
-    for (const item of items) {
-      if (item.field_name === "peserta_id") directIds.push(item.field_value);
-      else if (item.field_name === "batch_name")
-        batchNames.push(item.field_value);
-      else if (item.field_name === "tim") tims.push(item.field_value);
-    }
-
-    const resolvedIds = [...directIds];
-
-    if (batchNames.length > 0) {
-      const { data: batchData } = await supabaseAdmin
-        .from("profiler_peserta")
-        .select("id")
-        .in("batch_name", batchNames);
-      if (batchData) resolvedIds.push(...batchData.map((b) => b.id));
-    }
-
-    if (tims.length > 0) {
-      const { data: timData } = await supabaseAdmin
-        .from("profiler_peserta")
-        .select("id")
-        .in("tim", tims);
-      if (timData) resolvedIds.push(...timData.map((t) => t.id));
-    }
-
-    return [...new Set(resolvedIds)];
+    const snapshot = await getLeaderScopeSnapshot(userId, "sidak");
+    return snapshot.pesertaIds;
   }
 
   return [];
+}
+
+export interface SidakFilterScope {
+  agentIds: string[];
+  allowedFolders: { id: string; name: string }[];
+  allowedServices: ServiceType[];
+  serviceTypeLocked: boolean;
+}
+
+export async function getAccessibleSidakFilters(
+  userId: string,
+  role: string,
+): Promise<SidakFilterScope | null> {
+  if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
+
+  if ((LEADER_ROLES as readonly string[]).includes(role)) {
+    const snapshot = await getLeaderScopeSnapshot(userId, "sidak");
+
+    if (snapshot.pesertaIds.length === 0) {
+      return {
+        agentIds: [],
+        allowedFolders: [],
+        allowedServices: snapshot.serviceTypes,
+        serviceTypeLocked: snapshot.serviceTypes.length > 0,
+      };
+    }
+
+    const { data: batchRows } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("batch_name")
+      .in("id", snapshot.pesertaIds);
+    const scopedBatches = [
+      ...new Set((batchRows ?? []).map((r) => r.batch_name).filter(Boolean)),
+    ] as string[];
+
+    const { data: folderRows } = await supabaseAdmin
+      .from("profiler_folders")
+      .select("id, name")
+      .in("name", scopedBatches)
+      .order("name");
+
+    return {
+      agentIds: snapshot.pesertaIds,
+      allowedFolders: (folderRows ?? []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+      })),
+      allowedServices: snapshot.serviceTypes,
+      serviceTypeLocked: snapshot.serviceTypes.length > 0,
+    };
+  }
+
+  return {
+    agentIds: [],
+    allowedFolders: [],
+    allowedServices: [],
+    serviceTypeLocked: false,
+  };
+}
+
+async function getFolderNamesByIds(
+  folderIds: string[],
+): Promise<string[]> {
+  const { data } = await supabaseAdmin
+    .from("profiler_folders")
+    .select("name")
+    .in("id", folderIds);
+  return [...new Set((data ?? []).map((f) => f.name))].filter(Boolean);
+}
+
+async function getFoldersByIds(
+  folderIds: string[],
+): Promise<{ id: string; name: string }[]> {
+  const { data } = await supabaseAdmin
+    .from("profiler_folders")
+    .select("id, name")
+    .in("id", folderIds)
+    .order("name");
+  return (data ?? []).map((f: any) => ({ id: f.id, name: f.name }));
+}
+
+function emptyDashboardResponse(periods: QAPeriod[]): DashboardData {
+  return {
+    periods,
+    folders: [],
+    summary: {
+      totalDefects: 0,
+      avgDefectsPerAudit: 0,
+      zeroErrorRate: 0,
+      avgAgentScore: 0,
+      complianceRate: 0,
+      complianceCount: 0,
+      totalAgents: 0,
+    },
+    serviceData: [],
+    topAgents: [],
+    paretoData: [],
+    donutData: { critical: 0, nonCritical: 0, total: 0 },
+    paramTrend: { labels: [], datasets: [] },
+    sparklines: {},
+    availableYears: [],
+    currentYear: new Date().getFullYear(),
+    availableServices: [],
+  };
 }
 
 function roundTo(value: number, digits: number): number {
@@ -782,6 +838,7 @@ export async function getAgentDirectorySummary(
   year: number = new Date().getFullYear(),
   agentIds?: string[],
   includeExcluded?: boolean,
+  allowedServiceTypes?: ServiceType[],
 ): Promise<{ agents: AgentDirectoryEntry[]; batches: string[] }> {
   const { data: agentData } = await supabaseAdmin
     .from("profiler_peserta")
@@ -810,13 +867,16 @@ export async function getAgentDirectorySummary(
   const step = 1000;
   let finished = false;
   while (!finished) {
-    const { data } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("qa_temuan")
       .select(
         "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
       )
-      .eq("tahun", year)
-      .range(from, from + step - 1);
+      .eq("tahun", year);
+    if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+      query = query.in("service_type", allowedServiceTypes);
+    }
+    const { data } = await query.range(from, from + step - 1);
     if (!data || data.length === 0) {
       finished = true;
     } else {
@@ -837,7 +897,10 @@ export async function getAgentDirectorySummary(
   }
 
   const indicatorCache = new Map<string, QAIndicator[]>();
-  for (const st of VALID_SERVICE_TYPES) {
+  const svcsToLoad = allowedServiceTypes && allowedServiceTypes.length > 0
+    ? allowedServiceTypes
+    : VALID_SERVICE_TYPES;
+  for (const st of svcsToLoad) {
     indicatorCache.set(st, await getIndicators(st));
   }
 
@@ -939,6 +1002,7 @@ export async function getAgentDetail(
   serviceType?: string,
   startMonth?: number,
   endMonth?: number,
+  allowedServiceTypes?: ServiceType[],
 ): Promise<AgentDetailData> {
   const [peserta, indicators, periods] = await Promise.all([
     supabaseAdmin
@@ -953,12 +1017,17 @@ export async function getAgentDetail(
   if (peserta.error) throw new Error("Agent tidak ditemukan");
 
   const currentYear = year ?? new Date().getFullYear();
-  const { data: temuan } = await supabaseAdmin
+  let temuanQuery = supabaseAdmin
     .from("qa_temuan")
     .select("*")
     .eq("peserta_id", agentId)
-    .eq("tahun", currentYear)
-    .order("created_at", { ascending: false });
+    .eq("tahun", currentYear);
+
+  if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+    temuanQuery = temuanQuery.in("service_type", allowedServiceTypes);
+  }
+
+  const { data: temuan } = await temuanQuery.order("created_at", { ascending: false });
 
   const rows = temuan ?? [];
   const weight = serviceType
@@ -1108,25 +1177,34 @@ export async function getDashboardData(params: {
   showArchived?: boolean;
   startMonth?: number;
   endMonth?: number;
+  allowedServiceTypes?: ServiceType[];
 }): Promise<DashboardData> {
-  const [periods, folders, indicators, weights] = await Promise.all([
+  const [periods, indicators, weights] = await Promise.all([
     getPeriods(),
-    supabaseAdmin.from("profiler_folders").select("id, name").order("name"),
     getIndicators(),
     supabaseAdmin.from("qa_service_weights").select("*"),
   ]);
 
-  // Get soft-deleted peserta IDs for exclusion (unless showing archived)
   const excludedIds = params.showArchived
     ? []
     : await getSoftDeletedPesertaIds();
+
+  const allowedSvcs =
+    params.allowedServiceTypes && params.allowedServiceTypes.length > 0
+      ? params.allowedServiceTypes
+      : null;
 
   let query = supabaseAdmin
     .from("qa_temuan")
     .select("*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)");
 
   if (params.service_type && params.service_type !== "all") {
+    if (allowedSvcs && !allowedSvcs.includes(params.service_type as ServiceType)) {
+      return emptyDashboardResponse(periods);
+    }
     query = query.eq("service_type", params.service_type);
+  } else if (allowedSvcs) {
+    query = query.in("service_type", allowedSvcs);
   }
   if (params.period_ids && params.period_ids.length > 0) {
     query = query.in("period_id", params.period_ids);
@@ -1141,13 +1219,20 @@ export async function getDashboardData(params: {
     query = query.in("peserta_id", params.agent_ids);
   }
 
-  // Apply soft-delete exclusion at database level
+  if (params.folder_ids && params.folder_ids.length > 0) {
+    const folderNames = await getFolderNamesByIds(params.folder_ids);
+    if (folderNames.length > 0) {
+      query = query.in("profiler_peserta.batch_name", folderNames);
+    }
+  }
+
   if (excludedIds.length > 0) {
     query = query.not("peserta_id", "in", `(${excludedIds.join(",")})`);
   }
 
   const { data: allTemuan } = await query;
   const rows = allTemuan ?? [];
+
   const weightMap = (weights?.data ?? []).reduce(
     (acc: Record<string, any>, w: any) => {
       acc[w.service_type] = w;
@@ -1258,14 +1343,12 @@ export async function getDashboardData(params: {
     totalAgents,
   };
 
-  // Materialized view override: when single period + specific service type, prefer MV data
   if (
     params.period_ids?.length === 1 &&
     params.service_type &&
     params.service_type !== "all"
   ) {
     try {
-      // Try materialized view first (Requirement 3.2)
       const { data: mvRow } = await supabaseAdmin
         .from("mv_qa_period_summary")
         .select("*")
@@ -1283,7 +1366,6 @@ export async function getDashboardData(params: {
           totalAgents: Number(mvRow.total_agents),
         };
       } else {
-        // MV returned no rows — fall back to qa_dashboard_period_summary cache
         const { data: cachedPeriod } = await supabaseAdmin
           .from("qa_dashboard_period_summary")
           .select("*")
@@ -1303,7 +1385,7 @@ export async function getDashboardData(params: {
         }
       }
     } catch {
-      // MV unavailable (Requirement 3.4) — fall back to raw computed values above
+      // MV unavailable — fall back to raw computed values above
     }
   }
 
@@ -1353,15 +1435,27 @@ export async function getDashboardData(params: {
     p.cumulative = cumulative;
   }
 
-  const folderIds =
-    (params.folder_ids?.length ?? 0) > 0
-      ? params.folder_ids!.map((id) => ({ id, name: "" }))
-      : (folders?.data ?? []).map((f: any) => ({ id: f.id, name: f.name }));
+  let folderIds: { id: string; name: string }[];
+  if (params.folder_ids && params.folder_ids.length > 0) {
+    const matchedFolders = await getFoldersByIds(params.folder_ids);
+    folderIds = matchedFolders;
+  } else {
+    const { data: allFolders } = await supabaseAdmin
+      .from("profiler_folders")
+      .select("id, name")
+      .order("name");
+    folderIds = (allFolders ?? []).map((f: any) => ({ id: f.id, name: f.name }));
+  }
 
   const availableYears = [
     ...new Set(rows.map((r) => r.tahun).filter(Boolean)),
   ].sort((a, b) => b - a) as number[];
   const currentYear = params.year ?? new Date().getFullYear();
+
+  const usedServices = new Set(auditedAgents.map((a) => a.rows[0]?.service_type).filter(Boolean));
+  const availableServices = allowedSvcs
+    ? allowedSvcs
+    : VALID_SERVICE_TYPES.filter((svc) => usedServices.has(svc));
 
   return {
     periods,
@@ -1387,7 +1481,6 @@ export async function getDashboardData(params: {
       nonCritical: nonCriticalCount,
       total: criticalCount + nonCriticalCount,
     },
-    // ── Trend Computation ──
     ...(() => {
       const trendYear = params.year ?? new Date().getFullYear();
       let filteredPeriods = periods
@@ -1409,7 +1502,6 @@ export async function getDashboardData(params: {
           }
         }
 
-        // Filter periods to only include those with data for the selected service
         filteredPeriods = filteredPeriods.filter((p: any) => rowsByPeriod.has(p.id));
 
         const agentPeriodGroups = new Map<string, any[]>();
@@ -1518,6 +1610,7 @@ export async function getDashboardData(params: {
     })(),
     availableYears,
     currentYear,
+    availableServices,
   };
 }
 

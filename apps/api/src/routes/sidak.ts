@@ -5,7 +5,7 @@ import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import * as sidakService from "../services/sidak-service";
 import { logActivity } from "../services/activity-log-service";
-import { createTemuanBatchSchema } from "@trainers/types";
+import { createTemuanBatchSchema, VALID_SERVICE_TYPES } from "@trainers/types";
 import { buildAiReportDocx } from "../lib/report-docx-builder";
 import { buildHtmlReport } from "../lib/report-html-builder";
 import { buildAiReportPdf } from "../lib/report-pdf-builder";
@@ -13,6 +13,12 @@ import { buildAiReportPdf } from "../lib/report-pdf-builder";
 type Variables = { user: User; profile: any };
 
 const sidak = new Hono<{ Variables: Variables }>();
+
+async function resolveSidakFilterScope(c: any): Promise<sidakService.SidakFilterScope | null> {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  return sidakService.getAccessibleSidakFilters(user.id, profile?.role ?? "");
+}
 
 // ── Periods ────────────────────────────────────────────
 sidak.get("/periods", requireRole("admin", "trainer", "leader"), async (c) => {
@@ -282,10 +288,12 @@ sidak.get("/agents", requireRole("admin", "trainer", "leader"), async (c) => {
     user.id,
     profile?.role ?? "",
   );
+  const filterScope = await resolveSidakFilterScope(c);
   const result = await sidakService.getAgentDirectorySummary(
     year,
     accessibleIds ?? undefined,
     showAll,
+    filterScope?.allowedServices ?? undefined,
   );
   return c.json({ success: true, data: result });
 });
@@ -323,8 +331,16 @@ sidak.get(
         403,
       );
     }
+    const filterScope = await resolveSidakFilterScope(c);
     try {
-      const detail = await sidakService.getAgentDetail(id, year, serviceType, startMonth, endMonth);
+      const detail = await sidakService.getAgentDetail(
+        id,
+        year,
+        serviceType,
+        startMonth,
+        endMonth,
+        filterScope?.allowedServices ?? undefined,
+      );
       return c.json({ success: true, data: detail });
     } catch (e: any) {
       return c.json(
@@ -360,6 +376,8 @@ sidak.get(
       user.id,
       profile?.role ?? "",
     );
+    const filterScope = await resolveSidakFilterScope(c);
+
     const data = await sidakService.getDashboardData({
       period_ids,
       service_type,
@@ -369,6 +387,7 @@ sidak.get(
       endMonth,
       agent_ids: accessibleIds ?? undefined,
       showArchived,
+      allowedServiceTypes: filterScope?.allowedServices ?? undefined,
     });
     return c.json({ success: true, data });
   },
@@ -460,6 +479,10 @@ sidak.put(
 
 // ── Folders ────────────────────────────────────────────
 sidak.get("/folders", requireRole("admin", "trainer", "leader"), async (c) => {
+  const filterScope = await resolveSidakFilterScope(c);
+  if (filterScope) {
+    return c.json({ success: true, data: filterScope.allowedFolders });
+  }
   const { data } = await (await import("../lib/supabase")).supabaseAdmin
     .from("profiler_folders")
     .select("id, name")
@@ -473,12 +496,31 @@ sidak.get(
   requireRole("admin", "trainer", "leader"),
   async (c) => {
     const folder = c.req.param("folder");
+    const filterScope = await resolveSidakFilterScope(c);
+
+    if (filterScope) {
+      const isAllowed = filterScope.allowedFolders.some(
+        (f) => f.name === folder,
+      );
+      if (!isAllowed) {
+        return c.json({ success: true, data: [] });
+      }
+    }
+
     const { data } = await (await import("../lib/supabase")).supabaseAdmin
       .from("profiler_peserta")
       .select("id, nama")
       .eq("batch_name", folder)
       .order("nama");
-    return c.json({ success: true, data: data ?? [] });
+    const result = data ?? [];
+    if (filterScope && filterScope.agentIds.length > 0) {
+      const idSet = new Set(filterScope.agentIds);
+      return c.json({
+        success: true,
+        data: result.filter((a: any) => idSet.has(a.id)),
+      });
+    }
+    return c.json({ success: true, data: result });
   },
 );
 
@@ -500,6 +542,7 @@ sidak.get(
       user.id,
       profile?.role ?? "",
     );
+    const filterScope = await resolveSidakFilterScope(c);
 
     try {
       const { supabaseAdmin } = await import("../lib/supabase");
@@ -511,22 +554,32 @@ sidak.get(
             folder_ids: folder !== "ALL" ? [folder] : undefined,
             year,
             agent_ids: accessibleIds ?? undefined,
+            allowedServiceTypes: filterScope?.allowedServices ?? undefined,
           }),
           sidakService.getPeriods(),
           supabaseAdmin.from("profiler_folders").select("id, name").order("name"),
           sidakService.getAvailableYears(accessibleIds ?? undefined),
         ]);
 
+      const scopedFolders = filterScope
+        ? filterScope.allowedFolders
+        : (folders?.data ?? []).map((f: any) => ({ id: f.id, name: f.name }));
+
+      const availableServices = filterScope && filterScope.serviceTypeLocked
+        ? filterScope.allowedServices
+        : (() => {
+            const svcSet = new Set(dashboardData.serviceData.map((s) => s.serviceType));
+            return VALID_SERVICE_TYPES.filter((svc) => svcSet.has(svc));
+          })();
+
       return c.json({
         success: true,
         data: {
           rankings: dashboardData.topAgents,
           periods,
-          folders: (folders?.data ?? []).map((f: any) => ({
-            id: f.id,
-            name: f.name,
-          })),
+          folders: scopedFolders,
           availableYears,
+          availableServices,
         },
       });
     } catch (e: any) {

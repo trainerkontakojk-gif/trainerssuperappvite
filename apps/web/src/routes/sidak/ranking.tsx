@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useApi } from "../../hooks/useApi";
 import type { TopAgentData, QAPeriod } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,8 +23,6 @@ const SERVICE_LABELS: Record<string, string> = {
   slik: "SLIK",
 };
 
-const SERVICE_TYPES = Object.keys(SERVICE_LABELS);
-
 const MONTHS = [
   "Januari", "Februari", "Maret", "April",
   "Mei", "Juni", "Juli", "Agustus",
@@ -36,6 +34,7 @@ interface RankingResponse {
   periods: QAPeriod[];
   folders: { id: string; name: string }[];
   availableYears: number[];
+  availableServices?: string[];
 }
 
 type SortKey = "defects" | "nama" | "score";
@@ -61,6 +60,24 @@ export default function SidakRankingPage() {
   const { data, loading } = useApi<RankingResponse>(
     `/sidak/ranking?${queryParams}`,
   );
+
+  const availableServices = data?.availableServices ?? [];
+
+  // Normalize invalid selections
+  useEffect(() => {
+    if (loading || !data) return;
+    if (availableServices.length > 0 && !availableServices.includes(selectedService)) {
+      setSelectedService(availableServices[0]);
+    }
+  }, [availableServices, selectedService, loading, data]);
+
+  useEffect(() => {
+    if (loading || !data) return;
+    if (selectedFolder !== "ALL" && (data?.folders ?? []).length > 0) {
+      const valid = (data?.folders ?? []).some((f) => f.id === selectedFolder);
+      if (!valid) setSelectedFolder("ALL");
+    }
+  }, [data, selectedFolder, loading]);
 
   const rankings = data?.rankings;
   const sortedRankings = useMemo(() => {
@@ -161,9 +178,12 @@ export default function SidakRankingPage() {
                   onChange={(e) => setSelectedService(e.target.value)}
                   className="w-full h-12 bg-white/50 dark:bg-black/20 backdrop-blur-md border border-black/5 dark:border-white/10 rounded-2xl px-4 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-semibold text-sm cursor-pointer"
                 >
-                  {SERVICE_TYPES.map((st) => (
+                  {(availableServices.length > 0
+                    ? availableServices
+                    : Object.keys(SERVICE_LABELS)
+                  ).map((st) => (
                     <option key={st} value={st}>
-                      {SERVICE_LABELS[st]}
+                      {SERVICE_LABELS[st] || st}
                     </option>
                   ))}
                 </select>

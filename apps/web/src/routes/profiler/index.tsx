@@ -111,6 +111,16 @@ export default function ProfilerLanding() {
     }
   }, [selectedYearId, selectedTeamId, folders]);
 
+  // Normalize selectedBatch if no longer in folder list (scoped metadata shrink)
+  useEffect(() => {
+    if (!selectedBatch || folders.length === 0) return;
+    const exists = folders.some((f) => f.name === selectedBatch);
+    if (!exists) {
+      setSelectedBatch('');
+      setSelectedFolderId(null);
+    }
+  }, [folders, selectedBatch]);
+
   useEffect(() => {
     if (!selectedBatch) return;
     if (!pesertaMap[selectedBatch]) {
