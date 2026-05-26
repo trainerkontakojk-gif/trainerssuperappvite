@@ -637,3 +637,39 @@ export async function deleteActivity(id: string): Promise<void> {
 
   if (error) throw new Error(error.message);
 }
+
+export interface LeaderAccessStatusItem {
+  status: "none" | "pending" | "approved" | "rejected" | "revoked";
+  module: string;
+  created_at: string | null;
+}
+
+export async function getLeaderAccessStatus(
+  userId: string,
+): Promise<Record<string, LeaderAccessStatusItem>> {
+  const modules = ["ktp", "sidak"] as const;
+  const result: Record<string, LeaderAccessStatusItem> = {};
+
+  const { data: requests } = await supabaseAdmin
+    .from("leader_access_requests")
+    .select("id, module, status, created_at")
+    .eq("leader_user_id", userId)
+    .in("module", ["ktp", "sidak"]);
+
+  for (const mod of modules) {
+    const req = (requests ?? []).find(
+      (r) => r.module === mod || r.module === "all",
+    );
+    if (!req) {
+      result[mod] = { status: "none", module: mod, created_at: null };
+    } else {
+      result[mod] = {
+        status: req.status as LeaderAccessStatusItem["status"],
+        module: mod,
+        created_at: req.created_at,
+      };
+    }
+  }
+
+  return result;
+}

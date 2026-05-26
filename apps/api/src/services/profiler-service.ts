@@ -6,6 +6,86 @@ import type {
   ProfilerTim,
 } from "@trainers/types";
 
+const TRAINER_ROLES = ["admin", "trainer"] as const;
+const LEADER_ROLES = ["leader"] as const;
+
+export async function getAccessiblePesertaIds(
+  userId: string,
+  role: string,
+): Promise<string[] | null> {
+  if ((TRAINER_ROLES as readonly string[]).includes(role)) return null;
+
+  if (role === "agent") {
+    const { data } = await supabaseAdmin
+      .from("profiler_peserta")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return data ? [data.id] : [];
+  }
+
+  if ((LEADER_ROLES as readonly string[]).includes(role)) {
+    const { data: requests } = await supabaseAdmin
+      .from("leader_access_requests")
+      .select("id")
+      .eq("leader_user_id", userId)
+      .eq("status", "approved")
+      .eq("module", "ktp");
+
+    if (!requests || requests.length === 0) return [];
+
+    const requestIds = requests.map((r) => r.id);
+    const { data: groupLinks } = await supabaseAdmin
+      .from("leader_access_request_groups")
+      .select("access_group_id")
+      .in("request_id", requestIds);
+
+    if (!groupLinks || groupLinks.length === 0) return [];
+    const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
+
+    const { data: items } = await supabaseAdmin
+      .from("access_group_items")
+      .select("field_name, field_value")
+      .in("access_group_id", groupIds)
+      .eq("is_active", true);
+
+    if (!items || items.length === 0) return [];
+
+    const directIds: string[] = [];
+    const batchNames: string[] = [];
+    const tims: string[] = [];
+
+    for (const item of items) {
+      if (item.field_name === "peserta_id") directIds.push(item.field_value);
+      else if (item.field_name === "batch_name")
+        batchNames.push(item.field_value);
+      else if (item.field_name === "tim") tims.push(item.field_value);
+    }
+
+    const resolvedIds = [...directIds];
+
+    if (batchNames.length > 0) {
+      const { data: batchData } = await supabaseAdmin
+        .from("profiler_peserta")
+        .select("id")
+        .in("batch_name", batchNames);
+      if (batchData) resolvedIds.push(...batchData.map((b) => b.id));
+    }
+
+    if (tims.length > 0) {
+      const { data: timData } = await supabaseAdmin
+        .from("profiler_peserta")
+        .select("id")
+        .in("tim", tims);
+      if (timData) resolvedIds.push(...timData.map((t) => t.id));
+    }
+
+    return [...new Set(resolvedIds)];
+  }
+
+  return [];
+}
+
 // ── Years ────────────────────────────────────────────────
 export async function getYears(): Promise<ProfilerYear[]> {
   const { data } = await supabaseAdmin
@@ -201,16 +281,24 @@ export async function duplicateFolder(
 }
 
 // ── Peserta ──────────────────────────────────────────────
-export async function getPeserta(params: {
-  batch_name?: string;
-  tim?: string;
-  search?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<{ data: ProfilerPeserta[]; total: number }> {
+export async function getPeserta(
+  params: {
+    batch_name?: string;
+    tim?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  },
+  accessibleIds?: string[] | null,
+): Promise<{ data: ProfilerPeserta[]; total: number }> {
   let query = supabaseAdmin
     .from("profiler_peserta")
     .select("*", { count: "exact" });
+
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return { data: [], total: 0 };
+    query = query.in("id", accessibleIds);
+  }
 
   if (params.batch_name) query = query.eq("batch_name", params.batch_name);
   if (params.tim) query = query.eq("tim", params.tim);
@@ -228,7 +316,18 @@ export async function getPeserta(params: {
   return { data: data ?? [], total: count ?? 0 };
 }
 
-export async function getPesertaById(id: string): Promise<ProfilerPeserta> {
+export async function getPesertaById(
+  id: string,
+  accessibleIds?: string[] | null,
+): Promise<ProfilerPeserta> {
+  if (
+    accessibleIds !== null &&
+    accessibleIds !== undefined &&
+    !accessibleIds.includes(id)
+  ) {
+    throw new Error("Peserta tidak ditemukan");
+  }
+
   const { data, error } = await supabaseAdmin
     .from("profiler_peserta")
     .select("*")
@@ -240,13 +339,21 @@ export async function getPesertaById(id: string): Promise<ProfilerPeserta> {
 
 export async function getPesertaByBatch(
   batchName: string,
+  accessibleIds?: string[] | null,
 ): Promise<ProfilerPeserta[]> {
-  const { data } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("profiler_peserta")
     .select("*")
     .eq("batch_name", batchName)
     .order("nomor_urut")
     .order("nama");
+
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return [];
+    query = query.in("id", accessibleIds);
+  }
+
+  const { data } = await query;
   return data ?? [];
 }
 
@@ -652,12 +759,18 @@ export async function movePesertaToBatch(
 
 export async function getGlobalPesertaPool(
   excludeBatch?: string,
+  accessibleIds?: string[] | null,
 ): Promise<ProfilerPeserta[]> {
   let query = supabaseAdmin
     .from("profiler_peserta")
     .select("*")
     .order("batch_name")
     .order("nama");
+
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return [];
+    query = query.in("id", accessibleIds);
+  }
 
   if (excludeBatch) query = query.neq("batch_name", excludeBatch);
 
@@ -693,10 +806,17 @@ export async function deleteTeam(id: string): Promise<void> {
 }
 
 // ── Counts ───────────────────────────────────────────────
-export async function getFolderCounts(): Promise<Record<string, number>> {
-  const { data } = await supabaseAdmin
-    .from("profiler_peserta")
-    .select("batch_name");
+export async function getFolderCounts(
+  accessibleIds?: string[] | null,
+): Promise<Record<string, number>> {
+  let query = supabaseAdmin.from("profiler_peserta").select("batch_name");
+
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    if (accessibleIds.length === 0) return {};
+    query = query.in("id", accessibleIds);
+  }
+
+  const { data } = await query;
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
     counts[row.batch_name] = (counts[row.batch_name] ?? 0) + 1;

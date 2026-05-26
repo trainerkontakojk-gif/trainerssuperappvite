@@ -1096,6 +1096,14 @@ export const reassignLeaderRequestGroupsSchema = z.object({
   accessGroupIds: z.array(z.string()),
 });
 
+export interface LeaderAccessStatusItem {
+  status: "none" | "pending" | "approved" | "rejected" | "revoked";
+  module: string;
+  created_at: string | null;
+}
+
+export type LeaderAccessStatusMap = Record<string, LeaderAccessStatusItem>;
+
 export const pdktMailboxBatchSchema = z.object({
   client_request_id: z.string().optional(),
   sender_name: z.string(),

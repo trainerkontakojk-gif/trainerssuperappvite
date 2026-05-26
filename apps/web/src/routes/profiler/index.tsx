@@ -11,6 +11,7 @@ import DuplicateFolderModal from "./components/DuplicateFolderModal";
 import AddMemberPicker from "./components/AddMemberPicker";
 import { Cake, Trash2 } from "lucide-react";
 import { useProfilerAccess } from "../../hooks/useProfilerAccess";
+import LeaderAccessGate from "../../components/LeaderAccessGate";
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -233,6 +234,7 @@ export default function ProfilerLanding() {
   const activeYearLabel = useMemo(() => years.find(y => y.id === selectedYearId)?.label, [years, selectedYearId]);
 
   return (
+    <LeaderAccessGate module="ktp" moduleLabel="KTP">
     <div className="flex-1 bg-background flex flex-col transition-colors duration-500 overflow-hidden w-full relative">
       <WorkspaceHeader 
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -510,5 +512,6 @@ export default function ProfilerLanding() {
         </div>
       )}
     </div>
+    </LeaderAccessGate>
   );
 }

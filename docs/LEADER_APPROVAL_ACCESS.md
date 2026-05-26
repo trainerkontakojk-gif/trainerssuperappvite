@@ -79,6 +79,52 @@ Leader opens KTP/SIDAK page
 - `leader_access_requests`: Leader only sees and inserts own pending requests; Admin/trainer can manage all
 - `access_groups` / `access_group_items`: Admin/trainer only (leader cannot see these pages or data)
 
+### Backend Scope Enforcers
+
+| Function | File | Module | Used In |
+|----------|------|--------|---------|
+| `getAccessibleAgentIds(userId, role)` | `apps/api/src/services/sidak-service.ts:27` | SIDAK | All SIDAK read routes |
+| `getAccessiblePesertaIds(userId, role)` | `apps/api/src/services/profiler-service.ts:12` | KTP | All Profiler read routes |
+
+Both functions follow the same logic:
+1. Admin/Trainer → returns `null` (no filter, full access)
+2. Agent → returns own peserta ID or empty
+3. Leader → resolves scope from approved `leader_access_requests` + `access_group_items`; returns `string[]` or `[]` (fail-closed)
+4. Other roles → returns `[]` (deny)
+
+**KTP-specific**: `service_type` items are silently ignored in scope resolution (KTP has no service type column).
+
+### API: Access Status Endpoint
+
+`GET /v1/me/access-status` — Returns per-module access status for the current user.
+
+```json
+{
+  "success": true,
+  "data": {
+    "ktp": { "status": "approved", "module": "ktp", "created_at": "2025-01-01" },
+    "sidak": { "status": "none", "module": "sidak", "created_at": null }
+  }
+}
+```
+
+Status values: `none`, `pending`, `approved`, `rejected`, `revoked`.
+
+Module `all` in `leader_access_requests` counts as approved for both `ktp` and `sidak`.
+
+### Frontend: LeaderAccessGate Component
+
+`apps/web/src/components/LeaderAccessGate.tsx` wraps module landing pages:
+
+- Admin/Trainer/Agent → renders children immediately
+- Leader with `approved` → renders children
+- Leader with other status → shows status card with submit button
+- Loading → spinner
+
+Used in `apps/web/src/routes/profiler/index.tsx` and `apps/web/src/routes/sidak/index.tsx`.
+
+Leader submits request via Supabase client RLS INSERT into `leader_access_requests` — no backend API endpoint needed (RLS enforces validation).
+
 ### Security: Fail-Closed
 
 - Leader dengan scope kosong → data kosong (tidak fallback ke semua data)

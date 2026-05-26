@@ -9,6 +9,12 @@ type Variables = { user: User; profile: any };
 
 const profiler = new Hono<{ Variables: Variables }>();
 
+async function resolveKtpScope(c: any): Promise<string[] | null> {
+  const user = c.get("user");
+  const profile = c.get("profile");
+  return profilerService.getAccessiblePesertaIds(user.id, profile?.role ?? "");
+}
+
 // ── Years ────────────────────────────────────────────────
 profiler.get("/years", requireRole("admin", "trainer", "leader"), async (c) => {
   const years = await profilerService.getYears();
@@ -181,7 +187,8 @@ profiler.get(
   "/counts",
   requireRole("admin", "trainer", "leader"),
   async (c) => {
-    const counts = await profilerService.getFolderCounts();
+    const scope = await resolveKtpScope(c);
+    const counts = await profilerService.getFolderCounts(scope);
     return c.json({ success: true, data: counts });
   },
 );
@@ -201,13 +208,17 @@ profiler.get(
       ? parseInt(c.req.query("offset")!)
       : undefined;
 
-    const result = await profilerService.getPeserta({
-      batch_name,
-      tim,
-      search,
-      limit,
-      offset,
-    });
+    const scope = await resolveKtpScope(c);
+    const result = await profilerService.getPeserta(
+      {
+        batch_name,
+        tim,
+        search,
+        limit,
+        offset,
+      },
+      scope,
+    );
     return c.json({
       success: true,
       data: { items: result.data, total: result.total },
@@ -220,7 +231,8 @@ profiler.get(
   requireRole("admin", "trainer", "leader"),
   async (c) => {
     const excludeBatch = c.req.query("exclude_batch");
-    const pool = await profilerService.getGlobalPesertaPool(excludeBatch);
+    const scope = await resolveKtpScope(c);
+    const pool = await profilerService.getGlobalPesertaPool(excludeBatch, scope);
     return c.json({ success: true, data: pool });
   },
 );
@@ -230,7 +242,8 @@ profiler.get(
   requireRole("admin", "trainer", "leader"),
   async (c) => {
     const batchName = c.req.param("batchName");
-    const peserta = await profilerService.getPesertaByBatch(batchName);
+    const scope = await resolveKtpScope(c);
+    const peserta = await profilerService.getPesertaByBatch(batchName, scope);
     return c.json({ success: true, data: peserta });
   },
 );
@@ -241,7 +254,8 @@ profiler.get(
   async (c) => {
     const id = c.req.param("id");
     try {
-      const peserta = await profilerService.getPesertaById(id);
+      const scope = await resolveKtpScope(c);
+      const peserta = await profilerService.getPesertaById(id, scope);
       return c.json({ success: true, data: peserta });
     } catch (e: any) {
       return c.json(

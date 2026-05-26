@@ -13,6 +13,7 @@ import { ai } from "./routes/ai";
 import { profiler } from "./routes/profiler";
 import { adminRouter } from "./routes/admin";
 import { telefun } from "./routes/telefun";
+import { getLeaderAccessStatus } from "./services/admin-service";
 
 const allowedOrigins =
   env.NODE_ENV === "production"
@@ -92,6 +93,24 @@ const routes = app
     );
   })
   .use("/v1/*", authMiddleware)
+  .get("/v1/me/access-status", async (c) => {
+    const user = c.get("user");
+    try {
+      const status = await getLeaderAccessStatus(user.id);
+      return c.json({ success: true, data: status });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "SERVER_ERROR",
+            message: e.message || "Gagal memuat status akses",
+          },
+        },
+        500,
+      );
+    }
+  })
   .get("/v1/me", (c) => {
     const user = c.get("user");
     const profile = c.get("profile");

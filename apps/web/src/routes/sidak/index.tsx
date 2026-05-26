@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuthStore } from "../../store/authStore";
+import LeaderAccessGate from "../../components/LeaderAccessGate";
 
 const CARDS = [
   {
@@ -95,6 +96,7 @@ export default function SidakLanding() {
   );
 
   return (
+    <LeaderAccessGate module="sidak" moduleLabel="SIDAK">
     <div className="flex flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 pb-10">
@@ -160,5 +162,6 @@ export default function SidakLanding() {
         </div>
       </div>
     </div>
+    </LeaderAccessGate>
   );
 }
