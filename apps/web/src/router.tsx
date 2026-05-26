@@ -302,16 +302,51 @@ const accountRoute = createRoute({
   beforeLoad: requireAuth(),
 });
 
+export function guardWaitingApproval() {
+  return async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const profile = await fetchAuthProfile(session.user.id);
+    if (profile?.is_deleted || profile?.status === "inactive") {
+      throw redirect({ to: "/" });
+    }
+    if (profile?.status === "active") {
+      throw redirect({ to: "/dashboard" });
+    }
+  };
+}
+
+export function guardResetPassword() {
+  return async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/" });
+    }
+
+    const profile = await fetchAuthProfile(session.user.id);
+    if (profile?.status === "active" && !profile?.is_deleted) {
+      throw redirect({ to: "/dashboard" });
+    }
+  };
+}
+
 const waitingApprovalRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/waiting-approval",
   component: WaitingApprovalPage,
+  beforeLoad: guardWaitingApproval(),
 });
 
 const resetPasswordRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reset-password",
   component: ResetPasswordPage,
+  beforeLoad: guardResetPassword(),
 });
 
 const unauthorizedRoute = createRoute({

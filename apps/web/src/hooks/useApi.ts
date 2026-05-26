@@ -8,10 +8,20 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });
+
+  if (res.status === 401) {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_profile");
+    localStorage.removeItem("trainers_login_time");
+    localStorage.removeItem("trainers_last_activity");
+    window.location.href = "/";
+    throw new Error("Sesi telah berakhir. Silakan login kembali.");
+  }
 
   const contentType = res.headers.get("content-type") ?? "";
   if (contentType.includes("text/html")) {

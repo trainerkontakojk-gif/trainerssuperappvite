@@ -34,25 +34,26 @@ export default function WaitingApprovalPage() {
 
       setEmail(user.email || "");
 
-      const primary = await supabase
+      const { data: profile, error } = await supabase
         .from("profiles")
         .select("status, is_deleted")
         .eq("id", user.id)
         .maybeSingle();
 
-      const profile =
-        (primary.data as WaitingApprovalProfile | null) ??
-        ((
-          await supabase
+      const isMissingColumn = error?.code === "42703" || error?.message?.toLowerCase().includes("is_deleted");
+
+      const resolvedProfile: WaitingApprovalProfile = isMissingColumn
+        ? ((await supabase
             .from("profiles")
             .select("status")
             .eq("id", user.id)
             .maybeSingle()
-        ).data as WaitingApprovalProfile | null);
+          ).data as WaitingApprovalProfile | null) ?? { status: null, is_deleted: false }
+        : (profile as WaitingApprovalProfile | null) ?? { status: null, is_deleted: false };
 
-      const profileStatus = normalizeProfileStatus(profile?.status);
+      const profileStatus = normalizeProfileStatus(resolvedProfile?.status);
 
-      if (profile?.is_deleted) {
+      if (resolvedProfile?.is_deleted) {
         await supabase.auth.signOut();
         localStorage.removeItem("auth_token");
         localStorage.removeItem("auth_profile");

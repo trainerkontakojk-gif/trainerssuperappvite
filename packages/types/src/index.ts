@@ -5,7 +5,7 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  role: "admin" | "trainer" | "leader" | "agent";
+  role: "admin" | "trainer" | "leader" | "agent" | "qa";
   status?: "pending" | "active" | "inactive";
   is_deleted?: boolean;
 }
@@ -988,7 +988,7 @@ export interface ManagedUser {
   id: string;
   email: string;
   full_name: string | null;
-  role: "admin" | "trainer" | "leader" | "agent";
+  role: "admin" | "trainer" | "leader" | "agent" | "qa";
   status: "active" | "pending" | "inactive";
   is_deleted: boolean;
   created_at?: string;

@@ -198,6 +198,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 48. KETIK Legacy Parity Upgrade — 3-tier time instruction (near end/wrap up/still long) via SessionTimingContext, strictScriptMode for OpenRouter with scenario scripts, allowSolutionAcknowledgement timeout guard (11 instructional cues + 7 action verbs), timing data passthrough from frontend to backend (DONE)
 49. PDKT Legacy Parity Hardening — Settings contract alignment ({success,data}), access matrix role lock (trainer/qa/admin), history replay without active mailbox, client_request_id idempotency, bounded usage delta retry, human-friendly error mapping, DUMMY_PROFILES 5→20 + city randomization, coercion robustness (writingStyle + consumerNameMention), legacy script migration, test uplift 27+14 tests (DONE)
 50. Railway Login Non-Admin E2E Fix — Backend auth middleware hardened (is_deleted check, legacy status normalization via normalizeAuthProfileStatus, differentiated error codes: ACCOUNT_DELETED/ACCOUNT_PENDING/ACCOUNT_INACTIVE/PROFILE_NOT_FOUND/PROFILE_ERROR), .single() → .maybeSingle() for defensive null handling, CORS warning log when ALLOWED_ORIGINS empty in production, frontend fetchApi HTML response detection for SPA fallback errors, 18 API + 3 web regression tests (DONE)
+51. Auth Login, Reset Redirect & Approval Guard Hardening — Added `qa` to type unions (UserProfile, ManagedUser), CSRF header (`X-Requested-With`) + 401 interception with auto-redirect in fetchApi, beforeLoad guards for `/reset-password` (blocks non-recovery access) and `/waiting-approval` (redirects active users), optimized waiting-approval double query polling, client-side password complexity validation (min 8 chars, 1 uppercase, 1 digit), 27 regression tests across 3 test files (DONE)
 
 ## Relevant Files
 
@@ -238,7 +239,10 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-47a)
+- **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
+- **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
+- **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-51)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 
 ## Routes Reference (apps/web)

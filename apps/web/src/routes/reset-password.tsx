@@ -36,8 +36,16 @@ export default function ResetPasswordPage() {
       setError("Password dan konfirmasi password tidak cocok.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password minimal 6 karakter.");
+    if (password.length < 8) {
+      setError("Password minimal 8 karakter.");
+      return;
+    }
+    if (!/[A-Z]/.test(password)) {
+      setError("Password harus mengandung minimal 1 huruf besar (A-Z).");
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError("Password harus mengandung minimal 1 angka (0-9).");
       return;
     }
 
