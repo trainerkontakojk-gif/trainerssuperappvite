@@ -325,17 +325,20 @@ export default function SidakInputPage() {
         if (!ok) return;
       }
       setSaving(true);
-      const created = await postApi<QATemuan[]>("/sidak/temuan/batch", {
+      const created = await postApi<{ inserted: number; skipped: number; total: number }>("/sidak/temuan/batch", {
         peserta_id: selectedAgent.id,
         period_id: selectedPeriod.id,
         service_type: selectedService,
         no_tiket: normalizedTicket || null,
         items: temuanList,
       });
-      setTemuan((prev) => [...(created ?? []).reverse(), ...prev]);
+      const updated = await getApi<{ items: QATemuan[]; total: number }>(
+        `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${selectedService}&limit=200`,
+      );
+      setTemuan(updated.items ?? []);
       resetForm();
       setPreviewResult(null);
-      setSuccessMsg(`${created?.length ?? 0} temuan berhasil disimpan!`);
+      setSuccessMsg(`${created?.inserted ?? 0} temuan berhasil disimpan!`);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e: any) {
       setErrorMsg(e.message);
@@ -583,12 +586,12 @@ export default function SidakInputPage() {
         nilai: r.nilai!,
         ketidaksesuaian: r.ketidaksesuaian || null,
         sebaiknya: r.sebaiknya || null,
+        no_tiket: r.no_tiket || null,
       }));
       const preview = await postApi<any>("/sidak/temuan/batch/preview", {
         peserta_id: selectedAgent.id,
         period_id: selectedPeriod.id,
         service_type: selectedService,
-        no_tiket: null,
         items: importItems,
       });
       if (preview.stats.invalid_count > 0) {
@@ -603,17 +606,19 @@ export default function SidakInputPage() {
         );
         if (!ok) return;
       }
-      const created = await postApi<QATemuan[]>("/sidak/temuan/batch", {
+      const created = await postApi<{ inserted: number; skipped: number; total: number }>("/sidak/temuan/batch", {
         peserta_id: selectedAgent.id,
         period_id: selectedPeriod.id,
         service_type: selectedService,
-        no_tiket: null,
         items: importItems,
       });
-      setTemuan((prev) => [...(created ?? []).reverse(), ...prev]);
+      const updated = await getApi<{ items: QATemuan[]; total: number }>(
+        `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${selectedService}&limit=200`,
+      );
+      setTemuan(updated.items ?? []);
       setShowImport(false);
       setImportRows([]);
-      setSuccessMsg(`${created?.length ?? 0} temuan berhasil diimport!`);
+      setSuccessMsg(`${created?.inserted ?? 0} temuan berhasil diimport!`);
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (e: any) {
       setErrorMsg(e.message);

@@ -60,6 +60,8 @@ erDiagram
 - `20260525000400_telefun_history_add_feedback.sql` — Add feedback column to telefun_history for API patch compatibility
 - `20260525000500_telefun_history_add_metadata_columns.sql` — Add metadata columns to telefun_history
 - `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` — Terminal re-hardening: revoke all non-service_role access after contract restore
+- `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql` — Add unique index on qa_temuan to prevent duplicate input at database level (peserta + period + service + trimmed lowercased no_tiket + indicator)
+
 
 ### 1. `public.profiles`
 

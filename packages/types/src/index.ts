@@ -87,6 +87,7 @@ export const createTemuanBatchSchema = z.object({
         nilai: z.number().int().min(0).max(3),
         ketidaksesuaian: z.string().nullable().optional(),
         sebaiknya: z.string().nullable().optional(),
+        no_tiket: z.string().nullable().optional(),
       }),
     )
     .min(1),

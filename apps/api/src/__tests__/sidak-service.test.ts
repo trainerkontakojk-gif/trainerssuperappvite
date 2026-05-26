@@ -441,7 +441,7 @@ describe("sidak-service", () => {
       expect(r.invalid[0].error).toContain("milik layanan email");
     });
 
-    it("flags skipped duplicates", async () => {
+    it("skips duplicates already in db", async () => {
       let callCount = 0;
       pendingResolve = () => {
         callCount++;
@@ -451,12 +451,16 @@ describe("sidak-service", () => {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
-        return { data: [{ indicator_id: "i1" }], error: null }; // already exists
+        return {
+          data: [{ indicator_id: "i1", no_tiket: "TKT-123", service_type: "call" }],
+          error: null,
+        }; // already exists
       };
       const r = await sidakService.validateTemuanBatch({
         peserta_id: "p1",
         period_id: "per1",
         service_type: "call",
+        no_tiket: "TKT-123",
         items: [{ indicator_id: "i1", nilai: 2 }],
       });
       expect(r.stats.skipped_count).toBe(1);
@@ -515,6 +519,119 @@ describe("sidak-service", () => {
       pendingResolve = () => ({ count: 0, error: null });
       const r = await sidakService.hasDraftRuleVersion("call");
       expect(r).toBe(false);
+    });
+  });
+
+  describe("validateTemuanBatch - duplicate checks regression", () => {
+    it("allows different tickets for same indicator", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: null, error: null }; // rule version
+        if (callCount === 2)
+          return {
+            data: [{ id: "i1", name: "Test", service_type: "call" }],
+            error: null,
+          };
+        return {
+          data: [{ indicator_id: "i1", no_tiket: "TKT-123", service_type: "call" }],
+          error: null,
+        }; // existing
+      };
+
+      const r = await sidakService.validateTemuanBatch({
+        peserta_id: "p1",
+        period_id: "per1",
+        service_type: "call",
+        items: [
+          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-456" }, // Different ticket
+        ],
+      });
+      expect(r.stats.skipped_count).toBe(0);
+      expect(r.stats.valid_count).toBe(1);
+    });
+
+    it("skips duplicate in case-insensitive and trimmed matching", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: null, error: null };
+        if (callCount === 2)
+          return {
+            data: [{ id: "i1", name: "Test", service_type: "call" }],
+            error: null,
+          };
+        return {
+          data: [{ indicator_id: "i1", no_tiket: "  tkt-123  ", service_type: "call" }],
+          error: null,
+        };
+      };
+
+      const r = await sidakService.validateTemuanBatch({
+        peserta_id: "p1",
+        period_id: "per1",
+        service_type: "call",
+        items: [
+          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-123" }, // Should match case-insensitively and ignoring whitespace
+        ],
+      });
+      expect(r.stats.skipped_count).toBe(1);
+      expect(r.stats.valid_count).toBe(0);
+    });
+
+    it("allows duplicate parameters if no_tiket is empty or null", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: null, error: null };
+        if (callCount === 2)
+          return {
+            data: [{ id: "i1", name: "Test", service_type: "call" }],
+            error: null,
+          };
+        return {
+          data: [{ indicator_id: "i1", no_tiket: null, service_type: "call" }],
+          error: null,
+        };
+      };
+
+      const r = await sidakService.validateTemuanBatch({
+        peserta_id: "p1",
+        period_id: "per1",
+        service_type: "call",
+        items: [
+          { indicator_id: "i1", nilai: 2, no_tiket: null },
+          { indicator_id: "i1", nilai: 1, no_tiket: "" },
+        ],
+      });
+      expect(r.stats.skipped_count).toBe(0);
+      expect(r.stats.valid_count).toBe(2);
+    });
+
+    it("handles intra-batch duplicate detection", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: null, error: null };
+        if (callCount === 2)
+          return {
+            data: [{ id: "i1", name: "Test", service_type: "call" }],
+            error: null,
+          };
+        return { data: [], error: null };
+      };
+
+      const r = await sidakService.validateTemuanBatch({
+        peserta_id: "p1",
+        period_id: "per1",
+        service_type: "call",
+        items: [
+          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-999" },
+          { indicator_id: "i1", nilai: 1, no_tiket: "TKT-999" }, // duplicate within batch
+        ],
+      });
+      expect(r.stats.skipped_count).toBe(1);
+      expect(r.stats.valid_count).toBe(1);
     });
   });
 });

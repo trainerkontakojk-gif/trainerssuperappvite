@@ -1,4 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../lib/supabase", () => ({
+  supabaseAdmin: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
+        })),
+      })),
+    })),
+  },
+  createAdminClient: vi.fn(),
+}));
+
 import {
   buildTelefunSettingsUpsertPayload,
   buildTelefunSessionInsertPayload,

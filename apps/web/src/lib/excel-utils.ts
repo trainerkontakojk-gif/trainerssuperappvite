@@ -89,6 +89,7 @@ export interface ParsedRow {
   ketidaksesuaian: string;
   sebaiknya: string;
   indicator_id?: string;
+  service_type?: string;
   error?: string;
 }
 
@@ -135,6 +136,7 @@ export function parseExcel(
             sebaiknya: String(
               row["Sebaiknya"] || row["sebaiknya"] || "",
             ).trim(),
+            service_type: serviceType || undefined,
           };
 
           const errors: string[] = [];
@@ -175,11 +177,11 @@ export function validateImportRows(rows: ParsedRow[]): {
       invalid.push(row);
       continue;
     }
-    const key = `${row.no_tiket}|${row.indicator_id}`;
+    const key = `${row.no_tiket}|${row.indicator_id}|${row.service_type ?? ""}`;
     if (seen.has(key)) {
       invalid.push({
         ...row,
-        error: `Duplikat: kombinasi tiket "${row.no_tiket}" + indikator sudah ada`,
+        error: `Duplikat: kombinasi tiket "${row.no_tiket}" + indikator + service sudah ada`,
       });
       continue;
     }

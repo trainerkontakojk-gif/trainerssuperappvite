@@ -12,6 +12,7 @@ describe("validateImportRows", () => {
         ketidaksesuaian: "",
         sebaiknya: "",
         indicator_id: "i1",
+        service_type: "voice",
       },
       {
         row: 3,
@@ -21,6 +22,7 @@ describe("validateImportRows", () => {
         ketidaksesuaian: "",
         sebaiknya: "",
         indicator_id: "i2",
+        service_type: "voice",
       },
     ];
     const { valid, invalid } = validateImportRows(rows);
@@ -38,6 +40,7 @@ describe("validateImportRows", () => {
         ketidaksesuaian: "",
         sebaiknya: "",
         indicator_id: "i1",
+        service_type: "voice",
       },
       {
         row: 3,
@@ -54,7 +57,7 @@ describe("validateImportRows", () => {
     expect(invalid).toHaveLength(1);
   });
 
-  it("detects duplicate tiket+indicator combos", () => {
+  it("detects duplicate tiket+indicator+service combos", () => {
     const rows: ParsedRow[] = [
       {
         row: 2,
@@ -64,6 +67,7 @@ describe("validateImportRows", () => {
         ketidaksesuaian: "",
         sebaiknya: "",
         indicator_id: "i1",
+        service_type: "voice",
       },
       {
         row: 3,
@@ -73,11 +77,40 @@ describe("validateImportRows", () => {
         ketidaksesuaian: "",
         sebaiknya: "",
         indicator_id: "i1",
+        service_type: "voice",
       },
     ];
     const { valid, invalid } = validateImportRows(rows);
     expect(valid).toHaveLength(1);
     expect(invalid).toHaveLength(1);
     expect(invalid[0].error).toContain("Duplikat");
+  });
+
+  it("allows same tiket+indicator across different service_types", () => {
+    const rows: ParsedRow[] = [
+      {
+        row: 2,
+        no_tiket: "TKT-001",
+        indicator_name: "Salam",
+        nilai: 3,
+        ketidaksesuaian: "",
+        sebaiknya: "",
+        indicator_id: "i1",
+        service_type: "voice",
+      },
+      {
+        row: 3,
+        no_tiket: "TKT-001",
+        indicator_name: "Salam",
+        nilai: 2,
+        ketidaksesuaian: "",
+        sebaiknya: "",
+        indicator_id: "i1",
+        service_type: "chat",
+      },
+    ];
+    const { valid, invalid } = validateImportRows(rows);
+    expect(valid).toHaveLength(2);
+    expect(invalid).toHaveLength(0);
   });
 });

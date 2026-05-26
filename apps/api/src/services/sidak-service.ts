@@ -338,6 +338,7 @@ export interface PreviewResult {
     nilai: number;
     ketidaksesuaian?: string | null;
     sebaiknya?: string | null;
+    no_tiket?: string | null;
   }[];
   invalid: ValidationError[];
   skipped: {
@@ -345,6 +346,7 @@ export interface PreviewResult {
     nilai: number;
     ketidaksesuaian?: string | null;
     sebaiknya?: string | null;
+    no_tiket?: string | null;
   }[];
   stats: { valid_count: number; invalid_count: number; skipped_count: number };
 }
@@ -353,11 +355,13 @@ export async function validateTemuanBatch(items: {
   peserta_id: string;
   period_id: string;
   service_type: ServiceType;
+  no_tiket?: string | null;
   items: {
     indicator_id: string;
     nilai: number;
     ketidaksesuaian?: string | null;
     sebaiknya?: string | null;
+    no_tiket?: string | null;
   }[];
 }): Promise<PreviewResult> {
   const [activeVersion, validIndicators, existing] = await Promise.all([
@@ -371,16 +375,20 @@ export async function validateTemuanBatch(items: {
       ),
     supabaseAdmin
       .from("qa_temuan")
-      .select("indicator_id")
+      .select("no_tiket, indicator_id, service_type")
       .eq("period_id", items.period_id)
-      .eq("peserta_id", items.peserta_id),
+      .eq("peserta_id", items.peserta_id)
+      .eq("service_type", items.service_type)
+      .eq("is_phantom_padding", false),
   ]);
 
   const indicatorMap = new Map(
     (validIndicators?.data ?? []).map((i: any) => [i.id, i]),
   );
-  const existingIndicatorIds = new Set(
-    (existing?.data ?? []).map((e: any) => e.indicator_id),
+  const existingKeys = new Set(
+    (existing?.data ?? [])
+      .filter((e: any) => e.no_tiket?.trim())
+      .map((e: any) => `${e.no_tiket.trim().toLowerCase()}::${e.indicator_id}::${e.service_type}`)
   );
 
   let validLegacyIds: Set<string> | null = null;
@@ -401,6 +409,7 @@ export async function validateTemuanBatch(items: {
   const valid: PreviewResult["valid"] = [];
   const invalid: ValidationError[] = [];
   const skipped: PreviewResult["skipped"] = [];
+  const seenInBatch = new Set<string>();
 
   for (const item of items.items) {
     const ind = indicatorMap.get(item.indicator_id);
@@ -426,9 +435,15 @@ export async function validateTemuanBatch(items: {
       });
       continue;
     }
-    if (existingIndicatorIds.has(item.indicator_id)) {
-      skipped.push(item);
-      continue;
+
+    const itemTicket = (item.no_tiket ?? items.no_tiket ?? "").trim();
+    if (itemTicket) {
+      const key = `${itemTicket.toLowerCase()}::${item.indicator_id}::${items.service_type}`;
+      if (existingKeys.has(key) || seenInBatch.has(key)) {
+        skipped.push(item);
+        continue;
+      }
+      seenInBatch.add(key);
     }
 
     valid.push(item);
@@ -457,6 +472,7 @@ export async function createTemuanBatch(
       nilai: number;
       ketidaksesuaian?: string | null;
       sebaiknya?: string | null;
+      no_tiket?: string | null;
     }[];
   },
   userId?: string,
@@ -484,17 +500,21 @@ export async function createTemuanBatch(
   const activeVersion = await resolveActivePublishedRuleVersion(items.service_type);
   const ruleVersionId = activeVersion?.id ?? null;
 
-  const rows = validation.valid.map((item) => ({
-    peserta_id: items.peserta_id,
-    period_id: items.period_id,
-    indicator_id: item.indicator_id,
-    service_type: items.service_type,
-    no_tiket: items.no_tiket ?? null,
-    nilai: item.nilai,
-    ketidaksesuaian: item.ketidaksesuaian ?? null,
-    sebaiknya: item.sebaiknya ?? null,
-    rule_version_id: ruleVersionId,
-  }));
+  const rows = validation.valid.map((item) => {
+    const rawTicket = item.no_tiket ?? items.no_tiket ?? null;
+    const trimmedTicket = rawTicket ? rawTicket.trim() : null;
+    return {
+      peserta_id: items.peserta_id,
+      period_id: items.period_id,
+      indicator_id: item.indicator_id,
+      service_type: items.service_type,
+      no_tiket: trimmedTicket || null,
+      nilai: item.nilai,
+      ketidaksesuaian: item.ketidaksesuaian ?? null,
+      sebaiknya: item.sebaiknya ?? null,
+      rule_version_id: ruleVersionId,
+    };
+  });
 
   const { data, error } = await supabaseAdmin
     .from("qa_temuan")
