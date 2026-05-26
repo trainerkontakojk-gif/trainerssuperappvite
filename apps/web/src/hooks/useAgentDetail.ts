@@ -289,8 +289,10 @@ export function useAgentDetail(agentId: string) {
   }, [data, selectedYear, monthlySummaries, agentId]);
 
   const handleInputAudit = useCallback(() => {
-    window.location.assign(`/sidak/input?agent_id=${agentId}&year=${selectedYear}`);
-  }, [agentId, selectedYear]);
+    const folder = data?.peserta?.batch_name || data?.peserta?.tim || '';
+    const params = new URLSearchParams({ folder, agent_id: agentId });
+    window.location.assign(`/sidak/input?${params.toString()}`);
+  }, [agentId, data]);
 
   const handleEdit = useCallback((item: TemuanDisplayItem) => {
     setEditingTemuan(item);

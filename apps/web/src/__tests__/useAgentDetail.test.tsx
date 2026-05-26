@@ -145,4 +145,24 @@ describe("useAgentDetail", () => {
     );
     expect(result.current.availableServiceTypes).toHaveLength(2);
   });
+
+  it("handleInputAudit navigates with folder param encoded", async () => {
+    const assignMock = vi.fn();
+    const originalLocation = window.location;
+    delete (window as any).location;
+    (window as any).location = { ...originalLocation, assign: assignMock };
+
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+
+    result.current.handleInputAudit();
+
+    const calledUrl = assignMock.mock.calls[0][0] as string;
+    const url = new URL(calledUrl, "http://localhost");
+    expect(url.pathname).toBe("/sidak/input");
+    expect(url.searchParams.get("agent_id")).toBe("agent-1");
+    expect(url.searchParams.get("folder")).toBe("Tim Email");
+
+    (window as any).location = originalLocation;
+  });
 });

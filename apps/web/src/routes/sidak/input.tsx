@@ -3,15 +3,15 @@ import { useApi, getApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
 import type { QAIndicator, QAPeriod, QATemuan, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FolderOpen, User as UserIcon, CalendarDays, Plus, Trash2,
-  Pencil, Upload, Download, Check, X, ChevronRight,
-  Loader2, AlertCircle, ShieldCheck, ArrowLeft,
-  AlertTriangle, FileWarning,
+  FolderOpen, User as UserIcon, CalendarDays, Plus,
+  Upload, Download, Check, X, ChevronRight,
+  Loader2, AlertCircle,
+  AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
-import NilaiBadge from "../../components/sidak/NilaiBadge";
 import IndicatorDropdown from "../../components/sidak/IndicatorDropdown";
 import TemuanGroupCard from "../../components/sidak/TemuanGroupCard";
+import { scoreColor, scoreBg, scoreLabel } from "../../lib/scoring";
 
 const MONTHS = [
   "Januari", "Februari", "Maret", "April",
@@ -100,6 +100,7 @@ export default function SidakInputPage() {
   const [importing, setImporting] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [generatingTemplate, setGeneratingTemplate] = useState(false);
+  const [isPrefilling, setIsPrefilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -264,6 +265,52 @@ export default function SidakInputPage() {
     }
   };
 
+  const loadFolderAndPreSelectAgent = useCallback(async (folder: string, agentId: string) => {
+    setIsPrefilling(true);
+    setErrorMsg(null);
+    try {
+      const year = new Date().getFullYear();
+      const result = await getApi<AgentDirectoryResponse>(`/sidak/agents?year=${year}`);
+      const allAgents = normalizeAgentsResponse(result);
+      const folderAgents = allAgents.filter(
+        (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
+      );
+      const found = folderAgents.find((a) => a.id === agentId);
+      if (!found) {
+        setErrorMsg("Agen tidak ditemukan. Silakan pilih manual.");
+        setAgents(folderAgents);
+        setSelectedFolder(folder);
+        setStep("agent");
+        return;
+      }
+      setAgents(folderAgents);
+      setSelectedFolder(folder);
+      setSelectedAgent(found);
+      const serviceFromTeam: Record<string, string> = {
+        Telepon: "call", Chat: "chat", Email: "email",
+        Mix: "cso", BKO: "bko", "Tim BKO": "bko", SLIK: "slik",
+      };
+      const agentService = serviceFromTeam[found.tim ?? ""] || "call";
+      setSelectedService(agentService);
+      await refetchIndicators();
+      setStep("period");
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {
+      setErrorMsg("Gagal memuat data. Silakan pilih manual.");
+    } finally {
+      setIsPrefilling(false);
+    }
+  }, [refetchIndicators]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const folder = params.get("folder");
+    const agentId = params.get("agent_id");
+    if (folder && agentId) {
+      loadFolderAndPreSelectAgent(folder, agentId);
+    }
+  }, [loadFolderAndPreSelectAgent]);
+
   const updateEntry = (uid: string, patch: Record<string, any>) => {
     setEntries((prev) =>
       prev.map((e) => (e.uid === uid ? { ...e, ...patch } : e)),
@@ -415,6 +462,54 @@ export default function SidakInputPage() {
     });
     return groups;
   }, [temuan]);
+
+  const liveScore = useMemo(() => {
+    if (!activeIndicators.length) return null;
+    const sesiMap = new Map<string, { nilai: number; bobot: number }[]>();
+    temuan.forEach((t) => {
+      const key = t.no_tiket?.trim() || `__no_${t.id}`;
+      if (!sesiMap.has(key)) sesiMap.set(key, []);
+      const ind = indicatorLookup.get(t.indicator_id);
+      sesiMap.get(key)!.push({ nilai: t.nilai, bobot: ind?.bobot ?? 1 });
+    });
+    if (sesiMap.size === 0) {
+      return { finalScore: 100, nonCriticalScore: 100, criticalScore: 100, sessionCount: 0 };
+    }
+    const MAX_SAMPLING = 5;
+    const sessionScores = Array.from(sesiMap.values()).map((items) => {
+      let totalBobot = 0;
+      let earnedBobot = 0;
+      items.forEach((item) => {
+        totalBobot += item.bobot;
+        earnedBobot += (item.nilai / 3) * item.bobot;
+      });
+      return totalBobot > 0 ? (earnedBobot / totalBobot) * 100 : 100;
+    });
+    const sorted = [...sessionScores].sort((a, b) => a - b);
+    const selected = sorted.slice(0, MAX_SAMPLING);
+    const padded = [...selected];
+    while (padded.length < MAX_SAMPLING) padded.push(100);
+    const final = padded.reduce((a, b) => a + b, 0) / MAX_SAMPLING;
+    const catScore = (cat: "critical" | "non_critical") => {
+      const catInds = activeIndicators.filter((i) => i.category === cat);
+      if (catInds.length === 0) return 100;
+      let totalB = 0;
+      let earnedB = 0;
+      catInds.forEach((ind) => {
+        const tList = temuan.filter((t) => t.indicator_id === ind.id);
+        const val = tList.length > 0 ? Math.min(...tList.map((t) => t.nilai)) : 3;
+        totalB += ind.bobot;
+        earnedB += (val / 3) * ind.bobot;
+      });
+      return totalB > 0 ? (earnedB / totalB) * 100 : 100;
+    };
+    return {
+      finalScore: Math.round(final),
+      nonCriticalScore: Math.round(catScore("non_critical")),
+      criticalScore: Math.round(catScore("critical")),
+      sessionCount: sesiMap.size,
+    };
+  }, [temuan, activeIndicators, indicatorLookup]);
 
   const handleDownloadTemplate = async () => {
     if (activeIndicators.length === 0 || !selectedAgent || !selectedPeriod) return;
@@ -652,41 +747,47 @@ export default function SidakInputPage() {
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          {/* BREADCRUMB */}
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 text-sm"
-          >
-            <div className="p-2 bg-primary/10 rounded-xl">
-              <ShieldCheck className="w-4 h-4 text-primary" />
-            </div>
-            <span className="text-muted-foreground">SIDAK</span>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
-            {(["folder", "agent", "period", "list"] as Step[]).map((s, idx) => {
-              const isActive = step === s;
-              const isPast = ["folder", "agent", "period", "list"].indexOf(step) > idx;
-              return (
-                <span key={s} className="flex items-center gap-2">
-                  {idx > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" />}
-                  <button
-                    type="button"
-                    onClick={() => isPast && resetToStep(s)}
-                    className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                      isActive
-                        ? "text-primary"
-                        : isPast
-                          ? "text-muted-foreground hover:text-primary"
-                          : "text-muted-foreground/40"
-                    }`}
-                  >
-                    {s === "folder" ? "Folder" : s === "agent" ? "Agen" : s === "period" ? "Periode" : "Temuan"}
-                  </button>
+        <div className={`mx-auto space-y-6 ${step === "list" ? "max-w-6xl" : "max-w-3xl"}`}>
+          {/* COMPACT BREADCRUMB */}
+          <div className="flex items-center gap-1 text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => resetToStep("folder")}
+              className={`transition-colors shrink-0 ${step === "folder" ? "text-primary" : "text-muted-foreground/60 hover:text-primary"}`}
+            >
+              Folder
+            </button>
+            <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
+            <button
+              type="button"
+              onClick={() => selectedFolder && resetToStep("agent")}
+              disabled={!selectedFolder}
+              className={`transition-colors truncate max-w-[120px] ${step === "agent" ? "text-primary" : selectedFolder ? "text-muted-foreground hover:text-primary" : "text-muted-foreground/30"}`}
+            >
+              {selectedFolder || "Agen"}
+            </button>
+            {selectedFolder && (
+              <>
+                <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => selectedAgent && resetToStep("period")}
+                  disabled={!selectedAgent}
+                  className={`transition-colors truncate max-w-[120px] ${step === "period" ? "text-primary" : selectedAgent ? "text-muted-foreground hover:text-primary" : "text-muted-foreground/30"}`}
+                >
+                  {selectedAgent?.nama || "Agen"}
+                </button>
+              </>
+            )}
+            {selectedAgent && (
+              <>
+                <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
+                <span className={`truncate max-w-[120px] ${step === "list" ? "text-primary" : "text-muted-foreground/60"}`}>
+                  {selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : "Periode"}
                 </span>
-              );
-            })}
-          </motion.div>
+              </>
+            )}
+          </div>
 
           {/* MESSAGES */}
           <AnimatePresence>
@@ -722,14 +823,32 @@ export default function SidakInputPage() {
               className="space-y-6"
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
+                <div className="flex items-center gap-3">
+                  <FolderOpen className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-bold text-foreground/90">
                     Pilih Folder
-                  </h1>
-                  <p className="text-muted-foreground text-sm mt-1">
-                    Pilih folder/tim untuk memulai input temuan audit.
-                  </p>
+                  </h2>
                 </div>
+                <button
+                  data-testid="show-all-toggle"
+                  type="button"
+                  onClick={() => {
+                    setShowAllData(!showAllData);
+                    setSelectedFolder(null);
+                    setSelectedAgent(null);
+                    setSelectedPeriod(null);
+                    setTemuan([]);
+                    setStep("folder");
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                    showAllData
+                      ? "bg-amber-500 text-white border-amber-500"
+                      : "bg-background border-border/50 text-muted-foreground hover:border-amber-400"
+                  }`}
+                >
+                  {showAllData ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {showAllData ? "Data Terfilter" : "Tampilkan Semua"}
+                </button>
               </div>
 
               {displayFolders.length === 0 ? (
@@ -739,25 +858,24 @@ export default function SidakInputPage() {
                   description="Tidak ada folder yang tersedia untuk input temuan."
                 />
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div className="grid gap-2">
                   {displayFolders.map((f, i) => (
                     <motion.button
                       key={f.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
+                      transition={{ delay: i * 0.02 }}
                       type="button"
                       onClick={() => handleFolderClick(f.name)}
-                      className="group relative p-4 rounded-2xl bg-card/50 border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                      className="flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left"
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
-                          <FolderOpen className="w-5 h-5" />
-                        </div>
-                        <span className="text-xs font-bold text-center text-foreground/80 leading-tight">
-                          {f.name}
-                        </span>
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                        <FolderOpen className="w-5 h-5" />
                       </div>
+                      <span className="flex-1 font-semibold text-sm text-foreground/90 truncate">
+                        {f.name}
+                      </span>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                     </motion.button>
                   ))}
                 </div>
@@ -773,32 +891,22 @@ export default function SidakInputPage() {
               className="space-y-6"
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => resetToStep("folder")}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
-                      Pilih Agen
-                    </h1>
-                  </div>
-                  <p className="text-muted-foreground text-sm mt-1 ml-9">
-                    Folder: <span className="font-semibold text-foreground/70">{selectedFolder}</span>
-                  </p>
+                <div className="flex items-center gap-2">
+                  <UserIcon className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-bold text-foreground/90">
+                    Pilih Agen
+                  </h2>
                 </div>
               </div>
 
               {loading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="p-4 rounded-2xl bg-card/50 border border-border animate-pulse">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-foreground/10" />
-                        <div className="h-3 w-20 bg-foreground/10 rounded" />
+                <div className="grid gap-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-card/50 border border-border animate-pulse">
+                      <div className="w-10 h-10 rounded-full bg-foreground/10 shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 w-28 bg-foreground/10 rounded" />
+                        <div className="h-2.5 w-20 bg-foreground/10 rounded" />
                       </div>
                     </div>
                   ))}
@@ -810,30 +918,29 @@ export default function SidakInputPage() {
                   description={`Tidak ditemukan agen untuk folder "${selectedFolder}".`}
                 />
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div className="grid gap-2">
                   {agents.map((agent, i) => (
                     <motion.button
                       key={agent.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
+                      transition={{ delay: i * 0.02 }}
                       type="button"
                       onClick={() => handleAgentClick(agent)}
-                      className="group relative p-4 rounded-2xl bg-card/50 border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                      className="flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left"
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                          {agent.nama.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-xs font-bold text-center text-foreground/80 leading-tight">
-                          {agent.nama}
-                        </span>
-                        {agent.batch_name && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {agent.batch_name}
-                          </span>
-                        )}
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-sm shrink-0">
+                        {agent.nama.charAt(0).toUpperCase()}
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-foreground/90 truncate">
+                          {agent.nama}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {agent.batch_name || agent.tim || "-"}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                     </motion.button>
                   ))}
                 </div>
@@ -849,34 +956,22 @@ export default function SidakInputPage() {
               className="space-y-6"
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => resetToStep("agent")}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
-                      Pilih Periode
-                    </h1>
-                  </div>
-                  <p className="text-muted-foreground text-sm mt-1 ml-9">
-                    Agen: <span className="font-semibold text-foreground/70">{selectedAgent?.nama}</span>
-                    {" · "}
-                    Layanan: <span className="font-semibold text-foreground/70">{SERVICE_LABELS[selectedService]}</span>
-                  </p>
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-bold text-foreground/90">
+                    Pilih Periode
+                  </h2>
                 </div>
               </div>
 
               {loading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="p-4 rounded-2xl bg-card/50 border border-border animate-pulse">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="h-4 w-16 bg-foreground/10 rounded" />
-                        <div className="h-3 w-12 bg-foreground/10 rounded" />
+                <div className="grid gap-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-card/50 border border-border animate-pulse">
+                      <div className="w-10 h-10 rounded-xl bg-foreground/10 shrink-0" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3 w-24 bg-foreground/10 rounded" />
+                        <div className="h-2.5 w-16 bg-foreground/10 rounded" />
                       </div>
                     </div>
                   ))}
@@ -888,58 +983,33 @@ export default function SidakInputPage() {
                   description="Tidak ada periode audit yang tersedia."
                 />
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div className="grid gap-2">
                   {periods.map((p, i) => (
                     <motion.button
                       key={p.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.03 }}
+                      transition={{ delay: i * 0.02 }}
                       type="button"
                       onClick={() => handlePeriodClick(p)}
-                      className="group relative p-4 rounded-2xl bg-card/50 border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                      className="flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left"
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
-                          <CalendarDays className="w-5 h-5" />
-                        </div>
-                        <span className="text-xs font-bold text-foreground/80">
-                          {MONTHS[p.month - 1]}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {p.year}
-                        </span>
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-black text-sm shrink-0">
+                        {String(p.month).padStart(2, "0")}
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-foreground/90">
+                          {MONTHS[p.month - 1]}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.year}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                     </motion.button>
                   ))}
                 </div>
               )}
-
-              {/* Service override */}
-              <div className="p-4 rounded-2xl bg-card/50 border border-border">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-2">
-                  Override Layanan
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {SERVICE_TYPES.map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => {
-                        setSelectedService(st);
-                        refetchIndicators();
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                        selectedService === st
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-card text-muted-foreground border-border hover:border-primary/30"
-                      }`}
-                    >
-                      {SERVICE_LABELS[st]}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </motion.div>
           )}
 
@@ -992,6 +1062,95 @@ export default function SidakInputPage() {
                     <Plus className="w-3.5 h-3.5" /> Tambah
                   </button>
                 </div>
+              </div>
+
+              {/* Konfigurasi Audit card */}
+              <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">
+                  Konfigurasi Audit
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">
+                      Layanan Audit
+                    </label>
+                    <select
+                      value={selectedService}
+                      onChange={(e) => {
+                        setSelectedService(e.target.value);
+                        refetchIndicators();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
+                    >
+                      {SERVICE_TYPES.map((st) => (
+                        <option key={st} value={st}>
+                          {SERVICE_LABELS[st]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">
+                      Tim Agent
+                    </label>
+                    <div className="px-3 py-2 rounded-xl border border-border bg-muted/20 text-sm text-foreground/70">
+                      {selectedAgent?.tim || selectedAgent?.batch_name || '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Estimasi Skor card */}
+              <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Estimasi Skor
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedAgent?.nama} · {selectedPeriod && `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-4xl font-black ${liveScore ? scoreColor(liveScore.finalScore) : "text-muted-foreground"}`}>
+                      {liveScore ? liveScore.finalScore : "—"}
+                    </div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold mt-1">
+                      {liveScore ? scoreLabel(liveScore.finalScore) : "Menunggu"}
+                    </div>
+                  </div>
+                </div>
+                {liveScore && (
+                  <>
+                    <div className="mt-4 h-2.5 rounded-full bg-foreground/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${scoreBg(liveScore.finalScore)}`}
+                        style={{ width: `${Math.max(liveScore.finalScore, 0)}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                          NC Score
+                        </div>
+                        <div className="text-lg font-black text-rose-600">
+                          {liveScore.nonCriticalScore}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                          CR Score
+                        </div>
+                        <div className="text-lg font-black text-blue-600">
+                          {liveScore.criticalScore}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-3">
+                      {liveScore.sessionCount} sesi dihitung · Sampling max 5 sesi
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Draft warning banner */}
