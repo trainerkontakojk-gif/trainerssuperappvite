@@ -265,7 +265,7 @@ export default function AuthModal({
       const { error: forgotError } = await supabase.auth.resetPasswordForEmail(
         email,
         {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/reset-password`,
         },
       );
 
@@ -300,7 +300,7 @@ export default function AuthModal({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/api/auth/callback`,
         },
       });
       if (error) {
