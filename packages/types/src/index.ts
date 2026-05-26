@@ -713,6 +713,34 @@ export interface VoiceQualityAssessment {
   transcript: string;
   highlights: string[];
   strengths: string[];
+  communicationProfile?: TelefunCommunicationProfile | null;
+}
+
+export type CommunicationMetricMode =
+  | "higher_better"
+  | "lower_better"
+  | "optimal_range";
+
+export interface CommunicationMetric {
+  key: "speakingRate" | "intonation" | "articulation" | "fillers" | "tone";
+  label: string;
+  value: number;
+  benchmarkValue: number;
+  evaluationMode: CommunicationMetricMode;
+  idealMin?: number;
+  idealMax?: number;
+  goodMin?: number;
+  goodMax?: number;
+  status: "good" | "needs_improvement" | "poor";
+  explanation: string;
+  improvementTip?: string;
+}
+
+export interface TelefunCommunicationProfile {
+  metrics: CommunicationMetric[];
+  overallSummary: string;
+  strengths: string[];
+  improvementPriorities: string[];
 }
 
 export interface TelefunHistory {

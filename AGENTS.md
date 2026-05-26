@@ -202,6 +202,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 52. Approval Leader KTP & SIDAK Scope Hardening — KTP/Profiler backend scope filtering (new `getAccessiblePesertaIds()` in profiler-service.ts, parity with SIDAK's `getAccessibleAgentIds()`), scope injection at 5 GET endpoints (peserta, counts, global-pool, batch, by-id), new `GET /v1/me/access-status` API endpoint, frontend `LeaderAccessGate` component with submit-request flow via RLS INSERT, integration in KTP/SIDAK landing pages, 18 API + 11 web regression tests (DONE)
 53. Materialized View Security Hardening — Lock down `mv_qa_period_summary` to prevent unauthenticated/client-side access (REVOKE ALL FROM anon, public, authenticated), restrict refresh function to service_role, add regression tests (DONE)
 54. MV QA Period Summary Post-Restore Re-Hardening — Fix ordering gap: 017 hardening runs before contract restore (20260525000200) which regrants to authenticated; added terminal migration 20260526090000 after restore, order-aware regression tests, docs sync (DONE)
+55. Telefun Communication Profile Radar Chart — 2-series radar chart (Target QA + Hasil Anda) on `0-100` domain, semantics-aware metrics (Fillers as `lower_better`, Speaking Rate as `optimal_range`), AI insight (overallSummary, strengths, improvementPriorities), CommunicationProfileZoomModal with Escape/overlay/button close, score guard (`/10` vs `/100`) in ReviewModal, backend enrichment via `telefun-communication-profile.ts`, fix kontrak `POST /telefun/score/:id` envelope normalization, sessionFinalizer forwards `assessment` to `record.voiceAssessment`, 40+ tests across 5 test files, 0 new deps, 0 new migrations (DONE)
 
 ## Relevant Files
 
@@ -223,7 +224,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/__tests__/profiler-scope-filter.test.ts` — 18 API regression tests for getAccessiblePesertaIds + getLeaderAccessStatus
 - `apps/web/src/__tests__/leader-access-gate.test.tsx` — 11 web regression tests for LeaderAccessGate component
 - `docs/LEADER_APPROVAL_ACCESS.md` — full architecture doc updated with backend scope enforcers, access status API, and frontend gate
-- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**, **profile** (normalizeAuthProfileStatus)
+- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**, **profile** (normalizeAuthProfileStatus), **telefun-communication-profile** (Phase 55: benchmark defaults, status evaluator, legacy mapper)
 - `apps/api/src/middleware/auth.ts` — authentication middleware with is_deleted check + legacy status normalization
 - `apps/api/src/__tests__/auth-middleware.test.ts` — 18 regression tests for auth middleware (deleted/inactive/pending/legacy/non-admin)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
@@ -236,7 +237,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/hooks/useAgentDetail.ts` — agent detail hook with multi-service support
 - `apps/web/src/hooks/useProfilerAccess.ts` — profiler role/isReadOnly hook via Supabase auth
 - `apps/web/src/lib/html2canvas-tailwind-fix.ts` — Tailwind v4 oklch() fix for html2canvas exports
-- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
+- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler, Admin, and **TelefunCommunicationProfile** types — Phase 55)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
 - **`apps/web/src/__tests__/logout-redirect.test.ts`** — regression test for logout redirects and guards
@@ -255,11 +256,22 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types (TelefunScenario, TelefunConsumerType), VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
+- **`apps/web/src/routes/telefun/components/VoiceRadarChart.tsx`** — Phase 55: 2-series radar chart (Target QA + Hasil Anda), domain 0-100, 5 axis with direction hints
+- **`apps/web/src/routes/telefun/components/VoiceAssessmentSection.tsx`** — Phase 55: Profil Komunikasi card with chart, AI insight, zoom affordance, status badges, Cara Membaca
+- **`apps/web/src/routes/telefun/components/CommunicationProfileZoomModal.tsx`** — Phase 55: full-dialog modal with large chart, Escape/overlay/button close, metric detail cards
+- **`apps/web/src/lib/voiceAssessmentUtils.ts`** — Phase 55: +normalizeTelefunScoreResponse, +getCommunicationProfileFromAssessment, fallback builder
+- **`apps/web/src/routes/telefun/sessionFinalizer.ts`** — Phase 55: forwards assessment to record.voiceAssessment
+- **`apps/api/src/lib/telefun-communication-profile.ts`** — Phase 55: benchmark defaults, status evaluator, legacy mapper, enrichment
+- **`apps/api/src/lib/telefun-analysis.ts`** — Phase 55: AI schema extended, assessment enrichment before DB save
+- **`apps/api/src/__tests__/telefun-communication-profile.test.ts`** — Phase 55: 20 unit tests (evaluation modes, legacy fallback, enrichment)
+- **`apps/web/src/__tests__/telefun-communication-profile.test.tsx`** — Phase 55: 12 component tests (chart, zoom modal, Fillers explanation, Escape key)
+- **`apps/web/src/__tests__/telefun-voice-assessment-utils.test.ts`** — Phase 55: +envelope normalization, +legacy fallback tests
+- **`apps/web/src/__tests__/telefun-session-finalizer.test.ts`** — Phase 55: +voiceAssessment in record test
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-51)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-55)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 
 ## Routes Reference (apps/web)

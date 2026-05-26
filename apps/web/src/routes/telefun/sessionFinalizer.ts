@@ -124,12 +124,14 @@ export async function finalizeTelefunSession(params: {
   // 6. Call scoreSession only after agent recording path is persisted in DB
   let score = 0;
   let feedback = "";
+  let voiceAssessment: any = undefined;
   if (agentRecordingPath) {
     try {
       const scoring = await deps.scoreSession(params.sessionId);
       if (scoring) {
         score = scoring.score || 0;
         feedback = scoring.feedback || "";
+        voiceAssessment = scoring.assessment ?? undefined;
       }
     } catch (err) {
       console.error("Scoring failed:", err);
@@ -162,6 +164,7 @@ export async function finalizeTelefunSession(params: {
     agentRecordingPath,
     score,
     feedback,
+    voiceAssessment,
     sessionMetrics: params.metrics,
     realisticModeEnabled: params.sessionConfig?.realisticModeEnabled || false,
     responsePacingMode: params.sessionConfig?.responsePacingMode,

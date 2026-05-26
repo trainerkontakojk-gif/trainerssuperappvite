@@ -1,42 +1,9 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
-import { randomUUID } from "crypto";
+import type { VoiceQualityAssessment } from "@trainers/types";
+import { enrichAssessmentWithCommunicationProfile } from "./telefun-communication-profile";
 
-export interface VoiceQualityAssessment {
-  overallScore: number;
-  speakingRate: {
-    score: number;
-    wordsPerMinute: number;
-    verdict: string;
-    feedback: string;
-  };
-  intonation: {
-    score: number;
-    verdict: string;
-    feedback: string;
-  };
-  articulation: {
-    score: number;
-    verdict: string;
-    feedback: string;
-  };
-  fillerWords: {
-    score: number;
-    count: number;
-    examples: string[];
-    verdict: string;
-    feedback: string;
-  };
-  emotionalTone: {
-    score: number;
-    dominant: string;
-    verdict: string;
-    feedback: string;
-  };
-  transcript: string;
-  highlights: string[];
-  strengths: string[];
-}
+export type { VoiceQualityAssessment };
 
 const VOICE_ASSESSMENT_SCHEMA = {
   type: "object",
@@ -94,6 +61,53 @@ const VOICE_ASSESSMENT_SCHEMA = {
     transcript: { type: "string" },
     highlights: { type: "array", items: { type: "string" } },
     strengths: { type: "array", items: { type: "string" } },
+    communicationProfile: {
+      type: "object",
+      properties: {
+        metrics: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              key: {
+                type: "string",
+                enum: ["speakingRate", "intonation", "articulation", "fillers", "tone"],
+              },
+              label: { type: "string" },
+              value: { type: "number" },
+              benchmarkValue: { type: "number" },
+              evaluationMode: {
+                type: "string",
+                enum: ["higher_better", "lower_better", "optimal_range"],
+              },
+              idealMin: { type: "number" },
+              idealMax: { type: "number" },
+              goodMin: { type: "number" },
+              goodMax: { type: "number" },
+              status: {
+                type: "string",
+                enum: ["good", "needs_improvement", "poor"],
+              },
+              explanation: { type: "string" },
+              improvementTip: { type: "string" },
+            },
+            required: [
+              "key",
+              "label",
+              "value",
+              "benchmarkValue",
+              "evaluationMode",
+              "status",
+              "explanation",
+            ],
+          },
+        },
+        overallSummary: { type: "string" },
+        strengths: { type: "array", items: { type: "string" } },
+        improvementPriorities: { type: "array", items: { type: "string" } },
+      },
+      required: ["metrics", "overallSummary", "strengths", "improvementPriorities"],
+    },
   },
   required: [
     "overallScore",
@@ -132,9 +146,10 @@ export async function analyzeVoiceQuality(
 
   // 2. Return cached if exists and valid
   if (row.voice_assessment && typeof row.voice_assessment === "object") {
+    const cached = row.voice_assessment as VoiceQualityAssessment;
     return {
       success: true,
-      assessment: row.voice_assessment as VoiceQualityAssessment,
+      assessment: enrichAssessmentWithCommunicationProfile(cached),
     };
   }
 
@@ -200,7 +215,8 @@ export async function analyzeVoiceQuality(
 
   if (response.success && response.text) {
     try {
-      const assessment = JSON.parse(response.text) as VoiceQualityAssessment;
+      const parsed = JSON.parse(response.text) as VoiceQualityAssessment;
+      const assessment = enrichAssessmentWithCommunicationProfile(parsed);
 
       // Save to DB
       await adminClient

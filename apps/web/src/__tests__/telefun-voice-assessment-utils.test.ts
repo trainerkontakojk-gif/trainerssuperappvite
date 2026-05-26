@@ -1,18 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { validateAssessment } from "../lib/voiceAssessmentUtils";
+import {
+  validateAssessment,
+  normalizeTelefunScoreResponse,
+  getCommunicationProfileFromAssessment,
+} from "../lib/voiceAssessmentUtils";
+
+const valid = {
+  overallScore: 8,
+  speakingRate: { score: 7, verdict: "Good", feedback: "Nice pace", wordsPerMinute: 130 },
+  intonation: { score: 8, verdict: "Good", feedback: "Nice tone" },
+  articulation: { score: 9, verdict: "Great", feedback: "Clear speech" },
+  fillerWords: { score: 6, verdict: "Fine", feedback: "Some fillers", count: 5, examples: ["uh", "um"] },
+  emotionalTone: { score: 7, verdict: "Good", feedback: "Empathetic", dominant: "calm" },
+  transcript: "Hello world",
+  highlights: ["Great start"],
+  strengths: ["Clear voice"],
+};
 
 describe("validateAssessment", () => {
-  const valid = {
-    overallScore: 8,
-    speakingRate: { score: 7, verdict: "Good", feedback: "Nice pace", wordsPerMinute: 130 },
-    intonation: { score: 8, verdict: "Good", feedback: "Nice tone" },
-    articulation: { score: 9, verdict: "Great", feedback: "Clear speech" },
-    fillerWords: { score: 6, verdict: "Fine", feedback: "Some fillers", count: 5, examples: ["uh", "um"] },
-    emotionalTone: { score: 7, verdict: "Good", feedback: "Empathetic", dominant: "calm" },
-    transcript: "Hello world",
-    highlights: ["Great start"],
-    strengths: ["Clear voice"],
-  };
 
   it("returns null for non-object", () => {
     expect(validateAssessment(null)).toBeNull();
@@ -113,5 +118,115 @@ describe("validateAssessment", () => {
       speakingRate: { score: 15, verdict: "Too fast", feedback: "Slow down", wordsPerMinute: 200 },
     });
     expect(result!.speakingRate.score).toBe(10);
+  });
+
+  it("preserves communicationProfile if present in payload", () => {
+    const profile = {
+      metrics: [],
+      overallSummary: "Test",
+      strengths: ["Satu"],
+      improvementPriorities: ["Dua"],
+    };
+    const result = validateAssessment({
+      ...valid,
+      communicationProfile: profile,
+    });
+    expect(result!.communicationProfile).toEqual(profile);
+  });
+
+  it("sets communicationProfile to null for legacy payload", () => {
+    const result = validateAssessment(valid);
+    expect(result!.communicationProfile).toBeNull();
+  });
+});
+
+describe("normalizeTelefunScoreResponse", () => {
+  it("unwraps { score, feedback, assessment } envelope from postApi", () => {
+    const envelope = {
+      score: 85,
+      feedback: "Bagus",
+      assessment: {
+        overallScore: 8,
+        speakingRate: { score: 7, wordsPerMinute: 130, verdict: "Good", feedback: "Nice" },
+        intonation: { score: 8, verdict: "Good", feedback: "Nice" },
+        articulation: { score: 9, verdict: "Great", feedback: "Clear" },
+        fillerWords: { score: 7, count: 2, examples: ["uh"], verdict: "Good", feedback: "Minimal" },
+        emotionalTone: { score: 7, dominant: "calm", verdict: "Good", feedback: "Calm" },
+        transcript: "Hello",
+        highlights: [],
+        strengths: [],
+      },
+    };
+
+    const result = normalizeTelefunScoreResponse(envelope);
+    expect(result.score).toBe(85);
+    expect(result.feedback).toBe("Bagus");
+    expect(result.assessment).not.toBeNull();
+    expect(result.assessment!.overallScore).toBe(8);
+  });
+
+  it("handles assessment directly when no envelope (defensive)", () => {
+    const direct = {
+      overallScore: 7,
+      speakingRate: { score: 6, wordsPerMinute: 120, verdict: "Ok", feedback: "Fine" },
+      intonation: { score: 7, verdict: "Ok", feedback: "Fine" },
+      articulation: { score: 8, verdict: "Good", feedback: "Clear" },
+      fillerWords: { score: 5, count: 4, examples: [], verdict: "Ok", feedback: "Some" },
+      emotionalTone: { score: 6, dominant: "neutral", verdict: "Ok", feedback: "Neutral" },
+      transcript: "Hi",
+      highlights: [],
+      strengths: [],
+    };
+
+    const result = normalizeTelefunScoreResponse(direct);
+    expect(result.assessment).not.toBeNull();
+  });
+
+  it("returns safe defaults for invalid input", () => {
+    const result = normalizeTelefunScoreResponse(null);
+    expect(result.score).toBe(0);
+    expect(result.feedback).toBe("");
+    expect(result.assessment).toBeNull();
+  });
+});
+
+describe("getCommunicationProfileFromAssessment", () => {
+  it("returns existing communicationProfile if present", () => {
+    const existing = {
+      metrics: [],
+      overallSummary: "Ada",
+      strengths: [],
+      improvementPriorities: [],
+    };
+    const result = getCommunicationProfileFromAssessment({
+      ...valid,
+      communicationProfile: existing,
+    });
+    expect(result).toBe(existing);
+  });
+
+  it("builds fallback profile from legacy assessment", () => {
+    const result = getCommunicationProfileFromAssessment(valid);
+    expect(result).not.toBeNull();
+    expect(result!.metrics).toHaveLength(5);
+    expect(result!.overallSummary).toBeDefined();
+    expect(result!.strengths).toBeDefined();
+  });
+
+  it("fillers in fallback uses lower_better mode", () => {
+    const result = getCommunicationProfileFromAssessment(valid);
+    const fillers = result!.metrics.find((m: any) => m.key === "fillers");
+    expect(fillers!.evaluationMode).toBe("lower_better");
+  });
+
+  it("speakingRate in fallback uses optimal_range mode", () => {
+    const result = getCommunicationProfileFromAssessment(valid);
+    const sr = result!.metrics.find((m: any) => m.key === "speakingRate");
+    expect(sr!.evaluationMode).toBe("optimal_range");
+  });
+
+  it("returns null for null/undefined input", () => {
+    expect(getCommunicationProfileFromAssessment(null)).toBeNull();
+    expect(getCommunicationProfileFromAssessment(undefined)).toBeNull();
   });
 });
