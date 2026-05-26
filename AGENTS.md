@@ -186,6 +186,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 47. Telefun Call UI Parity, Replay Seek/Retry, dan Prompt Perilaku Legacy (Final Audit) — Full system instruction parity (emotion branching, KONSISTENSI SUARA, ATURAN ROLEPLAY, expanded ATURAN BICARA), ringtone+hold music+hold timer, volume segments+avatar upgrade+per-state status card+circular controls, dead air/interruption/stalled watchdog hardening, AI annotation generation endpoint, 19 prompt builder tests (DONE)
 48. KETIK Legacy Parity Upgrade — 3-tier time instruction (near end/wrap up/still long) via SessionTimingContext, strictScriptMode for OpenRouter with scenario scripts, allowSolutionAcknowledgement timeout guard (11 instructional cues + 7 action verbs), timing data passthrough from frontend to backend (DONE)
 49. PDKT Legacy Parity Hardening — Settings contract alignment ({success,data}), access matrix role lock (trainer/qa/admin), history replay without active mailbox, client_request_id idempotency, bounded usage delta retry, human-friendly error mapping, DUMMY_PROFILES 5→20 + city randomization, coercion robustness (writingStyle + consumerNameMention), legacy script migration, test uplift 27+14 tests (DONE)
+50. Railway Login Non-Admin E2E Fix — Backend auth middleware hardened (is_deleted check, legacy status normalization via normalizeAuthProfileStatus, differentiated error codes: ACCOUNT_DELETED/ACCOUNT_PENDING/ACCOUNT_INACTIVE/PROFILE_NOT_FOUND/PROFILE_ERROR), .single() → .maybeSingle() for defensive null handling, CORS warning log when ALLOWED_ORIGINS empty in production, frontend fetchApi HTML response detection for SPA fallback errors, 18 API + 3 web regression tests (DONE)
 
 ## Relevant Files
 
@@ -193,7 +194,9 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index)
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**, **monitoring-history-service**, **activity-log-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)
-- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**
+- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**, **profile** (normalizeAuthProfileStatus)
+- `apps/api/src/middleware/auth.ts` — authentication middleware with is_deleted check + legacy status normalization
+- `apps/api/src/__tests__/auth-middleware.test.ts` — 18 regression tests for auth middleware (deleted/inactive/pending/legacy/non-admin)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
 - `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (37 routes, all React.lazy())
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate

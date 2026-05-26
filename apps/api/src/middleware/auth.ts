@@ -1,11 +1,19 @@
 import { Context, Next } from "hono";
 import { supabaseAdmin } from "../lib/supabase";
+import { normalizeAuthProfileStatus } from "../lib/profile";
 import { User } from "@supabase/supabase-js";
 
 type Variables = {
   user: User;
   profile: any;
 };
+
+function buildForbidden(code: string, message: string) {
+  return {
+    success: false,
+    error: { code, message },
+  };
+}
 
 export const authMiddleware = async (
   c: Context<{ Variables: Variables }>,
@@ -38,24 +46,64 @@ export const authMiddleware = async (
     );
   }
 
-  // Fetch profile status
-  const { data: profile } = await supabaseAdmin
+  const { data: profile, error: profileError } = await supabaseAdmin
     .from("profiles")
-    .select("status, role, full_name")
+    .select("status, role, full_name, is_deleted")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (!profile || profile.status !== "active") {
+  if (profileError) {
     return c.json(
-      {
-        success: false,
-        error: { code: "ACCOUNT_PENDING", message: "Account pending approval" },
-      },
+      buildForbidden(
+        "PROFILE_ERROR",
+        "Gagal memverifikasi profil Anda. Silakan coba lagi.",
+      ),
       403,
     );
   }
 
-  // Use c.set to store user and profile in context
+  if (!profile) {
+    return c.json(
+      buildForbidden(
+        "PROFILE_NOT_FOUND",
+        "Profil tidak ditemukan. Silakan hubungi administrator.",
+      ),
+      403,
+    );
+  }
+
+  if (profile.is_deleted) {
+    return c.json(
+      buildForbidden(
+        "ACCOUNT_DELETED",
+        "Akun Anda telah dinonaktifkan. Silakan hubungi administrator.",
+      ),
+      403,
+    );
+  }
+
+  const normalizedStatus = normalizeAuthProfileStatus(profile.status);
+
+  if (normalizedStatus === "pending") {
+    return c.json(
+      buildForbidden(
+        "ACCOUNT_PENDING",
+        "Akun Anda masih menunggu persetujuan administrator.",
+      ),
+      403,
+    );
+  }
+
+  if (normalizedStatus !== "active") {
+    return c.json(
+      buildForbidden(
+        "ACCOUNT_INACTIVE",
+        "Akun Anda tidak aktif. Silakan hubungi administrator.",
+      ),
+      403,
+    );
+  }
+
   c.set("user", user);
   c.set("profile", profile);
   await next();

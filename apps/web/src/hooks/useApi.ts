@@ -12,6 +12,14 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   });
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("text/html")) {
+    throw new Error(
+      "API tidak tersedia. Pastikan VITE_API_URL sudah benar dan ALLOWED_ORIGINS mencakup URL aplikasi ini.",
+    );
+  }
+
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || "API Error");
   return json.data;

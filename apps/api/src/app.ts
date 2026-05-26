@@ -21,6 +21,15 @@ const allowedOrigins =
         .filter(Boolean) || []
     : ["http://localhost:3000"];
 
+if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
+  console.warn(
+    "[API] ⚠️  ALLOWED_ORIGINS is empty in production. CORS will block all cross-origin requests.",
+  );
+  console.warn(
+    "[API] Set ALLOWED_ORIGINS to your web service URL (e.g. https://web-xxx.up.railway.app)",
+  );
+}
+
 const app = new Hono().basePath("/api");
 
 app.use("*", cors({ origin: allowedOrigins, credentials: true }));

@@ -159,3 +159,49 @@ describe("fetchApi auth header", () => {
     expect(calledOptions.headers.Authorization).toBeUndefined();
   });
 });
+
+describe("fetchApi SPA fallback detection", () => {
+  beforeEach(() => {
+    mockLocalStorage();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("throws descriptive error when API returns HTML (SPA fallback)", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<!DOCTYPE html><html>...</html>", {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }),
+    );
+    await expect(fetchApi("/missing-endpoint")).rejects.toThrow(
+      "API tidak tersedia",
+    );
+  });
+
+  it("throws descriptive error when API returns HTML with SPA index fallback", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        '<html lang="id"><head><title>Trainers SuperApp</title></head><body><div id="root"></div></body></html>',
+        { headers: { "content-type": "text/html" } },
+      ),
+    );
+    await expect(fetchApi("/v1/sidak/dashboard")).rejects.toThrow(
+      "VITE_API_URL",
+    );
+  });
+
+  it("still handles normal JSON error responses correctly", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ success: false, error: { message: "Not found" } }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+    );
+    await expect(fetchApi("/not-found")).rejects.toThrow("Not found");
+  });
+});
