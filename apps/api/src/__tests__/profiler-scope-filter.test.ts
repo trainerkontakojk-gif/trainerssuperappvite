@@ -103,7 +103,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("returns empty array when request exists but no group links", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -119,7 +119,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("returns empty array when group links exist but no active items", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -139,7 +139,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("resolves direct peserta_id items", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -162,7 +162,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("resolves batch_name items", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -188,7 +188,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("resolves tim items", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -214,7 +214,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("skips service_type items (not relevant for KTP)", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -237,7 +237,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("combines all scope types into unique IDs", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "ktp", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {
@@ -267,7 +267,7 @@ describe("getAccessiblePesertaIds", () => {
 
     it("requests module all counts as ktp", async () => {
       tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1" }],
+        data: [{ id: "req-1", module: "all", status: "approved" }],
         error: null,
       };
       tableResults["leader_access_request_groups"] = {

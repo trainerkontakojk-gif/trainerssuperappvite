@@ -9,6 +9,7 @@ import { DashboardLayout } from "./components/Layout";
 import { isRoleAllowed } from "./lib/app-config";
 import { supabase } from "./lib/supabase";
 import { fetchAuthProfile } from "./lib/fetchAuthProfile";
+import { fetchApi } from "./hooks/useApi";
 
 const IndexPage = lazy(() => import("./routes/index"));
 const DashboardPage = lazy(() => import("./routes/dashboard"));
@@ -107,49 +108,77 @@ const profilerTableRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/table",
   component: ProfilerTable,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const profilerSlidesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/slides",
   component: ProfilerSlides,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const profilerAnalyticsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/analytics",
   component: ProfilerAnalytics,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const profilerExportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/export",
   component: ProfilerExport,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const profilerAddRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/add",
   component: ProfilerAdd,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const profilerImportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/import",
   component: ProfilerImport,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const profilerTeamsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profiler/teams",
   component: ProfilerTeams,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "ktp",
+    "/profiler",
+  ),
 });
 
 const sidakRoute = createRoute({
@@ -163,7 +192,11 @@ const sidakDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/dashboard",
   component: SidakDashboard,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "sidak",
+    "/sidak",
+  ),
 });
 
 const sidakInputRoute = createRoute({
@@ -177,7 +210,11 @@ const sidakRankingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/ranking",
   component: SidakRanking,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "sidak",
+    "/sidak",
+  ),
 });
 
 const sidakSettingsRoute = createRoute({
@@ -198,14 +235,22 @@ const sidakAgentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents",
   component: SidakAgents,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "sidak",
+    "/sidak",
+  ),
 });
 
 const sidakAgentDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/agents/$id",
   component: SidakAgentDetail,
-  beforeLoad: requireRole(["trainer", "leader", "admin"]),
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "sidak",
+    "/sidak",
+  ),
 });
 
 const sidakReportsRoute = createRoute({
@@ -388,6 +433,51 @@ function requireRole(allowedRoles: string[]) {
     } catch (error) {
       console.error("Auth revalidation error:", error);
       // On network error or other failure, default deny
+      throw redirect({ to: "/unauthorized" });
+    }
+  };
+}
+
+export function requireLeaderModuleApproval(
+  allowedRoles: string[],
+  module: "ktp" | "sidak",
+  landingPath: string,
+) {
+  return async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/" });
+    }
+
+    try {
+      const profile = await fetchAuthProfile(session.user.id);
+
+      if (!profile) {
+        throw redirect({ to: "/" });
+      }
+
+      if (profile.is_deleted || profile.status === "inactive") {
+        throw redirect({ to: "/waiting-approval" });
+      }
+
+      if (!isRoleAllowed(profile.role, allowedRoles)) {
+        throw redirect({ to: "/unauthorized" });
+      }
+
+      if (profile.role === "leader") {
+        const accessData = await fetchApi<
+          Record<string, { status: string }>
+        >("/me/access-status");
+        const moduleStatus = accessData[module]?.status;
+        if (moduleStatus !== "approved") {
+          throw redirect({ to: landingPath });
+        }
+      }
+    } catch (error: any) {
+      if (error.isRedirect) throw error;
+      console.error("Auth revalidation error:", error);
       throw redirect({ to: "/unauthorized" });
     }
   };

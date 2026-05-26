@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const { mockGetSession, mockFetchAuthProfile } = vi.hoisted(() => ({
+const { mockGetSession, mockFetchAuthProfile, mockFetchApi } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockFetchAuthProfile: vi.fn(),
+  mockFetchApi: vi.fn(),
 }));
 
 vi.mock("../lib/supabase", () => ({
@@ -20,6 +21,10 @@ vi.mock("../lib/supabase", () => ({
 
 vi.mock("../lib/fetchAuthProfile", () => ({
   fetchAuthProfile: (id: string) => mockFetchAuthProfile(id),
+}));
+
+vi.mock("../hooks/useApi", () => ({
+  fetchApi: <T,>(path: string) => mockFetchApi(path) as Promise<T>,
 }));
 
 vi.mock("@tanstack/react-router", async () => {
@@ -209,6 +214,164 @@ describe("Route Guards", () => {
       mockFetchAuthProfile.mockRejectedValue(new Error("Profile fetch error"));
       const { guardWaitingApproval } = await import("../router");
       await expect(runGuard(guardWaitingApproval)).rejects.toThrow("Profile fetch error");
+    });
+  });
+
+  describe("requireLeaderModuleApproval", () => {
+    it("allows trainer to pass without approval check", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "trainer",
+        status: "active",
+        is_deleted: false,
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "sidak",
+        "/sidak",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBeNull();
+    });
+
+    it("allows admin to pass without approval check", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "admin",
+        status: "active",
+        is_deleted: false,
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "sidak",
+        "/sidak",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBeNull();
+    });
+
+    it("redirects leader with non-approved status to landing", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "leader",
+        status: "active",
+        is_deleted: false,
+      });
+      mockFetchApi.mockResolvedValue({
+        sidak: { status: "none", module: "sidak", created_at: null },
+        ktp: { status: "pending", module: "ktp", created_at: "2025-01-01" },
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "sidak",
+        "/sidak",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBe("/sidak");
+    });
+
+    it("allows leader with approved status to pass", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "leader",
+        status: "active",
+        is_deleted: false,
+      });
+      mockFetchApi.mockResolvedValue({
+        sidak: { status: "approved", module: "sidak", created_at: "2025-01-01" },
+        ktp: { status: "approved", module: "ktp", created_at: "2025-01-01" },
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "sidak",
+        "/sidak",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBeNull();
+    });
+
+    it("redirects leader with revoked status to landing", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "leader",
+        status: "active",
+        is_deleted: false,
+      });
+      mockFetchApi.mockResolvedValue({
+        ktp: { status: "none", module: "ktp", created_at: null },
+        sidak: { status: "revoked", module: "sidak", created_at: "2025-01-01" },
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "sidak",
+        "/sidak",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBe("/sidak");
+    });
+
+    it("redirects leader with pending status to KTP landing", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "leader",
+        status: "active",
+        is_deleted: false,
+      });
+      mockFetchApi.mockResolvedValue({
+        ktp: { status: "pending", module: "ktp", created_at: "2025-01-01" },
+        sidak: { status: "none", module: "sidak", created_at: null },
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "ktp",
+        "/profiler",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBe("/profiler");
+    });
+
+    it("redirects unauthorized role to /unauthorized", async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: { user: { id: "u1" } } },
+      });
+      mockFetchAuthProfile.mockResolvedValue({
+        id: "u1",
+        role: "agent",
+        status: "active",
+        is_deleted: false,
+      });
+      const { requireLeaderModuleApproval } = await import("../router");
+      const guard = requireLeaderModuleApproval(
+        ["trainer", "leader", "admin"],
+        "sidak",
+        "/sidak",
+      );
+      const location = await runGuard(() => guard);
+      expect(location).toBe("/unauthorized");
     });
   });
 });

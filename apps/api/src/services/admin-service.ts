@@ -1,5 +1,10 @@
 import { supabaseAdmin } from "../lib/supabase";
 import { logActivity } from "./activity-log-service";
+import {
+  fetchLeaderModuleRequests,
+  resolveEffectiveModuleStatus,
+  resolveEffectiveModuleCreatedAt,
+} from "./leader-access-service";
 import type {
   ManagedUser,
   PendingLeaderRequest,
@@ -650,25 +655,14 @@ export async function getLeaderAccessStatus(
   const modules = ["ktp", "sidak"] as const;
   const result: Record<string, LeaderAccessStatusItem> = {};
 
-  const { data: requests } = await supabaseAdmin
-    .from("leader_access_requests")
-    .select("id, module, status, created_at")
-    .eq("leader_user_id", userId)
-    .in("module", ["ktp", "sidak"]);
-
   for (const mod of modules) {
-    const req = (requests ?? []).find(
-      (r) => r.module === mod || r.module === "all",
-    );
-    if (!req) {
-      result[mod] = { status: "none", module: mod, created_at: null };
-    } else {
-      result[mod] = {
-        status: req.status as LeaderAccessStatusItem["status"],
-        module: mod,
-        created_at: req.created_at,
-      };
-    }
+    const rows = await fetchLeaderModuleRequests(userId, mod);
+    const status = resolveEffectiveModuleStatus(rows, mod);
+    result[mod] = {
+      status,
+      module: mod,
+      created_at: resolveEffectiveModuleCreatedAt(rows, mod, status),
+    };
   }
 
   return result;

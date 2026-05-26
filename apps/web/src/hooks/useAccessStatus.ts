@@ -38,6 +38,25 @@ export function useAccessStatus(module: "ktp" | "sidak") {
     fetchStatus();
   }, [fetchStatus]);
 
+  useEffect(() => {
+    const onFocus = () => {
+      fetchStatus();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchStatus();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [fetchStatus]);
+
   const submitRequest = useCallback(async () => {
     try {
       setError(null);

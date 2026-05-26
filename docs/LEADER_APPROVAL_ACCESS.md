@@ -89,8 +89,29 @@ Leader opens KTP/SIDAK page
 Both functions follow the same logic:
 1. Admin/Trainer → returns `null` (no filter, full access)
 2. Agent → returns own peserta ID or empty
-3. Leader → resolves scope from approved `leader_access_requests` + `access_group_items`; returns `string[]` or `[]` (fail-closed)
+3. Leader → delegates to `getApprovedRequestIds(userId, module)` from shared helper, then resolves scope from approved `leader_access_request_groups` + `access_group_items`; returns `string[]` or `[]` (fail-closed)
 4. Other roles → returns `[]` (deny)
+
+### Shared Helper: Approal Resolution
+
+**File:** `apps/api/src/services/leader-access-service.ts`
+
+Centralized logic for resolving effective approval status and approved request IDs:
+
+| Function | Purpose |
+|----------|---------|
+| `fetchLeaderModuleRequests(userId, module)` | Queries rows for target module + `"all"`, ordered by `updated_at DESC, created_at DESC` |
+| `resolveEffectiveModuleStatus(rows, module)` | Pure function: returns effective status given all rows |
+| `resolveEffectiveModuleCreatedAt(rows, module, status)` | Returns `created_at` of the effective status row |
+| `getApprovedRequestIds(userId, module)` | Returns all approved request IDs for scope resolution (module + `"all"`) |
+
+**Precedence rules** (highest to lowest):
+1. `approved` (any row for target module or `"all"`)
+2. `pending` (any row for target module or `"all"`)
+3. Most recent terminal status (`revoked` / `rejected`) for target module or `"all"`
+4. `none` (no relevant rows)
+
+This ensures historical override works correctly: `revoked → approved` returns `approved`, and `module = "all"` covers both `ktp` and `sidak`.
 
 **KTP-specific**: `service_type` items are silently ignored in scope resolution (KTP has no service type column).
 
@@ -123,6 +144,33 @@ Module `all` in `leader_access_requests` counts as approved for both `ktp` and `
 
 Used in `apps/web/src/routes/profiler/index.tsx` and `apps/web/src/routes/sidak/index.tsx`.
 
+### Frontend: Route Guard (Subroute Protection)
+
+The `requireLeaderModuleApproval` guard in `apps/web/src/router.tsx:441` protects SIDAK and KTP subroutes from deep-link bypass. It wraps `requireRole` logic with an additional access-status check for leaders:
+
+- Admin/Trainer → passes immediately (no approval check)
+- Leader with `approved` access status for the target module → passes
+- Leader with non-approved status → redirected to the module landing page (`/sidak` or `/profiler`)
+
+**Protected subroutes:**
+
+| Module | Routes |
+|--------|--------|
+| SIDAK | `/sidak/dashboard`, `/sidak/ranking`, `/sidak/agents`, `/sidak/agents/$id` |
+| KTP | `/profiler/table`, `/profiler/slides`, `/profiler/analytics`, `/profiler/export`, `/profiler/add`, `/profiler/import`, `/profiler/teams` |
+
+**Landing pages** (`/sidak`, `/profiler`) are intentionally NOT guarded — they serve as the UX surface where leaders see their access status and CTA buttons.
+
+### Frontend: Access Status Refetch
+
+`useAccessStatus()` in `apps/web/src/hooks/useAccessStatus.ts` refetches on:
+1. Mount (initial load)
+2. After submitting a request
+3. `window.focus` event
+4. `document.visibilitychange` → `visible`
+
+This ensures cross-session approval changes are reflected without requiring a full page reload.
+
 Leader submits request via Supabase client RLS INSERT into `leader_access_requests` — no backend API endpoint needed (RLS enforces validation).
 
 ### Security: Fail-Closed
@@ -146,6 +194,10 @@ Leader submits request via Supabase client RLS INSERT into `leader_access_reques
 9. Admin/trainer opens KTP/SIDAK → full data remains visible.
 10. Leader approved for only one module → the other module remains blocked.
 11. Admin/trainer reassigns access groups on approved request → Leader scope updates immediately.
+12. Leader with historical revoked row + newer approved row → status shows approved (precedence override).
+13. Leader with `module = "all"` approval → has access to both KTP and SIDAK, scope resolver works for both.
+14. Leader non-approved deep-links to `/sidak/dashboard` or `/profiler/table` → redirected to landing page.
+15. Leader re-opens blocked tab → status refetches and reflects latest approval/revoke.
 
 ### Regression Commands
 

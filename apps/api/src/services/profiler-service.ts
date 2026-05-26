@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import { getApprovedRequestIds } from "./leader-access-service";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -25,16 +26,10 @@ export async function getAccessiblePesertaIds(
   }
 
   if ((LEADER_ROLES as readonly string[]).includes(role)) {
-    const { data: requests } = await supabaseAdmin
-      .from("leader_access_requests")
-      .select("id")
-      .eq("leader_user_id", userId)
-      .eq("status", "approved")
-      .eq("module", "ktp");
+    const requestIds = await getApprovedRequestIds(userId, "ktp");
 
-    if (!requests || requests.length === 0) return [];
+    if (!requestIds || requestIds.length === 0) return [];
 
-    const requestIds = requests.map((r) => r.id);
     const { data: groupLinks } = await supabaseAdmin
       .from("leader_access_request_groups")
       .select("access_group_id")
