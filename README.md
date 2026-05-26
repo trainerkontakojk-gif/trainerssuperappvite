@@ -1,75 +1,100 @@
 # Trainers SuperApp
 
-SuperApp untuk trainer dengan modul **SIDAK (QA Analyzer)**, **KETIK (Chat Simulation)**, **PDKT (Email Simulation)**, **Telefun (Voice Simulation)**, **Profiler (KTP)**, dan **Dashboard Admin**.
+Trainers SuperApp adalah aplikasi kerja untuk trainer yang mengumpulkan banyak kebutuhan pelatihan dalam satu tempat. Di sini ada simulasi chat, email, dan suara, ditambah alat untuk analisis kualitas, pengelolaan data peserta, dan dashboard admin.
 
-## Tech Stack
+Kalau Anda baru pertama kali membuka repo ini, anggap README ini seperti peta singkat: apa fungsi aplikasinya, modul-modul utamanya apa saja, lalu bagaimana cara menjalankannya di komputer Anda.
 
-- **Frontend:** Vite + React + TanStack Router + Tailwind CSS v4
-- **Backend:** Hono API (TypeScript)
-- **Database:** Supabase (PostgreSQL 17) + RLS
-- **WebSocket:** Telefun Server (persistent WS)
-- **Build:** pnpm + Turborepo (monorepo)
-- **Testing:** Vitest (277+ API tests, 121+ web tests)
+## Gambaran Singkat
 
-## Struktur Monorepo
+- **SIDAK** dipakai untuk analisis kualitas dan input audit.
+- **KETIK** dipakai untuk simulasi chat.
+- **PDKT** dipakai untuk simulasi email.
+- **Telefun** dipakai untuk simulasi panggilan suara.
+- **Profiler** dipakai untuk mengelola data peserta.
+- **Dashboard Admin** dipakai untuk ringkasan, pengelolaan pengguna, kelompok akses, dan log aktivitas.
 
-```
+## Modul yang Tersedia
+
+| Modul | Penjelasan Sederhana | Route |
+|---|---|---|
+| Dashboard | Tempat melihat ringkasan aplikasi, aktivitas, dan beberapa pengaturan penting | `/dashboard`, `/dashboard/*` |
+| SIDAK | Ruang kerja untuk audit kualitas, ranking, input data, dan laporan | `/sidak`, `/sidak/*` |
+| KETIK | Simulasi percakapan chat untuk latihan komunikasi | `/ketik`, `/ketik/*` |
+| PDKT | Simulasi balasan email untuk latihan menghadapi pesan pelanggan | `/pdkt`, `/pdkt/*` |
+| Telefun | Simulasi panggilan suara berbasis WebSocket | `/telefun` |
+| Profiler | Pengelolaan data peserta, impor, ekspor, dan analitik | `/profiler`, `/profiler/*` |
+| Monitoring | Riwayat penggunaan AI, harga, dan kurs | `/monitoring` |
+| Account | Profil akun dan penggantian password | `/account` |
+
+## Struktur Proyek
+
+```text
 apps/
-  api/          Backend Hono API (validasi, business logic, AI, DB mutations)
-  web/          Frontend Vite + React (UI, interaksi, route-based code splitting)
-  telefun/      WebSocket service untuk voice simulation
+  api/          Backend Hono API untuk validasi, business logic, AI, dan mutasi database
+  web/          Frontend Vite + React untuk UI dan interaksi pengguna
+  telefun/      Service WebSocket untuk simulasi suara
 packages/
-  types/        Shared Zod schemas + TypeScript interfaces
+  types/        Skema Zod dan tipe TypeScript yang dipakai bersama
 supabase/
-  migrations/   Database schema (17 migration files, fully idempotent)
-scripts/
-  database-parity/  Script untuk sinkronisasi data legacy → target
+  migrations/   Skema database dan perubahan schema
 docs/
-  rebuild-logs/  Log per-phase (phase 1–38)
-  database.md    Dokumentasi schema & security
+  rebuild-logs/  Catatan per fase pengerjaan
+  *.md          Dokumentasi teknis dan panduan operasional
 ```
 
-## Modul
+## Mulai Cepat
 
-| Modul | Deskripsi | Routes |
-|-------|-----------|--------|
-| **Dashboard** | Overview, user management, access groups, activity logs | `/dashboard`, `/dashboard/*` |
-| **SIDAK** | QA Analyzer: audit input, ranking, dashboard, settings, reports AI | `/sidak`, `/sidak/*` |
-| **KETIK** | Chat simulation + AI review | `/ketik`, `/ketik/*` |
-| **PDKT** | Email simulation + AI evaluation | `/pdkt`, `/pdkt/*` |
-| **Telefun** | Voice call simulation via WebSocket | `/telefun` |
-| **Profiler** | Participant data management (add, import, table, slides, analytics, export) | `/profiler`, `/profiler/*` |
-| **Monitoring** | AI usage history, pricing management | `/monitoring` |
-| **Account** | Profile settings, change password | `/account` |
-
-## Memulai
+Kalau Anda ingin menjalankan proyek ini secara lokal, cukup pakai perintah berikut:
 
 ```bash
 pnpm install
-pnpm dev          # menjalankan web + api + telefun
-pnpm build        # build production
-pnpm test         # jalankan semua test
-pnpm lint         # ESLint
+pnpm dev
+pnpm build
+pnpm test
+pnpm lint
 ```
+
+- `pnpm dev` menjalankan web, API, dan Telefun sekaligus.
+- `pnpm build` membuat build untuk production.
+- `pnpm test` menjalankan seluruh test suite.
+- `pnpm lint` mengecek kualitas kode.
 
 ## Environment Variables
 
 ### Frontend (`apps/web`)
+
+Gunakan prefix `VITE_` untuk variabel yang dibaca langsung saat build frontend:
+
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_API_URL`
 - `VITE_TELEFUN_WS_URL`
 
 ### Backend (`apps/api`)
+
+Variabel ini dipakai oleh server API:
+
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
 - `OPENROUTER_API_KEY`
 
-### Database Sync Scripts
-Copy `.env.migration` template dan isi `OLD_DB_URL` / `NEW_DB_URL`.
+### Telefun (`apps/telefun`)
 
-## Migration Database
+Service suara ini memakai variabel berikut:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+
+### Script Sinkronisasi Database
+
+Kalau Anda menjalankan script sinkronisasi database, salin template `.env.migration` lalu isi `OLD_DB_URL` dan `NEW_DB_URL`.
+
+## Migrasi Database
+
+Contoh perintah yang sering dipakai:
 
 ```bash
 # Sync May qa_temuan (dry-run dulu)
@@ -83,11 +108,22 @@ node scripts/database-parity/sidak-post-sync-verify.mjs --check-mv
 node scripts/database-parity/sidak-post-sync-verify.mjs --refresh-summaries
 ```
 
-## Dokumentasi
+## Dokumentasi Lanjutan
 
-- `docs/database.md` — Schema, RLS policies, security model
-- `docs/checklist-audit-trainers-superapp.md` — Legacy parity audit checklist
-- `docs/rebuild-logs/` — Per-phase implementation logs
+Kalau Anda ingin masuk lebih dalam, ini halaman yang paling berguna:
+
+- `docs/architecture.md` — gambaran arsitektur monorepo dan alur data
+- `docs/modules.md` — penjelasan tiap modul dari sisi penggunaan
+- `docs/deployment.md` — panduan deployment
+- `docs/database.md` — skema, RLS, dan keamanan database
+- `docs/checklist-audit-trainers-superapp.md` — checklist audit parity
+- `docs/rebuild-logs/` — catatan pengerjaan per fase
+
+## Catatan Penting
+
+- Build production tidak otomatis menjalankan migrasi Supabase.
+- File backup lokal ada di `local-backups/` dan tidak seharusnya ikut masuk ke git.
+- Kalau Anda butuh panduan teknis yang lebih detail, mulai dari `docs/README.md`.
 
 ## License
 
