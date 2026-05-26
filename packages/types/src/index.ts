@@ -279,6 +279,7 @@ export interface AgentDetailData {
   periodSummaries: AgentPeriodSummary[];
   selectedPeriod?: AgentPeriodSummary | null;
   temuan: QATemuan[];
+  weights: Record<ServiceType, ServiceWeight>;
   personalTrend: {
     labels: string[];
     datasets: { label: string; data: number[]; isTotal: boolean }[];

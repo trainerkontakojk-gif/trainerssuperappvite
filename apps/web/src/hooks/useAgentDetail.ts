@@ -1,14 +1,16 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useApi, putApi, deleteApi, fetchApi } from "./useApi";
 import { VALID_SERVICE_TYPES } from "@trainers/types";
-import type { AgentDetailData, QATemuan } from "@trainers/types";
+import type { AgentDetailData, ServiceType } from "@trainers/types";
 import { useAuthStore } from "../store/authStore";
+import { calculateSessionScoreFromTemuan, DEFAULT_SERVICE_WEIGHTS } from "../lib/scoring";
 
 interface TicketScore {
   no_tiket: string;
-  deduction: number;
-  count: number;
+  scoreDeduction: number;
+  findingCount: number;
   heaviestParam: string;
+  totalPenaltyWeight: number;
   isSamplingQa: boolean;
 }
 
@@ -179,57 +181,113 @@ export function useAgentDetail(agentId: string) {
   }, [temuan, periodSummaries, indicators, selectedService]);
 
   const topTickets = useMemo((): TicketScore[] => {
-    if (!temuan || !indicators) return [];
-    const ticketMap = new Map<string, { items: QATemuan[]; isSamplingQa: boolean }>();
+    if (!data || !temuan || !indicators || !data.periodSummaries) return [];
+    if (!selectedMonth) return [];
 
-    for (const t of temuan) {
-      if (selectedService !== "all" && t.service_type !== selectedService) continue;
-      const rawTicket = (t.no_tiket ?? "").trim();
-      const ticketKey = rawTicket || `audit-${t.id}`;
-      const entry = ticketMap.get(ticketKey);
-      const isSampling = ticketKey.startsWith("__PHANTOM__") || (t as any).is_phantom_padding === true;
-      if (entry) {
-        entry.items.push(t);
-        if (isSampling) entry.isSamplingQa = true;
-      } else {
-        ticketMap.set(ticketKey, { items: [t], isSamplingQa: isSampling });
-      }
-    }
+    const serviceIndicators = indicators.filter(
+      (i) => i.service_type === selectedService,
+    );
+    if (serviceIndicators.length === 0) return [];
 
-    const results: TicketScore[] = [];
-    for (const [ticket, { items, isSamplingQa }] of ticketMap) {
-      let maxDeduction = 0;
-      let heaviestParam = "";
-      for (const item of items) {
-        const ind = indicators.find((i) => i.id === item.indicator_id);
-        const weight = ind?.bobot ?? 1;
-        const nilai = item.nilai ?? 0;
-        const penalty = ((3 - nilai) / 3) * weight;
-        if (penalty > maxDeduction) {
-          maxDeduction = penalty;
-          heaviestParam = ind?.name || "Unknown";
-        }
+    const activeServiceWeight =
+      data.weights?.[selectedService as ServiceType] ??
+      DEFAULT_SERVICE_WEIGHTS[selectedService as ServiceType] ??
+      DEFAULT_SERVICE_WEIGHTS.call;
+
+    const periodMonthMap = new Map(
+      data.periodSummaries.map((s) => [s.id, s.month]),
+    );
+
+    const monthFindings = temuan.filter((t) => {
+      if (selectedService !== "all" && t.service_type !== selectedService) return false;
+      return periodMonthMap.get(t.period_id) === selectedMonth;
+    });
+
+    const ticketMap: Record<
+      string,
+      {
+        no_tiket: string;
+        totalPenaltyWeight: number;
+        findingCount: number;
+        heaviestParam: string;
+        maxPenaltyWeight: number;
+        isSamplingQa: boolean;
+        sessionFindings: { indicator_id: string; nilai: number }[];
       }
-      const minScore = items.reduce((max, item) => {
-        const weight = indicators.find((i) => i.id === item.indicator_id)?.bobot ?? 1;
-        const nilai = item.nilai ?? 0;
-        return Math.min(max, (nilai / 3) * weight * 100);
-      }, 100);
-      const scoreDeduction = Math.round((100 - minScore) * 10) / 10;
-      results.push({
-        no_tiket: ticket,
-        deduction: scoreDeduction,
-        count: items.length,
-        heaviestParam,
-        isSamplingQa,
+    > = {};
+
+    for (const f of monthFindings) {
+      const rawTicket = (f.no_tiket ?? "").trim();
+      const ticketKey = rawTicket || `audit-${f.id}`;
+      const ind = serviceIndicators.find((i) => i.id === f.indicator_id);
+      const weight = ind?.bobot ?? 0;
+      const nilai = Number.isFinite(f.nilai)
+        ? Math.max(0, Math.min(3, Number(f.nilai)))
+        : 3;
+      const penaltyWeight = ((3 - nilai) / 3) * weight;
+      const paramName = ind?.name || "Unknown";
+
+      if (!ticketMap[ticketKey]) {
+        ticketMap[ticketKey] = {
+          no_tiket: ticketKey,
+          totalPenaltyWeight: 0,
+          findingCount: 0,
+          heaviestParam: paramName,
+          maxPenaltyWeight: penaltyWeight,
+          isSamplingQa:
+            ticketKey.startsWith("__PHANTOM__") ||
+            (f as any).is_phantom_padding === true,
+          sessionFindings: [],
+        };
+      }
+
+      const entry = ticketMap[ticketKey];
+      entry.totalPenaltyWeight += penaltyWeight;
+      entry.findingCount += 1;
+      if (
+        ticketKey.startsWith("__PHANTOM__") ||
+        (f as any).is_phantom_padding === true
+      ) {
+        entry.isSamplingQa = true;
+      }
+      entry.sessionFindings.push({
+        indicator_id: f.indicator_id,
+        nilai,
       });
+
+      if (penaltyWeight > entry.maxPenaltyWeight) {
+        entry.maxPenaltyWeight = penaltyWeight;
+        entry.heaviestParam = paramName;
+      }
     }
 
-    return results
-      .filter((t) => t.deduction > 0)
-      .sort((a, b) => b.deduction - a.deduction)
+    return Object.values(ticketMap)
+      .map((ticket) => {
+        const sessionScore = calculateSessionScoreFromTemuan(
+          serviceIndicators,
+          ticket.sessionFindings,
+          activeServiceWeight,
+        );
+        const scoreDeduction = Math.max(0, 100 - sessionScore);
+        return {
+          no_tiket: ticket.no_tiket,
+          scoreDeduction,
+          totalPenaltyWeight: ticket.totalPenaltyWeight,
+          findingCount: ticket.findingCount,
+          heaviestParam: ticket.heaviestParam,
+          isSamplingQa: ticket.isSamplingQa,
+        };
+      })
+      .filter((ticket) => ticket.scoreDeduction > 0)
+      .sort((a, b) => {
+        if (b.scoreDeduction !== a.scoreDeduction)
+          return b.scoreDeduction - a.scoreDeduction;
+        if (b.totalPenaltyWeight !== a.totalPenaltyWeight)
+          return b.totalPenaltyWeight - a.totalPenaltyWeight;
+        return b.findingCount - a.findingCount;
+      })
       .slice(0, 5);
-  }, [temuan, indicators, selectedService]);
+  }, [data, temuan, indicators, selectedService, selectedMonth]);
 
   const automatedCoaching = useMemo((): CoachingInsight | null => {
     if (!temuan || !indicators || temuan.length === 0) return null;

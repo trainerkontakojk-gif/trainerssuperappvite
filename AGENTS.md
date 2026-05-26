@@ -207,13 +207,19 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 57. SIDAK Import Duplicate Logic Fix & no_tiket Passthrough — Fixed Excel import dropping no_tiket (hardcoded null), updated validateTemuanBatch() duplicate detection key with service_type and no_tiket mapping for legacy parity, and resolved frontend reverse() crash after batch creation (DONE)
 58. SIDAK Input Visual & Navigation Parity — Restored vertical list card layout (matching legacy), compact inline breadcrumb with actual selected values, added Estimasi Skor card (live score with NC/CR breakdown + progress bar), added Konfigurasi Audit card (service dropdown + tim info) moved from step 3 to step 4, added Show All Data toggle (eye icon) in step 1, fixed navigation pre-fill from agent detail page to skip directly to period step via URL params consumption, added client-side scoring utility (`apps/web/src/lib/scoring.ts`), 24 regression tests (DONE)
 59. **SIDAK Input Railway Build Fix (ArrowLeft Import)** — Added missing `ArrowLeft` lucide-react import in `input.tsx` that caused Railway deployment build failure (TS2304). TypeScript error `Cannot find name 'ArrowLeft'` at line 1032. (DONE)
+60. **Top 5 Pengurang Skor Terbesar Legacy Parity** — Fixed `topTickets` computation to match legacy: month scoping, `scoreSession()` with weighted/flat/no_category modes, service weights from `qa_service_weights` table with `DEFAULT_SERVICE_WEIGHTS` fallback, 3-level tiebreaker sort, and renamed properties (`deduction`→`scoreDeduction`, `count`→`findingCount`). Added shared scoring functions to `apps/web/src/lib/scoring.ts`, weights field to API response, and 17 regression tests. (DONE)
 
-## Key Files Changed (Phase 58 — 59)
+## Key Files Changed (Phase 58 — 60)
 
 - `apps/web/src/routes/sidak/input.tsx` — Major refactor: vertical list cards, compact breadcrumb, Estimasi Skor card, Konfigurasi Audit card, Show All toggle, URL param consumption for pre-fill
-- `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param
-- `apps/web/src/lib/scoring.ts` — **NEW**: client-side scoring helpers (scoreColor, scoreBg, scoreLabel)
+- `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param; rewritten `topTickets` with legacy parity
+- `apps/web/src/lib/scoring.ts` — **NEW**: client-side scoring helpers (scoreColor, scoreBg, scoreLabel); **Phase 60**: added `scoreSession()`, `calculateSessionScoreFromTemuan()`, `DEFAULT_SERVICE_WEIGHTS`
 - `apps/web/src/__tests__/sidak-input-parity.test.tsx` — **NEW**: 24 regression tests covering layout, breadcrumb, pre-fill, toggle, cards, scoring
+- `apps/api/src/services/sidak-service.ts` — **Phase 60**: fetch `qa_service_weights` in `getAgentDetail()`, resolve & return `weights` field
+- `packages/types/src/index.ts` — **Phase 60**: added `weights: Record<ServiceType, ServiceWeight>` to `AgentDetailData`
+- `apps/web/src/components/sidak/TopTicketsCard.tsx` — **Phase 60**: renamed `deduction`→`scoreDeduction`, `count`→`findingCount`
+- `apps/web/src/__tests__/top-tickets-legacy-parity.test.ts` — **NEW Phase 60**: 10 regression tests for scoring modes, tiebreaker, contract
+- `apps/api/src/__tests__/sidak-agent-detail-weights.test.ts` — **NEW Phase 60**: 7 regression tests for weights resolution
 
 ## Relevant Files
 

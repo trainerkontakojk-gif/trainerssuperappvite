@@ -2,8 +2,8 @@ import { Ticket, TrendingDown } from "lucide-react";
 
 interface TicketItem {
   no_tiket: string;
-  deduction: number;
-  count: number;
+  scoreDeduction: number;
+  findingCount: number;
   heaviestParam: string;
   isSamplingQa?: boolean;
 }
@@ -57,11 +57,11 @@ export default function TopTicketsCard({ tickets }: Props) {
               <div className="flex flex-col items-end gap-1 pt-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="whitespace-nowrap text-xs font-black leading-none">
-                    -{ticket.deduction.toFixed(1)} poin
+                    -{ticket.scoreDeduction.toFixed(1)} poin
                   </span>
                   <div className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{ticket.count} Temuan</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">{ticket.findingCount} Temuan</span>
               </div>
             </div>
           );

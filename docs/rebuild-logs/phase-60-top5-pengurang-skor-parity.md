@@ -1,0 +1,52 @@
+# Phase 60 — Top 5 Pengurang Skor Terbesar Legacy Parity
+
+**Status:** DONE
+**Date:** 2026-05-26
+**Type:** Parity Fix
+
+## Summary
+
+The `topTickets` computation ("Top 5 Pengurang Skor Terbesar") on the SIDAK Agent Detail page was using a simplified inline formula that did not match the legacy behavior. Key gaps: no month scoping, wrong scoring formula (ignoring `weighted`/`flat`/`no_category` modes), no service weights, single-level sort.
+
+## Root Cause
+
+The original implementation in `apps/web/src/hooks/useAgentDetail.ts` (Phase 27) used a simplified formula:
+```
+penalty = ((3 - nilai) / 3) * bobot
+scoreDeduction = Math.round((100 - minScore) * 10) / 10
+```
+
+The legacy uses `calculateSessionScoreFromTemuan()` → `scoreSession()` which handles:
+- `weighted` mode: Σ(per-kategori) × inter-category weights
+- `flat`/`no_category` mode: Σ(nilai/3 × bobot) / Σbobot
+
+## Fix
+
+### Approach: Client-side computation with shared scoring library
+
+- Added `scoreSession()`, `calculateSessionScoreFromTemuan()`, `DEFAULT_SERVICE_WEIGHTS` to `apps/web/src/lib/scoring.ts` (shared pure functions)
+- API now fetches `qa_service_weights` table and returns `weights` in `getAgentDetail()` response
+- Rewrote `topTickets` useMemo with:
+  1. Month scoping (filters by `selectedMonth`)
+  2. Service weights from API with `DEFAULT_SERVICE_WEIGHTS` fallback
+  3. Proper `scoreSession()` scoring
+  4. 3-level tiebreaker sort (scoreDeduction → totalPenaltyWeight → findingCount)
+  5. Renamed properties (`deduction`→`scoreDeduction`, `count`→`findingCount`)
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `apps/web/src/lib/scoring.ts` | Added `scoreSession`, `calculateSessionScoreFromTemuan`, `DEFAULT_SERVICE_WEIGHTS` |
+| `packages/types/src/index.ts` | Added `weights` field to `AgentDetailData` |
+| `apps/api/src/services/sidak-service.ts` | Fetch + resolve `qa_service_weights`, return in `getAgentDetail` |
+| `apps/web/src/hooks/useAgentDetail.ts` | Rewrote `topTickets` with legacy parity |
+| `apps/web/src/components/sidak/TopTicketsCard.tsx` | Renamed `deduction`→`scoreDeduction`, `count`→`findingCount` |
+| `apps/web/src/__tests__/top-tickets-legacy-parity.test.ts` | NEW: 10 regression tests |
+| `apps/api/src/__tests__/sidak-agent-detail-weights.test.ts` | NEW: 7 regression tests |
+
+## Verification
+
+- TypeScript compilation: Clean (0 errors)
+- Web tests: 365 PASS (2 pre-existing failures)
+- API tests: 407 PASS (0 failures)

@@ -13,6 +13,7 @@ import type {
   QAPeriod,
   QATemuan,
   ServiceType,
+  ServiceWeight,
   DashboardSummary,
   DashboardData,
   AgentDetailData,
@@ -1024,7 +1025,7 @@ export async function getAgentDetail(
   endMonth?: number,
   allowedServiceTypes?: ServiceType[],
 ): Promise<AgentDetailData> {
-  const [peserta, indicators, periods] = await Promise.all([
+  const [peserta, indicators, periods, weightsResult] = await Promise.all([
     supabaseAdmin
       .from("profiler_peserta")
       .select("*")
@@ -1032,6 +1033,7 @@ export async function getAgentDetail(
       .single(),
     getIndicators(serviceType),
     getPeriods(),
+    supabaseAdmin.from("qa_service_weights").select("*"),
   ]);
 
   if (peserta.error) throw new Error("Agent tidak ditemukan");
@@ -1054,6 +1056,20 @@ export async function getAgentDetail(
     ? (DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
       DEFAULT_SERVICE_WEIGHTS["call"])
     : DEFAULT_SERVICE_WEIGHTS["call"];
+
+  const rawWeights = weightsResult?.data ?? [];
+  const resolvedWeights: Record<string, ServiceWeight> = { ...DEFAULT_SERVICE_WEIGHTS };
+  for (const w of rawWeights) {
+    const st = w.service_type as ServiceType;
+    if (resolvedWeights[st]) {
+      resolvedWeights[st] = {
+        service_type: st,
+        critical_weight: Number(w.critical_weight ?? resolvedWeights[st].critical_weight),
+        non_critical_weight: Number(w.non_critical_weight ?? resolvedWeights[st].non_critical_weight),
+        scoring_mode: w.scoring_mode ?? resolvedWeights[st].scoring_mode,
+      };
+    }
+  }
 
   const summaries: AgentPeriodSummary[] = [];
   for (const period of periods) {
@@ -1167,6 +1183,7 @@ export async function getAgentDetail(
     indicators,
     periodSummaries: sortedSummaries,
     temuan: rows.filter((r) => !r.is_phantom_padding),
+    weights: resolvedWeights as Record<ServiceType, ServiceWeight>,
     personalTrend,
     scoreHistory,
     initialYear: currentYear,
