@@ -183,10 +183,73 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 44. Telefun Railway Force-Close & Legacy Parity Fix — JSON audio base64, settings/model/identity parity, close-code mapping, duration cues, RLS recording path, session deduplication (DONE)
 45. Telefun Production Voice And Session Save Repair — DB migrations for missing feedback column, client-side session finalizer sequence repair, base64 inline audio decoding for model responses, gated client audio until setup complete, added contract tests (DONE)
 46. Telefun V2 End-Call Lifecycle & Finalizer Hardening — introduced normalizing state, guarded premature unmounting, automated session fallback creation, handled granular upload failures, added 18 unit tests (DONE)
+47. Telefun Call UI Parity, Replay Seek/Retry, dan Prompt Perilaku Legacy (Final Audit) — Full system instruction parity (emotion branching, KONSISTENSI SUARA, ATURAN ROLEPLAY, expanded ATURAN BICARA), ringtone+hold music+hold timer, volume segments+avatar upgrade+per-state status card+circular controls, dead air/interruption/stalled watchdog hardening, AI annotation generation endpoint, 19 prompt builder tests (DONE)
+48. KETIK Legacy Parity Upgrade — 3-tier time instruction (near end/wrap up/still long) via SessionTimingContext, strictScriptMode for OpenRouter with scenario scripts, allowSolutionAcknowledgement timeout guard (11 instructional cues + 7 action verbs), timing data passthrough from frontend to backend (DONE)
+49. PDKT Legacy Parity Hardening — Settings contract alignment ({success,data}), access matrix role lock (trainer/qa/admin), history replay without active mailbox, client_request_id idempotency, bounded usage delta retry, human-friendly error mapping, DUMMY_PROFILES 5→20 + city randomization, coercion robustness (writingStyle + consumerNameMention), legacy script migration, test uplift 27+14 tests (DONE)
+50. Railway Login Non-Admin E2E Fix — Backend auth middleware hardened (is_deleted check, legacy status normalization via normalizeAuthProfileStatus, differentiated error codes: ACCOUNT_DELETED/ACCOUNT_PENDING/ACCOUNT_INACTIVE/PROFILE_NOT_FOUND/PROFILE_ERROR), .single() → .maybeSingle() for defensive null handling, CORS warning log when ALLOWED_ORIGINS empty in production, frontend fetchApi HTML response detection for SPA fallback errors, 18 API + 3 web regression tests (DONE)
+51. Auth Login, Reset Redirect & Approval Guard Hardening — Added `qa` to type unions (UserProfile, ManagedUser), CSRF header (`X-Requested-With`) + 401 interception with auto-redirect in fetchApi, beforeLoad guards for `/reset-password` (blocks non-recovery access) and `/waiting-approval` (redirects active users), optimized waiting-approval double query polling, client-side password complexity validation (min 8 chars, 1 uppercase, 1 digit), 27 regression tests across 3 test files (DONE)
+52. Approval Leader KTP & SIDAK Scope Hardening — KTP/Profiler backend scope filtering (new `getAccessiblePesertaIds()` in profiler-service.ts, parity with SIDAK's `getAccessibleAgentIds()`), scope injection at 5 GET endpoints (peserta, counts, global-pool, batch, by-id), new `GET /v1/me/access-status` API endpoint, frontend `LeaderAccessGate` component with submit-request flow via RLS INSERT, integration in KTP/SIDAK landing pages, 18 API + 11 web regression tests (DONE)
+53. Materialized View Security Hardening — Lock down `mv_qa_period_summary` to prevent unauthenticated/client-side access (REVOKE ALL FROM anon, public, authenticated), restrict refresh function to service_role, add regression tests (DONE)
+54. MV QA Period Summary Post-Restore Re-Hardening — Fix ordering gap: 017 hardening runs before contract restore (20260525000200) which regrants to authenticated; added terminal migration 20260526090000 after restore, order-aware regression tests, docs sync (DONE)
+
 ## Relevant Files
 
 - `opencode.json` — project-level opencode config with context7 MCP
-- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index)
+- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index, **017 MV hardening**, **20260526090000 MV terminal re-hardening**)
+- `supabase/rollbacks/` — DB rollbacks (including **rollback_017**, **rollback_20260526090000**)
+- `apps/api/src/__tests__/mv-qa-period-summary-security.test.ts` — order-aware regression tests for MV security hardening (Phase 53+54)
+- `apps/api/src/__tests__/database-parity-post-sync.test.ts` — parity tests with MV terminal re-hardening validation
+- `docs/database.md` — database architecture and security reference
+- `apps/api/src/services/profiler-service.ts` — profiler CRUD + **getAccessiblePesertaIds()** leader scope filter
+- `apps/api/src/services/admin-service.ts` — admin user mgmt + **getLeaderAccessStatus()** + leader request approval
+- `apps/api/src/routes/profiler.ts` — profiler routes with scope-filter injection at 5 GET endpoints
+- `apps/api/src/routes/admin.ts` — admin routes including leader request management
+- `apps/api/src/app.ts` — Hono app with `/v1/me/access-status` endpoint
+- `apps/web/src/hooks/useAccessStatus.ts` — leader access status fetch + submit via RLS INSERT
+- `apps/web/src/components/LeaderAccessGate.tsx` — wraps module landing pages, shows status card + submit button
+- `apps/web/src/routes/profiler/index.tsx` — KTP landing wrapped with LeaderAccessGate
+- `apps/web/src/routes/sidak/index.tsx` — SIDAK landing wrapped with LeaderAccessGate
+- `apps/api/src/__tests__/profiler-scope-filter.test.ts` — 18 API regression tests for getAccessiblePesertaIds + getLeaderAccessStatus
+- `apps/web/src/__tests__/leader-access-gate.test.tsx` — 11 web regression tests for LeaderAccessGate component
+- `docs/LEADER_APPROVAL_ACCESS.md` — full architecture doc updated with backend scope enforcers, access status API, and frontend gate
+- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**, **profile** (normalizeAuthProfileStatus)
+- `apps/api/src/middleware/auth.ts` — authentication middleware with is_deleted check + legacy status normalization
+- `apps/api/src/__tests__/auth-middleware.test.ts` — 18 regression tests for auth middleware (deleted/inactive/pending/legacy/non-admin)
+- `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
+- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (37 routes, all React.lazy())
+- `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
+- `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
+- `apps/web/src/lib/profilerService.ts` — typed Profiler API client
+- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes, `dashboard/DashboardTrendPanel.tsx` (lazy analytics), and `dashboard/users`, `dashboard/access-groups`, `dashboard/access-approval`, `dashboard/activities`)
+- `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
+- `apps/web/src/hooks/useAgentDetail.ts` — agent detail hook with multi-service support
+- `apps/web/src/hooks/useProfilerAccess.ts` — profiler role/isReadOnly hook via Supabase auth
+- `apps/web/src/lib/html2canvas-tailwind-fix.ts` — Tailwind v4 oklch() fix for html2canvas exports
+- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
+- `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
+- `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
+- **`apps/web/src/__tests__/logout-redirect.test.ts`** — regression test for logout redirects and guards
+- `.node-version` — Node.js version pinning for Railway/Nixpacks (22, required by Vite 8)
+- `apps/web/vite.config.ts` — Vite config (PORT env, API proxy, Tw v4, react plugin, preview block for Railway)
+- `apps/web/vite.config.test.ts` — Regression test: Vite preview port follows Railway `PORT` env
+- `scripts/deployment/railway-web-healthcheck-smoke.mjs` — Smoke test: spawn web on test PORT, poll `/`, assert 200
+- `scripts/deployment/guard-no-railway-dev.mjs` — Guard: block Vite dev server execution on Railway
+- `apps/web/src/__tests__/railway-dev-guard.test.ts` — Regression test: guard blocks dev when Railway env detected
+- `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
+- `apps/api/vitest.config.ts` — Vitest config for API service tests
+- `apps/web/src/lib/toast.ts` — sonner v2 wrapper (notify.success/error/warning)
+- `apps/web/src/routes/unauthorized.tsx` — 403 role-denied page
+- `apps/web/src/components/ui/Pagination.tsx` — shared pagination with page-size selector
+- `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types (TelefunScenario, TelefunConsumerType), VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
+- `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
+- `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
+- `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
+- **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
+- **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
+- **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-51)
+- `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
+- `supabase/`
 - `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **report-docx-builder**
 - `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
 - `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)

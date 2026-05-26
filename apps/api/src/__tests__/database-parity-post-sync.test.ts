@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -138,16 +138,66 @@ describe("MV contract restoration migration", () => {
     expect(sql).toContain("(period_id, service_type)");
   });
 
-  it("creates refresh function", () => {
+  it("creates refresh function with SECURITY DEFINER", () => {
     expect(sql).toContain("CREATE OR REPLACE FUNCTION public.refresh_mv_qa_period_summary()");
     expect(sql).toContain("REFRESH MATERIALIZED VIEW CONCURRENTLY");
+    expect(sql).toContain("SECURITY DEFINER");
   });
 
-  it("grants execute and select to authenticated and service_role", () => {
-    const grants = sql.match(/GRANT EXECUTE/g);
+  it("creates B-tree indexes for lookups", () => {
+    expect(sql).toContain("CREATE INDEX IF NOT EXISTS idx_mv_qa_period_summary_period_id");
+    expect(sql).toContain("CREATE INDEX IF NOT EXISTS idx_mv_qa_period_summary_service_type");
+  });
+
+  it("includes GRANT statements (restore grants to authenticated; NOTE: not final security posture)", () => {
+    const grants = sql.match(/GRANT/g);
     expect(grants).toBeTruthy();
-    expect(
-      (grants?.length ?? 0) >= 1,
-    ).toBe(true);
+    expect((grants?.length ?? 0) >= 2).toBe(true);
+    // Authenticated grant in this file is intermediate — terminal hardening
+    // (20260526090000) overwrites it. Security final state verified in
+    // mv-qa-period-summary-security.test.ts.
+  });
+});
+
+describe("MV terminal re-hardening migration", () => {
+  const sql = readFileSync(
+    resolve(MIGRATION_DIR, "20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql"),
+    "utf8",
+  );
+
+  it("exists and is lexicographically after the contract restore", () => {
+    const files = readdirSync(MIGRATION_DIR)
+      .filter((f) => f.endsWith(".sql"))
+      .sort((a, b) => a.localeCompare(b));
+    const idxRestore = files.indexOf(
+      "20260525000200_restore_mv_qa_period_summary_contract.sql",
+    );
+    const idxTerminal = files.indexOf(
+      "20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql",
+    );
+    expect(idxRestore).toBeGreaterThan(-1);
+    expect(idxTerminal).toBeGreaterThan(-1);
+    expect(idxRestore).toBeLessThan(idxTerminal);
+  });
+
+  it("only performs REVOKE/GRANT, does NOT touch MV schema", () => {
+    expect(sql).not.toContain("CREATE MATERIALIZED VIEW");
+    expect(sql).not.toContain("DROP MATERIALIZED VIEW");
+    expect(sql).not.toContain("CREATE OR REPLACE FUNCTION");
+    expect(sql).not.toContain("CREATE INDEX");
+  });
+
+  it("grants SELECT only to service_role on the MV (final posture)", () => {
+    expect(sql).toContain("GRANT SELECT ON public.mv_qa_period_summary TO service_role");
+    expect(sql).not.toMatch(
+      /GRANT SELECT ON public\.mv_qa_period_summary TO.*authenticated/,
+    );
+  });
+
+  it("grants EXECUTE on refresh function only to service_role (final posture)", () => {
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION public.refresh_mv_qa_period_summary() TO service_role");
+    expect(sql).not.toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.refresh_mv_qa_period_summary\(\) TO.*authenticated/,
+    );
   });
 });

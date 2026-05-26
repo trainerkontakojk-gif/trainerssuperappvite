@@ -58,6 +58,8 @@ erDiagram
 - `20260525000200_restore_mv_qa_period_summary_contract.sql` — Idempotent MV + refresh function contract repair
 - `20260525000300_telefun_history_add_consumer_contact_columns.sql` — Add consumer_phone and consumer_city columns to telefun_history
 - `20260525000400_telefun_history_add_feedback.sql` — Add feedback column to telefun_history for API patch compatibility
+- `20260525000500_telefun_history_add_metadata_columns.sql` — Add metadata columns to telefun_history
+- `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` — Terminal re-hardening: revoke all non-service_role access after contract restore
 
 ### 1. `public.profiles`
 
@@ -102,6 +104,8 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 ### 5. Modul SIDAK (QA Analyzer)
 
 - **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard per periode. Dibuat via `011_materialized_view_dashboard.sql` dan dijamin kontraknya via `20260525000200_restore_mv_qa_period_summary_contract.sql`. Direfresh via `refresh_mv_qa_period_summary()`.
+  - **Migration chain**: `011` (create MV) → `013` (create refresh function) → `017` (intermediate hardening, revokes from non-service_role) → `20260525000200` (contract restore, DROP CASCADE + recreate, regrants to authenticated+service_role) → `20260526090000` (terminal re-hardening, locks down to service_role only).
+  - **Final security posture**: `SELECT` and `EXECUTE` on `mv_qa_period_summary` and `refresh_mv_qa_period_summary()` are granted exclusively to `service_role`. Zero client-side grants after the terminal migration.
 - **`qa_dashboard_period_summary`**: Summary KPI per periode per service per folder untuk dashboard SIDAK (Vite cache, menggunakan `folder_id` bukan `folder_key`). Dihasilkan oleh `refresh_qa_dashboard_summary_for_period()`.
 - **`qa_dashboard_agent_period_summary`**: Skor dan metrik per agent per periode per service (Vite cache, menggunakan `agent_id`). Dihasilkan oleh `refresh_qa_dashboard_summary_for_period()`.
 - **`qa_periods`**: Definisi periode audit kualitas.
@@ -137,9 +141,9 @@ Sistem otorisasi data kami menggabungkan dua lapisan pertahanan utama: **Explici
 
 Berdasarkan mitigasi keamanan terbaru, seluruh hak akses bawaan yang luas (`GRANT ALL ON ... TO anon, public`) telah **dicabut secara permanen**.
 
-- **Peran `anon` dan `public`:** Tidak memiliki akses `SELECT`, `INSERT`, `UPDATE`, atau `DELETE` pada tabel aplikasi apa pun.
-- **Peran `authenticated`:** Diberikan hak akses secara terperinci (granular) hanya pada tabel-tabel yang berinteraksi dengan pengguna aktif. Tabel internal tingkat sistem seperti `ai_usage_logs`, `ai_pricing_settings`, dan `ai_billing_settings` sepenuhnya **tertutup** dari akses client (_zero client-side grants_) dan hanya dapat dimanipulasi melalui klien admin di sisi backend (Hono API).
-- **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) fungsi dibatasi secara ketat ke peran `authenticated` atau `service_role`.
+- **Peran `anon` dan `public`:** Tidak memiliki akses `SELECT`, `INSERT`, `UPDATE`, atau `DELETE` pada tabel aplikasi apa pun, termasuk materialized views (`mv_qa_period_summary`).
+- **Peran `authenticated`:** Diberikan hak akses secara terperinci (granular) hanya pada tabel-tabel yang berinteraksi dengan pengguna aktif. Tabel internal tingkat sistem seperti `ai_usage_logs`, `ai_pricing_settings`, dan `ai_billing_settings`, serta materialized view `mv_qa_period_summary` (setelah terminal re-hardening migration `20260526090000`) sepenuhnya **tertutup** dari akses client (_zero client-side grants_) dan hanya dapat dimanipulasi/dibaca melalui klien admin di sisi backend (Hono API menggunakan `service_role`).
+- **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) fungsi dibatasi secara ketat ke peran `authenticated` atau `service_role`. Fungsi refresh materialized view `refresh_mv_qa_period_summary()` dibatasi khusus untuk `service_role` (dipertegas setelah contract restore oleh migration `20260526090000`).
 
 ### 🛡️ Lapisan 2: Row Level Security (RLS)
 

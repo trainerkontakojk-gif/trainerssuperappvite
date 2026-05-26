@@ -200,11 +200,17 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 50. Railway Login Non-Admin E2E Fix — Backend auth middleware hardened (is_deleted check, legacy status normalization via normalizeAuthProfileStatus, differentiated error codes: ACCOUNT_DELETED/ACCOUNT_PENDING/ACCOUNT_INACTIVE/PROFILE_NOT_FOUND/PROFILE_ERROR), .single() → .maybeSingle() for defensive null handling, CORS warning log when ALLOWED_ORIGINS empty in production, frontend fetchApi HTML response detection for SPA fallback errors, 18 API + 3 web regression tests (DONE)
 51. Auth Login, Reset Redirect & Approval Guard Hardening — Added `qa` to type unions (UserProfile, ManagedUser), CSRF header (`X-Requested-With`) + 401 interception with auto-redirect in fetchApi, beforeLoad guards for `/reset-password` (blocks non-recovery access) and `/waiting-approval` (redirects active users), optimized waiting-approval double query polling, client-side password complexity validation (min 8 chars, 1 uppercase, 1 digit), 27 regression tests across 3 test files (DONE)
 52. Approval Leader KTP & SIDAK Scope Hardening — KTP/Profiler backend scope filtering (new `getAccessiblePesertaIds()` in profiler-service.ts, parity with SIDAK's `getAccessibleAgentIds()`), scope injection at 5 GET endpoints (peserta, counts, global-pool, batch, by-id), new `GET /v1/me/access-status` API endpoint, frontend `LeaderAccessGate` component with submit-request flow via RLS INSERT, integration in KTP/SIDAK landing pages, 18 API + 11 web regression tests (DONE)
+53. Materialized View Security Hardening — Lock down `mv_qa_period_summary` to prevent unauthenticated/client-side access (REVOKE ALL FROM anon, public, authenticated), restrict refresh function to service_role, add regression tests (DONE)
+54. MV QA Period Summary Post-Restore Re-Hardening — Fix ordering gap: 017 hardening runs before contract restore (20260525000200) which regrants to authenticated; added terminal migration 20260526090000 after restore, order-aware regression tests, docs sync (DONE)
 
 ## Relevant Files
 
 - `opencode.json` — project-level opencode config with context7 MCP
-- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index)
+- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index, **017 MV hardening**, **20260526090000 MV terminal re-hardening**)
+- `supabase/rollbacks/` — DB rollbacks (including **rollback_017**, **rollback_20260526090000**)
+- `apps/api/src/__tests__/mv-qa-period-summary-security.test.ts` — order-aware regression tests for MV security hardening (Phase 53+54)
+- `apps/api/src/__tests__/database-parity-post-sync.test.ts` — parity tests with MV terminal re-hardening validation
+- `docs/database.md` — database architecture and security reference
 - `apps/api/src/services/profiler-service.ts` — profiler CRUD + **getAccessiblePesertaIds()** leader scope filter
 - `apps/api/src/services/admin-service.ts` — admin user mgmt + **getLeaderAccessStatus()** + leader request approval
 - `apps/api/src/routes/profiler.ts` — profiler routes with scope-filter injection at 5 GET endpoints
