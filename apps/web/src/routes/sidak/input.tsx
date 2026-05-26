@@ -628,7 +628,7 @@ export default function SidakInputPage() {
           const ws = wb.Sheets[sheetName];
           const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
           const paramMap = new Map(activeIndicators.map((i) => [i.name.toLowerCase().trim(), i]));
-          const result: ParsedImportRow[] = [];
+          const result: ImportRowType[] = [];
 
           for (let i = 1; i < rows.length; i++) {
             const row = rows[i];

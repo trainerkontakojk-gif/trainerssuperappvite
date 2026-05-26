@@ -2,6 +2,7 @@ import type {
   ServiceType,
   ServiceWeight,
   QAIndicator,
+  ScoringMode,
 } from "@trainers/types";
 
 export const scoreColor = (score: number) => {

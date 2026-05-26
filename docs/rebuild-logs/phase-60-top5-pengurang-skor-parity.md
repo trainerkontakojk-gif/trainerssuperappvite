@@ -45,8 +45,31 @@ The legacy uses `calculateSessionScoreFromTemuan()` → `scoreSession()` which h
 | `apps/web/src/__tests__/top-tickets-legacy-parity.test.ts` | NEW: 10 regression tests |
 | `apps/api/src/__tests__/sidak-agent-detail-weights.test.ts` | NEW: 7 regression tests |
 
-## Verification
+## Post-Commit Fixes
+
+### Fix 1: Railway Build Failure — TypeScript errors in test files
+
+**Errors:**
+- `sidak-agent-detail-weights.test.ts`: `scoring_mode` typed as `string` instead of literal union `"flat" | "weighted" | "no_category"`
+- `scoring.ts`: Missing `ScoringMode` import in `QAScoreResult` interface
+- `input.tsx`: Used `ParsedImportRow` instead of aliased `ImportRowType`
+
+**Fixes:**
+- Added `as const` assertions to `scoring_mode` values in test fixtures
+- Added `ScoringMode` to imports from `@trainers/types` in `scoring.ts`
+- Changed `ParsedImportRow` → `ImportRowType` in `input.tsx`
+
+### Fix 2: 2 Pre-existing Test Failures (`STACK_TRACE_ERROR`)
+
+**Root cause:** Vitest 4.x module caching issue with async `vi.mock` factory using `vi.importActual("@tanstack/react-router")` in `route-guards.test.ts`. The mock leaked to other test files during full suite execution, causing `STACK_TRACE_ERROR` during test collection.
+
+**Fixes:**
+- Replaced `vi.importActual` with `importOriginal` parameter in mock factory (vitest 4.x recommended API)
+- Added `window.scrollTo = vi.fn()` to test setup (`setup.ts`) for jsdom compatibility
+
+## Verification (Final)
 
 - TypeScript compilation: Clean (0 errors)
-- Web tests: 365 PASS (2 pre-existing failures)
+- Full monorepo build: 3/3 packages successful
+- Web tests: 387 PASS (0 failures)
 - API tests: 407 PASS (0 failures)

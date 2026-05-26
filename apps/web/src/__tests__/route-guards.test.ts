@@ -27,8 +27,9 @@ vi.mock("../hooks/useApi", () => ({
   fetchApi: <T,>(path: string) => mockFetchApi(path) as Promise<T>,
 }));
 
-vi.mock("@tanstack/react-router", async () => {
-  const actual = await vi.importActual("@tanstack/react-router");
+vi.mock("@tanstack/react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-router")>();
+  const OriginalRedirect = actual.redirect;
   return {
     ...actual,
     redirect: (opts: { to: string }) => {
