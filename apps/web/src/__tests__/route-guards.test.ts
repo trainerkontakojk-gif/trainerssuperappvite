@@ -64,7 +64,7 @@ describe("Route Guards", () => {
       expect(location).toBe("/");
     });
 
-    it("redirects active user to /dashboard", async () => {
+    it("allows active user to access reset password", async () => {
       mockGetSession.mockResolvedValue({
         data: { session: { user: { id: "u1" } } },
       });
@@ -76,7 +76,7 @@ describe("Route Guards", () => {
       });
       const { guardResetPassword } = await import("../router");
       const location = await runGuard(guardResetPassword);
-      expect(location).toBe("/dashboard");
+      expect(location).toBeNull();
     });
 
     it("allows pending user to access reset password", async () => {
@@ -124,13 +124,13 @@ describe("Route Guards", () => {
       expect(location).toBeNull();
     });
 
-    it("lets error propagate when fetchAuthProfile fails", async () => {
+    it("allows any user with session to access (only checks session existence)", async () => {
       mockGetSession.mockResolvedValue({
         data: { session: { user: { id: "u1" } } },
       });
-      mockFetchAuthProfile.mockRejectedValue(new Error("Network Error"));
       const { guardResetPassword } = await import("../router");
-      await expect(runGuard(guardResetPassword)).rejects.toThrow("Network Error");
+      const location = await runGuard(guardResetPassword);
+      expect(location).toBeNull();
     });
   });
 

@@ -327,11 +327,6 @@ export function guardResetPassword() {
     if (!session) {
       throw redirect({ to: "/" });
     }
-
-    const profile = await fetchAuthProfile(session.user.id);
-    if (profile?.status === "active" && !profile?.is_deleted) {
-      throw redirect({ to: "/dashboard" });
-    }
   };
 }
 

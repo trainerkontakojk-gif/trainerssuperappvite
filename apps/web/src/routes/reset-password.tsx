@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { CheckCircle, KeyRound, Loader2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -12,23 +12,46 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState(false);
+  const sessionReadyRef = useRef(false);
 
   useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setSessionReady(true);
-    });
+    let cancelled = false;
 
-    const timeout = setTimeout(() => {
-      if (!sessionReady) setSessionError(true);
-    }, 5000);
+    (async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (session) {
+        sessionReadyRef.current = true;
+        setSessionReady(true);
+        return;
+      }
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY" && !cancelled) {
+          sessionReadyRef.current = true;
+          setSessionReady(true);
+        }
+      });
+
+      const timeout = setTimeout(() => {
+        if (!cancelled && !sessionReadyRef.current) setSessionError(true);
+      }, 5000);
+
+      return () => {
+        cancelled = true;
+        subscription.unsubscribe();
+        clearTimeout(timeout);
+      };
+    })();
 
     return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
+      cancelled = true;
     };
-  }, [sessionReady]);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
