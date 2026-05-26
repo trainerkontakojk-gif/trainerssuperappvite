@@ -1231,6 +1231,11 @@ export async function getDashboardData(params: {
       ? params.allowedServiceTypes
       : null;
 
+  const folderNames =
+    params.folder_ids && params.folder_ids.length > 0
+      ? await getFolderNamesByIds(params.folder_ids)
+      : null;
+
   let query = supabaseAdmin
     .from("qa_temuan")
     .select("*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)");
@@ -1256,18 +1261,41 @@ export async function getDashboardData(params: {
     query = query.in("peserta_id", params.agent_ids);
   }
 
-  if (params.folder_ids && params.folder_ids.length > 0) {
-    const folderNames = await getFolderNamesByIds(params.folder_ids);
-    if (folderNames.length > 0) {
-      query = query.in("profiler_peserta.batch_name", folderNames);
-    }
+  if (folderNames && folderNames.length > 0) {
+    query = query.in("profiler_peserta.batch_name", folderNames);
   }
 
   if (excludedIds.length > 0) {
     query = query.not("peserta_id", "in", `(${excludedIds.join(",")})`);
   }
 
-  const { data: allTemuan } = await query;
+  let distinctQuery = supabaseAdmin
+    .from("qa_temuan")
+    .select("service_type");
+
+  if (allowedSvcs) {
+    distinctQuery = distinctQuery.in("service_type", allowedSvcs);
+  }
+  if (params.period_ids && params.period_ids.length > 0) {
+    distinctQuery = distinctQuery.in("period_id", params.period_ids);
+  }
+  if (params.year) {
+    distinctQuery = distinctQuery.eq("tahun", params.year);
+  }
+  if (params.peserta_id) {
+    distinctQuery = distinctQuery.eq("peserta_id", params.peserta_id);
+  }
+  if (params.agent_ids && params.agent_ids.length > 0) {
+    distinctQuery = distinctQuery.in("peserta_id", params.agent_ids);
+  }
+  if (excludedIds.length > 0) {
+    distinctQuery = distinctQuery.not("peserta_id", "in", `(${excludedIds.join(",")})`);
+  }
+
+  const [{ data: allTemuan }, { data: distinctServiceRows }] = await Promise.all([
+    query,
+    distinctQuery,
+  ]);
   const rows = allTemuan ?? [];
 
   const weightMap = (weights?.data ?? []).reduce(
@@ -1489,10 +1517,14 @@ export async function getDashboardData(params: {
   ].sort((a, b) => b - a) as number[];
   const currentYear = params.year ?? new Date().getFullYear();
 
-  const usedServices = new Set(auditedAgents.map((a) => a.rows[0]?.service_type).filter(Boolean));
+  const distinctSvcs = new Set(
+    (distinctServiceRows ?? [])
+      .map((r: any) => r.service_type)
+      .filter((s: any) => typeof s === "string" && s.length > 0),
+  );
   const availableServices = allowedSvcs
-    ? allowedSvcs
-    : VALID_SERVICE_TYPES.filter((svc) => usedServices.has(svc));
+    ? allowedSvcs.filter((svc) => distinctSvcs.has(svc))
+    : VALID_SERVICE_TYPES.filter((svc) => distinctSvcs.has(svc));
 
   return {
     periods,

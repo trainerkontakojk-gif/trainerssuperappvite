@@ -5,7 +5,7 @@ import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import * as sidakService from "../services/sidak-service";
 import { logActivity } from "../services/activity-log-service";
-import { createTemuanBatchSchema, VALID_SERVICE_TYPES } from "@trainers/types";
+import { createTemuanBatchSchema } from "@trainers/types";
 import { buildAiReportDocx } from "../lib/report-docx-builder";
 import { buildHtmlReport } from "../lib/report-html-builder";
 import { buildAiReportPdf } from "../lib/report-pdf-builder";
@@ -566,11 +566,10 @@ sidak.get(
         : (folders?.data ?? []).map((f: any) => ({ id: f.id, name: f.name }));
 
       const availableServices = filterScope && filterScope.serviceTypeLocked
-        ? filterScope.allowedServices
-        : (() => {
-            const svcSet = new Set(dashboardData.serviceData.map((s) => s.serviceType));
-            return VALID_SERVICE_TYPES.filter((svc) => svcSet.has(svc));
-          })();
+        ? filterScope.allowedServices.filter((svc) =>
+            dashboardData.availableServices.includes(svc),
+          )
+        : dashboardData.availableServices;
 
       return c.json({
         success: true,

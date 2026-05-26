@@ -829,3 +829,184 @@ describe("hasCritical Parity Validation", () => {
     expect(agent?.hasCritical).toBe(true);
   });
 });
+
+// ─── Service Filter AvailableServices Regression ──────────────────────────────
+
+describe("getDashboardData availableServices regression", () => {
+  beforeEach(() => {
+    mvState = "returns-null";
+    mvData = null;
+    queryCallCount = 0;
+  });
+
+  it("returns all services with data when service_type is filtered (ranking filter fix)", async () => {
+    mockTemuan = [
+      {
+        id: "sf-1",
+        peserta_id: "sf-a-1",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "sf-a-1",
+          nama: "Agent SF1",
+          batch_name: "Batch SF",
+          tim: "Tim SF",
+          jabatan: "Agent",
+        },
+      },
+      {
+        id: "sf-2",
+        peserta_id: "sf-a-2",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "chat",
+        profiler_peserta: {
+          id: "sf-a-2",
+          nama: "Agent SF2",
+          batch_name: "Batch SF",
+          tim: "Tim SF",
+          jabatan: "Agent",
+        },
+      },
+      {
+        id: "sf-3",
+        peserta_id: "sf-a-3",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "email",
+        profiler_peserta: {
+          id: "sf-a-3",
+          nama: "Agent SF3",
+          batch_name: "Batch SF",
+          tim: "Tim SF",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      service_type: "call",
+      year: 2025,
+    });
+
+    expect(result.availableServices).toContain("call");
+    expect(result.availableServices).toContain("chat");
+    expect(result.availableServices).toContain("email");
+  });
+
+  it("intersects availableServices with leader allowedServices", async () => {
+    mockTemuan = [
+      {
+        id: "sf-4",
+        peserta_id: "sf-a-4",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "sf-a-4",
+          nama: "Agent SF4",
+          batch_name: "Batch SF2",
+          tim: "Tim SF2",
+          jabatan: "Agent",
+        },
+      },
+      {
+        id: "sf-5",
+        peserta_id: "sf-a-5",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "chat",
+        profiler_peserta: {
+          id: "sf-a-5",
+          nama: "Agent SF5",
+          batch_name: "Batch SF2",
+          tim: "Tim SF2",
+          jabatan: "Agent",
+        },
+      },
+      {
+        id: "sf-6",
+        peserta_id: "sf-a-6",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "email",
+        profiler_peserta: {
+          id: "sf-a-6",
+          nama: "Agent SF6",
+          batch_name: "Batch SF2",
+          tim: "Tim SF2",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      service_type: "call",
+      year: 2025,
+      allowedServiceTypes: ["call", "email"],
+    });
+
+    expect(result.availableServices).toEqual(["call", "email"]);
+    expect(result.availableServices).not.toContain("chat");
+  });
+
+  it("returns empty availableServices when no data matches year filter", async () => {
+    mockTemuan = [];
+
+    const result = await sidakService.getDashboardData({
+      service_type: "call",
+      year: 2025,
+    });
+
+    expect(result.availableServices).toEqual([]);
+  });
+
+  it("availableServices reflects leader scope even without serviceTypeLocked", async () => {
+    mockTemuan = [
+      {
+        id: "sf-8",
+        peserta_id: "sf-a-8",
+        indicator_id: "ind-1",
+        nilai: 3,
+        is_phantom_padding: false,
+        tahun: 2025,
+        period_id: "period-1",
+        service_type: "call",
+        profiler_peserta: {
+          id: "sf-a-8",
+          nama: "Agent SF8",
+          batch_name: "Batch SF4",
+          tim: "Tim SF4",
+          jabatan: "Agent",
+        },
+      },
+    ];
+
+    const result = await sidakService.getDashboardData({
+      service_type: "call",
+      year: 2025,
+      allowedServiceTypes: ["call", "chat"],
+    });
+
+    expect(result.availableServices).toEqual(["call"]);
+  });
+});
