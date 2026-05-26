@@ -70,3 +70,13 @@ Menutup gap parity antara Vite rebuild dengan reference Next.js pada modul Telef
 - **Tests**: 237/239 web pass, 278/282 API pass (pre-existing failures unchanged)
 - **Build**: Web build succeeds, API typecheck clean
 - **Type**: `stalled_response_watchdog` added to `TelefunTimelineEventName`
+
+## Hotfix — Dead Air Double-Fire
+
+Manual dead-air detection (7s threshold) was running concurrently with RealisticMode's `prolongedSilenceHandler` (8s `check_in`) and `fallbackResponseManager` (5s after agent stops), causing aggressive overlapping prompts.
+
+**Fix**: Added `!this.orchestrator` guard on manual dead-air detection. When realistic mode is active, only the orchestrator's silence/fallback handlers manage timing:
+- `prolongedSilenceHandler`: 8s check-in, 20s closing prompt, 35s session end
+- `fallbackResponseManager`: 5s timeout after agent stops speaking
+
+Manual detection remains as fallback for non-realistic mode calls.
