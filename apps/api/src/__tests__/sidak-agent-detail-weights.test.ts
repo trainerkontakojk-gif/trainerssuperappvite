@@ -49,7 +49,7 @@ describe("DEFAULT_SERVICE_WEIGHTS", () => {
 describe("getAgentDetail — weights resolution contract", () => {
   it("builds resolvedWeights by merging DB overrides with defaults", () => {
     const rawWeights = [
-      { service_type: "call", critical_weight: 0.7, non_critical_weight: 0.3, scoring_mode: "weighted" },
+      { service_type: "call" as const, critical_weight: 0.7, non_critical_weight: 0.3, scoring_mode: "weighted" as const },
     ];
     const resolvedWeights: Record<string, ServiceWeight> = {
       ...DEFAULT_SERVICE_WEIGHTS,
@@ -93,8 +93,8 @@ describe("getAgentDetail — weights resolution contract", () => {
 
   it("works when DB has partial services (not all 7)", () => {
     const rawWeights = [
-      { service_type: "email", critical_weight: 0.8, non_critical_weight: 0.2, scoring_mode: "weighted" },
-      { service_type: "slik", critical_weight: 0.9, non_critical_weight: 0.1, scoring_mode: "weighted" },
+      { service_type: "email" as const, critical_weight: 0.8, non_critical_weight: 0.2, scoring_mode: "weighted" as const },
+      { service_type: "slik" as const, critical_weight: 0.9, non_critical_weight: 0.1, scoring_mode: "weighted" as const },
     ];
     const resolvedWeights: Record<string, ServiceWeight> = {
       ...DEFAULT_SERVICE_WEIGHTS,

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useApi, getApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
-import type { QAIndicator, QAPeriod, QATemuan, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
+import { useAuthStore } from "../../store/authStore";
+import type { QAIndicator, QAPeriod, QATemuan, ServiceWeight, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, FolderOpen, User as UserIcon, CalendarDays, Plus,
@@ -9,9 +10,14 @@ import {
   AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
-import IndicatorDropdown from "../../components/sidak/IndicatorDropdown";
 import TemuanGroupCard from "../../components/sidak/TemuanGroupCard";
-import { scoreColor, scoreBg, scoreLabel } from "../../lib/scoring";
+import SidakInputScoreCard from "../../components/sidak/SidakInputScoreCard";
+import SidakInputManualForm from "../../components/sidak/SidakInputManualForm";
+import SidakInputImportPanel from "../../components/sidak/SidakInputImportPanel";
+import type { ParsedImportRow as ImportRowType } from "../../components/sidak/SidakInputImportPanel";
+import {
+  resolveServiceTypeFromTeam, calculateQAScoreFromTemuan,
+} from "../../lib/scoring";
 
 const MONTHS = [
   "Januari", "Februari", "Maret", "April",
@@ -27,26 +33,8 @@ const SERVICE_LABELS: Record<string, string> = {
   pencatatan: "Pencatatan", bko: "BKO", slik: "SLIK",
 };
 
-const NILAI_OPTIONS = [
-  { v: 0, sub: "Sangat Tidak Sesuai", active: "bg-rose-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-  { v: 1, sub: "Tidak Sesuai", active: "bg-orange-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-  { v: 2, sub: "Perlu Perbaikan", active: "bg-amber-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-  { v: 3, sub: "Sesuai", active: "bg-green-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-];
-
 function newEntry() {
   return { uid: Math.random().toString(36).slice(2), indicator_id: "", nilai: 3, ketidaksesuaian: "", sebaiknya: "" };
-}
-
-interface ParsedImportRow {
-  rowNum: number;
-  no_tiket: string;
-  paramName: string;
-  indicator_id: string | null;
-  nilai: number | null;
-  ketidaksesuaian: string;
-  sebaiknya: string;
-  error: string;
 }
 
 interface AgentEntry {
@@ -72,6 +60,10 @@ export default function SidakInputPage() {
   const [selectedAgent, setSelectedAgent] = useState<AgentEntry | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<QAPeriod | null>(null);
   const [selectedService, setSelectedService] = useState("call");
+  const [activeWeight, setActiveWeight] = useState<ServiceWeight | null>(null);
+
+  const profile = useAuthStore((s) => s.profile);
+  const role = profile?.role ?? "trainer";
 
   const { data: folders } = useApi<{ id: string; name: string }[]>("/sidak/folders");
   const { data: periods } = useApi<QAPeriod[]>("/sidak/periods");
@@ -96,7 +88,8 @@ export default function SidakInputPage() {
 
   const [showImport, setShowImport] = useState(false);
   const [importTab, setImportTab] = useState<"download" | "upload">("download");
-  const [importRows, setImportRows] = useState<ParsedImportRow[]>([]);
+  const [importRows, setImportRows] = useState<ImportRowType[]>([]);
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [generatingTemplate, setGeneratingTemplate] = useState(false);
@@ -198,6 +191,18 @@ export default function SidakInputPage() {
 
   const displayFolders = folders ?? [];
 
+  const fetchWeights = useCallback(async (svc: string) => {
+    try {
+      const res = await getApi<{ data?: ServiceWeight[] }>("/sidak/service-weights");
+      if (res?.data) {
+        const found = res.data.find((w: ServiceWeight) => w.service_type === svc);
+        if (found) setActiveWeight(found);
+      }
+    } catch {
+      // fallback: activeWeight stays null
+    }
+  }, []);
+
   const handleAgentClick = async (agent: AgentEntry) => {
     setSelectedAgent(agent);
     setSelectedPeriod(null);
@@ -206,13 +211,10 @@ export default function SidakInputPage() {
     setErrorMsg(null);
 
     try {
-      const serviceFromTeam: Record<string, string> = {
-        Telepon: "call", Chat: "chat", Email: "email",
-        Mix: "cso", BKO: "bko", "Tim BKO": "bko", SLIK: "slik",
-      };
-      const agentService = serviceFromTeam[agent.tim ?? ""] || "call";
+      const agentService = resolveServiceTypeFromTeam(agent.tim);
       setSelectedService(agentService);
       await refetchIndicators();
+      setActiveWeight(null);
       setStep("period");
     } catch {
       setErrorMsg("Gagal memuat data");
@@ -228,9 +230,17 @@ export default function SidakInputPage() {
     setErrorMsg(null);
 
     try {
-      const result = await getApi<{ items: QATemuan[]; total: number }>(
-        `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${period.id}&service_type=${selectedService}&limit=200`,
-      );
+      const svc = selectedService;
+      const [weightsRes, result] = await Promise.all([
+        getApi<{ data?: ServiceWeight[] }>("/sidak/service-weights"),
+        getApi<{ items: QATemuan[]; total: number }>(
+          `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${period.id}&service_type=${svc}&limit=200`,
+        ),
+      ]);
+      if (weightsRes?.data) {
+        const found = weightsRes.data.find((w: ServiceWeight) => w.service_type === svc);
+        if (found) setActiveWeight(found);
+      }
       setTemuan(result.items ?? []);
       setStep("list");
     } catch {
@@ -239,6 +249,33 @@ export default function SidakInputPage() {
       setLoading(false);
     }
   };
+
+  const handleServiceChange = useCallback(async (newService: string) => {
+    setSelectedService(newService);
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const [weightsRes] = await Promise.all([
+        getApi<{ data?: ServiceWeight[] }>("/sidak/service-weights"),
+        refetchIndicators(),
+      ]);
+      if (weightsRes?.data) {
+        const found = weightsRes.data.find((w: ServiceWeight) => w.service_type === newService);
+        if (found) setActiveWeight(found);
+      }
+      setEntries([newEntry()]);
+      if (selectedAgent && selectedPeriod) {
+        const result = await getApi<{ items: QATemuan[]; total: number }>(
+          `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${newService}&limit=200`,
+        );
+        setTemuan(result.items ?? []);
+      }
+    } catch {
+      setErrorMsg("Gagal memuat data untuk layanan baru");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedAgent, selectedPeriod, refetchIndicators]);
 
   const handleFolderClick = async (folder: string) => {
     setSelectedFolder(folder);
@@ -286,13 +323,10 @@ export default function SidakInputPage() {
       setAgents(folderAgents);
       setSelectedFolder(folder);
       setSelectedAgent(found);
-      const serviceFromTeam: Record<string, string> = {
-        Telepon: "call", Chat: "chat", Email: "email",
-        Mix: "cso", BKO: "bko", "Tim BKO": "bko", SLIK: "slik",
-      };
-      const agentService = serviceFromTeam[found.tim ?? ""] || "call";
+      const agentService = resolveServiceTypeFromTeam(found.tim);
       setSelectedService(agentService);
       await refetchIndicators();
+      setActiveWeight(null);
       setStep("period");
       window.history.replaceState({}, "", window.location.pathname);
     } catch {
@@ -334,7 +368,21 @@ export default function SidakInputPage() {
       setErrorMsg("Beberapa parameter yang dipilih belum terhubung ke database global. Gunakan parameter yang sudah dilink di halaman Settings QA.");
       return;
     }
-    if (!noTiket.trim()) {
+    const normalizedTicket = noTiket.trim();
+    if (normalizedTicket) {
+      const seenManual = new Set<string>();
+      for (const entry of entries) {
+        if (!entry.indicator_id) continue;
+        const key = `${normalizedTicket.toLowerCase()}::${entry.indicator_id}`;
+        if (seenManual.has(key)) {
+          const indicatorName = activeIndicators.find((i) => i.id === entry.indicator_id)?.name || "parameter tersebut";
+          setErrorMsg(`Duplicate temuan ditemukan: No. Tiket ${normalizedTicket} dengan parameter ${indicatorName} muncul lebih dari sekali.`);
+          return;
+        }
+        seenManual.add(key);
+      }
+    }
+    if (!normalizedTicket) {
       const ok = window.confirm(
         "No. Tiket kosong. Setiap temuan tanpa no. tiket dihitung sebagai sesi terpisah. Lanjutkan?",
       );
@@ -343,7 +391,6 @@ export default function SidakInputPage() {
     setPreviewing(true);
     setErrorMsg(null);
     try {
-      const normalizedTicket = noTiket.trim();
       const temuanList = entries.map((entry) => ({
         indicator_id: entry.indicator_id,
         no_tiket: normalizedTicket || undefined,
@@ -464,52 +511,30 @@ export default function SidakInputPage() {
   }, [temuan]);
 
   const liveScore = useMemo(() => {
-    if (!activeIndicators.length) return null;
-    const sesiMap = new Map<string, { nilai: number; bobot: number }[]>();
-    temuan.forEach((t) => {
-      const key = t.no_tiket?.trim() || `__no_${t.id}`;
-      if (!sesiMap.has(key)) sesiMap.set(key, []);
-      const ind = indicatorLookup.get(t.indicator_id);
-      sesiMap.get(key)!.push({ nilai: t.nilai, bobot: ind?.bobot ?? 1 });
+    if (!activeIndicators.length || !activeWeight) return null;
+    return calculateQAScoreFromTemuan(
+      activeIndicators,
+      temuan.map((t) => ({ indicator_id: t.indicator_id, nilai: t.nilai, no_tiket: t.no_tiket })),
+      activeWeight,
+    );
+  }, [temuan, activeIndicators, activeWeight, indicatorLookup]);
+
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, string>();
+    activeIndicators.forEach((i) => {
+      if (i.category) map.set(i.id, i.category);
     });
-    if (sesiMap.size === 0) {
-      return { finalScore: 100, nonCriticalScore: 100, criticalScore: 100, sessionCount: 0 };
-    }
-    const MAX_SAMPLING = 5;
-    const sessionScores = Array.from(sesiMap.values()).map((items) => {
-      let totalBobot = 0;
-      let earnedBobot = 0;
-      items.forEach((item) => {
-        totalBobot += item.bobot;
-        earnedBobot += (item.nilai / 3) * item.bobot;
-      });
-      return totalBobot > 0 ? (earnedBobot / totalBobot) * 100 : 100;
-    });
-    const sorted = [...sessionScores].sort((a, b) => a - b);
-    const selected = sorted.slice(0, MAX_SAMPLING);
-    const padded = [...selected];
-    while (padded.length < MAX_SAMPLING) padded.push(100);
-    const final = padded.reduce((a, b) => a + b, 0) / MAX_SAMPLING;
-    const catScore = (cat: "critical" | "non_critical") => {
-      const catInds = activeIndicators.filter((i) => i.category === cat);
-      if (catInds.length === 0) return 100;
-      let totalB = 0;
-      let earnedB = 0;
-      catInds.forEach((ind) => {
-        const tList = temuan.filter((t) => t.indicator_id === ind.id);
-        const val = tList.length > 0 ? Math.min(...tList.map((t) => t.nilai)) : 3;
-        totalB += ind.bobot;
-        earnedB += (val / 3) * ind.bobot;
-      });
-      return totalB > 0 ? (earnedB / totalB) * 100 : 100;
-    };
-    return {
-      finalScore: Math.round(final),
-      nonCriticalScore: Math.round(catScore("non_critical")),
-      criticalScore: Math.round(catScore("critical")),
-      sessionCount: sesiMap.size,
-    };
-  }, [temuan, activeIndicators, indicatorLookup]);
+    return map;
+  }, [activeIndicators]);
+
+  const scoringMode = activeWeight?.scoring_mode ?? "weighted";
+  const periodLabel = selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : "";
+
+  const handleImportClose = useCallback(() => {
+    setShowImport(false);
+    setImportRows([]);
+    setImportFile(null);
+  }, []);
 
   const handleDownloadTemplate = async () => {
     if (activeIndicators.length === 0 || !selectedAgent || !selectedPeriod) return;
@@ -590,6 +615,7 @@ export default function SidakInputPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || activeIndicators.length === 0) return;
+    setImportFile(file);
     setParsing(true);
     try {
       const XLSX = await import("xlsx");
@@ -1044,23 +1070,29 @@ export default function SidakInputPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowImport(!showImport);
-                      setImportTab("download");
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Import
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Tambah
-                  </button>
+                  {role !== "leader" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowImport(!showImport);
+                          setImportTab("download");
+                          setImportRows([]);
+                          setImportFile(null);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
+                      >
+                        <Upload className="w-3.5 h-3.5" /> Import
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowForm(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Tambah
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1076,10 +1108,7 @@ export default function SidakInputPage() {
                     </label>
                     <select
                       value={selectedService}
-                      onChange={(e) => {
-                        setSelectedService(e.target.value);
-                        refetchIndicators();
-                      }}
+                      onChange={(e) => handleServiceChange(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
                     >
                       {SERVICE_TYPES.map((st) => (
@@ -1101,57 +1130,12 @@ export default function SidakInputPage() {
               </div>
 
               {/* Estimasi Skor card */}
-              <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Estimasi Skor
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {selectedAgent?.nama} · {selectedPeriod && `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className={`text-4xl font-black ${liveScore ? scoreColor(liveScore.finalScore) : "text-muted-foreground"}`}>
-                      {liveScore ? liveScore.finalScore : "—"}
-                    </div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold mt-1">
-                      {liveScore ? scoreLabel(liveScore.finalScore) : "Menunggu"}
-                    </div>
-                  </div>
-                </div>
-                {liveScore && (
-                  <>
-                    <div className="mt-4 h-2.5 rounded-full bg-foreground/10 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${scoreBg(liveScore.finalScore)}`}
-                        style={{ width: `${Math.max(liveScore.finalScore, 0)}%` }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-rose-600">
-                          NC Score
-                        </div>
-                        <div className="text-lg font-black text-rose-600">
-                          {liveScore.nonCriticalScore}
-                        </div>
-                      </div>
-                      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                          CR Score
-                        </div>
-                        <div className="text-lg font-black text-blue-600">
-                          {liveScore.criticalScore}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-3">
-                      {liveScore.sessionCount} sesi dihitung · Sampling max 5 sesi
-                    </div>
-                  </>
-                )}
-              </div>
+              <SidakInputScoreCard
+                liveScore={liveScore}
+                activeWeight={activeWeight}
+                agentName={selectedAgent?.nama ?? ""}
+                periodLabel={selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : ""}
+              />
 
               {/* Draft warning banner */}
               {hasDraftVersion && (
@@ -1181,129 +1165,20 @@ export default function SidakInputPage() {
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="p-5 rounded-2xl bg-card/50 border border-border space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-foreground/90">
-                          Tambah Temuan Baru
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => setEntries((prev) => [...prev, newEntry()])}
-                          className="flex items-center gap-1 text-xs font-bold text-primary hover:opacity-80"
-                        >
-                          <Plus className="w-3.5 h-3.5" /> Baris
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
-                            No Tiket
-                          </label>
-                          <input
-                            value={noTiket}
-                            onChange={(e) => setNoTiket(e.target.value)}
-                            placeholder="Contoh: L2503001"
-                            className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                          />
-                        </div>
-                        <div className="flex-1" />
-                      </div>
-
-                      {entries.map((entry, idx) => (
-                        <div key={entry.uid} className="p-3 rounded-xl bg-foreground/5 border border-border space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              Parameter #{idx + 1}
-                            </span>
-                            {entries.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setEntries((prev) => prev.filter((e) => e.uid !== entry.uid))
-                                }
-                                className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-
-                          <IndicatorDropdown
-                            value={entry.indicator_id}
-                            indicators={activeIndicators}
-                            onChange={(id) => updateEntry(entry.uid, { indicator_id: id })}
-                          />
-
-                          <div>
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">
-                              Nilai
-                            </label>
-                            <div className="flex gap-1.5">
-                              {NILAI_OPTIONS.map((opt) => (
-                                <button
-                                  key={opt.v}
-                                  type="button"
-                                  onClick={() => updateEntry(entry.uid, { nilai: opt.v })}
-                                  className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
-                                    entry.nilai === opt.v ? opt.active : opt.inactive
-                                  }`}
-                                  title={opt.sub}
-                                >
-                                  {opt.v}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
-                                Ketidaksesuaian
-                              </label>
-                              <textarea
-                                value={entry.ketidaksesuaian}
-                                onChange={(e) =>
-                                  updateEntry(entry.uid, { ketidaksesuaian: e.target.value })
-                                }
-                                className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                rows={2}
-                                placeholder="Deskripsi ketidaksesuaian..."
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
-                                Sebaiknya
-                              </label>
-                              <textarea
-                                value={entry.sebaiknya}
-                                onChange={(e) =>
-                                  updateEntry(entry.uid, { sebaiknya: e.target.value })
-                                }
-                                className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
-                                rows={2}
-                                placeholder="Saran perbaikan..."
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving || previewing}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
-                      >
-                        {saving ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</>
-                        ) : previewing ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> Memeriksa...</>
-                        ) : (
-                          <><Check className="w-4 h-4" /> Simpan Temuan</>
-                        )}
-                      </button>
-                    </div>
+                    <SidakInputManualForm
+                      entries={entries}
+                      noTiket={noTiket}
+                      onSetNoTiket={setNoTiket}
+                      onUpdateEntry={updateEntry}
+                      onAddEntry={() => setEntries((prev) => [...prev, newEntry()])}
+                      onRemoveEntry={(uid) => setEntries((prev) => prev.filter((e) => e.uid !== uid))}
+                      onSave={handleSave}
+                      onCancel={resetForm}
+                      activeIndicators={activeIndicators}
+                      scoringMode={scoringMode}
+                      saving={saving}
+                      previewing={previewing}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1317,144 +1192,20 @@ export default function SidakInputPage() {
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="p-5 rounded-2xl bg-card/50 border border-border space-y-4">
-                      <div className="flex items-center gap-2 border-b border-border pb-3">
-                        <button
-                          type="button"
-                          onClick={() => setImportTab("download")}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                            importTab === "download"
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          <Download className="w-3 h-3 inline mr-1" />
-                          Download Template
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setImportTab("upload")}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                            importTab === "upload"
-                              ? "bg-primary text-primary-foreground"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          <Upload className="w-3 h-3 inline mr-1" />
-                          Upload & Preview
-                        </button>
-                      </div>
-
-                      {importTab === "download" ? (
-                        <div className="text-center py-6">
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Download template Excel untuk mengisi temuan secara offline.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={handleDownloadTemplate}
-                            disabled={generatingTemplate}
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20 disabled:opacity-50 transition-colors"
-                          >
-                            {generatingTemplate ? (
-                              <><Loader2 className="w-4 h-4 animate-spin" /> Membuat template...</>
-                            ) : (
-                              <><Download className="w-4 h-4" /> Download Template</>
-                            )}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <label className="flex items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed border-border bg-foreground/5 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
-                            <Upload className="w-6 h-6 text-muted-foreground" />
-                            <div>
-                              <p className="text-sm font-medium text-foreground/80">
-                                Pilih file Excel
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                .xlsx atau .xls
-                              </p>
-                            </div>
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept=".xlsx,.xls"
-                              onChange={handleFileUpload}
-                              className="hidden"
-                            />
-                          </label>
-
-                          {parsing && (
-                            <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Memproses file...
-                            </div>
-                          )}
-
-                          {importRows.length > 0 && !parsing && (
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-3 text-xs">
-                                <span className="text-green-600 font-bold">
-                                  {importRows.filter((r) => !r.error).length} Valid
-                                </span>
-                                {importRows.filter((r) => r.error).length > 0 && (
-                                  <span className="text-red-600 font-bold">
-                                    {importRows.filter((r) => r.error).length} Invalid
-                                  </span>
-                                )}
-                              </div>
-                              <div className="max-h-48 overflow-auto border border-border rounded-xl">
-                                <table className="w-full text-xs">
-                                  <thead className="bg-card sticky top-0">
-                                    <tr>
-                                      <th className="p-2 text-left text-muted-foreground font-bold">#</th>
-                                      <th className="p-2 text-left text-muted-foreground font-bold">Tiket</th>
-                                      <th className="p-2 text-left text-muted-foreground font-bold">Parameter</th>
-                                      <th className="p-2 text-center text-muted-foreground font-bold">Nilai</th>
-                                      <th className="p-2 text-left text-muted-foreground font-bold">Status</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {importRows.map((r, i) => (
-                                      <tr
-                                        key={i}
-                                        className={`border-t border-border ${r.error ? "bg-red-500/5" : ""}`}
-                                      >
-                                        <td className="p-2 text-muted-foreground">{r.rowNum}</td>
-                                        <td className="p-2">{r.no_tiket}</td>
-                                        <td className="p-2">{r.paramName}</td>
-                                        <td className="p-2 text-center">{r.nilai ?? "-"}</td>
-                                        <td className="p-2">
-                                          {r.error ? (
-                                            <span className="text-red-500">{r.error}</span>
-                                          ) : (
-                                            <span className="text-green-600">OK</span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={handleImportSave}
-                                disabled={
-                                  importing || importRows.filter((r) => !r.error).length === 0
-                                }
-                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
-                              >
-                                {importing ? (
-                                  <><Loader2 className="w-4 h-4 animate-spin" /> Mengimport...</>
-                                ) : (
-                                  <><Upload className="w-4 h-4" /> Import {importRows.filter((r) => !r.error).length} Temuan</>
-                                )}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <SidakInputImportPanel
+                      show={showImport}
+                      onClose={handleImportClose}
+                      importTab={importTab}
+                      onSetImportTab={setImportTab}
+                      importRows={importRows}
+                      importFile={importFile}
+                      generatingTemplate={generatingTemplate}
+                      parsing={parsing}
+                      importing={importing}
+                      onDownloadTemplate={handleDownloadTemplate}
+                      onFileUpload={handleFileUpload}
+                      onImportSave={handleImportSave}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -1486,16 +1237,19 @@ export default function SidakInputPage() {
                 />
               ) : (
                 <div className="space-y-3">
-                  {groupedTemuan.map((group) => (
+                  {groupedTemuan.map((group, gIdx) => (
                     <TemuanGroupCard
                       key={group.key}
                       group={group as any}
+                      gIdx={gIdx}
                       indicatorLabelMap={indicatorLabelMap}
+                      categoryMap={categoryMap}
                       editingId={editingId}
                       editNilai={editNilai}
                       editKetidaksesuaian={editKetidaksesuaian}
                       editSebaiknya={editSebaiknya}
                       deletingId={deletingId}
+                      canEdit={role !== "leader"}
                       onStartEdit={startEdit}
                       onCancelEdit={cancelEdit}
                       onSaveEdit={handleSaveEdit}

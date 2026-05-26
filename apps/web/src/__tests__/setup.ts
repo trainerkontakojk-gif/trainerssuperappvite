@@ -32,6 +32,9 @@ Object.defineProperty(globalThis, "localStorage", {
 // jsdom doesn't implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
+// jsdom doesn't implement scrollTo
+window.scrollTo = vi.fn();
+
 // jsdom doesn't implement matchMedia
 Object.defineProperty(window, "matchMedia", {
   value: vi.fn().mockImplementation((query: string) => ({
