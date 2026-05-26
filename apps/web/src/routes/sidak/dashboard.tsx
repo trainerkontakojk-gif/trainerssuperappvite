@@ -100,7 +100,7 @@ export default function SidakDashboardPage() {
   // Normalize invalid selections
   useEffect(() => {
     if (loading || !data) return;
-    if (availableServices.length > 0 && !availableServices.includes(selectedService)) {
+    if (availableServices.length > 0 && !(availableServices as string[]).includes(selectedService)) {
       setSelectedService(availableServices[0]);
     }
   }, [availableServices, selectedService, loading, data]);

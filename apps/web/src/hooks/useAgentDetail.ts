@@ -106,7 +106,7 @@ export function useAgentDetail(agentId: string) {
     if (!data || !data.periodSummaries) return;
     const svcs = [...new Set((data.periodSummaries ?? []).map((s) => s.serviceType))];
     if (svcs.length === 0) return;
-    if (selectedService && svcs.includes(selectedService)) return;
+    if (selectedService && (svcs as string[]).includes(selectedService)) return;
     setSelectedService(svcs[0]);
   }, [data, selectedService]);
 
