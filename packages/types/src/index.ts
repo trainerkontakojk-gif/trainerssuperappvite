@@ -859,6 +859,8 @@ export const generateMessageSchema = z.object({
     .enum(["realistic", "training_fast"])
     .default("realistic"),
   chatHistory: z.array(chatMessageSchema),
+  remainingSeconds: z.number().optional(),
+  elapsedSeconds: z.number().optional(),
 });
 
 export const generateEmailSchema = z.object({

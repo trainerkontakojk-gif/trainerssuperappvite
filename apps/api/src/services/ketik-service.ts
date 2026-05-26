@@ -142,19 +142,80 @@ function sanitizeConsumerText(rawText: string): string {
   return text.trim();
 }
 
+function formatDurationLabel(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  if (minutes <= 0) return `${seconds} detik`;
+  if (seconds === 0) return `${minutes} menit`;
+  return `${minutes} menit ${seconds} detik`;
+}
+
+interface SessionTimingContext {
+  remainingSeconds?: number;
+  elapsedSeconds?: number;
+  totalDurationSeconds?: number;
+}
+
 function buildTimeLimitInstruction(
   simulationDurationMinutes: number | undefined,
+  timing?: SessionTimingContext,
 ): string {
   if (!simulationDurationMinutes || simulationDurationMinutes <= 0) {
     return "";
   }
 
-  return `
+  const totalDurationSeconds =
+    timing?.totalDurationSeconds ?? simulationDurationMinutes * 60;
+  const remainingSecondsRaw = timing?.remainingSeconds;
+
+  if (
+    remainingSecondsRaw === undefined ||
+    Number.isNaN(remainingSecondsRaw)
+  ) {
+    return `
 STATUS WAKTU SIMULASI:
 - Simulasi dibatasi maksimal ${simulationDurationMinutes} menit.
 - Anda TIDAK boleh menutup percakapan lebih awal hanya karena menebak-nebak waktu hampir habis.
 - Jangan bilang harus pergi, baterai habis, sinyal jelek, atau alasan serupa kecuali memang ada instruksi eksplisit bahwa waktu benar-benar hampir habis atau sudah habis.
 - Selama belum ada instruksi waktu yang eksplisit, fokuslah membantu agen menyelesaikan percakapan secara natural.`;
+  }
+
+  const remainingSeconds = Math.max(0, Math.floor(remainingSecondsRaw));
+  const nearEndThreshold = Math.min(
+    45,
+    Math.max(20, Math.floor(totalDurationSeconds * 0.15)),
+  );
+  const wrapUpThreshold = Math.min(
+    90,
+    Math.max(45, Math.floor(totalDurationSeconds * 0.3)),
+  );
+
+  if (remainingSeconds <= nearEndThreshold) {
+    return `
+STATUS WAKTU SIMULASI SAAT INI:
+- Sisa waktu nyata sekitar ${formatDurationLabel(remainingSeconds)}. Ini benar-benar fase akhir sesi.
+- Anda BOLEH mulai menutup percakapan secara natural, tetapi jangan mendadak memotong jawaban agen bila agen sedang memberi penjelasan penting.
+- Jika agen masih menjelaskan hal yang relevan, beri kesempatan satu respons singkat yang tetap menanggapi inti penjelasan, lalu arahkan ke penutupan yang wajar.
+- Jangan menyebut "timer", "waktu sistem", atau istilah teknis simulasi. Tetap sebagai konsumen biasa.`;
+  }
+
+  if (remainingSeconds <= wrapUpThreshold) {
+    return `
+STATUS WAKTU SIMULASI SAAT INI:
+- Sisa waktu nyata sekitar ${formatDurationLabel(remainingSeconds)}. Sesi sudah mulai mendekati akhir, tetapi BELUM perlu menutup percakapan secara tiba-tiba.
+- Prioritaskan menanggapi penjelasan agen sampai inti masalah atau langkah berikutnya jelas.
+- Anda baru boleh mulai merapikan arah percakapan ke penutupan jika pembahasan memang sudah cukup selesai secara natural.
+- Jangan berpura-pura waktu habis dan jangan memberi alasan pergi mendadak kalau masalah belum cukup dijelaskan.`;
+  }
+
+  return `
+STATUS WAKTU SIMULASI SAAT INI:
+- Sisa waktu nyata masih sekitar ${formatDurationLabel(remainingSeconds)} dari total ${formatDurationLabel(totalDurationSeconds)}. Sesi masih panjang.
+- JANGAN menutup percakapan, JANGAN bersikap seolah waktu habis, dan JANGAN memberi alasan seperti harus pergi, baterai habis, atau sinyal jelek hanya karena asumsi waktu.
+- Walau sedang frustrasi, bingung, atau kesal, tetap tanggapi agen selama agen masih berusaha menjelaskan atau membantu.
+- Anda WAJIB menjelaskan masalah Anda di 2-3 pesan pertama dan TIDAK BOLEH menutup percakapan sebelum inti masalah tersampaikan.
+- Fokuslah pada substansi masalah, bukan pada penutupan percakapan karena batas waktu.`;
 }
 
 export async function generateConsumerResponse(
@@ -170,6 +231,7 @@ export async function generateConsumerResponse(
   chatHistory: ChatMessage[],
   usageContext?: UsageContext,
   userId?: string,
+  timing?: SessionTimingContext,
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   const imagesCount = (scenario as any).images?.length || 0;
   const imageInstruction =
@@ -177,6 +239,7 @@ export async function generateConsumerResponse(
       ? `Anda memiliki ${imagesCount} lampiran gambar yang bisa dikirim (indeks 0 sampai ${imagesCount - 1}). Gunakan tag [SEND_IMAGE: indeks] untuk mengirimnya.`
       : "Anda tidak memiliki lampiran gambar untuk dikirim.";
 
+  const hasScript = Boolean(scenario.script);
   const scriptInstruction = scenario.script
     ? `SKRIP PERCAKAPAN (PANDUAN ALUR):
 Gunakan skrip berikut sebagai panduan utama arah percakapan, informasi penting, dan urutan eskalasi masalah.
@@ -201,6 +264,7 @@ ${scenario.script}`
 
   const timeLimitInstruction = buildTimeLimitInstruction(
     config.simulationDuration,
+    timing,
   );
 
   const systemInstruction = `
@@ -250,15 +314,24 @@ ATURAN BALASAN:
     .map((m) => `${m.sender === "agent" ? "[AGEN]" : "[KONSUMEN]"} ${m.text}`)
     .join("\n");
 
-  const prompt = `Skenario: ${scenario.title}\n\nRiwayat Chat:\n${historyText}\n\nBalas sebagai konsumen:`;
+  const prompt = `Skenario Saat Ini: ${scenario.title}\n\nRiwayat Chat:\n${historyText}\n\nInstruksi akhir:\n- Balas hanya sebagai konsumen.\n- Tulis 1 sampai 3 chat pendek yang relevan.\n- Jangan gunakan prefix nama pembicara.\n- Jangan ulangi isi pesan agen.\n- Hindari mengulang pola kalimat atau frasa yang sama seperti balasan sebelumnya kecuali memang sangat natural.\n\nBalas sebagai konsumen:`;
 
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
   const isOpenRouter = provider === "openrouter";
+
+  const providerSystemInstruction = isOpenRouter && hasScript
+    ? `${systemInstruction}\n\nOPENROUTER SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
+    : systemInstruction;
+
   const callPayload = {
     model: modelId,
-    systemInstruction,
+    systemInstruction: providerSystemInstruction,
     contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
-    temperature: isOpenRouter ? 0.55 : 0.82,
+    temperature: isOpenRouter && hasScript
+      ? Math.min(0.82, 0.55)
+      : isOpenRouter
+        ? 0.55
+        : 0.82,
     usageContext,
     userId,
   };

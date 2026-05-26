@@ -62,6 +62,13 @@ ketik.post(
       body.chatHistory,
       { module: "ketik", action: "generate_consumer_response" },
       userId,
+      {
+        remainingSeconds: body.remainingSeconds,
+        elapsedSeconds: body.elapsedSeconds,
+        totalDurationSeconds: body.simulationDuration
+          ? body.simulationDuration * 60
+          : undefined,
+      },
     );
 
     if (!result.success) {
