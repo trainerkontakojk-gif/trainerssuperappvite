@@ -3,7 +3,7 @@ import { useApi, getApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
 import type { QAIndicator, QAPeriod, QATemuan, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FolderOpen, User as UserIcon, CalendarDays, Plus,
+  ArrowLeft, FolderOpen, User as UserIcon, CalendarDays, Plus,
   Upload, Download, Check, X, ChevronRight,
   Loader2, AlertCircle,
   AlertTriangle, Eye, EyeOff,

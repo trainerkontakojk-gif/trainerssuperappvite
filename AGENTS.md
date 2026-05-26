@@ -206,8 +206,9 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 56. Leader Folder/Service Scope Visibility Hardening — Shared `LeaderScopeSnapshot` helper eliminating duplicate scope parsing; KTP metadata scoped (years/folders/teams filtered by leader pesertaIds); SIDAK `service_type` first-class enforcement via `getAccessibleSidakFilters()` including `allowedServiceTypes` in dashboard/ranking/agent-detail queries; SIDAK `folder_ids` real filtering (resolve batch_name from folder IDs); frontend normalization (`availableServices` prop, invalid service/folder/batch auto-reset with redirect); 16 files modified, 0 migrations, all 390 API + 314 web tests passing (DONE)
 57. SIDAK Import Duplicate Logic Fix & no_tiket Passthrough — Fixed Excel import dropping no_tiket (hardcoded null), updated validateTemuanBatch() duplicate detection key with service_type and no_tiket mapping for legacy parity, and resolved frontend reverse() crash after batch creation (DONE)
 58. SIDAK Input Visual & Navigation Parity — Restored vertical list card layout (matching legacy), compact inline breadcrumb with actual selected values, added Estimasi Skor card (live score with NC/CR breakdown + progress bar), added Konfigurasi Audit card (service dropdown + tim info) moved from step 3 to step 4, added Show All Data toggle (eye icon) in step 1, fixed navigation pre-fill from agent detail page to skip directly to period step via URL params consumption, added client-side scoring utility (`apps/web/src/lib/scoring.ts`), 24 regression tests (DONE)
+59. **SIDAK Input Railway Build Fix (ArrowLeft Import)** — Added missing `ArrowLeft` lucide-react import in `input.tsx` that caused Railway deployment build failure (TS2304). TypeScript error `Cannot find name 'ArrowLeft'` at line 1032. (DONE)
 
-## Key Files Changed (Phase 58)
+## Key Files Changed (Phase 58 — 59)
 
 - `apps/web/src/routes/sidak/input.tsx` — Major refactor: vertical list cards, compact breadcrumb, Estimasi Skor card, Konfigurasi Audit card, Show All toggle, URL param consumption for pre-fill
 - `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param
@@ -281,7 +282,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-55)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-58a)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 
 ## Routes Reference (apps/web)
