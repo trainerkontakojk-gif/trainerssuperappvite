@@ -43,7 +43,7 @@ describe("PDKT Mailbox UX", () => {
 
     (useApiModule.getApi as any).mockImplementation((url: string) => {
       if (url === "/pdkt/settings")
-        return Promise.resolve({ success: true, settings: null });
+        return Promise.resolve(null);
       if (url === "/pdkt/history") return Promise.resolve([]);
       return Promise.resolve(null);
     });

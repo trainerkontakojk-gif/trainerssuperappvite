@@ -90,12 +90,9 @@ export default function PdktLanding() {
 
   const fetchSettings = async () => {
     try {
-      const res = await getApi<{
-        success: boolean;
-        settings: PdktAppSettings | null;
-      }>("/pdkt/settings");
-      if (res && res.settings) {
-        setSettings(res.settings);
+      const res = await getApi<PdktAppSettings | null>("/pdkt/settings");
+      if (res) {
+        setSettings(res);
       } else {
         setSettings(null);
       }
@@ -166,7 +163,10 @@ export default function PdktLanding() {
     }
   };
 
-  const handleSelectSession = (_session: SessionHistory) => {
+  const [replaySession, setReplaySession] = useState<SessionHistory | null>(null);
+
+  const handleSelectSession = (session: SessionHistory) => {
+    setReplaySession(session);
     setIsHistoryOpen(false);
     setView("mailbox");
   };
@@ -186,7 +186,7 @@ export default function PdktLanding() {
     }
   };
 
-  const computeUsageDelta = async () => {
+  const computeUsageDelta = async (retriesLeft = 2) => {
     if (!usageSnapshotRef.current) {
       setSessionDeltaPending(false);
       return;
@@ -206,6 +206,14 @@ export default function PdktLanding() {
           0,
           summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr,
         );
+
+        if ((deltaCalls === 0 && deltaTokens === 0 && deltaCost === 0) && retriesLeft > 0) {
+          setTimeout(() => {
+            computeUsageDelta(retriesLeft - 1);
+          }, 2000);
+          return;
+        }
+
         setSessionDelta({
           totalCalls: deltaCalls,
           totalTokens: deltaTokens,

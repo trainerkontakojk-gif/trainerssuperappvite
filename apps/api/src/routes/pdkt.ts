@@ -16,6 +16,18 @@ import { createUserClient, createAdminClient } from "../lib/supabase";
 
 type Variables = { user: User; profile: any };
 
+function pdktErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return "Terjadi kesalahan yang tidak diketahui.";
+  const msg = err.message.toLowerCase();
+  if (msg.includes("duplicate key") || msg.includes("unique constraint"))
+    return "Data sudah ada, tidak dapat membuat duplikat.";
+  if (msg.includes("foreign key") || msg.includes("violates foreign key"))
+    return "Data terkait tidak ditemukan atau rusak.";
+  if (msg.includes("jwt expired") || msg.includes("token")) return "Sesi Anda telah berakhir. Silakan login kembali.";
+  if (msg.includes("permission") || msg.includes("policy")) return "Anda tidak memiliki izin untuk melakukan tindakan ini.";
+  return err.message || "Terjadi kesalahan saat menghubungi database.";
+}
+
 const pdkt = new Hono<{ Variables: Variables }>();
 
 pdkt.get(
@@ -176,7 +188,7 @@ pdkt.get(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -204,7 +216,7 @@ pdkt.post(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -232,7 +244,7 @@ pdkt.delete(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -272,7 +284,7 @@ pdkt.post(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -319,7 +331,7 @@ pdkt.get(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -387,7 +399,7 @@ pdkt.post(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -416,7 +428,7 @@ pdkt.get(
 
       return c.json({
         success: true,
-        settings: readPdktSettings(data?.settings),
+        data: readPdktSettings(data?.settings),
       });
     } catch (error: any) {
       return c.json(
@@ -424,7 +436,7 @@ pdkt.get(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -479,7 +491,7 @@ pdkt.post(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -513,7 +525,7 @@ pdkt.get(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -544,7 +556,7 @@ pdkt.delete(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,
@@ -577,7 +589,7 @@ pdkt.delete(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: pdktErrorMessage(error),
           },
         },
         500,

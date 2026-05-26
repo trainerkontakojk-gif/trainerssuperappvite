@@ -163,12 +163,34 @@ const DEFAULT_CONSUMER_TYPES: PdktConsumerType[] = [
   },
 ];
 
+const DUMMY_CITIES = [
+  "Jakarta Selatan", "Jakarta Pusat", "Jakarta Barat", "Jakarta Timur", "Jakarta Utara",
+  "Surabaya", "Bandung", "Medan", "Semarang", "Makassar", "Palembang", "Tangerang",
+  "Depok", "Bekasi", "Bogor", "Yogyakarta", "Malang", "Denpasar", "Balikpapan",
+  "Samarinda", "Banjarmasin", "Pontianak", "Manado", "Padang", "Pekanbaru",
+];
+
 const DUMMY_PROFILES = [
   { name: "Budi Santoso", email: "budi.santoso88@gmail.com" },
   { name: "Siti Aminah", email: "siti.aminah_real@yahoo.com" },
   { name: "Agus Setiawan", email: "agus.setiawan.work@gmail.com" },
   { name: "Dewi Lestari", email: "dewi.lestari1990@outlook.com" },
   { name: "Rudi Hartono", email: "rudi.hartono.bisnis@gmail.com" },
+  { name: "Ratna Sari", email: "ratna.sari.cantik@gmail.com" },
+  { name: "Eko Prasetyo", email: "eko.prasetyo77@yahoo.co.id" },
+  { name: "Sri Wahyuni", email: "sri.wahyuni.guru@gmail.com" },
+  { name: "Hendra Wijaya", email: "hendra.wijaya.store@gmail.com" },
+  { name: "Nurul Hidayah", email: "nurul.hidayah.family@gmail.com" },
+  { name: "Bambang Pamungkas", email: "bambang.pamungkas.bola@gmail.com" },
+  { name: "Lina Marlina", email: "lina.marlina.shop@gmail.com" },
+  { name: "Dedi Supriyadi", email: "dedi.supriyadi.teknik@gmail.com" },
+  { name: "Rina Wati", email: "rina.wati.kue@gmail.com" },
+  { name: "Fajar Nugroho", email: "fajar.nugroho.dev@gmail.com" },
+  { name: "Yanti Susanti", email: "yanti.susanti.salon@gmail.com" },
+  { name: "Iwan Fals", email: "iwan.fals.fans@gmail.com" },
+  { name: "Maya Putri", email: "maya.putri.travel@gmail.com" },
+  { name: "Reza Rahadian", email: "reza.rahadian.actor@gmail.com" },
+  { name: "Indah Permatasari", email: "indah.permatasari.model@gmail.com" },
 ];
 
 // ── Helpers ─────────────────────────────────────────────
@@ -184,10 +206,11 @@ export function getConsumerTypes(): PdktConsumerType[] {
 export function generateRandomIdentity(): PdktIdentity {
   const profile =
     DUMMY_PROFILES[Math.floor(Math.random() * DUMMY_PROFILES.length)];
+  const city = DUMMY_CITIES[Math.floor(Math.random() * DUMMY_CITIES.length)];
   return {
     name: profile.name,
     email: profile.email,
-    city: "Jakarta",
+    city,
     bodyName: profile.name.split(" ")[0],
   };
 }

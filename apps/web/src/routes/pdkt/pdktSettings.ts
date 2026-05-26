@@ -23,6 +23,15 @@ export type PdktAppSettings = {
   };
 };
 
+const WRITING_STYLE_MODES = ["realistic", "training"] as const;
+const CONSUMER_NAME_MENTION_PATTERNS = [
+  "random",
+  "upfront",
+  "middle",
+  "late",
+  "none",
+] as const;
+
 export const DEFAULT_PDKT_MODEL_ID = "gemini-3.1-flash-lite";
 
 export const TEXT_MODELS = [
@@ -71,11 +80,42 @@ const DUMMY_PROFILES = [
   { name: "Agus Setiawan", email: "agus.setiawan.work@gmail.com" },
   { name: "Dewi Lestari", email: "dewi.lestari1990@outlook.com" },
   { name: "Rudi Hartono", email: "rudi.hartono.bisnis@gmail.com" },
+  { name: "Ratna Sari", email: "ratna.sari.cantik@gmail.com" },
+  { name: "Eko Prasetyo", email: "eko.prasetyo77@yahoo.co.id" },
+  { name: "Sri Wahyuni", email: "sri.wahyuni.guru@gmail.com" },
+  { name: "Hendra Wijaya", email: "hendra.wijaya.store@gmail.com" },
+  { name: "Nurul Hidayah", email: "nurul.hidayah.family@gmail.com" },
+  { name: "Bambang Pamungkas", email: "bambang.pamungkas.bola@gmail.com" },
+  { name: "Lina Marlina", email: "lina.marlina.shop@gmail.com" },
+  { name: "Dedi Supriyadi", email: "dedi.supriyadi.teknik@gmail.com" },
+  { name: "Rina Wati", email: "rina.wati.kue@gmail.com" },
+  { name: "Fajar Nugroho", email: "fajar.nugroho.dev@gmail.com" },
+  { name: "Yanti Susanti", email: "yanti.susanti.salon@gmail.com" },
+  { name: "Iwan Fals", email: "iwan.fals.fans@gmail.com" },
+  { name: "Maya Putri", email: "maya.putri.travel@gmail.com" },
+  { name: "Reza Rahadian", email: "reza.rahadian.actor@gmail.com" },
+  { name: "Indah Permatasari", email: "indah.permatasari.model@gmail.com" },
 ];
 
 export function coercePdktModelId(modelId?: string | null): string {
   const exists = TEXT_MODELS.some((model) => model.id === modelId);
   return exists ? (modelId as string) : DEFAULT_PDKT_MODEL_ID;
+}
+
+export function coerceWritingStyleMode(
+  value?: string | null,
+): "realistic" | "training" {
+  return WRITING_STYLE_MODES.includes(value as any)
+    ? (value as "realistic" | "training")
+    : "training";
+}
+
+export function coerceConsumerNameMentionPattern(
+  value?: string | null,
+): "random" | "upfront" | "middle" | "late" | "none" {
+  return CONSUMER_NAME_MENTION_PATTERNS.includes(value as any)
+    ? (value as "random" | "upfront" | "middle" | "late" | "none")
+    : "random";
 }
 
 export function resolveConsumerNameMentionPattern(

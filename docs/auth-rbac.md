@@ -26,7 +26,7 @@ Aplikasi memiliki 4 role utama dengan hierarki akses sebagai berikut:
 | **Admin**   | Pengelola Sistem  | Akses penuh seluruh modul, manajemen user (approve/reject/delete), audit logs, & konfigurasi sistem.                       |
 | **Trainer** | Operasional Utama | Manajemen data Profiler, input & setting QA (SIDAK), monitoring, editor pricing/kurs usage billing, & audit logs terbatas. |
 | **Leader**  | Pengawas Tim      | Melihat dashboard tim, monitoring aktivitas tim, monitoring usage billing lintas akun, melihat data Profiler.              |
-| **Agent**   | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT, Telefun), melihat dashboard pribadi.                                                 |
+| **Agent**   | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT, Telefun), melihat dashboard pribadi. `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK, TELEFUN). PDKT dibatasi untuk trainer/qa/admin saja. |
 
 ## Alur Pendaftaran & Approval
 
@@ -65,7 +65,7 @@ Role enforcement coverage per module (Phase B hardening):
 | ----------------- | --------- | -------------------------------------- | -------------------------------------- |
 | **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
 | **Profiler**      | 23        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
-| **PDKT**          | 16        | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa (AI)                |
+| **PDKT**          | 16        | admin, trainer, qa                     | admin, trainer, qa (AI)                |
 | **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history) | admin, trainer (pricing)           |
 | **KETIK**         | 4         | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa, tl, spv, om, agent |
 | **Admin**         | 8         | admin only                             | admin only                             |
@@ -150,7 +150,7 @@ Kontrak akses untuk fitur monitoring usage billing:
 Catatan:
 
 - `leader` tetap dapat melihat agregasi usage lintas akun, tetapi tidak menerima editor pricing/kurs.
-- `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK, PDKT, TELEFUN).
+- `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK, TELEFUN). PDKT dibatasi untuk trainer/qa/admin.
 
 ## Referensi Guardrail
 

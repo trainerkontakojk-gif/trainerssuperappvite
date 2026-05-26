@@ -48,13 +48,23 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
 
 - **Fungsi**: Simulasi penulisan email balasan untuk keluhan atau pertanyaan pelanggan.
 - **Routes**: `/pdkt`, `/pdkt/simulation`, `/pdkt/history`
+- **Akses**: Trainer, QA, Admin. Agent dan role lain tidak memiliki akses ke modul ini.
 - **Fitur Utama**:
   - **Durable Mailbox**: Inbound email tersimpan secara persisten di database.
   - **Manual Scenario Selection**: User secara eksplisit memilih skenario untuk menghasilkan email baru.
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
+  - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
+  - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.
   - **Filtering & Search**: Memudahkan user mencari email tertentu atau memfilter berdasarkan status.
-- **Catatan Teknis**: PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk. Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
+- **Catatan Teknis**:
+  - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
+  - Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Settings response API selalu mengikuti kontrak `{ success, data }`.
+  - Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
+  - Error database mentah dipetakan ke pesan user-friendly via `pdktErrorMessage()` helper.
+  - Migrasi field legacy `script` → `sampleEmailTemplate` dijalankan saat settings dibaca.
+  - DUMMY_PROFILES pool 20 identitas dengan 25 kota acak untuk variasi identitas konsumen.
+  - Usage delta setelah evaluasi async di-retry hingga 2x (2s delay) untuk akurasi.
 
 ## 4. TELEFUN (Telephone Fun)
 

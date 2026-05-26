@@ -25,8 +25,7 @@ describe("PDKT Landing Page", () => {
       refetch: vi.fn(),
     });
     mockGetApi.mockImplementation((url: string) => {
-      if (url === "/pdkt/settings")
-        return Promise.resolve({ success: true, settings: null });
+      if (url === "/pdkt/settings") return Promise.resolve(null);
       if (url === "/pdkt/history") return Promise.resolve([]);
       if (url.startsWith("/ai/usage/summary"))
         return Promise.resolve({

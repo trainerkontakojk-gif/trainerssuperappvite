@@ -135,12 +135,9 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
   // Fetch Settings & History from DB
   const fetchSettings = async () => {
     try {
-      const res = await getApi<{
-        success: boolean;
-        settings: PdktAppSettings | null;
-      }>("/pdkt/settings");
-      if (res && res.settings) {
-        setSettings(res.settings);
+      const res = await getApi<PdktAppSettings | null>("/pdkt/settings");
+      if (res) {
+        setSettings(res);
       } else {
         setSettings(null);
       }
@@ -317,7 +314,7 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
     }
   };
 
-  const computeUsageDelta = async () => {
+  const computeUsageDelta = async (retriesLeft = 2) => {
     if (!usageSnapshotRef.current) {
       setSessionDeltaPending(false);
       return;
@@ -337,6 +334,13 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
           0,
           summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr,
         );
+
+        if ((deltaCalls === 0 && deltaTokens === 0 && deltaCost === 0) && retriesLeft > 0) {
+          setTimeout(() => {
+            computeUsageDelta(retriesLeft - 1);
+          }, 2000);
+          return;
+        }
 
         setSessionDelta({
           totalCalls: deltaCalls,
@@ -410,10 +414,49 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
     );
     if (matchingMailbox) {
       setSelectedId(matchingMailbox.id);
-    } else {
-      notify.info(
-        "Sesi ini hanya ada di riwayat dan tidak aktif di kotak masuk.",
-      );
+    } else if (session.config && session.emails && session.emails.length > 0) {
+      const firstInbound = session.emails.find((e: any) => !e.isAgent);
+      const syntheticId = "replay_" + session.id;
+      const syntheticItem: PdktMailboxItem = {
+        id: syntheticId,
+        user_id: "",
+        status: "replied",
+        created_at: session.timestamp || new Date().toISOString(),
+        sender_name: session.config.identity?.name || "Konsumen",
+        sender_email: session.config.identity?.email || "",
+        subject: (firstInbound as any)?.subject || "",
+        snippet: (firstInbound as any)?.body?.substring(0, 100) || "",
+        scenario_snapshot: session.config.scenarios?.[0] || ({} as PdktScenario),
+        config_snapshot: session.config,
+        inbound_email: firstInbound || {
+          id: "msg_replay",
+          from: "",
+          to: "",
+          subject: "",
+          body: "",
+          timestamp: new Date().toISOString(),
+          isAgent: false,
+        },
+        emails_thread: session.emails,
+        history_id: session.id,
+        last_activity_at: session.timestamp || new Date().toISOString(),
+        time_taken: session.timeTaken,
+      };
+
+      setEvaluations((prev) => {
+        if (prev[syntheticId]) return prev;
+        return {
+          ...prev,
+          [syntheticId]: {
+            result: session.evaluation || null,
+            status: session.evaluationStatus || "completed",
+            error: session.evaluationError || null,
+          },
+        };
+      });
+
+      (mailboxItems as PdktMailboxItem[] | undefined)?.push(syntheticItem);
+      setSelectedId(syntheticId);
     }
     setIsHistoryOpen(false);
   };
@@ -476,7 +519,10 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
       }
 
       // 4. Submit new mailbox batch
+      const clientRequestId = crypto.randomUUID();
+
       const newItemId = await postApi<string>("/pdkt/mailbox/batch", {
+        client_request_id: clientRequestId,
         sender_name: config.identity.name,
         sender_email: config.identity.email,
         subject: subject,

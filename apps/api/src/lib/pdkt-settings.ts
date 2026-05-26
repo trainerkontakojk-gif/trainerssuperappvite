@@ -21,11 +21,38 @@ function hasLegacyPdktShape(value: JsonRecord): boolean {
 export function readPdktSettings(settings: unknown): JsonRecord | null {
   if (!isPlainObject(settings)) return null;
 
+  let pdkt: JsonRecord | null = null;
+
   if (Object.prototype.hasOwnProperty.call(settings, "pdkt")) {
-    return isPlainObject(settings.pdkt) ? settings.pdkt : null;
+    pdkt = isPlainObject(settings.pdkt) ? settings.pdkt : null;
+  } else if (hasLegacyPdktShape(settings)) {
+    pdkt = settings;
   }
 
-  return hasLegacyPdktShape(settings) ? settings : null;
+  if (!pdkt) return null;
+
+  return migratePdktSettings(pdkt);
+}
+
+function migratePdktSettings(pdkt: JsonRecord): JsonRecord {
+  const result = { ...pdkt };
+
+  const scenarios = Array.isArray(result.scenarios) ? result.scenarios : [];
+  if (scenarios.length > 0) {
+    result.scenarios = (scenarios as any[]).map((s) => {
+      let migrated = { ...s };
+      if (s.script && (!s.sampleEmailTemplate || !s.sampleEmailTemplate.body)) {
+        migrated.sampleEmailTemplate = {
+          ...migrated.sampleEmailTemplate,
+          body: s.script,
+        };
+        migrated.alwaysUseSampleEmail = false;
+      }
+      return migrated;
+    });
+  }
+
+  return result;
 }
 
 export function writePdktSettings(
