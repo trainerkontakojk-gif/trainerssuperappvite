@@ -600,7 +600,7 @@ sidak.get(
             year: period === "alltime" ? undefined : year,
             agent_ids: accessibleIds ?? undefined,
             allowedServiceTypes: filterScope?.allowedServices ?? undefined,
-            limit: period === "alltime" ? 20 : 0,
+            limit: 0,
           }),
           sidakService.getPeriods(),
           supabaseAdmin.from("profiler_folders").select("id, name").order("name"),
@@ -686,12 +686,10 @@ sidak.get(
         }
       }
 
-      const slicedRankings = finalRankings.slice(0, 20);
-
       return c.json({
         success: true,
         data: {
-          rankings: slicedRankings,
+          rankings: finalRankings,
           periods,
           folders: scopedFolders,
           availableYears,
