@@ -19,6 +19,7 @@ dist
 # ── Tooling / Config Agents ──
 .antigravitycli/
 .kiro/
+.opencode/
 .superpowers
 docs/superpowers/
 plan/

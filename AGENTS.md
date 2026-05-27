@@ -14,6 +14,19 @@
 - Gunakan subagent untuk tugas yang memerlukan eksplorasi codebase mendalam atau riset multi-step.
 - Berikan instruksi yang spesifik tentang arsitektur monorepo (apps/web, apps/api, packages/types).
 
+## UI/UX Pro Max Skill
+
+**WAJIB** gunakan skill **UI/UX Pro Max** (`ui-ux-pro-max`) untuk semua task yang berhubungan dengan perubahan UI/UX — baik itu build, design, create, implement, review, fix, atau improve tampilan. Skill ini menyediakan:
+
+- **67 UI Styles** — Glassmorphism, Neumorphism, Bento Grid, dll.
+- **161 Color Palettes** — Industri-specific
+- **57 Font Pairings** — Typography recommendations
+- **161 Reasoning Rules** — Design system generation sesuai industri
+- **99 UX Guidelines** — Best practices & anti-patterns
+- **Stack-specific guidelines** — React, Tailwind, shadcn/ui, Next.js, dan lainnya
+
+Skill ter-install di `.opencode/skills/ui-ux-pro-max/` dan akan aktif otomatis saat ada permintaan UI/UX.
+
 ## ECC Plugin
 
 **WAJIB** gunakan plugin **ECC (Everything Claude Code)** (`ecc-universal`) di setiap task. ECC menyediakan 48 specialized agents, 183 skills, dan 79 commands. Pilih agent/skill yang sesuai dengan konteks task:
@@ -26,6 +39,7 @@
 - Build error → **build-error-resolver** agent
 - Cek dokumentasi library → **docs-lookup** agent (Context7)
 - Autonomous loop / monitoring → **loop-operator** agent
+- **Perubahan UI/UX** → **ui-ux-pro-max** skill (aktivasi otomatis)
 
 ECS agents bisa dipanggil via `Task` tool dengan `subagent_type` yang sesuai.
 
