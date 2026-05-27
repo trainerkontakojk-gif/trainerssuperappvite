@@ -379,7 +379,7 @@ export default function SidakRankingPage() {
                                           ▲ +{agent.rankChange}
                                         </motion.span>
                                         <span className="text-[9px] text-muted-foreground whitespace-nowrap font-medium">
-                                          Sebelumnya Posisi {(index + 1) + agent.rankChange}
+                                          Sebelumnya Posisi {rank + agent.rankChange}
                                         </span>
                                       </div>
                                     )}
@@ -394,7 +394,7 @@ export default function SidakRankingPage() {
                                           ▼ {agent.rankChange}
                                         </motion.span>
                                         <span className="text-[9px] text-muted-foreground whitespace-nowrap font-medium">
-                                          Sebelumnya Posisi {(index + 1) + agent.rankChange}
+                                          Sebelumnya Posisi {rank + agent.rankChange}
                                         </span>
                                       </div>
                                     )}
