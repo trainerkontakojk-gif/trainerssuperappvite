@@ -62,6 +62,8 @@ function formatUsageDeltaLabel(delta: UsageDelta): string {
 
 export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
+  const profile = useAuthStore((s) => s.profile);
+  const canStartReview = ["admin", "trainer", "qa"].includes(profile?.role || "");
   const [view, setView] = useState<"home" | "chat">("home");
   const [settings, setSettings] = useState<KetikAppSettings>(
     DEFAULT_KETIK_SETTINGS,
@@ -680,6 +682,12 @@ export default function KetikLanding() {
           onReplay={() => handleReviewHistory(selectedSessionForReview)}
           onStartReview={handleStartManualReview}
           progress={reviewProgress}
+          canStartReview={canStartReview}
+          reviewAccessMessage={
+            !canStartReview
+              ? "Hanya admin, trainer, dan QA yang dapat menjalankan analisis AI."
+              : undefined
+          }
         />
       )}
     </div>

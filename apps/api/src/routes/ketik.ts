@@ -5,6 +5,7 @@ import { generateMessageSchema } from "@trainers/types";
 import * as ketikService from "../services/ketik-service";
 import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
+import { createAdminClient } from "../lib/supabase";
 import { z } from "zod";
 
 type Variables = { user: User; profile: any };
@@ -241,10 +242,93 @@ ketik.post(
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
+    const adminClient = createAdminClient();
 
     try {
+      // 1. Verify session ownership
+      const { data: session, error: sessionError } = await adminClient
+        .from("ketik_history")
+        .select("user_id, review_status")
+        .eq("id", body.sessionId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (sessionError || !session) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Sesi tidak ditemukan atau bukan milik Anda.",
+            },
+          },
+          404,
+        );
+      }
+
+      // 2. Check existing job state (legacy parity)
+      const { data: existingJob } = await adminClient
+        .from("ketik_review_jobs")
+        .select("status")
+        .eq("session_id", body.sessionId)
+        .maybeSingle();
+
+      if (existingJob?.status === "completed") {
+        if (session.review_status !== "completed") {
+          await adminClient
+            .from("ketik_history")
+            .update({ review_status: "completed" })
+            .eq("id", body.sessionId);
+        }
+        return c.json({
+          success: true,
+          data: { status: "completed" },
+        });
+      }
+
+      if (existingJob?.status === "processing") {
+        if (session.review_status !== "processing") {
+          await adminClient
+            .from("ketik_history")
+            .update({ review_status: "processing" })
+            .eq("id", body.sessionId);
+        }
+        return c.json({
+          success: true,
+          data: { status: "processing" },
+        });
+      }
+
+      if (existingJob?.status === "queued") {
+        return c.json({
+          success: true,
+          data: { status: "processing" },
+        });
+      }
+
+      if (existingJob?.status === "failed") {
+        // Reset failed job for retry
+        await adminClient
+          .from("ketik_review_jobs")
+          .update({
+            status: "queued",
+            lease_owner: null,
+            lease_expires_at: null,
+            error_message: null,
+          })
+          .eq("session_id", body.sessionId);
+      }
+
+      // 3. Trigger review (handles missing job + enqueue)
       await ketikService.triggerKetikAIReview(body.sessionId, user.id);
 
+      // 4. Update history to processing so polling doesn't stick on pending
+      await adminClient
+        .from("ketik_history")
+        .update({ review_status: "processing" })
+        .eq("id", body.sessionId);
+
+      // 5. Process (fire-and-forget with waitUntil if available)
       const processPromise = ketikService.claimAndProcessKetikReviewJob(
         body.sessionId,
         body.workerId || "immediate-web",
@@ -259,7 +343,7 @@ ketik.post(
 
       return c.json({
         success: true,
-        message: "Review enqueued and processing started.",
+        data: { status: "processing" },
       });
     } catch (err: any) {
       return c.json(

@@ -37,6 +37,7 @@ export async function generateGeminiContent(options: {
   temperature?: number;
   usageContext?: UsageContext;
   userId?: string;
+  sanitizeOutput?: boolean;
 }): Promise<GeminiResponse> {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -164,7 +165,8 @@ export async function generateGeminiContent(options: {
     }
 
     const rawText = resolveResponseText(response);
-    return { success: true, text: sanitizeAiResponse(rawText) };
+    const shouldSanitize = options.sanitizeOutput !== false;
+    return { success: true, text: shouldSanitize ? sanitizeAiResponse(rawText) : rawText };
   } catch (error) {
     console.error("[Gemini] Error:", error);
     return {

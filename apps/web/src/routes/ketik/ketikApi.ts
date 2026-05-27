@@ -15,6 +15,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "X-Requested-With": "XMLHttpRequest",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
@@ -85,7 +86,10 @@ export const ketikApi = {
   getUsageSummary: () => {
     const token = localStorage.getItem("auth_token");
     return fetch(`${API_BASE}/ai/usage/summary?module=ketik`, {
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     })
       .then((r) => r.json())
       .then((j) => (j.success ? j.data : null));

@@ -15,6 +15,7 @@ import { resolveModelProvider, TEXT_SIMULATION_MODELS } from "../lib/ai-models";
 import { UsageContext } from "../lib/ai-usage";
 import { Type } from "@google/genai";
 import { createAdminClient } from "../lib/supabase";
+import { sanitizeAiResponse } from "../lib/ai-sanitize";
 
 const DEFAULT_SCENARIOS: KetikScenario[] = [
   {
@@ -354,51 +355,142 @@ ATURAN BALASAN:
   }
 }
 
+/**
+ * Generate AI review response with Gemini-first + OpenRouter fallback.
+ * Both Gemini and OpenRouter responses use `sanitizeOutput: false` so that
+ * structured JSON is returned raw; the caller sanitizes individual string
+ * fields after parsing.
+ */
+async function generateKetikReviewAiResponse(options: {
+  systemInstruction: string;
+  contents: { role: string; parts: { text: string }[] }[];
+  userId: string;
+}): Promise<{ success: boolean; text?: string; error?: string }> {
+  const usageContext: UsageContext = { module: "ketik", action: "coaching_review" };
+
+  // Try Gemini first
+  try {
+    const geminiResp = await generateGeminiContent({
+      model: "gemini-3.1-flash-lite",
+      systemInstruction: options.systemInstruction,
+      contents: options.contents as any,
+      responseMimeType: "application/json",
+      responseSchema: responseSchema as any,
+      usageContext,
+      userId: options.userId,
+      sanitizeOutput: false,
+    });
+    if (geminiResp.success && geminiResp.text) {
+      return geminiResp;
+    }
+    console.warn("[KETIK Review] Gemini failed, falling back to OpenRouter:", geminiResp.error);
+  } catch (err) {
+    console.warn("[KETIK Review] Gemini exception, falling back to OpenRouter:", err);
+  }
+
+  // Fallback to OpenRouter
+  try {
+    const orResp = await generateOpenRouterContent({
+      model: "openai/gpt-4o-mini",
+      systemInstruction: options.systemInstruction,
+      contents: options.contents,
+      responseMimeType: "application/json",
+      usageContext,
+      userId: options.userId,
+      sanitizeOutput: false,
+    });
+    return orResp;
+  } catch (err) {
+    console.error("[KETIK Review] OpenRouter fallback also failed:", err);
+    return { success: false, error: "AI tidak tersedia dari provider manapun." };
+  }
+}
+
+/**
+ * Sanitize individual string fields of a parsed KETIK review result.
+ * Applied AFTER JSON.parse to avoid corrupting structured output.
+ */
+function sanitizeKetikReviewResult(result: any): void {
+  if (!result || typeof result !== "object") return;
+  if (typeof result.summary === "string") {
+    result.summary = sanitizeAiResponse(result.summary);
+  }
+  if (Array.isArray(result.strengths)) {
+    result.strengths = result.strengths.map((s: any) =>
+      typeof s === "string" ? sanitizeAiResponse(s) : s,
+    );
+  }
+  if (Array.isArray(result.weaknesses)) {
+    result.weaknesses = result.weaknesses.map((w: any) =>
+      typeof w === "string" ? sanitizeAiResponse(w) : w,
+    );
+  }
+  if (Array.isArray(result.coachingFocus)) {
+    result.coachingFocus = result.coachingFocus.map((c: any) =>
+      typeof c === "string" ? sanitizeAiResponse(c) : c,
+    );
+  }
+}
+
 export async function triggerKetikAIReview(
   sessionId: string,
   userId: string,
 ): Promise<any> {
   const adminClient = createAdminClient();
+  let canMarkFailed = false;
 
-  const { data: session, error: sessionError } = await adminClient
-    .from("ketik_history")
-    .select("*")
-    .eq("id", sessionId)
-    .eq("user_id", userId)
-    .single();
+  try {
+    const { data: session, error: sessionError } = await adminClient
+      .from("ketik_history")
+      .select("*")
+      .eq("id", sessionId)
+      .eq("user_id", userId)
+      .single();
 
-  if (sessionError || !session) {
-    console.error(
-      `[triggerKetikAIReview] Session not found or unauthorized: ${sessionId}`,
-    );
-    throw new Error("Session not found or unauthorized");
+    if (sessionError || !session) {
+      console.error(
+        `[triggerKetikAIReview] Session not found or unauthorized: ${sessionId}`,
+      );
+      throw new Error("Session not found or unauthorized");
+    }
+
+    canMarkFailed = true;
+
+    if (session.review_status === "completed") {
+      return { status: "skipped" };
+    }
+
+    const { error: jobError } = await adminClient
+      .from("ketik_review_jobs")
+      .upsert(
+        {
+          session_id: sessionId,
+          status: "queued",
+          lease_owner: null,
+          lease_expires_at: null,
+          error_message: null,
+        },
+        { onConflict: "session_id" },
+      );
+
+    if (jobError) throw jobError;
+
+    await adminClient
+      .from("ketik_history")
+      .update({ review_status: "pending" })
+      .eq("id", sessionId);
+
+    return { status: "queued" };
+  } catch (error) {
+    console.error(`[triggerKetikAIReview] Error for session ${sessionId}:`, error);
+    if (canMarkFailed) {
+      await adminClient
+        .from("ketik_history")
+        .update({ review_status: "failed" })
+        .eq("id", sessionId);
+    }
+    throw error;
   }
-
-  if (session.review_status === "completed") {
-    return { status: "skipped" };
-  }
-
-  const { error: jobError } = await adminClient
-    .from("ketik_review_jobs")
-    .upsert(
-      {
-        session_id: sessionId,
-        status: "queued",
-        lease_owner: null,
-        lease_expires_at: null,
-        error_message: null,
-      },
-      { onConflict: "session_id" },
-    );
-
-  if (jobError) throw jobError;
-
-  await adminClient
-    .from("ketik_history")
-    .update({ review_status: "pending" })
-    .eq("id", sessionId);
-
-  return { status: "queued" };
 }
 
 export async function claimAndProcessKetikReviewJob(
@@ -573,15 +665,11 @@ export async function processKetikReviewJob(
   IMPORTANT: ALL textual response (summary, strengths, weaknesses, coachingFocus) MUST be in Indonesian.
   `;
 
-  const aiResponse = await generateGeminiContent({
-    model: "gemini-3.1-flash-lite",
+  const aiResponse = await generateKetikReviewAiResponse({
     systemInstruction,
     contents: [
       { role: "user", parts: [{ text: `Transcript:\n${transcript}` }] },
     ],
-    responseMimeType: "application/json",
-    responseSchema: responseSchema as any,
-    usageContext: { module: "ketik", action: "coaching_review" },
     userId: session.user_id,
   });
 
@@ -651,6 +739,8 @@ export async function processKetikReviewJob(
     ) {
       throw new Error("Invalid AI response shape after normalization");
     }
+
+    sanitizeKetikReviewResult(reviewResult);
   } catch (error) {
     console.error(
       "[processKetikReviewJob] Failed to parse or normalize AI response:",
@@ -814,6 +904,25 @@ export async function getKetikReviewStatus(
         typo: history.typo_score,
         compliance: history.compliance_score,
       };
+    }
+  }
+
+  // Reconcile with job status when history is not terminal
+  if (status !== "completed" && status !== "failed") {
+    const { data: job } = await adminClient
+      .from("ketik_review_jobs")
+      .select("status")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (job?.status === "failed") {
+      status = "failed";
+      await adminClient
+        .from("ketik_history")
+        .update({ review_status: "failed" })
+        .eq("id", sessionId);
+    } else if (job?.status === "processing" || job?.status === "queued") {
+      status = "processing";
     }
   }
 

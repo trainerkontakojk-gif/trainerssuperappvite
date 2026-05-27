@@ -40,6 +40,8 @@ interface SessionReviewModalProps {
     percent: number;
     etaSeconds: number;
   };
+  canStartReview?: boolean;
+  reviewAccessMessage?: string;
 }
 
 export function SessionReviewModal({
@@ -51,6 +53,8 @@ export function SessionReviewModal({
   onReplay,
   onStartReview,
   progress = { status: "idle", percent: 0, etaSeconds: 0 },
+  canStartReview = true,
+  reviewAccessMessage,
 }: SessionReviewModalProps) {
   const isProcessing =
     session.reviewStatus === "processing" ||
@@ -354,7 +358,7 @@ export function SessionReviewModal({
               ) : (
                 <button
                   onClick={handleAnalyze}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !canStartReview}
                   className="inline-flex h-14 w-full max-w-sm flex-col items-center justify-center gap-1 rounded-2xl bg-primary px-8 text-xs font-black uppercase tracking-widest text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-80 disabled:hover:scale-100 overflow-hidden relative"
                 >
                   {isProcessing ? (
@@ -382,9 +386,11 @@ export function SessionReviewModal({
                     <div className="flex items-center gap-3">
                       <BrainCircuit className="w-5 h-5" />
                       <span>
-                        {session.reviewStatus === "failed"
-                          ? "Jalankan Ulang Analisis"
-                          : "Mulai Analisis"}
+                        {!canStartReview
+                          ? "Tidak Memiliki Akses"
+                          : session.reviewStatus === "failed"
+                            ? "Jalankan Ulang Analisis"
+                            : "Mulai Analisis"}
                       </span>
                     </div>
                   )}
@@ -395,6 +401,12 @@ export function SessionReviewModal({
                 <p className="mt-4 text-[10px] text-muted-foreground animate-pulse">
                   Proses ini memakan waktu lebih lama dari biasanya. Harap
                   tunggu...
+                </p>
+              )}
+
+              {!canStartReview && reviewAccessMessage && (
+                <p className="mt-4 text-[11px] text-orange-500 font-medium text-center">
+                  {reviewAccessMessage}
                 </p>
               )}
             </div>

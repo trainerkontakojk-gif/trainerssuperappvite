@@ -17,6 +17,7 @@ export async function generateOpenRouterContent(options: {
   responseMimeType?: string;
   usageContext?: UsageContext;
   userId?: string;
+  sanitizeOutput?: boolean;
 }): Promise<OpenRouterResponse> {
   try {
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -115,7 +116,9 @@ export async function generateOpenRouterContent(options: {
         error: data.error.message || "Model tidak tersedia.",
       };
 
-    const text = sanitizeAiResponse(data.choices?.[0]?.message?.content || "");
+    const rawContent = data.choices?.[0]?.message?.content || "";
+    const shouldSanitize = options.sanitizeOutput !== false;
+    const text = shouldSanitize ? sanitizeAiResponse(rawContent) : rawContent;
 
     if (options.usageContext && options.userId) {
       const usage = data.usage;

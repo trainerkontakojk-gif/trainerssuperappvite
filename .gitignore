@@ -13,6 +13,7 @@ dist
 
 # ── Editor / OS ──
 .vscode/
+.commandcode/
 .DS_Store
 *.log
 
