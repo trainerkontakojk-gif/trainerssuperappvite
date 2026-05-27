@@ -1,7 +1,13 @@
 import { z } from "zod";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../../../..");
+const envFile = path.join(repoRoot, ".env.local");
 
 try {
-  process.loadEnvFile("../../.env.local");
+  process.loadEnvFile(envFile);
 } catch (_e) {
   // Ignore if file doesn't exist
 }
@@ -13,7 +19,9 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   OPENROUTER_API_KEY: z.string().min(1),
   ALLOWED_ORIGINS: z.string().optional(),
-  NODE_ENV: z.enum(["development", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
 });
 
 const parsed = envSchema.safeParse(process.env);

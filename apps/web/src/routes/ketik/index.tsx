@@ -582,6 +582,10 @@ export default function KetikLanding() {
               handleViewReview(updatedSession);
             } else if (updatedStatus === "failed") {
               setReviewProgress((prev) => ({ ...prev, status: "failed" }));
+              notify.error(
+                data.errorMessage ||
+                  "Analisis AI gagal diproses. Silakan jalankan ulang.",
+              );
             }
           }
         } catch (e) {

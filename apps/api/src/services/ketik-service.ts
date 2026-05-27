@@ -17,6 +17,16 @@ import { Type } from "@google/genai";
 import { createAdminClient } from "../lib/supabase";
 import { sanitizeAiResponse } from "../lib/ai-sanitize";
 
+export function extractJsonObjectText(raw: string): string {
+  const trimmed = raw.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start < 0 || end <= start) return candidate;
+  return candidate.slice(start, end + 1);
+}
+
 const DEFAULT_SCENARIOS: KetikScenario[] = [
   {
     id: "pinjol",
@@ -679,7 +689,7 @@ export async function processKetikReviewJob(
 
   let reviewResult: any;
   try {
-    reviewResult = JSON.parse(aiResponse.text);
+    reviewResult = JSON.parse(extractJsonObjectText(aiResponse.text));
 
     const clamp = (val: any) => {
       const num = Number(val);
@@ -876,6 +886,7 @@ export async function getKetikReviewStatus(
   let status = history.review_status || "pending";
   let resultReady = false;
   let scores = null;
+  let errorMessage: string | undefined = undefined;
 
   if (status === "completed") {
     // Auto-heal check: verify review row actually exists
@@ -887,13 +898,14 @@ export async function getKetikReviewStatus(
 
     if (!review || reviewError) {
       status = "failed";
+      errorMessage = "Hasil analisis tidak ditemukan. Silakan jalankan ulang.";
       await adminClient
         .from("ketik_history")
         .update({ review_status: "failed" })
         .eq("id", sessionId);
       await adminClient
         .from("ketik_review_jobs")
-        .update({ status: "failed" })
+        .update({ status: "failed", error_message: errorMessage })
         .eq("session_id", sessionId);
     } else {
       resultReady = true;
@@ -918,12 +930,14 @@ export async function getKetikReviewStatus(
     if (!job) {
       // No job at all — mark failed so UI can retry
       status = "failed";
+      errorMessage = "Pekerjaan analisis tidak ditemukan. Silakan jalankan ulang.";
       await adminClient
         .from("ketik_history")
         .update({ review_status: "failed" })
         .eq("id", sessionId);
     } else if (job.status === "failed") {
       status = "failed";
+      errorMessage = job.error_message || "Analisis AI gagal diproses. Silakan jalankan ulang.";
       await adminClient
         .from("ketik_history")
         .update({ review_status: "failed" })
@@ -938,6 +952,7 @@ export async function getKetikReviewStatus(
       if (leaseExpired) {
         // Stale processing — mark failed to enable retry
         status = "failed";
+        errorMessage = "Analisis AI melebihi batas waktu. Silakan jalankan ulang.";
         await adminClient
           .from("ketik_review_jobs")
           .update({
@@ -960,6 +975,7 @@ export async function getKetikReviewStatus(
         new Date().getTime() - new Date(job.updated_at).getTime() > queueTTL
       ) {
         status = "failed";
+        errorMessage = "Analisis AI terlalu lama mengantre. Silakan jalankan ulang.";
         await adminClient
           .from("ketik_review_jobs")
           .update({
@@ -982,7 +998,7 @@ export async function getKetikReviewStatus(
     status = "processing";
   }
 
-  return { status, resultReady, scores };
+  return { status, resultReady, scores, errorMessage };
 }
 
 const coerceKetikModelId = (modelId?: string) =>

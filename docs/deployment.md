@@ -134,6 +134,22 @@ Ekspektasi: `web, api, and telefun health return HTTP 200` and `All health check
 
 ## Development (Local)
 
+### Env Bootstrap (API)
+
+API (`apps/api`) me-load `.env.local` dari **repo root** menggunakan path absolut yang diresolve dari lokasi modul (`import.meta.url`), bukan dari `process.cwd()`. Ini mencegah load dari lokasi yang salah (sebelumnya: `../../.env.local` yang dari cwd resolve ke `/Users/<user>/.env.local`).
+
+```ts
+// apps/api/src/lib/env.ts
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../../..");
+const envFile = path.join(repoRoot, ".env.local");
+process.loadEnvFile(envFile);
+```
+
+Import order di `apps/api/src/index.ts`: `env` di-import SEBELUM `app`, sehingga Supabase client (`supabase.ts`) yang dibuat di top-level sudah dapat env yang sudah tervalidasi.
+
+Supabase client (`apps/api/src/lib/supabase.ts`) menggunakan nilai dari modul `env`, **bukan** langsung dari `process.env` dengan fallback string kosong. Jika env hilang, API akan exit dengan kode 1 dan pesan error yang jelas.
+
 ### Root `.env.local`
 
 ```env
@@ -164,6 +180,50 @@ pnpm install
 pnpm dev          # Semua 3 service paralel
 pnpm build        # Build semua
 pnpm test         # Vitest
+```
+
+### Localhost Debug Checklist (KETIK AI Review)
+
+Jika "Mulai Analisis" KETIK gagal di localhost dengan status `failed`:
+
+```bash
+# 1. Pastikan API membaca .env.local dari repo root
+pnpm --filter @trainers/api dev
+# Harus muncul: [API] Supabase client initialized for project <ref>
+
+# 2. Cek health endpoint
+curl http://localhost:3001/api/health
+# Ekspektasi: {"status":"ok"}
+
+# 3. Cek log API saat review dijalankan
+# Ekspektasi log sequence:
+# [KETIK Review] session=<id> status=<...> action=<claim|retry|...>
+# [KETIK Review] session=<id> action=process result=<completed|failed> [error=...]
+
+# 4. Jika error "AI response JSON tidak valid atau format tidak sesuai."
+#  -> Provider mengembalikan format bukan plain JSON
+#  -> Parser extractJsonObjectText() di ketik-service.ts handle fenced JSON
+#  -> Cek raw aiResponse.text untuk diagnosis lebih lanjut
+
+# 5. Jika error "AI tidak tersedia dari provider manapun."
+#  -> Cek GEMINI_API_KEY dan OPENROUTER_API_KEY di .env.local
+#  -> Verifikasi dengan curl ke endpoint AI provider
+
+# 6. Jika review stuck "processing" lebih dari 5 menit
+#  -> Polling akan auto-mark failed (lease timeout + 30s grace)
+#  -> Klik "Jalankan Ulang Analisis" untuk retry
+```
+
+### Test Commands (KETIK Specific)
+
+### Test Commands (KETIK Specific)
+
+```bash
+pnpm --filter @trainers/api test -- ketik                     # Semua KETIK tests (service + route + worker + parser)
+pnpm --filter @trainers/api test -- ketik-review-route        # Route E2E (Hono app.request)
+pnpm --filter @trainers/api test -- ketik-review-ai-parser    # JSON extraction helper
+pnpm --filter @trainers/api test -- api-env-bootstrap         # Env load path + supabase client
+pnpm --filter @trainers/web test -- ketik                     # KETIK landing page
 ```
 
 ## Supabase Migrations

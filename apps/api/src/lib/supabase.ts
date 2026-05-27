@@ -1,19 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
+import { env } from "./env";
 
-// Note: Ensure process.env access is correct for your environment
-const supabaseUrl =
-  process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+export const supabaseAdmin = createClient(
+  env.VITE_SUPABASE_URL,
+  env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+console.log(
+  `[API] Supabase client initialized for project ${new URL(env.VITE_SUPABASE_URL).hostname.split(".")[0]}`,
+);
 
 export function createAdminClient() {
   return supabaseAdmin;
 }
 
 export function createUserClient(token: string) {
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || token;
-  return createClient(supabaseUrl, anonKey, {
+  return createClient(env.VITE_SUPABASE_URL, token, {
     global: {
       headers: {
         Authorization: `Bearer ${token}`,
