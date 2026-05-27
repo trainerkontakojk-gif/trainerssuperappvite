@@ -243,6 +243,7 @@ ketik.post(
     const body = c.req.valid("json");
     const user = c.get("user");
     const adminClient = createAdminClient();
+    const nowIso = new Date().toISOString();
 
     try {
       // 1. Verify session ownership
@@ -266,10 +267,10 @@ ketik.post(
         );
       }
 
-      // 2. Check existing job state (legacy parity)
+      // 2. Check existing job state with lease info (legacy parity)
       const { data: existingJob } = await adminClient
         .from("ketik_review_jobs")
-        .select("status")
+        .select("status, lease_owner, lease_expires_at, attempt_count, error_message")
         .eq("session_id", body.sessionId)
         .maybeSingle();
 
@@ -280,34 +281,44 @@ ketik.post(
             .update({ review_status: "completed" })
             .eq("id", body.sessionId);
         }
+        console.log(`[KETIK Review] session=${body.sessionId} status=completed action=skip`);
         return c.json({
           success: true,
           data: { status: "completed" },
         });
       }
 
+      // For processing: check if lease is still active
       if (existingJob?.status === "processing") {
-        if (session.review_status !== "processing") {
-          await adminClient
-            .from("ketik_history")
-            .update({ review_status: "processing" })
-            .eq("id", body.sessionId);
+        const leaseExpired =
+          existingJob.lease_expires_at &&
+          existingJob.lease_expires_at < nowIso;
+        if (!leaseExpired) {
+          // Active lease — let the existing worker finish
+          if (session.review_status !== "processing") {
+            await adminClient
+              .from("ketik_history")
+              .update({ review_status: "processing" })
+              .eq("id", body.sessionId);
+          }
+          console.log(`[KETIK Review] session=${body.sessionId} status=processing action=skip_active_lease`);
+          return c.json({
+            success: true,
+            data: { status: "processing" },
+          });
         }
-        return c.json({
-          success: true,
-          data: { status: "processing" },
-        });
+        // Expired lease — reclaim by falling through to processing
+        console.log(`[KETIK Review] session=${body.sessionId} status=processing action=reclaim_expired_lease`);
       }
 
+      // For queued: fall through to claim/process directly
       if (existingJob?.status === "queued") {
-        return c.json({
-          success: true,
-          data: { status: "processing" },
-        });
+        console.log(`[KETIK Review] session=${body.sessionId} status=queued action=claim`);
       }
 
+      // For failed: reset job for retry
       if (existingJob?.status === "failed") {
-        // Reset failed job for retry
+        console.log(`[KETIK Review] session=${body.sessionId} status=failed action=retry`);
         await adminClient
           .from("ketik_review_jobs")
           .update({
@@ -320,7 +331,15 @@ ketik.post(
       }
 
       // 3. Trigger review (handles missing job + enqueue)
-      await ketikService.triggerKetikAIReview(body.sessionId, user.id);
+      const triggerResult = await ketikService.triggerKetikAIReview(body.sessionId, user.id);
+
+      if (triggerResult?.status === "skipped") {
+        console.log(`[KETIK Review] session=${body.sessionId} action=skipped`);
+        return c.json({
+          success: true,
+          data: { status: "completed" },
+        });
+      }
 
       // 4. Update history to processing so polling doesn't stick on pending
       await adminClient
@@ -328,24 +347,23 @@ ketik.post(
         .update({ review_status: "processing" })
         .eq("id", body.sessionId);
 
-      // 5. Process (fire-and-forget with waitUntil if available)
-      const processPromise = ketikService.claimAndProcessKetikReviewJob(
+      // 5. Process synchronously (legacy parity — await completion)
+      const processResult = await ketikService.claimAndProcessKetikReviewJob(
         body.sessionId,
         body.workerId || "immediate-web",
       );
-      if (c.executionCtx?.waitUntil) {
-        c.executionCtx.waitUntil(processPromise);
-      } else {
-        processPromise.catch((err) =>
-          console.error("[KETIK Immediate Process Error]", err),
-        );
-      }
+
+      console.log(`[KETIK Review] session=${body.sessionId} action=process result=${processResult.status}${processResult.error ? ` error=${processResult.error}` : ""}`);
 
       return c.json({
         success: true,
-        data: { status: "processing" },
+        data: {
+          status: processResult.status,
+          error: processResult.error || undefined,
+        },
       });
     } catch (err: any) {
+      console.error(`[KETIK Review] session=${body.sessionId} action=error error=${err.message}`);
       return c.json(
         {
           success: false,

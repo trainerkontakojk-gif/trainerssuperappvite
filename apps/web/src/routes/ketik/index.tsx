@@ -105,6 +105,7 @@ export default function KetikLanding() {
 
   const sessionBaselineRef = useRef<any>(null);
   const sessionRunIdRef = useRef(0);
+  const reviewStartedAtRef = useRef<number>(0);
 
   useEffect(() => {
     const init = async () => {
@@ -153,15 +154,41 @@ export default function KetikLanding() {
     }
   };
 
+  const POLLING_TIMEOUT_SECONDS = 120;
+
   const handleStartManualReview = async (sessionId: string) => {
+    reviewStartedAtRef.current = Date.now();
     try {
       setReviewProgress({ status: "starting", percent: 5, etaSeconds: 30 });
-      await ketikApi.startReview(sessionId);
+      const result = await ketikApi.startReview(sessionId);
 
       if (
         selectedSessionForReview &&
         selectedSessionForReview.id === sessionId
       ) {
+        const returnedStatus = result?.status;
+        if (returnedStatus === "completed") {
+          handleViewReview({
+            ...selectedSessionForReview,
+            reviewStatus: "completed" as const,
+          });
+          return;
+        }
+
+        if (returnedStatus === "failed") {
+          setReviewProgress((prev) => ({ ...prev, status: "failed" }));
+          notify.error(result?.error || "Analisis AI gagal. Silakan coba lagi.");
+          const failedSession = {
+            ...selectedSessionForReview,
+            reviewStatus: "failed" as const,
+          };
+          setSelectedSessionForReview(failedSession);
+          setHistory((prev) =>
+            prev.map((item) => (item.id === sessionId ? failedSession : item)),
+          );
+          return;
+        }
+
         const updatedSession = {
           ...selectedSessionForReview,
           reviewStatus: "processing" as const,
@@ -498,6 +525,33 @@ export default function KetikLanding() {
 
       const poll = async () => {
         try {
+          // Polling timeout guard
+          if (
+            reviewStartedAtRef.current > 0 &&
+            Date.now() - reviewStartedAtRef.current >
+              POLLING_TIMEOUT_SECONDS * 1000
+          ) {
+            console.warn(
+              `[Ketik] Polling timeout after ${POLLING_TIMEOUT_SECONDS}s for session ${currentSessionId}`,
+            );
+            setReviewProgress((prev) => ({ ...prev, status: "failed" }));
+            const staleSession = {
+              ...selectedSessionForReview,
+              reviewStatus: "failed" as const,
+            };
+            setSelectedSessionForReview(staleSession);
+            setHistory(
+              (prev) =>
+                prev.map((item) =>
+                  item.id === staleSession.id ? staleSession : item,
+                ) as KetikSessionHistoryItem[],
+            );
+            notify.warning(
+              "Analisis AI melebihi batas waktu. Silakan coba lagi.",
+            );
+            return;
+          }
+
           const data = await ketikApi.getReviewStatus(currentSessionId);
           if (selectedSessionForReview?.id !== currentSessionId) return;
 

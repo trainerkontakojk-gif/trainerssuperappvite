@@ -47,6 +47,7 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Provider fallback**: Review AI mencoba Gemini terlebih dahulu, lalu fallback ke OpenRouter (`openai/gpt-4o-mini`) jika Gemini gagal atau key tidak tersedia.
   - **Role restriction**: Hanya role `admin`, `trainer`, dan `qa` yang dapat menjalankan analisis AI. Role lain melihat tombol disabled dengan pesan akses.
   - **Sanitizer safety**: Structured JSON response tidak disanitasi sebelum parsing. Sanitasi hanya diterapkan ke field string setelah parse untuk mencegah corrupt JSON.
+  - **Review lifecycle**: `POST /ketik/review` memproses job secara sinkron (await claimAndProcess). Job `queued` dan job `processing` dengan lease expired langsung di-reclaim. Job `failed` di-reset ke `queued` sebelum retry. Frontend polling memiliki timeout 120s — jika tidak mencapai terminal state, UI forced ke `failed` dengan tombol retry. Status reconciliation di `getKetikReviewStatus()` menandai stale processing (lease +30s grace) dan stale queue (5 menit TTL) sebagai `failed`.
 
 ## 3. PDKT (Paham Dulu Kasih Tanggapan)
 

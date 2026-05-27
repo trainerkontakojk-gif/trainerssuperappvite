@@ -911,18 +911,69 @@ export async function getKetikReviewStatus(
   if (status !== "completed" && status !== "failed") {
     const { data: job } = await adminClient
       .from("ketik_review_jobs")
-      .select("status")
+      .select("status, lease_expires_at, error_message, updated_at")
       .eq("session_id", sessionId)
       .maybeSingle();
 
-    if (job?.status === "failed") {
+    if (!job) {
+      // No job at all — mark failed so UI can retry
       status = "failed";
       await adminClient
         .from("ketik_history")
         .update({ review_status: "failed" })
         .eq("id", sessionId);
-    } else if (job?.status === "processing" || job?.status === "queued") {
-      status = "processing";
+    } else if (job.status === "failed") {
+      status = "failed";
+      await adminClient
+        .from("ketik_history")
+        .update({ review_status: "failed" })
+        .eq("id", sessionId);
+    } else if (job.status === "processing") {
+      // Check if lease has expired (with 30s grace period)
+      const gracePeriodMs = 30_000;
+      const now = new Date();
+      const leaseExpired =
+        job.lease_expires_at &&
+        new Date(job.lease_expires_at).getTime() + gracePeriodMs < now.getTime();
+      if (leaseExpired) {
+        // Stale processing — mark failed to enable retry
+        status = "failed";
+        await adminClient
+          .from("ketik_review_jobs")
+          .update({
+            status: "failed",
+            error_message: "Processing timeout — lease expired",
+          })
+          .eq("session_id", sessionId);
+        await adminClient
+          .from("ketik_history")
+          .update({ review_status: "failed" })
+          .eq("id", sessionId);
+      } else {
+        status = "processing";
+      }
+    } else if (job.status === "queued") {
+      // Check if queued too long (5 min TTL)
+      const queueTTL = 5 * 60 * 1000;
+      if (
+        job.updated_at &&
+        new Date().getTime() - new Date(job.updated_at).getTime() > queueTTL
+      ) {
+        status = "failed";
+        await adminClient
+          .from("ketik_review_jobs")
+          .update({
+            status: "failed",
+            error_message: "Queue timeout — no worker picked up the job",
+          })
+          .eq("session_id", sessionId);
+        await adminClient
+          .from("ketik_history")
+          .update({ review_status: "failed" })
+          .eq("id", sessionId);
+      } else {
+        status = "processing";
+      }
     }
   }
 
