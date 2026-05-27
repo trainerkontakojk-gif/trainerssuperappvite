@@ -39,6 +39,11 @@ Hardening PDKT mailbox error handling across the stack and fixing API env bootst
 | `apps/web/src/routes/pdkt/simulation.tsx` | Error state UI, retry button, better notifications, warnings |
 | `apps/web/src/__tests__/pdkt-mailbox.test.tsx` | 5 error state regression tests |
 
+### Post-Commit Fix: Hono Variables Generic
+
+- Added explicit `Hono<{ Variables: { user: any; profile: any } }>` generic to app instance in `pdkt-reply-route.test.ts` to fix TypeScript type checking
+- File: `apps/api/src/__tests__/pdkt-reply-route.test.ts` (2 insertions, 2 deletions)
+
 ## Test Coverage
 
 - **5 new frontend tests** — Error state rendering, retry button refetch, loading state absence, 2 pre-existing tests unchanged

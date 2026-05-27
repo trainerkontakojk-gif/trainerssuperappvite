@@ -61,11 +61,11 @@ vi.mock("../lib/pdkt-settings", () => ({
   }),
 }));
 
-let app: Hono;
+let app: Hono<{ Variables: { user: any; profile: any } }>;
 
 async function createAuthenticatedApp(role = "trainer") {
   const { pdkt: pdktRoute } = await import("../routes/pdkt");
-  app = new Hono().basePath("/api");
+  app = new Hono<{ Variables: { user: any; profile: any } }>().basePath("/api");
   app.use("/v1/*", async (c, next) => {
     c.set("user", {
       id: "test-user-id",
