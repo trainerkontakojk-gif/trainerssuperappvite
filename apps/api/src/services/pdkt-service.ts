@@ -712,7 +712,15 @@ export async function fetchMailboxItems(supabaseClient: any, userId: string) {
     .neq("status", "deleted")
     .order("last_activity_at", { ascending: false });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Gagal mengambil data mailbox.");
+
+  if (!data || data.length === 0) {
+    console.warn(
+      "[PDKT] Empty mailbox for user:", userId,
+      "- verify RLS policies, user_id mismatch, or data existence",
+    );
+  }
+
   return data;
 }
 
@@ -743,7 +751,7 @@ export async function createMailboxItem(
     },
   );
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Gagal membuat item mailbox.");
   return data;
 }
 
@@ -758,7 +766,7 @@ export async function softDeleteMailboxItem(
     .eq("id", id)
     .eq("user_id", userId);
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Gagal menghapus item mailbox.");
   return data;
 }
 
@@ -779,8 +787,7 @@ export async function submitMailboxReply(
     },
   );
 
-  if (error) throw error;
-
+  if (error) throw new Error(error.message || "Gagal mengirim balasan mailbox.");
   return historyId;
 }
 

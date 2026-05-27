@@ -15,7 +15,7 @@ export function createAdminClient() {
 }
 
 export function createUserClient(token: string) {
-  return createClient(env.VITE_SUPABASE_URL, token, {
+  return createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
     global: {
       headers: {
         Authorization: `Bearer ${token}`,

@@ -62,6 +62,77 @@ describe("PDKT Mailbox UX", () => {
     expect(await screen.findByText("Sender One")).toBeDefined();
     expect(screen.getAllByText("Subject One").length).toBeGreaterThan(0);
   });
+
+  it("shows error state when API returns error", async () => {
+    (useApiModule.useApi as any).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Anda tidak memiliki akses ke resource ini.",
+      refetch: vi.fn(),
+    });
+
+    const rootRoute = createRootRoute();
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: PdktSimulation,
+    });
+    const routeTree = rootRoute.addChildren([indexRoute]);
+    const router = createRouter({ routeTree });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("Gagal Memuat Email")).toBeDefined();
+    expect(
+      screen.getByText("Anda tidak memiliki akses ke resource ini."),
+    ).toBeDefined();
+    expect(screen.getByText("Coba Lagi")).toBeDefined();
+  });
+
+  it("calls refetch when retry button is clicked", async () => {
+    const refetchMock = vi.fn();
+    (useApiModule.useApi as any).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Network error",
+      refetch: refetchMock,
+    });
+
+    const rootRoute = createRootRoute();
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: PdktSimulation,
+    });
+    const routeTree = rootRoute.addChildren([indexRoute]);
+    const router = createRouter({ routeTree });
+    render(<RouterProvider router={router} />);
+
+    const retryBtn = await screen.findByText("Coba Lagi");
+    fireEvent.click(retryBtn);
+    expect(refetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show error state while loading", () => {
+    (useApiModule.useApi as any).mockReturnValue({
+      data: null,
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const rootRoute = createRootRoute();
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: PdktSimulation,
+    });
+    const routeTree = rootRoute.addChildren([indexRoute]);
+    const router = createRouter({ routeTree });
+    render(<RouterProvider router={router} />);
+
+    expect(screen.queryByText("Gagal Memuat Email")).toBeNull();
+    expect(document.querySelector(".animate-spin")).toBeDefined();
+  });
 });
 
 describe("EmailDetailPane Component", () => {

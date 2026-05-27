@@ -17,15 +17,24 @@ import { createUserClient, createAdminClient } from "../lib/supabase";
 type Variables = { user: User; profile: any };
 
 function pdktErrorMessage(err: unknown): string {
-  if (!(err instanceof Error)) return "Terjadi kesalahan yang tidak diketahui.";
-  const msg = err.message.toLowerCase();
+  const message = typeof err === "string"
+    ? err
+    : (err instanceof Error)
+      ? err.message
+      : (err && typeof err === "object" && "message" in err)
+        ? String((err as any).message)
+        : null;
+
+  if (!message) return "Terjadi kesalahan yang tidak diketahui.";
+
+  const msg = message.toLowerCase();
   if (msg.includes("duplicate key") || msg.includes("unique constraint"))
     return "Data sudah ada, tidak dapat membuat duplikat.";
   if (msg.includes("foreign key") || msg.includes("violates foreign key"))
     return "Data terkait tidak ditemukan atau rusak.";
   if (msg.includes("jwt expired") || msg.includes("token")) return "Sesi Anda telah berakhir. Silakan login kembali.";
   if (msg.includes("permission") || msg.includes("policy")) return "Anda tidak memiliki izin untuk melakukan tindakan ini.";
-  return err.message || "Terjadi kesalahan saat menghubungi database.";
+  return message;
 }
 
 const pdkt = new Hono<{ Variables: Variables }>();
@@ -175,8 +184,8 @@ pdkt.get(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {
@@ -203,8 +212,8 @@ pdkt.post(
   zValidator("json", pdktMailboxBatchSchema),
   async (c) => {
     const body = c.req.valid("json");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {
@@ -231,8 +240,8 @@ pdkt.delete(
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {
@@ -260,18 +269,25 @@ pdkt.post(
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {
       const historyId = await pdktService.submitMailboxReply(userClient, body);
 
-      // Process evaluation in background
+      // Process evaluation in background (fire-and-forget, graceful on test context)
       const evalPromise = pdktService.processPdktEvaluation(historyId, user.id);
-      if (c.executionCtx?.waitUntil) {
-        c.executionCtx.waitUntil(evalPromise);
-      } else {
+      try {
+        if (c.executionCtx?.waitUntil) {
+          c.executionCtx.waitUntil(evalPromise);
+        } else {
+          evalPromise.catch((err) =>
+            console.error("[PDKT Async Eval Error]", err),
+          );
+        }
+      } catch (_execCtxErr) {
+        // No ExecutionContext (e.g. app.request() in tests) — silently ignore
         evalPromise.catch((err) =>
           console.error("[PDKT Async Eval Error]", err),
         );
@@ -279,6 +295,13 @@ pdkt.post(
 
       return c.json({ success: true, data: { historyId } });
     } catch (error: any) {
+      console.error("[PDKT /mailbox/reply] Raw error:", error);
+      console.error("[PDKT /mailbox/reply] Error detail:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
       return c.json(
         {
           success: false,
@@ -299,8 +322,8 @@ pdkt.get(
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {
@@ -358,8 +381,8 @@ pdkt.post(
       }
 
       const user = c.get("user");
-      const authHeader = c.req.header("Authorization");
-      const token = authHeader!.split(" ")[1];
+      const authHeader = c.req.header("Authorization") || "";
+      const token = (authHeader.split(" ")[1]) || "";
       const userClient = createUserClient(token);
 
       // Verify ownership
@@ -384,9 +407,15 @@ pdkt.post(
       }
 
       const evalPromise = pdktService.processPdktEvaluation(historyId, user.id);
-      if (c.executionCtx?.waitUntil) {
-        c.executionCtx.waitUntil(evalPromise);
-      } else {
+      try {
+        if (c.executionCtx?.waitUntil) {
+          c.executionCtx.waitUntil(evalPromise);
+        } else {
+          evalPromise.catch((err) =>
+            console.error("[PDKT Async Eval Retry Error]", err),
+          );
+        }
+      } catch (_execCtxErr) {
         evalPromise.catch((err) =>
           console.error("[PDKT Async Eval Retry Error]", err),
         );
@@ -413,8 +442,8 @@ pdkt.get(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {
@@ -450,8 +479,8 @@ pdkt.post(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
     const body = await c.req.json();
 
@@ -505,8 +534,8 @@ pdkt.get(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
-    const authHeader = c.req.header("Authorization");
-    const token = authHeader!.split(" ")[1];
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
     const userClient = createUserClient(token);
 
     try {

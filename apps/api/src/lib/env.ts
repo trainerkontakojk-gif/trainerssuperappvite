@@ -15,7 +15,9 @@ try {
 const envSchema = z.object({
   PORT: z.string().default("3001").transform(Number),
   VITE_SUPABASE_URL: z.string().url(),
+  VITE_SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_ANON_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
   OPENROUTER_API_KEY: z.string().min(1),
   ALLOWED_ORIGINS: z.string().optional(),

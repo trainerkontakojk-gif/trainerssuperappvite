@@ -10,6 +10,8 @@ describe("API Env Bootstrap", () => {
     vi.resetModules();
     process.env = { ...originalEnv };
     process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
+    process.env.VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
+    process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     process.env.GEMINI_API_KEY = "test-gemini-key";
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
@@ -45,6 +47,8 @@ describe("API Env Bootstrap", () => {
     process.loadEnvFile = loadEnvFileSpy;
 
     process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
+    process.env.VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
+    process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     process.env.GEMINI_API_KEY = "test-gemini-key";
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
@@ -58,6 +62,8 @@ describe("API Env Bootstrap", () => {
     }) as any);
 
     delete process.env.VITE_SUPABASE_URL;
+    delete process.env.VITE_SUPABASE_ANON_KEY;
+    delete process.env.SUPABASE_ANON_KEY;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
@@ -80,6 +86,8 @@ describe("Supabase Client Bootstrap", () => {
     vi.resetModules();
     process.env = { ...originalEnv };
     process.env.VITE_SUPABASE_URL = "https://test.supabase.co";
+    process.env.VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
+    process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     process.env.GEMINI_API_KEY = "test-gemini-key";
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";

@@ -14,7 +14,7 @@ import type {
   PdktIdentity,
 } from "@trainers/types";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Plus, ArrowLeft } from "lucide-react";
+import { Loader2, Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
 import { notify } from "../../lib/toast";
 import {
   type PdktAppSettings,
@@ -480,6 +480,13 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
       );
 
       // 2. Build Config
+      if (!defaultScenarios || defaultScenarios.length === 0) {
+        console.warn("[PDKT] Scenarios list empty/not loaded. CreateEmailModal may show no scenarios.");
+      }
+      if (!defaultConsumerTypesFromApi) {
+        console.warn("[PDKT] Consumer types not loaded from API. Using hardcoded defaults.");
+      }
+
       const currentSettings: PdktAppSettings = settings || {
         scenarios: defaultScenarios || [],
         consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
@@ -589,10 +596,12 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
       });
 
       await refetch();
-      await fetchHistory(); // reload evaluation status in history
+      await fetchHistory();
       setIsReplyOpen(false);
-    } catch (err) {
-      notify.error("Gagal mengirim balasan.");
+      notify.success("Balasan terkirim! Evaluasi AI sedang berjalan.");
+    } catch (err: any) {
+      console.error("[PDKT] Reply error:", err);
+      notify.error(err?.message || "Gagal mengirim balasan.");
       setSessionDeltaPending(false);
     } finally {
       setIsReplying(false);
@@ -643,6 +652,33 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
     return (
       <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="w-8 h-8 text-sky-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error && !mailboxItems) {
+    return (
+      <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 max-w-md text-center px-6">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+            <AlertCircle className="w-7 h-7 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-800 mb-1">
+              Gagal Memuat Email
+            </p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {error}
+            </p>
+          </div>
+          <button
+            onClick={refetch}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-bold hover:bg-sky-700 transition-all shadow-sm"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Coba Lagi
+          </button>
+        </div>
       </div>
     );
   }

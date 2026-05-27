@@ -154,8 +154,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 ## Environment Variables
 
-- **Frontend (`apps/web`)**: Menggunakan prefix `VITE_` (e.g., `VITE_SUPABASE_URL`, `VITE_TELEFUN_WS_URL`).
-- **Backend (`apps/api`)**: Menggunakan variabel langsung (e.g., `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`).
+- **Frontend (`apps/web`)**: Menggunakan prefix `VITE_` (e.g., `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_TELEFUN_WS_URL`).
+- **Backend (`apps/api`)**: Menggunakan variabel langsung (e.g., `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `GEMINI_API_KEY`).
 - **Telefun Server (`apps/telefun`)**: Menggunakan variabel langsung (e.g., `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`).
 - **MCP / Tools**: `CONTEXT7_API_KEY` disimpan di `.env.local` untuk context7 MCP server.
 - File `.env.local` di root diabaikan oleh git, tapi isinya harus disinkronkan ke masing-masing apps jika diperlukan (atau load dari root).
@@ -210,7 +210,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 46. Telefun V2 End-Call Lifecycle & Finalizer Hardening — introduced normalizing state, guarded premature unmounting, automated session fallback creation, handled granular upload failures, added 18 unit tests (DONE)
 47. Telefun Call UI Parity, Replay Seek/Retry, dan Prompt Perilaku Legacy (Final Audit) — Full system instruction parity (emotion branching, KONSISTENSI SUARA, ATURAN ROLEPLAY, expanded ATURAN BICARA), ringtone+hold music+hold timer, volume segments+avatar upgrade+per-state status card+circular controls, dead air/interruption/stalled watchdog hardening, AI annotation generation endpoint, 19 prompt builder tests (DONE)
 48. KETIK Legacy Parity Upgrade — 3-tier time instruction (near end/wrap up/still long) via SessionTimingContext, strictScriptMode for OpenRouter with scenario scripts, allowSolutionAcknowledgement timeout guard (11 instructional cues + 7 action verbs), timing data passthrough from frontend to backend (DONE)
-49. PDKT Legacy Parity Hardening — Settings contract alignment ({success,data}), access matrix role lock (trainer/qa/admin), history replay without active mailbox, client_request_id idempotency, bounded usage delta retry, human-friendly error mapping, DUMMY_PROFILES 5→20 + city randomization, coercion robustness (writingStyle + consumerNameMention), legacy script migration, test uplift 27+14 tests (DONE)
+49. PDKT Legacy Parity Hardening — Settings contract alignment ({success,data}), access matrix role lock (admin/trainer/leader/tl/spv/om/agent), history replay without active mailbox, client_request_id idempotency, bounded usage delta retry, human-friendly error mapping, DUMMY_PROFILES 5→20 + city randomization, coercion robustness (writingStyle + consumerNameMention), legacy script migration, test uplift 27+14 tests (DONE)
 50. Railway Login Non-Admin E2E Fix — Backend auth middleware hardened (is_deleted check, legacy status normalization via normalizeAuthProfileStatus, differentiated error codes: ACCOUNT_DELETED/ACCOUNT_PENDING/ACCOUNT_INACTIVE/PROFILE_NOT_FOUND/PROFILE_ERROR), .single() → .maybeSingle() for defensive null handling, CORS warning log when ALLOWED_ORIGINS empty in production, frontend fetchApi HTML response detection for SPA fallback errors, 18 API + 3 web regression tests (DONE)
 51. Auth Login, Reset Redirect & Approval Guard Hardening — Added `qa` to type unions (UserProfile, ManagedUser), CSRF header (`X-Requested-With`) + 401 interception with auto-redirect in fetchApi, beforeLoad guards for `/reset-password` (blocks non-recovery access) and `/waiting-approval` (redirects active users), optimized waiting-approval double query polling, client-side password complexity validation (min 8 chars, 1 uppercase, 1 digit), 27 regression tests across 3 test files (DONE)
 52. Approval Leader KTP & SIDAK Scope Hardening — KTP/Profiler backend scope filtering (new `getAccessiblePesertaIds()` in profiler-service.ts, parity with SIDAK's `getAccessibleAgentIds()`), scope injection at 5 GET endpoints (peserta, counts, global-pool, batch, by-id), new `GET /v1/me/access-status` API endpoint, frontend `LeaderAccessGate` component with submit-request flow via RLS INSERT, integration in KTP/SIDAK landing pages, 18 API + 11 web regression tests (DONE)
@@ -227,8 +227,10 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 63. **SIDAK Sesi Tanpa Temuan Legacy Parity** — Added "Sesi Tanpa Temuan" (phantom padding) feature for SIDAK Input. Users with trainer/admin role can create 5 phantom sessions (nilai=3, is_phantom_padding=true) when agent has no bad findings (nilai < 3). New `POST /temuan/perfect-session` API endpoint with RBAC guard, duplicate batch protection, rule version resolution, activity logging, and dashboard summary refresh. Frontend green button "Sesi Tanpa Temuan" with hasBadFindings guard (disabled → "Sudah Ada Temuan"), hidden when form/import active or role===leader. 4 API + 7 web regression tests. 415 API + 394 web tests passing. (DONE)
 64. **SIDAK Ranking Month Filter Fix** — Fixed bug where monthly Agent Ranking filter showed YTD historical findings instead of filtering strictly by the selected month. Passed `period_ids` (and conditionally set `year` to undefined for all-time selections) from Hono route `/ranking` to `getDashboardData()`. Added 4 API integration tests in `sidak-ranking-route.test.ts`. 423 API + 394 web tests passing. (DONE)
 65. **SIDAK YTD & Monthly Agent Ranking Change Indicator** — Added rank position change indicators to the Agent Ranking page for both YTD and Monthly selections. Compares current ranking with previous ranking (preceding YTD or preceding month) to calculate `rankChange` (+X/-X index shift). Renders red upward arrows (`▲ +X`) for rank increases (higher defects, worse performance), green downward arrows (`▼ -X`) for rank decreases (fewer defects, better performance), and blue badges (`Baru`) for new agents evaluated in the period. Added optional `limit` parameter to `getDashboardData()`, implemented rank shift calculations, updated types, added integration tests, removed top 20 limit constraint, and added a dynamic context subtitle `"Sebelumnya Posisi X"` under the ranking badges for clearer UX. 425 API + 394 web tests passing. (DONE)
+66. **KETIK Review Progress & Scoring Fix** — Fixed 2 critical UX bugs in AI review: (1) progress bar stuck at 5% — added auto-transition timer (starting→processing after 2s), non-linear progress curve, standalone progress bar with visible ETA; (2) all scores displayed as 0 — backend returns scores in `POST /ketik/review` response, frontend maps `detail.scores` fallback. Score card UI overhaul: grade color coding, mini progress bars, rubric legend. 6 files modified, 17 frontend + 22 API tests. (DONE)
+67. **PDKT Mailbox Error Handling & API Env Bootstrap** — Null-safe auth header extraction across all PDKT endpoints, ExecutionContext guard for test compatibility, structured error logging, human-friendly error wrapping in service (4 functions). Frontend error state UI with retry, success toast on reply, error message passthrough, diagnostic warnings for empty scenarios. Added `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` env vars with Zod validation + test coverage. Fixed `createAdminClient()` to use env variable. 5 new frontend tests. 425 API + 394 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 66)
+## Key Files Changed (Phase 58 — 67)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing.
@@ -242,6 +244,14 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/ketik/components/SessionReviewModal.tsx` — **Phase 66**: Standalone progress bar (removed scaleX button overlay), unified processing/loading UI, delayed message inside progress section, ETA countdown visible; score card UI overhaul — grade-based color coding, mini progress bars, category descriptions, "Tata Tulis" label rename, rubric legend with collapsible details, improved text contrast per UX guidelines.
 - `apps/api/src/__tests__/ketik-review-route.test.ts` — **Phase 66**: NEW test verifying scores returned in `POST /review` response with correct shape.
 - `apps/web/src/__tests__/ketik-review-progress.test.tsx` — **NEW Phase 66**: 17 regression tests covering progress bar visibility, score display, status text transitions, and action button states.
+
+- `apps/api/src/routes/pdkt.ts` — **Phase 67**: Null-safe auth headers (`authHeader || ""`), ExecutionContext try-catch guard, structured error logging, human error mapper with type narrowing
+- `apps/api/src/services/pdkt-service.ts` — **Phase 67**: Error message wrapping in 4 functions (fetchMailboxItems, createMailboxItem, softDeleteMailboxItem, submitMailboxReply)
+- `apps/api/src/lib/env.ts` — **Phase 67**: Added `VITE_SUPABASE_ANON_KEY` and `SUPABASE_ANON_KEY` Zod schema validation
+- `apps/api/src/lib/supabase.ts` — **Phase 67**: Fixed `createAdminClient()` to use `env.VITE_SUPABASE_ANON_KEY`
+- `apps/api/src/__tests__/api-env-bootstrap.test.ts` — **Phase 67**: Anon key env var set/cleanup in Supabase client tests
+- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 67**: Error state UI (AlertCircle + Coba Lagi), success toast on reply, empty scenarios/consumer-type warnings
+- `apps/web/src/__tests__/pdkt-mailbox.test.tsx` — **Phase 67**: 5 regression tests for error state rendering, retry refetch, loading state
 
 - `apps/web/src/routes/sidak/input.tsx` — Major refactor: vertical list cards, compact breadcrumb, Estimasi Skor card, Konfigurasi Audit card, Show All toggle, URL param consumption for pre-fill; **Phase 61**: added `activeWeight` state, `handleServiceChange` with 3-fetch (indikator+weights+temuan), `resolveServiceTypeFromTeam`, `categoryMap`, `scoringMode`, leader role guard (`role !== "leader"`), client-side duplicate check, replaced inline form/import/score JSX with component imports
 - `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param; rewritten `topTickets` with legacy parity
@@ -332,7 +342,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-58a)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-67)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 
 ## Routes Reference (apps/web)
