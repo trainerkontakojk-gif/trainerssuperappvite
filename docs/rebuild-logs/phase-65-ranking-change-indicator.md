@@ -10,10 +10,10 @@ Added rank position change indicators to the Agent Ranking page for both YTD and
 
 ### Backend
 - **`apps/api/src/services/sidak-service.ts`**: Added optional `limit` parameter to `getDashboardData()` — 0 means no slicing (full list), default remains 20.
-- **`apps/api/src/routes/sidak.ts`**: Implemented YTD and Monthly rank shift calculation by fetching previous period rankings, mapping agent positions, and computing delta.
+- **`apps/api/src/routes/sidak.ts`**: Implemented YTD and Monthly rank shift calculation by fetching previous period rankings, mapping agent positions, and computing delta. Removed top 20 limit constraint — API now returns all agents for rank change context.
 
 ### Frontend
-- **`apps/web/src/routes/sidak/ranking.tsx`**: Custom rendering of `rankChange` — red ▲ +X (worse), green ▼ -X (better), gray `-` (unchanged), blue "Baru" (new). Visible for YTD and monthly views (not all-time).
+- **`apps/web/src/routes/sidak/ranking.tsx`**: Custom rendering of `rankChange` — red ▲ +X (worse), green ▼ -X (better), gray `-` (unchanged), blue "Baru" (new). Visible for YTD and monthly views (not all-time). Added dynamic context subtitle `"Sebelumnya Posisi X"` under the rank change badges for clearer UX.
 
 ### Tests
 - **API** (`sidak-ranking-route.test.ts`): 8 additional integration tests — 4 for YTD rank change calculation, 4 for monthly rank change calculation (current vs previous period).
@@ -22,6 +22,11 @@ Added rank position change indicators to the Agent Ranking page for both YTD and
 - 425 API tests PASS (previously 423)
 - 394 Web tests PASS
 - No new lint issues
+
+## Post-Commit Fixes
+- Removed 20-agent slice constraint from API response, allowing full agent list
+- Added `"Sebelumnya Posisi X"` subtitle context under each rank badge
+- Fixed `index is not defined` runtime error in ranking badge rendering
 
 ## Migration
 No new database migrations.
