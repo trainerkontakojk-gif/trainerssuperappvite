@@ -162,7 +162,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 ## Phase Progress
 
-1. Monorepo Foundation (DONE)
+66. **KETIK Review Progress & Scoring Fix** — Fixed 2 critical UX bugs: (1) progress bar stuck at 5% during AI review — added auto-transition timer (starting→processing after 2s), improved non-linear progress curve, standalone progress bar with visible ETA; (2) all scores displayed as 0 — backend now returns scores in `POST /ketik/review` response, frontend maps `detail.scores` to session object in `handleViewReview` as fallback. Also enhanced score card UI: grade-based color coding, mini progress bars, category descriptions, "Tata Tulis" label rename, rubric legend with collapsible details, improved text contrast per UX guidelines. 6 files modified, 17 frontend + 22 API regression tests passing. (DONE)
 2. Auth & Layout (DONE)
 3. SIDAK Core (DONE)
 4. KETIK & PDKT (DONE)
@@ -228,13 +228,20 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 64. **SIDAK Ranking Month Filter Fix** — Fixed bug where monthly Agent Ranking filter showed YTD historical findings instead of filtering strictly by the selected month. Passed `period_ids` (and conditionally set `year` to undefined for all-time selections) from Hono route `/ranking` to `getDashboardData()`. Added 4 API integration tests in `sidak-ranking-route.test.ts`. 423 API + 394 web tests passing. (DONE)
 65. **SIDAK YTD & Monthly Agent Ranking Change Indicator** — Added rank position change indicators to the Agent Ranking page for both YTD and Monthly selections. Compares current ranking with previous ranking (preceding YTD or preceding month) to calculate `rankChange` (+X/-X index shift). Renders red upward arrows (`▲ +X`) for rank increases (higher defects, worse performance), green downward arrows (`▼ -X`) for rank decreases (fewer defects, better performance), and blue badges (`Baru`) for new agents evaluated in the period. Added optional `limit` parameter to `getDashboardData()`, implemented rank shift calculations, updated types, added integration tests, removed top 20 limit constraint, and added a dynamic context subtitle `"Sebelumnya Posisi X"` under the ranking badges for clearer UX. 425 API + 394 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 65)
+## Key Files Changed (Phase 58 — 66)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing.
 - `apps/api/src/routes/sidak.ts` — **Phase 64**: Forwarded `period_ids` query param and conditionally disabled `year` filter when `period === "alltime"` inside the `/ranking` endpoint; **Phase 65**: Implemented YTD and Monthly rank shift calculation by fetching current and previous lists and calculating rank index changes.
 - `apps/api/src/__tests__/sidak-ranking-route.test.ts` — **NEW Phase 64**: Added 4 route integration tests validating parameter parsing and forwarding; **Phase 65**: Added tests validating previous vs current rank calculation for YTD and Monthly filters.
 - `apps/web/src/routes/sidak/ranking.tsx` — **Phase 65**: Custom rendering of `rankChange` in Status column for YTD and Monthly views with red `▲ +X` upward badges, green `▼ -X` downward badges, gray `-` for neutral, and blue `Baru` badges, along with subtitle context `"Sebelumnya Posisi X"`.
+
+- `apps/api/src/services/ketik-service.ts` — **Phase 66**: `processKetikReviewJob()` now returns `scores` alongside `status` for direct passthrough to API response.
+- `apps/api/src/routes/ketik.ts` — **Phase 66**: `POST /review` response now includes `data.scores` when processing completes synchronously.
+- `apps/web/src/routes/ketik/index.tsx` — **Phase 66**: Auto-transition progress from `starting`→`processing` after 2s timeout; maps `detail.scores` to session object in `handleViewReview`; non-linear progress curve (2/1.2/0.6/0.2/0.05 per-phase increments).
+- `apps/web/src/routes/ketik/components/SessionReviewModal.tsx` — **Phase 66**: Standalone progress bar (removed scaleX button overlay), unified processing/loading UI, delayed message inside progress section, ETA countdown visible; score card UI overhaul — grade-based color coding, mini progress bars, category descriptions, "Tata Tulis" label rename, rubric legend with collapsible details, improved text contrast per UX guidelines.
+- `apps/api/src/__tests__/ketik-review-route.test.ts` — **Phase 66**: NEW test verifying scores returned in `POST /review` response with correct shape.
+- `apps/web/src/__tests__/ketik-review-progress.test.tsx` — **NEW Phase 66**: 17 regression tests covering progress bar visibility, score display, status text transitions, and action button states.
 
 - `apps/web/src/routes/sidak/input.tsx` — Major refactor: vertical list cards, compact breadcrumb, Estimasi Skor card, Konfigurasi Audit card, Show All toggle, URL param consumption for pre-fill; **Phase 61**: added `activeWeight` state, `handleServiceChange` with 3-fetch (indikator+weights+temuan), `resolveServiceTypeFromTeam`, `categoryMap`, `scoringMode`, leader role guard (`role !== "leader"`), client-side duplicate check, replaced inline form/import/score JSX with component imports
 - `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param; rewritten `topTickets` with legacy parity

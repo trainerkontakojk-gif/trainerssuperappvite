@@ -375,6 +375,83 @@ describe("KETIK Review Route E2E", () => {
       expect(body.data.error).toBeDefined();
     });
 
+    it("returns scores when processing completes synchronously", async () => {
+      const mockScores = {
+        final: 85,
+        empathy: 80,
+        probing: 75,
+        typo: 90,
+        compliance: 85,
+      };
+      (ketikService.claimAndProcessKetikReviewJob as any).mockResolvedValue({
+        status: "completed",
+        scores: mockScores,
+      });
+      (ketikService.triggerKetikAIReview as any).mockResolvedValue({
+        status: "queued",
+      });
+
+      mockFrom.mockImplementation((table: string) => {
+        if (table === "ketik_history") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: {
+                id: "sess1",
+                user_id: "user1",
+                review_status: "pending",
+              },
+              error: null,
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          };
+        }
+        if (table === "ketik_review_jobs") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                status: "queued",
+                lease_owner: null,
+                lease_expires_at: null,
+                attempt_count: 0,
+                error_message: null,
+              },
+              error: null,
+            }),
+            update: vi.fn().mockReturnThis(),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+            or: vi.fn().mockReturnThis(),
+          };
+        }
+        return mockDefaultQuery();
+      });
+
+      const app = buildApp();
+      const res = await app.request("/review", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-token",
+        },
+        body: JSON.stringify({ sessionId: "sess1" }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json() as any;
+      expect(body.success).toBe(true);
+      expect(body.data.status).toBe("completed");
+      expect(body.data.scores).toBeDefined();
+      expect(body.data.scores.final).toBe(85);
+      expect(body.data.scores.empathy).toBe(80);
+      expect(body.data.scores.probing).toBe(75);
+      expect(body.data.scores.typo).toBe(90);
+      expect(body.data.scores.compliance).toBe(85);
+    });
+
     it("returns completed status for completed job without processing", async () => {
       mockFrom.mockImplementation((table: string) => {
         if (table === "ketik_history") {

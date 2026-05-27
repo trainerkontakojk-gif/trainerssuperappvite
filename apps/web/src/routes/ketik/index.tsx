@@ -158,9 +158,20 @@ export default function KetikLanding() {
 
   const handleStartManualReview = async (sessionId: string) => {
     reviewStartedAtRef.current = Date.now();
+    setReviewProgress({ status: "starting", percent: 0, etaSeconds: 35 });
+
+    // Auto-transition: starting → processing after 2 detik agar UI tidak terasa stuck
+    const transitionTimer = setTimeout(() => {
+      setReviewProgress((prev) =>
+        prev.status === "starting"
+          ? { ...prev, status: "processing", percent: 10, etaSeconds: 25 }
+          : prev,
+      );
+    }, 2000);
+
     try {
-      setReviewProgress({ status: "starting", percent: 5, etaSeconds: 30 });
       const result = await ketikApi.startReview(sessionId);
+      clearTimeout(transitionTimer);
 
       if (
         selectedSessionForReview &&
@@ -168,10 +179,34 @@ export default function KetikLanding() {
       ) {
         const returnedStatus = result?.status;
         if (returnedStatus === "completed") {
-          handleViewReview({
-            ...selectedSessionForReview,
-            reviewStatus: "completed" as const,
+          // Map scores from API response to session object
+          const sessionWithScores = result?.scores
+            ? {
+                ...selectedSessionForReview,
+                reviewStatus: "completed" as const,
+                finalScore: result.scores.final,
+                empathyScore: result.scores.empathy,
+                probingScore: result.scores.probing,
+                typoScore: result.scores.typo,
+                complianceScore: result.scores.compliance,
+              }
+            : {
+                ...selectedSessionForReview,
+                reviewStatus: "completed" as const,
+              };
+
+          setSelectedSessionForReview(sessionWithScores);
+          setHistory((prev) =>
+            prev.map((item) =>
+              item.id === sessionId ? sessionWithScores : item,
+            ),
+          );
+          setReviewProgress({
+            status: "loading-result",
+            percent: 90,
+            etaSeconds: 3,
           });
+          handleViewReview(sessionWithScores);
           return;
         }
 
@@ -204,6 +239,7 @@ export default function KetikLanding() {
         });
       }
     } catch (error) {
+      clearTimeout(transitionTimer);
       console.error("[Ketik] Error starting manual review:", error);
       setReviewProgress((prev) => ({ ...prev, status: "failed" }));
       notify.error("Gagal memulai analisis AI. Silakan coba lagi.");
@@ -462,6 +498,21 @@ export default function KetikLanding() {
       try {
         const detail = await ketikApi.getReviewDetail(session.id);
         if (detail) {
+          // Map scores from detail ke session object (defense-in-depth)
+          const sessionWithScores = {
+            ...session,
+            finalScore: detail.scores.final,
+            empathyScore: detail.scores.empathy,
+            probingScore: detail.scores.probing,
+            typoScore: detail.scores.typo,
+            complianceScore: detail.scores.compliance,
+          };
+          setSelectedSessionForReview(sessionWithScores);
+          setHistory((prev) =>
+            prev.map((item) =>
+              item.id === session.id ? sessionWithScores : item,
+            ),
+          );
           setSelectedReview(detail.review);
           setSelectedTypos(detail.typos);
           setReviewProgress({ status: "ready", percent: 100, etaSeconds: 0 });
@@ -504,15 +555,25 @@ export default function KetikLanding() {
             prev.status === "idle"
           )
             return prev;
-          let nextPercent = prev.percent + (prev.percent < 90 ? 1.5 : 0.2);
+          let increment: number;
+          if (prev.percent < 10) increment = 2;
+          else if (prev.percent < 40) increment = 1.2;
+          else if (prev.percent < 70) increment = 0.6;
+          else if (prev.percent < 90) increment = 0.2;
+          else increment = 0.05;
+
+          let nextPercent = Math.min(
+            prev.percent + increment,
+            prev.status === "delayed"
+              ? 92
+              : prev.status === "loading-result"
+                ? 98
+                : 95,
+          );
           const nextEta = Math.max(0, prev.etaSeconds - 1);
           let nextStatus = prev.status;
-          if (nextPercent > 92 && prev.status === "processing") {
-            nextPercent = 92;
+          if (nextPercent >= 92 && prev.status === "processing") {
             nextStatus = "delayed";
-          }
-          if (nextPercent > 98 && prev.status === "loading-result") {
-            nextPercent = 98;
           }
           return {
             ...prev,

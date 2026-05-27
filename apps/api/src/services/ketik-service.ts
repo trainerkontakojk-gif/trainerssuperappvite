@@ -875,7 +875,7 @@ export async function processKetikReviewJob(
   const { error: jobUpdateError } = await jobUpdateQuery;
   if (jobUpdateError) throw jobUpdateError;
 
-  return { status: "completed" };
+  return { status: "completed", scores: reviewResult.scores };
 }
 
 export async function getKetikReviewStatus(

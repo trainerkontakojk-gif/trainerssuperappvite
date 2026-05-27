@@ -359,6 +359,7 @@ ketik.post(
         success: true,
         data: {
           status: processResult.status,
+          scores: processResult.scores || undefined,
           error: processResult.error || undefined,
         },
       });

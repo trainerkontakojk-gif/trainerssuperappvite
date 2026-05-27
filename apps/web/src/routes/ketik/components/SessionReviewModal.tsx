@@ -13,12 +13,33 @@ import {
   TrendingUp,
   BrainCircuit,
   Sparkles,
+  Info,
 } from "lucide-react";
 import type {
   KetikSessionHistoryItem,
   KetikSessionReview,
   KetikTypoFinding,
 } from "@trainers/types";
+
+function getScoreGrade(score: number) {
+  if (score >= 90) return { label: "Sangat Baik", color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/25", bar: "bg-emerald-500" };
+  if (score >= 75) return { label: "Baik", color: "text-sky-600", bg: "bg-sky-500/10", border: "border-sky-500/25", bar: "bg-sky-500" };
+  if (score >= 60) return { label: "Cukup", color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/25", bar: "bg-amber-500" };
+  return { label: "Perlu Coaching", color: "text-rose-600", bg: "bg-rose-500/10", border: "border-rose-500/25", bar: "bg-rose-500" };
+}
+
+function ScoreBar({ score }: { score: number }) {
+  return (
+    <div className="w-full h-1.5 bg-foreground/5 rounded-full overflow-hidden mt-1">
+      <motion.div
+        className={`h-full rounded-full ${getScoreGrade(score).bar}`}
+        initial={{ width: 0 }}
+        animate={{ width: `${score}%` }}
+        transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+      />
+    </div>
+  );
+}
 
 interface SessionReviewModalProps {
   isOpen: boolean;
@@ -62,10 +83,6 @@ export function SessionReviewModal({
       progress.status,
     );
 
-  const isLoadingResults =
-    progress.status === "loading-result" ||
-    (session.reviewStatus === "completed" && !review);
-
   if (!isOpen) return null;
 
   const handleAnalyze = async () => {
@@ -96,30 +113,37 @@ export function SessionReviewModal({
       label: "Empathy",
       score: session.empathyScore || 0,
       icon: Heart,
-      color: "text-rose-500",
-      bg: "bg-rose-500/10",
+      description: "Kemampuan memahami & merespons perasaan konsumen dengan hangat",
+      instruction: "Semakin tinggi semakin baik",
     },
     {
       label: "Probing",
       score: session.probingScore || 0,
       icon: Zap,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
+      description: "Kemampuan menggali informasi & kebutuhan konsumen secara mendalam",
+      instruction: "Semakin tinggi semakin baik",
     },
     {
-      label: "Typo",
+      label: "Tata Tulis",
       score: session.typoScore || 0,
       icon: AlertTriangle,
-      color: "text-orange-500",
-      bg: "bg-orange-500/10",
+      description: "Kualitas penulisan: ejaan, tata bahasa, & kerapian pesan",
+      instruction: "Semakin tinggi = semakin baik penulisan",
     },
     {
       label: "Compliance",
       score: session.complianceScore || 0,
       icon: Award,
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+      description: "Kepatuhan terhadap prosedur, regulasi, & etika komunikasi",
+      instruction: "Semakin tinggi semakin baik",
     },
+  ];
+
+  const scoreRubrik = [
+    { range: "90-100", label: "Sangat Baik", color: "text-emerald-600" },
+    { range: "75-89", label: "Baik", color: "text-sky-600" },
+    { range: "60-74", label: "Cukup", color: "text-amber-600" },
+    { range: "<60", label: "Perlu Coaching", color: "text-rose-600" },
   ];
 
   return (
@@ -163,45 +187,80 @@ export function SessionReviewModal({
           {review ? (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {scoreCards.map((card) => (
-                  <div
-                    key={card.label}
-                    className="bg-foreground/[0.02] border border-border/50 p-4 rounded-2xl flex flex-col items-center text-center gap-2"
-                  >
+                {scoreCards.map((card) => {
+                  const grade = getScoreGrade(card.score);
+                  return (
                     <div
-                      className={`w-10 h-10 ${card.bg} ${card.color} rounded-xl flex items-center justify-center mb-1`}
+                      key={card.label}
+                      className={`${grade.bg} ${grade.border} border p-4 rounded-2xl flex flex-col items-center text-center gap-2`}
                     >
-                      <card.icon className="w-5 h-5" />
+                      <div
+                        className={`w-10 h-10 ${grade.bg} ${grade.color} rounded-xl flex items-center justify-center mb-1`}
+                      >
+                        <card.icon className="w-5 h-5" />
+                      </div>
+                      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                        {card.label}
+                      </div>
+                      <div className={`text-2xl font-black ${grade.color}`}>
+                        {card.score}
+                      </div>
+                      <div className={`text-[9px] font-bold ${grade.color} uppercase tracking-wider`}>
+                        {grade.label}
+                      </div>
+                      <ScoreBar score={card.score} />
+                      <div className="text-[10px] text-foreground/75 leading-snug mt-1 max-w-[130px]">
+                        {card.description}
+                      </div>
+                      <div className="text-[8px] text-muted-foreground/70 uppercase tracking-wider">
+                        {card.instruction}
+                      </div>
                     </div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                      {card.label}
-                    </div>
-                    <div className="text-2xl font-black text-foreground">
-                      {card.score}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              <div className="bg-primary/5 rounded-[1.5rem] p-6 border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="bg-primary/5 rounded-[1.5rem] p-6 border border-primary/10 flex flex-col md:flex-row items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+                  <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
                     <TrendingUp className="w-7 h-7 text-white" />
                   </div>
                   <div>
                     <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/60">
                       Skor Akhir
                     </div>
-                    <div className="text-3xl font-black text-primary">
+                    <div className={`text-3xl font-black ${getScoreGrade(session.finalScore || 0).color}`}>
                       {session.finalScore || 0}
+                    </div>
+                    <div className={`text-[11px] font-bold ${getScoreGrade(session.finalScore || 0).color} mt-0.5`}>
+                      {getScoreGrade(session.finalScore || 0).label}
                     </div>
                   </div>
                 </div>
-                <div className="text-sm text-muted-foreground font-medium max-w-[400px] text-center md:text-right">
-                  Performa Anda dinilai berdasarkan kemampuan empati, probing
-                  informasi, ketepatan penulisan, dan kepatuhan prosedur.
+                <div className="flex flex-col gap-1.5 text-right">
+                  <div className="text-sm text-foreground/80 font-medium max-w-[360px]">
+                    Performa Anda dinilai dari: <strong>Empati</strong>, <strong>Probing</strong>, <strong>Tata Tulis</strong>, & <strong>Kepatuhan</strong>.
+                  </div>
+                  <div className="flex items-center gap-2 justify-end text-[11px] text-muted-foreground/80">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>Semakin tinggi skor, semakin baik performa</span>
+                  </div>
                 </div>
               </div>
+
+              <details className="group cursor-pointer">
+                <summary className="flex items-center gap-2 text-xs text-muted-foreground/80 hover:text-foreground/90 transition-colors list-none select-none">
+                  <Info className="w-3.5 h-3.5" />
+                  <span className="font-semibold">Rubrik Penilaian</span>
+                </summary>
+                <div className="flex items-center gap-4 mt-3 flex-wrap">
+                  {scoreRubrik.map((r) => (
+                    <span key={r.label} className={`text-xs ${r.color} font-semibold`}>
+                      {r.range}: {r.label}
+                    </span>
+                  ))}
+                </div>
+              </details>
 
               <div className="space-y-6">
                 <section className="space-y-3">
@@ -335,73 +394,58 @@ export function SessionReviewModal({
               <p className="text-sm text-muted-foreground max-w-md mb-8">
                 {session.reviewStatus === "failed"
                   ? "Analisis sebelumnya gagal atau hasilnya tidak lengkap. Jalankan ulang analisis AI untuk membuat hasil review baru."
-                  : "Gunakan AI untuk menilai empati, teknik probing, kepatuhan prosedur, dan mendeteksi typo pada sesi chat Anda."}
+                  : "Gunakan AI untuk menilai empati, teknik probing, kepatuhan prosedur, dan tata tulis pada sesi chat Anda."}
               </p>
 
-              {!review && isLoadingResults ? (
-                <div className="w-full max-w-sm space-y-4">
-                  <div className="flex items-center justify-center gap-3 text-primary animate-pulse">
-                    <div className="w-5 h-5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                    <span className="text-xs font-black uppercase tracking-widest">
-                      {getStatusText()}
+              <button
+                onClick={handleAnalyze}
+                disabled={isProcessing || !canStartReview}
+                className="inline-flex h-14 w-full max-w-sm items-center justify-center gap-3 rounded-2xl bg-primary px-8 text-xs font-black uppercase tracking-widest text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                    <span>{getStatusText()}</span>
+                    <span className="opacity-60 tabular-nums">
+                      {Math.round(progress.percent)}%
                     </span>
-                  </div>
-                  <div className="h-2 bg-foreground/5 rounded-full overflow-hidden">
+                  </>
+                ) : (
+                  <>
+                    <BrainCircuit className="w-5 h-5" />
+                    <span>
+                      {!canStartReview
+                        ? "Tidak Memiliki Akses"
+                        : session.reviewStatus === "failed"
+                          ? "Jalankan Ulang Analisis"
+                          : "Mulai Analisis"}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              {isProcessing && (
+                <div className="w-full max-w-sm mt-5 space-y-3">
+                  <div className="h-2.5 bg-foreground/5 rounded-full overflow-hidden">
                     <motion.div
-                      className="h-full bg-primary"
+                      className="h-full bg-primary rounded-full"
                       initial={{ width: 0 }}
                       animate={{ width: `${progress.percent}%` }}
-                      transition={{ duration: 0.5 }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
                     />
                   </div>
-                </div>
-              ) : (
-                <button
-                  onClick={handleAnalyze}
-                  disabled={isProcessing || !canStartReview}
-                  className="inline-flex h-14 w-full max-w-sm flex-col items-center justify-center gap-1 rounded-2xl bg-primary px-8 text-xs font-black uppercase tracking-widest text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-80 disabled:hover:scale-100 overflow-hidden relative"
-                >
-                  {isProcessing ? (
-                    <>
-                      <div
-                        className="absolute inset-0 bg-white/10 origin-left transition-transform duration-500 ease-out z-0"
-                        style={{
-                          transform: `scaleX(${progress.percent / 100})`,
-                        }}
-                      />
-                      <div className="relative z-10 flex items-center gap-3">
-                        <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                        <span>{getStatusText()}</span>
-                        <span className="opacity-60 tabular-nums">
-                          {Math.round(progress.percent)}%
-                        </span>
-                      </div>
-                      {progress.etaSeconds > 0 && (
-                        <div className="relative z-10 text-[9px] font-bold opacity-70 tracking-normal normal-case">
-                          Estimasi: {progress.etaSeconds} detik lagi
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <BrainCircuit className="w-5 h-5" />
-                      <span>
-                        {!canStartReview
-                          ? "Tidak Memiliki Akses"
-                          : session.reviewStatus === "failed"
-                            ? "Jalankan Ulang Analisis"
-                            : "Mulai Analisis"}
-                      </span>
-                    </div>
+                  {progress.etaSeconds > 0 && (
+                    <p className="text-[10px] text-muted-foreground text-center tabular-nums">
+                      Estimasi: ~{progress.etaSeconds} detik lagi
+                    </p>
                   )}
-                </button>
-              )}
-
-              {progress.status === "delayed" && (
-                <p className="mt-4 text-[10px] text-muted-foreground animate-pulse">
-                  Proses ini memakan waktu lebih lama dari biasanya. Harap
-                  tunggu...
-                </p>
+                  {progress.status === "delayed" && (
+                    <p className="text-[10px] text-muted-foreground animate-pulse text-center">
+                      Proses ini memakan waktu lebih lama dari biasanya. Harap
+                      tunggu...
+                    </p>
+                  )}
+                </div>
               )}
 
               {!canStartReview && reviewAccessMessage && (
