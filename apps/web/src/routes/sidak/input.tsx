@@ -496,6 +496,27 @@ export default function SidakInputPage() {
     }
   };
 
+  const handlePerfectScore = async () => {
+    if (!selectedAgent || !selectedPeriod) return;
+    setSaving(true);
+    try {
+      const res = await postApi<any[]>("/sidak/temuan/perfect-session", {
+        peserta_id: selectedAgent.id,
+        period_id: selectedPeriod.id,
+        service_type: selectedService,
+      });
+      if (res && res.length > 0) {
+        setTemuan((prev) => [...res.reverse(), ...prev]);
+      }
+      setSuccessMsg("Sesi Tanpa Temuan berhasil ditambahkan (phantom padding 5 sesi).");
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e: any) {
+      setErrorMsg(e.message || "Gagal membuat sesi tanpa temuan.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const groupedTemuan = useMemo(() => {
     const groups: { key: string; label: string | null; items: QATemuan[] }[] = [];
     const keyToGroup = new Map<string, number>();
@@ -527,6 +548,7 @@ export default function SidakInputPage() {
     return map;
   }, [activeIndicators]);
 
+  const hasBadFindings = useMemo(() => temuan.some((t) => t.nilai < 3), [temuan]);
   const scoringMode = activeWeight?.scoring_mode ?? "weighted";
   const periodLabel = selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : "";
 
@@ -1084,6 +1106,26 @@ export default function SidakInputPage() {
                       >
                         <Upload className="w-3.5 h-3.5" /> Import
                       </button>
+                      {!showForm && !showImport && (
+                        <button
+                          type="button"
+                          onClick={handlePerfectScore}
+                          disabled={saving || hasBadFindings}
+                          className={
+                            hasBadFindings
+                              ? "flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-bold cursor-not-allowed opacity-50"
+                              : "flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+                          }
+                          title={
+                            hasBadFindings
+                              ? "Sesi tanpa temuan hanya bisa dibuat jika belum ada laporan temuan buruk."
+                              : ""
+                          }
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          {hasBadFindings ? "Sudah Ada Temuan" : "Sesi Tanpa Temuan"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setShowForm(true)}

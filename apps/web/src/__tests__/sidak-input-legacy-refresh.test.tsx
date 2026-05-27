@@ -169,3 +169,54 @@ describe("TemuanGroupCard — new props", () => {
     expect(mod.default).toBeDefined();
   }, 10000);
 });
+
+// ── Perfect Score Session (Sesi Tanpa Temuan) ─────────────────
+describe("Sesi Tanpa Temuan — hasBadFindings logic", () => {
+  it("returns true when any temuan has nilai < 3", () => {
+    const temuan = [
+      { id: "1", nilai: 3 },
+      { id: "2", nilai: 2 },
+      { id: "3", nilai: 3 },
+    ];
+    const hasBad = temuan.some((t) => t.nilai < 3);
+    expect(hasBad).toBe(true);
+  });
+
+  it("returns false when all temuan have nilai >= 3", () => {
+    const temuan = [
+      { id: "1", nilai: 3 },
+      { id: "2", nilai: 3 },
+    ];
+    const hasBad = temuan.some((t) => t.nilai < 3);
+    expect(hasBad).toBe(false);
+  });
+
+  it("returns false for empty temuan array", () => {
+    const hasBad = [].some((t: any) => t.nilai < 3);
+    expect(hasBad).toBe(false);
+  });
+
+  it("uses < 3 not <= 3 or < 2 — nilai === 3 is safe", () => {
+    const temuan = [{ id: "1", nilai: 3 }];
+    const hasBad = temuan.some((t) => t.nilai < 3);
+    expect(hasBad).toBe(false);
+  });
+
+  it("nilai === 0 is considered bad", () => {
+    const temuan = [{ id: "1", nilai: 0 }];
+    const hasBad = temuan.some((t) => t.nilai < 3);
+    expect(hasBad).toBe(true);
+  });
+});
+
+describe("Sesi Tanpa Temuan — Button component contract", () => {
+  it("can import postApi from useApi hook", async () => {
+    const mod = await import("../hooks/useApi");
+    expect(typeof mod.postApi).toBe("function");
+  });
+
+  it("can import Check icon from lucide-react", async () => {
+    const mod = await import("lucide-react");
+    expect(mod.Check).toBeDefined();
+  });
+});

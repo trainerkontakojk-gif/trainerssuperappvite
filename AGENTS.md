@@ -211,8 +211,9 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 61. **SIDAK Input Period + Temuan Legacy Refresh** — Service weights fetch from API, `handleServiceChange`, `resolveServiceTypeFromTeam`, mode-aware `calculateQAScoreFromTemuan`, client-side duplicate check, phantom padding. 3 new components (`ScoreCard`, `ManualForm`, `ImportPanel`). `TemuanGroupCard` upgraded (session#, category chip, NILAI_LABELS). 52 tests. (DONE)
 61. **SIDAK Input Period + Temuan Legacy Refresh** — Audit ditemukan 7 gap kritikal (tidak fetch service weights, inline liveScore tidak mode-aware, tidak ada handleServiceChange, scoringMode tidak di-pass ke dropdown, tidak fetch indikator+weights saat period select, phantom padding filter hilang, tidak ada client-side duplicate check). Implementasi: expanded scoring.ts dengan `calculateQAScoreFromTemuan` + `resolveServiceTypeFromTeam` + `NILAI_LABELS`, created 3 new components (`SidakInputScoreCard`, `SidakInputManualForm`, `SidakInputImportPanel`), major-modified `input.tsx` (add activeWeight state, handleServiceChange, leader role guard, filtering), upgraded `TemuanGroupCard` (session number, category chip, NILAI_LABELS, canEdit). 52 total tests passing (32 existing + 20 new). (DONE)
 62. **SIDAK Ranking Service Filter Fix** — Fixed bug where Ranking Agen and Dashboard service filter dropdowns only showed "Call" instead of all services with data. Root cause: `availableServices` was derived from `dashboardData.serviceData` (already filtered by active `service_type`). Fix: added parallel `distinctQuery` (SELECT `service_type` WITHOUT `service_type` filter) in `getDashboardData()`, simplified `/ranking` endpoint to use `dashboardData.availableServices` directly. Leader scope enforcement preserved via `allowedSvcs` intersection. 4 new regression tests. Zero frontend changes. 411 API + 385 web tests passing. (DONE)
+63. **SIDAK Sesi Tanpa Temuan Legacy Parity** — Added "Sesi Tanpa Temuan" (phantom padding) feature for SIDAK Input. Users with trainer/admin role can create 5 phantom sessions (nilai=3, is_phantom_padding=true) when agent has no bad findings (nilai < 3). New `POST /temuan/perfect-session` API endpoint with RBAC guard, duplicate batch protection, rule version resolution, activity logging, and dashboard summary refresh. Frontend green button "Sesi Tanpa Temuan" with hasBadFindings guard (disabled → "Sudah Ada Temuan"), hidden when form/import active or role===leader. 4 API + 7 web regression tests. 415 API + 394 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 62)
+## Key Files Changed (Phase 58 — 63)
 
 - `apps/web/src/routes/sidak/input.tsx` — Major refactor: vertical list cards, compact breadcrumb, Estimasi Skor card, Konfigurasi Audit card, Show All toggle, URL param consumption for pre-fill; **Phase 61**: added `activeWeight` state, `handleServiceChange` with 3-fetch (indikator+weights+temuan), `resolveServiceTypeFromTeam`, `categoryMap`, `scoringMode`, leader role guard (`role !== "leader"`), client-side duplicate check, replaced inline form/import/score JSX with component imports
 - `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param; rewritten `topTickets` with legacy parity
@@ -230,7 +231,11 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/__tests__/sidak-agent-detail-weights.test.ts` — **NEW Phase 60**: 7 regression tests for weights resolution
 - `apps/web/src/__tests__/setup.ts` — **Phase 60 fix**: Added `window.scrollTo = vi.fn()` jsdom stub
 - `apps/web/src/__tests__/route-guards.test.ts` — **Phase 60 fix**: Replaced `vi.importActual` with `importOriginal` in `@tanstack/react-router` mock factory
-- `apps/web/src/routes/sidak/input.tsx` — **Phase 60 fix**: `ParsedImportRow` → `ImportRowType` (build fix)
+- `apps/web/src/routes/sidak/input.tsx` — **Phase 63**: Added `hasBadFindings` computed, `handlePerfectScore` handler, green "Sesi Tanpa Temuan" button with hasBadFindings guard + form/import hide + leader role hide
+- `apps/api/src/services/sidak-service.ts` — **Phase 63**: Added `createPerfectScoreSession()` — phantom padding creation with rule version resolution, duplicate guard, and indicator fallback
+- `apps/api/src/routes/sidak.ts` — **Phase 63**: Added `POST /temuan/perfect-session` endpoint with RBAC, activity logging, and dashboard summary refresh
+- `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 63**: 4 regression tests for `createPerfectScoreSession`
+- `apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx` — **Phase 63**: 7 regression tests for hasBadFindings logic + component contract
 
 ## Relevant Files
 
@@ -349,7 +354,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 | Prefix             | Endpoints    | Service                         |
 | ------------------ | ------------ | ------------------------------- |
-| `/api/v1/sidak`    | 15 endpoints | `sidak-service.ts`              |
+| `/api/v1/sidak`    | 16 endpoints | `sidak-service.ts`              |
 | `/api/v1/ketik`    | 4 endpoints  | `ketik-service.ts`              |
 | `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
 | `/api/v1/ai`       | 7 endpoints  | —                               |

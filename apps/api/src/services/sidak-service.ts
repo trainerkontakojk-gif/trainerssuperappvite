@@ -328,6 +328,96 @@ export async function getTemuan(params: {
   return { data: data ?? [], total: count ?? 0 };
 }
 
+export async function createPerfectScoreSession(
+  peserta_id: string,
+  period_id: string,
+  service_type: ServiceType,
+): Promise<QATemuan[]> {
+  const { data: periodInfo } = await supabaseAdmin
+    .from("qa_periods")
+    .select("year")
+    .eq("id", period_id)
+    .single();
+  const periodYear = periodInfo?.year ?? new Date().getFullYear();
+
+  const { count: existingCount } = await supabaseAdmin
+    .from("qa_temuan")
+    .select("id", { count: "exact", head: true })
+    .eq("peserta_id", peserta_id)
+    .eq("period_id", period_id)
+    .eq("service_type", service_type)
+    .eq("is_phantom_padding", true);
+  if ((existingCount ?? 0) > 0) {
+    throw new Error("Sesi tanpa temuan untuk periode ini sudah pernah dibuat.");
+  }
+
+  const activeVersion = await resolveActivePublishedRuleVersion(service_type);
+  let indicators: { id: string; rule_indicator_id: string | null }[];
+  let rule_version_id: string | null = null;
+
+  if (activeVersion) {
+    const { data: ruleIndicators } = await supabaseAdmin
+      .from("qa_service_rule_indicators")
+      .select("id, indicator_id")
+      .eq("rule_version_id", activeVersion.id);
+    if (ruleIndicators && ruleIndicators.length > 0) {
+      indicators = ruleIndicators.map((ri: any) => ({
+        id: ri.indicator_id,
+        rule_indicator_id: ri.id,
+      }));
+      rule_version_id = activeVersion.id;
+    } else {
+      const { data: inds } = await supabaseAdmin
+        .from("qa_indicators")
+        .select("id")
+        .eq("service_type", service_type);
+      if (!inds || inds.length === 0) throw new Error("Tidak ada parameter untuk tim agent ini");
+      indicators = inds.map((i: any) => ({ id: i.id, rule_indicator_id: null }));
+    }
+  } else {
+    const { data: inds } = await supabaseAdmin
+      .from("qa_indicators")
+      .select("id")
+      .eq("service_type", service_type);
+    if (!inds || inds.length === 0) throw new Error("Tidak ada parameter untuk tim agent ini");
+    indicators = inds.map((i: any) => ({ id: i.id, rule_indicator_id: null }));
+  }
+
+  if (indicators.length === 0) throw new Error("Tidak ada parameter untuk tim agent ini");
+
+  const phantomBatchId = crypto.randomUUID();
+  const PADDING_COUNT = 5;
+  const rows = Array.from({ length: PADDING_COUNT }).flatMap((_, sessionIdx) =>
+    indicators.map((ind) => ({
+      peserta_id,
+      period_id,
+      tahun: periodYear,
+      indicator_id: ind.id,
+      rule_version_id,
+      rule_indicator_id: ind.rule_indicator_id,
+      no_tiket: `__PHANTOM__${phantomBatchId}_${sessionIdx + 1}`,
+      nilai: 3,
+      service_type,
+      is_phantom_padding: true,
+      phantom_batch_id: phantomBatchId,
+    })),
+  );
+
+  const { data, error } = await supabaseAdmin
+    .from("qa_temuan")
+    .insert(rows)
+    .select();
+
+  if (error) {
+    if (error.message.includes("foreign key")) {
+      throw new Error("Data tidak valid: pastikan agent, periode, dan indikator sudah benar");
+    }
+    throw new Error(`Gagal membuat sesi tanpa temuan: ${error.message}`);
+  }
+
+  return data ?? [];
+}
+
 export interface ValidationError {
   indicator_id: string;
   error: string;

@@ -634,4 +634,70 @@ describe("sidak-service", () => {
       expect(r.stats.valid_count).toBe(1);
     });
   });
+
+  describe("createPerfectScoreSession", () => {
+    it("creates 5 × N phantom rows with nilai=3 and is_phantom_padding=true", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: { year: 2025 }, error: null };
+        if (callCount === 2) return { count: 0, error: null };
+        if (callCount === 3) return { data: { id: "ver1" }, error: null };
+        if (callCount === 4) return { data: [{ id: "ri1", indicator_id: "ind1" }, { id: "ri2", indicator_id: "ind2" }], error: null };
+        return { data: [{ id: "p1", nilai: 3, is_phantom_padding: true, no_tiket: "__PHANTOM__batch_1" }], error: null };
+      };
+
+      const result = await sidakService.createPerfectScoreSession("peserta1", "per1", "call");
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].nilai).toBe(3);
+      expect(result[0].is_phantom_padding).toBe(true);
+      expect(result[0].no_tiket).toContain("__PHANTOM__");
+    });
+
+    it("throws when phantom sessions already exist for same period/service/agent", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: { year: 2025 }, error: null };
+        if (callCount >= 2) return { count: 3, error: null };
+        return { data: null, error: null };
+      };
+
+      await expect(
+        sidakService.createPerfectScoreSession("peserta1", "per1", "call"),
+      ).rejects.toThrow("Sesi tanpa temuan untuk periode ini sudah pernah dibuat.");
+    });
+
+    it("throws when no indicators available", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: { year: 2025 }, error: null };
+        if (callCount === 2) return { count: 0, error: null };
+        if (callCount === 3) return { data: null, error: null };
+        if (callCount >= 4) return { data: [], error: null };
+        return { data: null, error: null };
+      };
+
+      await expect(
+        sidakService.createPerfectScoreSession("peserta1", "per1", "call"),
+      ).rejects.toThrow("Tidak ada parameter untuk tim agent ini");
+    });
+
+    it("uses fallback qa_indicators when rule version has no indicators", async () => {
+      let callCount = 0;
+      pendingResolve = () => {
+        callCount++;
+        if (callCount === 1) return { data: { year: 2025 }, error: null };
+        if (callCount === 2) return { count: 0, error: null };
+        if (callCount === 3) return { data: { id: "ver1" }, error: null };
+        if (callCount === 4) return { data: [], error: null };
+        if (callCount === 5) return { data: [{ id: "ind1" }, { id: "ind2" }], error: null };
+        return { data: [{ id: "p1", nilai: 3, is_phantom_padding: true }], error: null };
+      };
+
+      const result = await sidakService.createPerfectScoreSession("peserta1", "per1", "call");
+      expect(result.length).toBeGreaterThan(0);
+    });
+  });
 });

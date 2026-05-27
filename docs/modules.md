@@ -124,5 +124,6 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Scoring Engine**: Perhitungan skor agent dengan weighted/counting mode, clean-session handling, phantom padding exclusion.
   - **Dashboard Summary Rollup**: Cache KPI per periode untuk performa dashboard.
   - **Phantom Padding**: Clean session (audit tanpa temuan real) tetap dihitung sebagai valid audit.
+  - **Sesi Tanpa Temuan**: Trainer/admin dapat membuat 5 sesi phantom (nilai=3) ketika agent belum memiliki temuan buruk, memastikan scoring adil dengan padding 5 sesi.
   - **Excel Upload**: Template generation, parsing, dan validasi untuk bulk input temuan.
-- **Catatan Teknis**: Backend API di `/api/v1/sidak/` (15 endpoints) dengan business logic di `sidak-service.ts`. Scoring engine di `apps/api/src/lib/scoring.ts`.
+- **Catatan Teknis**: Backend API di `/api/v1/sidak/` (16 endpoints) dengan business logic di `sidak-service.ts`. Scoring engine di `apps/api/src/lib/scoring.ts`.
