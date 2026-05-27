@@ -589,12 +589,15 @@ sidak.get(
     try {
       const { supabaseAdmin } = await import("../lib/supabase");
 
+      const isPeriodUuid = period && period !== "ytd" && period !== "alltime";
+
       const [dashboardData, periods, folders, availableYears] =
         await Promise.all([
           sidakService.getDashboardData({
+            period_ids: isPeriodUuid ? [period] : undefined,
             service_type,
             folder_ids: folder !== "ALL" ? [folder] : undefined,
-            year,
+            year: period === "alltime" ? undefined : year,
             agent_ids: accessibleIds ?? undefined,
             allowedServiceTypes: filterScope?.allowedServices ?? undefined,
           }),
