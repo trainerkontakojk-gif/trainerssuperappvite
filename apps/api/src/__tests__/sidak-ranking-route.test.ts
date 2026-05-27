@@ -202,4 +202,68 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
     expect(rankings[1].agentId).toBe("agent-a");
     expect(rankings[1].rankChange).toBe(-1);
   });
+
+  it("calculates rankChange comparing current month and previous month", async () => {
+    // Mock getPeriods to return multiple periods
+    vi.spyOn(sidakService, "getPeriods").mockResolvedValue([
+      { id: "period-1", year: 2026, month: 1, label: "01/2026" },
+      { id: "period-2", year: 2026, month: 2, label: "02/2026" },
+    ]);
+
+    // Mock getDashboardData and return different rankings based on period_ids
+    vi.spyOn(sidakService, "getDashboardData").mockImplementation(async (params: any) => {
+      // If it is the previous month (period-1)
+      if (params.period_ids && params.period_ids.length === 1 && params.period_ids[0] === "period-1") {
+        return {
+          periods: [],
+          folders: [],
+          summary: {} as any,
+          serviceData: [],
+          topAgents: [
+            { agentId: "agent-a", nama: "Agent A", defects: 2, score: 95, hasCritical: false, batch: "Batch 1" },
+            { agentId: "agent-b", nama: "Agent B", defects: 4, score: 85, hasCritical: false, batch: "Batch 1" },
+          ],
+          paretoData: [],
+          donutData: { critical: 0, nonCritical: 0, total: 0 },
+          availableServices: ["call"],
+          paramTrend: [] as any,
+          sparklines: {} as any,
+          availableYears: [] as any,
+          currentYear: 2026,
+        };
+      }
+      // If it is the current month (period-2)
+      return {
+        periods: [],
+        folders: [],
+        summary: {} as any,
+        serviceData: [],
+        topAgents: [
+          { agentId: "agent-b", nama: "Agent B", defects: 6, score: 80, hasCritical: false, batch: "Batch 1" }, // rank 1 now
+          { agentId: "agent-a", nama: "Agent A", defects: 1, score: 98, hasCritical: false, batch: "Batch 1" }, // rank 2 now
+        ],
+        paretoData: [],
+        donutData: { critical: 0, nonCritical: 0, total: 0 },
+        availableServices: ["call"],
+        paramTrend: [] as any,
+        sparklines: {} as any,
+        availableYears: [] as any,
+        currentYear: 2026,
+      };
+    });
+
+    const res = await app.request("/ranking?period=period-2&year=2026&service_type=call");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+
+    const rankings = body.data.rankings;
+    // Agent B: was rank 2 (in period-1), now rank 1 (in period-2). rankChange = 2 - 1 = +1
+    // Agent A: was rank 1 (in period-1), now rank 2 (in period-2). rankChange = 1 - 2 = -1
+    expect(rankings[0].agentId).toBe("agent-b");
+    expect(rankings[0].rankChange).toBe(1);
+    expect(rankings[1].agentId).toBe("agent-a");
+    expect(rankings[1].rankChange).toBe(-1);
+  });
 });
+

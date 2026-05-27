@@ -366,7 +366,7 @@ export default function SidakRankingPage() {
                             </td>
                             <td className="px-6 py-5 text-center">
                               <div className="flex items-center justify-center gap-2">
-                                {isYearToDate && agent.rankChange !== undefined && (
+                                {selectedPeriod !== "alltime" && agent.rankChange !== undefined && (
                                   <>
                                     {typeof agent.rankChange === 'number' && agent.rankChange > 0 && (
                                       <motion.span
@@ -398,7 +398,7 @@ export default function SidakRankingPage() {
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-500/20"
-                                        title="Agen baru dinilai pada YTD ini"
+                                        title="Agen baru dinilai pada periode ini"
                                       >
                                         Baru
                                       </motion.span>

@@ -600,7 +600,7 @@ sidak.get(
             year: period === "alltime" ? undefined : year,
             agent_ids: accessibleIds ?? undefined,
             allowedServiceTypes: filterScope?.allowedServices ?? undefined,
-            limit: period === "ytd" ? 0 : 20,
+            limit: period === "alltime" ? 20 : 0,
           }),
           sidakService.getPeriods(),
           supabaseAdmin.from("profiler_folders").select("id, name").order("name"),
@@ -619,12 +619,14 @@ sidak.get(
 
       let finalRankings = dashboardData.topAgents;
 
-      if (period === "ytd" && periods) {
+      if (periods && period !== "alltime") {
         const periodsForYearAsc = periods
           .filter((p: any) => p.year === year)
           .sort((a: any, b: any) => (a.month ?? 0) - (b.month ?? 0));
 
-        if (periodsForYearAsc.length > 1) {
+        let prevPeriodIds: string[] | undefined = undefined;
+
+        if (period === "ytd" && periodsForYearAsc.length > 1) {
           let temuanQuery = supabaseAdmin
             .from("qa_temuan")
             .select("period_id")
@@ -647,32 +649,40 @@ sidak.get(
           }
 
           if (latestIdx > 0) {
-            const prevPeriodIds = periodsForYearAsc.slice(0, latestIdx).map((p: any) => p.id);
-            const prevDashboardData = await sidakService.getDashboardData({
-              period_ids: prevPeriodIds,
-              service_type,
-              folder_ids: folder !== "ALL" ? [folder] : undefined,
-              year,
-              agent_ids: accessibleIds ?? undefined,
-              allowedServiceTypes: filterScope?.allowedServices ?? undefined,
-              limit: 0,
-            });
-
-            const prevRankMap = new Map<string, number>();
-            (prevDashboardData.topAgents ?? []).forEach((agent: any, index: number) => {
-              prevRankMap.set(agent.agentId, index + 1);
-            });
-
-            finalRankings = (dashboardData.topAgents ?? []).map((agent: any, index: number) => {
-              const currentRank = index + 1;
-              const previousRank = prevRankMap.get(agent.agentId);
-              const rankChange = previousRank !== undefined ? (previousRank - currentRank) : null;
-              return {
-                ...agent,
-                rankChange,
-              };
-            });
+            prevPeriodIds = periodsForYearAsc.slice(0, latestIdx).map((p: any) => p.id);
           }
+        } else if (isPeriodUuid) {
+          const selectedIdx = periodsForYearAsc.findIndex((p: any) => p.id === period);
+          if (selectedIdx > 0) {
+            prevPeriodIds = [periodsForYearAsc[selectedIdx - 1].id];
+          }
+        }
+
+        if (prevPeriodIds && prevPeriodIds.length > 0) {
+          const prevDashboardData = await sidakService.getDashboardData({
+            period_ids: prevPeriodIds,
+            service_type,
+            folder_ids: folder !== "ALL" ? [folder] : undefined,
+            year,
+            agent_ids: accessibleIds ?? undefined,
+            allowedServiceTypes: filterScope?.allowedServices ?? undefined,
+            limit: 0,
+          });
+
+          const prevRankMap = new Map<string, number>();
+          (prevDashboardData.topAgents ?? []).forEach((agent: any, index: number) => {
+            prevRankMap.set(agent.agentId, index + 1);
+          });
+
+          finalRankings = (dashboardData.topAgents ?? []).map((agent: any, index: number) => {
+            const currentRank = index + 1;
+            const previousRank = prevRankMap.get(agent.agentId);
+            const rankChange = previousRank !== undefined ? (previousRank - currentRank) : null;
+            return {
+              ...agent,
+              rankChange,
+            };
+          });
         }
       }
 
