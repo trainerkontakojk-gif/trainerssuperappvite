@@ -137,6 +137,7 @@ describe("KETIK Service - History", () => {
         consumer_phone: "08123456789",
         consumer_city: "Jakarta",
         messages: [],
+        simulation_duration: null,
         review_status: "pending",
       };
       mockFrom.mockReturnValue({
@@ -155,6 +156,41 @@ describe("KETIK Service - History", () => {
       });
       expect(result.id).toBe("new-sess-1");
       expect(result.reviewStatus).toBe("pending");
+    });
+
+    it("passes simulation_duration to insert when provided", async () => {
+      const mockInsert = vi.fn().mockReturnThis();
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: {
+          id: "sess-dur-1",
+          date: "2025-01-15T10:00:00Z",
+          scenario_title: "Durasi Test",
+          consumer_name: "Budi",
+          consumer_phone: "",
+          consumer_city: "",
+          messages: [],
+          simulation_duration: 10,
+          review_status: "pending",
+        },
+        error: null,
+      });
+      mockFrom.mockReturnValue({
+        insert: mockInsert,
+        select: vi.fn().mockReturnThis(),
+        single: mockSingle,
+      });
+      const result = await ketikService.persistSession("user1", {
+        scenarioTitle: "Durasi Test",
+        consumerName: "Budi",
+        consumerPhone: "",
+        consumerCity: "",
+        messages: [],
+        simulationDuration: 10,
+      });
+      expect(mockInsert).toHaveBeenCalledWith([
+        expect.objectContaining({ simulation_duration: 10 }),
+      ]);
+      expect(result.simulationDuration).toBe(10);
     });
   });
 

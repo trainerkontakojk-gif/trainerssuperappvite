@@ -304,6 +304,7 @@ export default function KetikLanding() {
           consumerPhone: session.consumerPhone,
           consumerCity: session.consumerCity,
           messages: session.messages,
+          simulationDuration: session.simulationDuration,
           reviewStatus: session.reviewStatus ?? "pending",
         };
 

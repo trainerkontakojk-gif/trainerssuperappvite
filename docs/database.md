@@ -61,6 +61,7 @@ erDiagram
 - `20260525000500_telefun_history_add_metadata_columns.sql` — Add metadata columns to telefun_history
 - `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` — Terminal re-hardening: revoke all non-service_role access after contract restore
 - `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql` — Add unique index on qa_temuan to prevent duplicate input at database level (peserta + period + service + trimmed lowercased no_tiket + indicator)
+- `20260527000001_add_simulation_duration_to_ketik_history.sql` — Add `simulation_duration INTEGER` column to `ketik_history` (fixes KETIK session save failure)
 
 
 ### 1. `public.profiles`
@@ -88,7 +89,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 
 ### 3. Modul Simulasi
 
-- **`ketik_history`**: Riwayat sesi KETIK per user, termasuk skenario, identitas konsumen, dan messages.
+- **`ketik_history`**: Riwayat sesi KETIK per user, termasuk skenario, identitas konsumen, messages, dan `simulation_duration` (durasi simulasi dalam menit, nullable untuk backward compatibility).
 - **`ketik_session_reviews`**: Hasil review AI per sesi KETIK. Berisi skor, rubrik, dan feedback dalam format JSONB.
 - **`pdkt_history`**: Riwayat sesi PDKT per user, email thread, config, dan hasil evaluasi async.
 - **`pdkt_mailbox_items`**: Kotak masuk simulasi PDKT yang persisten. Menyimpan inbound email, status (`open`, `replied`, `deleted`).
