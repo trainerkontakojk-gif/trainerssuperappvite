@@ -40,7 +40,7 @@ function migratePdktSettings(pdkt: JsonRecord): JsonRecord {
   const scenarios = Array.isArray(result.scenarios) ? result.scenarios : [];
   if (scenarios.length > 0) {
     result.scenarios = (scenarios as any[]).map((s) => {
-      let migrated = { ...s };
+      const migrated = { ...s };
       if (s.script && (!s.sampleEmailTemplate || !s.sampleEmailTemplate.body)) {
         migrated.sampleEmailTemplate = {
           ...migrated.sampleEmailTemplate,

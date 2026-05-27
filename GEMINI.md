@@ -14,9 +14,20 @@
 - Gunakan subagent untuk tugas yang memerlukan eksplorasi codebase mendalam atau riset multi-step.
 - Berikan instruksi yang spesifik tentang arsitektur monorepo (apps/web, apps/api, packages/types).
 
-## Superpowers Skills
+## ECC Plugin
 
-**WAJIB** panggil `Skill` tool di setiap task — cek apakah ada skill yang relevan sebelum memulai pekerjaan. Skill tersedia untuk: brainstorming, writing-plans, TDD, customize-opencode, dll. Ikuti workflow skill secara disiplin.
+**WAJIB** gunakan plugin **ECC (Everything Claude Code)** (`ecc-universal`) di setiap task. ECC menyediakan 48 specialized agents, 183 skills, dan 79 commands. Pilih agent/skill yang sesuai dengan konteks task:
+
+- Fitur kompleks / refactoring → **planner** agent
+- Bug fix / fitur baru → **tdd-guide** agent
+- Arsitektur / system design → **architect** agent
+- Setelah menulis kode → **code-reviewer** agent
+- Kode sensitif / security → **security-reviewer** agent
+- Build error → **build-error-resolver** agent
+- Cek dokumentasi library → **docs-lookup** agent (Context7)
+- Autonomous loop / monitoring → **loop-operator** agent
+
+ECS agents bisa dipanggil via `Task` tool dengan `subagent_type` yang sesuai.
 
 ## Commands (Monorepo)
 
@@ -27,11 +38,29 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint` (ESLint 9 flat config — `eslint.config.mjs` di root)
 - **Lint (single workspace):** `pnpm --filter @trainers/web lint`
-- **Test:** `pnpm test` (vitest — 299+ tests covering API services + frontend hooks/components)
+- **Test:** `pnpm test` (vitest — 300+ tests covering API services + frontend hooks/components)
 - **Test (api only):** `pnpm --filter @trainers/api test`
 - **Test (web only):** `pnpm --filter @trainers/web test`
 - **Format:** `pnpm format`
 - **Telefun standalone:** `pnpm --filter @trainers/telefun dev`
+
+## RTK (Rust Token Killer)
+
+Gunakan **RTK** (`rtk`) sebagai prefix untuk setiap perintah shell untuk mengoptimalkan konsumsi token. RTK memfilter dan mengompresi output perintah sebelum masuk ke konteks LLM, menghemat 60-90% token pada operasi umum.
+
+```bash
+rtk git status        # Lihat status git (token-efficient)
+rtk pnpm test         # Jalankan test
+rtk ls src/           # List direktori
+rtk grep "pattern"    # Cari pattern di file
+```
+
+**Meta commands:**
+```bash
+rtk gain              # Lihat token savings
+rtk gain --history    # Riwayat perintah dengan savings
+rtk discover          # Temukan missed RTK opportunities
+```
 
 ## Verified Structure
 
@@ -103,11 +132,11 @@ Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
 2. **Design** — Arsitektur, alur data, component tree, interface changes, dan keputusan teknis.
 3. **Tasklist** — Langkah-langkah implementasi terperinci, file affected, test strategy, timeline estimasi, dependensi, risk register, dan rollback plan.
 
-### 7. Selalu Referensi Context7 + Superpowers untuk Dokumentasi
+### 7. Selalu Referensi Context7 + ECC untuk Dokumentasi
 
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
 
-1. Panggil `Skill` tool untuk cek apakah ada superpower skill yang relevan.
+1. Panggil ECC **docs-lookup** agent (via `Task` tool) untuk cek dokumentasi terbaru library.
 2. Gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
    - Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
    - Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
@@ -194,6 +223,44 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 55. Telefun Communication Profile Radar Chart — 2-series radar chart (Target QA + Hasil Anda) on `0-100` domain, semantics-aware metrics (Fillers as `lower_better`, Speaking Rate as `optimal_range`), AI insight (overallSummary, strengths, improvementPriorities), CommunicationProfileZoomModal with Escape/overlay/button close, score guard (`/10` vs `/100`) in ReviewModal, backend enrichment via `telefun-communication-profile.ts`, fix kontrak `POST /telefun/score/:id` envelope normalization, sessionFinalizer forwards `assessment` to `record.voiceAssessment`, 40+ tests across 5 test files, 0 new deps, 0 new migrations (DONE)
 56. Leader Folder/Service Scope Visibility Hardening — Shared `LeaderScopeSnapshot` helper eliminating duplicate scope parsing; KTP metadata scoped (years/folders/teams filtered by leader pesertaIds); SIDAK `service_type` first-class enforcement via `getAccessibleSidakFilters()` including `allowedServiceTypes` in dashboard/ranking/agent-detail queries; SIDAK `folder_ids` real filtering (resolve batch_name from folder IDs); frontend normalization (`availableServices` prop, invalid service/folder/batch auto-reset with redirect); 16 files modified, 0 migrations, all 390 API + 314 web tests passing (DONE)
 57. SIDAK Import Duplicate Logic Fix & no_tiket Passthrough — Fixed Excel import dropping no_tiket (hardcoded null), updated validateTemuanBatch() duplicate detection key with service_type and no_tiket mapping for legacy parity, and resolved frontend reverse() crash after batch creation (DONE)
+58. SIDAK Input Visual & Navigation Parity — Restored vertical list card layout (matching legacy), compact inline breadcrumb with actual selected values, added Estimasi Skor card (live score with NC/CR breakdown + progress bar), added Konfigurasi Audit card (service dropdown + tim info) moved from step 3 to step 4, added Show All Data toggle (eye icon) in step 1, fixed navigation pre-fill from agent detail page to skip directly to period step via URL params consumption, added client-side scoring utility (`apps/web/src/lib/scoring.ts`), 24 regression tests (DONE)
+59. **SIDAK Input Railway Build Fix (ArrowLeft Import)** — Added missing `ArrowLeft` lucide-react import in `input.tsx` that caused Railway deployment build failure (TS2304). TypeScript error `Cannot find name 'ArrowLeft'` at line 1032. (DONE)
+60. **Top 5 Pengurang Skor Terbesar Legacy Parity** — Fixed `topTickets` computation to match legacy: month scoping, `scoreSession()` with weighted/flat/no_category modes, service weights from `qa_service_weights` table with `DEFAULT_SERVICE_WEIGHTS` fallback, 3-level tiebreaker sort, and renamed properties (`deduction`→`scoreDeduction`, `count`→`findingCount`). Added shared scoring functions to `apps/web/src/lib/scoring.ts`, weights field to API response, and 17 regression tests. Post-commit fixes: resolved Railway build TS errors (`ScoringMode` import, `ParsedImportRow`→`ImportRowType`), fixed 2 pre-existing `STACK_TRACE_ERROR` test failures (vitest 4.x `importOriginal` mock pattern + jsdom `scrollTo` stub). Final: 387 web PASS + 407 API PASS, 0 failures. (DONE)
+61. **SIDAK Input Period + Temuan Legacy Refresh** — Audit ditemukan 7 gap kritikal (tidak fetch service weights, inline liveScore tidak mode-aware, tidak ada handleServiceChange, scoringMode tidak di-pass ke dropdown, tidak fetch indikator+weights saat period select, phantom padding filter hilang, tidak ada client-side duplicate check). Implementasi: expanded scoring.ts dengan `calculateQAScoreFromTemuan` + `resolveServiceTypeFromTeam` + `NILAI_LABELS`, created 3 new components (`SidakInputScoreCard`, `SidakInputManualForm`, `SidakInputImportPanel`), major-modified `input.tsx` (add activeWeight state, handleServiceChange, leader role guard, filtering), upgraded `TemuanGroupCard` (session number, category chip, NILAI_LABELS, canEdit). 52 total tests passing (32 existing + 20 new). (DONE)
+62. **SIDAK Ranking Service Filter Fix** — Fixed bug where Ranking Agen and Dashboard service filter dropdowns only showed "Call" instead of all services with data. Root cause: `availableServices` was derived from `dashboardData.serviceData` (already filtered by active `service_type`). Fix: added parallel `distinctQuery` (SELECT `service_type` WITHOUT `service_type` filter) in `getDashboardData()`, simplified `/ranking` endpoint to use `dashboardData.availableServices` directly. Leader scope enforcement preserved via `allowedSvcs` intersection. 4 new regression tests. Zero frontend changes. 411 API + 385 web tests passing. (DONE)
+63. **SIDAK Sesi Tanpa Temuan Legacy Parity** — Added "Sesi Tanpa Temuan" (phantom padding) feature for SIDAK Input. Users with trainer/admin role can create 5 phantom sessions (nilai=3, is_phantom_padding=true) when agent has no bad findings (nilai < 3). New `POST /temuan/perfect-session` API endpoint with RBAC guard, duplicate batch protection, rule version resolution, activity logging, and dashboard summary refresh. Frontend green button "Sesi Tanpa Temuan" with hasBadFindings guard (disabled → "Sudah Ada Temuan"), hidden when form/import active or role===leader. 4 API + 7 web regression tests. 415 API + 394 web tests passing. (DONE)
+64. **SIDAK Ranking Month Filter Fix** — Fixed bug where monthly Agent Ranking filter showed YTD historical findings instead of filtering strictly by the selected month. Passed `period_ids` (and conditionally set `year` to undefined for all-time selections) from Hono route `/ranking` to `getDashboardData()`. Added 4 API integration tests in `sidak-ranking-route.test.ts`. 423 API + 394 web tests passing. (DONE)
+65. **SIDAK YTD Agent Ranking Change Indicator** — Added rank position change indicators to the Agent Ranking page. Compares YTD ranking with previous YTD ranking to calculate `rankChange` (+X/-X index shift). Renders red upward arrows (`▲ +X`) for rank increases (higher defects, worse performance), green downward arrows (`▼ -X`) for rank decreases (fewer defects, better performance), and blue badges (`Baru`) for new agents evaluated in the period. Added optional `limit` parameter to `getDashboardData()`, implemented rank shift calculations, updated types, and added integration tests. 424 API + 394 web tests passing. (DONE)
+
+## Key Files Changed (Phase 58 — 65)
+
+- `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface.
+- `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing.
+- `apps/api/src/routes/sidak.ts` — **Phase 64**: Forwarded `period_ids` query param and conditionally disabled `year` filter when `period === "alltime"` inside the `/ranking` endpoint; **Phase 65**: Implemented YTD rank shift calculation by fetching current and previous YTD lists and calculating rank index changes.
+- `apps/api/src/__tests__/sidak-ranking-route.test.ts` — **NEW Phase 64**: Added 4 route integration tests validating parameter parsing and forwarding; **Phase 65**: Added test validating previous vs current YTD rank calculation and change tracking.
+- `apps/web/src/routes/sidak/ranking.tsx` — **Phase 65**: Custom rendering of `rankChange` in Status column with red `▲ +X` upward badges, green `▼ -X` downward badges, gray `-` for neutral, and blue `Baru` badges.
+
+- `apps/web/src/routes/sidak/input.tsx` — Major refactor: vertical list cards, compact breadcrumb, Estimasi Skor card, Konfigurasi Audit card, Show All toggle, URL param consumption for pre-fill; **Phase 61**: added `activeWeight` state, `handleServiceChange` with 3-fetch (indikator+weights+temuan), `resolveServiceTypeFromTeam`, `categoryMap`, `scoringMode`, leader role guard (`role !== "leader"`), client-side duplicate check, replaced inline form/import/score JSX with component imports
+- `apps/web/src/hooks/useAgentDetail.ts` — Fixed `handleInputAudit` to pass `folder` param; rewritten `topTickets` with legacy parity
+- `apps/web/src/lib/scoring.ts` — **NEW**: client-side scoring helpers (scoreColor, scoreBg, scoreLabel); **Phase 60**: added `scoreSession()`, `calculateSessionScoreFromTemuan()`, `DEFAULT_SERVICE_WEIGHTS`; **Phase 61**: added `resolveServiceTypeFromTeam()`, `calculateQAScoreFromTemuan()` full version with session grouping/MODE_SAMPLING/mode branching, `NILAI_LABELS`, `NILAI_BADGE_COLORS`
+- `apps/web/src/components/sidak/SidakInputScoreCard.tsx` — **NEW Phase 61**: mode-aware score card (weighted→NC/CR split with weight %, flat→flat panel, no_category→BKO panel)
+- `apps/web/src/components/sidak/SidakInputManualForm.tsx` — **NEW Phase 61**: legacy-like manual form with subtitle, full-width parameter button, scoringMode pass, 4-col nilai grid, cancel button
+- `apps/web/src/components/sidak/SidakInputImportPanel.tsx` — **NEW Phase 61**: legacy-like import panel with tips, file state, card summary, card preview, duplicate banner
+- `apps/web/src/components/sidak/TemuanGroupCard.tsx` — **Phase 61**: session number header (gIdx), category chip (Critical/Non-Critical), NILAI_LABELS badge, canEdit prop, legacy-like edit panel
+- `apps/web/src/__tests__/sidak-input-parity.test.tsx` — **NEW**: 24 regression tests covering layout, breadcrumb, pre-fill, toggle, cards, scoring
+- `apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx` — **NEW Phase 61**: 20 regression tests for scoring helpers, component contracts, NILAI_LABELS
+- `apps/api/src/services/sidak-service.ts` — **Phase 62**: Added parallel `distinctQuery` (SELECT `service_type` WITHOUT `service_type` filter) in `getDashboardData()`, pre-resolved folder names to enable parallel execution, replaced `availableServices` derivation from `auditedAgents` (filtered) with distinct query results intersected with `allowedSvcs`
+- `apps/api/src/routes/sidak.ts` — **Phase 62**: Simplified `/ranking` endpoint — replaced manual `availableServices` re-derivation with `dashboardData.availableServices` + leader `allowedServices` intersection; removed unused `VALID_SERVICE_TYPES` import
+- `apps/api/src/__tests__/sidak-service-dashboard.test.ts` — **Phase 62**: 4 new regression tests (multi-service distinct, leader scope intersection, empty results, leader scope without serviceTypeLocked)
+- `apps/web/src/__tests__/top-tickets-legacy-parity.test.ts` — **NEW Phase 60**: 10 regression tests for scoring modes, tiebreaker, contract
+- `apps/api/src/__tests__/sidak-agent-detail-weights.test.ts` — **NEW Phase 60**: 7 regression tests for weights resolution
+- `apps/web/src/__tests__/setup.ts` — **Phase 60 fix**: Added `window.scrollTo = vi.fn()` jsdom stub
+- `apps/web/src/__tests__/route-guards.test.ts` — **Phase 60 fix**: Replaced `vi.importActual` with `importOriginal` in `@tanstack/react-router` mock factory
+- `apps/web/src/routes/sidak/input.tsx` — **Phase 63**: Added `hasBadFindings` computed, `handlePerfectScore` handler, green "Sesi Tanpa Temuan" button with hasBadFindings guard + form/import hide + leader role hide
+- `apps/api/src/services/sidak-service.ts` — **Phase 63**: Added `createPerfectScoreSession()` — phantom padding creation with rule version resolution, duplicate guard, and indicator fallback
+- `apps/api/src/routes/sidak.ts` — **Phase 63**: Added `POST /temuan/perfect-session` endpoint with RBAC, activity logging, and dashboard summary refresh
+- `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 63**: 4 regression tests for `createPerfectScoreSession`
+- `apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx` — **Phase 63**: 7 regression tests for hasBadFindings logic + component contract
 
 ## Relevant Files
 
@@ -215,7 +282,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/api/src/__tests__/profiler-scope-filter.test.ts` — 18 API regression tests for getAccessiblePesertaIds + getLeaderAccessStatus
 - `apps/web/src/__tests__/leader-access-gate.test.tsx` — 11 web regression tests for LeaderAccessGate component
 - `docs/LEADER_APPROVAL_ACCESS.md` — full architecture doc updated with backend scope enforcers, access status API, and frontend gate
-- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**, **profile** (normalizeAuthProfileStatus)
+- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **timezone**, **report-docx-builder**, **profile** (normalizeAuthProfileStatus), **telefun-communication-profile** (Phase 55: benchmark defaults, status evaluator, legacy mapper)
 - `apps/api/src/middleware/auth.ts` — authentication middleware with is_deleted check + legacy status normalization
 - `apps/api/src/__tests__/auth-middleware.test.ts` — 18 regression tests for auth middleware (deleted/inactive/pending/legacy/non-admin)
 - `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
@@ -228,10 +295,11 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/hooks/useAgentDetail.ts` — agent detail hook with multi-service support
 - `apps/web/src/hooks/useProfilerAccess.ts` — profiler role/isReadOnly hook via Supabase auth
 - `apps/web/src/lib/html2canvas-tailwind-fix.ts` — Tailwind v4 oklch() fix for html2canvas exports
-- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
+- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler, Admin, and **TelefunCommunicationProfile** types — Phase 55)
 - `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
 - `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
 - **`apps/web/src/__tests__/logout-redirect.test.ts`** — regression test for logout redirects and guards
+- `railway.toml` — Railway production deployment config (build/start commands, healthcheck) — **removed; see Phase 40**
 - `.node-version` — Node.js version pinning for Railway/Nixpacks (22, required by Vite 8)
 - `apps/web/vite.config.ts` — Vite config (PORT env, API proxy, Tw v4, react plugin, preview block for Railway)
 - `apps/web/vite.config.test.ts` — Regression test: Vite preview port follows Railway `PORT` env
@@ -246,38 +314,23 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 - `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types (TelefunScenario, TelefunConsumerType), VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
 - `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
 - `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
+- **`apps/web/src/routes/telefun/components/VoiceRadarChart.tsx`** — Phase 55: 2-series radar chart (Target QA + Hasil Anda), domain 0-100, 5 axis with direction hints
+- **`apps/web/src/routes/telefun/components/VoiceAssessmentSection.tsx`** — Phase 55: Profil Komunikasi card with chart, AI insight, zoom affordance, status badges, Cara Membaca
+- **`apps/web/src/routes/telefun/components/CommunicationProfileZoomModal.tsx`** — Phase 55: full-dialog modal with large chart, Escape/overlay/button close, metric detail cards
+- **`apps/web/src/lib/voiceAssessmentUtils.ts`** — Phase 55: +normalizeTelefunScoreResponse, +getCommunicationProfileFromAssessment, fallback builder
+- **`apps/web/src/routes/telefun/sessionFinalizer.ts`** — Phase 55: forwards assessment to record.voiceAssessment
+- **`apps/api/src/lib/telefun-communication-profile.ts`** — Phase 55: benchmark defaults, status evaluator, legacy mapper, enrichment
+- **`apps/api/src/lib/telefun-analysis.ts`** — Phase 55: AI schema extended, assessment enrichment before DB save
+- **`apps/api/src/__tests__/telefun-communication-profile.test.ts`** — Phase 55: 20 unit tests (evaluation modes, legacy fallback, enrichment)
+- **`apps/web/src/__tests__/telefun-communication-profile.test.tsx`** — Phase 55: 12 component tests (chart, zoom modal, Fillers explanation, Escape key)
+- **`apps/web/src/__tests__/telefun-voice-assessment-utils.test.ts`** — Phase 55: +envelope normalization, +legacy fallback tests
+- **`apps/web/src/__tests__/telefun-session-finalizer.test.ts`** — Phase 55: +voiceAssessment in record test
 - `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-51)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-58a)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
-- `supabase/`
-- `apps/api/src/lib/` — scoring, ai-models, ai-usage, gemini, openrouter, **report-docx-builder**
-- `apps/api/src/services/` — sidak-service, ketik-service, pdkt-service, profiler-service, **admin-service**
-- `apps/api/src/routes/` — Hono endpoints (sidak, ketik, pdkt, ai, profiler, **admin**)
-- `apps/telefun/src/` — WebSocket proxy server (server, auth, usage, env)
-- `apps/web/src/router.tsx` — centralized TanStack Router v1 routes (37 routes, all React.lazy())
-- `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate
-- `apps/web/src/lib/app-config.ts` — APP_MODULES definitions with accent colors/icons
-- `apps/web/src/lib/profilerService.ts` — typed Profiler API client
-- `apps/web/src/routes/` — page components per module (including `profiler/` with 8 sub-routes, and `dashboard/users`, `dashboard/access-groups`, `dashboard/access-approval`, `dashboard/activities`)
-- `apps/web/src/hooks/useQueryParams.ts` — search params helper for TanStack Router v1
-- `packages/types/src/index.ts` — all shared Zod schemas & TS interfaces (including Profiler and Admin types)
-- `apps/web/src/components/Layout.tsx` — sidebar, SIDAK/Admin submenus, Suspense boundary for lazy routes
-- `apps/web/src/lib/excel-utils.ts` — Excel template gen, parse, validate (dynamic xlsx/exceljs import)
-- `apps/web/src/__tests__/` — frontend test files (useApi, useQueryParams, app-config, excel-utils, pdkt-mailbox, pdkt-settings, sidak-agents-load-more-copy)
-- `apps/api/src/__tests__/` — API service test files (scoring, sidak-service, profiler-service, **admin-service**)
-- `apps/web/vitest.config.ts` — Vitest config for frontend (jsdom, testing-library)
-- `apps/api/vitest.config.ts` — Vitest config for API service tests
-- `apps/web/src/lib/toast.ts` — sonner v2 wrapper (notify.success/error/warning)
-- `apps/web/src/routes/unauthorized.tsx` — 403 role-denied page
-- `apps/web/src/components/ui/Pagination.tsx` — shared pagination with page-size selector
-- `apps/web/src/routes/telefun/telefunSettings.ts` — Telefun settings types (TelefunScenario, TelefunConsumerType), VOICE_MODELS, VOICE_OPTIONS, SCENARIO_PRESETS
-- `apps/web/src/routes/telefun/components/SettingsModal.tsx` — 4-tab Telefun settings modal (Model, Skema/CRUD, Konsumen/CRUD)
-- `apps/api/src/routes/telefun.ts` — Telefun settings GET/PUT endpoints (Zod schema validasi scenarios[] + consumerTypes[])
-- `docs/checklist-audit-trainers-superapp.md` — frontend audit checklist (sections 1.1-1.8)
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-29)
 
 ## Routes Reference (apps/web)
 
@@ -292,7 +345,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 | 7   | `/sidak/settings`            | CRUD         | Service weights configuration                            |
 | 8   | `/sidak/periods`             | Manager      | Create/view audit periods                                |
 | 9   | `/sidak/agents`              | Directory    | Searchable agent list                                    |
-| 10  | `/sidak/agents/$id`          | Detail       | Score history + findings table                           |
+| 10  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service, score badges in temuan history |
 | 11  | `/ketik`                     | Landing      | Chat simulation intro                                    |
 | 12  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                      |
 | 13  | `/ketik/history`             | Placeholder  | Session history                                          |
@@ -326,7 +379,7 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 | Prefix             | Endpoints    | Service                         |
 | ------------------ | ------------ | ------------------------------- |
-| `/api/v1/sidak`    | 15 endpoints | `sidak-service.ts`              |
+| `/api/v1/sidak`    | 16 endpoints | `sidak-service.ts`              |
 | `/api/v1/ketik`    | 4 endpoints  | `ketik-service.ts`              |
 | `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
 | `/api/v1/ai`       | 7 endpoints  | —                               |

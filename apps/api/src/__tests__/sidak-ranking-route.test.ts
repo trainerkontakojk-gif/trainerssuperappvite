@@ -157,12 +157,16 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           summary: {} as any,
           serviceData: [],
           topAgents: [
-            { agentId: "agent-a", nama: "Agent A", defects: 5, score: 90, hasCritical: false },
-            { agentId: "agent-b", nama: "Agent B", defects: 10, score: 80, hasCritical: false },
+            { agentId: "agent-a", nama: "Agent A", defects: 5, score: 90, hasCritical: false, batch: "Batch 1" },
+            { agentId: "agent-b", nama: "Agent B", defects: 10, score: 80, hasCritical: false, batch: "Batch 1" },
           ],
           paretoData: [],
           donutData: { critical: 0, nonCritical: 0, total: 0 },
           availableServices: ["call"],
+          paramTrend: [] as any,
+          sparklines: {} as any,
+          availableYears: [] as any,
+          currentYear: 2026,
         };
       }
       // If it is the current YTD (both periods, or period is ytd)
@@ -172,12 +176,16 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
         summary: {} as any,
         serviceData: [],
         topAgents: [
-          { agentId: "agent-b", nama: "Agent B", defects: 12, score: 78, hasCritical: false }, // rank 1 now
-          { agentId: "agent-a", nama: "Agent A", defects: 6, score: 88, hasCritical: false }, // rank 2 now
+          { agentId: "agent-b", nama: "Agent B", defects: 12, score: 78, hasCritical: false, batch: "Batch 1" }, // rank 1 now
+          { agentId: "agent-a", nama: "Agent A", defects: 6, score: 88, hasCritical: false, batch: "Batch 1" }, // rank 2 now
         ],
         paretoData: [],
         donutData: { critical: 0, nonCritical: 0, total: 0 },
         availableServices: ["call"],
+        paramTrend: [] as any,
+        sparklines: {} as any,
+        availableYears: [] as any,
+        currentYear: 2026,
       };
     });
 

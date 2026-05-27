@@ -368,7 +368,7 @@ export default function SidakRankingPage() {
                               <div className="flex items-center justify-center gap-2">
                                 {isYearToDate && agent.rankChange !== undefined && (
                                   <>
-                                    {agent.rankChange > 0 && (
+                                    {typeof agent.rankChange === 'number' && agent.rankChange > 0 && (
                                       <motion.span
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
@@ -378,7 +378,7 @@ export default function SidakRankingPage() {
                                         ▲ +{agent.rankChange}
                                       </motion.span>
                                     )}
-                                    {agent.rankChange < 0 && (
+                                    {typeof agent.rankChange === 'number' && agent.rankChange < 0 && (
                                       <motion.span
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}

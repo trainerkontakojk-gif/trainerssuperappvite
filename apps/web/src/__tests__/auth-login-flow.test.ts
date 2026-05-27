@@ -84,7 +84,9 @@ describe("Auth Login Flow Hardening", () => {
       const { fetchApi } = await import("../hooks/useApi");
       try {
         await fetchApi("/protected");
-      } catch (_) {}
+      } catch (_) {
+        // Expected to throw
+      }
 
       expect(localStorage.getItem("auth_token")).toBeNull();
       expect(localStorage.getItem("auth_profile")).toBeNull();
@@ -134,7 +136,9 @@ describe("Auth Login Flow Hardening", () => {
       const { fetchApi } = await import("../hooks/useApi");
       try {
         await fetchApi("/test");
-      } catch (_) {}
+      } catch (_) {
+        // Expected to throw
+      }
 
       expect(localStorage.getItem("auth_token")).toBe("valid-token");
       expect(redirectUrl).toBe("");
