@@ -23,7 +23,7 @@ Aplikasi ini dibangun menggunakan arsitektur monorepo modern dengan pemisahan fr
 ```mermaid
 graph TD
     User((User)) -->|Browser| ViteApp[Vite React SPA]
-    ViteApp -->|Hono RPC (fetch)| HonoAPI[Hono API Server]
+    ViteApp -->|"Hono RPC (fetch)"| HonoAPI[Hono API Server]
     HonoAPI -->|SQL / Auth| Supabase[(Supabase / PostgreSQL)]
     ViteApp -->|Client SDK / Realtime| Supabase
     ViteApp -->|WebSocket Voice| TelefunProxy[Telefun Node Proxy]
