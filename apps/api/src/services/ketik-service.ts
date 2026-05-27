@@ -470,20 +470,32 @@ export async function triggerKetikAIReview(
       return { status: "skipped" };
     }
 
-    const { error: jobError } = await adminClient
+    const { data: existingJob } = await adminClient
       .from("ketik_review_jobs")
-      .upsert(
-        {
+      .select("id, status")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+
+    if (!existingJob) {
+      const { error: insertError } = await adminClient
+        .from("ketik_review_jobs")
+        .insert({
           session_id: sessionId,
           status: "queued",
           lease_owner: null,
           lease_expires_at: null,
           error_message: null,
-        },
-        { onConflict: "session_id" },
-      );
+        });
 
-    if (jobError) throw jobError;
+      // Duplicate insert race: treat as idempotent success
+      if (insertError) {
+        if ((insertError as { code?: string }).code !== "23505") {
+          throw insertError;
+        }
+      }
+    } else if (existingJob.status === "completed" || existingJob.status === "processing") {
+      return { status: existingJob.status === "completed" ? "skipped" : "processing" };
+    }
 
     await adminClient
       .from("ketik_history")
