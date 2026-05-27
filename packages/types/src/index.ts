@@ -241,6 +241,7 @@ export interface TopAgentData {
   defects: number;
   score: number;
   hasCritical: boolean;
+  rankChange?: number | null;
 }
 
 export interface ParetoData {

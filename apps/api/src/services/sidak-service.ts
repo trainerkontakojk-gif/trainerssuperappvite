@@ -1305,6 +1305,7 @@ export async function getDashboardData(params: {
   startMonth?: number;
   endMonth?: number;
   allowedServiceTypes?: ServiceType[];
+  limit?: number;
 }): Promise<DashboardData> {
   const [periods, indicators, weights] = await Promise.all([
     getPeriods(),
@@ -1544,7 +1545,8 @@ export async function getDashboardData(params: {
     }
   }
 
-  const topAgents: TopAgentData[] = auditedAgents
+  const limit = params.limit !== undefined ? params.limit : 20;
+  const topAgentsAll: TopAgentData[] = auditedAgents
     .map((agent) => {
       const svc = agent.rows[0]?.service_type ?? "call";
       const weight =
@@ -1571,8 +1573,9 @@ export async function getDashboardData(params: {
         }),
       };
     })
-    .sort((a, b) => b.defects - a.defects || a.nama.localeCompare(b.nama))
-    .slice(0, 20);
+    .sort((a, b) => b.defects - a.defects || a.nama.localeCompare(b.nama));
+
+  const topAgents = limit > 0 ? topAgentsAll.slice(0, limit) : topAgentsAll;
 
   const paretoArray: ParetoData[] = Array.from(paretoMap.entries())
     .map(([_key, val]) => ({

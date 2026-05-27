@@ -365,15 +365,56 @@ export default function SidakRankingPage() {
                               {agent.score.toFixed(1)}%
                             </td>
                             <td className="px-6 py-5 text-center">
-                              {agent.hasCritical && (
-                                <motion.span
-                                  initial={{ scale: 0.8 }}
-                                  animate={{ scale: 1 }}
-                                  className="px-2 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter rounded-full shadow-lg shadow-red-500/20"
-                                >
-                                  Fatal
-                                </motion.span>
-                              )}
+                              <div className="flex items-center justify-center gap-2">
+                                {isYearToDate && agent.rankChange !== undefined && (
+                                  <>
+                                    {agent.rankChange > 0 && (
+                                      <motion.span
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-black border border-red-500/20"
+                                        title="Posisi defects naik (kinerja memburuk)"
+                                      >
+                                        ▲ +{agent.rankChange}
+                                      </motion.span>
+                                    )}
+                                    {agent.rankChange < 0 && (
+                                      <motion.span
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black border border-emerald-500/20"
+                                        title="Posisi defects turun (kinerja membaik)"
+                                      >
+                                        ▼ {agent.rankChange}
+                                      </motion.span>
+                                    )}
+                                    {agent.rankChange === 0 && (
+                                      <span className="text-muted-foreground text-xs font-bold" title="Posisi tetap">
+                                        -
+                                      </span>
+                                    )}
+                                    {agent.rankChange === null && (
+                                      <motion.span
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black border border-blue-500/20"
+                                        title="Agen baru dinilai pada YTD ini"
+                                      >
+                                        Baru
+                                      </motion.span>
+                                    )}
+                                  </>
+                                )}
+                                {agent.hasCritical && (
+                                  <motion.span
+                                    initial={{ scale: 0.8 }}
+                                    animate={{ scale: 1 }}
+                                    className="px-2 py-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-tighter rounded-full shadow-lg shadow-red-500/20"
+                                  >
+                                    Fatal
+                                  </motion.span>
+                                )}
+                              </div>
                             </td>
                           </motion.tr>
                         );

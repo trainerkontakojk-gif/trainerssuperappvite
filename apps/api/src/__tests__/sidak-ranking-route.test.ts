@@ -124,4 +124,74 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
       })
     );
   });
+
+  it("calculates rankChange comparing current YTD and previous YTD", async () => {
+    // Mock getPeriods to return multiple periods
+    vi.spyOn(sidakService, "getPeriods").mockResolvedValue([
+      { id: "period-1", year: 2026, month: 1, label: "01/2026" },
+      { id: "period-2", year: 2026, month: 2, label: "02/2026" },
+    ]);
+
+    // Mock supabaseAdmin from to return mock temuan findings in both periods
+    const { supabaseAdmin } = await import("../lib/supabase");
+    vi.spyOn(supabaseAdmin, "from").mockImplementation((tableName: string) => {
+      if (tableName === "qa_temuan") {
+        return buildQuery(() => ({
+          data: [
+            { period_id: "period-1" },
+            { period_id: "period-2" },
+          ],
+          error: null,
+        })) as any;
+      }
+      return buildQuery(() => ({ data: [], error: null })) as any;
+    });
+
+    // Spy on getDashboardData and return different rankings based on the input period_ids
+    vi.spyOn(sidakService, "getDashboardData").mockImplementation(async (params: any) => {
+      // If it is the previous YTD (only period-1)
+      if (params.period_ids && params.period_ids.length === 1 && params.period_ids[0] === "period-1") {
+        return {
+          periods: [],
+          folders: [],
+          summary: {} as any,
+          serviceData: [],
+          topAgents: [
+            { agentId: "agent-a", nama: "Agent A", defects: 5, score: 90, hasCritical: false },
+            { agentId: "agent-b", nama: "Agent B", defects: 10, score: 80, hasCritical: false },
+          ],
+          paretoData: [],
+          donutData: { critical: 0, nonCritical: 0, total: 0 },
+          availableServices: ["call"],
+        };
+      }
+      // If it is the current YTD (both periods, or period is ytd)
+      return {
+        periods: [],
+        folders: [],
+        summary: {} as any,
+        serviceData: [],
+        topAgents: [
+          { agentId: "agent-b", nama: "Agent B", defects: 12, score: 78, hasCritical: false }, // rank 1 now
+          { agentId: "agent-a", nama: "Agent A", defects: 6, score: 88, hasCritical: false }, // rank 2 now
+        ],
+        paretoData: [],
+        donutData: { critical: 0, nonCritical: 0, total: 0 },
+        availableServices: ["call"],
+      };
+    });
+
+    const res = await app.request("/ranking?period=ytd&year=2026&service_type=call");
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+
+    const rankings = body.data.rankings;
+    // Agent B: was rank 2, now rank 1. rankChange = 2 - 1 = +1
+    // Agent A: was rank 1, now rank 2. rankChange = 1 - 2 = -1
+    expect(rankings[0].agentId).toBe("agent-b");
+    expect(rankings[0].rankChange).toBe(1);
+    expect(rankings[1].agentId).toBe("agent-a");
+    expect(rankings[1].rankChange).toBe(-1);
+  });
 });
