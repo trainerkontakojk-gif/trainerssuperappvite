@@ -369,24 +369,34 @@ export default function SidakRankingPage() {
                                 {selectedPeriod !== "alltime" && agent.rankChange !== undefined && (
                                   <>
                                     {typeof agent.rankChange === 'number' && agent.rankChange > 0 && (
-                                      <motion.span
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-black border border-red-500/20"
-                                        title="Posisi defects naik (kinerja memburuk)"
-                                      >
-                                        ▲ +{agent.rankChange}
-                                      </motion.span>
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <motion.span
+                                          initial={{ opacity: 0, scale: 0.8 }}
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-black border border-red-500/20"
+                                          title="Posisi defects naik (kinerja memburuk)"
+                                        >
+                                          ▲ +{agent.rankChange}
+                                        </motion.span>
+                                        <span className="text-[9px] text-muted-foreground whitespace-nowrap font-medium">
+                                          Sebelumnya Posisi {(index + 1) + agent.rankChange}
+                                        </span>
+                                      </div>
                                     )}
                                     {typeof agent.rankChange === 'number' && agent.rankChange < 0 && (
-                                      <motion.span
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black border border-emerald-500/20"
-                                        title="Posisi defects turun (kinerja membaik)"
-                                      >
-                                        ▼ {agent.rankChange}
-                                      </motion.span>
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <motion.span
+                                          initial={{ opacity: 0, scale: 0.8 }}
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          className="inline-flex items-center gap-0.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black border border-emerald-500/20"
+                                          title="Posisi defects turun (kinerja membaik)"
+                                        >
+                                          ▼ {agent.rankChange}
+                                        </motion.span>
+                                        <span className="text-[9px] text-muted-foreground whitespace-nowrap font-medium">
+                                          Sebelumnya Posisi {(index + 1) + agent.rankChange}
+                                        </span>
+                                      </div>
                                     )}
                                     {agent.rankChange === 0 && (
                                       <span className="text-muted-foreground text-xs font-bold" title="Posisi tetap">
