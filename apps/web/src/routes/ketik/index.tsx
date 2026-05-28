@@ -24,41 +24,14 @@ import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import { ChatInterface } from "./components/ChatInterface";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal } from "./components/HistoryModal";
-import { UsageModal } from "./components/UsageModal";
+import { UsageModal } from "../../components/UsageModal";
 import { SessionReviewModal } from "./components/SessionReviewModal";
 import { useAuthStore } from "../../store/authStore";
 import { notify } from "../../lib/toast";
+import { computeUsageDelta, formatUsageDeltaLabel, type UsageDelta } from "../../lib/usage-snapshot";
 
 const accentClassName = "text-emerald-600";
 const accentSoftClassName = "bg-emerald-100";
-
-interface UsageDelta {
-  costIdr: number;
-  totalTokens: number;
-  totalCalls: number;
-}
-
-function computeUsageDelta(
-  before: any | null,
-  after: any | null,
-): UsageDelta | null {
-  if (!before || !after) return null;
-  return {
-    costIdr: Math.max(0, after.total_cost_idr - before.total_cost_idr),
-    totalTokens: Math.max(0, after.total_tokens - before.total_tokens),
-    totalCalls: Math.max(0, after.total_calls - before.total_calls),
-  };
-}
-
-function formatCompactIdr(value: number): string {
-  if (value >= 1_000_000) return `Rp${(value / 1_000_000).toFixed(1)}jt`;
-  if (value >= 1_000) return `Rp${(value / 1_000).toFixed(0)}rb`;
-  return `Rp${value}`;
-}
-
-function formatUsageDeltaLabel(delta: UsageDelta): string {
-  return `+${formatCompactIdr(delta.costIdr)}`;
-}
 
 export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
@@ -207,6 +180,7 @@ export default function KetikLanding() {
             etaSeconds: 3,
           });
           handleViewReview(sessionWithScores);
+          handleReviewComplete();
           return;
         }
 
@@ -330,10 +304,9 @@ export default function KetikLanding() {
       const usage = await ketikApi.getUsageSummary();
       if (usage && runId === sessionRunIdRef.current) {
         sessionBaselineRef.current = {
-          total_calls: usage.total_calls,
-          total_tokens: usage.total_tokens,
-          total_cost_idr: usage.total_cost_idr,
-          periodLabel: usage.periodLabel,
+          totalCalls: usage.totalCalls ?? 0,
+          totalTokens: usage.totalTokens ?? 0,
+          totalCostIdr: usage.totalCostIdr ?? 0,
         };
       }
     } catch (e) {
@@ -389,10 +362,15 @@ export default function KetikLanding() {
     const runId = sessionRunIdRef.current;
     const baseline = sessionBaselineRef.current;
     setSessionDeltaPending(true);
-    void (async () => {
+
+    const recordAndComputeDelta = async () => {
+      if (runId !== sessionRunIdRef.current || !baseline) {
+        setSessionDeltaPending(false);
+        return;
+      }
       try {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        let retries = 5;
+        let retries = 8;
         while (retries > 0 && runId === sessionRunIdRef.current) {
           const afterUsage = await ketikApi.getUsageSummary();
           if (afterUsage) {
@@ -400,26 +378,45 @@ export default function KetikLanding() {
             if (delta && delta.totalCalls > 0) {
               setSessionDelta(delta);
               setSessionDeltaPending(false);
-              break;
+              return;
             }
           }
           retries--;
           if (retries > 0)
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1500));
         }
       } catch (e) {
         console.warn("[Ketik] Failed to fetch post-session usage:", e);
       }
-      if (runId === sessionRunIdRef.current) {
-        setSessionDeltaPending(false);
-      }
-    })();
+      setSessionDeltaPending(false);
+    };
 
-    sessionBaselineRef.current = null;
+    // Compute chat-only delta immediately (covers /ketik/generate calls)
+    recordAndComputeDelta();
+
     setView("home");
     setCurrentConfig(null);
     setCurrentScenario(null);
     setReviewMessages([]);
+  };
+
+  const handleReviewComplete = async () => {
+    if (!sessionBaselineRef.current) return;
+    setSessionDeltaPending(true);
+    try {
+      const afterUsage = await ketikApi.getUsageSummary();
+      if (afterUsage && sessionBaselineRef.current) {
+        const delta = computeUsageDelta(sessionBaselineRef.current, afterUsage);
+        if (delta && delta.totalCalls > 0) {
+          setSessionDelta(delta);
+        }
+      }
+    } catch (e) {
+      console.warn("[Ketik] Failed to recompute delta after review:", e);
+    } finally {
+      setSessionDeltaPending(false);
+      sessionBaselineRef.current = null;
+    }
   };
 
   const handleReviewHistory = (session: KetikSessionHistoryItem) => {
@@ -641,6 +638,7 @@ export default function KetikLanding() {
 
             if (updatedStatus === "completed" && data.resultReady) {
               handleViewReview(updatedSession);
+              handleReviewComplete();
             } else if (updatedStatus === "failed") {
               setReviewProgress((prev) => ({ ...prev, status: "failed" }));
               notify.error(

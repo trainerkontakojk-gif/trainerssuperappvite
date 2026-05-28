@@ -49,6 +49,7 @@ interface SessionReviewModalProps {
   typos?: KetikTypoFinding[];
   onReplay: () => void;
   onStartReview?: (sessionId: string) => Promise<void>;
+  onReviewComplete?: () => void;
   progress?: {
     status:
       | "idle"
@@ -73,6 +74,7 @@ export function SessionReviewModal({
   typos = [],
   onReplay,
   onStartReview,
+  onReviewComplete,
   progress = { status: "idle", percent: 0, etaSeconds: 0 },
   canStartReview = true,
   reviewAccessMessage,

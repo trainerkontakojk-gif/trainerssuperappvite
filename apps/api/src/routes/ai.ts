@@ -135,6 +135,15 @@ ai.get("/usage/summary", async (c) => {
 
     if (error) throw error;
 
+    const months = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    ];
+    const startDay = start.getUTCDate();
+    const endDay = end.getUTCDate();
+    const startMonth = months[month - 1];
+    const periodLabel = `${startDay} ${startMonth} ${year} - ${endDay} ${startMonth} ${year} WIB`;
+
     let totalCalls = 0;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -159,6 +168,7 @@ ai.get("/usage/summary", async (c) => {
         module: moduleParam,
         year,
         month,
+        periodLabel,
         totalCalls,
         totalInputTokens,
         totalOutputTokens,

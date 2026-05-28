@@ -5,7 +5,6 @@ import { ReplyComposer } from "./components/ReplyComposer";
 import { CreateEmailModal } from "./components/CreateEmailModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
-import { UsageModal } from "./components/UsageModal";
 import { useApi, postApi, deleteApi, getApi } from "../../hooks/useApi";
 import type {
   PdktMailboxItem,
@@ -69,9 +68,11 @@ const defaultConsumerTypes: PdktConsumerType[] = [
 
 interface PdktSimulationProps {
   onBack?: () => void;
+  onBeforeActivity?: () => Promise<void>;
+  onAfterActivity?: () => void;
 }
 
-export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
+export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivity }: PdktSimulationProps = {}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -81,7 +82,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
   // Modals visibility
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isUsageOpen, setIsUsageOpen] = useState(false);
 
   // Settings state
   const [settings, setSettings] = useState<PdktAppSettings | null>(null);
@@ -105,19 +105,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
       }
     >
   >({});
-
-  // Usage delta states
-  const [sessionDelta, setSessionDelta] = useState<{
-    totalCalls: number;
-    totalTokens: number;
-    costIdr: number;
-  } | null>(null);
-  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
-  const usageSnapshotRef = useRef<{
-    totalCalls: number;
-    totalTokens: number;
-    totalCostIdr: number;
-  } | null>(null);
 
   const {
     data: mailboxItems,
@@ -283,7 +270,7 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
           ) {
             await refetch();
             await fetchHistory();
-            await computeUsageDelta();
+            notifyAfter();
           }
         }
       } catch (err) {
@@ -298,61 +285,12 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
     return () => clearInterval(timer);
   }, [mailboxItems, evaluations, refetch]);
 
-  // Usage delta helper functions
-  const captureUsageBaseline = async () => {
-    try {
-      const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
-      if (summary) {
-        usageSnapshotRef.current = {
-          totalCalls: summary.totalCalls,
-          totalTokens: summary.totalTokens,
-          totalCostIdr: summary.totalCostIdr,
-        };
-      }
-    } catch (err) {
-      console.error("[PDKT] Failed to capture usage baseline:", err);
-    }
+  // Trigger parent-level usage delta computation on activity
+  const notifyBefore = async () => {
+    if (onBeforeActivity) await onBeforeActivity();
   };
-
-  const computeUsageDelta = async (retriesLeft = 2) => {
-    if (!usageSnapshotRef.current) {
-      setSessionDeltaPending(false);
-      return;
-    }
-    try {
-      const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
-      if (summary) {
-        const deltaCalls = Math.max(
-          0,
-          summary.totalCalls - usageSnapshotRef.current.totalCalls,
-        );
-        const deltaTokens = Math.max(
-          0,
-          summary.totalTokens - usageSnapshotRef.current.totalTokens,
-        );
-        const deltaCost = Math.max(
-          0,
-          summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr,
-        );
-
-        if ((deltaCalls === 0 && deltaTokens === 0 && deltaCost === 0) && retriesLeft > 0) {
-          setTimeout(() => {
-            computeUsageDelta(retriesLeft - 1);
-          }, 2000);
-          return;
-        }
-
-        setSessionDelta({
-          totalCalls: deltaCalls,
-          totalTokens: deltaTokens,
-          costIdr: deltaCost,
-        });
-      }
-    } catch (err) {
-      console.error("[PDKT] Failed to compute usage delta:", err);
-    } finally {
-      setSessionDeltaPending(false);
-    }
+  const notifyAfter = () => {
+    if (onAfterActivity) onAfterActivity();
   };
 
   // Save Settings handler
@@ -468,10 +406,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
   // Start new simulation session
   const handleStartNew = async (scenario: PdktScenario) => {
     setIsStartingNew(true);
-    // Capture baseline before generating template/initializing email session
-    await captureUsageBaseline();
-    setSessionDelta(null);
-    setSessionDeltaPending(true);
     try {
       // 1. Determine Identity (Fallback)
       const fallbackIdentity = await postApi<PdktIdentity>(
@@ -558,7 +492,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
     } catch (err) {
       console.error("[PDKT] Failed to start new simulation:", err);
       notify.error("Gagal memulai simulasi baru.");
-      setSessionDeltaPending(false);
     } finally {
       setIsStartingNew(false);
     }
@@ -571,11 +504,7 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
   const handleReplySubmit = async (replyText: string) => {
     if (!selectedId || !selectedItem) return;
     setIsReplying(true);
-    // Capture baseline before submitting reply
-    await captureUsageBaseline();
-    setSessionDelta(null);
-    setSessionDeltaPending(true);
-
+    await notifyBefore();
     try {
       const startTime = sessionStartTimeRef.current[selectedId] || Date.now();
       const timeTaken = Math.round((Date.now() - startTime) / 1000);
@@ -598,22 +527,17 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
       await refetch();
       await fetchHistory();
       setIsReplyOpen(false);
+      notifyAfter();
       notify.success("Balasan terkirim! Evaluasi AI sedang berjalan.");
     } catch (err: any) {
       console.error("[PDKT] Reply error:", err);
       notify.error(err?.message || "Gagal mengirim balasan.");
-      setSessionDeltaPending(false);
     } finally {
       setIsReplying(false);
     }
   };
 
   const handleRetryEval = async (mailboxId: string, historyId: string) => {
-    // Capture baseline before retrying evaluation
-    await captureUsageBaseline();
-    setSessionDelta(null);
-    setSessionDeltaPending(true);
-
     setEvaluations((prev) => ({
       ...prev,
       [mailboxId]: {
@@ -633,7 +557,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
           error: err?.message || "Gagal memulai ulang evaluasi.",
         },
       }));
-      setSessionDeltaPending(false);
     }
   };
 
@@ -744,7 +667,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
           await fetchHistory();
           setIsHistoryOpen(true);
         }}
-        onUsage={() => setIsUsageOpen(true)}
       />
 
       <div className="flex-1 flex flex-col min-w-0 relative">
@@ -825,14 +747,6 @@ export default function PdktSimulation({ onBack }: PdktSimulationProps = {}) {
         onSelectSession={handleSelectSession}
         onDeleteSession={handleDeleteSession}
         onClearHistory={handleClearHistory}
-      />
-
-      <UsageModal
-        isOpen={isUsageOpen}
-        onClose={() => setIsUsageOpen(false)}
-        module="pdkt"
-        sessionDelta={sessionDelta}
-        sessionDeltaPending={sessionDeltaPending}
       />
         </div>
       </div>

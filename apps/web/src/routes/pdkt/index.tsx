@@ -5,12 +5,13 @@ import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
-import { UsageModal } from "./components/UsageModal";
+import { UsageModal } from "../../components/UsageModal";
 import { useApi, getApi, deleteApi } from "../../hooks/useApi";
 import type { PdktAppSettings } from "./pdktSettings";
 import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
 import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import { notify } from "../../lib/toast";
+import { computeUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
 
 const accentClassName = "text-purple-500";
 const accentSoftClassName = "bg-purple-100";
@@ -71,17 +72,9 @@ export default function PdktLanding() {
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
-  const [sessionDelta, setSessionDelta] = useState<{
-    totalCalls: number;
-    totalTokens: number;
-    costIdr: number;
-  } | null>(null);
+  const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
-  const usageSnapshotRef = useRef<{
-    totalCalls: number;
-    totalTokens: number;
-    totalCostIdr: number;
-  } | null>(null);
+  const usageSnapshotRef = useRef<UsageSnapshot | null>(null);
 
   const { data: defaultScenarios } = useApi<PdktScenario[]>("/pdkt/scenarios");
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
@@ -176,9 +169,9 @@ export default function PdktLanding() {
       const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
       if (summary) {
         usageSnapshotRef.current = {
-          totalCalls: summary.totalCalls,
-          totalTokens: summary.totalTokens,
-          totalCostIdr: summary.totalCostIdr,
+          totalCalls: summary.totalCalls ?? 0,
+          totalTokens: summary.totalTokens ?? 0,
+          totalCostIdr: summary.totalCostIdr ?? 0,
         };
       }
     } catch (err) {
@@ -186,45 +179,40 @@ export default function PdktLanding() {
     }
   };
 
-  const computeUsageDelta = async (retriesLeft = 2) => {
+  const doComputeDelta = async (retriesLeft = 5) => {
     if (!usageSnapshotRef.current) {
       setSessionDeltaPending(false);
       return;
     }
     try {
       const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
-      if (summary) {
-        const deltaCalls = Math.max(
-          0,
-          summary.totalCalls - usageSnapshotRef.current.totalCalls,
-        );
-        const deltaTokens = Math.max(
-          0,
-          summary.totalTokens - usageSnapshotRef.current.totalTokens,
-        );
-        const deltaCost = Math.max(
-          0,
-          summary.totalCostIdr - usageSnapshotRef.current.totalCostIdr,
-        );
-
-        if ((deltaCalls === 0 && deltaTokens === 0 && deltaCost === 0) && retriesLeft > 0) {
-          setTimeout(() => {
-            computeUsageDelta(retriesLeft - 1);
-          }, 2000);
-          return;
+      if (summary && usageSnapshotRef.current) {
+        const after = {
+          totalCalls: summary.totalCalls ?? 0,
+          totalTokens: summary.totalTokens ?? 0,
+          totalCostIdr: summary.totalCostIdr ?? 0,
+        };
+        const delta = computeUsageDelta(usageSnapshotRef.current, after);
+        if (delta) {
+          if ((delta.costIdr === 0 && delta.totalTokens === 0 && delta.totalCalls === 0) && retriesLeft > 0) {
+            setTimeout(() => {
+              doComputeDelta(retriesLeft - 1);
+            }, 3000);
+            return;
+          }
+          setSessionDelta(delta);
         }
-
-        setSessionDelta({
-          totalCalls: deltaCalls,
-          totalTokens: deltaTokens,
-          costIdr: deltaCost,
-        });
       }
     } catch (err) {
       console.error("[PDKT] Failed to compute usage delta:", err);
     } finally {
       setSessionDeltaPending(false);
     }
+  };
+
+  const computeUsageDeltaNow = async () => {
+    setSessionDeltaPending(true);
+    await doComputeDelta();
   };
 
   const handleStartSimulation = async () => {
@@ -317,7 +305,7 @@ export default function PdktLanding() {
                         sessionDelta.totalTokens > 0 ||
                         sessionDelta.totalCalls > 0) && (
                         <span className="ml-auto text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                          +Rp{(sessionDelta.costIdr / 1000).toFixed(0)}rb sesi
+                          {formatUsageDeltaLabel(sessionDelta)} sesi
                           terakhir
                         </span>
                       )}
@@ -335,7 +323,7 @@ export default function PdktLanding() {
             className="fixed inset-0 z-[100] flex flex-col overflow-hidden transition-colors duration-500 bg-background"
           >
             <div className="w-full h-full relative flex flex-col bg-card">
-              <PdktSimulation onBack={() => setView("home")} />
+              <PdktSimulation onBack={() => setView("home")} onBeforeActivity={captureUsageBaseline} onAfterActivity={computeUsageDeltaNow} />
             </div>
           </motion.div>
         )}

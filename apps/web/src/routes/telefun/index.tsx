@@ -11,25 +11,16 @@ import { SettingsModal } from "./components/SettingsModal";
 import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
 import { ReviewModal } from "./components/ReviewModal";
-import { UsageModal } from "../ketik/components/UsageModal";
+import { UsageModal } from "../../components/UsageModal";
 import { postApi, putApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import { finalizeTelefunSession } from "./sessionFinalizer";
+import { computeUsageDelta, formatUsageDeltaLabel, type UsageSnapshot } from "../../lib/usage-snapshot";
 
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
-
-function formatCompactIdr(value: number): string {
-  if (value >= 1_000_000) return `Rp${(value / 1_000_000).toFixed(1)}jt`;
-  if (value >= 1_000) return `Rp${(value / 1_000).toFixed(0)}rb`;
-  return `Rp${value}`;
-}
-
-function formatUsageDeltaLabel(delta: { costIdr: number; totalTokens: number; totalCalls: number }): string {
-  return `+${formatCompactIdr(delta.costIdr)}`;
-}
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
 
@@ -66,11 +57,7 @@ export default function TelefunLanding() {
     totalTokens: number;
     totalCalls: number;
   } | null>(null);
-  const sessionBaselineRef = useRef<{
-    total_calls: number;
-    total_tokens: number;
-    total_cost_idr: number;
-  } | null>(null);
+  const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const optimisticRecordIdRef = useRef<string | null>(null);
 
@@ -245,23 +232,21 @@ export default function TelefunLanding() {
     setSessionDelta(null);
     sessionBaselineRef.current = null;
 
-    void (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/ai/usage/summary?module=telefun`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        const json = await res.json();
-        if (json?.success && json.data && runId === sessionRunIdRef.current) {
-          sessionBaselineRef.current = {
-            total_calls: json.data.total_calls || 0,
-            total_tokens: json.data.total_tokens || 0,
-            total_cost_idr: json.data.total_cost_idr || 0,
-          };
-        }
-      } catch {
-        // best-effort
+    try {
+      const res = await fetch(`${API_BASE}/ai/usage/summary?module=telefun`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = await res.json();
+      if (json?.success && json.data && runId === sessionRunIdRef.current) {
+        sessionBaselineRef.current = {
+          totalCalls: json.data.totalCalls || 0,
+          totalTokens: json.data.totalTokens || 0,
+          totalCostIdr: json.data.totalCostIdr || 0,
+        };
       }
-    })();
+    } catch {
+      // best-effort
+    }
 
     try {
       const res = await postApi<any>("/telefun/sessions", {
@@ -410,8 +395,8 @@ export default function TelefunLanding() {
 
     void (async () => {
       try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        let retries = 5;
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        let retries = 8;
         while (retries > 0 && runId === sessionRunIdRef.current) {
           try {
             const token = getToken();
@@ -422,17 +407,14 @@ export default function TelefunLanding() {
               },
             );
             const json = await res.json();
-            if (json?.success && json.data) {
-              const delta = {
-                totalCalls:
-                  (json.data.total_calls || 0) - (baseline?.total_calls || 0),
-                totalTokens:
-                  (json.data.total_tokens || 0) - (baseline?.total_tokens || 0),
-                costIdr:
-                  (json.data.total_cost_idr || 0) -
-                  (baseline?.total_cost_idr || 0),
+            if (json?.success && json.data && baseline) {
+              const after: UsageSnapshot = {
+                totalCalls: json.data.totalCalls || 0,
+                totalTokens: json.data.totalTokens || 0,
+                totalCostIdr: json.data.totalCostIdr || 0,
               };
-              if (delta.totalCalls > 0) {
+              const delta = computeUsageDelta(baseline, after);
+              if (delta && delta.totalCalls > 0) {
                 setSessionDelta(delta);
                 break;
               }
