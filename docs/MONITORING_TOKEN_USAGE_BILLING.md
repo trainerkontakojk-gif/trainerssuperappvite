@@ -21,7 +21,7 @@ Tujuan utamanya:
 
 Halaman monitoring dengan tiga tab:
 
-- `Riwayat Simulasi`
+- `Riwayat Simulasi` (Redesigned to replace crowded cards with a spacious, premium data table featuring client-side pagination, 4 dynamic growth KPI cards, inline date-range popover, and modular submetric columns to eliminate overstimulation)
 - `Penggunaan Token`
 - `Harga & Kurs`
 

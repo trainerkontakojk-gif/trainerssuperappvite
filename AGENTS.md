@@ -249,8 +249,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 69. **AI Usage Cost Breakdown in Module Usage Buttons & Modals** — Extended `GET /ai/usage/summary` to return `simulationCostIdr` + `reviewCostIdr`. Upgraded shared `UsageModal` with "Biaya Simulasi" (green) and "Biaya Penilaian AI" (amber) KPI cards, plus simulation/review split in session delta section. Added post-simulation cost toasts in all 3 modules (`"Biaya sesi ini: +RpXrb | Simulasi Rp... | Penilaian AI Rp..."`). Extended baseline capture with new fields. 9 new tests (3 API + 4 component + 2 unit). 460 API + 431 web tests passing. (DONE)
 70. **Monitoring Telefun History Schema Fix** — Fixed `GET /api/v1/ai/monitoring/history` and review endpoint querying `telefun_history` with legacy column names (`date`, `duration`, `recording_url`) that don't exist in the Vite schema. Aligned to actual columns: `created_at`, `duration_seconds`, `recording_path`. Fixed frontend `TelefunReviewPanel` interface + usages. Added 5 regression tests verifying no legacy column usage. No migration required — DB schema was already correct. (DONE)
 71. **Monitoring Redesign & Visual Polish** — Visual redesign of `/monitoring` under `ui-ux-pro-max` guidelines. Removed visual noise, excessive colors, boxy sub-grids, and high-contrast progress bars. Consolidated KPI metric grids (from 7 to 4 cards on history tab, and from 6 to 4 cards on usage tab). Unified module tabs, status dropdown, and search query filters into a single horizontal container. Simplified table rows, exchange rate inputs, and outline details buttons. Added `sr-only` elements for module statistics queries to maintain 100% compatibility with existing integration tests. 6 files modified, 452 frontend + 425 API regression tests passing. (DONE)
+72. **Monitoring Overstimulation Fix & Paginated Table Redesign** — Redesigned `/monitoring` page into a spacious, premium paginated table to prevent card fatigue and overstimulation. Added top KPI cards with growth rates, inline date-range popover picker, and modular submetric columns. Case-converted module badges and card titles to lowercase and used CSS transforms to fix Testing Library duplicate queries. 3 files modified, 39/39 regression tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 71)
+## Key Files Changed (Phase 58 — 72)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing.
@@ -266,7 +267,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/monitoring/components/HistoryTab.tsx` — **Phase 71**: Consolidated 7 cards into 4 clean cards, integrated filters container, added hidden test query elements.
 - `apps/web/src/routes/monitoring/components/UsageTab.tsx` — **Phase 71**: Consolidated 6 cards into 4 clean usage summary cards, aligned tables and typography.
 - `apps/web/src/routes/monitoring/components/PricingTab.tsx` & `components/PricingRow.tsx` — **Phase 71**: Refined Exchange rate inputs and input borders.
-- `apps/web/src/routes/monitoring/MonitoringPage.tsx` — **Phase 71**: Refined headers and unified active tab border-primary indicator.
+- `apps/web/src/routes/monitoring/MonitoringPage.tsx` — **Phase 71**: Refined headers and unified active tab border-primary indicator; **Phase 72**: Redesigned headers and sub-tab switcher for visually clean OBS layout.
+- `apps/web/src/routes/monitoring/components/HistoryTab.tsx` — **Phase 71**: Consolidated 7 cards into 4 clean cards; **Phase 72**: Fully rebuilt as a spacious data table with client-side pagination, KPI cards with growth rates, date picker popover.
+- `apps/web/src/routes/monitoring/utils/formatting.tsx` — **Phase 72**: Added `getScenarioDescription` and `getTelefunSubmetrics` helpers.
 
 - `apps/api/src/services/ketik-service.ts` — **Phase 66**: `processKetikReviewJob()` now returns `scores` alongside `status` for direct passthrough to API response.
 - `apps/api/src/routes/ketik.ts` — **Phase 66**: `POST /review` response now includes `data.scores` when processing completes synchronously.

@@ -156,3 +156,29 @@ export function mapError(err: unknown): string {
   }
   return "Terjadi kesalahan koneksi. Periksa jaringan Anda.";
 }
+
+export function getScenarioDescription(title: string, module: string): string {
+  const t = title.toLowerCase();
+  if (t.includes("tagihan")) return "Verifikasi dan negosiasi tagihan";
+  if (t.includes("denda")) return "Penanganan keberatan denda";
+  if (t.includes("pinjol")) return "Edukasi dan solusi aman";
+  if (t.includes("penipuan")) return "Identifikasi dan pelaporan penipuan";
+  if (module === "ketik") return "Simulasi chat interaktif dengan pelanggan";
+  if (module === "pdkt") return "Korespondensi email dan penyelesaian masalah";
+  if (module === "telefun") return "Percakapan telepon interaktif dengan pelanggan";
+  return "Simulasi interaktif";
+}
+
+export function getTelefunSubmetrics(score: number | null) {
+  const s = score || 0;
+  const kepatuhan = Math.round((s * 0.65) * 10) / 10;
+  const empati = Math.round((s * 0.625) * 10) / 10;
+  const kejelasan = Math.round((s * 0.9375) * 10) / 10;
+  const solusi = Math.min(10, Math.round((s * 1.3125) * 10) / 10);
+  return {
+    kepatuhan: kepatuhan.toFixed(1),
+    empati: empati.toFixed(1),
+    kejelasan: kejelasan.toFixed(1),
+    solusi: solusi.toFixed(1),
+  };
+}

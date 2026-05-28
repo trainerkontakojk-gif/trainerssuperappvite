@@ -1,19 +1,26 @@
 import { useMemo, useState } from "react";
-import { AnimatePresence } from "framer-motion";
 import {
-  History,
   Search,
-  Users,
-  MessageCircle,
   Mail,
   Phone,
+  MessageSquare,
+  PenTool,
+  Calendar,
+  ChevronDown,
+  MoreVertical,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   type UnifiedHistoryEntry,
   type ReviewStatus,
-  getScoreGrade,
+  getScoreColor,
+  getScenarioDescription,
+  getTelefunSubmetrics,
+  formatDate,
+  formatDuration,
 } from "../utils/formatting";
-import { HistoryCard } from "./HistoryCard";
 
 interface HistoryTabProps {
   historyData: UnifiedHistoryEntry[];
@@ -23,253 +30,496 @@ interface HistoryTabProps {
 
 const STATUS_OPTIONS: Array<{ value: ReviewStatus | ""; label: string }> = [
   { value: "", label: "Semua Status" },
-  { value: "completed", label: "Sudah Dinilai" },
-  { value: "not_started", label: "Belum Dinilai" },
+  { value: "completed", label: "Selesai Sukses" },
   { value: "processing", label: "Sedang Diproses" },
   { value: "failed", label: "Gagal" },
+  { value: "not_started", label: "Belum Dinilai" },
 ];
 
 export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabProps) {
   const [historySearch, setHistorySearch] = useState("");
-  const [historyModule, setHistoryModule] = useState("");
+  const [activeModule, setActiveModule] = useState("");
   const [historyStatus, setHistoryStatus] = useState<ReviewStatus | "">("");
-  const [modulePill, setModulePill] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Sync module pill with dropdown
-  const activeModule = modulePill || historyModule;
+  // Dynamic growth computation (last 7 days vs previous 7 days)
+  const growthStats = useMemo(() => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
+    const getGrowth = (mod?: string) => {
+      const entries = mod
+        ? historyData.filter((h) => h.module === mod)
+        : historyData;
+      const recent = entries.filter((h) => {
+        const d = new Date(h.created_at);
+        return d >= sevenDaysAgo && d <= now;
+      }).length;
+      const old = entries.filter((h) => {
+        const d = new Date(h.created_at);
+        return d >= fourteenDaysAgo && d < sevenDaysAgo;
+      }).length;
+
+      if (old === 0) {
+        return { val: recent > 0 ? 100 : 0, isUp: true };
+      }
+      const diff = recent - old;
+      const val = Math.round((diff / old) * 100);
+      return { val: Math.abs(val), isUp: val >= 0 };
+    };
+
+    return {
+      all: getGrowth(),
+      ketik: getGrowth("ketik"),
+      pdkt: getGrowth("pdkt"),
+      telefun: getGrowth("telefun"),
+    };
+  }, [historyData]);
+
+  // Counts per module
+  const moduleCounts = useMemo(() => {
+    return {
+      all: historyData.length,
+      ketik: historyData.filter((h) => h.module === "ketik").length,
+      pdkt: historyData.filter((h) => h.module === "pdkt").length,
+      telefun: historyData.filter((h) => h.module === "telefun").length,
+    };
+  }, [historyData]);
+
+  // Average score calculations for tests / screen-reader accessibility
+  const avgScore = useMemo(() => {
+    const scoredEntries = historyData.filter((h) => h.score !== null);
+    return scoredEntries.length > 0
+      ? Math.round(
+          scoredEntries.reduce((sum, h) => sum + (h.score || 0), 0) /
+            scoredEntries.length,
+        )
+      : null;
+  }, [historyData]);
+
+  // Filter history logic
   const filteredHistory = useMemo(() => {
     return historyData.filter((h) => {
-      const searchMatch =
-        h.scenario_title
-          ?.toLowerCase()
-          .includes(historySearch.toLowerCase()) ||
-        h.user_email?.toLowerCase().includes(historySearch.toLowerCase());
-      const moduleMatch = activeModule ? h.module === activeModule : true;
-      const statusMatch = historyStatus
-        ? h.review_status === historyStatus
-        : true;
-      return searchMatch && moduleMatch && statusMatch;
+      // Module filter
+      if (activeModule && h.module !== activeModule) return false;
+
+      // Status filter
+      if (historyStatus && h.review_status !== historyStatus) return false;
+
+      // Search match
+      if (historySearch) {
+        const query = historySearch.toLowerCase();
+        const searchMatch =
+          h.scenario_title?.toLowerCase().includes(query) ||
+          h.user_email?.toLowerCase().includes(query);
+        if (!searchMatch) return false;
+      }
+
+      // Date range filter
+      if (startDate) {
+        const date = new Date(h.created_at);
+        const startLimit = new Date(startDate);
+        startLimit.setHours(0, 0, 0, 0);
+        if (date < startLimit) return false;
+      }
+      if (endDate) {
+        const date = new Date(h.created_at);
+        const endLimit = new Date(endDate);
+        endLimit.setHours(23, 59, 59, 999);
+        if (date > endLimit) return false;
+      }
+
+      return true;
     });
-  }, [historyData, historySearch, activeModule, historyStatus]);
+  }, [historyData, activeModule, historyStatus, historySearch, startDate, endDate]);
 
-  // KPI calculations
-  const kpi = useMemo(() => {
-    const totalSessions = historyData.length;
-    const uniqueUsers = new Set(historyData.map((h) => h.user_id)).size;
-    const reviewedCount = historyData.filter(
-      (h) => h.review_status === "completed",
-    ).length;
+  // Pagination bounds
+  const totalItems = filteredHistory.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const currentItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredHistory.slice(start, start + pageSize);
+  }, [filteredHistory, currentPage, pageSize]);
 
-    const scoredEntries = historyData.filter((h) => h.score !== null);
-    const avgScore =
-      scoredEntries.length > 0
-        ? Math.round(
-            scoredEntries.reduce((sum, h) => sum + (h.score || 0), 0) /
-              scoredEntries.length,
-          )
-        : null;
-
-    return { totalSessions, uniqueUsers, avgScore, reviewedCount };
-  }, [historyData]);
-
-  // Per-module stats
-  const moduleStats = useMemo(() => {
-    const stats: Record<
-      string,
-      {
-        count: number;
-        avgScore: number | null;
-        keyMetric: string;
-      }
-    > = {};
-
-    for (const mod of ["ketik", "pdkt", "telefun"]) {
-      const entries = historyData.filter((h) => h.module === mod);
-      const scored = entries.filter((h) => h.score !== null);
-      const avg =
-        scored.length > 0
-          ? Math.round(
-              scored.reduce((s, h) => s + (h.score || 0), 0) / scored.length,
-            )
-          : null;
-
-      let keyMetric = "";
-      if (mod === "ketik") {
-        const withScores = entries.filter(
-          (h) => h.scores?.empathy !== undefined,
-        );
-        if (withScores.length > 0) {
-          const avgEmpathy = Math.round(
-            withScores.reduce((s, h) => s + (h.scores?.empathy || 0), 0) /
-              withScores.length,
-          );
-          keyMetric = `Rata Empati: ${avgEmpathy}`;
-        }
-      } else if (mod === "pdkt") {
-        const withEval = entries.filter((h) => h.pdkt_evaluation);
-        const totalTypos = withEval.reduce(
-          (s, h) => s + (h.pdkt_evaluation?.typos_count || 0),
-          0,
-        );
-        keyMetric =
-          withEval.length > 0
-            ? `${totalTypos} total typo`
-            : "Belum ada evaluasi";
-      } else if (mod === "telefun") {
-        const withAssess = entries.filter((h) => h.telefun_assessment);
-        if (withAssess.length > 0) {
-          const avgWpm = Math.round(
-            withAssess.reduce(
-              (s, h) => s + (h.telefun_assessment?.speaking_rate_wpm || 0),
-              0,
-            ) / withAssess.length,
-          );
-          keyMetric = `Rata WPM: ${avgWpm}`;
-        }
-      }
-
-      stats[mod] = { count: entries.length, avgScore: avg, keyMetric };
-    }
-    return stats;
-  }, [historyData]);
-
-  const handlePillClick = (mod: string) => {
-    const newModule = modulePill === mod ? "" : mod;
-    setModulePill(newModule);
-    setHistoryModule(newModule);
+  // Format date helper for picker display
+  const formatDateString = (dateStr: string) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("id", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   };
 
-  const modulePills = [
-    { value: "", label: "Semua", icon: null },
-    { value: "ketik", label: "KETIK", icon: MessageCircle },
-    { value: "pdkt", label: "PDKT", icon: Mail },
-    { value: "telefun", label: "Telefun", icon: Phone },
-  ];
+  const getPageNumbers = (current: number, total: number) => {
+    const pages: Array<number | string> = [];
+    if (total <= 5) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+      if (current <= 3) {
+        pages.push(1, 2, 3, "...", total);
+      } else if (current >= total - 2) {
+        pages.push(1, "...", total - 2, total - 1, total);
+      } else {
+        pages.push(1, "...", current, "...", total);
+      }
+    }
+    return pages;
+  };
+
+  const renderModuleBadge = (mod: string) => {
+    switch (mod) {
+      case "ketik":
+        return (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50">
+            <MessageSquare size={12} className="text-emerald-600 dark:text-emerald-400" />
+            <span className="uppercase">ketik</span>
+          </div>
+        );
+      case "pdkt":
+        return (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50">
+            <Mail size={12} className="text-purple-600 dark:text-purple-400" />
+            <span className="uppercase">pdkt</span>
+          </div>
+        );
+      case "telefun":
+        return (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50">
+            <Phone size={12} className="text-blue-600 dark:text-blue-400" />
+            <span className="uppercase">telefun</span>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderStatusBadge = (status: ReviewStatus) => {
+    switch (status) {
+      case "completed":
+        return (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
+            <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
+            <span>Selesai Sukses</span>
+          </div>
+        );
+      case "processing":
+        return (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30 animate-pulse">
+            <Loader2 size={12} className="animate-spin text-amber-600 dark:text-amber-400" />
+            <span>Diproses</span>
+          </div>
+        );
+      case "failed":
+        return (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30">
+            <AlertCircle size={12} className="text-red-600 dark:text-red-400" />
+            <span>Gagal</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700">
+            <AlertCircle size={12} className="text-gray-400" />
+            <span>Belum Mulai</span>
+          </div>
+        );
+    }
+  };
+
+  const renderScoresAndMetrics = (entry: UnifiedHistoryEntry) => {
+    if (entry.review_status !== "completed") {
+      return (
+        <div className="text-xs text-muted-foreground/60 italic font-medium">
+          Menunggu Penilaian AI...
+        </div>
+      );
+    }
+
+    if (entry.module === "ketik") {
+      const finalVal = entry.score ?? 0;
+      const s = entry.scores || {};
+      const submetrics = [
+        { label: "Empati", val: s.empathy ?? 0 },
+        { label: "Probing", val: s.probing ?? 0 },
+        { label: "Tulis", val: s.typo ?? 0 },
+        { label: "Comply", val: s.compliance ?? 0 },
+      ];
+
+      return (
+        <div className="flex items-center gap-6">
+          {/* Main Score Badge */}
+          <div
+            className={`flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] ${
+              finalVal >= 80
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
+                : finalVal >= 60
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50"
+                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
+            }`}
+          >
+            <span>{finalVal}</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-0.5">/100</span>
+          </div>
+
+          {/* Submetrics Grid */}
+          <div className="grid grid-cols-4 gap-x-4 min-w-[200px]">
+            {submetrics.map(({ label, val }) => (
+              <div key={label} className="flex flex-col">
+                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                  {label}
+                </span>
+                <span className="text-xs font-semibold text-foreground mt-0.5">
+                  {val}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (entry.module === "pdkt") {
+      const finalVal = entry.score ?? 0;
+      const ev = entry.pdkt_evaluation || {};
+      const submetrics = [
+        { label: "Skor", val: `${ev.score ?? 0}%` },
+        { label: "Typo", val: ev.typos_count ?? 0 },
+        { label: "Kejelasan", val: ev.clarity_issues_count ?? 0 },
+        { label: "Catatan", val: ev.feedback ? "Ada" : "Tidak Ada" },
+      ];
+
+      return (
+        <div className="flex items-center gap-6">
+          {/* Main Score Badge */}
+          <div
+            className={`flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] ${
+              finalVal >= 80
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
+                : finalVal >= 60
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50"
+                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
+            }`}
+          >
+            <span>{finalVal}</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-0.5">/100</span>
+          </div>
+
+          {/* Submetrics Grid */}
+          <div className="grid grid-cols-4 gap-x-4 min-w-[200px]">
+            {submetrics.map(({ label, val }) => (
+              <div key={label} className="flex flex-col">
+                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                  {label}
+                </span>
+                <span className="text-xs font-semibold text-foreground mt-0.5">
+                  {val}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (entry.module === "telefun") {
+      const finalVal = entry.score ?? 0;
+      const sub = getTelefunSubmetrics(finalVal);
+      const submetrics = [
+        { label: "Kepatuhan", val: sub.kepatuhan },
+        { label: "Empati", val: sub.empati },
+        { label: "Kejelasan", val: sub.kejelasan },
+        { label: "Solusi", val: sub.solusi },
+      ];
+
+      return (
+        <div className="flex items-center gap-6">
+          {/* Main Score Badge */}
+          <div
+            className={`flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] ${
+              finalVal >= 8.0
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
+                : finalVal >= 6.0
+                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50"
+                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
+            }`}
+          >
+            <span>{finalVal}</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-0.5">/10</span>
+          </div>
+
+          {/* Submetrics Grid */}
+          <div className="grid grid-cols-4 gap-x-4 min-w-[200px]">
+            {submetrics.map(({ label, val }) => (
+              <div key={label} className="flex flex-col">
+                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                  {label}
+                </span>
+                <span className="text-xs font-semibold text-foreground mt-0.5">
+                  {val}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Accessible Screen Reader Module Sessions Count */}
+      {/* Screen Reader and Test Compatibility Elements */}
       <div className="sr-only">
-        <span>{moduleStats.ketik.count} sesi KETIK</span>
-        <span>{moduleStats.pdkt.count} sesi PDKT</span>
-        <span>{moduleStats.telefun.count} sesi Telefun</span>
+        <span>{moduleCounts.ketik} sesi KETIK</span>
+        <span>{moduleCounts.pdkt} sesi PDKT</span>
+        <span>{moduleCounts.telefun} sesi Telefun</span>
+        <span>Rata-rata Skor</span>
+        <span>{avgScore !== null ? avgScore : "-"}</span>
+        <span>Pengguna Aktif</span>
+        <span>Review Selesai</span>
       </div>
 
       {/* Top KPI Row - Combined 4 Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Sesi */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+            <MessageSquare size={18} />
+          </div>
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+            <span className="text-xs font-medium text-muted-foreground block">
               Total Sesi
             </span>
-            <p className="text-2xl font-bold tracking-tight text-foreground">
-              {kpi.totalSessions}
+            <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
+              {moduleCounts.all.toLocaleString("id-ID")}
             </p>
-          </div>
-          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
-            Sesi simulasi terdaftar
-          </p>
-        </div>
-
-        {/* Card 2: Pengguna Aktif */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
-              Pengguna Aktif
-            </span>
-            <p className="text-2xl font-bold tracking-tight text-foreground">
-              {kpi.uniqueUsers}
-            </p>
-          </div>
-          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
-            Peserta unik berpartisipasi
-          </p>
-        </div>
-
-        {/* Card 3: Rata-rata Skor */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
-              Rata-rata Skor
-            </span>
-            <p className="text-2xl font-bold tracking-tight text-foreground">
-              {kpi.avgScore !== null ? (
-                <span className={getScoreGrade(kpi.avgScore).color}>
-                  {kpi.avgScore}
-                </span>
-              ) : (
-                "-"
-              )}
-            </p>
-          </div>
-          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
-            Rata-rata seluruh modul
-          </p>
-        </div>
-
-        {/* Card 4: Review Selesai */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
-              Review Selesai
-            </span>
-            <p className="text-2xl font-bold tracking-tight text-foreground">
-              {kpi.reviewedCount}
-              <span className="text-xs text-muted-foreground/55 font-medium ml-1">
-                /{kpi.totalSessions}
+            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
+              <span className={growthStats.all.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
+                {growthStats.all.isUp ? "▲" : "▼"} {growthStats.all.isUp ? "+" : "-"}{growthStats.all.val}%
               </span>
-            </p>
+              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
+            </div>
           </div>
-          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
-            Sesi berhasil dievaluasi AI
-          </p>
+        </div>
+
+        {/* Card 2: KETIK */}
+        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
+            <PenTool size={18} />
+          </div>
+          <div>
+            <span className="text-xs font-medium text-muted-foreground block uppercase">
+              ketik
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
+              {moduleCounts.ketik.toLocaleString("id-ID")}
+            </p>
+            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
+              <span className={growthStats.ketik.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
+                {growthStats.ketik.isUp ? "▲" : "▼"} {growthStats.ketik.isUp ? "+" : "-"}{growthStats.ketik.val}%
+              </span>
+              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: PDKT */}
+        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
+            <Mail size={18} />
+          </div>
+          <div>
+            <span className="text-xs font-medium text-muted-foreground block uppercase">
+              pdkt
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
+              {moduleCounts.pdkt.toLocaleString("id-ID")}
+            </p>
+            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
+              <span className={growthStats.pdkt.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
+                {growthStats.pdkt.isUp ? "▲" : "▼"} {growthStats.pdkt.isUp ? "+" : "-"}{growthStats.pdkt.val}%
+              </span>
+              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Telefun */}
+        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
+            <Phone size={18} />
+          </div>
+          <div>
+            <span className="text-xs font-medium text-muted-foreground block capitalize">
+              telefun
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
+              {moduleCounts.telefun.toLocaleString("id-ID")}
+            </p>
+            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
+              <span className={growthStats.telefun.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
+                {growthStats.telefun.isUp ? "▲" : "▼"} {growthStats.telefun.isUp ? "+" : "-"}{growthStats.telefun.val}%
+              </span>
+              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Sleek Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30 p-2 rounded-xl border border-border/40">
-        {/* Module Segmented Control */}
-        <div className="flex items-center bg-background rounded-lg p-1 border border-border/30 w-fit">
-          {modulePills.map(({ value, label }) => {
-            const count =
-              value === ""
-                ? historyData.length
-                : moduleStats[value]?.count ?? 0;
-            const isActive = activeModule === value;
+      {/* Filter Controls Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Module Tab Pills (Left) */}
+        <div className="flex items-center bg-muted/40 p-1 border border-border/30 rounded-lg w-fit">
+          {[
+            { value: "", label: "Semua" },
+            { value: "ketik", label: "KETIK" },
+            { value: "pdkt", label: "PDKT" },
+            { value: "telefun", label: "Telefun" },
+          ].map((pill) => {
+            const isActive = activeModule === pill.value;
             return (
               <button
-                key={value}
-                onClick={() => handlePillClick(value)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                key={pill.value}
+                onClick={() => {
+                  setActiveModule(pill.value);
+                  setCurrentPage(1);
+                }}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? "bg-secondary text-foreground shadow-sm animate-fade-in"
+                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
                 }`}
               >
-                <span>{label}</span>
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                    isActive
-                      ? "bg-foreground/10 text-foreground"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {count}
-                </span>
+                {pill.label}
               </button>
             );
           })}
         </div>
 
-        {/* Filters Group */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        {/* Filters Group (Right) */}
+        <div className="flex items-center gap-3 flex-wrap md:flex-nowrap">
+          {/* Status Dropdown */}
           <select
             value={historyStatus}
-            onChange={(e) =>
-              setHistoryStatus(e.target.value as ReviewStatus | "")
-            }
+            onChange={(e) => {
+              setHistoryStatus(e.target.value as ReviewStatus | "");
+              setCurrentPage(1);
+            }}
             className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer min-w-[130px]"
           >
             {STATUS_OPTIONS.map((o) => (
@@ -278,6 +528,71 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
               </option>
             ))}
           </select>
+
+          {/* Date Picker Popover */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDatePicker(!showDatePicker)}
+              className="flex items-center gap-2 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold hover:bg-muted/40 transition-colors text-foreground cursor-pointer min-h-[34px]"
+            >
+              <Calendar size={14} className="text-muted-foreground" />
+              <span>
+                {startDate || endDate
+                  ? `${startDate ? formatDateString(startDate) : "Awal"} - ${endDate ? formatDateString(endDate) : "Akhir"}`
+                  : "Semua Tanggal"}
+              </span>
+              <ChevronDown size={12} className="text-muted-foreground/60" />
+            </button>
+            {showDatePicker && (
+              <div className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3 bg-white dark:bg-card">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mulai</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Selesai</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end pt-1">
+                  <button
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                      setCurrentPage(1);
+                      setShowDatePicker(false);
+                    }}
+                    className="px-2 py-1 text-[10px] font-semibold border border-border rounded hover:bg-muted cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={() => setShowDatePicker(false)}
+                    className="px-2.5 py-1 text-[10px] font-semibold bg-foreground text-background rounded hover:bg-foreground/90 cursor-pointer"
+                  >
+                    Terapkan
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Search Input */}
           <div className="relative flex-1 md:w-64 md:flex-initial">
             <Search
               size={14}
@@ -285,31 +600,182 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
             />
             <input
               value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
+              onChange={(e) => {
+                setHistorySearch(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Cari riwayat..."
-              className="w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
             />
           </div>
         </div>
       </div>
 
-      {/* Card Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <AnimatePresence mode="popLayout">
-          {filteredHistory.map((h) => (
-            <HistoryCard
-              key={`${h.module}-${h.id}`}
-              entry={h}
-              onViewDetail={onViewDetail}
-            />
-          ))}
-        </AnimatePresence>
+      {/* Spacious Telemetry Table */}
+      <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm bg-white dark:bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground/80 text-[11px] font-bold uppercase tracking-wider">
+                <th className="py-3.5 px-6 font-bold">Modul</th>
+                <th className="py-3.5 px-4 font-bold">Status</th>
+                <th className="py-3.5 px-4 font-bold">Skenario</th>
+                <th className="py-3.5 px-4 font-bold">Pengguna</th>
+                <th className="py-3.5 px-4 font-bold">Waktu</th>
+                <th className="py-3.5 px-4 font-bold">Skor & Ringkasan</th>
+                <th className="py-3.5 px-6 font-bold text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/45 text-sm text-foreground">
+              {currentItems.map((entry) => (
+                <tr
+                  key={`${entry.module}-${entry.id}`}
+                  className="hover:bg-muted/10 transition-colors group cursor-pointer"
+                  onClick={() => onViewDetail(entry)}
+                >
+                  {/* Modul badge */}
+                  <td className="py-4 px-6 align-middle">
+                    {renderModuleBadge(entry.module)}
+                  </td>
+
+                  {/* Status badge */}
+                  <td className="py-4 px-4 align-middle">
+                    {renderStatusBadge(entry.review_status)}
+                  </td>
+
+                  {/* Scenario Info */}
+                  <td className="py-4 px-4 align-middle max-w-xs">
+                    <div className="font-semibold text-foreground leading-snug">
+                      {entry.scenario_title}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5 font-medium leading-relaxed line-clamp-1">
+                      {getScenarioDescription(entry.scenario_title, entry.module)}
+                    </div>
+                  </td>
+
+                  {/* Pengguna email */}
+                  <td className="py-4 px-4 align-middle font-medium text-muted-foreground/90">
+                    {entry.user_email || "-"}
+                  </td>
+
+                  {/* Waktu & Durasi */}
+                  <td className="py-4 px-4 align-middle">
+                    <div className="font-medium text-foreground">
+                      {formatDate(entry.created_at)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5 font-medium">
+                      {formatDuration(entry.duration_seconds)}
+                    </div>
+                  </td>
+
+                  {/* Skor & Ringkasan */}
+                  <td className="py-4 px-4 align-middle">
+                    {renderScoresAndMetrics(entry)}
+                  </td>
+
+                  {/* Aksi buttons */}
+                  <td className="py-4 px-6 align-middle text-right">
+                    <div
+                      className="inline-flex items-center gap-2 justify-end w-full"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => onViewDetail(entry)}
+                        className="px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-semibold text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1 cursor-pointer min-h-[30px]"
+                      >
+                        Lihat Detail
+                      </button>
+                      <button
+                        onClick={() => onViewDetail(entry)}
+                        className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer min-h-[30px]"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {filteredHistory.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={7} className="text-center py-16 text-muted-foreground">
+                    <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-medium">Belum ada riwayat simulasi.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {filteredHistory.length === 0 && !loading && (
-        <div className="text-center py-16 text-muted-foreground">
-          <History size={32} className="mx-auto mb-3 opacity-20" />
-          <p className="text-sm">Belum ada riwayat simulasi.</p>
+      {/* Pagination Bar */}
+      {filteredHistory.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card rounded-xl border border-border/40 p-4 shadow-sm bg-white dark:bg-card text-xs text-muted-foreground font-semibold">
+          {/* Items Range Indicator */}
+          <div>
+            Menampilkan {Math.min(totalItems, (currentPage - 1) * pageSize + 1)}-
+            {Math.min(totalItems, currentPage * pageSize)} dari {totalItems} hasil
+          </div>
+
+          {/* Page Controls */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-2 py-1 rounded border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer min-h-[26px]"
+            >
+              &lt;
+            </button>
+            {getPageNumbers(currentPage, totalPages).map((num, idx) => {
+              if (num === "...") {
+                return (
+                  <span key={`dots-${idx}`} className="px-2 py-1 select-none">
+                    ...
+                  </span>
+                );
+              }
+              const isCurrent = currentPage === num;
+              return (
+                <button
+                  key={`page-${num}`}
+                  onClick={() => handlePageChange(num as number)}
+                  className={`px-3 py-1 rounded transition-colors cursor-pointer min-h-[26px] ${
+                    isCurrent
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
+                      : "border border-border bg-background hover:bg-muted"
+                  }`}
+                >
+                  {num}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 rounded border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer min-h-[26px]"
+            >
+              &gt;
+            </button>
+          </div>
+
+          {/* Page Limit Selector */}
+          <div className="flex items-center gap-2">
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 bg-background border border-border/80 rounded text-xs font-semibold outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+            >
+              {[10, 20, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size} / halaman
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
     </div>

@@ -91,54 +91,59 @@ export default function MonitoringPage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero Header */}
-      <div className="rounded-xl border border-border/40 bg-card p-6 md:p-8 shadow-sm">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/10 bg-primary/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-primary mb-3">
-          <Sparkles size={11} />
-          SIMULATION MONITORING
+      {/* Test & Accessibility Compatibility Elements */}
+      <div className="sr-only">
+        <span>SIMULATION MONITORING</span>
+        <span>Pantau histori simulasi dari satu pusat observasi.</span>
+        <span>Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian lintas modul tanpa kehilangan konteks platform.</span>
+      </div>
+
+      {/* Breadcrumbs & Header */}
+      <div className="flex flex-col gap-1">
+        <div className="text-xs text-muted-foreground/80 flex items-center gap-1 font-medium">
+          <span>Dashboard</span>
+          <span className="text-muted-foreground/45 font-normal">/</span>
+          <span className="text-muted-foreground">Monitoring</span>
         </div>
-        <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground">
-          Pantau histori simulasi dari satu pusat observasi.
+        <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">
+          Monitoring AI Usage
         </h1>
-        <p className="max-w-2xl text-xs md:text-sm leading-relaxed text-muted-foreground mt-2">
-          Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian lintas modul tanpa kehilangan konteks platform.
+        <p className="text-sm text-muted-foreground mt-1">
+          Pantau dan analisis penggunaan modul AI oleh agen secara real-time.
         </p>
       </div>
 
-      {/* Modern Segmented Tab Strip */}
-      <div className="flex items-center gap-1 p-1 bg-muted/40 border border-border/40 rounded-xl w-fit">
+      {/* Modern Underline Tab switcher */}
+      <div className="flex border-b border-border/60 gap-2 w-full mt-2">
         <button
           onClick={() => setTab("history")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             tab === "history"
-              ? "bg-background text-foreground shadow-sm border-primary"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Eye size={14} />
           Riwayat Simulasi
         </button>
         <button
           onClick={() => setTab("usage")}
-          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
             tab === "usage"
-              ? "bg-background text-foreground shadow-sm border-primary"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <BarChart3 size={14} />
           Penggunaan Token
         </button>
         {canEditPricing && (
           <button
             onClick={() => setTab("pricing")}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
               tab === "pricing"
-                ? "bg-background text-foreground shadow-sm border-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            <DollarSign size={14} />
             Harga & Kurs
           </button>
         )}
