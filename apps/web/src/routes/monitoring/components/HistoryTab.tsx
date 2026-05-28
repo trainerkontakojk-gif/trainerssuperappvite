@@ -4,8 +4,6 @@ import {
   History,
   Search,
   Users,
-  TrendingUp,
-  CheckCircle2,
   MessageCircle,
   Mail,
   Phone,
@@ -151,117 +149,90 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
 
   return (
     <div className="space-y-6">
-      {/* Top KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
-            Total Sesi
-          </span>
-          <p className="text-3xl font-black">{kpi.totalSessions}</p>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
-            <Users size={12} className="inline mr-1" />
-            Pengguna Aktif
-          </span>
-          <p className="text-3xl font-black">{kpi.uniqueUsers}</p>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
-            <TrendingUp size={12} className="inline mr-1" />
-            Rata-rata Skor
-          </span>
-          <p className="text-3xl font-black">
-            {kpi.avgScore !== null ? (
-              <span className={getScoreGrade(kpi.avgScore).color}>
-                {kpi.avgScore}
-              </span>
-            ) : (
-              "-"
-            )}
-          </p>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
-            <CheckCircle2 size={12} className="inline mr-1" />
-            Review Selesai
-          </span>
-          <p className="text-3xl font-black">
-            {kpi.reviewedCount}
-            <span className="text-base text-muted-foreground/40 font-bold ml-1">
-              /{kpi.totalSessions}
+      {/* Accessible Screen Reader Module Sessions Count */}
+      <div className="sr-only">
+        <span>{moduleStats.ketik.count} sesi KETIK</span>
+        <span>{moduleStats.pdkt.count} sesi PDKT</span>
+        <span>{moduleStats.telefun.count} sesi Telefun</span>
+      </div>
+
+      {/* Top KPI Row - Combined 4 Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Sesi */}
+        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+              Total Sesi
             </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {kpi.totalSessions}
+            </p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
+            Sesi simulasi terdaftar
+          </p>
+        </div>
+
+        {/* Card 2: Pengguna Aktif */}
+        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+              Pengguna Aktif
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {kpi.uniqueUsers}
+            </p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
+            Peserta unik berpartisipasi
+          </p>
+        </div>
+
+        {/* Card 3: Rata-rata Skor */}
+        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+              Rata-rata Skor
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {kpi.avgScore !== null ? (
+                <span className={getScoreGrade(kpi.avgScore).color}>
+                  {kpi.avgScore}
+                </span>
+              ) : (
+                "-"
+              )}
+            </p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
+            Rata-rata seluruh modul
+          </p>
+        </div>
+
+        {/* Card 4: Review Selesai */}
+        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+          <div>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+              Review Selesai
+            </span>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {kpi.reviewedCount}
+              <span className="text-xs text-muted-foreground/55 font-medium ml-1">
+                /{kpi.totalSessions}
+              </span>
+            </p>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60 mt-2.5">
+            Sesi berhasil dievaluasi AI
           </p>
         </div>
       </div>
 
-      {/* Per-Module Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          {
-            mod: "ketik",
-            label: "KETIK",
-            icon: MessageCircle,
-            color: "module-ketik",
-          },
-          {
-            mod: "pdkt",
-            label: "PDKT",
-            icon: Mail,
-            color: "module-pdkt",
-          },
-          {
-            mod: "telefun",
-            label: "Telefun",
-            icon: Phone,
-            color: "module-telefun",
-          },
-        ].map(({ mod, label, icon: Icon, color }) => {
-          const stat = moduleStats[mod];
-          return (
-            <div
-              key={mod}
-              className={`bg-card rounded-2xl border border-border p-5 flex items-center gap-4 ${
-                activeModule === mod ? `ring-2 ring-${color}/30 border-${color}/40` : ""
-              }`}
-            >
-              <div
-                className={`w-12 h-12 bg-${color}/10 rounded-xl flex items-center justify-center shrink-0`}
-              >
-                <Icon className={`w-6 h-6 text-${color}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-black">{stat.count}</span>
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    sesi {label}
-                  </span>
-                </div>
-                {stat.avgScore !== null ? (
-                  <span className={`text-sm font-black ${getScoreGrade(stat.avgScore).color}`}>
-                    Avg: {stat.avgScore}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground/40">
-                    Belum ada skor
-                  </span>
-                )}
-                {stat.keyMetric && (
-                  <p className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
-                    {stat.keyMetric}
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Module Pill Filter + Status/Search Filters */}
-      <div className="space-y-3">
-        {/* Module Pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {modulePills.map(({ value, label, icon: Icon }) => {
+      {/* Sleek Filter Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30 p-2 rounded-xl border border-border/40">
+        {/* Module Segmented Control */}
+        <div className="flex items-center bg-background rounded-lg p-1 border border-border/30 w-fit">
+          {modulePills.map(({ value, label }) => {
             const count =
               value === ""
                 ? historyData.length
@@ -271,19 +242,18 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
               <button
                 key={value}
                 onClick={() => handlePillClick(value)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                   isActive
-                    ? "bg-foreground text-background shadow-sm"
-                    : "bg-card border border-border text-muted-foreground hover:bg-foreground/5"
+                    ? "bg-secondary text-foreground shadow-sm animate-fade-in"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
                 }`}
               >
-                {Icon && <Icon size={12} />}
-                {label}
+                <span>{label}</span>
                 <span
-                  className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                  className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
                     isActive
-                      ? "bg-background/20 text-background"
-                      : "bg-foreground/5 text-muted-foreground"
+                      ? "bg-foreground/10 text-foreground"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {count}
@@ -293,14 +263,14 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
           })}
         </div>
 
-        {/* Status + Search */}
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* Filters Group */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <select
             value={historyStatus}
             onChange={(e) =>
               setHistoryStatus(e.target.value as ReviewStatus | "")
             }
-            className="px-4 py-2.5 bg-card border border-border rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer min-w-[130px]"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -308,16 +278,16 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
               </option>
             ))}
           </select>
-          <div className="relative flex-1 max-w-xs">
+          <div className="relative flex-1 md:w-64 md:flex-initial">
             <Search
-              size={16}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               value={historySearch}
               onChange={(e) => setHistorySearch(e.target.value)}
               placeholder="Cari riwayat..."
-              className="w-full pl-12 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
         </div>

@@ -92,54 +92,53 @@ export default function MonitoringPage() {
   return (
     <div className="space-y-6">
       {/* Hero Header */}
-      <div className="rounded-2xl border border-border/50 bg-card p-6 md:p-8 shadow-sm">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-primary mb-4">
-          <Sparkles size={12} />
+      <div className="rounded-xl border border-border/40 bg-card p-6 md:p-8 shadow-sm">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/10 bg-primary/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-primary mb-3">
+          <Sparkles size={11} />
           SIMULATION MONITORING
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground">
           Pantau histori simulasi dari satu pusat observasi.
         </h1>
-        <p className="max-w-3xl text-sm md:text-base leading-relaxed text-muted-foreground mt-3">
-          Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian
-          lintas modul tanpa kehilangan konteks platform.
+        <p className="max-w-2xl text-xs md:text-sm leading-relaxed text-muted-foreground mt-2">
+          Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian lintas modul tanpa kehilangan konteks platform.
         </p>
       </div>
 
-      {/* Tab Strip */}
-      <div className="flex gap-2 mb-2 border-b border-border">
+      {/* Modern Segmented Tab Strip */}
+      <div className="flex items-center gap-1 p-1 bg-muted/40 border border-border/40 rounded-xl w-fit">
         <button
           onClick={() => setTab("history")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
             tab === "history"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "bg-background text-foreground shadow-sm border-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
           }`}
         >
-          <Eye size={16} />
+          <Eye size={14} />
           Riwayat Simulasi
         </button>
         <button
           onClick={() => setTab("usage")}
-          className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
             tab === "usage"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
+              ? "bg-background text-foreground shadow-sm border-primary"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
           }`}
         >
-          <BarChart3 size={16} />
+          <BarChart3 size={14} />
           Penggunaan Token
         </button>
         {canEditPricing && (
           <button
             onClick={() => setTab("pricing")}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
               tab === "pricing"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "bg-background text-foreground shadow-sm border-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/20"
             }`}
           >
-            <DollarSign size={16} />
+            <DollarSign size={14} />
             Harga & Kurs
           </button>
         )}
