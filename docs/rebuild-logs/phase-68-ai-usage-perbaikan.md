@@ -70,3 +70,100 @@ Setelah phase 68, user melaporkan masih tidak tampil info pertambahan rupiah. In
 - **API**: 457 passed, 4 skipped
 - **Web**: 414 passed, 0 failed
 - **Type check**: Clean for both `@trainers/web` and `@trainers/api`
+
+---
+
+## Follow-up: AI Usage Delta Robustness & Monitoring Cost Separation
+
+**Date**: 2026-05-28
+
+### Issues Reported
+
+1. **KETIK** — "Kenaikan setelah sesi terakhir" masih kosong meskipun sudah ada retry
+2. **PDKT** — "Kenaikan" menampilkan Rp0 (bukan kosong, tapi nol)
+3. **Telefun** — Belum diverifikasi apakah delta berfungsi
+4. **Monitoring** — Tidak ada pemisahan biaya simulasi vs penilaian AI
+5. **Period label** — Menampilkan "30 mei - 31 mei" instead of "1 mei - 31 mei"
+
+### Root Cause Analysis
+
+| Modul | Bug | Detail |
+|-------|-----|--------|
+| **KETIK** | Guard `delta.totalCalls > 0` terlalu ketat | `logAiUsage()` dipanggil dengan `void` (fire-and-forget), DB insert bisa terjadi setelah 14 detik retry selesai. Ketika `totalCalls` masih 0, delta tidak pernah di-set. |
+| **PDKT** | `finally` block menghapus `sessionDeltaPending` saat retry | `doComputeDelta(retriesLeft)` memanggil `setTimeout(doComputeDelta, retriesLeft-1)` lalu `return`, tapi `finally` tetap berjalan dan meng-set `sessionDeltaPending(false)`. Juga, zero delta di-set sebagai hasil setelah retry habis. |
+| **Telefun** | Tidak ada `sessionDeltaPending` state | Tidak ada feedback "masih diproses" di UsageModal. Raw `fetch` inline, tidak menggunakan `getApi`. |
+| **Period label** | `start.getUTCDate()` salah setelah WIB offset | `start.setUTCHours(-7)` menggeser 1 Mei 00:00 WIB → 30 April 17:00 UTC, sehingga `getUTCDate()` = 30. |
+| **Monitoring** | Tidak ada kolom `action` di aggregation | Endpoint hanya group by `module` + `model_id`, tidak ada cara membedakan simulasi vs penilaian AI. |
+
+### Perbaikan
+
+#### 1. Shared `pollUsageDelta()` utility
+**File**: `apps/web/src/lib/usage-snapshot.ts`
+
+```ts
+async function pollUsageDelta(
+  fetchSummary: () => Promise<UsageSnapshot | null>,
+  baseline: UsageSnapshot,
+  options?: { maxRetries?: number; initialDelayMs?: number; retryDelayMs?: number }
+): Promise<UsageDelta | null>
+```
+
+- Initial delay 2s, max 15 retry, 2s interval (~32s total timeout)
+- Guard: `after.totalCalls > baseline.totalCalls` (bukan `delta.totalCalls > 0`)
+- Menangkap error fetch tanpa crash
+- Return `null` jika timeout (UsageModal tidak menampilkan section "Kenaikan")
+
+#### 2. KETIK delta fix
+**File**: `apps/web/src/routes/ketik/index.tsx`
+- Replaced `recordAndComputeDelta` inline (8 retry, 14s) dengan `pollUsageDelta` (15 retry, 32s)
+- Replaced `handleReviewComplete` single-shot fetch dengan `pollUsageDelta`
+- Import `pollUsageDelta` instead of `computeUsageDelta`
+
+#### 3. PDKT delta fix
+**File**: `apps/web/src/routes/pdkt/index.tsx`
+- Replaced `doComputeDelta` + `computeUsageDeltaNow` dengan single `computeUsageDeltaNow` menggunakan `pollUsageDelta`
+- Hapus zero-delta fallback yang menyebabkan Rp0 muncul
+- `finally` block hanya berjalan sekali (setelah `pollUsageDelta` selesai), bukan berulang kali
+
+#### 4. Telefun delta fix
+**File**: `apps/web/src/routes/telefun/index.tsx`
+- Tambah `sessionDeltaPending` state
+- Replaced raw `fetch` inline polling dengan `pollUsageDelta`
+- Update `UsageModal` props: tambah `sessionDeltaPending`
+- Ganti type inline `{ costIdr, totalTokens, totalCalls }` dengan `UsageDelta`
+
+#### 5. Period label fix
+**File**: `apps/api/src/routes/ai.ts`
+- Replaced `start.getUTCDate()` / `end.getUTCDate()` dengan `1` dan `new Date(Date.UTC(year, month, 0)).getUTCDate()`
+- Label sekarang: "1 Mei 2026 - 31 Mei 2026 WIB"
+
+#### 6. Monitoring: Simulasi vs Penilaian AI
+**File**: `apps/api/src/routes/ai.ts`
+- Tambah konstanta `SIMULATION_ACTIONS` dan `REVIEW_ACTIONS`
+- Query param `action_category` (`simulation` | `review`) untuk filter
+- Response: `simulation_cost_idr`, `review_cost_idr` per user
+- Model breakdown: `action`, `action_category` per model
+
+**File**: `apps/web/src/routes/monitoring.tsx`
+- State `actionCategory` + toggle pills (Semua | Simulasi | Penilaian AI)
+- 2 KPI cards baru: Biaya Simulasi (hijau) + Biaya Penilaian AI (amber)
+- Tabel utama: kolom Simulasi (Rp) + Penilaian AI (Rp) menggantikan Input/Output tokens
+- Per-model breakdown + "Keseluruhan per Model": kolom Kategori dengan badge hijau/amber/abu
+
+### Files Modified (Follow-up ini)
+
+| File | Change |
+|---|---|
+| `apps/web/src/lib/usage-snapshot.ts` | Added `pollUsageDelta()` |
+| `apps/web/src/__tests__/usage-snapshot.test.ts` | NEW: 12 tests |
+| `apps/web/src/routes/ketik/index.tsx` | `pollUsageDelta` replace inline polling |
+| `apps/web/src/routes/pdkt/index.tsx` | `pollUsageDelta` replace `doComputeDelta` |
+| `apps/web/src/routes/telefun/index.tsx` | Added `sessionDeltaPending`, `pollUsageDelta` |
+| `apps/api/src/routes/ai.ts` | Period label fix, `action_category` filter, sim/review split |
+| `apps/web/src/routes/monitoring.tsx` | Toggle pills, 2 KPI cards, sim/review columns, badges |
+
+### Test Results (Follow-up ini)
+
+- **API**: 457 passed, 4 skipped, 0 failed
+- **Web**: 424 passed, 2 failed (pre-existing timeout flakes)
+- **New tests**: 12 (usage-snapshot)

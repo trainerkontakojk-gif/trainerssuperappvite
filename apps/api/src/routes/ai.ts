@@ -14,6 +14,22 @@ import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
 import { getMonitoringHistory } from "../services/monitoring-history-service";
 
+const SIMULATION_ACTIONS = new Set([
+  "chat_response",
+  "ai_generate",
+  "session_timeout",
+  "init_email",
+  "generate_template",
+  "voice_live",
+]);
+
+const REVIEW_ACTIONS = new Set([
+  "coaching_review",
+  "evaluate_response",
+  "voice_assessment",
+  "coaching_summary",
+]);
+
 type Variables = { user: User; profile: any };
 
 const ai = new Hono<{ Variables: Variables }>();
@@ -126,7 +142,7 @@ ai.get("/usage/summary", async (c) => {
     const { data: logs, error } = await admin
       .from("ai_usage_logs")
       .select(
-        "input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr",
+        "action, input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr",
       )
       .eq("user_id", userId)
       .eq("module", moduleParam)
@@ -139,10 +155,9 @@ ai.get("/usage/summary", async (c) => {
       "Januari", "Februari", "Maret", "April", "Mei", "Juni",
       "Juli", "Agustus", "September", "Oktober", "November", "Desember",
     ];
-    const startDay = start.getUTCDate();
-    const endDay = end.getUTCDate();
     const startMonth = months[month - 1];
-    const periodLabel = `${startDay} ${startMonth} ${year} - ${endDay} ${startMonth} ${year} WIB`;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const periodLabel = `1 ${startMonth} ${year} - ${lastDay} ${startMonth} ${year} WIB`;
 
     let totalCalls = 0;
     let totalInputTokens = 0;
@@ -150,6 +165,8 @@ ai.get("/usage/summary", async (c) => {
     let totalTokens = 0;
     let totalCostUsd = 0;
     let totalCostIdr = 0;
+    let simulationCostIdr = 0;
+    let reviewCostIdr = 0;
 
     if (logs) {
       totalCalls = logs.length;
@@ -159,6 +176,13 @@ ai.get("/usage/summary", async (c) => {
         totalTokens += log.total_tokens || 0;
         totalCostUsd += Number(log.estimated_cost_usd || 0);
         totalCostIdr += Number(log.estimated_cost_idr || 0);
+
+        const cost = Number(log.estimated_cost_idr || 0);
+        if (SIMULATION_ACTIONS.has(log.action)) {
+          simulationCostIdr += cost;
+        } else if (REVIEW_ACTIONS.has(log.action)) {
+          reviewCostIdr += cost;
+        }
       }
     }
 
@@ -175,6 +199,8 @@ ai.get("/usage/summary", async (c) => {
         totalTokens,
         totalCostUsd,
         totalCostIdr,
+        simulationCostIdr,
+        reviewCostIdr,
       },
     });
   } catch (error: any) {
@@ -229,20 +255,24 @@ ai.get(
       10,
     );
     const module = c.req.query("module");
+    const actionCategory = c.req.query("action_category") as
+      | "simulation"
+      | "review"
+      | undefined;
 
     const { start: monthStart, end: monthEnd } = getWibMonthBounds(year, month);
 
     let query = admin
       .from("ai_usage_logs")
       .select(
-        "user_id, model_id, module, input_tokens, output_tokens, total_tokens, estimated_cost_idr",
+        "user_id, model_id, module, action, input_tokens, output_tokens, total_tokens, estimated_cost_idr",
       )
       .gte("created_at", monthStart)
       .lte("created_at", monthEnd);
 
     if (module) query = query.eq("module", module);
 
-    const { data: logs, error } = await query.order("created_at", {
+    const { data: allLogs, error } = await query.order("created_at", {
       ascending: false,
     });
     if (error)
@@ -251,7 +281,16 @@ ai.get(
         500,
       );
 
-    if (!logs || logs.length === 0) return c.json({ success: true, data: [] });
+    let logs = allLogs || [];
+
+    // Filter by action_category AFTER fetch (since action is a derived field)
+    if (actionCategory === "simulation") {
+      logs = logs.filter((l) => SIMULATION_ACTIONS.has(l.action));
+    } else if (actionCategory === "review") {
+      logs = logs.filter((l) => REVIEW_ACTIONS.has(l.action));
+    }
+
+    if (logs.length === 0) return c.json({ success: true, data: [] });
 
     const userIds = [...new Set(logs.map((l) => l.user_id))];
     const { data: profiles } = await admin
@@ -274,21 +313,36 @@ ai.get(
           total_output_tokens: 0,
           total_tokens: 0,
           total_cost_idr: 0,
+          simulation_cost_idr: 0,
+          review_cost_idr: 0,
           models: {},
         };
       }
       const agg = userAgg[log.user_id];
+      const cost = log.estimated_cost_idr || 0;
       agg.total_calls += 1;
       agg.total_input_tokens += log.input_tokens || 0;
       agg.total_output_tokens += log.output_tokens || 0;
       agg.total_tokens += log.total_tokens || 0;
-      agg.total_cost_idr += log.estimated_cost_idr || 0;
+      agg.total_cost_idr += cost;
 
-      const key = `${log.model_id}|${log.module}`;
+      if (SIMULATION_ACTIONS.has(log.action)) {
+        agg.simulation_cost_idr += cost;
+      } else if (REVIEW_ACTIONS.has(log.action)) {
+        agg.review_cost_idr += cost;
+      }
+
+      const key = `${log.model_id}|${log.module}|${log.action}`;
       if (!agg.models[key])
         agg.models[key] = {
           model_id: log.model_id,
           module: log.module,
+          action: log.action,
+          action_category: SIMULATION_ACTIONS.has(log.action)
+            ? "simulation"
+            : REVIEW_ACTIONS.has(log.action)
+              ? "review"
+              : "other",
           calls: 0,
           input_tokens: 0,
           output_tokens: 0,
@@ -300,7 +354,7 @@ ai.get(
       m.input_tokens += log.input_tokens || 0;
       m.output_tokens += log.output_tokens || 0;
       m.total_tokens += log.total_tokens || 0;
-      m.cost_idr += log.estimated_cost_idr || 0;
+      m.cost_idr += cost;
     }
 
     const result = Object.values(userAgg).map((agg: any) => ({

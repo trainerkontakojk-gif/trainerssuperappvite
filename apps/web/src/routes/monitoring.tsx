@@ -28,9 +28,13 @@ type UsageAggregation = {
   total_output_tokens: number;
   total_tokens: number;
   total_cost_idr: number;
+  simulation_cost_idr: number;
+  review_cost_idr: number;
   models: Array<{
     model_id: string;
     module: string;
+    action: string;
+    action_category: "simulation" | "review" | "other";
     calls: number;
     input_tokens: number;
     output_tokens: number;
@@ -157,6 +161,7 @@ export default function MonitoringPage() {
   const [historySearch, setHistorySearch] = useState("");
   const [historyModule, setHistoryModule] = useState("");
   const [aggregationModule, setAggregationModule] = useState("");
+  const [actionCategory, setActionCategory] = useState<"" | "simulation" | "review">("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [detailEntry, setDetailEntry] = useState<UnifiedHistoryEntry | null>(
     null,
@@ -170,8 +175,11 @@ export default function MonitoringPage() {
       const moduleParam = aggregationModule
         ? `&module=${aggregationModule}`
         : "";
+      const categoryParam = actionCategory
+        ? `&action_category=${actionCategory}`
+        : "";
       const data = await getApi<UsageAggregation[]>(
-        `/ai/monitoring/aggregation?year=${year}&month=${month}${moduleParam}`,
+        `/ai/monitoring/aggregation?year=${year}&month=${month}${moduleParam}${categoryParam}`,
       );
       setAggregation(data);
     } catch (err) {
@@ -218,7 +226,7 @@ export default function MonitoringPage() {
     if (tab === "history") fetchHistory();
     else if (tab === "usage") fetchAggregation();
     else if (tab === "pricing") fetchPricing();
-  }, [tab, year, month, aggregationModule]);
+  }, [tab, year, month, aggregationModule, actionCategory]);
 
   const handleSavePricing = async (entry: PricingEntry) => {
     try {
@@ -270,8 +278,10 @@ export default function MonitoringPage() {
       calls: acc.calls + a.total_calls,
       tokens: acc.tokens + a.total_tokens,
       cost: acc.cost + a.total_cost_idr,
+      simulationCost: acc.simulationCost + (a.simulation_cost_idr || 0),
+      reviewCost: acc.reviewCost + (a.review_cost_idr || 0),
     }),
-    { calls: 0, tokens: 0, cost: 0 },
+    { calls: 0, tokens: 0, cost: 0, simulationCost: 0, reviewCost: 0 },
   );
 
   const allModels = useMemo(() => {
@@ -280,6 +290,7 @@ export default function MonitoringPage() {
       {
         model_id: string;
         module: string;
+        action_category: "simulation" | "review" | "other";
         calls: number;
         total_tokens: number;
         cost_idr: number;
@@ -287,7 +298,7 @@ export default function MonitoringPage() {
     >();
     for (const agg of aggregation) {
       for (const m of agg.models) {
-        const key = `${m.model_id}|${m.module}`;
+        const key = `${m.model_id}|${m.module}|${m.action}`;
         const existing = map.get(key);
         if (existing) {
           existing.calls += m.calls;
@@ -297,6 +308,7 @@ export default function MonitoringPage() {
           map.set(key, {
             model_id: m.model_id,
             module: m.module,
+            action_category: m.action_category,
             calls: m.calls,
             total_tokens: m.total_tokens,
             cost_idr: m.cost_idr,
@@ -565,7 +577,7 @@ export default function MonitoringPage() {
       {tab === "usage" && (
         <>
           {/* KPI Summary */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="bg-card rounded-2xl border border-border p-5">
               <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2 block">
                 <Target size={12} className="inline mr-1" />
@@ -589,6 +601,32 @@ export default function MonitoringPage() {
               </span>
               <p className="text-2xl font-black text-primary">
                 Rp {Math.round(totalSummary.cost).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-card rounded-2xl border border-emerald-200 p-5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2 block">
+                <Sparkles size={12} className="inline mr-1" />
+                Biaya Simulasi
+              </span>
+              <p className="text-2xl font-black text-emerald-600">
+                Rp {Math.round(totalSummary.simulationCost).toLocaleString()}
+              </p>
+              <p className="text-[10px] text-emerald-600/60 mt-1">
+                Chat, email, panggilan suara
+              </p>
+            </div>
+            <div className="bg-card rounded-2xl border border-amber-200 p-5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-2 block">
+                <Sparkles size={12} className="inline mr-1" />
+                Biaya Penilaian AI
+              </span>
+              <p className="text-2xl font-black text-amber-600">
+                Rp {Math.round(totalSummary.reviewCost).toLocaleString()}
+              </p>
+              <p className="text-[10px] text-amber-600/60 mt-1">
+                Evaluasi, coaching, analisis suara
               </p>
             </div>
             <div className="bg-card rounded-2xl border border-border p-5">
@@ -635,6 +673,39 @@ export default function MonitoringPage() {
                 </option>
               ))}
             </select>
+            {/* Category toggle */}
+            <div className="flex items-center rounded-xl border border-border overflow-hidden">
+              <button
+                onClick={() => setActionCategory("")}
+                className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                  actionCategory === ""
+                    ? "bg-foreground text-background"
+                    : "bg-card text-muted-foreground hover:bg-foreground/5"
+                }`}
+              >
+                Semua
+              </button>
+              <button
+                onClick={() => setActionCategory("simulation")}
+                className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all border-l border-border ${
+                  actionCategory === "simulation"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-card text-muted-foreground hover:bg-foreground/5"
+                }`}
+              >
+                Simulasi
+              </button>
+              <button
+                onClick={() => setActionCategory("review")}
+                className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest transition-all border-l border-border ${
+                  actionCategory === "review"
+                    ? "bg-amber-600 text-white"
+                    : "bg-card text-muted-foreground hover:bg-foreground/5"
+                }`}
+              >
+                Penilaian AI
+              </button>
+            </div>
             <div className="relative flex-1 max-w-xs">
               <Search
                 size={16}
@@ -669,16 +740,16 @@ export default function MonitoringPage() {
                     Call
                   </th>
                   <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
-                    Input
+                    Token
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">
+                    <span className="text-emerald-600">Simulasi (Rp)</span>
+                  </th>
+                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest">
+                    <span className="text-amber-600">Penilaian AI (Rp)</span>
                   </th>
                   <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
-                    Output
-                  </th>
-                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
-                    Total Token
-                  </th>
-                  <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
-                    Biaya (Rp)
+                    Total Biaya (Rp)
                   </th>
                 </tr>
               </thead>
@@ -705,13 +776,17 @@ export default function MonitoringPage() {
                     </td>
                     <td className="px-6 py-4 text-right">{a.total_calls}</td>
                     <td className="px-6 py-4 text-right">
-                      {a.total_input_tokens.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      {a.total_output_tokens.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold">
                       {a.total_tokens.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-right text-emerald-600 font-bold">
+                      {(a.simulation_cost_idr || 0) > 0
+                        ? formatIdr(a.simulation_cost_idr)
+                        : "-"}
+                    </td>
+                    <td className="px-6 py-4 text-right text-amber-600 font-bold">
+                      {(a.review_cost_idr || 0) > 0
+                        ? formatIdr(a.review_cost_idr)
+                        : "-"}
                     </td>
                     <td className="px-6 py-4 text-right text-primary font-bold">
                       {formatIdr(a.total_cost_idr)}
@@ -755,6 +830,9 @@ export default function MonitoringPage() {
                     <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
                       Modul
                     </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Kategori
+                    </th>
                     <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
                       Call
                     </th>
@@ -772,6 +850,7 @@ export default function MonitoringPage() {
                       a.models.map((m) => ({
                         model_id: m.model_id,
                         module: m.module,
+                        action_category: m.action_category,
                         calls: m.calls,
                         total_tokens: m.total_tokens,
                         cost_idr: m.cost_idr,
@@ -791,6 +870,21 @@ export default function MonitoringPage() {
                           >
                             {m.module}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {m.action_category === "simulation" ? (
+                            <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                              Simulasi
+                            </span>
+                          ) : m.action_category === "review" ? (
+                            <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                              Penilaian
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-muted text-muted-foreground border border-border">
+                              Lainnya
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right text-xs">
                           {m.calls}
@@ -825,6 +919,9 @@ export default function MonitoringPage() {
                     <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
                       Modul
                     </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Kategori
+                    </th>
                     <th className="px-6 py-4 text-right text-[10px] font-black uppercase tracking-widest opacity-40">
                       Call
                     </th>
@@ -849,6 +946,21 @@ export default function MonitoringPage() {
                         <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-foreground/5">
                           {m.module}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {m.action_category === "simulation" ? (
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            Simulasi
+                          </span>
+                        ) : m.action_category === "review" ? (
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                            Penilaian
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-muted text-muted-foreground border border-border">
+                            Lainnya
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right text-xs">
                         {m.calls}

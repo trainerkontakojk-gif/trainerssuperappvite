@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, BarChart3, Loader2, TrendingUp } from "lucide-react";
+import { X, BarChart3, Loader2, TrendingUp, Sparkles, Zap } from "lucide-react";
 import { getApi } from "../hooks/useApi";
 import type { UsageDelta } from "../lib/usage-snapshot";
 
@@ -60,6 +60,8 @@ export function UsageModal({
     totalOutputTokens: number;
     totalTokens: number;
     totalCostIdr: number;
+    simulationCostIdr: number;
+    reviewCostIdr: number;
     periodLabel?: string;
     year?: number;
     month?: number;
@@ -182,6 +184,22 @@ export function UsageModal({
                       </span>
                     )}
                   </div>
+                  {sessionDelta && (sessionDelta.simulationCostIdr > 0 || sessionDelta.reviewCostIdr > 0) && (
+                    <div className="flex items-center gap-3 mt-2 pt-2 border-t border-current/10">
+                      {sessionDelta.simulationCostIdr > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                          <Zap className="w-3 h-3" />
+                          Simulasi +{formatIdr(sessionDelta.simulationCostIdr)}
+                        </span>
+                      )}
+                      {sessionDelta.reviewCostIdr > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600">
+                          <Sparkles className="w-3 h-3" />
+                          Penilaian AI +{formatIdr(sessionDelta.reviewCostIdr)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -193,6 +211,34 @@ export function UsageModal({
                   <div className={`text-3xl font-black ${meta.accent}`}>
                     {formatIdr(usage.totalCostIdr)}
                   </div>
+                </div>
+                <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Zap className="w-3 h-3 text-emerald-600" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                      Biaya Simulasi
+                    </span>
+                  </div>
+                  <div className="text-lg font-black text-emerald-600">
+                    {(usage.simulationCostIdr ?? 0) > 0 ? formatIdr(usage.simulationCostIdr) : "-"}
+                  </div>
+                  <p className="text-[10px] text-emerald-600/60 mt-0.5">
+                    Chat, email, panggilan suara
+                  </p>
+                </div>
+                <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/10">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Sparkles className="w-3 h-3 text-amber-600" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                      Biaya Penilaian AI
+                    </span>
+                  </div>
+                  <div className="text-lg font-black text-amber-600">
+                    {(usage.reviewCostIdr ?? 0) > 0 ? formatIdr(usage.reviewCostIdr) : "-"}
+                  </div>
+                  <p className="text-[10px] text-amber-600/60 mt-0.5">
+                    Evaluasi, coaching, analisis suara
+                  </p>
                 </div>
                 <div className="bg-foreground/[0.02] rounded-xl p-4">
                   <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">

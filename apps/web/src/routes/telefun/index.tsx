@@ -17,7 +17,7 @@ import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import { finalizeTelefunSession } from "./sessionFinalizer";
-import { computeUsageDelta, formatUsageDeltaLabel, type UsageSnapshot } from "../../lib/usage-snapshot";
+import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
 
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
@@ -52,11 +52,8 @@ export default function TelefunLanding() {
   } | null>(null);
   const [history, setHistory] = useState<CallRecord[]>([]);
 
-  const [sessionDelta, setSessionDelta] = useState<{
-    costIdr: number;
-    totalTokens: number;
-    totalCalls: number;
-  } | null>(null);
+  const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
+  const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const optimisticRecordIdRef = useRef<string | null>(null);
@@ -242,6 +239,8 @@ export default function TelefunLanding() {
           totalCalls: json.data.totalCalls || 0,
           totalTokens: json.data.totalTokens || 0,
           totalCostIdr: json.data.totalCostIdr || 0,
+          simulationCostIdr: json.data.simulationCostIdr || 0,
+          reviewCostIdr: json.data.reviewCostIdr || 0,
         };
       }
     } catch {
@@ -393,43 +392,48 @@ export default function TelefunLanding() {
     const runId = sessionRunIdRef.current;
     const baseline = sessionBaselineRef.current;
 
-    void (async () => {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        let retries = 8;
-        while (retries > 0 && runId === sessionRunIdRef.current) {
+    if (baseline && runId === sessionRunIdRef.current) {
+      setSessionDeltaPending(true);
+      pollUsageDelta(
+        async () => {
           try {
             const token = getToken();
             const res = await fetch(
               `${API_BASE}/ai/usage/summary?module=telefun`,
-              {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-              },
+              { headers: token ? { Authorization: `Bearer ${token}` } : {} },
             );
             const json = await res.json();
-            if (json?.success && json.data && baseline) {
-              const after: UsageSnapshot = {
+            if (json?.success && json.data) {
+              return {
                 totalCalls: json.data.totalCalls || 0,
                 totalTokens: json.data.totalTokens || 0,
                 totalCostIdr: json.data.totalCostIdr || 0,
+                simulationCostIdr: json.data.simulationCostIdr || 0,
+                reviewCostIdr: json.data.reviewCostIdr || 0,
               };
-              const delta = computeUsageDelta(baseline, after);
-              if (delta && delta.totalCalls > 0) {
-                setSessionDelta(delta);
-                break;
-              }
             }
           } catch {
-            // retry
+            // ignore
           }
-          retries--;
-          if (retries > 0)
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+          return null;
+        },
+        baseline,
+      ).then((delta) => {
+        if (runId === sessionRunIdRef.current) {
+          setSessionDelta(delta);
+          if (delta && delta.costIdr > 0) {
+            const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
+            if (delta.simulationCostIdr > 0) parts.push(`Simulasi Rp${delta.simulationCostIdr.toLocaleString("id-ID")}`);
+            if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
+            notify.success(parts.join(" | "));
+          }
         }
-      } catch {
-        // best-effort
-      }
-    })();
+      }).catch(() => {}).finally(() => {
+        if (runId === sessionRunIdRef.current) {
+          setSessionDeltaPending(false);
+        }
+      });
+    }
   };
 
   const handleDeleteSession = async (id: string) => {
@@ -517,6 +521,7 @@ export default function TelefunLanding() {
         onClose={() => setIsUsageOpen(false)}
         module="telefun"
         sessionDelta={sessionDelta}
+        sessionDeltaPending={sessionDeltaPending}
       />
 
       <AnimatePresence mode="wait">

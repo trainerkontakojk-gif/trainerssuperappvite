@@ -28,7 +28,7 @@ import { UsageModal } from "../../components/UsageModal";
 import { SessionReviewModal } from "./components/SessionReviewModal";
 import { useAuthStore } from "../../store/authStore";
 import { notify } from "../../lib/toast";
-import { computeUsageDelta, formatUsageDeltaLabel, type UsageDelta } from "../../lib/usage-snapshot";
+import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta } from "../../lib/usage-snapshot";
 
 const accentClassName = "text-emerald-600";
 const accentSoftClassName = "bg-emerald-100";
@@ -307,6 +307,8 @@ export default function KetikLanding() {
           totalCalls: usage.totalCalls ?? 0,
           totalTokens: usage.totalTokens ?? 0,
           totalCostIdr: usage.totalCostIdr ?? 0,
+          simulationCostIdr: usage.simulationCostIdr ?? 0,
+          reviewCostIdr: usage.reviewCostIdr ?? 0,
         };
       }
     } catch (e) {
@@ -363,36 +365,29 @@ export default function KetikLanding() {
     const baseline = sessionBaselineRef.current;
     setSessionDeltaPending(true);
 
-    const recordAndComputeDelta = async () => {
-      if (runId !== sessionRunIdRef.current || !baseline) {
-        setSessionDeltaPending(false);
-        return;
-      }
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        let retries = 8;
-        while (retries > 0 && runId === sessionRunIdRef.current) {
-          const afterUsage = await ketikApi.getUsageSummary();
-          if (afterUsage) {
-            const delta = computeUsageDelta(baseline, afterUsage);
-            if (delta && delta.totalCalls > 0) {
-              setSessionDelta(delta);
-              setSessionDeltaPending(false);
-              return;
-            }
+    // Poll for usage delta (covers /ketik/generate calls)
+    if (baseline && runId === sessionRunIdRef.current) {
+      pollUsageDelta(
+        () => ketikApi.getUsageSummary(),
+        baseline,
+      ).then((delta) => {
+        if (runId === sessionRunIdRef.current) {
+          setSessionDelta(delta);
+          if (delta && delta.costIdr > 0) {
+            const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
+            if (delta.simulationCostIdr > 0) parts.push(`Simulasi Rp${delta.simulationCostIdr.toLocaleString("id-ID")}`);
+            if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
+            notify.success(parts.join(" | "));
           }
-          retries--;
-          if (retries > 0)
-            await new Promise((resolve) => setTimeout(resolve, 1500));
         }
-      } catch (e) {
-        console.warn("[Ketik] Failed to fetch post-session usage:", e);
-      }
+      }).catch(() => {}).finally(() => {
+        if (runId === sessionRunIdRef.current) {
+          setSessionDeltaPending(false);
+        }
+      });
+    } else {
       setSessionDeltaPending(false);
-    };
-
-    // Compute chat-only delta immediately (covers /ketik/generate calls)
-    recordAndComputeDelta();
+    }
 
     setView("home");
     setCurrentConfig(null);
@@ -401,15 +396,19 @@ export default function KetikLanding() {
   };
 
   const handleReviewComplete = async () => {
-    if (!sessionBaselineRef.current) return;
+    const baseline = sessionBaselineRef.current;
+    if (!baseline) return;
     setSessionDeltaPending(true);
     try {
-      const afterUsage = await ketikApi.getUsageSummary();
-      if (afterUsage && sessionBaselineRef.current) {
-        const delta = computeUsageDelta(sessionBaselineRef.current, afterUsage);
-        if (delta && delta.totalCalls > 0) {
-          setSessionDelta(delta);
-        }
+      const delta = await pollUsageDelta(
+        () => ketikApi.getUsageSummary(),
+        baseline,
+      );
+      setSessionDelta(delta);
+      if (delta && delta.costIdr > 0) {
+        const parts = [`Biaya penilaian: ${formatUsageDeltaLabel(delta)}`];
+        if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
+        notify.success(parts.join(" | "));
       }
     } catch (e) {
       console.warn("[Ketik] Failed to recompute delta after review:", e);
