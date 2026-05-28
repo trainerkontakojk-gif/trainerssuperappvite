@@ -142,6 +142,16 @@ Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
 2. **Design** — Arsitektur, alur data, component tree, interface changes, dan keputusan teknis.
 3. **Tasklist** — Langkah-langkah implementasi terperinci, file affected, test strategy, timeline estimasi, dependensi, risk register, dan rollback plan.
 
+### 8. Wajib Test Sebelum Push ke GitHub
+
+Saat user meminta push ke GitHub (`git push` atau `git commit && git push`), **WAJIB** lakukan pre-push checklist berikut secara berurutan:
+
+1. **Lint:** Jalankan `pnpm lint` — pastikan 0 error (warning diperbolehkan).
+2. **Build:** Jalankan `pnpm build` — pastikan 0 error. Build failure = Railway deploy failure.
+3. **Test:** Jalankan `pnpm test` — pastikan seluruh suite lulus (API + web). Jika ada test failure, perbaiki sebelum push.
+
+Jika ada langkah yang gagal, **HENTIKAN** proses push dan informasikan ke user beserta output error-nya. Jangan melanjutkan push sampai semua langkah hijau.
+
 ### 7. Selalu Referensi Context7 + ECC untuk Dokumentasi
 
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:

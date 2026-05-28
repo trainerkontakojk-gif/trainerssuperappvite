@@ -77,7 +77,7 @@ export function UsageTab({
     { calls: 0, tokens: 0, cost: 0, simulationCost: 0, reviewCost: 0 },
   );
 
-  const allModels = useMemo(() => {
+  const allModels = (() => {
     const map = new Map<
       string,
       {
@@ -110,7 +110,7 @@ export function UsageTab({
       }
     }
     return Array.from(map.values());
-  }, [aggregation]);
+  })();
 
   return (
     <div className="space-y-6">

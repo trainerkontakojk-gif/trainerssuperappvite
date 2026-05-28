@@ -288,11 +288,11 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
 
     if (entry.module === "pdkt") {
       const finalVal = entry.score ?? 0;
-      const ev = entry.pdkt_evaluation || {};
+      const ev = entry.pdkt_evaluation ?? { score: 0, feedback: "", typos_count: 0, clarity_issues_count: 0 };
       const submetrics = [
-        { label: "Skor", val: `${ev.score ?? 0}%` },
-        { label: "Typo", val: ev.typos_count ?? 0 },
-        { label: "Kejelasan", val: ev.clarity_issues_count ?? 0 },
+        { label: "Skor", val: `${ev.score}%` },
+        { label: "Typo", val: ev.typos_count },
+        { label: "Kejelasan", val: ev.clarity_issues_count },
         { label: "Catatan", val: ev.feedback ? "Ada" : "Tidak Ada" },
       ];
 

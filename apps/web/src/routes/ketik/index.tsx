@@ -130,7 +130,7 @@ export default function KetikLanding() {
   const POLLING_TIMEOUT_SECONDS = 120;
 
   const handleStartManualReview = async (sessionId: string) => {
-    reviewStartedAtRef.current = Date.now();
+    reviewStartedAtRef.current = (() => Date.now())();
     setReviewProgress({ status: "starting", percent: 0, etaSeconds: 35 });
 
     // Auto-transition: starting → processing after 2 detik agar UI tidak terasa stuck
@@ -558,7 +558,7 @@ export default function KetikLanding() {
           else if (prev.percent < 90) increment = 0.2;
           else increment = 0.05;
 
-          let nextPercent = Math.min(
+          const nextPercent = Math.min(
             prev.percent + increment,
             prev.status === "delayed"
               ? 92

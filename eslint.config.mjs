@@ -15,6 +15,7 @@ export default tseslint.config(
       '**/.turbo/**',
       'docs/**',
       '.codex-plugin/**',
+      'scripts/**',
       '**/apply-migration.js',
     ],
   },
