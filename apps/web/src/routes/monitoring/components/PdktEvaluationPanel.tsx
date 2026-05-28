@@ -109,33 +109,45 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
             {emails.map((email: any, i: number) => {
-              const isResponse = email.type !== "received";
+              const isResponse =
+                email.isAgent === true ||
+                (email.type !== undefined && email.type !== "received");
               return (
                 <div
                   key={i}
-                  className={`p-4 rounded-xl text-sm ${
-                    isResponse
-                      ? "bg-primary/5 ml-8 border border-primary/10"
-                      : "bg-muted mr-8 border border-border"
-                  }`}
+                  className={`flex w-full ${isResponse ? "justify-end" : "justify-start"}`}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    {isResponse ? (
-                      <Send size={10} className="text-primary" />
-                    ) : (
-                      <Inbox size={10} className="text-muted-foreground" />
-                    )}
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40">
-                      {isResponse ? "BALASAN USER" : "EMAIL MASUK"}
-                    </span>
-                  </div>
-                  {email.subject && (
-                    <div className="text-xs font-bold text-foreground mb-2">
-                      {email.subject}
+                  <div
+                    className={`max-w-[85%] p-4 rounded-2xl text-sm shadow-sm ${
+                      isResponse
+                        ? "bg-primary/5 border border-primary/15 rounded-tr-none ml-12"
+                        : "bg-muted/70 border border-border rounded-tl-none mr-12"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {isResponse ? (
+                        <Send size={10} className="text-primary" />
+                      ) : (
+                        <Inbox size={10} className="text-module-pdkt" />
+                      )}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          isResponse
+                            ? "bg-primary/10 text-primary"
+                            : "bg-module-pdkt/10 text-module-pdkt"
+                        }`}
+                      >
+                        {isResponse ? "Balasan Anda (Agen)" : "Email Masuk (Konsumen)"}
+                      </span>
                     </div>
-                  )}
-                  <div className="whitespace-pre-wrap leading-relaxed text-foreground/80">
-                    {email.body || email.content || "(empty)"}
+                    {email.subject && (
+                      <div className="text-xs font-bold text-foreground mb-1.5">
+                        {email.subject}
+                      </div>
+                    )}
+                    <div className="whitespace-pre-wrap leading-relaxed text-foreground/90">
+                      {email.body || email.content || "(empty)"}
+                    </div>
                   </div>
                 </div>
               );

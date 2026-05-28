@@ -12,6 +12,8 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  User,
+  Bot,
 } from "lucide-react";
 import { getApi } from "../../../hooks/useApi";
 import { getScoreGrade } from "../utils/formatting";
@@ -98,27 +100,41 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
             {messages.map((msg: any, i: number) => {
-              const isUser = msg.role === "user";
+              const isUser =
+                msg.sender === "agent" ||
+                msg.role === "user" ||
+                msg.role === "agent";
               return (
                 <div
                   key={i}
-                  className={`p-4 rounded-xl text-sm ${
-                    isUser
-                      ? "bg-primary/5 ml-12 border border-primary/10"
-                      : "bg-muted mr-12 border border-border"
-                  }`}
+                  className={`flex w-full ${isUser ? "justify-end" : "justify-start"}`}
                 >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                  <div
+                    className={`max-w-[80%] p-4 rounded-2xl text-sm shadow-sm ${
                       isUser
-                        ? "bg-primary/10 text-primary"
-                        : "bg-module-ketik/10 text-module-ketik"
-                    }`}>
-                      {isUser ? "Anda (Trainer)" : "Konsumen (AI)"}
-                    </span>
-                  </div>
-                  <div className="whitespace-pre-wrap leading-relaxed">
-                    {msg.text || msg.content || "(empty)"}
+                        ? "bg-primary/5 border border-primary/15 rounded-tr-none ml-12"
+                        : "bg-muted/70 border border-border rounded-tl-none mr-12"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      {isUser ? (
+                        <User className="w-3 h-3 text-primary" />
+                      ) : (
+                        <Bot className="w-3 h-3 text-module-ketik" />
+                      )}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          isUser
+                            ? "bg-primary/10 text-primary"
+                            : "bg-module-ketik/10 text-module-ketik"
+                        }`}
+                      >
+                        {isUser ? "Anda (Agen)" : "Konsumen (AI)"}
+                      </span>
+                    </div>
+                    <div className="whitespace-pre-wrap leading-relaxed text-foreground/90">
+                      {msg.text || msg.content || "(empty)"}
+                    </div>
                   </div>
                 </div>
               );

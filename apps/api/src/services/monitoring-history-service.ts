@@ -85,8 +85,8 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
         .limit(200),
       admin
         .from("telefun_history")
-        .select("id, user_id, date, scenario_title, duration, recording_url, score, voice_assessment, ai_summary, strengths, weaknesses")
-        .order("date", { ascending: false })
+        .select("id, user_id, created_at, scenario_title, duration_seconds, recording_path, score, voice_assessment, ai_summary, strengths, weaknesses")
+        .order("created_at", { ascending: false })
         .limit(200),
       admin
         .from("results")
@@ -255,15 +255,15 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       user_id: row.user_id,
       module: "telefun",
       scenario_title: safeString(row.scenario_title, "Simulasi Telepon"),
-      created_at: safeString(row.date, ""),
-      duration_seconds: safeNumber(row.duration, 0),
+      created_at: safeString(row.created_at, ""),
+      duration_seconds: safeNumber(row.duration_seconds, 0),
       // Use voice_assessment.overallScore (0-10) when available, otherwise fall back to score
       score: va
-        ? safeNumber(va.overallScore, typeof row.score === "number" ? row.score : null)
+        ? safeNumber(va.overallScore, typeof row.score === "number" ? row.score : 0)
         : typeof row.score === "number"
           ? row.score
           : null,
-      history: safeString(row.recording_url, ""),
+      history: safeString(row.recording_path, ""),
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
       review_status:

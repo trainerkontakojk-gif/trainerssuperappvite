@@ -247,14 +247,19 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 67. **PDKT Mailbox Error Handling & API Env Bootstrap** — Null-safe auth header extraction across all PDKT endpoints, ExecutionContext guard for test compatibility, structured error logging, human-friendly error wrapping in service (4 functions). Frontend error state UI with retry, success toast on reply, error message passthrough, diagnostic warnings for empty scenarios. Added `VITE_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY` env vars with Zod validation + test coverage. Fixed `createAdminClient()` to use env variable. 5 new frontend tests. 425 API + 394 web tests passing. (DONE)
 68. **AI Usage Delta Fix & Monitoring Cost Separation** — Fixed 4 issues: (1) KETIK "Kenaikan setelah sesi terakhir" kosong — replaced inline 8-retry polling (14s) with shared `pollUsageDelta()` utility (15 retries, 32s, `after.totalCalls > baseline.totalCalls` guard); (2) PDKT delta menampilkan Rp0 — fixed `finally` clearing `sessionDeltaPending` during retries, zero delta filtered; (3) Telefun delta — added missing `sessionDeltaPending` state, replaced raw fetch with `pollUsageDelta()`; (4) Period label "30 mei - 31 mei" — fixed WIB timezone offset bug in `/ai/usage/summary`. Monitoring separation: added `action_category` filter to `/ai/monitoring/aggregation` with `SIMULATION_ACTIONS`/`REVIEW_ACTIONS` constants, 2 new KPI cards (Biaya Simulasi + Penilaian AI), toggle pills, simulation/review columns, action category badges. 7 files modified, 1 new test file (12 tests). 457 API + 424 web tests passing. (DONE)
 69. **AI Usage Cost Breakdown in Module Usage Buttons & Modals** — Extended `GET /ai/usage/summary` to return `simulationCostIdr` + `reviewCostIdr`. Upgraded shared `UsageModal` with "Biaya Simulasi" (green) and "Biaya Penilaian AI" (amber) KPI cards, plus simulation/review split in session delta section. Added post-simulation cost toasts in all 3 modules (`"Biaya sesi ini: +RpXrb | Simulasi Rp... | Penilaian AI Rp..."`). Extended baseline capture with new fields. 9 new tests (3 API + 4 component + 2 unit). 460 API + 431 web tests passing. (DONE)
+70. **Monitoring Telefun History Schema Fix** — Fixed `GET /api/v1/ai/monitoring/history` and review endpoint querying `telefun_history` with legacy column names (`date`, `duration`, `recording_url`) that don't exist in the Vite schema. Aligned to actual columns: `created_at`, `duration_seconds`, `recording_path`. Fixed frontend `TelefunReviewPanel` interface + usages. Added 5 regression tests verifying no legacy column usage. No migration required — DB schema was already correct. (DONE)
 
-## Key Files Changed (Phase 58 — 67)
+## Key Files Changed (Phase 58 — 70)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing.
 - `apps/api/src/routes/sidak.ts` — **Phase 64**: Forwarded `period_ids` query param and conditionally disabled `year` filter when `period === "alltime"` inside the `/ranking` endpoint; **Phase 65**: Implemented YTD and Monthly rank shift calculation by fetching current and previous lists and calculating rank index changes.
 - `apps/api/src/__tests__/sidak-ranking-route.test.ts` — **NEW Phase 64**: Added 4 route integration tests validating parameter parsing and forwarding; **Phase 65**: Added tests validating previous vs current rank calculation for YTD and Monthly filters.
 - `apps/web/src/routes/sidak/ranking.tsx` — **Phase 65**: Custom rendering of `rankChange` in Status column for YTD and Monthly views with red `▲ +X` upward badges, green `▼ -X` downward badges, gray `-` for neutral, and blue `Baru` badges, along with subtitle context `"Sebelumnya Posisi X"`.
+
+- `apps/api/src/services/monitoring-history-service.ts` — **Phase 70**: Fixed Telefun history query to use Vite schema columns (`created_at`, `duration_seconds`, `recording_path`) instead of legacy aliases (`date`, `duration`, `recording_url`).
+- `apps/api/src/routes/ai.ts` — **Phase 70**: Fixed Telefun review endpoint to query and return `recording_path`/`duration_seconds` instead of `recording_url`/`duration`.
+- `apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx` — **Phase 70**: Updated `TelefunReviewData` interface and usages to match correct API response keys.
 
 - `apps/api/src/services/ketik-service.ts` — **Phase 66**: `processKetikReviewJob()` now returns `scores` alongside `status` for direct passthrough to API response.
 - `apps/api/src/routes/ketik.ts` — **Phase 66**: `POST /review` response now includes `data.scores` when processing completes synchronously.
@@ -362,6 +367,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
 - `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-67)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
+- `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
+- `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
+- `apps/api/src/__tests__/monitoring-history-enrichment.test.ts` — **Phase 70 update**: Mock data aligned to Vite schema columns
 
 ## Routes Reference (apps/web)
 

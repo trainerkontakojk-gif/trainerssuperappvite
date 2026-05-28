@@ -56,10 +56,10 @@ const mockTelefunHistoryData = [
   {
     id: "telefun-1",
     user_id: "user-4",
-    date: "2026-05-23T11:00:00Z",
+    created_at: "2026-05-23T11:00:00Z",
     scenario_title: "Tagihan Kartu Kredit",
-    duration: 240,
-    recording_url: "https://storage.supabase.co/telefun/1.mp3",
+    duration_seconds: 240,
+    recording_path: "https://storage.supabase.co/telefun/1.mp3",
     score: 7.5,
     voice_assessment: {
       overallScore: 7.5,

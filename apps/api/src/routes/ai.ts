@@ -373,7 +373,7 @@ ai.get(
       if (module === "telefun") {
         const { data: history, error: historyError } = await admin
           .from("telefun_history")
-          .select("score, recording_url, scenario_title, duration, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus")
+          .select("score, recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus")
           .eq("id", id)
           .single();
 
@@ -403,9 +403,9 @@ ai.get(
             review_status:
               typeof normalizedScore === "number" ? "completed" : "not_started",
             score: normalizedScore,
-            recording_url: history.recording_url,
+            recording_path: history.recording_path,
             scenario_title: history.scenario_title,
-            duration: history.duration,
+            duration_seconds: history.duration_seconds,
             voice_assessment: voiceAssessment || null,
             ai_summary: history.ai_summary || null,
             strengths: history.strengths || null,

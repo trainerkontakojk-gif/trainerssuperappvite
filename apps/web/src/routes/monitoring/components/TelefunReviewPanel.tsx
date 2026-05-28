@@ -27,9 +27,9 @@ interface TelefunReviewData {
   module: string;
   review_status: string;
   score: number | null;
-  recording_url: string | null;
+  recording_path: string | null;
   scenario_title: string | null;
-  duration: number | null;
+  duration_seconds: number | null;
   voice_assessment: {
     overallScore: number;
     speakingRate: { score: number; verdict: string; feedback: string; wordsPerMinute: number };
@@ -151,7 +151,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
 
   const hasScore = typeof data.score === "number";
   const hasVoiceAssessment = data.voice_assessment !== null;
-  const hasRecording = !!data.recording_url;
+  const hasRecording = !!data.recording_path;
   const va = data.voice_assessment;
 
   // Score grade helper (0-10 scale for Telefun)
@@ -178,7 +178,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
               <>
                 <audio
                   controls
-                  src={data.recording_url!}
+                  src={data.recording_path!}
                   className="w-full h-10 rounded-lg"
                   onError={() => setAudioError(true)}
                 >
@@ -189,7 +189,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                     {data.scenario_title}
                   </span>
                   <a
-                    href={data.recording_url!}
+                    href={data.recording_path!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] font-bold text-module-telefun hover:underline cursor-pointer"
@@ -256,13 +256,13 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 </div>
               </div>
             </div>
-            {data.duration && (
+            {data.duration_seconds && (
               <div className="text-right">
                 <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Durasi
                 </div>
                 <div className="text-lg font-black">
-                  {Math.floor(data.duration / 60)}m {data.duration % 60}d
+                  {Math.floor(data.duration_seconds / 60)}m {data.duration_seconds % 60}d
                 </div>
               </div>
             )}
