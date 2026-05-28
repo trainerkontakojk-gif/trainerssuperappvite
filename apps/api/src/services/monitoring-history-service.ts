@@ -1,5 +1,12 @@
 import { createAdminClient } from "../lib/supabase";
 
+export type ReviewStatus =
+  | "not_started"
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed";
+
 export interface UnifiedHistoryEntry {
   id: string;
   user_id: string;
@@ -11,6 +18,31 @@ export interface UnifiedHistoryEntry {
   history: unknown;
   user_email?: string;
   user_role?: string;
+  review_status: ReviewStatus;
+  scores?: {
+    final?: number;
+    empathy?: number;
+    probing?: number;
+    typo?: number;
+    compliance?: number;
+  };
+  pdkt_evaluation?: {
+    score: number;
+    feedback: string;
+    typos_count: number;
+    clarity_issues_count: number;
+    content_gaps_count: number;
+  };
+  telefun_assessment?: {
+    overall_score: number;
+    speaking_rate_wpm: number;
+    intonation_score: number;
+    articulation_score: number;
+    filler_words_count: number;
+    emotional_tone: string;
+    strengths: string[];
+    highlights: string[];
+  };
 }
 
 function safeString(value: unknown, fallback = ""): string {
@@ -39,19 +71,21 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
     await Promise.all([
       admin
         .from("ketik_history")
-        .select("id, user_id, date, scenario_title, messages")
+        .select(
+          "id, user_id, date, scenario_title, messages, final_score, empathy_score, probing_score, typo_score, compliance_score, review_status",
+        )
         .order("date", { ascending: false })
         .limit(200),
       admin
         .from("pdkt_history")
         .select(
-          "id, user_id, timestamp, config, emails, evaluation, time_taken, evaluation_status",
+          "id, user_id, timestamp, config, emails, evaluation, evaluation_status, evaluation_error, time_taken",
         )
         .order("timestamp", { ascending: false })
         .limit(200),
       admin
         .from("telefun_history")
-        .select("id, user_id, date, scenario_title, duration, recording_url")
+        .select("id, user_id, date, scenario_title, duration, recording_url, score, voice_assessment, ai_summary, strengths, weaknesses")
         .order("date", { ascending: false })
         .limit(200),
       admin
@@ -114,10 +148,22 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       scenario_title: safeString(row.scenario_title, "Simulasi Chat"),
       created_at: safeString(row.date, ""),
       duration_seconds: durationSeconds,
-      score: null,
+      score:
+        typeof row.final_score === "number" ? row.final_score : null,
       history: row.messages,
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
+      review_status: (row.review_status as ReviewStatus) || "not_started",
+      scores:
+        typeof row.final_score === "number"
+          ? {
+              final: row.final_score ?? undefined,
+              empathy: row.empathy_score ?? undefined,
+              probing: row.probing_score ?? undefined,
+              typo: row.typo_score ?? undefined,
+              compliance: row.compliance_score ?? undefined,
+            }
+          : undefined,
     });
   });
 
@@ -128,6 +174,23 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       row.evaluation && typeof row.evaluation === "object"
         ? row.evaluation
         : {};
+
+    const pdkt_evaluation =
+      typeof evaluation?.score === "number"
+        ? {
+            score: evaluation.score,
+            feedback: safeString(evaluation.feedback, "").slice(0, 150),
+            typos_count: Array.isArray(evaluation.typos)
+              ? evaluation.typos.length
+              : 0,
+            clarity_issues_count: Array.isArray(evaluation.clarityIssues)
+              ? evaluation.clarityIssues.length
+              : 0,
+            content_gaps_count: Array.isArray(evaluation.contentGaps)
+              ? evaluation.contentGaps.length
+              : 0,
+          }
+        : undefined;
 
     unified.push({
       id: row.id,
@@ -144,6 +207,8 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       history: Array.isArray(row.emails) ? row.emails : [],
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
+      review_status: (row.evaluation_status as ReviewStatus) || "not_started",
+      pdkt_evaluation,
     });
   });
 
@@ -170,6 +235,8 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       history: safeString(payload.recordingUrl, ""),
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
+      review_status:
+        typeof row.score === "number" ? "completed" : "not_started",
     };
 
     telefunSeen.add(createTelefunSignature(entry));
@@ -177,6 +244,12 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
   });
 
   (telefunHistoryRes.data || []).forEach((row) => {
+    const va =
+      row.voice_assessment &&
+      typeof row.voice_assessment === "object"
+        ? row.voice_assessment
+        : null;
+
     const entry: UnifiedHistoryEntry = {
       id: row.id,
       user_id: row.user_id,
@@ -184,16 +257,53 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       scenario_title: safeString(row.scenario_title, "Simulasi Telepon"),
       created_at: safeString(row.date, ""),
       duration_seconds: safeNumber(row.duration, 0),
-      score: null,
+      // Use voice_assessment.overallScore (0-10) when available, otherwise fall back to score
+      score: va
+        ? safeNumber(va.overallScore, typeof row.score === "number" ? row.score : null)
+        : typeof row.score === "number"
+          ? row.score
+          : null,
       history: safeString(row.recording_url, ""),
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
+      review_status:
+        typeof row.score === "number" ? "completed" : "not_started",
+      telefun_assessment: va
+        ? {
+            overall_score: safeNumber(va.overallScore, 0),
+            speaking_rate_wpm: safeNumber(va.speakingRate?.wordsPerMinute, 0),
+            intonation_score: safeNumber(va.intonation?.score, 0),
+            articulation_score: safeNumber(va.articulation?.score, 0),
+            filler_words_count: safeNumber(va.fillerWords?.count, 0),
+            emotional_tone: safeString(
+              va.emotionalTone?.dominant,
+              "",
+            ),
+            strengths: Array.isArray(va.strengths)
+              ? va.strengths.slice(0, 3)
+              : [],
+            highlights: Array.isArray(va.highlights)
+              ? va.highlights.slice(0, 3)
+              : [],
+          }
+        : undefined,
     };
 
     const signature = createTelefunSignature(entry);
     if (!telefunSeen.has(signature)) {
       telefunSeen.add(signature);
       unified.push(entry);
+    } else if (va) {
+      // If telefun_history has voice_assessment but results table entry doesn't,
+      // merge the assessment into the existing entry
+      const existing = unified.find(
+        (e) =>
+          e.module === "telefun" &&
+          createTelefunSignature(e) === signature,
+      );
+      if (existing && !existing.telefun_assessment) {
+        existing.telefun_assessment = entry.telefun_assessment;
+      }
     }
   });
 

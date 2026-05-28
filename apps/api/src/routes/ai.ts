@@ -240,6 +240,207 @@ ai.get(
   },
 );
 
+// ── Monitoring Review Detail (admin-only, cross-user) ──
+ai.get(
+  "/monitoring/history/:module/:id/review",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const { module, id } = c.req.param();
+    const admin = createAdminClient();
+
+    try {
+      if (module === "ketik") {
+        const { data: history, error: historyError } = await admin
+          .from("ketik_history")
+          .select(
+            "review_status, final_score, empathy_score, probing_score, typo_score, compliance_score",
+          )
+          .eq("id", id)
+          .single();
+
+        if (historyError || !history) {
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: "NOT_FOUND",
+                message: "Sesi KETIK tidak ditemukan.",
+              },
+            },
+            404,
+          );
+        }
+
+        if (history.review_status !== "completed") {
+          return c.json({
+            success: true,
+            data: {
+              module: "ketik",
+              review_status: history.review_status || "not_started",
+              scores: {
+                final: history.final_score,
+                empathy: history.empathy_score,
+                probing: history.probing_score,
+                typo: history.typo_score,
+                compliance: history.compliance_score,
+              },
+            },
+          });
+        }
+
+        const [{ data: reviewData }, { data: typosData }] = await Promise.all([
+          admin
+            .from("ketik_session_reviews")
+            .select("*")
+            .eq("session_id", id)
+            .maybeSingle(),
+          admin
+            .from("ketik_typo_findings")
+            .select("*")
+            .eq("session_id", id),
+        ]);
+
+        return c.json({
+          success: true,
+          data: {
+            module: "ketik",
+            review_status: "completed",
+            scores: {
+              final: history.final_score,
+              empathy: history.empathy_score,
+              probing: history.probing_score,
+              typo: history.typo_score,
+              compliance: history.compliance_score,
+            },
+            review: reviewData
+              ? {
+                  id: reviewData.id,
+                  sessionId: reviewData.session_id,
+                  aiSummary: reviewData.ai_summary,
+                  strengths: reviewData.strengths,
+                  weaknesses: reviewData.weaknesses,
+                  coachingFocus: reviewData.coaching_focus,
+                  createdAt: reviewData.created_at,
+                }
+              : null,
+            typos: (typosData || []).map((t: any) => ({
+              id: t.id,
+              sessionId: t.session_id,
+              messageId: t.message_id,
+              originalWord: t.original_word,
+              correctedWord: t.corrected_word,
+              severity: t.severity,
+            })),
+          },
+        });
+      }
+
+      if (module === "pdkt") {
+        const { data: history, error: historyError } = await admin
+          .from("pdkt_history")
+          .select(
+            "evaluation, evaluation_status, evaluation_error, time_taken, emails, config",
+          )
+          .eq("id", id)
+          .single();
+
+        if (historyError || !history) {
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: "NOT_FOUND",
+                message: "Sesi PDKT tidak ditemukan.",
+              },
+            },
+            404,
+          );
+        }
+
+        return c.json({
+          success: true,
+          data: {
+            module: "pdkt",
+            review_status: history.evaluation_status || "not_started",
+            evaluation: history.evaluation || null,
+            evaluation_error: history.evaluation_error || null,
+            time_taken: history.time_taken || null,
+            emails: Array.isArray(history.emails) ? history.emails : [],
+          },
+        });
+      }
+
+      if (module === "telefun") {
+        const { data: history, error: historyError } = await admin
+          .from("telefun_history")
+          .select("score, recording_url, scenario_title, duration, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus")
+          .eq("id", id)
+          .single();
+
+        if (historyError || !history) {
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: "NOT_FOUND",
+                message: "Sesi Telefun tidak ditemukan.",
+              },
+            },
+            404,
+          );
+        }
+
+        const voiceAssessment = history.voice_assessment;
+        const normalizedScore =
+          voiceAssessment && typeof voiceAssessment === "object" && typeof voiceAssessment.overallScore === "number"
+            ? voiceAssessment.overallScore
+            : history.score;
+
+        return c.json({
+          success: true,
+          data: {
+            module: "telefun",
+            review_status:
+              typeof normalizedScore === "number" ? "completed" : "not_started",
+            score: normalizedScore,
+            recording_url: history.recording_url,
+            scenario_title: history.scenario_title,
+            duration: history.duration,
+            voice_assessment: voiceAssessment || null,
+            ai_summary: history.ai_summary || null,
+            strengths: history.strengths || null,
+            weaknesses: history.weaknesses || null,
+            coaching_focus: history.coaching_focus || null,
+          },
+        });
+      }
+
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: `Modul tidak dikenal: ${module}`,
+          },
+        },
+        400,
+      );
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "DB_ERROR",
+            message:
+              error?.message || "Gagal memuat detail review monitoring.",
+          },
+        },
+        500,
+      );
+    }
+  },
+);
+
 // ── Usage Aggregation ──────────────────────────────────
 ai.get(
   "/monitoring/aggregation",

@@ -28,16 +28,19 @@ const SAMPLE_HISTORY = [
     id: "h1", user_id: "u1", module: "ketik", scenario_title: "Skenario A",
     created_at: "2025-05-01T10:00:00Z", duration_seconds: 120, score: 85,
     history: [], user_email: "a@test.com", user_role: "trainer",
+    review_status: "completed", scores: { final: 85, empathy: 90, probing: 80, typo: 85, compliance: 85 },
   },
   {
     id: "h2", user_id: "u2", module: "pdkt", scenario_title: "Skenario B",
     created_at: "2025-05-02T14:00:00Z", duration_seconds: 60, score: null,
     history: [], user_email: "b@test.com", user_role: "leader",
+    review_status: "not_started",
   },
   {
     id: "h3", user_id: "u3", module: "telefun", scenario_title: "Skenario C",
     created_at: "2025-05-03T09:00:00Z", duration_seconds: 300, score: 45,
     history: "http://rec.url", user_email: "c@test.com", user_role: "qa",
+    review_status: "completed",
   },
 ];
 
@@ -199,7 +202,8 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 15000 }
       render(React.createElement(MonitoringPage));
       await screen.findByText("Total Sesi");
       expect(screen.getByText("Pengguna Aktif")).toBeTruthy();
-      expect(screen.getByText("Modul Terpopuler")).toBeTruthy();
+      expect(screen.getByText("Rata-rata Skor")).toBeTruthy();
+      expect(screen.getByText("Review Selesai")).toBeTruthy();
     });
 
     it("renders history data in table rows", async () => {
@@ -209,12 +213,18 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 15000 }
       expect(screen.getByText("Skenario B")).toBeTruthy();
     });
 
-    it("renders module filter dropdown", async () => {
+    it("renders module pill filters and status dropdown", async () => {
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
       await screen.findByText("Riwayat Simulasi");
-      const select = screen.getByRole("combobox", { name: "" }) as HTMLSelectElement || document.querySelector("select");
-      expect(document.querySelector("select")).toBeTruthy();
+      // Status dropdown select
+      const selects = document.querySelectorAll("select");
+      expect(selects.length).toBeGreaterThanOrEqual(1); // status filter
+      // Module pill buttons
+      expect(screen.getByText("Semua")).toBeTruthy();
+      expect(screen.getByText("KETIK")).toBeTruthy();
+      expect(screen.getByText("PDKT")).toBeTruthy();
+      expect(screen.getByText("Telefun")).toBeTruthy();
     });
 
     it("switches to usage tab and fetches aggregation", async () => {
