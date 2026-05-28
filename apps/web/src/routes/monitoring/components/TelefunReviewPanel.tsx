@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Phone,
@@ -19,9 +19,20 @@ import {
   ChevronUp,
   PhoneOff,
   XCircle,
+  TrendingUp,
+  TrendingDown,
+  Maximize2,
+  AlertCircle,
 } from "lucide-react";
 import { getApi } from "../../../hooks/useApi";
 import { getScoreGrade } from "../utils/formatting";
+import type { VoiceQualityAssessment } from "@trainers/types";
+import {
+  validateAssessment,
+  getCommunicationProfileFromAssessment,
+} from "../../../lib/voiceAssessmentUtils";
+import { VoiceRadarChart } from "../../telefun/components/VoiceRadarChart";
+import { CommunicationProfileZoomModal } from "../../telefun/components/CommunicationProfileZoomModal";
 
 interface TelefunReviewData {
   module: string;
@@ -30,17 +41,7 @@ interface TelefunReviewData {
   recording_path: string | null;
   scenario_title: string | null;
   duration_seconds: number | null;
-  voice_assessment: {
-    overallScore: number;
-    speakingRate: { score: number; verdict: string; feedback: string; wordsPerMinute: number };
-    intonation: { score: number; verdict: string; feedback: string };
-    articulation: { score: number; verdict: string; feedback: string };
-    fillerWords: { score: number; verdict: string; feedback: string; count: number; examples: string[] };
-    emotionalTone: { score: number; verdict: string; feedback: string; dominant: string };
-    transcript: string;
-    highlights: string[];
-    strengths: string[];
-  } | null;
+  voice_assessment: VoiceQualityAssessment | null;
   ai_summary: string | null;
   strengths: string[] | null;
   weaknesses: string[] | null;
@@ -90,6 +91,19 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioError, setAudioError] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
+
+  const va = useMemo(() => {
+    return data?.voice_assessment ? validateAssessment(data.voice_assessment) : null;
+  }, [data]);
+
+  const communicationProfile = useMemo(() => {
+    return getCommunicationProfileFromAssessment(va);
+  }, [va]);
+
+  const hasVoiceAssessment = va !== null;
+  const hasScore = data ? typeof data.score === "number" : false;
+  const hasRecording = data ? !!data.recording_path : false;
 
   const fetchReview = async () => {
     setLoading(true);
@@ -149,17 +163,24 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
     );
   }
 
-  const hasScore = typeof data.score === "number";
-  const hasVoiceAssessment = data.voice_assessment !== null;
-  const hasRecording = !!data.recording_path;
-  const va = data.voice_assessment;
-
   // Score grade helper (0-10 scale for Telefun)
   const getTelefunGrade = (score: number) => {
     if (score >= 8) return { label: "Sangat Baik", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" };
     if (score >= 6) return { label: "Baik", color: "text-sky-600", bg: "bg-sky-50", border: "border-sky-200" };
     if (score >= 4) return { label: "Cukup", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" };
     return { label: "Perlu Coaching", color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-200" };
+  };
+
+  const STATUS_COLORS: Record<string, string> = {
+    good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    needs_improvement: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+  };
+
+  const STATUS_LABELS: Record<string, string> = {
+    good: "Baik",
+    needs_improvement: "Perlu Perbaikan",
+    poor: "Kurang",
   };
 
   return (
@@ -282,6 +303,97 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
       {/* ── Voice Assessment Metrics ────────────────────────── */}
       {hasVoiceAssessment && va ? (
         <>
+          {/* Profil Komunikasi Card */}
+          <div className="rounded-2xl border border-slate-950/10 bg-white p-6 dark:border-white/10 dark:bg-slate-900 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
+                  Profil Komunikasi
+                </h3>
+                <p className="text-[11px] text-slate-400 dark:text-white/35 mt-0.5">
+                  Semakin sesuai dengan area target, semakin baik
+                </p>
+              </div>
+              <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-500">
+                <Sparkles className="h-3 w-3" />
+                <span>{va.overallScore}/10</span>
+              </div>
+            </div>
+
+            {communicationProfile ? (
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Perbesar diagram profil komunikasi"
+                onClick={() => setZoomOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setZoomOpen(true);
+                  }
+                }}
+                className="group relative cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-950/[0.02] dark:hover:bg-white/[0.02]"
+              >
+                <VoiceRadarChart profile={communicationProfile} compact />
+                <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1.5 rounded-lg bg-slate-950/80 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm dark:bg-white/20">
+                    <Maximize2 className="h-3 w-3" />
+                    Klik untuk memperbesar
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[240px] rounded-xl bg-slate-950/[0.02] dark:bg-white/[0.02]">
+                <div className="text-center">
+                  <AlertCircle className="mx-auto h-8 w-8 text-slate-300 dark:text-white/20 mb-2" />
+                  <p className="text-sm text-slate-400 dark:text-white/40">
+                    Analisis komunikasi belum tersedia untuk sesi ini
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Legend */}
+            <div className="flex flex-wrap justify-center gap-4 text-[10px] font-bold mt-3 text-slate-500 dark:text-white/45">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-0 border border-dashed border-emerald-500" />
+                Target QA
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-blue-500/30 border border-blue-500" />
+                Hasil Anda
+              </div>
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                Semakin tinggi
+              </div>
+              <div className="flex items-center gap-1.5">
+                <TrendingDown className="h-3 w-3 text-amber-500" />
+                Semakin rendah
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Gauge className="h-3 w-3 text-blue-500" />
+                Rentang ideal
+              </div>
+            </div>
+
+            {/* Metric Status Summary */}
+            {communicationProfile && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {communicationProfile.metrics.map((m) => (
+                  <span
+                    key={m.key}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${STATUS_COLORS[m.status] || ""}`}
+                  >
+                    {m.label}: {STATUS_LABELS[m.status]}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-border mt-6 pt-6" />
+
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Gauge className="w-4 h-4 text-module-telefun" />
@@ -550,6 +662,14 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
             </ul>
           </div>
         </section>
+      )}
+
+      {communicationProfile && (
+        <CommunicationProfileZoomModal
+          isOpen={zoomOpen}
+          onClose={() => setZoomOpen(false)}
+          profile={communicationProfile}
+        />
       )}
     </div>
   );

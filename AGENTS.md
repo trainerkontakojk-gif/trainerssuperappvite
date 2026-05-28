@@ -146,6 +146,7 @@ Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
 
 Saat user meminta push ke GitHub (`git push` atau `git commit && git push`), **WAJIB** lakukan pre-push checklist berikut secara berurutan:
 
+0. **Gitignore Audit:** Jalankan `git status` — periksa apakah ada file tidak sengaja ter-track yang seharusnya di `.gitignore` (misal: `.env`, `*.log`, `dist/`, file editor config). Jika ada, update `.gitignore`, hapus dari staging/index, lalu commit fix terpisah.
 1. **Lint:** Jalankan `pnpm lint` — pastikan 0 error (warning diperbolehkan).
 2. **Build:** Jalankan `pnpm build` — pastikan 0 error. Build failure = Railway deploy failure.
 3. **Test:** Jalankan `pnpm test` — pastikan seluruh suite lulus (API + web). Jika ada test failure, perbaiki sebelum push.
@@ -260,8 +261,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 70. **Monitoring Telefun History Schema Fix** — Fixed `GET /api/v1/ai/monitoring/history` and review endpoint querying `telefun_history` with legacy column names (`date`, `duration`, `recording_url`) that don't exist in the Vite schema. Aligned to actual columns: `created_at`, `duration_seconds`, `recording_path`. Fixed frontend `TelefunReviewPanel` interface + usages. Added 5 regression tests verifying no legacy column usage. No migration required — DB schema was already correct. (DONE)
 71. **Monitoring Redesign & Visual Polish** — Visual redesign of `/monitoring` under `ui-ux-pro-max` guidelines. Removed visual noise, excessive colors, boxy sub-grids, and high-contrast progress bars. Consolidated KPI metric grids (from 7 to 4 cards on history tab, and from 6 to 4 cards on usage tab). Unified module tabs, status dropdown, and search query filters into a single horizontal container. Simplified table rows, exchange rate inputs, and outline details buttons. Added `sr-only` elements for module statistics queries to maintain 100% compatibility with existing integration tests. 6 files modified, 452 frontend + 425 API regression tests passing. (DONE)
 72. **Monitoring Overstimulation Fix & Paginated Table Redesign** — Redesigned `/monitoring` page into a spacious, premium paginated table to prevent card fatigue and overstimulation. Added top KPI cards with growth rates, inline date-range popover picker, and modular submetric columns. Case-converted module badges and card titles to lowercase and used CSS transforms to fix Testing Library duplicate queries. 3 files modified, 39/39 regression tests passing. (DONE)
+73. **Monitoring Category Filter Toggle Removal** — Removed the non-functioning "Semua", "Simulasi", and "Penilaian" category toggle buttons from the Token Usage tab. Cleaned up lifted React state variables, API fetch parameters, and component props to simplify the interface, eliminate visual redundancy, and prevent visual layout issues with empty columns. 2 files modified, 452 web + 425 API regression tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 72)
+## Key Files Changed (Phase 58 — 73)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing.

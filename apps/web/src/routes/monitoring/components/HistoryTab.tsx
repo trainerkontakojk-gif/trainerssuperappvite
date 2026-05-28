@@ -21,11 +21,14 @@ import {
   formatDate,
   formatDuration,
 } from "../utils/formatting";
+import { useAuthStore } from "../../../store/authStore";
+import { deleteApi } from "../../../hooks/useApi";
 
 interface HistoryTabProps {
   historyData: UnifiedHistoryEntry[];
   loading: boolean;
   onViewDetail: (entry: UnifiedHistoryEntry) => void;
+  onRefresh?: () => void;
 }
 
 const STATUS_OPTIONS: Array<{ value: ReviewStatus | ""; label: string }> = [
@@ -36,7 +39,7 @@ const STATUS_OPTIONS: Array<{ value: ReviewStatus | ""; label: string }> = [
   { value: "not_started", label: "Belum Dinilai" },
 ];
 
-export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabProps) {
+export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: HistoryTabProps) {
   const [historySearch, setHistorySearch] = useState("");
   const [activeModule, setActiveModule] = useState("");
   const [historyStatus, setHistoryStatus] = useState<ReviewStatus | "">("");
@@ -45,6 +48,29 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const profile = useAuthStore((s) => s.profile);
+  const role = profile?.role?.toLowerCase() || "";
+  const canDelete = role === "trainer" || role === "admin";
+
+  const handleDelete = async (entry: UnifiedHistoryEntry) => {
+    if (!window.confirm("Apakah Anda yakin ingin menghapus riwayat simulasi ini?")) {
+      return;
+    }
+    const dId = `${entry.module}-${entry.id}`;
+    setIsDeleting(dId);
+    try {
+      await deleteApi(`/ai/monitoring/history/${entry.module}/${entry.id}`);
+      onRefresh?.();
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus riwayat.");
+    } finally {
+      setIsDeleting(null);
+      setActiveDropdownId(null);
+    }
+  };
 
   // Dynamic growth computation (last 7 days vs previous 7 days)
   const growthStats = useMemo(() => {
@@ -270,7 +296,7 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
           </div>
 
           {/* Submetrics Grid */}
-          <div className="grid grid-cols-4 gap-x-4 min-w-[200px]">
+          <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
                 <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
@@ -313,7 +339,7 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
           </div>
 
           {/* Submetrics Grid */}
-          <div className="grid grid-cols-4 gap-x-4 min-w-[200px]">
+          <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
                 <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
@@ -356,7 +382,7 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
           </div>
 
           {/* Submetrics Grid */}
-          <div className="grid grid-cols-4 gap-x-4 min-w-[200px]">
+          <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
                 <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
@@ -408,12 +434,6 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
               {moduleCounts.all.toLocaleString("id-ID")}
             </p>
-            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
-              <span className={growthStats.all.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
-                {growthStats.all.isUp ? "▲" : "▼"} {growthStats.all.isUp ? "+" : "-"}{growthStats.all.val}%
-              </span>
-              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
-            </div>
           </div>
         </div>
 
@@ -429,12 +449,6 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
               {moduleCounts.ketik.toLocaleString("id-ID")}
             </p>
-            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
-              <span className={growthStats.ketik.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
-                {growthStats.ketik.isUp ? "▲" : "▼"} {growthStats.ketik.isUp ? "+" : "-"}{growthStats.ketik.val}%
-              </span>
-              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
-            </div>
           </div>
         </div>
 
@@ -450,12 +464,6 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
               {moduleCounts.pdkt.toLocaleString("id-ID")}
             </p>
-            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
-              <span className={growthStats.pdkt.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
-                {growthStats.pdkt.isUp ? "▲" : "▼"} {growthStats.pdkt.isUp ? "+" : "-"}{growthStats.pdkt.val}%
-              </span>
-              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
-            </div>
           </div>
         </div>
 
@@ -471,12 +479,6 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
               {moduleCounts.telefun.toLocaleString("id-ID")}
             </p>
-            <div className="flex items-center gap-1 mt-1 text-[11px] font-medium">
-              <span className={growthStats.telefun.isUp ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}>
-                {growthStats.telefun.isUp ? "▲" : "▼"} {growthStats.telefun.isUp ? "+" : "-"}{growthStats.telefun.val}%
-              </span>
-              <span className="text-muted-foreground/70">dari 7 hari terakhir</span>
-            </div>
           </div>
         </div>
       </div>
@@ -676,7 +678,7 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
                   {/* Aksi buttons */}
                   <td className="py-4 px-6 align-middle text-right">
                     <div
-                      className="inline-flex items-center gap-2 justify-end w-full"
+                      className="inline-flex items-center gap-2 justify-end w-full relative"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
@@ -685,12 +687,45 @@ export function HistoryTab({ historyData, loading, onViewDetail }: HistoryTabPro
                       >
                         Lihat Detail
                       </button>
-                      <button
-                        onClick={() => onViewDetail(entry)}
-                        className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer min-h-[30px]"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => {
+                            const dId = `${entry.module}-${entry.id}`;
+                            setActiveDropdownId(activeDropdownId === dId ? null : dId);
+                          }}
+                          className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer min-h-[30px]"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                        {activeDropdownId === `${entry.module}-${entry.id}` && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setActiveDropdownId(null)}
+                            />
+                            <div className="absolute right-0 mt-1 w-36 bg-card border border-border/80 rounded-xl shadow-xl z-50 py-1 bg-white dark:bg-card text-left">
+                              <button
+                                onClick={() => {
+                                  onViewDetail(entry);
+                                  setActiveDropdownId(null);
+                                }}
+                                className="w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer"
+                              >
+                                Lihat Detail
+                              </button>
+                              {canDelete && (
+                                <button
+                                  onClick={() => handleDelete(entry)}
+                                  disabled={isDeleting === `${entry.module}-${entry.id}`}
+                                  className="w-full px-4 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                >
+                                  {isDeleting === `${entry.module}-${entry.id}` ? "Menghapus..." : "Hapus"}
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>

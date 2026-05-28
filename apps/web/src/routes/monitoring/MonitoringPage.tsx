@@ -32,6 +32,7 @@ export default function MonitoringPage() {
     null,
   );
   const [showDetail, setShowDetail] = useState(false);
+  const [usageModule, setUsageModule] = useState("");
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -53,7 +54,7 @@ export default function MonitoringPage() {
     setError(null);
     try {
       const data = await getApi<UsageAggregation[]>(
-        `/ai/monitoring/aggregation?year=${year}&month=${month}`,
+        `/ai/monitoring/aggregation?year=${year}&month=${month}&module=${usageModule}`,
       );
       setAggregation(data);
     } catch (err) {
@@ -82,7 +83,7 @@ export default function MonitoringPage() {
     if (tab === "history") fetchHistory();
     else if (tab === "usage") fetchAggregation();
     else if (tab === "pricing") fetchPricing();
-  }, [tab, year, month]);
+  }, [tab, year, month, usageModule]);
 
   const handleViewDetail = (entry: UnifiedHistoryEntry) => {
     setDetailEntry(entry);
@@ -177,6 +178,7 @@ export default function MonitoringPage() {
           historyData={historyData}
           loading={loading}
           onViewDetail={handleViewDetail}
+          onRefresh={fetchHistory}
         />
       )}
       {tab === "usage" && (
@@ -187,6 +189,8 @@ export default function MonitoringPage() {
           month={month}
           onYearChange={setYear}
           onMonthChange={setMonth}
+          module={usageModule}
+          onModuleChange={setUsageModule}
         />
       )}
       {tab === "pricing" && canEditPricing && (

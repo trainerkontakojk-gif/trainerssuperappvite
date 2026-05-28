@@ -39,6 +39,8 @@ interface UsageTabProps {
   month: number;
   onYearChange: (y: number) => void;
   onMonthChange: (m: number) => void;
+  module: string;
+  onModuleChange: (m: string) => void;
 }
 
 export function UsageTab({
@@ -48,12 +50,10 @@ export function UsageTab({
   month,
   onYearChange,
   onMonthChange,
+  module,
+  onModuleChange,
 }: UsageTabProps) {
   const [search, setSearch] = useState("");
-  const [aggregationModule, setAggregationModule] = useState("");
-  const [actionCategory, setActionCategory] = useState<
-    "" | "simulation" | "review"
-  >("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
   const filteredAgg = useMemo(() => {
@@ -205,8 +205,8 @@ export function UsageTab({
             ))}
           </select>
           <select
-            value={aggregationModule}
-            onChange={(e) => setAggregationModule(e.target.value)}
+            value={module}
+            onChange={(e) => onModuleChange(e.target.value)}
             className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
           >
             {MODULE_OPTIONS.map((o) => (
@@ -215,40 +215,6 @@ export function UsageTab({
               </option>
             ))}
           </select>
-
-          {/* Category toggle */}
-          <div className="flex items-center bg-background rounded-lg p-0.5 border border-border/30">
-            <button
-              onClick={() => setActionCategory("")}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                actionCategory === ""
-                  ? "bg-secondary text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Semua
-            </button>
-            <button
-              onClick={() => setActionCategory("simulation")}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                actionCategory === "simulation"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Simulasi
-            </button>
-            <button
-              onClick={() => setActionCategory("review")}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider transition-all cursor-pointer ${
-                actionCategory === "review"
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-500 shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Penilaian
-            </button>
-          </div>
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
