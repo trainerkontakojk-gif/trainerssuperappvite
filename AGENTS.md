@@ -11,7 +11,8 @@
 
 ## Subagent Usage
 
-- Gunakan subagent untuk tugas yang memerlukan eksplorasi codebase mendalam atau riset multi-step.
+- Gunakan **Superpower Skill** (`subagent_type: "general"`) untuk sebagian besar task — eksplorasi, implementasi, riset multi-step.
+- Untuk task kompleks, kombinasikan dengan ECC specialized agents (planner, architect, dll).
 - Berikan instruksi yang spesifik tentang arsitektur monorepo (apps/web, apps/api, packages/types).
 
 ## UI/UX Pro Max Skill
@@ -27,9 +28,22 @@
 
 Skill ter-install di `.opencode/skills/ui-ux-pro-max/` dan akan aktif otomatis saat ada permintaan UI/UX.
 
-## ECC Plugin
+## Superpower Skill + ECC Plugin
 
-**WAJIB** gunakan plugin **ECC (Everything Claude Code)** (`ecc-universal`) di setiap task. ECC menyediakan 48 specialized agents, 183 skills, dan 79 commands. Pilih agent/skill yang sesuai dengan konteks task:
+Gunakan **Superpower Skill** sebagai default untuk semua task — dipadukan dengan **ECC (Everything Claude Code)** jika kompleksitas task membutuhkan specialized agents.
+
+### Superpower Skill (Default)
+
+Superpower Skill adalah pendekatan general-purpose yang optimal untuk sebagian besar task. Cukup panggil `Task` tool dengan `subagent_type: "general"` — agent akan menangani eksplorasi, implementasi, debugging, dan testing secara otonom.
+
+Gunakan Superpower Skill untuk:
+- Task yang membutuhkan eksplorasi codebase mendalam
+- Implementasi fitur dengan kompleksitas rendah-sedang
+- Riset multi-step dan debugging umum
+
+### ECC Plugin (Task Kompleks)
+
+Jika task membutuhkan specialized agent, kombinasikan dengan **ECC (Everything Claude Code)** (`ecc-universal`):
 
 - Fitur kompleks / refactoring → **planner** agent
 - Bug fix / fitur baru → **tdd-guide** agent
@@ -41,7 +55,7 @@ Skill ter-install di `.opencode/skills/ui-ux-pro-max/` dan akan aktif otomatis s
 - Autonomous loop / monitoring → **loop-operator** agent
 - **Perubahan UI/UX** → **ui-ux-pro-max** skill (aktivasi otomatis)
 
-ECS agents bisa dipanggil via `Task` tool dengan `subagent_type` yang sesuai.
+ECC agents bisa dipanggil via `Task` tool dengan `subagent_type` yang sesuai.
 
 ## Commands (Monorepo)
 
@@ -132,7 +146,7 @@ Setiap file plan WAJIB mengandung 3 seksi utama (mengadopsi struktur `.kiro`):
 
 Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, Hono, Zod, TanStack, dsb), **WAJIB** lakukan:
 
-1. Panggil ECC **docs-lookup** agent (via `Task` tool) untuk cek dokumentasi terbaru library.
+1. Panggil ECC **docs-lookup** agent (via `Task` tool dengan `subagent_type` yang sesuai) untuk cek dokumentasi terbaru library. Alternatifnya, gunakan Superpower Skill dengan instruksi lookup dokumentasi.
 2. Gunakan tool `context7` (via MCP server `@upstash/context7-mcp`) untuk mengecek dokumentasi terbaru. Alur:
    - Panggil `resolve-library-id` dulu untuk mendapatkan library ID (format: `/org/project`).
    - Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
@@ -151,6 +165,8 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 
 - **SIDAK-Auditor**: Fokus pada audit logic SIDAK dari `reference-repo` ke `apps/api`. Pastikan validasi indicator_id dan service_type ketat sebelum insert.
 - **AI-Usage-Guard**: Memastikan setiap modul AI (KETIK, PDKT, Telefun) melakukan logging usage secara konsisten melalui service backend.
+
+Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi spesifik, atau via ECC agent yang sesuai untuk audit lebih mendalam.
 
 ## Environment Variables
 
