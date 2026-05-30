@@ -1,4 +1,12 @@
-import type { AiModelInfo } from "./index";
+export interface AiModelInfo {
+  id: string;
+  name: string;
+  description: string;
+  provider: AIProvider;
+  timeoutMs?: number;
+}
+
+export type AIProvider = "gemini" | "openrouter";
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.1-flash-lite";
 

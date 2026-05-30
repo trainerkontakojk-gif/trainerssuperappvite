@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AIProvider } from "./ai-models";
 
 // ── Auth Types ──────────────────────────────────────────
 export interface UserProfile {
@@ -817,15 +818,6 @@ export interface PdktSessionHistory {
 
 // ── AI Types ───────────────────────────────────────────
 export type AIModule = "ketik" | "pdkt" | "telefun" | "qa-analyzer";
-export type AIProvider = "gemini" | "openrouter";
-
-export interface AiModelInfo {
-  id: string;
-  name: string;
-  description: string;
-  provider: AIProvider;
-  timeoutMs?: number;
-}
 
 export interface AiUsageLog {
   id: string;
