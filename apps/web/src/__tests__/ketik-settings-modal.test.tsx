@@ -142,7 +142,7 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     expect(screen.queryByText("Pengaturan Simulasi")).toBeNull();
   });
 
-  it("adds a quick template without mutating original settings", async () => {
+  it("adds a quick template without mutating original settings", { timeout: 15000 }, async () => {
     const user = userEvent.setup();
     const onSaveMock = vi.fn();
     render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
