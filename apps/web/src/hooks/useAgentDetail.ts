@@ -137,6 +137,23 @@ export function useAgentDetail(agentId: string) {
       .sort((a, b) => a.month - b.month);
   }, [periodSummaries, selectedService]);
 
+  useEffect(() => {
+    if (monthlySummaries.length === 0) {
+      if (selectedMonth !== null) {
+        setSelectedMonth(null);
+      }
+      return;
+    }
+
+    const hasActiveMonth =
+      selectedMonth !== null &&
+      monthlySummaries.some((summary) => summary.month === selectedMonth);
+
+    if (!hasActiveMonth) {
+      setSelectedMonth(monthlySummaries[monthlySummaries.length - 1].month);
+    }
+  }, [monthlySummaries, selectedMonth]);
+
   const latestPeriod = useMemo(() => {
     if (selectedMonth !== null) {
       return monthlySummaries.find((s) => s.month === selectedMonth) ?? monthlySummaries[monthlySummaries.length - 1];
@@ -218,7 +235,7 @@ export function useAgentDetail(agentId: string) {
 
     for (const f of monthFindings) {
       const rawTicket = (f.no_tiket ?? "").trim();
-      const ticketKey = rawTicket || `audit-${f.id}`;
+      const ticketKey = rawTicket ? rawTicket.toUpperCase() : `audit-${f.id}`;
       const ind = serviceIndicators.find((i) => i.id === f.indicator_id);
       const weight = ind?.bobot ?? 0;
       const nilai = Number.isFinite(f.nilai)

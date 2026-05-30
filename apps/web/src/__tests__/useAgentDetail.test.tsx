@@ -165,4 +165,22 @@ describe("useAgentDetail", () => {
 
     (window as any).location = originalLocation;
   });
+
+  it("restores the latest available month when the active service changes so Top 5 stays populated", async () => {
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+    await waitFor(() => expect(result.current.selectedMonth).toBe(4));
+
+    result.current.handleServiceChange("call");
+
+    await waitFor(() => expect(result.current.selectedService).toBe("call"));
+    await waitFor(() => expect(result.current.selectedMonth).toBe(5));
+    await waitFor(() => expect(result.current.topTickets).toHaveLength(1));
+
+    expect(result.current.topTickets[0]).toMatchObject({
+      no_tiket: "T-001",
+      findingCount: 1,
+    });
+  });
 });

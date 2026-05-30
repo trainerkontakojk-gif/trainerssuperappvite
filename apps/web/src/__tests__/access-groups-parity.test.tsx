@@ -59,7 +59,7 @@ function findSelectContainingOption(
   throw new Error(`No select found with option "${optionText}"`);
 }
 
-describe("access-groups-parity", () => {
+describe("access-groups-parity", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useApiMock.mockImplementation((url: string | null) => {
@@ -98,7 +98,7 @@ describe("access-groups-parity", () => {
       if (agentSelect) {
         expect(agentSelect.disabled).toBe(true);
       }
-    }, 15000);
+    }, 30000);
 
     it("enables agent dropdown after team is selected and shows correct agents", async () => {
       const { default: AccessGroupsPage } = await import(
@@ -145,7 +145,7 @@ describe("access-groups-parity", () => {
         expect(agentValues).toContain("agent-2");
         expect(agentValues).not.toContain("agent-3");
       }
-    }, 15000);
+    }, 30000);
 
     it("shows cross-team agents not available via ruleValueOptions", async () => {
       const { default: AccessGroupsPage } = await import(

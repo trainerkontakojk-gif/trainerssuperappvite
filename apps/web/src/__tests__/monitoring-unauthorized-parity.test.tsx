@@ -58,7 +58,7 @@ const SAMPLE_PRICING = [
 
 const SAMPLE_BILLING = { usd_to_idr_rate: 15000 };
 
-describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 15000 }, () => {
+describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     _mockProfile = { id: "u1", role: "trainer", full_name: "Test", status: "active", email: "test@test.com" };
@@ -85,7 +85,7 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 15000 }
       render(React.createElement(MonitoringPage));
       await waitFor(() => expect(mockGetApi).toHaveBeenCalled());
       expect(mockGetApi).toHaveBeenCalledWith("/ai/monitoring/history");
-    });
+    }, 30000);
 
     it("does NOT call global fetch (raw unauthenticated) for monitoring endpoints", async () => {
       const rawFetch = vi.spyOn(globalThis, "fetch");

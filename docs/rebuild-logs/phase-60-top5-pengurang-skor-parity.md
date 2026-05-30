@@ -73,3 +73,8 @@ The legacy uses `calculateSessionScoreFromTemuan()` → `scoreSession()` which h
 - Full monorepo build: 3/3 packages successful
 - Web tests: 387 PASS (0 failures)
 - API tests: 407 PASS (0 failures)
+
+## Regression Note
+
+- Follow-up fix added in Vite: `selectedMonth` now auto-syncs to the latest available month when the active service changes or when the current month is no longer valid, matching legacy behavior and preventing the Top 5 card from rendering empty on first load.
+- Added regression coverage in `apps/web/src/__tests__/useAgentDetail.test.tsx` for service-switch month restoration.

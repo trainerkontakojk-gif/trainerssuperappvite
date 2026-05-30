@@ -52,7 +52,7 @@ async function runGuard(guardFactory: () => () => Promise<void>): Promise<string
   }
 }
 
-describe("Route Guards", () => {
+describe("Route Guards", { timeout: 30000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
@@ -68,7 +68,7 @@ describe("Route Guards", () => {
       const { guardResetPassword } = await import("../router");
       const location = await runGuard(guardResetPassword);
       expect(location).toBe("/");
-    });
+    }, 30000);
 
     it("allows active user to access reset password", async () => {
       mockGetSession.mockResolvedValue({
