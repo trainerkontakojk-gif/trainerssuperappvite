@@ -267,8 +267,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 76. **Types Circular Dependency Fix** — Resolved circular dependencies between `packages/types/src/index.ts` and `packages/types/src/ai-models.ts` causing Railway deployment syntax crashes during build/runtime. Moved types to be self-contained in `ai-models.ts` and unidirectional in `index.ts`. All tasks build successfully. (DONE)
 77. **SIDAK Service Thermo-Nuclear Code Quality Refactor** — Performed code quality refactor on decomposed SIDAK service modules: simplified barrel file `sidak-service.ts` using `export * from` statements (reduced from 176 lines to 14), extracted shared `buildTrendResult` helper to eliminate ~100 lines of duplicated trend aggregation in `service-trends.ts`, defined unified `REPORT_ADMIN_ROLES` constant to clean up repeated inline arrays in `report-archives.ts`, and optimized array allocation loops (from `concat`/spread to `.push(...)`) in `agent-directory.ts` and `service-trends.ts`. All 479 API + 468 web tests passing. (DONE)
 78. **SIDAK Route AI Report & Folders/Agents Extraction** — Extracted AI report generation (`generateAiReport`, `aiReportSchema`) from `routes/sidak.ts` into new `sidak/ai-report-service.ts` sub-module. Extracted `getAllFolders()` and `getAgentsByFolder()` into `sidak/access-scope.ts`. Replaced ~150 lines of inline route logic with delegated service calls. Added gemini/openrouter mocks to sidak-service.test.ts for AI report test coverage. 1 new file, 4 modified, 479 API + 468 web tests passing. (DONE)
+79. **SIDAK Route Full Decomposition** — Completed full decomposition of monolithic `routes/sidak.ts` (1,503 → 19 lines, 27 handlers across 5 sub-modules: core, dashboard, temuan, rule-versions, reports). All helpers preserved. Graphify synced. (DONE)
+80. **Telefun Route Full Decomposition** — Completed full decomposition of monolithic `routes/telefun.ts` (1,240 → 21 lines, 12 handlers across 4 sub-modules: sessions, recordings, settings, annotations). All helpers re-exported for test backward compatibility. Graphify synced. (DONE)
 
-## Key Files Changed (Phase 58 — 78)
+## Key Files Changed (Phase 58 — 79)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -422,6 +424,12 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 78**: Added gemini/openrouter mocks + AI report/folders/agents tests
 - `apps/api/src/__tests__/sidak-decomposition-structural.test.ts` — **Phase 78**: Updated expected exports list with generateAiReport, aiReportSchema, getAllFolders, getAgentsByFolder
 - `docs/rebuild-logs/phase-78-sidak-route-extraction.md` — **NEW Phase 78**: Documentation for AI report + folders/agents route extraction
+- `apps/api/src/routes/sidak/` — **Phase 79**: Full SIDAK route decomposition into 5 sub-modules (core.ts 161 lines, dashboard.ts 343 lines, temuan.ts 200 lines, rule-versions.ts 405 lines, reports.ts 447 lines)
+- `apps/api/src/routes/telefun/` — **Phase 80**: Full Telefun route decomposition into 4 sub-modules (sessions.ts 377 lines, recordings.ts 284 lines, settings.ts 144 lines, annotations.ts 468 lines)
+- `apps/api/src/routes/sidak.ts` — **Phase 79**: Reduced from 1,503 to 19 lines — only import + route registration + export
+- `apps/api/src/routes/telefun.ts` — **Phase 80**: Reduced from 1,240 to 21 lines — only import + route registration + export + backward compat re-exports
+- `docs/rebuild-logs/phase-79-sidak-route-decomposition.md` — **NEW Phase 79**: Documentation for SIDAK route full decomposition
+- `docs/rebuild-logs/phase-80-telefun-route-decomposition.md` — **NEW Phase 80**: Documentation for Telefun route full decomposition
 
 ## Routes Reference (apps/web)
 
@@ -470,13 +478,13 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 
 | Prefix             | Endpoints    | Service                         |
 | ------------------ | ------------ | ------------------------------- |
-| `/api/v1/sidak`    | 16 endpoints | `sidak-service.ts`              |
+| `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports) |
 | `/api/v1/ketik`    | 4 endpoints  | `ketik-service.ts`              |
 | `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
 | `/api/v1/ai`       | 7 endpoints  | —                               |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
 | `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |
-| `/api/v1/telefun`  | 5 endpoints  | `telefun.ts` (settings GET/PUT, recording, annotations, score) |
+| `/api/v1/telefun`  | 5 endpoints  | `routes/telefun/` — 4 sub-modules (sessions, recordings, settings, annotations) |
 
 ## graphify
 
