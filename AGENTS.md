@@ -269,6 +269,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 78. **SIDAK Route AI Report & Folders/Agents Extraction** — Extracted AI report generation (`generateAiReport`, `aiReportSchema`) from `routes/sidak.ts` into new `sidak/ai-report-service.ts` sub-module. Extracted `getAllFolders()` and `getAgentsByFolder()` into `sidak/access-scope.ts`. Replaced ~150 lines of inline route logic with delegated service calls. Added gemini/openrouter mocks to sidak-service.test.ts for AI report test coverage. 1 new file, 4 modified, 479 API + 468 web tests passing. (DONE)
 79. **SIDAK Route Full Decomposition** — Completed full decomposition of monolithic `routes/sidak.ts` (1,503 → 19 lines, 27 handlers across 5 sub-modules: core, dashboard, temuan, rule-versions, reports). All helpers preserved. Graphify synced. (DONE)
 80. **Telefun Route Full Decomposition** — Completed full decomposition of monolithic `routes/telefun.ts` (1,240 → 21 lines, 12 handlers across 4 sub-modules: sessions, recordings, settings, annotations). All helpers re-exported for test backward compatibility. Graphify synced. (DONE)
+81. **KETIK ChatInterface Message Utils & Pacing Extraction** — Extracted inline constants, helpers, and pacing functions from `ChatInterface.tsx` (277 → 16 lines) into `ketik/lib/message-utils.ts` (193 lines) and `ketik/lib/pacing.ts` (69 lines). Pure extraction, zero logic change. (DONE)
 
 ## Key Files Changed (Phase 58 — 79)
 
@@ -430,6 +431,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/routes/telefun.ts` — **Phase 80**: Reduced from 1,240 to 21 lines — only import + route registration + export + backward compat re-exports
 - `docs/rebuild-logs/phase-79-sidak-route-decomposition.md` — **NEW Phase 79**: Documentation for SIDAK route full decomposition
 - `docs/rebuild-logs/phase-80-telefun-route-decomposition.md` — **NEW Phase 80**: Documentation for Telefun route full decomposition
+- `apps/web/src/routes/ketik/components/ChatInterface.tsx` — **Phase 81**: Reduced from 277 to 16 lines (import + JSX), inline constants/helpers extracted to ketik/lib/
+- `apps/web/src/routes/ketik/lib/message-utils.ts` — **NEW Phase 81**: Extracted message normalization, image tag, system tag, and allowSolutionAcknowledgement utilities (193 lines)
+- `apps/web/src/routes/ketik/lib/pacing.ts` — **NEW Phase 81**: Extracted session timing, text band classification, and pacing ranges (69 lines)
+- `docs/rebuild-logs/phase-81-ketik-chatinterface-extraction.md` — **NEW Phase 81**: Documentation for KETIK ChatInterface extraction
 
 ## Routes Reference (apps/web)
 

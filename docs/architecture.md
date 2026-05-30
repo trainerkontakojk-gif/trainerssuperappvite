@@ -59,9 +59,31 @@ Struktur folder monorepo:
 │   │   └── vite.config.ts      # Vite config dengan code splitting
 │   ├── api/                    # Backend Hono API server
 │   │   ├── src/
-│   │   │   ├── routes/         # Hono route handlers (sidak, ketik, pdkt, ai, profiler, admin)
-│   │   │   ├── services/       # Business logic (sidak-service, ketik-service, dll)
-│   │   │   ├── lib/            # AI models, scoring, usage logging, Supabase clients
+│   │   │   ├── routes/         # Hono route handlers — decomposed per module:
+│   │   │   │   ├── sidak.ts    #   barrel (import + route registration 5 sub-modules)
+│   │   │   │   ├── sidak/      #   sub-modules: core, dashboard, temuan, rule-versions, reports
+│   │   │   │   ├── telefun.ts  #   barrel (import + route registration 4 sub-modules)
+│   │   │   │   ├── telefun/    #   sub-modules: sessions, recordings, settings, annotations
+│   │   │   │   ├── ketik.ts    #   KETIK endpoints
+│   │   │   │   ├── pdkt.ts     #   PDKT endpoints
+│   │   │   │   ├── ai.ts       #   AI monitoring endpoints
+│   │   │   │   ├── profiler.ts #   Profiler endpoints
+│   │   │   │   └── admin.ts    #   Admin endpoints
+│   │   │   ├── services/       # Business logic — decomposed per module:
+│   │   │   │   ├── sidak-service.ts   # barrel (13 sub-modules: shared-constants, access-scope,
+│   │   │   │   │                   #   period-indicator, temuan-service, agent-directory,
+│   │   │   │   │                   #   rule-versions, service-trends, dashboard-*, report-*)
+│   │   │   │   ├── sidak/            #   SIDAK sub-modules
+│   │   │   │   ├── sidak-ranking-service.ts  #   Ranking extraction
+│   │   │   │   ├── ketik-service.ts
+│   │   │   │   ├── pdkt-service.ts
+│   │   │   │   ├── profiler-service.ts
+│   │   │   │   ├── admin-service.ts
+│   │   │   │   ├── monitoring-history-service.ts
+│   │   │   │   └── activity-log-service.ts
+│   │   │   ├── lib/            # AI models, scoring, usage logging, Supabase clients,
+│   │   │   │                   #   math-utils, telefun-communication-profile, report builders
+│   │   │   ├── middleware/      # auth, role, rate-limit middleware
 │   │   │   └── index.ts        # Hono app entry point + AppType export
 │   │   └── vitest.config.ts    # API test config
 │   └── telefun/                # WebSocket proxy server untuk Gemini Live
@@ -87,8 +109,8 @@ Struktur folder monorepo:
 Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 
 - Logic database tidak diletakkan langsung di dalam komponen UI frontend.
-- Semua query kompleks berada di `apps/api/src/services/` (contoh: `sidak-service.ts`, `profiler-service.ts`).
-- Mutasi data dilakukan melalui Hono route handlers di `apps/api/src/routes/`.
+- Semua query kompleks berada di `apps/api/src/services/` (contoh: `sidak-service.ts` — barrel dari 13 sub-modules, `profiler-service.ts`).
+- Route handlers didekomposisi per modul: sub-modul di `apps/api/src/routes/sidak/` (5 file) dan `apps/api/src/routes/telefun/` (4 file), dengan barrel file `sidak.ts`/`telefun.ts` sebagai entry point.
 - Frontend mengonsumsi API via Hono RPC client (`hc<AppType>`) untuk full type-safety.
 - Hybrid Client Pattern untuk Supabase:
   - Default: Gunakan User JWT untuk menghormati RLS.

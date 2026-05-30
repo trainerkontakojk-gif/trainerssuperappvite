@@ -18,6 +18,22 @@ import type {
   PacingMeta,
 } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
+import {
+  IMAGE_TAG_PATTERN,
+  IMAGE_TAG_PATTERN_GLOBAL,
+  allowSolutionAcknowledgement,
+  normalizeGeneratedParts,
+  normalizeMessagesForDisplay,
+} from "../lib/message-utils";
+import {
+  classifyTextBand,
+  isAgentGivingSolution,
+  isSlowEligible,
+  boundedRandom,
+  REALISTIC_RANGES,
+  TRAINING_FAST_RANGES,
+  type SessionPhase,
+} from "../lib/pacing";
 
 interface ChatInterfaceProps {
   config: KetikSessionConfig;
@@ -39,269 +55,8 @@ const TickIcon = ({ status }: { status?: string }) => {
   return <CheckCheck className={`w-3.5 h-3.5 ${color}`} />;
 };
 
-const IMAGE_TAG_PATTERN = /\[SEND_IMAGE\s*:\s*\d+\]/i;
-const IMAGE_TAG_PATTERN_GLOBAL = /\[SEND_IMAGE\s*:\s*\d+\]/gi;
-const SYSTEM_TAG_PATTERN = /\[(sistem|system)\]/i;
-const SYSTEM_TAG_PATTERN_GLOBAL = /\[(sistem|system)\]/gi;
 const MAINTENANCE_TEMPLATE =
   "Demikian informasi yang dapat kami sampaikan. Apakah informasinya sudah cukup jelas? Ada hal lain yang dapat kami bantu?";
-
-const STRICT_INSTRUCTIONAL_CUES = [
-  "silakan",
-  "mohon",
-  "harap",
-  "bisa dilakukan",
-  "yang perlu",
-  "pastikan",
-  "hubungi",
-  "datang ke",
-  "bawa",
-  "siapkan",
-  "verifikasi",
-] as const;
-
-const ACTION_VERB_CUES = [
-  "coba",
-  "klik",
-  "tekan",
-  "pilih",
-  "masukkan",
-  "isi",
-  "konfirmasi",
-] as const;
-
-function hasStructuralSteps(text: string): boolean {
-  const lines = text.split(/\n/);
-  let stepCount = 0;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (/^[\d]+[.)]\s/.test(trimmed)) stepCount += 1;
-    else if (/^[a-z][.)]\s/i.test(trimmed)) stepCount += 1;
-    else if (/^[-*•]\s/.test(trimmed)) stepCount += 1;
-  }
-  return stepCount >= 2;
-}
-
-function countCuesWithBoundary(lower: string): number {
-  let count = 0;
-  for (const cue of STRICT_INSTRUCTIONAL_CUES) {
-    const escaped = cue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = cue.includes(" ")
-      ? new RegExp(escaped, "i")
-      : new RegExp(`\\b${escaped}\\b`, "i");
-    if (pattern.test(lower)) count += 1;
-  }
-  for (const cue of ACTION_VERB_CUES) {
-    const escaped = cue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`\\b${escaped}\\b`, "i");
-    if (pattern.test(lower)) count += 1;
-  }
-  return count;
-}
-
-function allowSolutionAcknowledgement(
-  lastAgentText: string | null,
-): boolean {
-  if (!lastAgentText) return false;
-  const lower = lastAgentText.toLowerCase();
-  const cueCount = countCuesWithBoundary(lower);
-  const hasSteps = hasStructuralSteps(lastAgentText);
-  const hasNextWord = /\b(selanjutnya|berikutnya|kemudian|lalu)\b/i.test(lower);
-  if (cueCount >= 3) return true;
-  if (cueCount >= 2 && hasSteps) return true;
-  if (cueCount >= 2 && hasNextWord) return true;
-  if (cueCount >= 1 && hasSteps) return true;
-  return false;
-}
-
-function stripSystemTags(text: string): string {
-  return text.replace(SYSTEM_TAG_PATTERN_GLOBAL, "").trim();
-}
-
-function hasImageTag(text: string): boolean {
-  return IMAGE_TAG_PATTERN.test(text);
-}
-
-function isImageOnlyText(text: string): boolean {
-  const cleaned = stripSystemTags(text);
-  return (
-    cleaned.length > 0 &&
-    hasImageTag(cleaned) &&
-    cleaned.replace(IMAGE_TAG_PATTERN_GLOBAL, "").trim() === ""
-  );
-}
-
-function stripNarrationFromImagePart(text: string): string {
-  const match = text.match(IMAGE_TAG_PATTERN);
-  if (match) {
-    const stripped = text.replace(IMAGE_TAG_PATTERN_GLOBAL, "").trim();
-    if (stripped) {
-      console.warn(
-        "[ketik][stripNarration] Stripped narration from image part:",
-        { stripped, kept: match[0] },
-      );
-    }
-    return match[0];
-  }
-  return text;
-}
-
-function normalizeGeneratedParts(
-  parts: string[],
-): Array<Pick<ChatMessage, "sender" | "text">> {
-  const normalized: Array<Pick<ChatMessage, "sender" | "text">> = [];
-
-  for (let index = 0; index < parts.length; index += 1) {
-    const currentRaw = parts[index];
-    const currentText = stripSystemTags(currentRaw);
-    const nextRaw = parts[index + 1];
-
-    if (!currentText) continue;
-
-    if (SYSTEM_TAG_PATTERN.test(currentRaw) && hasImageTag(currentRaw)) {
-      normalized.push({
-        sender: "consumer",
-        text: stripNarrationFromImagePart(currentRaw),
-      });
-      continue;
-    }
-
-    if (
-      SYSTEM_TAG_PATTERN.test(currentRaw) &&
-      nextRaw &&
-      isImageOnlyText(nextRaw)
-    ) {
-      normalized.push({
-        sender: "consumer",
-        text: `${currentText} ${stripSystemTags(nextRaw)}`.trim(),
-      });
-      index += 1;
-      continue;
-    }
-
-    normalized.push({
-      sender: hasImageTag(currentText)
-        ? "consumer"
-        : SYSTEM_TAG_PATTERN.test(currentRaw)
-          ? "system"
-          : "consumer",
-      text: currentText,
-    });
-  }
-
-  return normalized;
-}
-
-function normalizeMessagesForDisplay(messages: ChatMessage[]): ChatMessage[] {
-  const normalized: ChatMessage[] = [];
-
-  for (let index = 0; index < messages.length; index += 1) {
-    const current = messages[index];
-    const currentText = typeof current.text === "string" ? current.text : "";
-    const cleanedText = stripSystemTags(currentText);
-    const next = messages[index + 1];
-
-    if (current.sender === "system" && hasImageTag(currentText)) {
-      normalized.push({
-        ...current,
-        sender: "consumer",
-        text: stripNarrationFromImagePart(currentText),
-      });
-      continue;
-    }
-
-    if (current.sender === "system" && next && isImageOnlyText(next.text)) {
-      normalized.push({
-        ...next,
-        sender: "consumer",
-        text: `${cleanedText} ${stripSystemTags(next.text)}`.trim(),
-      });
-      index += 1;
-      continue;
-    }
-
-    if (hasImageTag(currentText)) {
-      normalized.push({ ...current, sender: "consumer", text: cleanedText });
-      continue;
-    }
-
-    normalized.push(
-      cleanedText !== currentText ? { ...current, text: cleanedText } : current,
-    );
-  }
-
-  return normalized;
-}
-
-type SessionPhase = "active" | "expired" | "closed";
-
-function classifyTextBand(textLength: number): "short" | "normal" | "long" {
-  if (textLength <= 25) return "short";
-  if (textLength <= 90) return "normal";
-  return "long";
-}
-
-function isAgentGivingSolution(lastAgentText: string | undefined): boolean {
-  if (!lastAgentText) return false;
-  return lastAgentText.length > 90;
-}
-
-function isSlowEligible(params: {
-  consumerTurnIndex: number;
-  consecutiveSlowCount: number;
-  totalSlowCount: number;
-  sessionDurationMinutes: number;
-  remainingSeconds: number;
-  elapsedSeconds?: number;
-  totalDurationSeconds?: number;
-}): boolean {
-  const {
-    consumerTurnIndex,
-    consecutiveSlowCount,
-    totalSlowCount,
-    sessionDurationMinutes,
-    remainingSeconds,
-    elapsedSeconds,
-    totalDurationSeconds,
-  } = params;
-  if (consumerTurnIndex < 4) return false;
-  if (consecutiveSlowCount >= 1) return false;
-  if (remainingSeconds < 45) return false;
-  if (
-    elapsedSeconds !== undefined &&
-    totalDurationSeconds !== undefined &&
-    totalDurationSeconds > 0
-  ) {
-    const elapsedRatio = elapsedSeconds / totalDurationSeconds;
-    if (elapsedRatio < 0.25) return false;
-  }
-  const maxSlow =
-    sessionDurationMinutes <= 5 ? 1 : sessionDurationMinutes <= 15 ? 2 : 2;
-  if (totalSlowCount >= maxSlow) return false;
-  return Math.random() < 0.15;
-}
-
-const REALISTIC_RANGES: Record<string, { minMs: number; maxMs: number }> = {
-  short: { minMs: 1000, maxMs: 3000 },
-  normal: { minMs: 5000, maxMs: 10000 },
-  long: { minMs: 10000, maxMs: 20000 },
-  slow: { minMs: 20000, maxMs: 30000 },
-  follow_up: { minMs: 1200, maxMs: 2500 },
-  greeting_reply: { minMs: 2000, maxMs: 6000 },
-};
-
-const TRAINING_FAST_RANGES: Record<string, { minMs: number; maxMs: number }> = {
-  short: { minMs: 800, maxMs: 1500 },
-  normal: { minMs: 2000, maxMs: 4000 },
-  long: { minMs: 4000, maxMs: 7000 },
-  slow: { minMs: 800, maxMs: 1500 },
-  follow_up: { minMs: 800, maxMs: 1500 },
-  greeting_reply: { minMs: 500, maxMs: 1500 },
-};
-
-function boundedRandom(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
 
 export function ChatInterface({
   config,

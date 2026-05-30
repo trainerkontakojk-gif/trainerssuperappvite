@@ -37,11 +37,12 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 - `docs/deployment.md`: Panduan deployment aplikasi.
 - `docs/checklist-audit-trainers-superapp.md`: Checklist audit parity Next.js vs Vite.
 - `docs/AUTH_KNOWN_ISSUE_PROFILE_SCHEMA_DRIFT.md`: Catatan isu schema drift profil auth.
+- `apps/web/src/routes/ketik/lib/`: KETIK shared utilities (`message-utils.ts`, `pacing.ts`).
 
 ## Verifikasi Umum
 
 - Jalankan `pnpm lint` untuk validasi lint cepat.
-- Jalankan `pnpm test` untuk menjalankan seluruh test suite (92 tests).
+- Jalankan `pnpm test` untuk menjalankan seluruh test suite (475 API + 468 web = 943 tests).
 - Jalankan `pnpm --filter @trainers/api test` untuk test API service saja.
 - Jalankan `pnpm --filter @trainers/web test` untuk test frontend saja.
 - Jalankan `pnpm build` untuk validasi build production.
