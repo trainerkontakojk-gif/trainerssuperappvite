@@ -1,10 +1,9 @@
+import { roundTo } from "../../lib/math-utils";
 import type { QAPeriod, ServiceWeight } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
 import { getScoreRows } from "./dashboard-aggregation";
-function roundTo(value: number, digits: number): number {
-  const factor = Math.pow(10, digits);
-  return Math.round(value * factor) / factor;
-}
+
+
 
 export const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
 
