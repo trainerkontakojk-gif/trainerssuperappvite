@@ -104,3 +104,28 @@ export async function getFoldersByIds(
     .order("name");
   return (data ?? []).map((f: any) => ({ id: f.id, name: f.name }));
 }
+
+export async function getAllFolders(): Promise<{ id: string; name: string }[]> {
+  const { data } = await supabaseAdmin
+    .from("profiler_folders")
+    .select("id, name")
+    .order("name");
+  return data ?? [];
+}
+
+export async function getAgentsByFolder(
+  folder: string,
+  filterScope: SidakFilterScope | null,
+): Promise<{ id: string; nama: string }[]> {
+  const { data } = await supabaseAdmin
+    .from("profiler_peserta")
+    .select("id, nama")
+    .eq("batch_name", folder)
+    .order("nama");
+  let result = data ?? [];
+  if (filterScope && filterScope.agentIds.length > 0) {
+    const idSet = new Set(filterScope.agentIds);
+    result = result.filter((a: any) => idSet.has(a.id));
+  }
+  return result;
+}

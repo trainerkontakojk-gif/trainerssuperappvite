@@ -266,9 +266,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 75. **Maintainability Refactor & Recording Fix** — SIDAK service decomposition into 13 sub-modules (shared-constants, access-scope, period-indicator, temuan-service, agent-directory, rule-versions, service-trends, dashboard-data, dashboard-aggregation, dashboard-trends, dashboard-types, report-data, report-archives) + extracted ranking-service.ts + shared math-utils.ts; Telefun API adapter replacing raw `fetch()`, shared AI model registry eliminating duplicate model lists, KETIK/PDKT settings modal layout decomposition. Post-review fix: Telefun recording endpoint `{ success, url }` → `{ success, data: { url }, url }` (fetchApi unwrap compat + backward-compat), fixed 3 frontend recording consumers. 28 files modified/added. Full suite: build pass, API 475 + web 468 tests pass, 0 failures. (DONE)
 76. **Types Circular Dependency Fix** — Resolved circular dependencies between `packages/types/src/index.ts` and `packages/types/src/ai-models.ts` causing Railway deployment syntax crashes during build/runtime. Moved types to be self-contained in `ai-models.ts` and unidirectional in `index.ts`. All tasks build successfully. (DONE)
 77. **SIDAK Service Thermo-Nuclear Code Quality Refactor** — Performed code quality refactor on decomposed SIDAK service modules: simplified barrel file `sidak-service.ts` using `export * from` statements (reduced from 176 lines to 14), extracted shared `buildTrendResult` helper to eliminate ~100 lines of duplicated trend aggregation in `service-trends.ts`, defined unified `REPORT_ADMIN_ROLES` constant to clean up repeated inline arrays in `report-archives.ts`, and optimized array allocation loops (from `concat`/spread to `.push(...)`) in `agent-directory.ts` and `service-trends.ts`. All 479 API + 468 web tests passing. (DONE)
+78. **SIDAK Route AI Report & Folders/Agents Extraction** — Extracted AI report generation (`generateAiReport`, `aiReportSchema`) from `routes/sidak.ts` into new `sidak/ai-report-service.ts` sub-module. Extracted `getAllFolders()` and `getAgentsByFolder()` into `sidak/access-scope.ts`. Replaced ~150 lines of inline route logic with delegated service calls. Added gemini/openrouter mocks to sidak-service.test.ts for AI report test coverage. 1 new file, 4 modified, 479 API + 468 web tests passing. (DONE)
 
-
-## Key Files Changed (Phase 58 — 75)
+## Key Files Changed (Phase 58 — 78)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -416,6 +416,12 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/telefun/components/HistoryModal.tsx` — **Phase 75 fix**: Reading recording URL from unwrapped `json.url`
 - `apps/web/src/routes/telefun/replay.tsx` — **Phase 75 fix**: Reading recording URL from unwrapped `json.url`
 - `docs/rebuild-logs/phase-75-maintainability-refactor.md` — **NEW Phase 75**: Documentation for maintainability refactor
+- `apps/api/src/services/sidak/ai-report-service.ts` — **NEW Phase 78**: Extracted AI report generation (generateAiReport, aiReportSchema) from sidak.ts route
+- `apps/api/src/services/sidak/access-scope.ts` — **Phase 78**: Added getAllFolders() and getAgentsByFolder() extracted from sidak.ts route
+- `apps/api/src/routes/sidak.ts` — **Phase 78**: Replaced ~150 lines of inline AI report/folders/agents logic with delegated service calls
+- `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 78**: Added gemini/openrouter mocks + AI report/folders/agents tests
+- `apps/api/src/__tests__/sidak-decomposition-structural.test.ts` — **Phase 78**: Updated expected exports list with generateAiReport, aiReportSchema, getAllFolders, getAgentsByFolder
+- `docs/rebuild-logs/phase-78-sidak-route-extraction.md` — **NEW Phase 78**: Documentation for AI report + folders/agents route extraction
 
 ## Routes Reference (apps/web)
 

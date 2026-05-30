@@ -8,6 +8,7 @@ export * from "./sidak/service-trends";
 export * from "./sidak/rule-versions";
 export * from "./sidak/report-archives";
 export * from "./sidak/report-data";
+export * from "./sidak/ai-report-service";
 export { roundTo } from "../lib/math-utils";
 
 // Test compatibility: supabaseAdmin.from("mv_qa_period_summary")

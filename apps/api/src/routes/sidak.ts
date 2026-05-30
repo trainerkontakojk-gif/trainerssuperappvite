@@ -526,11 +526,8 @@ sidak.get("/folders", requireRole("admin", "trainer", "leader"), async (c) => {
   if (filterScope) {
     return c.json({ success: true, data: filterScope.allowedFolders });
   }
-  const { data } = await (await import("../lib/supabase")).supabaseAdmin
-    .from("profiler_folders")
-    .select("id, name")
-    .order("name");
-  return c.json({ success: true, data: data ?? [] });
+  const folders = await sidakService.getAllFolders();
+  return c.json({ success: true, data: folders });
 });
 
 // ── Agents by Folder ────────────────────────────────────
@@ -550,19 +547,7 @@ sidak.get(
       }
     }
 
-    const { data } = await (await import("../lib/supabase")).supabaseAdmin
-      .from("profiler_peserta")
-      .select("id, nama")
-      .eq("batch_name", folder)
-      .order("nama");
-    const result = data ?? [];
-    if (filterScope && filterScope.agentIds.length > 0) {
-      const idSet = new Set(filterScope.agentIds);
-      return c.json({
-        success: true,
-        data: result.filter((a: any) => idSet.has(a.id)),
-      });
-    }
+    const result = await sidakService.getAgentsByFolder(folder, filterScope);
     return c.json({ success: true, data: result });
   },
 );
@@ -668,17 +653,7 @@ sidak.post(
     const user = c.get("user");
     const profile = c.get("profile");
     const body = await c.req.json();
-    const parsed = z
-      .object({
-        modelId: z.string().optional(),
-        serviceType: z.string().optional(),
-        year: z.number().int().optional(),
-        startMonth: z.number().int().min(1).max(12).optional(),
-        endMonth: z.number().int().min(1).max(12).optional(),
-        pesertaId: z.string().optional(),
-        mode: z.enum(["layanan", "individu"]).default("layanan"),
-      })
-      .safeParse(body);
+    const parsed = sidakService.aiReportSchema.safeParse(body);
     if (!parsed.success)
       return c.json(
         {
@@ -693,129 +668,18 @@ sidak.post(
         user.id,
         profile?.role ?? "",
       );
-      const rows = await sidakService.getDataReportRows({
-        serviceType: parsed.data.serviceType,
-        year: parsed.data.year,
-        startMonth: parsed.data.startMonth,
-        endMonth: parsed.data.endMonth,
-        pesertaId:
-          parsed.data.mode === "individu" ? parsed.data.pesertaId : undefined,
-        agent_ids: accessibleIds ?? undefined,
-      });
-
-      if (rows.length === 0) {
-        return c.json(
-          {
-            success: false,
-            error: {
-              code: "NO_DATA",
-              message: "Tidak ada data temuan untuk filter yang dipilih.",
-            },
-          },
-          400,
-        );
-      }
-
-      const totalFindings = rows.filter(
-        (r) => (r.nilai ?? 3) < 3 || r.ketidaksesuaian,
-      ).length;
-      const agentName = rows[0]?.profiler_peserta?.nama ?? "Unknown";
-      const serviceTypes = [...new Set(rows.map((r) => r.service_type))].join(
-        ", ",
+      const result = await sidakService.generateAiReport(
+        parsed.data,
+        user.id,
+        accessibleIds ?? undefined,
       );
-
-      const { generateGeminiContent } = await import("../lib/gemini");
-      const { generateOpenRouterContent } = await import("../lib/openrouter");
-      const { resolveModelProvider } = await import("../lib/ai-models");
-
-      const modelInfo = resolveModelProvider(parsed.data.modelId);
-      const findingsSample = rows.slice(0, 20).map((r) => ({
-        agent: r.profiler_peserta?.nama,
-        service: r.service_type,
-        parameter: r.qa_indicators?.name,
-        nilai: r.nilai,
-        ketidaksesuaian: r.ketidaksesuaian,
-        sebaiknya: r.sebaiknya,
-      }));
-
-      const prompt = `Buat laporan analisis kualitas QA dalam Bahasa Indonesia berdasarkan data berikut.
-
-PENTING: Gunakan HANYA data yang disediakan di bawah ini. Jangan pernah mengarang, menebak, atau menambahkan angka atau temuan yang tidak ada di data. Jika data tidak mencukupi, nyatakan dengan jujur bahwa data terbatas.
-
-Periode: ${parsed.data.startMonth ? `${parsed.data.startMonth}-${parsed.data.endMonth ?? "?"}/${parsed.data.year}` : `${parsed.data.year || "Semua"}`}
-Mode: ${parsed.data.mode}
-${parsed.data.mode === "individu" ? `Nama Agen: ${agentName}` : `Tipe Layanan: ${serviceTypes}`}
-Total Temuan: ${totalFindings}
-Total Baris Data: ${rows.length}
-
-Sample Data (20 baris pertama):
-${JSON.stringify(findingsSample, null, 2)}
-
-Buat laporan dengan format JSON:
-{
-  "executiveSummary": "Ringkasan eksekutif 2-3 paragraf",
-  "keyFindings": ["Temuan penting 1", "Temuan penting 2", "Temuan penting 3"],
-  "scoreAnalysis": "Analisis skor dan tren",
-  "recommendations": ["Rekomendasi 1", "Rekomendasi 2", "Rekomendasi 3"],
-  "priorityAreas": ["Area prioritas perbaikan 1", "Area prioritas perbaikan 2"]
-}`;
-
-      const contents = [{ role: "user", parts: [{ text: prompt }] }] as any;
-      const genOptions = {
-        model: modelInfo.modelId,
-        contents,
-        temperature: 0.5,
-        usageContext: {
-          module: "qa-analyzer" as const,
-          action: "report_generation",
-        },
-        userId: user?.id,
-      };
-
-      const result =
-        modelInfo.provider === "openrouter"
-          ? await generateOpenRouterContent(genOptions)
-          : await generateGeminiContent(genOptions);
-
-      if (!result.success) {
-        return c.json(
-          {
-            success: false,
-            error: {
-              code: "AI_ERROR",
-              message: result.error || "Gagal generate laporan",
-            },
-          },
-          500,
-        );
-      }
-
-      let parsedReport;
-      try {
-        const cleaned = (result.text || "")
-          .replace(/^```(?:json)?\s*/, "")
-          .replace(/\s*```$/, "");
-        parsedReport = JSON.parse(cleaned);
-      } catch {
-        parsedReport = { executiveSummary: result.text };
-      }
-
-      return c.json({
-        success: true,
-        data: {
-          report: parsedReport,
-          metadata: {
-            totalRows: rows.length,
-            totalFindings,
-            agentName: parsed.data.mode === "individu" ? agentName : undefined,
-            serviceTypes,
-          },
-        },
-      });
+      return c.json({ success: true, data: result });
     } catch (e: any) {
+      const isNoData = e.message.includes("Tidak ada data");
+      const code = isNoData ? "NO_DATA" : "REPORT_ERROR";
       return c.json(
-        { success: false, error: { code: "REPORT_ERROR", message: e.message } },
-        500,
+        { success: false, error: { code, message: e.message } },
+        isNoData ? 400 : 500,
       );
     }
   },

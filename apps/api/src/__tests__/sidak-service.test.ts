@@ -24,6 +24,14 @@ vi.mock("../lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
 
+vi.mock("../lib/gemini", () => ({
+  generateGeminiContent: vi.fn().mockResolvedValue({ success: true, text: '{"executiveSummary": "test summary"}' }),
+}));
+
+vi.mock("../lib/openrouter", () => ({
+  generateOpenRouterContent: vi.fn().mockResolvedValue({ success: true, text: '{"executiveSummary": "test summary"}' }),
+}));
+
 import * as sidakService from "../services/sidak-service";
 
 describe("sidak-service", () => {
@@ -698,6 +706,75 @@ describe("sidak-service", () => {
 
       const result = await sidakService.createPerfectScoreSession("peserta1", "per1", "call");
       expect(result.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("getAllFolders", () => {
+    it("returns sorted folders from database", async () => {
+      const fake = [{ id: "1", name: "Folder A" }];
+      pendingResolve = () => ({ data: fake, error: null });
+
+      const result = await sidakService.getAllFolders();
+      expect(result).toEqual(fake);
+    });
+  });
+
+  describe("getAgentsByFolder", () => {
+    it("returns agents for folder", async () => {
+      const fake = [{ id: "a1", nama: "Agent A" }, { id: "a2", nama: "Agent B" }];
+      pendingResolve = () => ({ data: fake, error: null });
+
+      const result = await sidakService.getAgentsByFolder("Folder A", null);
+      expect(result).toEqual(fake);
+    });
+
+    it("filters agents by allowed agentIds in filterScope", async () => {
+      const fake = [{ id: "a1", nama: "Agent A" }, { id: "a2", nama: "Agent B" }];
+      pendingResolve = () => ({ data: fake, error: null });
+
+      const result = await sidakService.getAgentsByFolder("Folder A", {
+        agentIds: ["a1"],
+        allowedFolders: [],
+        allowedServices: [],
+        serviceTypeLocked: false,
+      });
+      expect(result).toEqual([{ id: "a1", nama: "Agent A" }]);
+    });
+  });
+
+  describe("generateAiReport", () => {
+    it("throws error when no data rows are found", async () => {
+      pendingResolve = () => ({ data: [], error: null });
+
+      await expect(
+        sidakService.generateAiReport(
+          { mode: "layanan", serviceType: "call", year: 2025 },
+          "u1",
+        ),
+      ).rejects.toThrow("Tidak ada data temuan untuk filter yang dipilih.");
+    });
+
+    it("generates and returns report when rows exist", async () => {
+      const fakeRows = [
+        {
+          id: "r1",
+          nilai: 3,
+          service_type: "call",
+          profiler_peserta: { nama: "Agent A" },
+          qa_indicators: { name: "Param 1" },
+        },
+      ];
+      pendingResolve = () => ({ data: fakeRows, error: null });
+
+      const result = await sidakService.generateAiReport(
+        { mode: "layanan", serviceType: "call", year: 2025 },
+        "u1",
+      );
+
+      expect(result.report).toEqual({ executiveSummary: "test summary" });
+      expect(result.metadata.totalRows).toBe(1);
+      expect(result.metadata.totalFindings).toBe(0);
+      expect(result.metadata.serviceTypes).toBe("call");
     });
   });
 });

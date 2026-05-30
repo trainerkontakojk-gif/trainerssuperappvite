@@ -64,6 +64,10 @@ describe("Sidak Decomposition - Structural Property Tests", () => {
       "getReportArchives",
       "getReportArchiveById",
       "deleteReportArchive",
+      "generateAiReport",
+      "aiReportSchema",
+      "getAllFolders",
+      "getAgentsByFolder",
     ];
 
     const actualExports = Object.keys(sidakService);
