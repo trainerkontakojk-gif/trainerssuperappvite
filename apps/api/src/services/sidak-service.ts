@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "../lib/supabase";
+import type { DashboardAgentGroup, DashboardTemuanRow } from "./sidak/dashboard-types";
+import { groupTemuanByAgent, getScoreRows } from "./sidak/dashboard-aggregation";
+import { buildDashboardTrends } from "./sidak/dashboard-trends";
 import { getLeaderScopeSnapshot } from "./leader-access-service";
 import {
   calculateQAScoreFromTemuan,
@@ -153,7 +156,7 @@ function emptyDashboardResponse(periods: QAPeriod[]): DashboardData {
   };
 }
 
-function roundTo(value: number, digits: number): number {
+export function roundTo(value: number, digits: number): number {
   if (!Number.isFinite(value)) return 0;
   return Number(value.toFixed(digits));
 }
@@ -162,7 +165,7 @@ function hasMeaningfulNote(value: string | null | undefined) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function isCountableFinding(
+export function isCountableFinding(
   item:
     | {
         nilai?: number | null;
@@ -752,11 +755,8 @@ export async function refreshDashboardSummary(
       DEFAULT_SERVICE_WEIGHTS[agentSvc as ServiceType] ??
       DEFAULT_SERVICE_WEIGHTS.call;
 
-    const realRows = agent.rows.filter(
-      (r: any) => r.is_phantom_padding !== true,
-    );
-    const scoreRows = realRows.length > 0 ? realRows : agent.rows;
-    const score = calculateQAScoreFromTemuan(indicators, scoreRows, weight);
+    const scoreRows = getScoreRows(agent.rows as DashboardTemuanRow[]);
+    const score = calculateQAScoreFromTemuan(indicators, scoreRows as any, weight);
 
     const findingRows = agent.rows.filter((r: any) => isCountableFinding(r));
     const agentFindings = findingRows.length;
@@ -1176,11 +1176,10 @@ export async function getAgentDetail(
         (serviceType ? r.service_type === serviceType : true),
     );
     if (periodRows.length === 0) continue;
-    const scoreRows = periodRows.filter((r) => r.is_phantom_padding !== true);
-    const scoreRowsForCalc = scoreRows.length > 0 ? scoreRows : periodRows;
+    const scoreRowsForCalc = getScoreRows(periodRows as DashboardTemuanRow[]);
     const score = calculateQAScoreFromTemuan(
       indicators,
-      scoreRowsForCalc,
+      scoreRowsForCalc as any,
       weight,
     );
     const findingsCount = periodRows.filter((r) =>
@@ -1404,35 +1403,7 @@ export async function getDashboardData(params: {
     {},
   );
 
-  const agentMap = new Map<
-    string,
-    {
-      id: string;
-      nama: string;
-      batch_name: string;
-      tim: string;
-      jabatan: string;
-      rows: any[];
-    }
-  >();
-
-  for (const row of rows) {
-    const pid = row.peserta_id;
-    if (!agentMap.has(pid)) {
-      const p = row.profiler_peserta as any;
-      agentMap.set(pid, {
-        id: pid,
-        nama: p?.nama ?? "Unknown",
-        batch_name: p?.batch_name ?? "",
-        tim: p?.tim ?? "",
-        jabatan: p?.jabatan ?? "",
-        rows: [],
-      });
-    }
-    agentMap.get(pid)!.rows.push(row);
-  }
-
-  const auditedAgents = Array.from(agentMap.values());
+  const auditedAgents = groupTemuanByAgent(rows as DashboardTemuanRow[]);
   let totalFindings = 0;
   let totalScore = 0;
   let zeroErrorCount = 0;
@@ -1454,9 +1425,8 @@ export async function getDashboardData(params: {
       DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ??
       DEFAULT_SERVICE_WEIGHTS["call"];
 
-    const realRows = agent.rows.filter((r) => r.is_phantom_padding !== true);
-    const scoreRows = realRows.length > 0 ? realRows : agent.rows;
-    const score = calculateQAScoreFromTemuan(indicators, scoreRows, weight);
+    const scoreRows = getScoreRows(agent.rows);
+    const score = calculateQAScoreFromTemuan(indicators, scoreRows as any, weight);
 
     const findingRows = agent.rows.filter((r) => isCountableFinding(r));
     const agentFindings = findingRows.length;
@@ -1560,9 +1530,8 @@ export async function getDashboardData(params: {
         weightMap[svc] ??
         DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ??
         DEFAULT_SERVICE_WEIGHTS["call"];
-      const realRows = agent.rows.filter((r) => r.is_phantom_padding !== true);
-      const scoreRows = realRows.length > 0 ? realRows : agent.rows;
-      const score = calculateQAScoreFromTemuan(indicators, scoreRows, weight);
+      const scoreRows = getScoreRows(agent.rows);
+      const score = calculateQAScoreFromTemuan(indicators, scoreRows as any, weight);
       const findingRows = agent.rows.filter((r) => isCountableFinding(r));
       return {
         agentId: agent.id,
@@ -1650,133 +1619,23 @@ export async function getDashboardData(params: {
       nonCritical: nonCriticalCount,
       total: criticalCount + nonCriticalCount,
     },
-    ...(() => {
-      const trendYear = params.year ?? new Date().getFullYear();
-      let filteredPeriods = periods
-        .filter((p: any) => p.year === trendYear)
-        .filter((p: any) => !params.startMonth || p.month >= params.startMonth)
-        .filter((p: any) => !params.endMonth || p.month <= params.endMonth)
-        .sort((a: any, b: any) => a.month - b.month);
-
-      const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des'];
-
-      if (filteredPeriods.length > 0 && rows.length > 0) {
-        const validPeriodIds = new Set(filteredPeriods.map((p: any) => p.id));
-
-        const rowsByPeriod = new Map<string, any[]>();
-        for (const row of rows) {
-          if (validPeriodIds.has(row.period_id)) {
-            if (!rowsByPeriod.has(row.period_id)) rowsByPeriod.set(row.period_id, []);
-            rowsByPeriod.get(row.period_id)!.push(row);
-          }
-        }
-
-        filteredPeriods = filteredPeriods.filter((p: any) => rowsByPeriod.has(p.id));
-
-        const agentPeriodGroups = new Map<string, any[]>();
-        for (const [pid, periodRows] of rowsByPeriod) {
-          const agentGroups = new Map<string, any[]>();
-          for (const row of periodRows) {
-            const key = `${pid}:${row.peserta_id}`;
-            if (!agentGroups.has(key)) agentGroups.set(key, []);
-            agentGroups.get(key)!.push(row);
-          }
-          for (const [key, agentRows] of agentGroups) {
-            agentPeriodGroups.set(key, agentRows);
-          }
-        }
-
-        const periodMetrics = filteredPeriods.map((period: any) => {
-          const periodRows = rowsByPeriod.get(period.id) ?? [];
-          const periodAgentKeys = [...agentPeriodGroups.keys()].filter(
-            (k: string) => k.startsWith(period.id + ':')
-          );
-
-          const totalAudited = periodAgentKeys.length;
-          const totalFindings = periodRows.filter((r: any) => isCountableFinding(r)).length;
-
-          let zeroCount = 0;
-          let complianceCount = 0;
-          let totalScore = 0;
-
-          for (const agentKey of periodAgentKeys) {
-            const agentRows = agentPeriodGroups.get(agentKey)!;
-            const svc = agentRows[0]?.service_type ?? 'call';
-            const weight = weightMap[svc] ?? DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ?? DEFAULT_SERVICE_WEIGHTS['call'];
-            const realRows = agentRows.filter((r: any) => r.is_phantom_padding !== true);
-            const scoreRows = realRows.length > 0 ? realRows : agentRows;
-            const score = calculateQAScoreFromTemuan(indicators, scoreRows, weight);
-
-            const findingRows = agentRows.filter((r: any) => isCountableFinding(r));
-            if (findingRows.length === 0) zeroCount++;
-            if (score.finalScore >= 95) complianceCount++;
-            totalScore += score.finalScore;
-          }
-
-          return {
-            periodId: period.id,
-            label: `${MONTHS_SHORT[period.month - 1]} ${String(period.year).slice(-2)}`,
-            total: totalFindings,
-            avg: totalAudited > 0 ? roundTo(totalFindings / totalAudited, 1) : 0,
-            zero: totalAudited > 0 ? roundTo((zeroCount / totalAudited) * 100, 1) : 0,
-            compliance: complianceCount,
-            avgAgentScore: totalAudited > 0 ? roundTo(totalScore / totalAudited, 1) : 0,
-            totalAudited,
-          };
-        });
-
-        const paramCounts: Record<string, Record<string, number>> = {};
-        const totalFindingsByPeriod: Record<string, number> = {};
-
-        for (const [pid, periodRows] of rowsByPeriod) {
-          for (const row of periodRows) {
-            if (!isCountableFinding(row)) continue;
-            totalFindingsByPeriod[pid] = (totalFindingsByPeriod[pid] || 0) + 1;
-
-            const indicator = indicators.find((i: any) => i.id === row.indicator_id);
-            const paramName = indicator?.name || 'Unknown';
-            if (!paramCounts[paramName]) paramCounts[paramName] = {};
-            paramCounts[paramName][pid] = (paramCounts[paramName][pid] || 0) + 1;
-          }
-        }
-
-        const topParams = Object.entries(paramCounts)
-          .map(([name, periodCounts]) => ({
-            name,
-            total: Object.values(periodCounts).reduce((a: number, b: number) => a + b, 0),
-          }))
-          .sort((a, b) => b.total - a.total)
-          .map((p) => p.name);
-
-        const labels = filteredPeriods.map((p: any) =>
-          `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`
-        );
-
-        const datasets = [
-          {
-            label: 'Total Temuan',
-            data: filteredPeriods.map((p: any) => totalFindingsByPeriod[p.id] || 0),
-            isTotal: true,
-          },
-          ...topParams.map((name) => ({
-            label: name,
-            data: filteredPeriods.map((p: any) => paramCounts[name][p.id] || 0),
-            isTotal: false,
-          })),
-        ];
-
-        const sparklines = {
-          'total-defects': periodMetrics.map(m => ({ label: m.label, value: m.total })),
-          'avg-defects': periodMetrics.map(m => ({ label: m.label, value: m.avg })),
-          'avg-score': periodMetrics.map(m => ({ label: m.label, value: m.avgAgentScore })),
-          'compliance': periodMetrics.map(m => ({ label: m.label, value: m.compliance })),
-        };
-
-        return { paramTrend: { labels, datasets }, sparklines };
-      }
-
-      return { paramTrend: { labels: [], datasets: [] }, sparklines: {} };
-    })(),
+    ...buildDashboardTrends({
+      periods,
+      rows: rows as DashboardTemuanRow[],
+      indicators,
+      weightMap,
+      year: params.year ?? new Date().getFullYear(),
+      startMonth: params.startMonth,
+      endMonth: params.endMonth,
+      isCountableFinding,
+      calculateScore: (scoreRows, serviceType) => {
+        const weight =
+          weightMap[serviceType] ??
+          DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
+          DEFAULT_SERVICE_WEIGHTS.call;
+        return calculateQAScoreFromTemuan(indicators, scoreRows as any, weight).finalScore;
+      },
+    }),
     availableYears,
     currentYear,
     availableServices,

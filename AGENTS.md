@@ -263,8 +263,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 72. **Monitoring Overstimulation Fix & Paginated Table Redesign** — Redesigned `/monitoring` page into a spacious, premium paginated table to prevent card fatigue and overstimulation. Added top KPI cards with growth rates, inline date-range popover picker, and modular submetric columns. Case-converted module badges and card titles to lowercase and used CSS transforms to fix Testing Library duplicate queries. 3 files modified, 39/39 regression tests passing. (DONE)
 73. **Monitoring Category Filter Toggle Removal** — Removed the non-functioning "Semua", "Simulasi", and "Penilaian" category toggle buttons from the Token Usage tab. Cleaned up lifted React state variables, API fetch parameters, and component props to simplify the interface, eliminate visual redundancy, and prevent visual layout issues with empty columns. 2 files modified, 452 web + 425 API regression tests passing. (DONE)
 74. **SIDAK Agent Current Month Display** — Added the latest audited month name in parentheses next to the agent's average score percentage on the Directory Agent page (Vite parity + UX improvement). Added `periodMonth` to backend `getAgentDirectorySummary` response, updated shared `AgentDirectoryEntry` interface, re-added `%` to frontend score, and implemented a baseline-aligned flex layout displaying Indonesian short month names. Added 4 frontend tests for `AgentCard` component. 4 files modified, 1 new test file, 477 API + 457 web regression tests passing. (DONE)
+75. **Maintainability Refactor & Recording Fix** — SIDAK service decomposition (ranking-service + dashboard aggregation/trends helpers with local `roundTo()`), Telefun API adapter replacing raw `fetch()`, shared AI model registry eliminating duplicate model lists, KETIK/PDKT settings modal layout decomposition. Post-review fix: Telefun recording endpoint `{ success, url }` → `{ success, data: { url }, url }` (fetchApi unwrap compat + backward-compat), fixed 3 frontend recording consumers. 26 files modified/added. Full suite: build pass, API 475 + web 468 tests pass, 0 failures. (DONE)
 
-## Key Files Changed (Phase 58 — 74)
+## Key Files Changed (Phase 58 — 75)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -394,6 +395,22 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
 - `apps/api/src/__tests__/monitoring-history-enrichment.test.ts` — **Phase 70 update**: Mock data aligned to Vite schema columns
+- `apps/api/src/services/sidak/` — **NEW Phase 75**: SIDAK service decomposition (dashboard-types, dashboard-aggregation, dashboard-trends with local `roundTo()`)
+- `apps/api/src/services/sidak-ranking-service.ts` — **NEW Phase 75**: Extracted ranking service from sidak-service.ts
+- `apps/api/src/__tests__/sidak-ranking-service.test.ts` — **NEW Phase 75**: 2 tests for ranking service
+- `apps/web/src/routes/telefun/telefunApi.ts` — **NEW Phase 75**: Telefun API adapter replacing raw `fetch()`
+- `apps/web/src/__tests__/telefun-api-adapter.test.ts` — **NEW Phase 75**: 3 tests for telefun API adapter
+- `packages/types/src/ai-models.ts` — **NEW Phase 75**: Shared AI model registry
+- `apps/web/src/lib/aiModels.ts` — **NEW Phase 75**: Frontend model list helper
+- `apps/web/src/routes/ketik/components/settings/` — **NEW Phase 75**: KETIK settings decomposition (KetikSystemTab, useKetikSettingsDraft)
+- `apps/web/src/routes/pdkt/components/settings/` — **NEW Phase 75**: PDKT settings decomposition (PdktSystemTab, usePdktSettingsDraft)
+- `apps/web/src/__tests__/ketik-settings-modal.test.tsx` — **NEW Phase 75**: 4 tests for KETIK settings modal
+- `apps/web/src/__tests__/pdkt-settings-modal.test.tsx` — **NEW Phase 75**: 4 tests for PDKT settings modal
+- `apps/api/src/routes/telefun.ts` — **Phase 75 fix**: Recording endpoint response contract `{ success, data: { url }, url }` for fetchApi unwrap + backward compat
+- `apps/web/src/routes/telefun/components/ReviewModal.tsx` — **Phase 75 fix**: Reading recording URL from unwrapped `json.url`
+- `apps/web/src/routes/telefun/components/HistoryModal.tsx` — **Phase 75 fix**: Reading recording URL from unwrapped `json.url`
+- `apps/web/src/routes/telefun/replay.tsx` — **Phase 75 fix**: Reading recording URL from unwrapped `json.url`
+- `docs/rebuild-logs/phase-75-maintainability-refactor.md` — **NEW Phase 75**: Documentation for maintainability refactor
 
 ## Routes Reference (apps/web)
 
@@ -448,4 +465,4 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 | `/api/v1/ai`       | 7 endpoints  | —                               |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
 | `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |
-| `/api/v1/telefun`  | 2 endpoints  | `telefun.ts` (settings GET/PUT) |
+| `/api/v1/telefun`  | 5 endpoints  | `telefun.ts` (settings GET/PUT, recording, annotations, score) |

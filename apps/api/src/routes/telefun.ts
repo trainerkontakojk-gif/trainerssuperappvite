@@ -378,7 +378,7 @@ telefun.get("/recording/:id", async (c) => {
       .createSignedUrl(path, 3600);
 
     if (error) throw error;
-    return c.json({ success: true, url: data.signedUrl });
+    return c.json({ success: true, data: { url: data.signedUrl }, url: data.signedUrl });
   } catch (error: any) {
     return c.json(
       {
@@ -548,7 +548,7 @@ telefun.get("/settings", async (c) => {
 
     if (error) throw error;
     const telefunSettings = data?.settings?.telefun || null;
-    return c.json({ success: true, settings: telefunSettings });
+    return c.json({ success: true, settings: telefunSettings, data: telefunSettings });
   } catch (error: any) {
     return c.json(
       {

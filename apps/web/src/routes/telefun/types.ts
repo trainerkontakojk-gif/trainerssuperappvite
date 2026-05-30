@@ -5,6 +5,8 @@ export interface CallRecord {
   date: string;
   url: string;
   consumerName: string;
+  consumerPhone?: string;
+  consumerCity?: string;
   scenarioTitle: string;
   duration: number;
   configuredDuration?: number;

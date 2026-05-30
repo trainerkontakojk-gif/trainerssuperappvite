@@ -29,7 +29,7 @@ import {
   type ReplayAnnotationItem,
   type CoachingRecommendationItem,
 } from "./ReplayAnnotator";
-import { useApi, postApi, deleteApi } from "../../../hooks/useApi";
+import { useApi, getApi, postApi, deleteApi } from "../../../hooks/useApi";
 import { notify } from "../../../lib/toast";
 
 interface ReviewModalProps {
@@ -151,28 +151,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     const loadRecordingUrl = async () => {
       setRecordingLoading(true);
       try {
-        const token =
-          localStorage.getItem("auth_token") ??
-          localStorage.getItem("supabase_token");
-        const response = await fetch(
-          `${API_BASE}/telefun/recording/${record.id}`,
-          {
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          },
-        );
-        const json = await response.json();
+        const json = await getApi<any>(`/telefun/recording/${record.id}`);
 
         if (cancelled) return;
 
-        if (json?.success && json.url) {
+        if (json?.url) {
           setRecordingUrl(json.url);
         } else {
           setRecordingUrl(null);
           setRecordingError(
-            json?.error?.message || "Tautan rekaman belum tersedia.",
+            "Tautan rekaman belum tersedia.",
           );
         }
       } catch (error) {

@@ -12,17 +12,25 @@ import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
 import { ReviewModal } from "./components/ReviewModal";
 import { UsageModal } from "../../components/UsageModal";
-import { postApi, putApi } from "../../hooks/useApi";
+import { getApi, postApi, putApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import { finalizeTelefunSession } from "./sessionFinalizer";
 import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
+import {
+  getTelefunSettings,
+  saveTelefunSettings,
+  getTelefunSessions,
+  deleteTelefunSession,
+  clearTelefunHistory,
+  mapTelefunSessionRow,
+} from "./telefunApi";
 
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
 
-const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
+
 
 function getToken(): string | null {
   return (
@@ -73,18 +81,11 @@ export default function TelefunLanding() {
 
     const loadSettings = async () => {
       try {
-        const token = getToken();
-        const res = await fetch(`${API_BASE}/telefun/settings`, {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const json = await res.json();
+        const data = await getTelefunSettings();
         if (cancelled) return;
 
-        if (json?.success && json.settings) {
-          setSettings(parseTelefunSettings(json.settings));
+        if (data) {
+          setSettings(parseTelefunSettings(data));
         } else {
           setSettings(DEFAULT_TELEFUN_SETTINGS);
         }
@@ -101,64 +102,33 @@ export default function TelefunLanding() {
 
     const loadHistory = async () => {
       try {
-        const token = getToken();
-        const res = await fetch(`${API_BASE}/telefun/sessions`, {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const json = await res.json();
-        if (!cancelled && json?.success) {
-          const dbRecords: CallRecord[] = json.data.map((row: any) => ({
-            id: row.id,
-            date: row.created_at || row.date,
-            url: row.recording_url || "",
-            consumerName: row.consumer_name || "",
-            consumerPhone: row.consumer_phone,
-            consumerCity: row.consumer_city,
-            scenarioTitle: row.scenario_title || "",
-            duration: row.duration || row.duration_seconds || 0,
-            configuredDuration: row.configured_duration || 0,
-            recordingPath: row.recording_path,
-            agentRecordingPath: row.agent_recording_path,
-            score: row.score || row.voice_dashboard_metrics?.score || 0,
-            feedback: row.feedback || undefined,
-            voiceAssessment: row.voice_assessment || null,
-            sessionMetrics: row.session_metrics || null,
-            realisticModeEnabled: row.realistic_mode_enabled,
-            voiceDashboardMetrics: row.voice_dashboard_metrics,
-            personaConfig: row.persona_config,
-            disruptionConfig: row.disruption_config,
-            disruptionResults: row.disruption_results,
-            responsePacingMode: row.response_pacing_mode || undefined,
-            telefunModelId: row.telefun_model_id || undefined,
-            telefunTransport: row.telefun_transport || undefined,
-          }));
+        const rows = await getTelefunSessions();
+        if (cancelled) return;
 
-          let localRecords: CallRecord[] = [];
-          const savedHistory = localStorage.getItem("telefun_history");
-          if (savedHistory) {
-            try {
-              localRecords = JSON.parse(savedHistory) as CallRecord[];
-            } catch {
-              // ignore
-            }
+        const dbRecords = rows.map(mapTelefunSessionRow);
+
+        let localRecords: CallRecord[] = [];
+        const savedHistory = localStorage.getItem("telefun_history");
+        if (savedHistory) {
+          try {
+            localRecords = JSON.parse(savedHistory) as CallRecord[];
+          } catch {
+            // ignore
           }
+        }
 
-          const merged = [
-            ...dbRecords,
-            ...localRecords.filter(
-              (lr) => !new Set(dbRecords.map((r) => r.id)).has(lr.id),
-            ),
-          ].sort(
-            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-          );
+        const merged = [
+          ...dbRecords,
+          ...localRecords.filter(
+            (lr) => !new Set(dbRecords.map((r) => r.id)).has(lr.id),
+          ),
+        ].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
 
-          setHistory(merged);
-          if (merged.length > 0) {
-            localStorage.setItem("telefun_history", JSON.stringify(merged));
-          }
+        setHistory(merged);
+        if (merged.length > 0) {
+          localStorage.setItem("telefun_history", JSON.stringify(merged));
         }
       } catch {
         // ignore
@@ -175,7 +145,7 @@ export default function TelefunLanding() {
 
   const handleSaveSettings = async (newSettings: TelefunAppSettings) => {
     try {
-      await putApi("/telefun/settings", newSettings);
+      await saveTelefunSettings(newSettings);
       setSettings(newSettings);
       notify.success("Pengaturan Telefun berhasil disimpan");
     } catch {
@@ -230,17 +200,14 @@ export default function TelefunLanding() {
     sessionBaselineRef.current = null;
 
     try {
-      const res = await fetch(`${API_BASE}/ai/usage/summary?module=telefun`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      const json = await res.json();
-      if (json?.success && json.data && runId === sessionRunIdRef.current) {
+      const data = await getApi<any>("/ai/usage/summary?module=telefun");
+      if (data && runId === sessionRunIdRef.current) {
         sessionBaselineRef.current = {
-          totalCalls: json.data.totalCalls || 0,
-          totalTokens: json.data.totalTokens || 0,
-          totalCostIdr: json.data.totalCostIdr || 0,
-          simulationCostIdr: json.data.simulationCostIdr || 0,
-          reviewCostIdr: json.data.reviewCostIdr || 0,
+          totalCalls: data.totalCalls || 0,
+          totalTokens: data.totalTokens || 0,
+          totalCostIdr: data.totalCostIdr || 0,
+          simulationCostIdr: data.simulationCostIdr || 0,
+          reviewCostIdr: data.reviewCostIdr || 0,
         };
       }
     } catch {
@@ -397,19 +364,14 @@ export default function TelefunLanding() {
       pollUsageDelta(
         async () => {
           try {
-            const token = getToken();
-            const res = await fetch(
-              `${API_BASE}/ai/usage/summary?module=telefun`,
-              { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-            );
-            const json = await res.json();
-            if (json?.success && json.data) {
+            const data = await getApi<any>("/ai/usage/summary?module=telefun");
+            if (data) {
               return {
-                totalCalls: json.data.totalCalls || 0,
-                totalTokens: json.data.totalTokens || 0,
-                totalCostIdr: json.data.totalCostIdr || 0,
-                simulationCostIdr: json.data.simulationCostIdr || 0,
-                reviewCostIdr: json.data.reviewCostIdr || 0,
+                totalCalls: data.totalCalls || 0,
+                totalTokens: data.totalTokens || 0,
+                totalCostIdr: data.totalCostIdr || 0,
+                simulationCostIdr: data.simulationCostIdr || 0,
+                reviewCostIdr: data.reviewCostIdr || 0,
               };
             }
           } catch {
@@ -438,12 +400,7 @@ export default function TelefunLanding() {
 
   const handleDeleteSession = async (id: string) => {
     try {
-      await fetch(`${API_BASE}/telefun/history/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      });
+      await deleteTelefunSession(id);
       setHistory((prev) => {
         const updated = prev.filter((h) => h.id !== id);
         localStorage.setItem("telefun_history", JSON.stringify(updated));
@@ -457,12 +414,7 @@ export default function TelefunLanding() {
 
   const handleClearHistory = async () => {
     try {
-      await fetch(`${API_BASE}/telefun/history`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      });
+      await clearTelefunHistory();
       setHistory([]);
       localStorage.removeItem("telefun_history");
       notify.success("Riwayat dibersihkan");

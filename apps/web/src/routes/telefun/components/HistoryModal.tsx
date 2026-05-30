@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { CallRecord } from "../types";
 import { notify } from "../../../lib/toast";
+import { getApi } from "../../../hooks/useApi";
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -129,17 +130,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       let downloadUrl = record.url;
 
       if (!downloadUrl && (record.recordingPath || record.agentRecordingPath)) {
-        const token =
-          localStorage.getItem("auth_token") ??
-          localStorage.getItem("supabase_token");
-        const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
-        const res = await fetch(`${API_BASE}/telefun/recording/${record.id}`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const json = await res.json();
-        if (json?.success && json.url) {
+        const json = await getApi<any>(`/telefun/recording/${record.id}`);
+        if (json?.url) {
           downloadUrl = json.url;
         }
       }

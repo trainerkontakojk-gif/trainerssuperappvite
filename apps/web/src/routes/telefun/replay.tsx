@@ -15,7 +15,7 @@ import {
   Trash2,
   Loader2,
 } from "lucide-react";
-import { useApi, postApi, deleteApi } from "../../hooks/useApi";
+import { useApi, getApi, postApi, deleteApi } from "../../hooks/useApi";
 import type {
   TelefunHistory,
   TelefunCoachingSummary,
@@ -60,21 +60,9 @@ export default function TelefunReplay() {
   useEffect(() => {
     if (session?.id) {
       const fetchAudio = async () => {
-        const token =
-          localStorage.getItem("auth_token") ??
-          localStorage.getItem("supabase_token");
-        const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
         try {
-          const res = await fetch(
-            `${API_BASE}/telefun/recording/${session.id}`,
-            {
-              headers: {
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-            },
-          );
-          const json = await res.json();
-          if (json?.success && json.url) {
+          const json = await getApi<any>(`/telefun/recording/${session.id}`);
+          if (json?.url) {
             setAudioUrl(json.url);
           }
         } catch (e) {

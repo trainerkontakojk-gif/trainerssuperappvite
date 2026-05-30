@@ -6,6 +6,8 @@ import type {
   KetikQuickTemplate,
 } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import { useKetikSettingsDraft } from "./settings/useKetikSettingsDraft";
+import { KetikSystemTab } from "./settings/KetikSystemTab";
 import {
   Clock,
   Trash2,
@@ -25,6 +27,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { notify } from "../../../lib/toast";
+import { TEXT_SIMULATION_MODELS as TEXT_MODELS } from "../../../lib/aiModels";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -39,566 +42,82 @@ export function SettingsModal({
   settings,
   onSave,
 }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<
-    "scenarios" | "consumers" | "identity" | "system" | "template"
-  >("scenarios");
-  const [localSettings, setLocalSettings] = useState<KetikAppSettings>(() => ({
-    ...settings,
-    quickTemplates:
-      settings.quickTemplates || DEFAULT_KETIK_SETTINGS.quickTemplates,
-  }));
-  const [isScenarioFormOpen, setIsScenarioFormOpen] = useState(false);
-  const [isConsumerFormOpen, setIsConsumerFormOpen] = useState(false);
-  const [isTemplateFormOpen, setIsTemplateFormOpen] = useState(false);
-  const [editingScenarioId, setEditingScenarioId] = useState<string | null>(
-    null,
-  );
-  const [newScenarioCategory, setNewScenarioCategory] = useState("");
-  const [isNewCategoryInput, setIsNewCategoryInput] = useState(false);
-  const [newScenarioTitle, setNewScenarioTitle] = useState("");
-  const [newScenarioDesc, setNewScenarioDesc] = useState("");
-  const [newScenarioScript, setNewScenarioScript] = useState("");
-  const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
-  const [newScenarioImages, setNewScenarioImages] = useState<string[]>([]);
-  const [editingConsumerId, setEditingConsumerId] = useState<string | null>(
-    null,
-  );
-  const [newConsumerName, setNewConsumerName] = useState("");
-  const [newConsumerDesc, setNewConsumerDesc] = useState("");
-  const [newConsumerDifficulty, setNewConsumerDifficulty] = useState<
-    "Mudah" | "Sedang" | "Sulit"
-  >("Sedang");
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
-    null,
-  );
-  const [newTemplateKeyword, setNewTemplateKeyword] = useState("");
-  const [newTemplateContent, setNewTemplateContent] = useState("");
-  const [customInputValue, setCustomInputValue] = useState("");
-  const [durationValidationError, setDurationValidationError] = useState<
-    string | null
-  >(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const PRESET_DURATIONS = [5, 10, 15];
-  const MIN_DURATION = 1;
-  const MAX_DURATION = 60;
-
-  const classifyDurationMode = (
-    val: number | undefined,
-  ): "preset" | "custom" => {
-    const d = Number(val);
-    if (isNaN(d)) return "custom";
-    return (PRESET_DURATIONS as number[]).includes(d) ? "preset" : "custom";
-  };
-
-  const durationMode = classifyDurationMode(localSettings.simulationDuration);
-
-  const handlePresetClick = (d: number) => {
-    setCustomInputValue("");
-    setDurationValidationError(null);
-    setLocalSettings((prev) => ({ ...prev, simulationDuration: d }));
-  };
-
-  const handleCustomClick = () => {
-    const current = localSettings.simulationDuration;
-    setCustomInputValue(current ? String(current) : "");
-    setDurationValidationError(null);
-  };
-
-  const handleDurationInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const raw = e.target.value;
-    const filtered = raw.replace(/[^0-9]/g, "");
-    setCustomInputValue(filtered);
-    setDurationValidationError(null);
-    const num = parseInt(filtered, 10);
-    if (
-      filtered.length > 0 &&
-      !isNaN(num) &&
-      num >= MIN_DURATION &&
-      num <= MAX_DURATION
-    ) {
-      setLocalSettings((prev) => ({ ...prev, simulationDuration: num }));
-    }
-  };
-
-  const handleDurationBlur = () => {
-    const num = parseInt(customInputValue, 10);
-    if (isNaN(num) || num < MIN_DURATION || num > MAX_DURATION) {
-      setDurationValidationError(
-        `Masukkan angka ${MIN_DURATION}-${MAX_DURATION}.`,
-      );
-      setLocalSettings((prev) => ({
-        ...prev,
-        simulationDuration: clampDuration(prev.simulationDuration),
-      }));
-      return;
-    }
-    setCustomInputValue(String(num));
-    setDurationValidationError(null);
-    setLocalSettings((prev) => ({ ...prev, simulationDuration: num }));
-  };
-
-  const clampDuration = (val: number | undefined): number => {
-    const d = Number(val);
-    if (isNaN(d) || d < MIN_DURATION) return MIN_DURATION;
-    if (d > MAX_DURATION) return MAX_DURATION;
-    return d;
-  };
-
-  const TEXT_MODELS = [
-    {
-      id: "gemini-3.1-flash-lite",
-      name: "Gemini 3.1 Flash Lite",
-      description: "Cepat dan efisien untuk simulasi chat ringan.",
-      provider: "gemini",
-    },
-    {
-      id: "gemini-3-flash-preview",
-      name: "Gemini 3 Flash (Preview)",
-      description: "Model Gemini terbaru dengan performa tinggi.",
-      provider: "gemini",
-    },
-    {
-      id: "gemini-3.1-pro-preview",
-      name: "Gemini 3.1 Pro (Preview)",
-      description: "Model terbesar dengan kemampuan analisis mendalam.",
-      provider: "gemini",
-    },
-    {
-      id: "gemini-2.0-flash-lite",
-      name: "Gemini 2.0 Flash Lite",
-      description: "Model ringan dengan kecepatan respons tinggi.",
-      provider: "gemini",
-    },
-    {
-      id: "openai/gpt-oss-120b:free",
-      name: "GPT-OSS 120B",
-      description: "Model open-source 120B parameter gratis.",
-      provider: "openrouter",
-    },
-    {
-      id: "google/gemini-3.1-flash-lite",
-      name: "Gemini 3.1 Flash Lite (OpenRouter)",
-      description: "Gemini Flash Lite via OpenRouter.",
-      provider: "openrouter",
-    },
-    {
-      id: "google/gemini-2.0-flash-lite",
-      name: "Gemini 2.0 Flash Lite (OpenRouter)",
-      description: "Gemini Flash Lite 2.0 via OpenRouter.",
-      provider: "openrouter",
-    },
-    {
-      id: "openai/gpt-4o-mini",
-      name: "GPT-4o Mini",
-      description: "Model ringan OpenAI dengan performa solid.",
-      provider: "openrouter",
-    },
-    {
-      id: "qwen/qwen3.5-flash-02-23",
-      name: "Qwen 3.5 Flash",
-      description: "Model Qwen cepat dengan kualitas baik.",
-      provider: "openrouter",
-    },
-  ];
-
-  const handleIdentityChange = (field: string, value: string) => {
-    setLocalSettings((prev) => ({
-      ...prev,
-      identitySettings: { ...prev.identitySettings, [field]: value },
-    }));
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      setLocalSettings({
-        ...settings,
-        quickTemplates:
-          settings.quickTemplates ||
-          DEFAULT_KETIK_SETTINGS.quickTemplates ||
-          [],
-      });
-      setIsScenarioFormOpen(false);
-      setIsConsumerFormOpen(false);
-      setIsTemplateFormOpen(false);
-      setEditingScenarioId(null);
-      setEditingConsumerId(null);
-      setEditingTemplateId(null);
-    }
-  }, [isOpen, settings]);
-
-  if (!isOpen) return null;
-
-  const categories = Array.from(
-    new Set(localSettings.scenarios.map((s) => s.category)),
-  );
-  const activeCount = localSettings.scenarios.filter((s) => s.isActive).length;
-  const totalScenarios = localSettings.scenarios.length;
-  const allSelected = totalScenarios > 0 && activeCount === totalScenarios;
-  const noneSelected = activeCount === 0;
-
-  const handleSelectAll = () =>
-    setLocalSettings((prev) => ({
-      ...prev,
-      scenarios: prev.scenarios.map((s) => ({ ...s, isActive: true })),
-    }));
-  const handleUnselectAll = () =>
-    setLocalSettings((prev) => ({
-      ...prev,
-      scenarios: prev.scenarios.map((s) => ({ ...s, isActive: false })),
-    }));
-  const handleToggleScenario = (id: string) =>
-    setLocalSettings((prev) => ({
-      ...prev,
-      scenarios: prev.scenarios.map((s) =>
-        s.id === id ? { ...s, isActive: !s.isActive } : s,
-      ),
-    }));
-  const handleDeleteScenario = (id: string) => {
-    if (window.confirm("Hapus skenario ini?"))
-      setLocalSettings((prev) => ({
-        ...prev,
-        scenarios: prev.scenarios.filter((s) => s.id !== id),
-      }));
-  };
-  const handleSelectConsumerType = (id: string) =>
-    setLocalSettings((prev) => ({ ...prev, activeConsumerTypeId: id }));
-
-  const resetScenarioForm = () => {
-    setEditingScenarioId(null);
-    setNewScenarioTitle("");
-    setNewScenarioDesc("");
-    setNewScenarioScript("");
-    setIsScenarioScriptEnabled(false);
-    setNewScenarioCategory("");
-    setNewScenarioImages([]);
-    setIsNewCategoryInput(false);
-  };
-  const handleEditScenario = (scenario: KetikScenario) => {
-    setEditingScenarioId(scenario.id);
-    setNewScenarioCategory(scenario.category);
-    setNewScenarioTitle(scenario.title);
-    setNewScenarioDesc(scenario.description);
-    setNewScenarioScript(scenario.script || "");
-    setIsScenarioScriptEnabled(Boolean(scenario.script?.trim()));
-    setNewScenarioImages(scenario.images || []);
-    setIsNewCategoryInput(!categories.includes(scenario.category));
-    setIsScenarioFormOpen(true);
-    setTimeout(
-      () =>
-        document
-          .getElementById("scenario-form")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      100,
-    );
-  };
-  const handleSaveScenario = () => {
-    if (!newScenarioTitle || !newScenarioDesc) return;
-    const category = isNewCategoryInput
-      ? newScenarioCategory
-      : newScenarioCategory || "Umum";
-    if (editingScenarioId) {
-      setLocalSettings((prev) => ({
-        ...prev,
-        scenarios: prev.scenarios.map((s) =>
-          s.id === editingScenarioId
-            ? {
-                ...s,
-                category,
-                title: newScenarioTitle,
-                description: newScenarioDesc,
-                script: isScenarioScriptEnabled ? newScenarioScript : "",
-                images: newScenarioImages,
-              }
-            : s,
-        ),
-      }));
-    } else {
-      setLocalSettings((prev) => ({
-        ...prev,
-        scenarios: [
-          ...prev.scenarios,
-          {
-            id: `s-${Date.now()}`,
-            category,
-            title: newScenarioTitle,
-            description: newScenarioDesc,
-            script: isScenarioScriptEnabled ? newScenarioScript : "",
-            isActive: true,
-            images: newScenarioImages,
-          },
-        ],
-      }));
-    }
-    resetScenarioForm();
-    setIsScenarioFormOpen(false);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      Array.from(e.target.files).forEach((file) => {
-        if (file.size > 500 * 1024) {
-          notify.error(
-            `File ${file.name} terlalu besar (>500KB). Mohon kompres gambar terlebih dahulu.`,
-          );
-          return;
-        }
-        const reader = new FileReader();
-        reader.onloadend = () =>
-          setNewScenarioImages((prev) => [...prev, reader.result as string]);
-        reader.readAsDataURL(file);
-      });
-    }
-  };
-
-  const resetConsumerForm = () => {
-    setEditingConsumerId(null);
-    setNewConsumerName("");
-    setNewConsumerDesc("");
-    setNewConsumerDifficulty("Sedang");
-  };
-  const handleEditConsumer = (consumer: KetikConsumerType) => {
-    setEditingConsumerId(consumer.id);
-    setNewConsumerName(consumer.name);
-    setNewConsumerDesc(consumer.description);
-    setNewConsumerDifficulty(consumer.difficulty);
-    setIsConsumerFormOpen(true);
-    setTimeout(
-      () =>
-        document
-          .getElementById("consumer-form")
-          ?.scrollIntoView({ behavior: "smooth" }),
-      100,
-    );
-  };
-  const handleSaveConsumer = () => {
-    if (!newConsumerName || !newConsumerDesc) return;
-    if (editingConsumerId) {
-      setLocalSettings((prev) => ({
-        ...prev,
-        consumerTypes: prev.consumerTypes.map((c) =>
-          c.id === editingConsumerId
-            ? {
-                ...c,
-                name: newConsumerName,
-                description: newConsumerDesc,
-                difficulty: newConsumerDifficulty,
-              }
-            : c,
-        ),
-      }));
-    } else {
-      setLocalSettings((prev) => ({
-        ...prev,
-        consumerTypes: [
-          ...prev.consumerTypes,
-          {
-            id: `c-${Date.now()}`,
-            name: newConsumerName,
-            description: newConsumerDesc,
-            difficulty: newConsumerDifficulty,
-            isCustom: true,
-          },
-        ],
-      }));
-    }
-    resetConsumerForm();
-    setIsConsumerFormOpen(false);
-  };
-  const handleDeleteConsumer = (id: string) => {
-    if (window.confirm("Hapus karakteristik ini?")) {
-      setLocalSettings((prev) => ({
-        ...prev,
-        consumerTypes: prev.consumerTypes.filter((c) => c.id !== id),
-        activeConsumerTypeId:
-          prev.activeConsumerTypeId === id
-            ? "random"
-            : prev.activeConsumerTypeId,
-      }));
-    }
-  };
-
-  const handleSaveTemplate = () => {
-    if (!newTemplateKeyword || !newTemplateContent) return;
-    const sanitizedKeyword = newTemplateKeyword
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "-");
-    const tmpl: KetikQuickTemplate = {
-      id: editingTemplateId || `qt-${Date.now()}`,
-      keyword: sanitizedKeyword,
-      content: newTemplateContent.trim(),
-    };
-    setLocalSettings((prev) => ({
-      ...prev,
-      quickTemplates: editingTemplateId
-        ? (prev.quickTemplates || []).map((t) =>
-            t.id === editingTemplateId ? tmpl : t,
-          )
-        : [...(prev.quickTemplates || []), tmpl],
-    }));
-    setEditingTemplateId(null);
-    setNewTemplateKeyword("");
-    setNewTemplateContent("");
-    setIsTemplateFormOpen(false);
-  };
-  const handleDeleteTemplate = (id: string) => {
-    if (window.confirm("Hapus template ini?"))
-      setLocalSettings((prev) => ({
-        ...prev,
-        quickTemplates: (prev.quickTemplates || []).filter((t) => t.id !== id),
-      }));
-  };
-
-  const isScenarioDraftDirty = () => isScenarioFormOpen;
-  const isScenarioDraftValid = () => !!(newScenarioTitle && newScenarioDesc);
-  const isConsumerDraftDirty = () => isConsumerFormOpen;
-  const isConsumerDraftValid = () => !!(newConsumerName && newConsumerDesc);
-  const isTemplateDirty = () => isTemplateFormOpen;
-
-  const handleSave = () => {
-    if (isScenarioDraftDirty() && !isScenarioDraftValid()) {
-      setActiveTab("scenarios");
-      setTimeout(
-        () =>
-          document
-            .getElementById("scenario-form")
-            ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-        100,
-      );
-      notify.warning(
-        "Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.",
-      );
-      return;
-    }
-    if (isConsumerDraftDirty() && !isConsumerDraftValid()) {
-      setActiveTab("consumers");
-      setTimeout(
-        () =>
-          document
-            .getElementById("consumer-form")
-            ?.scrollIntoView({ behavior: "smooth" }),
-        100,
-      );
-      notify.warning(
-        "Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.",
-      );
-      return;
-    }
-    if (isTemplateDirty() && (!newTemplateKeyword || !newTemplateContent)) {
-      setActiveTab("template");
-      setTimeout(
-        () =>
-          document
-            .getElementById("template-form")
-            ?.scrollIntoView({ behavior: "smooth" }),
-        100,
-      );
-      notify.warning(
-        "Template yang sedang Anda buat belum lengkap. Isi keyword dan konten terlebih dahulu, atau klik Batal untuk membatalkan template.",
-      );
-      return;
-    }
-
-    let finalSettings = localSettings;
-    if (isScenarioDraftDirty() && isScenarioDraftValid()) {
-      const category = isNewCategoryInput
-        ? newScenarioCategory
-        : newScenarioCategory || "Umum";
-      if (editingScenarioId) {
-        finalSettings = {
-          ...finalSettings,
-          scenarios: finalSettings.scenarios.map((s) =>
-            s.id === editingScenarioId
-              ? {
-                  ...s,
-                  category,
-                  title: newScenarioTitle,
-                  description: newScenarioDesc,
-                  script: isScenarioScriptEnabled ? newScenarioScript : "",
-                  images: newScenarioImages,
-                }
-              : s,
-          ),
-        };
-      } else {
-        finalSettings = {
-          ...finalSettings,
-          scenarios: [
-            ...finalSettings.scenarios,
-            {
-              id: `s-${Date.now()}`,
-              category,
-              title: newScenarioTitle,
-              description: newScenarioDesc,
-              script: isScenarioScriptEnabled ? newScenarioScript : "",
-              isActive: true,
-              images: newScenarioImages,
-            },
-          ],
-        };
-      }
-    }
-    if (isConsumerDraftDirty() && isConsumerDraftValid()) {
-      if (editingConsumerId) {
-        finalSettings = {
-          ...finalSettings,
-          consumerTypes: finalSettings.consumerTypes.map((c) =>
-            c.id === editingConsumerId
-              ? {
-                  ...c,
-                  name: newConsumerName,
-                  description: newConsumerDesc,
-                  difficulty: newConsumerDifficulty,
-                }
-              : c,
-          ),
-        };
-      } else {
-        finalSettings = {
-          ...finalSettings,
-          consumerTypes: [
-            ...finalSettings.consumerTypes,
-            {
-              id: `c-${Date.now()}`,
-              name: newConsumerName,
-              description: newConsumerDesc,
-              difficulty: newConsumerDifficulty,
-              isCustom: true,
-            },
-          ],
-        };
-      }
-    }
-    if (isScenarioDraftDirty()) {
-      resetScenarioForm();
-      setIsScenarioFormOpen(false);
-    }
-    if (isConsumerDraftDirty()) {
-      resetConsumerForm();
-      setIsConsumerFormOpen(false);
-    }
-    if (isTemplateDirty()) {
-      setEditingTemplateId(null);
-      setNewTemplateKeyword("");
-      setNewTemplateContent("");
-      setIsTemplateFormOpen(false);
-    }
-
-    onSave(finalSettings);
-    onClose();
-  };
-
-  const handleResetDefaults = () => {
-    if (
-      window.confirm(
-        "Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.",
-      )
-    )
-      setLocalSettings(DEFAULT_KETIK_SETTINGS);
-  };
+  const {
+    activeTab,
+    setActiveTab,
+    localSettings,
+    setLocalSettings,
+    isScenarioFormOpen,
+    setIsScenarioFormOpen,
+    isConsumerFormOpen,
+    setIsConsumerFormOpen,
+    isTemplateFormOpen,
+    setIsTemplateFormOpen,
+    editingScenarioId,
+    setEditingScenarioId,
+    newScenarioCategory,
+    setNewScenarioCategory,
+    isNewCategoryInput,
+    setIsNewCategoryInput,
+    newScenarioTitle,
+    setNewScenarioTitle,
+    newScenarioDesc,
+    setNewScenarioDesc,
+    newScenarioScript,
+    setNewScenarioScript,
+    isScenarioScriptEnabled,
+    setIsScenarioScriptEnabled,
+    newScenarioImages,
+    setNewScenarioImages,
+    editingConsumerId,
+    setEditingConsumerId,
+    newConsumerName,
+    setNewConsumerName,
+    newConsumerDesc,
+    setNewConsumerDesc,
+    newConsumerDifficulty,
+    setNewConsumerDifficulty,
+    editingTemplateId,
+    setEditingTemplateId,
+    newTemplateKeyword,
+    setNewTemplateKeyword,
+    newTemplateContent,
+    setNewTemplateContent,
+    customInputValue,
+    setCustomInputValue,
+    durationValidationError,
+    setDurationValidationError,
+    categories,
+    activeCount,
+    totalScenarios,
+    allSelected,
+    noneSelected,
+    durationMode,
+    handlePresetClick,
+    handleCustomClick,
+    handleDurationInputChange,
+    handleDurationBlur,
+    handleIdentityChange,
+    handleSelectAll,
+    handleUnselectAll,
+    handleToggleScenario,
+    handleDeleteScenario,
+    handleSelectConsumerType,
+    resetScenarioForm,
+    handleEditScenario,
+    handleSaveScenario,
+    handleImageUpload,
+    resetConsumerForm,
+    handleEditConsumer,
+    handleSaveConsumer,
+    handleDeleteConsumer,
+    handleSaveTemplate,
+    handleDeleteTemplate,
+    handleSave,
+    handleResetDefaults,
+  } = useKetikSettingsDraft({ settings, isOpen, onSave, onClose });
 
   const tabs = [
     { id: "scenarios", label: "Masalah", icon: FileText },
@@ -1455,235 +974,18 @@ Akhir:
               )}
 
               {activeTab === "system" && (
-                <div className="space-y-10 pb-10">
-                  <section className="space-y-6">
-                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                      <div className="flex items-start gap-6 relative z-10">
-                        <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center shrink-0 border border-purple-500/20">
-                          <span className="text-3xl">&#x1F916;</span>
-                        </div>
-                        <div>
-                          <h3 className="font-black text-foreground text-xl tracking-tighter">
-                            Pilih Model Simulasi
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">
-                            Pilih model AI yang akan menggerakkan karakter
-                            pelanggan.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid gap-4">
-                      {TEXT_MODELS.map((model) => {
-                        const isSelected =
-                          localSettings.selectedModel === model.id;
-                        return (
-                          <div
-                            key={model.id}
-                            onClick={() =>
-                              setLocalSettings((prev) => ({
-                                ...prev,
-                                selectedModel: model.id,
-                              }))
-                            }
-                            className={`cursor-pointer p-6 rounded-[2rem] border-2 transition-all flex items-center justify-between gap-6 group ${isSelected ? "border-primary bg-primary/5 shadow-2xl shadow-primary/5" : "border-transparent bg-card border-border/50 hover:bg-foreground/5"}`}
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-black text-foreground tracking-tight text-lg">
-                                  {model.name}
-                                </h4>
-                                <span
-                                  className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${model.provider === "openrouter" ? "bg-orange-500/10 text-orange-500 border-orange-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"}`}
-                                >
-                                  {model.provider}
-                                </span>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1 font-medium">
-                                {model.description}
-                              </p>
-                            </div>
-                            {isSelected && (
-                              <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-                                <Check className="w-4 h-4 text-white" />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </section>
-
-                  <section className="space-y-6">
-                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                      <div className="flex items-start gap-6 relative z-10">
-                        <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
-                          <Clock className="w-7 h-7 text-orange-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-black text-foreground text-xl tracking-tighter">
-                            Durasi Simulasi
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">
-                            Tentukan batas waktu maksimal untuk setiap sesi
-                            simulasi.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
-                      {PRESET_DURATIONS.map((d) => {
-                        const isSelected =
-                          durationMode === "preset" &&
-                          localSettings.simulationDuration === d;
-                        return (
-                          <div
-                            key={d}
-                            onClick={() => handlePresetClick(d)}
-                            className={`cursor-pointer p-6 sm:p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-2 sm:gap-3 text-center relative group ${isSelected ? "border-primary bg-primary/5 shadow-2xl shadow-primary/5" : "border-transparent bg-card border-border/50 hover:bg-foreground/5"}`}
-                          >
-                            <span
-                              className={`text-3xl sm:text-4xl font-black tracking-tighter ${isSelected ? "text-primary" : "text-foreground/20"}`}
-                            >
-                              {d}
-                            </span>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                              Menit
-                            </span>
-                            {isSelected && (
-                              <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 z-10">
-                                <Check className="w-4 h-4 text-white" />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      <div
-                        onClick={handleCustomClick}
-                        className={`cursor-pointer p-6 sm:p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-2 sm:gap-3 text-center relative group ${durationMode === "custom" ? "border-primary bg-primary/5 shadow-2xl shadow-primary/5" : "border-transparent bg-card border-border/50 hover:bg-foreground/5"}`}
-                      >
-                        <span
-                          className={`text-3xl sm:text-4xl font-black tracking-tighter ${durationMode === "custom" ? "text-primary" : "text-foreground/20"}`}
-                        >
-                          &#x2699;&#xFE0F;
-                        </span>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                          Kustom
-                        </span>
-                        {durationMode === "custom" && (
-                          <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 z-10">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <AnimatePresence>
-                      {durationMode === "custom" && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0, y: -10 }}
-                          animate={{ opacity: 1, height: "auto", y: 0 }}
-                          exit={{ opacity: 0, height: 0, y: -10 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="p-6 rounded-[2rem] border border-border/50 bg-card/50 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-                            <div>
-                              <label className="block text-xs font-black text-foreground uppercase tracking-wider mb-1">
-                                Masukkan Durasi Kustom
-                              </label>
-                              <p className="text-[11px] text-muted-foreground font-medium">
-                                Tentukan durasi simulasi antara {MIN_DURATION}{" "}
-                                hingga {MAX_DURATION} menit.
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <div className="relative w-36">
-                                <input
-                                  ref={inputRef}
-                                  type="text"
-                                  inputMode="numeric"
-                                  placeholder="5"
-                                  value={customInputValue}
-                                  onChange={handleDurationInputChange}
-                                  onBlur={handleDurationBlur}
-                                  className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-3.5 pr-12 text-base font-black text-foreground focus:ring-2 focus:ring-primary outline-none transition-all text-right"
-                                />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black uppercase tracking-widest text-muted-foreground pointer-events-none">
-                                  Min
-                                </span>
-                              </div>
-                              {durationValidationError && (
-                                <motion.span
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  className="text-[10px] font-black text-red-500 uppercase tracking-wider mt-1"
-                                >
-                                  {durationValidationError}
-                                </motion.span>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </section>
-
-                  <section className="space-y-6">
-                    <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                      <div className="flex items-start gap-6 relative z-10">
-                        <div className="w-14 h-14 rounded-2xl bg-teal-500/10 flex items-center justify-center shrink-0 border border-teal-500/20">
-                          <Zap className="w-7 h-7 text-teal-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-black text-foreground text-xl tracking-tighter">
-                            Tempo Balasan Konsumen
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">
-                            Pengaturan ini memengaruhi kecepatan balasan
-                            konsumen ditampilkan.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {(["realistic", "training_fast"] as const).map((mode) => (
-                        <div
-                          key={mode}
-                          onClick={() =>
-                            setLocalSettings((prev) => ({
-                              ...prev,
-                              responsePacingMode: mode,
-                            }))
-                          }
-                          className={`cursor-pointer p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-3 text-center relative ${localSettings.responsePacingMode === mode ? "border-primary bg-primary/5" : "border-transparent bg-card border-border/50 hover:bg-foreground/5"}`}
-                        >
-                          <Zap
-                            className={`w-8 h-8 ${localSettings.responsePacingMode === mode ? "text-primary" : "text-foreground/20"}`}
-                          />
-                          <span
-                            className={`text-lg font-black tracking-tight ${localSettings.responsePacingMode === mode ? "text-primary" : "text-foreground"}`}
-                          >
-                            {mode === "realistic"
-                              ? "Realistis"
-                              : "Cepat Latihan"}
-                          </span>
-                          <span className="text-xs text-muted-foreground font-medium text-center">
-                            {mode === "realistic"
-                              ? "Variasi tempo seperti manusia asli."
-                              : "Balasan lebih cepat, cocok untuk latihan."}
-                          </span>
-                          {localSettings.responsePacingMode === mode && (
-                            <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center">
-                              <Check className="w-4 h-4 text-white" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                </div>
+                <KetikSystemTab
+                  localSettings={localSettings}
+                  setLocalSettings={setLocalSettings}
+                  durationMode={durationMode}
+                  handlePresetClick={handlePresetClick}
+                  handleCustomClick={handleCustomClick}
+                  customInputValue={customInputValue}
+                  handleDurationInputChange={handleDurationInputChange}
+                  handleDurationBlur={handleDurationBlur}
+                  durationValidationError={durationValidationError}
+                  inputRef={inputRef}
+                />
               )}
             </div>
 

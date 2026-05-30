@@ -6,23 +6,13 @@ import {
   FileText, Printer, Download, Sparkles, Users,
 } from "lucide-react";
 import { useApi, postApi } from "../../hooks/useApi";
+import { AI_MODELS } from "../../lib/aiModels";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
 const SERVICE_LABELS: Record<string, string> = {
   call: "Call", chat: "Chat", email: "Email", cso: "CSO",
   pencatatan: "Pencatatan", bko: "BKO", slik: "SLIK",
 };
-
-const AI_MODELS = [
-  { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", provider: "gemini" },
-  { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (Preview)", provider: "gemini" },
-  { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (Preview)", provider: "gemini" },
-  { id: "openai/gpt-oss-120b:free", name: "GPT-OSS 120B", provider: "openrouter" },
-  { id: "google/gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite (OR)", provider: "openrouter" },
-  { id: "google/gemini-2.0-flash-lite", name: "Gemini 2.0 Flash Lite (OR)", provider: "openrouter" },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "openrouter" },
-  { id: "qwen/qwen3.5-flash-02-23", name: "Qwen 3.5 Flash", provider: "openrouter" },
-];
 
 type ExportFormat = "docx" | "html" | "pdf";
 
