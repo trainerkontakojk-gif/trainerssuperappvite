@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { REPORT_ADMIN_ROLES } from "./shared-constants";
+
+const adminRoles: readonly string[] = REPORT_ADMIN_ROLES;
 
 type ReportArchiveInput = {
   userId: string;
@@ -30,7 +33,6 @@ export async function saveReportArchive(params: ReportArchiveInput) {
 }
 
 export async function getReportArchives(userId: string, role: string) {
-  const adminRoles: readonly string[] = ["admin", "trainer", "qa"];
   let query = supabaseAdmin
     .from("report_archives")
     .select("id, title, report_type, filter_params, created_at")
@@ -58,7 +60,6 @@ export async function getReportArchiveById(
 
   if (error) return null;
 
-  const adminRoles: readonly string[] = ["admin", "trainer", "qa"];
   if (!adminRoles.includes(role) && data.user_id !== userId) return null;
 
   return data;
@@ -69,7 +70,6 @@ export async function deleteReportArchive(
   userId: string,
   role: string,
 ) {
-  const adminRoles: readonly string[] = ["admin", "trainer", "qa"];
   let query = supabaseAdmin
     .from("report_archives")
     .delete()

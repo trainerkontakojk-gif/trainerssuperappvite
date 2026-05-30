@@ -2,6 +2,7 @@ import type { QAPeriod, DashboardData } from "@trainers/types";
 
 export const TRAINER_ROLES = ["admin", "trainer"] as const;
 export const LEADER_ROLES = ["leader"] as const;
+export const REPORT_ADMIN_ROLES = ["admin", "trainer", "qa"] as const;
 
 export const EXCLUDED_FOLDERS = ["tim om", "tim qa", "tim spv", "tim da & konten"];
 export const EXCLUDED_JABATAN = [

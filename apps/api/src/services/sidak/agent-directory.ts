@@ -111,7 +111,7 @@ export async function getAgentDirectorySummary(
     ...new Set(agents.map((a: any) => a.batch_name).filter(Boolean)),
   ] as string[];
 
-  let allTemuan: any[] = [];
+  const allTemuan: any[] = [];
   let from = 0;
   const step = 1000;
   let finished = false;
@@ -129,7 +129,7 @@ export async function getAgentDirectorySummary(
     if (!data || data.length === 0) {
       finished = true;
     } else {
-      allTemuan = allTemuan.concat(data);
+      allTemuan.push(...data);
       if (data.length < step) finished = true;
       else from += step;
     }
