@@ -466,3 +466,36 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
 | `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |
 | `/api/v1/telefun`  | 5 endpoints  | `telefun.ts` (settings GET/PUT, recording, annotations, score) |
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+
+### WAJIB: Gunakan graphify secara otomatis
+
+Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — baik oleh agent utama (saya) maupun oleh subagent lewat Task tool. Ini berlaku untuk semua skenario:
+
+#### Untuk Planning
+- SEBELUM membuat plan, WAJIB query graphify untuk memahami konteks fitur/modul yang akan diubah.
+- Gunakan `graphify query "arsitektur modul X"` atau `graphify explain "KonsepY"` untuk dapatkan gambaran sebelum menyusun tasklist.
+- Untuk plan yang menyentuh banyak file/modul, query `graphify path "ModuleA" "ModuleB"` untuk lihat relasi.
+
+#### Untuk Eksekusi (Bug Fix / Fitur Baru)
+- SEBELUM mengubah kode, WAJIB query graphify untuk tahu dependensi dan file terkait.
+- Gunakan `graphify query "file apa yang terkait dengan fitur X"` untuk identifikasi file yang perlu diubah.
+- Jika ragu dengan dampak perubahan, query graphify dulu untuk cek cross-file relationships.
+- SETELAH selesai mengubah kode, WAJIB jalankan `graphify update .` untuk menjaga graph tetap sinkron.
+
+#### Untuk Subagent (Task tool)
+- Saat mengirim task ke subagent via Task tool, SERTAKAN instruksi: "Gunakan graphify dulu untuk referensi codebase sebelum memulai."
+- Subagent harus query graphify via `graphify query "<pertanyaan>"` sebelum menulis kode.
+
+### Aturan Penting
+
+- **Prioritas:** graphify query > GRAPH_REPORT.md > grep manual. Graph query return subgraph yang jauh lebih kecil dan relevan.
+- **Dirty files:** File graphify-out/ yang dirty adalah normal (after hooks/update). Jangan skip graphify hanya karena dirty — kecuali user minta atau task spesifik tentang graph yang stale.
+- **Wiki:** Jika `graphify-out/wiki/index.md` ada, gunakan untuk navigasi broad daripada browsing raw source.
+- **GRAPH_REPORT.md:** Baca hanya untuk architecture review broad atau saat query/path/explain tidak cukup.
+- **Gratis (AST-only):** `graphify update .` hanya proses AST — tidak ada biaya API. Jadi tidak ada alasan untuk skip update setelah modifikasi kode.

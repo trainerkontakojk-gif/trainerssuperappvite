@@ -35,3 +35,9 @@ scratch/
 supabase/.temp/
 supabase/config.toml
 supabase/.gitignore
+
+# ── Graphify Knowledge Graph ──
+graphify-out/manifest.json    # mtime-based, breaks after git clone
+graphify-out/cost.json        # local cost tracker only
+graphify-out/cache/           # extraction cache (keep repo small)
+graphify-out/[0-9]*-[0-9]*-[0-9]*/  # backup dirs from --update
