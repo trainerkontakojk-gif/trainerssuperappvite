@@ -21,6 +21,7 @@ dist
 .antigravitycli/
 .kiro/
 .opencode/
+opencode.json
 .superpowers
 docs/superpowers/
 plan/

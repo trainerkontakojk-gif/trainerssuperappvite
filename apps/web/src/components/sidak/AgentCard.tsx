@@ -14,6 +14,21 @@ const DOT_CLASSES = {
   none: "bg-muted-foreground/40",
 };
 
+const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agt",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+
 const BADGE_CLASSES = {
   atRisk:
     "bg-rose-500/10 border border-rose-500/20 text-rose-500",
@@ -113,13 +128,20 @@ export default function AgentCard({ agent, index }: AgentCardProps) {
                   : "Not Audited"}
             </span>
           </div>
-          <span
-            className={`text-xl font-black tabular-nums leading-none ${scoreColor(agent.avgScore)}`}
-          >
-            {agent.avgScore !== null
-              ? agent.avgScore.toFixed(1)
-              : "--"}
-          </span>
+          <div className="flex items-baseline gap-1">
+            <span
+              className={`text-xl font-black tabular-nums leading-none ${scoreColor(agent.avgScore)}`}
+            >
+              {agent.avgScore !== null
+                ? `${agent.avgScore.toFixed(1)}%`
+                : "--"}
+            </span>
+            {agent.avgScore !== null && agent.periodMonth && (
+              <span className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-wider">
+                ({MONTHS_SHORT[agent.periodMonth - 1]})
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

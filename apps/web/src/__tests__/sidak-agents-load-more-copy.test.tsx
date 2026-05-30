@@ -28,6 +28,7 @@ function makeAgents(count: number) {
     trend: "same" as const,
     trendValue: null,
     atRisk: false,
+    periodMonth: null,
   }));
 }
 

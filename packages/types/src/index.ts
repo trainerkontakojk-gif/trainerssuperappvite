@@ -212,6 +212,7 @@ export interface AgentDirectoryEntry {
   trend: "up" | "down" | "same" | "none";
   trendValue: number | null;
   atRisk: boolean;
+  periodMonth?: number | null;
 }
 
 export interface AgentDirectoryResponse {

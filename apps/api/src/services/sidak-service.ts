@@ -1027,6 +1027,7 @@ export async function getAgentDirectorySummary(
     trend: "none" as const,
     trendValue: null,
     atRisk: false,
+    periodMonth: null,
   }));
 
   for (const agent of entries) {
@@ -1074,6 +1075,12 @@ export async function getAgentDirectorySummary(
       const roundedScore = Math.round(score.finalScore * 100) / 100;
       agent.avgScore = roundedScore;
       agent.atRisk = roundedScore < 95;
+
+      const latestPeriodId = latestTemuan[0]?.period_id;
+      const latestPeriod = latestPeriodId ? periodsMap.get(latestPeriodId) : null;
+      if (latestPeriod) {
+        agent.periodMonth = latestPeriod.month;
+      }
 
       const prevKey =
         sortedKeys.find(
