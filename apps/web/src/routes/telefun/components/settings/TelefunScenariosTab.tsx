@@ -59,7 +59,7 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
     if (!scenarioForm.draft.title || !scenarioForm.draft.instruction || !category) return;
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : '';
-    
+
     // Save draft to local settings
     setLocalSettings((prev: any) => ({
       ...prev,
@@ -93,16 +93,16 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             {activeCount} dari {totalScenarios} skenario dipilih
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <button 
+          <button
             onClick={handleSelectAll}
             disabled={allSelected}
             className="px-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             Pilih Semua
           </button>
-          <button 
+          <button
             onClick={handleUnselectAll}
             disabled={noneSelected}
             className="px-4 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-white/10 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
@@ -111,16 +111,16 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
           </button>
         </div>
       </div>
-        
+
       {/* Scenario List */}
       <div className="grid grid-cols-1 gap-3">
         {scenarios.map(scenario => (
-          <motion.div 
+          <motion.div
             layout
-            key={scenario.id} 
+            key={scenario.id}
             className={`flex items-start p-5 rounded-2xl border transition-all ${
-              scenario.isActive 
-                ? 'bg-white dark:bg-[#1C1C1E] border-blue-500/30 shadow-md' 
+              scenario.isActive
+                ? 'bg-white dark:bg-[#1C1C1E] border-blue-500/30 shadow-md'
                 : 'bg-gray-50 dark:bg-[#1C1C1E]/50 border-gray-200 dark:border-white/5 opacity-70'
             }`}
           >
@@ -129,8 +129,8 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
               <button
                 onClick={() => handleToggleScenario(scenario.id)}
                 className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-                  scenario.isActive 
-                    ? 'bg-blue-500 border-blue-500 text-white' 
+                  scenario.isActive
+                    ? 'bg-blue-500 border-blue-500 text-white'
                     : 'border-gray-300 dark:border-gray-600 bg-transparent'
                 }`}
               >
@@ -155,13 +155,13 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
 
             {/* Action */}
             <div className="flex items-center gap-2 ml-4">
-              <button 
+              <button
                 onClick={() => handleEditClick(scenario)}
                 className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all"
               >
                 <Edit2 className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={() => handleDeleteScenario(scenario.id)}
                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"
               >
@@ -194,9 +194,9 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Kategori</label>
               {!isNewCategoryInput ? (
                 <div className="relative">
-                  <select 
-                    className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none" 
-                    value={scenarioForm.draft.category || ''} 
+                  <select
+                    className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                    value={scenarioForm.draft.category || ''}
                     onChange={(e) => {
                       if (e.target.value === 'NEW') {
                         setIsNewCategoryInput(true);
@@ -218,15 +218,15 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    className="flex-1 rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                    placeholder="Kategori Baru" 
-                    value={newScenarioCategory} 
+                  <input
+                    type="text"
+                    className="flex-1 rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Kategori Baru"
+                    value={newScenarioCategory}
                     onChange={(e) => {
                       setNewScenarioCategory(e.target.value);
                       scenarioForm.setDraft({ category: e.target.value });
-                    }} 
+                    }}
                   />
                   <button onClick={() => setIsNewCategoryInput(false)} className="px-4 text-xs text-red-500 font-bold hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all">Batal</button>
                 </div>
@@ -234,21 +234,21 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Judul Masalah</label>
-              <input 
-                type="text" 
-                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                placeholder="Contoh: Gagal Transfer" 
-                value={scenarioForm.draft.title || ''} 
-                onChange={(e) => scenarioForm.setDraft({ title: e.target.value })} 
+              <input
+                type="text"
+                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Contoh: Gagal Transfer"
+                value={scenarioForm.draft.title || ''}
+                onChange={(e) => scenarioForm.setDraft({ title: e.target.value })}
               />
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Deskripsi Masalah</label>
-              <textarea 
-                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none" 
-                rows={3} 
-                value={scenarioForm.draft.instruction || ''} 
-                onChange={(e) => scenarioForm.setDraft({ instruction: e.target.value })} 
+              <textarea
+                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                rows={3}
+                value={scenarioForm.draft.instruction || ''}
+                onChange={(e) => scenarioForm.setDraft({ instruction: e.target.value })}
               />
             </div>
             <div className="col-span-2">
@@ -320,9 +320,9 @@ Akhir:
             </div>
             <div className="col-span-2 flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-white/10">
               <button onClick={handleCancelScenarioForm} className="px-6 py-2.5 rounded-xl text-gray-600 dark:text-gray-400 font-bold hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-all">Batal</button>
-              <button 
-                onClick={handleSaveScenario} 
-                disabled={!scenarioForm.draft.title || !scenarioForm.draft.instruction || !(isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category)} 
+              <button
+                onClick={handleSaveScenario}
+                disabled={!scenarioForm.draft.title || !scenarioForm.draft.instruction || !(isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category)}
                 className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Simpan

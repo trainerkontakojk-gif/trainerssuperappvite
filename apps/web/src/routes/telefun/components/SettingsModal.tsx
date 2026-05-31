@@ -46,7 +46,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={handleClose}>
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -57,15 +57,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
         <div className="px-8 py-6 border-b border-border flex justify-between items-center bg-card/50 backdrop-blur-xl shrink-0">
           <h2 className="text-2xl font-bold text-foreground tracking-tight">Pengaturan Simulasi</h2>
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={handleSave}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
               Simpan Perubahan
             </button>
-            <button 
-              onClick={handleClose} 
+            <button
+              onClick={handleClose}
               className="w-9 h-9 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-full text-muted-foreground transition-all"
             >
               <X className="w-5 h-5" />
@@ -81,8 +81,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all relative ${
-                  activeTab === tab.id 
-                    ? 'text-foreground shadow-sm' 
+                  activeTab === tab.id
+                    ? 'text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-muted-foreground'
                 }`}
               >

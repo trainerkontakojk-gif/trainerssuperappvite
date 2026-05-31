@@ -80,7 +80,7 @@ export function KetikScenariosTab({
     if (!scenarioForm.draft.title || !scenarioForm.draft.description || !category) return;
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : "";
-    
+
     setLocalSettings((prev: any) => ({
       ...prev,
       scenarios: applyCollectionDraft<KetikScenario>({

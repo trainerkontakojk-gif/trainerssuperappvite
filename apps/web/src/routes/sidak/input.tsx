@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useApi, getApi } from "../../hooks/useApi";
 import { useAuthStore } from "../../store/authStore";
 import type { QAIndicator, QAPeriod, QATemuan, ServiceWeight, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
@@ -57,7 +57,7 @@ export default function SidakInputPage() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentEntry | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<QAPeriod | null>(null);
-  const [selectedService, setSelectedService] = useState("call");
+  const [selectedService, setSelectedService] = useState<QAIndicator["service_type"]>("call");
   const [activeWeight, setActiveWeight] = useState<ServiceWeight | null>(null);
 
   const profile = useAuthStore((s) => s.profile);
@@ -73,13 +73,12 @@ export default function SidakInputPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [isPrefilling, setIsPrefilling] = useState(false);
 
   // Rule version snapshot for input
-  const [activeRuleVersionId, setActiveRuleVersionId] = useState<string | null>(null);
+  const [_activeRuleVersionId, setActiveRuleVersionId] = useState<string | null>(null);
   const [hasDraftVersion, setHasDraftVersion] = useState(false);
   const [ruleIndicatorsRaw, setRuleIndicatorsRaw] = useState<SidakRuleIndicatorRow[]>([]);
-  const [loadingRuleIndicators, setLoadingRuleIndicators] = useState(false);
+  const [_loadingRuleIndicators, setLoadingRuleIndicators] = useState(false);
 
   // Rule indicators derivation via hook
   const { activeIndicators, unlinkedIndicatorIds } = useSidakInputRuleModel({
@@ -119,6 +118,8 @@ export default function SidakInputPage() {
     setErrorMsg,
     setSuccessMsg,
   });
+
+  const { setEntries } = formHook;
 
   const fetchRuleVersionIndicators = useCallback(async (svc: string) => {
     setLoadingRuleIndicators(true);
@@ -189,7 +190,7 @@ export default function SidakInputPage() {
 
     try {
       const agentService = resolveServiceTypeFromTeam(agent.tim);
-      setSelectedService(agentService);
+      setSelectedService(agentService as QAIndicator["service_type"]);
       await refetch();
       setActiveWeight(null);
       setStep("period");
@@ -227,7 +228,7 @@ export default function SidakInputPage() {
     }
   };
 
-  const handleServiceChange = useCallback(async (newService: string) => {
+  const handleServiceChange = useCallback(async (newService: QAIndicator["service_type"]) => {
     setSelectedService(newService);
     setLoading(true);
     setErrorMsg(null);
@@ -240,7 +241,7 @@ export default function SidakInputPage() {
         const found = weightsRes.data.find((w: ServiceWeight) => w.service_type === newService);
         if (found) setActiveWeight(found);
       }
-      formHook.setEntries([newEntry()]);
+      setEntries([newEntry()]);
       if (selectedAgent && selectedPeriod) {
         const result = await getApi<{ items: QATemuan[]; total: number }>(
           `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${newService}&limit=200`,
@@ -252,7 +253,7 @@ export default function SidakInputPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedAgent, selectedPeriod, refetch, formHook.setEntries]);
+  }, [selectedAgent, selectedPeriod, refetch, setEntries]);
 
   const handleFolderClick = async (folder: string) => {
     setSelectedFolder(folder);
@@ -280,7 +281,6 @@ export default function SidakInputPage() {
   };
 
   const loadFolderAndPreSelectAgent = useCallback(async (folder: string, agentId: string) => {
-    setIsPrefilling(true);
     setErrorMsg(null);
     try {
       const year = new Date().getFullYear();
@@ -301,15 +301,13 @@ export default function SidakInputPage() {
       setSelectedFolder(folder);
       setSelectedAgent(found);
       const agentService = resolveServiceTypeFromTeam(found.tim);
-      setSelectedService(agentService);
+      setSelectedService(agentService as QAIndicator["service_type"]);
       await refetch();
       setActiveWeight(null);
       setStep("period");
       window.history.replaceState({}, "", window.location.pathname);
     } catch {
       setErrorMsg("Gagal memuat data. Silakan pilih manual.");
-    } finally {
-      setIsPrefilling(false);
     }
   }, [refetch]);
 
@@ -343,7 +341,7 @@ export default function SidakInputPage() {
       temuan.map((t) => ({ indicator_id: t.indicator_id, nilai: t.nilai, no_tiket: t.no_tiket })),
       activeWeight,
     );
-  }, [temuan, activeIndicators, activeWeight, indicatorLookup]);
+  }, [temuan, activeIndicators, activeWeight]);
 
   const categoryMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -735,7 +733,7 @@ export default function SidakInputPage() {
                     </label>
                     <select
                       value={selectedService}
-                      onChange={(e) => handleServiceChange(e.target.value)}
+                      onChange={(e) => handleServiceChange(e.target.value as QAIndicator["service_type"])}
                       className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
                     >
                       {SERVICE_TYPES.map((st) => (

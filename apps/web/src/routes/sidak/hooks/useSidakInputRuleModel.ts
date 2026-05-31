@@ -18,7 +18,7 @@ export interface SidakInputRuleModel {
 export function buildSidakInputRuleModel(params: {
   ruleIndicatorsRaw: SidakRuleIndicatorRow[];
   globalIndicators: QAIndicator[];
-  selectedService: string;
+  selectedService: QAIndicator["service_type"];
 }): SidakInputRuleModel {
   if (params.ruleIndicatorsRaw.length === 0) {
     return {
@@ -47,13 +47,17 @@ export function buildSidakInputRuleModel(params: {
   return { activeIndicators, unlinkedIndicatorIds };
 }
 
-export function useSidakInputRuleModel(params: {
+export function useSidakInputRuleModel({
+  ruleIndicatorsRaw,
+  globalIndicators,
+  selectedService,
+}: {
   ruleIndicatorsRaw: SidakRuleIndicatorRow[];
   globalIndicators: QAIndicator[];
-  selectedService: string;
+  selectedService: QAIndicator["service_type"];
 }): SidakInputRuleModel {
   return useMemo(
-    () => buildSidakInputRuleModel(params),
-    [params.ruleIndicatorsRaw, params.globalIndicators, params.selectedService],
+    () => buildSidakInputRuleModel({ ruleIndicatorsRaw, globalIndicators, selectedService }),
+    [ruleIndicatorsRaw, globalIndicators, selectedService],
   );
 }

@@ -139,7 +139,7 @@ export async function processKetikReviewJob(
   const systemInstruction = `
   You are an expert Quality Assurance (QA) and Coaching AI for a customer service contact center.
   Review the customer service chat transcript between an Agent (user) and a Consumer (consumer).
-  
+
   Evaluation Categories (Skala 0-100):
   - Communication (naturalness, empathy, readability, professionalism)
   - Probing (depth, relevance, chronology gathering)

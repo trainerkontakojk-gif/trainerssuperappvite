@@ -1,8 +1,8 @@
 import React from 'react';
 import { Zap, AlertCircle, Clock, Check } from 'lucide-react';
 import { DurationSelector } from '../DurationSelector';
-import { 
-  TelefunAppSettings as AppSettings, 
+import {
+  TelefunAppSettings as AppSettings,
   VOICE_MODELS as TELEFUN_AUDIO_MODELS
 } from '../../telefunSettings';
 

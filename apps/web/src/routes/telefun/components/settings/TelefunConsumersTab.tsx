@@ -78,11 +78,11 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
       {/* Selection Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Random Option */}
-        <div 
+        <div
           onClick={() => handleSelectConsumerType('random')}
           className={`cursor-pointer p-6 rounded-2xl border-2 transition-all relative ${
             preferredConsumerTypeId === 'random'
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10' 
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
               : 'border-transparent bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
           }`}
         >
@@ -103,12 +103,12 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
 
         {/* Defined Types */}
         {consumerTypes.map(c => (
-          <div 
-            key={c.id} 
+          <div
+            key={c.id}
             onClick={() => handleSelectConsumerType(c.id)}
             className={`cursor-pointer p-6 rounded-2xl border-2 transition-all relative group ${
               preferredConsumerTypeId === c.id
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10' 
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10'
                 : 'border-transparent bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
@@ -130,13 +130,13 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
                   </div>
                 ) : (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleEditClick(c); }}
                       className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button 
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteConsumer(c.id); }}
                       className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                     >
@@ -163,7 +163,7 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
           <span>Buat Karakteristik Baru</span>
         </button>
       )}
-      
+
       {/* Form for Add/Edit Consumer */}
       {consumerForm.isOpen && (
         <div id="consumer-form" className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-white/10 shadow-lg overflow-hidden">
@@ -175,19 +175,19 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
           <div className="p-6 space-y-5">
             <div>
               <label className="block text-xs font-bold uppercase mb-2 text-gray-500 dark:text-gray-400">Nama</label>
-              <input 
-                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                value={consumerForm.draft.name || ''} 
-                onChange={e => consumerForm.setDraft({ name: e.target.value })} 
-                placeholder="Contoh: Pelanggan Marah" 
+              <input
+                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                value={consumerForm.draft.name || ''}
+                onChange={e => consumerForm.setDraft({ name: e.target.value })}
+                placeholder="Contoh: Pelanggan Marah"
               />
             </div>
             <div>
               <label className="block text-xs font-bold uppercase mb-2 text-gray-500 dark:text-gray-400">Kesulitan</label>
               <div className="relative">
-                <select 
-                  className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none" 
-                  value={consumerForm.draft.difficulty || ConsumerDifficulty.Medium} 
+                <select
+                  className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                  value={consumerForm.draft.difficulty || ConsumerDifficulty.Medium}
                   onChange={e => consumerForm.setDraft({ difficulty: e.target.value as any })}
                 >
                   <option value={ConsumerDifficulty.Easy}>Mudah</option>
@@ -201,19 +201,19 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
             </div>
             <div>
               <label className="block text-xs font-bold uppercase mb-2 text-gray-500 dark:text-gray-400">Deskripsi/Prompt</label>
-              <textarea 
-                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none" 
-                rows={3} 
-                value={consumerForm.draft.description || ''} 
-                onChange={e => consumerForm.setDraft({ description: e.target.value })} 
-                placeholder="Deskripsikan bagaimana karakter ini berperilaku..." 
+              <textarea
+                className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                rows={3}
+                value={consumerForm.draft.description || ''}
+                onChange={e => consumerForm.setDraft({ description: e.target.value })}
+                placeholder="Deskripsikan bagaimana karakter ini berperilaku..."
               />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={handleCancelConsumerForm} className="px-6 py-2.5 rounded-xl text-gray-600 dark:text-gray-400 font-bold hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-all">Batal</button>
-              <button 
-                onClick={handleSaveConsumer} 
-                disabled={!consumerForm.draft.name || !consumerForm.draft.description} 
+              <button
+                onClick={handleSaveConsumer}
+                disabled={!consumerForm.draft.name || !consumerForm.draft.description}
                 className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Simpan

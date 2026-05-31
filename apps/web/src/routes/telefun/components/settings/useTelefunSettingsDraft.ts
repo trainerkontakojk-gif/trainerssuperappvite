@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
-import { 
-  TelefunAppSettings as AppSettings, 
-  TelefunScenario as Scenario, 
-  TelefunConsumerType as ConsumerType, 
+import {
+  TelefunAppSettings as AppSettings,
+  TelefunScenario as Scenario,
+  TelefunConsumerType as ConsumerType,
   ConsumerDifficulty,
   VOICE_MODELS as TELEFUN_AUDIO_MODELS
 } from '../../telefunSettings';
@@ -42,7 +42,7 @@ export function useTelefunSettingsDraft({
 }: UseTelefunSettingsDraftProps) {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'consumers' | 'identity' | 'system'>('scenarios');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
-  
+
   const [selectedTelefunModel, setSelectedTelefunModel] = useState<string>(
     settings.telefunModelId || TELEFUN_AUDIO_MODELS[0]?.id || 'gemini-3.1-flash-live-preview'
   );
@@ -132,7 +132,7 @@ export function useTelefunSettingsDraft({
       return true;
     }
     const original = JSON.stringify(settings);
-    
+
     // Construct hypothetical settings with current selections
     const selectedTelefunTransport = TELEFUN_AUDIO_MODELS.find((m: any) => m.id === selectedTelefunModel)?.telefunTransport || 'gemini-live';
     const currentSettings = {
@@ -140,7 +140,7 @@ export function useTelefunSettingsDraft({
       telefunModelId: selectedTelefunModel,
       telefunTransport: selectedTelefunTransport,
     };
-    
+
     const current = JSON.stringify(currentSettings);
     return original !== current;
   };

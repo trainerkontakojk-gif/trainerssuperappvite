@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { QAIndicator } from "@trainers/types";
 import { buildSidakInputRuleModel } from "../routes/sidak/hooks/useSidakInputRuleModel";
 
 describe("buildSidakInputRuleModel", () => {
   it("uses global indicators when no rule version indicators are loaded", () => {
-    const globalIndicators = [
-      { id: "i1", service_type: "call", name: "Salam", category: "none" as const, bobot: 1, has_na: false },
+    const globalIndicators: QAIndicator[] = [
+      { id: "i1", service_type: "call", name: "Salam", category: "none", bobot: 1, has_na: false },
     ];
 
     const result = buildSidakInputRuleModel({

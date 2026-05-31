@@ -71,7 +71,7 @@ describe("Sidak Decomposition - Structural Property Tests", () => {
     ];
 
     const actualExports = Object.keys(sidakService);
-    
+
     // Check that every expected export is present in actual exports
     for (const exp of EXPECTED_EXPORTS) {
       expect(actualExports).toContain(exp);
@@ -105,7 +105,7 @@ describe("Sidak Decomposition - Structural Property Tests", () => {
 
     for (const file of files) {
       const code = readFileSync(join(sidakDir, file), "utf-8");
-      
+
       // Look for relative import patterns pointing to parent barrel
       // e.g., import ... from "../sidak-service" or "../"
       expect(code).not.toMatch(/from\s+["']\.\.\/sidak-service["']/);

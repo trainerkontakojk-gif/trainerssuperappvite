@@ -1,9 +1,9 @@
 import React from 'react';
 import { User } from 'lucide-react';
-import { 
-  TelefunAppSettings as AppSettings, 
+import {
+  TelefunAppSettings as AppSettings,
   TelefunIdentitySettings as ConsumerIdentitySettings,
-  MALE_VOICES, 
+  MALE_VOICES,
   FEMALE_VOICES
 } from '../../telefunSettings';
 
@@ -53,18 +53,18 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="col-span-1">
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Nama Konsumen (Lengkap)</label>
-            <input 
-              type="text" 
-              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
-              placeholder="Contoh: Agus Setiawan" 
-              value={identitySettings?.displayName || ''} 
-              onChange={(e) => handleIdentityChange('displayName', e.target.value)} 
+            <input
+              type="text"
+              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              placeholder="Contoh: Agus Setiawan"
+              value={identitySettings?.displayName || ''}
+              onChange={(e) => handleIdentityChange('displayName', e.target.value)}
             />
           </div>
           <div className="col-span-1">
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Jenis Kelamin</label>
             <div className="relative">
-              <select 
+              <select
                 className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
                 value={identitySettings?.gender || 'random'}
                 onChange={(e) => handleIdentityChange('gender', e.target.value as any)}
@@ -81,7 +81,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
           <div className="col-span-1">
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Pilihan Suara</label>
             <div className="relative">
-              <select 
+              <select
                 className={`w-full rounded-2xl border-gray-200 dark:border-white/10 p-4 text-base outline-none appearance-none transition-all ${
                   (!identitySettings?.gender || identitySettings?.gender === 'random')
                     ? 'bg-gray-100 dark:bg-[#1C1C1E]/50 text-gray-400 dark:text-gray-600 cursor-not-allowed'
@@ -108,22 +108,22 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
           </div>
           <div className="col-span-1">
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Nomor Telepon Konsumen</label>
-            <input 
-              type="text" 
-              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
-              placeholder="Contoh: 0812..." 
-              value={identitySettings?.phoneNumber || ''} 
-              onChange={(e) => handleIdentityChange('phoneNumber', e.target.value)} 
+            <input
+              type="text"
+              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              placeholder="Contoh: 0812..."
+              value={identitySettings?.phoneNumber || ''}
+              onChange={(e) => handleIdentityChange('phoneNumber', e.target.value)}
             />
           </div>
           <div className="col-span-1">
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Kota Konsumen</label>
-            <input 
-              type="text" 
-              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
-              placeholder="Contoh: Jakarta" 
-              value={identitySettings?.city || ''} 
-              onChange={(e) => handleIdentityChange('city', e.target.value)} 
+            <input
+              type="text"
+              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              placeholder="Contoh: Jakarta"
+              value={identitySettings?.city || ''}
+              onChange={(e) => handleIdentityChange('city', e.target.value)}
             />
           </div>
         </div>
