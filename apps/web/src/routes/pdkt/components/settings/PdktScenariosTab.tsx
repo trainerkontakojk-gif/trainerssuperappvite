@@ -3,6 +3,7 @@ import { Check, Edit2, Trash2, Plus, X, Image as ImageIcon, Sparkles, Loader2, F
 import { motion } from "framer-motion";
 import { PdktScenario, PdktIdentity } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
+import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
 import { notify } from "../../../../lib/toast";
 import { postApi } from "../../../../hooks/useApi";
 import ScenarioImage from "../ScenarioImage";
@@ -183,28 +184,16 @@ export function PdktScenariosTab({
 
     const category = isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category || "Umum";
 
-    setLocalSettings((prev: any) => {
-      const updatedDraft = {
-        ...scenarioForm.draft,
-        category,
-      };
-      let updatedScenarios = prev.scenarios;
-      if (scenarioForm.editingId) {
-        updatedScenarios = prev.scenarios.map((s: any) =>
-          s.id === scenarioForm.editingId ? { ...s, ...updatedDraft } : s
-        );
-      } else {
-        updatedScenarios = [
-          ...prev.scenarios,
-          {
-            id: `s-${Date.now()}`,
-            ...updatedDraft,
-            isActive: true,
-          },
-        ];
-      }
-      return { ...prev, scenarios: updatedScenarios };
-    });
+    setLocalSettings((prev: any) => ({
+      ...prev,
+      scenarios: applyCollectionDraft<PdktScenario>({
+        items: prev.scenarios,
+        draft: { ...scenarioForm.draft, category },
+        editingId: scenarioForm.editingId,
+        idPrefix: "s",
+        extraDefaults: { isActive: true },
+      }),
+    }));
 
     scenarioForm.close();
   };

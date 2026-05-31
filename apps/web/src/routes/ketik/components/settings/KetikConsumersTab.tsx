@@ -3,6 +3,8 @@ import { Users, Check, Edit2, Trash2, Plus } from "lucide-react";
 import { KetikConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 
+import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
+
 interface KetikConsumersTabProps {
   consumerTypes: KetikConsumerType[];
   activeConsumerTypeId: string;
@@ -50,26 +52,16 @@ export function KetikConsumersTab({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    setLocalSettings((prev: any) => {
-      let updatedTypes = prev.consumerTypes;
-      if (consumerForm.editingId) {
-        updatedTypes = prev.consumerTypes.map((c: any) =>
-          c.id === consumerForm.editingId
-            ? { ...c, ...consumerForm.draft }
-            : c
-        );
-      } else {
-        updatedTypes = [
-          ...prev.consumerTypes,
-          {
-            id: `c-${Date.now()}`,
-            ...consumerForm.draft,
-            isCustom: true,
-          },
-        ];
-      }
-      return { ...prev, consumerTypes: updatedTypes };
-    });
+    setLocalSettings((prev: any) => ({
+      ...prev,
+      consumerTypes: applyCollectionDraft<KetikConsumerType>({
+        items: prev.consumerTypes,
+        draft: consumerForm.draft,
+        editingId: consumerForm.editingId,
+        idPrefix: "c",
+        extraDefaults: { isCustom: true },
+      }),
+    }));
 
     consumerForm.close();
   };

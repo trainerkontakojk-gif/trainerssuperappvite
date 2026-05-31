@@ -2,6 +2,7 @@ import React from "react";
 import { Users, Check, Edit2, Trash2, Plus, X } from "lucide-react";
 import { PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
+import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
 
 interface PdktConsumersTabProps {
   consumerTypes: PdktConsumerType[];
@@ -48,29 +49,16 @@ export function PdktConsumersTab({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    setLocalSettings((prev: any) => {
-      let updatedTypes = prev.consumerTypes;
-      if (consumerForm.editingId) {
-        updatedTypes = prev.consumerTypes.map((c: any) =>
-          c.id === consumerForm.editingId
-            ? {
-                ...c,
-                ...consumerForm.draft,
-              }
-            : c
-        );
-      } else {
-        updatedTypes = [
-          ...prev.consumerTypes,
-          {
-            id: `c-${Date.now()}`,
-            ...consumerForm.draft,
-            isCustom: true,
-          },
-        ];
-      }
-      return { ...prev, consumerTypes: updatedTypes };
-    });
+    setLocalSettings((prev: any) => ({
+      ...prev,
+      consumerTypes: applyCollectionDraft<PdktConsumerType>({
+        items: prev.consumerTypes,
+        draft: consumerForm.draft,
+        editingId: consumerForm.editingId,
+        idPrefix: "c",
+        extraDefaults: { isCustom: true },
+      }),
+    }));
 
     consumerForm.close();
   };

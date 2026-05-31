@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Check, Edit2, Trash2, Plus, X } from 'lucide-react';
 import { TelefunScenario as Scenario } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
+import { applyCollectionDraft } from '../../../../hooks/useCollectionDraft';
 
 interface TelefunScenariosTabProps {
   scenarios: Scenario[];
@@ -60,29 +61,16 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : '';
     
     // Save draft to local settings
-    setLocalSettings((prev: any) => {
-      const updatedDraft = {
-        ...scenarioForm.draft,
-        category,
-        script: draftScript,
-      };
-      let updatedScenarios = prev.scenarios;
-      if (scenarioForm.editingId) {
-        updatedScenarios = prev.scenarios.map((s: any) =>
-          s.id === scenarioForm.editingId ? { ...s, ...updatedDraft } : s
-        );
-      } else {
-        updatedScenarios = [
-          ...prev.scenarios,
-          {
-            id: `s-${Date.now()}`,
-            ...updatedDraft,
-            isActive: true,
-          },
-        ];
-      }
-      return { ...prev, scenarios: updatedScenarios };
-    });
+    setLocalSettings((prev: any) => ({
+      ...prev,
+      scenarios: applyCollectionDraft<Scenario>({
+        items: prev.scenarios,
+        draft: { ...scenarioForm.draft, category, script: draftScript },
+        editingId: scenarioForm.editingId,
+        idPrefix: "s",
+        extraDefaults: { isActive: true },
+      }),
+    }));
 
     scenarioForm.close();
   };

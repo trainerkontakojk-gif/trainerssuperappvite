@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { KetikScenario } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
+import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
 
 interface KetikScenariosTabProps {
   scenarios: KetikScenario[];
@@ -80,29 +81,16 @@ export function KetikScenariosTab({
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : "";
     
-    setLocalSettings((prev: any) => {
-      const updatedDraft = {
-        ...scenarioForm.draft,
-        category,
-        script: draftScript,
-      };
-      let updatedScenarios = prev.scenarios;
-      if (scenarioForm.editingId) {
-        updatedScenarios = prev.scenarios.map((s: any) =>
-          s.id === scenarioForm.editingId ? { ...s, ...updatedDraft } : s
-        );
-      } else {
-        updatedScenarios = [
-          ...prev.scenarios,
-          {
-            id: `s-${Date.now()}`,
-            ...updatedDraft,
-            isActive: true,
-          },
-        ];
-      }
-      return { ...prev, scenarios: updatedScenarios };
-    });
+    setLocalSettings((prev: any) => ({
+      ...prev,
+      scenarios: applyCollectionDraft<KetikScenario>({
+        items: prev.scenarios,
+        draft: { ...scenarioForm.draft, category, script: draftScript },
+        editingId: scenarioForm.editingId,
+        idPrefix: "s",
+        extraDefaults: { isActive: true },
+      }),
+    }));
 
     scenarioForm.close();
   };
