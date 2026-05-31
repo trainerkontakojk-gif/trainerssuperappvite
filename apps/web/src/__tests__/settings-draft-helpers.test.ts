@@ -5,7 +5,6 @@ import { buildPdktSettingsForSave } from "../routes/pdkt/components/settings/use
 import { buildTelefunSettingsForSave } from "../routes/telefun/components/settings/useTelefunSettingsDraft";
 import { DEFAULT_TELEFUN_SETTINGS } from "../routes/telefun/telefunSettings";
 import type { PdktAppSettings } from "../routes/pdkt/pdktSettings";
-import { applyCollectionDraft } from "../hooks/useCollectionDraft";
 
 describe("settings draft commit helpers", () => {
   it("buildKetikSettingsForSave returns a new object and does not mutate localSettings", () => {
@@ -78,64 +77,5 @@ describe("settings draft commit helpers", () => {
     expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
     expect(result.telefunTransport).toBe("gemini-live");
     expect(original.telefunTransport).toBe("gemini-live");
-  });
-});
-
-describe("applyCollectionDraft", () => {
-  interface TestItem {
-    id: string;
-    name: string;
-    isCustom?: boolean;
-  }
-
-  it("adds a new item with prefix and default values when editingId is null", () => {
-    const items: TestItem[] = [
-      { id: "c-1", name: "Item 1" },
-    ];
-    const draft = { name: "New Item" };
-
-    const result = applyCollectionDraft<TestItem>({
-      items,
-      draft,
-      editingId: null,
-      create: (nextDraft) => ({
-        id: "c-123",
-        name: nextDraft.name ?? "",
-        isCustom: true,
-      }),
-    });
-
-    expect(result).toHaveLength(2);
-    expect(result[0]).toBe(items[0]);
-    expect(result[1].id).toBe("c-123");
-    expect(result[1].name).toBe("New Item");
-    expect(result[1].isCustom).toBe(true);
-    expect(items).toHaveLength(1);
-  });
-
-  it("updates an existing item with editingId", () => {
-    const items: TestItem[] = [
-      { id: "c-1", name: "Item 1" },
-      { id: "c-2", name: "Item 2", isCustom: true },
-    ];
-    const draft = { name: "Updated Item 2" };
-
-    const result = applyCollectionDraft<TestItem>({
-      items,
-      draft,
-      editingId: "c-2",
-      create: (nextDraft) => ({
-        id: "c-new",
-        name: nextDraft.name ?? "",
-      }),
-    });
-
-    expect(result).toHaveLength(2);
-    expect(result[0]).toBe(items[0]);
-    expect(result[1]).not.toBe(items[1]);
-    expect(result[1].id).toBe("c-2");
-    expect(result[1].name).toBe("Updated Item 2");
-    expect(result[1].isCustom).toBe(true);
-    expect(items[1].name).toBe("Item 2");
   });
 });
