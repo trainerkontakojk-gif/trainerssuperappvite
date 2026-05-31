@@ -2,12 +2,17 @@ import { useApi, getApi, putApi, postApi, deleteApi } from "../../hooks/useApi";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Settings, Plus, Trash2, Info,
-  Check, History, Clock, Rocket, AlertTriangle,
-  GitBranch, X, Loader2, Pencil
+  Settings, Plus, Trash2,
+  History, Rocket, AlertTriangle,
+  GitBranch, Pencil
 } from "lucide-react";
 import { notify } from "../../lib/toast";
 import type { ServiceType, RuleVersion, QARuleIndicator } from "@trainers/types";
+import { SERVICE_LABELS, formatPeriodLabel } from "./settings/constants";
+import { RuleVersionPicker } from "./settings/components/RuleVersionPicker";
+import { ServiceWeightsPanel } from "./settings/components/ServiceWeightsPanel";
+import { RuleIndicatorsPanel } from "./settings/components/RuleIndicatorsPanel";
+import { PublishRulePanel } from "./settings/components/PublishRulePanel";
 
 interface RuleVersionMeta {
   service_type: string;
@@ -16,39 +21,6 @@ interface RuleVersionMeta {
   draft_count: number;
   published_count: number;
 }
-
-const TEAMS: ServiceType[] = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"];
-
-const SERVICE_LABELS: Record<string, string> = {
-  call: "Call",
-  chat: "Chat",
-  email: "Email",
-  cso: "CSO",
-  pencatatan: "Pencatatan",
-  bko: "BKO",
-  slik: "SLIK",
-};
-
-const CAT_LABEL: Record<string, string> = {
-  non_critical: "Non-Critical Error",
-  critical: "Critical Error",
-  none: "Semua Parameter",
-};
-
-const CAT_COLOR: Record<string, string> = {
-  non_critical: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20",
-  critical: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/20",
-  none: "bg-muted text-muted-foreground border-border",
-};
-
-const formatPeriodLabel = (month?: number, year?: number) => {
-  if (!month || !year) return "-";
-  const months = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-  ];
-  return `${months[month - 1]} ${year}`;
-};
 
 export default function SidakSettingsPage() {
   const [activeTeam, setActiveTeam] = useState<ServiceType>("call");
@@ -330,108 +302,18 @@ export default function SidakSettingsPage() {
 
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
         {/* Sidebar: Version History */}
-        <aside className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-border bg-card/30 overflow-y-auto">
-          <div className="p-4 space-y-4">
-            <div className="flex flex-wrap gap-1 p-1 bg-foreground/5 rounded-xl border border-border">
-              {TEAMS.map((team) => (
-                <button
-                  key={team}
-                  onClick={() => setActiveTeam(team)}
-                  className={`flex-1 min-w-[60px] py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
-                    activeTeam === team ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:bg-foreground/5"
-                  }`}
-                >
-                  {SERVICE_LABELS[team]}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Riwayat Versi</p>
-              {versionsLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-20 bg-foreground/5 animate-pulse rounded-2xl border border-border/50" />
-                  ))}
-                </div>
-              ) : !versions || versions.length === 0 ? (
-                <div className="p-4 text-center border-2 border-dashed border-border rounded-2xl">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">
-                    Belum ada versi untuk {SERVICE_LABELS[activeTeam]}
-                  </p>
-                  {meta?.indicator_count ? (
-                    <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
-                      Baseline tersedia: {meta.indicator_count} parameter. Buat baseline untuk menampilkan detail versi.
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-[11px] font-semibold text-muted-foreground">
-                      Belum ada parameter baseline untuk service ini.
-                    </p>
-                  )}
-                  <button onClick={() => handleCreateDraft()} className="mt-2 text-[10px] font-black text-primary uppercase underline">
-                    Buat Baseline
-                  </button>
-                </div>
-              ) : (
-                versions.map((v) => (
-                  <div key={v.id} className="group relative">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedVersion(v)}
-                      className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                        selectedVersion?.id === v.id
-                          ? "bg-primary/5 border-primary shadow-sm shadow-primary/10"
-                          : "bg-card border-border hover:border-primary/30"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span
-                          className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${
-                            v.status === "draft"
-                              ? "bg-amber-500/20 text-amber-600 border border-amber-500/20"
-                              : v.status === "superseded"
-                              ? "bg-muted text-muted-foreground border border-border"
-                              : "bg-emerald-500/20 text-emerald-600 border border-emerald-500/20"
-                          }`}
-                        >
-                          {v.status}
-                        </span>
-                        <span className="text-[9px] font-bold text-muted-foreground">
-                          {new Date(v.created_at).toLocaleDateString("id-ID")}
-                        </span>
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-foreground">v{v.version_number}</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Efektif: {getPeriodLabel(v.effective_period_id)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 opacity-60 group-hover:opacity-100 text-[10px] font-bold text-muted-foreground uppercase">
-                        <Clock className="w-3 h-3" />
-                        <span>{v.scoring_mode} Mode</span>
-                      </div>
-                    </button>
-
-                    {v.status === "draft" && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteDraft(v.id);
-                        }}
-                        className="absolute bottom-3 right-3 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-destructive/20"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </aside>
+        <RuleVersionPicker
+          activeTeam={activeTeam}
+          setActiveTeam={setActiveTeam}
+          versions={versions}
+          versionsLoading={versionsLoading}
+          selectedVersion={selectedVersion}
+          setSelectedVersion={setSelectedVersion}
+          meta={meta}
+          getPeriodLabel={getPeriodLabel}
+          handleCreateDraft={handleCreateDraft}
+          handleDeleteDraft={handleDeleteDraft}
+        />
 
         {/* Main Content: Version Detail & Editor */}
         <section className="flex-1 overflow-y-auto bg-foreground/[0.01] p-4 lg:p-8">
@@ -445,244 +327,34 @@ export default function SidakSettingsPage() {
                 className="max-w-4xl mx-auto space-y-6"
               >
                 {/* Status Banner */}
-                {selectedVersion.status === "published" ? (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-6 flex items-start gap-4">
-                    <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <Check className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-black text-emerald-700 dark:text-emerald-400">
-                        Versi Aktif (Published) v{selectedVersion.version_number}
-                      </h2>
-                      <p className="text-sm text-emerald-600/80 font-medium leading-relaxed mt-1">
-                        Versi ini bersifat <strong>immutable</strong> dan digunakan untuk kalkulasi periode{" "}
-                        <strong>{getPeriodLabel(selectedVersion.effective_period_id)}</strong> dan seterusnya hingga ada versi baru.
-                      </p>
-                    </div>
-                  </div>
-                ) : selectedVersion.status === "superseded" ? (
-                  <div className="bg-muted border border-border rounded-3xl p-6 flex items-start gap-4">
-                    <div className="w-12 h-12 bg-foreground/5 rounded-2xl flex items-center justify-center flex-shrink-0">
-                      <History className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-black text-foreground/80">
-                        Versi Lama (Superseded) v{selectedVersion.version_number}
-                      </h2>
-                      <p className="text-sm text-muted-foreground font-medium leading-relaxed mt-1">
-                        Versi ini telah digantikan oleh versi yang lebih baru. Data historis yang menggunakan versi ini tetap dipertahankan.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-3xl p-6 flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-amber-500/20 rounded-2xl flex items-center justify-center flex-shrink-0">
-                        <Pencil className="w-6 h-6 text-amber-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="text-lg font-black text-amber-700 dark:text-amber-400">
-                          Draft Rules v{selectedVersion.version_number}
-                        </h2>
-                        <p className="text-sm text-amber-600/80 font-medium leading-relaxed mt-1">
-                          Anda dapat mengubah parameter dan bobot pada draft ini. Publish draft ini untuk menjadikannya rule efektif mulai bulan tertentu.
-                        </p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Clock className="w-3 h-3 text-amber-600" />
-                          <span className="text-[10px] font-black uppercase text-amber-700">
-                            Target: {getPeriodLabel(selectedVersion.effective_period_id)}
-                          </span>
-                        </div>
-                      </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Threshold</label>
-                    <input
-                      type="number"
-                      value={newThreshold}
-                      onChange={(e) => setNewThreshold(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Urutan (sort_order)</label>
-                    <input
-                      type="number"
-                      value={newSortOrder}
-                      onChange={(e) => setNewSortOrder(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
-                    />
-                  </div>
-                </div>
-                <button
-                      onClick={() => setShowAddForm(true)}
-                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition"
-                    >
-                      Tambah Parameter
-                    </button>
-                  </div>
-                )}
+                <PublishRulePanel
+                  selectedVersion={selectedVersion}
+                  getPeriodLabel={getPeriodLabel}
+                  setShowAddForm={setShowAddForm}
+                  newThreshold={newThreshold}
+                  setNewThreshold={setNewThreshold}
+                  newSortOrder={newSortOrder}
+                  setNewSortOrder={setNewSortOrder}
+                />
 
                 {/* Weights & Mode Panel */}
-                <div className="bg-card rounded-[2.5rem] border border-border p-8 shadow-sm space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                      <Settings className="w-4 h-4" /> Konfigurasi Bobot & Mode
-                    </h3>
-                    <span className="px-3 py-1 bg-foreground/5 border border-border rounded-full text-[10px] font-black uppercase">
-                      {selectedVersion.scoring_mode} Mode
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Bobot Non-Critical</label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          disabled={!isDraft || selectedVersion.scoring_mode === "no_category"}
-                          value={selectedVersion.non_critical_weight * 100}
-                          onChange={async (e) => {
-                            const ncVal = parseInt(e.target.value) / 100;
-                            const cVal = (100 - parseInt(e.target.value)) / 100;
-                            try {
-                              const updated = await putApi<RuleVersion>(`/sidak/rule-versions/${selectedVersion.id}`, {
-                                non_critical_weight: ncVal,
-                                critical_weight: cVal,
-                              });
-                              setSelectedVersion(updated);
-                            } catch (err: any) {
-                              notify.error(err.message || "Gagal mengupdate bobot");
-                            }
-                          }}
-                          className="flex-1 accent-primary disabled:opacity-30 cursor-pointer"
-                        />
-                        <span className="w-12 text-center font-black text-sm">{Math.round(selectedVersion.non_critical_weight * 100)}%</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Bobot Critical</label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          disabled={true}
-                          value={selectedVersion.critical_weight * 100}
-                          className="flex-1 accent-red-500 opacity-50"
-                        />
-                        <span className="w-12 text-center font-black text-sm text-red-500">{Math.round(selectedVersion.critical_weight * 100)}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {isDraft && selectedVersion.scoring_mode !== "no_category" && (
-                    <div className="flex gap-2 pt-4 border-t border-border">
-                      <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                        <Info className="w-3 h-3 text-primary" /> Geser slider untuk mengubah proporsi kontribusi antar kategori.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <ServiceWeightsPanel
+                  selectedVersion={selectedVersion}
+                  isDraft={isDraft}
+                  setSelectedVersion={setSelectedVersion}
+                />
 
                 {/* Parameters List */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground px-2">Daftar Parameter</h3>
-
-                  {loadingIndicators ? (
-                    <div className="space-y-2">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="h-14 bg-card animate-pulse rounded-2xl border border-border" />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-card rounded-[2.5rem] border border-border overflow-hidden shadow-sm divide-y divide-border">
-                      {draftIndicators.length === 0 ? (
-                        <div className="p-12 text-center space-y-4">
-                          <Info className="w-12 h-12 text-muted-foreground/20 mx-auto" />
-                          <p className="text-sm font-bold text-muted-foreground">Belum ada parameter di versi ini.</p>
-                          {publishedWhenDraftEmpty && (
-                            <div className="inline-flex flex-col items-center gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20">
-                              <p className="text-xs text-amber-600/80">
-                                Versi published <span className="font-black">v{publishedWhenDraftEmpty.version_number}</span> sudah memiliki parameter.
-                              </p>
-                              <button
-                                onClick={() => handleCreateDraft(publishedWhenDraftEmpty.id)}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all"
-                              >
-                                <GitBranch className="w-3.5 h-3.5" />
-                                Create Revision dari Published
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        draftIndicators.map((ind) => (
-                          <div key={ind.id} className="group p-4 lg:px-8 hover:bg-foreground/[0.01] transition-all flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4 flex-1 min-w-0">
-                              <div className="w-12 text-center flex-shrink-0">
-                                <span className={`text-[10px] font-black px-2 py-1 rounded-lg border uppercase tracking-wider ${CAT_COLOR[ind.category as any] || CAT_COLOR.none}`}>
-                                  {Math.round(ind.bobot * 100)}%
-                                </span>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-foreground truncate">{ind.name}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border uppercase tracking-widest ${CAT_COLOR[ind.category as any] || CAT_COLOR.none}`}>
-                                    {CAT_LABEL[ind.category as any] ? CAT_LABEL[ind.category as any].replace(" Error", "") : ind.category}
-                                  </span>
-                                  {ind.has_na && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-foreground/5 text-muted-foreground border border-border">N/A</span>}
-                                  {ind.sort_order != null && ind.sort_order > 0 && (
-                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 border border-purple-500/20">#{ind.sort_order}</span>
-                                  )}
-                                  {ind.threshold != null && (
-                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-600 border border-amber-500/20">Th: {ind.threshold}</span>
-                                  )}
-                                  {ind.legacy_indicator_id && (
-                                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">Linked</span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            {isDraft && (
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
-                                <button
-                                  onClick={() => {
-                                    setEditIndId(ind.id);
-                                    setEditState({
-                                      name: ind.name,
-                                      category: ind.category,
-                                      bobot: String(Math.round(ind.bobot * 100)),
-                                      has_na: ind.has_na,
-                                      threshold: ind.threshold != null ? String(ind.threshold) : "",
-                                      sort_order: String(ind.sort_order ?? 0),
-                                    });
-                                  }}
-                                  className="p-2 hover:bg-primary/10 text-muted-foreground hover:text-primary rounded-xl transition"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteIndicator(ind.id)}
-                                  className="p-2 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl transition"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
+                <RuleIndicatorsPanel
+                  loadingIndicators={loadingIndicators}
+                  draftIndicators={draftIndicators}
+                  publishedWhenDraftEmpty={publishedWhenDraftEmpty}
+                  isDraft={isDraft}
+                  handleCreateDraft={handleCreateDraft}
+                  handleDeleteIndicator={handleDeleteIndicator}
+                  setEditIndId={setEditIndId}
+                  setEditState={setEditState}
+                />
               </motion.div>
             ) : (
               <div className="h-full flex items-center justify-center py-20">
