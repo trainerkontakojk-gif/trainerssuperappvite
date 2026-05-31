@@ -61,6 +61,7 @@ export function useKetikSettingsDraft({
       images: [],
     },
     validate: (draft) => !!(draft.title && draft.description && draft.category),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   const consumerForm = useCrudForm<KetikConsumerType>({
@@ -72,6 +73,7 @@ export function useKetikSettingsDraft({
       isCustom: true,
     },
     validate: (draft) => !!(draft.name && draft.description),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   const templateForm = useCrudForm<KetikQuickTemplate>({
@@ -81,6 +83,7 @@ export function useKetikSettingsDraft({
       content: "",
     },
     validate: (draft) => !!(draft.keyword && draft.content),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   const PRESET_DURATIONS = [5, 10, 15];

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Check, Edit2, Trash2, Plus, X, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
-import { KetikScenario } from "@trainers/types";
+import { KetikAppSettings, KetikScenario } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
@@ -9,7 +9,7 @@ import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
 interface KetikScenariosTabProps {
   scenarios: KetikScenario[];
   scenarioForm: ReturnType<typeof useCrudForm<KetikScenario>>;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<KetikAppSettings>>;
 }
 
 export function KetikScenariosTab({
@@ -22,30 +22,30 @@ export function KetikScenariosTab({
   const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
 
   const handleSelectAll = () =>
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: any) => ({ ...s, isActive: true })),
+      scenarios: prev.scenarios.map((s) => ({ ...s, isActive: true })),
     }));
 
   const handleUnselectAll = () =>
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: any) => ({ ...s, isActive: false })),
+      scenarios: prev.scenarios.map((s) => ({ ...s, isActive: false })),
     }));
 
   const handleToggleScenario = (id: string) =>
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: any) =>
+      scenarios: prev.scenarios.map((s) =>
         s.id === id ? { ...s, isActive: !s.isActive } : s,
       ),
     }));
 
   const handleDeleteScenario = (id: string) => {
     if (window.confirm("Hapus skenario ini?"))
-      setLocalSettings((prev: any) => ({
+      setLocalSettings((prev) => ({
         ...prev,
-        scenarios: prev.scenarios.filter((s: any) => s.id !== id),
+        scenarios: prev.scenarios.filter((s) => s.id !== id),
       }));
   };
 
@@ -81,14 +81,21 @@ export function KetikScenariosTab({
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : "";
 
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
       scenarios: applyCollectionDraft<KetikScenario>({
         items: prev.scenarios,
         draft: { ...scenarioForm.draft, category, script: draftScript },
         editingId: scenarioForm.editingId,
-        idPrefix: "s",
-        extraDefaults: { isActive: true },
+        create: (draft) => ({
+          id: `s-${Date.now()}`,
+          category: draft.category ?? "Umum",
+          title: draft.title ?? "",
+          description: draft.description ?? "",
+          script: draft.script,
+          images: draft.images ?? [],
+          isActive: true,
+        }),
       }),
     }));
 

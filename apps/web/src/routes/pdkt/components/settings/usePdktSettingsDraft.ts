@@ -107,6 +107,7 @@ export function usePdktSettingsDraft({
       attachmentImages: [],
     },
     validate: (draft) => !!(draft.title && draft.description && draft.category),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   const consumerForm = useCrudForm<PdktConsumerType>({
@@ -119,6 +120,7 @@ export function usePdktSettingsDraft({
       isCustom: true,
     },
     validate: (draft) => !!(draft.name && draft.description),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   // Sync state when modal opens to ensure fresh data

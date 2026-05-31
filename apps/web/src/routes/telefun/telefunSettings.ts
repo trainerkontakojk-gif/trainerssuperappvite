@@ -40,6 +40,16 @@ export interface TelefunIdentity {
   signatureName: string;
 }
 
+export type TelefunTransport = "gemini-live" | "openai-audio";
+
+export interface TelefunVoiceModel {
+  id: string;
+  name: string;
+  telefunTransport: TelefunTransport;
+  description: string;
+  disabled: boolean;
+}
+
 export interface TelefunSessionConfig {
   scenarios: TelefunScenario[];
   consumerType: TelefunConsumerType;
@@ -48,7 +58,7 @@ export interface TelefunSessionConfig {
   simulationDuration: number;
   maxCallDuration: number;
   responsePacingMode: "realistic" | "training_fast";
-  telefunTransport?: "gemini-live" | "openai-audio";
+  telefunTransport?: TelefunTransport;
   telefunModelId: string;
   realisticModeEnabled: boolean;
   realisticModeDisruptionTypes?: string[];
@@ -70,7 +80,7 @@ export type TelefunAppSettings = {
   preferredConsumerTypeId: string;
   identitySettings: TelefunIdentitySettings;
   telefunModelId: string;
-  telefunTransport?: "gemini-live" | "openai-audio";
+  telefunTransport?: TelefunTransport;
   activeScenario?: TelefunScenario;
   activeConsumerType?: TelefunConsumerType;
   sessionId?: string;
@@ -80,7 +90,7 @@ export type TelefunAppSettings = {
 
 
 
-export const VOICE_MODELS = [
+export const VOICE_MODELS: TelefunVoiceModel[] = [
   {
     id: 'gemini-3.1-flash-live-preview',
     name: 'Gemini 3.1 Flash Live',

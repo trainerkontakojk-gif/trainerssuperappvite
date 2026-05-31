@@ -98,13 +98,16 @@ describe("applyCollectionDraft", () => {
       items,
       draft,
       editingId: null,
-      idPrefix: "c",
-      extraDefaults: { isCustom: true },
+      create: (nextDraft) => ({
+        id: "c-123",
+        name: nextDraft.name ?? "",
+        isCustom: true,
+      }),
     });
 
     expect(result).toHaveLength(2);
     expect(result[0]).toBe(items[0]);
-    expect(result[1].id).toMatch(/^c-\d+$/);
+    expect(result[1].id).toBe("c-123");
     expect(result[1].name).toBe("New Item");
     expect(result[1].isCustom).toBe(true);
     expect(items).toHaveLength(1);
@@ -121,7 +124,10 @@ describe("applyCollectionDraft", () => {
       items,
       draft,
       editingId: "c-2",
-      idPrefix: "c",
+      create: (nextDraft) => ({
+        id: "c-new",
+        name: nextDraft.name ?? "",
+      }),
     });
 
     expect(result).toHaveLength(2);

@@ -1,6 +1,6 @@
 import React from "react";
 import { Users, Check, Edit2, Trash2, Plus } from "lucide-react";
-import { KetikConsumerType } from "@trainers/types";
+import { KetikAppSettings, KetikConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 
 import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
@@ -9,7 +9,7 @@ interface KetikConsumersTabProps {
   consumerTypes: KetikConsumerType[];
   activeConsumerTypeId: string;
   consumerForm: ReturnType<typeof useCrudForm<KetikConsumerType>>;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<KetikAppSettings>>;
 }
 
 export function KetikConsumersTab({
@@ -20,13 +20,13 @@ export function KetikConsumersTab({
 }: KetikConsumersTabProps) {
 
   const handleSelectConsumerType = (id: string) =>
-    setLocalSettings((prev: any) => ({ ...prev, activeConsumerTypeId: id }));
+    setLocalSettings((prev) => ({ ...prev, activeConsumerTypeId: id }));
 
   const handleDeleteConsumer = (id: string) => {
     if (window.confirm("Hapus karakteristik ini?")) {
-      setLocalSettings((prev: any) => ({
+      setLocalSettings((prev) => ({
         ...prev,
-        consumerTypes: prev.consumerTypes.filter((c: any) => c.id !== id),
+        consumerTypes: prev.consumerTypes.filter((c) => c.id !== id),
         activeConsumerTypeId:
           prev.activeConsumerTypeId === id
             ? "random"
@@ -52,14 +52,19 @@ export function KetikConsumersTab({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
       consumerTypes: applyCollectionDraft<KetikConsumerType>({
         items: prev.consumerTypes,
         draft: consumerForm.draft,
         editingId: consumerForm.editingId,
-        idPrefix: "c",
-        extraDefaults: { isCustom: true },
+        create: (draft) => ({
+          id: `c-${Date.now()}`,
+          name: draft.name ?? "",
+          description: draft.description ?? "",
+          difficulty: draft.difficulty ?? "Sedang",
+          isCustom: true,
+        }),
       }),
     }));
 
@@ -205,7 +210,9 @@ export function KetikConsumersTab({
                 className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none appearance-none transition-all"
                 value={consumerForm.draft.difficulty || "Sedang"}
                 onChange={(e) =>
-                  consumerForm.setDraft({ difficulty: e.target.value as any })
+                  consumerForm.setDraft({
+                    difficulty: e.target.value as KetikConsumerType["difficulty"],
+                  })
                 }
               >
                 <option value="Mudah">Mudah</option>

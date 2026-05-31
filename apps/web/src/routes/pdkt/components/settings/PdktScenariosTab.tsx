@@ -7,6 +7,7 @@ import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
 import { notify } from "../../../../lib/toast";
 import { postApi } from "../../../../hooks/useApi";
 import ScenarioImage from "../ScenarioImage";
+import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
 
 interface PdktScenariosTabProps {
   scenarios: PdktScenario[];
@@ -15,7 +16,7 @@ interface PdktScenariosTabProps {
   setEnableImageGeneration: (val: boolean) => void;
   customIdentity: PdktIdentity;
   globalConsumerTypeId: string;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
 export function PdktScenariosTab({
@@ -39,23 +40,23 @@ export function PdktScenariosTab({
   const noneSelected = activeCount === 0;
 
   const handleSelectAll = () => {
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: any) => ({ ...s, isActive: true })),
+      scenarios: prev.scenarios.map((s) => ({ ...s, isActive: true })),
     }));
   };
 
   const handleUnselectAll = () => {
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: any) => ({ ...s, isActive: false })),
+      scenarios: prev.scenarios.map((s) => ({ ...s, isActive: false })),
     }));
   };
 
   const handleToggleScenario = (id: string) => {
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: any) =>
+      scenarios: prev.scenarios.map((s) =>
         s.id === id ? { ...s, isActive: !s.isActive } : s
       ),
     }));
@@ -63,9 +64,9 @@ export function PdktScenariosTab({
 
   const handleDeleteScenario = (id: string) => {
     if (window.confirm("Hapus skenario ini?")) {
-      setLocalSettings((prev: any) => ({
+      setLocalSettings((prev) => ({
         ...prev,
-        scenarios: prev.scenarios.filter((s: any) => s.id !== id),
+        scenarios: prev.scenarios.filter((s) => s.id !== id),
       }));
     }
   };
@@ -184,14 +185,24 @@ export function PdktScenariosTab({
 
     const category = isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category || "Umum";
 
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
       scenarios: applyCollectionDraft<PdktScenario>({
         items: prev.scenarios,
         draft: { ...scenarioForm.draft, category },
         editingId: scenarioForm.editingId,
-        idPrefix: "s",
-        extraDefaults: { isActive: true },
+        create: (draft) => ({
+          id: `s-${Date.now()}`,
+          category: draft.category ?? "Umum",
+          title: draft.title ?? "",
+          description: draft.description ?? "",
+          isActive: true,
+          script: draft.script,
+          sampleEmailTemplate: draft.sampleEmailTemplate,
+          alwaysUseSampleEmail: draft.alwaysUseSampleEmail,
+          isLicensed: draft.isLicensed,
+          attachmentImages: draft.attachmentImages ?? [],
+        }),
       }),
     }));
 

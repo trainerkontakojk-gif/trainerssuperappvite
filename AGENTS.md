@@ -273,8 +273,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 82. **KETIK Service Decomposition** — Decomposed monolithic `ketik-service.ts` (1,400 → 5 lines barrel file) into 5 sub-modules under `apps/api/src/services/ketik/`: `shared-utils.ts` (9 lines — `extractJsonObjectText`), `consumer-response.ts` (347 lines — scenario defaults, consumer response generation), `review-lifecycle.ts` (317 lines — `triggerKetikAIReview` lifecycle), `review-processor.ts` (353 lines — `processKetikReviewJob` with AI scoring), `settings-history.ts` (369 lines — session CRUD, settings history). Backward compatible — all consumers import via barrel unchanged. 484 API tests passing. (DONE)
 83. **Settings Modal Full Decomposition** — Decomposed 3 monolithic SettingsModal components (Telefun 1,232→78, KETIK 915→58, PDKT 976→63 lines) into per-tab sub-modules. Created shared `useCrudForm` hook (87 lines) with generic CRUD form state management (openAdd/openEdit/close, save/remove, isDirty/isValid). Extracted all tab content to dedicated components: Telefun (Scenarios/Consumers/Identity/SystemTabs), KETIK (Scenarios/Consumers/Identity/TemplateTabs), PDKT (Scenarios/Consumers/IdentityTabs). 18 files modified/added, pure decomposition with zero logic change. (DONE)
 84. **SIDAK Input Hooks Decomposition** — Extracted 3 custom hooks from monolithic `input.tsx` (767→274 lines): `useTemuanEdit` (106 lines — edit/delete state + save handler), `useTemuanForm` (217 lines — manual form entries, validation, duplicate check, batch save, perfect score), `useTemuanImport` (327 lines — Excel template download, file parse, import save with duplicate/preview). Also extracted `newEntry()` helper and `FormEntry` interface. Pure decomposition, zero logic change. (DONE)
+85. **Thermo Quality Gate Hardening** — Post-decomposition cleanup: immutable settings draft saves, typed collection-draft helper, SIDAK input rule indicator source-of-truth, whitespace/lint blockers cleared. (DONE)
+86. **Settings Draft Type Safety Hardening** — Eliminated 15+ `as T`/`as any` assertions from settings draft system. Added `createItem`/`updateItem` factories to `useCrudForm`, `create` factory to `useCollectionDraft` (replacing `idPrefix`/`extraDefaults`), `isEqual` comparator (replacing `JSON.stringify`), typed all `setLocalSettings` dispatches and inline callbacks, added `TelefunTransport` type alias + `TelefunVoiceModel` interface. 14 files modified, behavior-preserving. (DONE)
 
-## Key Files Changed (Phase 58 — 84)
+## Key Files Changed (Phase 58 — 86)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -331,6 +333,21 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/routes/sidak.ts` — **Phase 63**: Added `POST /temuan/perfect-session` endpoint with RBAC, activity logging, and dashboard summary refresh
 - `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 63**: 4 regression tests for `createPerfectScoreSession`
 - `apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx` — **Phase 63**: 7 regression tests for hasBadFindings logic + component contract
+
+- `apps/web/src/hooks/useCrudForm.ts` — **Phase 86**: Added `createItem`/`updateItem` factories, `isEqual` comparator, `shallowEqualDraft` default
+- `apps/web/src/hooks/useCollectionDraft.ts` — **Phase 86**: Replaced `idPrefix`/`extraDefaults` with `create` factory, removed `as T` assertions
+- `apps/web/src/routes/telefun/telefunSettings.ts` — **Phase 86**: Added `TelefunTransport` type alias + `TelefunVoiceModel` interface, typed `VOICE_MODELS`
+- `apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts` — **Phase 86**: Added `createItem` to useCrudForm calls
+- `apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory in applyCollectionDraft, removed `as any`
+- `apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory in applyCollectionDraft
+- `apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts` — **Phase 86**: Added `createItem` to 3 useCrudForm calls
+- `apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory, removed `as any`
+- `apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory, removed `as any`
+- `apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts` — **Phase 86**: Added `createItem` to 2 useCrudForm calls
+- `apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory, removed `as any`
+- `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory, removed `as any`
+- `apps/web/src/routes/pdkt/components/settings/PdktIdentityTab.tsx` — **Phase 86**: Added `ConsumerNameMentionPattern` type, removed `as any`
+- `apps/web/src/__tests__/settings-draft-helpers.test.ts` — **Phase 86**: Updated to use `create` factory pattern
 
 ## Relevant Files
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Edit2, Trash2, Plus, X } from 'lucide-react';
-import { TelefunScenario as Scenario } from '../../telefunSettings';
+import { TelefunAppSettings as AppSettings, TelefunScenario as Scenario } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
 import { applyCollectionDraft } from '../../../../hooks/useCollectionDraft';
 
@@ -12,7 +12,7 @@ interface TelefunScenariosTabProps {
   handleUnselectAll: () => void;
   handleToggleScenario: (id: string) => void;
   handleDeleteScenario: (id: string) => void;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
 export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
@@ -61,14 +61,20 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : '';
 
     // Save draft to local settings
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
       scenarios: applyCollectionDraft<Scenario>({
         items: prev.scenarios,
         draft: { ...scenarioForm.draft, category, script: draftScript },
         editingId: scenarioForm.editingId,
-        idPrefix: "s",
-        extraDefaults: { isActive: true },
+        create: (draft) => ({
+          id: `s-${Date.now()}`,
+          category: draft.category ?? "Umum",
+          title: draft.title ?? "",
+          instruction: draft.instruction ?? "",
+          script: draft.script ?? "",
+          isActive: true,
+        }),
       }),
     }));
 

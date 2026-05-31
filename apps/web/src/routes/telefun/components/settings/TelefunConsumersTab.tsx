@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, Check, Edit2, Trash2, Plus } from 'lucide-react';
-import { TelefunConsumerType as ConsumerType, ConsumerDifficulty } from '../../telefunSettings';
+import { TelefunAppSettings as AppSettings, TelefunConsumerType as ConsumerType, ConsumerDifficulty } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
 import { applyCollectionDraft } from '../../../../hooks/useCollectionDraft';
 
@@ -10,7 +10,7 @@ interface TelefunConsumersTabProps {
   consumerForm: ReturnType<typeof useCrudForm<ConsumerType>>;
   handleSelectConsumerType: (id: string) => void;
   handleDeleteConsumer: (id: string) => void;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
 export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
@@ -39,13 +39,19 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
-      consumerTypes: applyCollectionDraft({
+      consumerTypes: applyCollectionDraft<ConsumerType>({
         items: prev.consumerTypes,
         draft: { ...consumerForm.draft, gender: 'random' },
         editingId: consumerForm.editingId,
-        idPrefix: "c",
+        create: (draft) => ({
+          id: `c-${Date.now()}`,
+          name: draft.name ?? "",
+          description: draft.description ?? "",
+          difficulty: draft.difficulty ?? ConsumerDifficulty.Medium,
+          gender: draft.gender ?? "random",
+        }),
       }),
     }));
 
@@ -188,7 +194,7 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
                 <select
                   className="w-full rounded-xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-3 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
                   value={consumerForm.draft.difficulty || ConsumerDifficulty.Medium}
-                  onChange={e => consumerForm.setDraft({ difficulty: e.target.value as any })}
+                  onChange={e => consumerForm.setDraft({ difficulty: e.target.value as ConsumerType["difficulty"] })}
                 >
                   <option value={ConsumerDifficulty.Easy}>Mudah</option>
                   <option value={ConsumerDifficulty.Medium}>Sedang</option>

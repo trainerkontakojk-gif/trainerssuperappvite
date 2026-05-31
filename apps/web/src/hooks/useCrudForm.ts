@@ -4,12 +4,18 @@ export interface UseCrudFormOptions<T> {
   generateId: () => string;
   defaultValues: Omit<T, "id">;
   validate: (draft: Omit<T, "id">) => boolean;
+  createItem: (id: string, draft: Omit<T, "id">) => T;
+  updateItem?: (item: T, draft: Omit<T, "id">) => T;
+  isEqual?: (left: Omit<T, "id">, right: Omit<T, "id">) => boolean;
 }
 
 export function useCrudForm<T extends { id: string }>({
   generateId,
   defaultValues,
   validate,
+  createItem,
+  updateItem,
+  isEqual = shallowEqualDraft,
 }: UseCrudFormOptions<T>) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -29,7 +35,6 @@ export function useCrudForm<T extends { id: string }>({
     setEditingId(item.id);
     setIsOpen(true);
     const { id: _, ...rest } = item;
-    // rest is Omit<T, "id"> which is assignable to the state type without as any
     setDraftState(rest);
   }, []);
 
@@ -43,16 +48,14 @@ export function useCrudForm<T extends { id: string }>({
     if (!validate(draft)) return items;
     if (editingId) {
       return items.map((item) =>
-        // Cast 'as T' is necessary because spreading generic T and Omit<T, "id">
-        // is not automatically assignable to type parameter T in TypeScript.
-        item.id === editingId ? ({ ...item, ...draft } as T) : item
+        item.id === editingId
+          ? (updateItem?.(item, draft) ?? { ...item, ...draft })
+          : item
       );
     } else {
-      // Cast 'as T' is necessary because generic T cannot be instantiated with a concrete object type.
-      const newItem = { id: generateId(), ...draft } as T;
-      return [...items, newItem];
+      return [...items, createItem(generateId(), draft)];
     }
-  }, [editingId, draft, generateId, validate]);
+  }, [editingId, draft, generateId, validate, createItem, updateItem]);
 
   const remove = useCallback((id: string, items: T[]): T[] => {
     return items.filter((item) => item.id !== id);
@@ -64,12 +67,10 @@ export function useCrudForm<T extends { id: string }>({
       const original = items.find((item) => item.id === editingId);
       if (!original) return true;
       const { id: _, ...rest } = original;
-      // Flat object key-order comparison via JSON.stringify is safe and non-brittle here
-      // because both objects have the exact same shape/keys of type Omit<T, "id">.
-      return JSON.stringify(draft) !== JSON.stringify(rest);
+      return !isEqual(draft, rest);
     }
-    return JSON.stringify(draft) !== JSON.stringify(defaultValues);
-  }, [isOpen, editingId, draft, defaultValues]);
+    return !isEqual(draft, defaultValues);
+  }, [isOpen, editingId, draft, defaultValues, isEqual]);
 
   const isValid = useCallback(() => {
     return validate(draft);
@@ -90,4 +91,11 @@ export function useCrudForm<T extends { id: string }>({
     isDirty,
     isValid,
   };
+}
+
+function shallowEqualDraft<T extends object>(left: T, right: T): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key) => Object.is(Reflect.get(left, key), Reflect.get(right, key)));
 }

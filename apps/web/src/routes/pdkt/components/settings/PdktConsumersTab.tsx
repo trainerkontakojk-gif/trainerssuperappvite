@@ -3,13 +3,14 @@ import { Users, Check, Edit2, Trash2, Plus, X } from "lucide-react";
 import { PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
+import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
 
 interface PdktConsumersTabProps {
   consumerTypes: PdktConsumerType[];
   globalConsumerTypeId: string;
   setGlobalConsumerTypeId: (val: string) => void;
   consumerForm: ReturnType<typeof useCrudForm<PdktConsumerType>>;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
 }
 
 export function PdktConsumersTab({
@@ -22,9 +23,9 @@ export function PdktConsumersTab({
 
   const handleDeleteConsumer = (id: string) => {
     if (window.confirm("Hapus tipe konsumen ini?")) {
-      setLocalSettings((prev: any) => ({
+      setLocalSettings((prev) => ({
         ...prev,
-        consumerTypes: prev.consumerTypes.filter((c: any) => c.id !== id),
+        consumerTypes: prev.consumerTypes.filter((c) => c.id !== id),
       }));
       if (globalConsumerTypeId === id) {
         setGlobalConsumerTypeId("random");
@@ -49,14 +50,20 @@ export function PdktConsumersTab({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    setLocalSettings((prev: any) => ({
+    setLocalSettings((prev) => ({
       ...prev,
       consumerTypes: applyCollectionDraft<PdktConsumerType>({
         items: prev.consumerTypes,
         draft: consumerForm.draft,
         editingId: consumerForm.editingId,
-        idPrefix: "c",
-        extraDefaults: { isCustom: true },
+        create: (draft) => ({
+          id: `c-${Date.now()}`,
+          name: draft.name ?? "",
+          description: draft.description ?? "",
+          difficulty: draft.difficulty ?? "Medium",
+          tone: draft.tone ?? "",
+          isCustom: true,
+        }),
       }),
     }));
 
@@ -255,7 +262,9 @@ export function PdktConsumersTab({
                 className="w-full rounded-2xl border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none font-medium appearance-none"
                 value={consumerForm.draft.difficulty || "Medium"}
                 onChange={(e) =>
-                  consumerForm.setDraft({ difficulty: e.target.value as any })
+                  consumerForm.setDraft({
+                    difficulty: e.target.value as PdktConsumerType["difficulty"],
+                  })
                 }
               >
                 <option value="Easy">Mudah (Sopan)</option>

@@ -29,7 +29,7 @@ export function buildTelefunSettingsForSave(params: {
     ...params.localSettings,
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes,
-    telefunTransport: (selectedModel?.telefunTransport as AppSettings["telefunTransport"]) ?? "gemini-live",
+    telefunTransport: selectedModel?.telefunTransport ?? "gemini-live",
     telefunModelId: params.selectedTelefunModel,
   };
 }
@@ -57,6 +57,7 @@ export function useTelefunSettingsDraft({
       isActive: true,
     },
     validate: (draft) => !!(draft.title && draft.instruction && draft.category),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   const consumerForm = useCrudForm<ConsumerType>({
@@ -68,6 +69,7 @@ export function useTelefunSettingsDraft({
       gender: 'random',
     },
     validate: (draft) => !!(draft.name && draft.description),
+    createItem: (id, draft) => ({ id, ...draft }),
   });
 
   // Sync settings when modal opens
@@ -134,7 +136,7 @@ export function useTelefunSettingsDraft({
     const original = JSON.stringify(settings);
 
     // Construct hypothetical settings with current selections
-    const selectedTelefunTransport = TELEFUN_AUDIO_MODELS.find((m: any) => m.id === selectedTelefunModel)?.telefunTransport || 'gemini-live';
+    const selectedTelefunTransport = TELEFUN_AUDIO_MODELS.find((model) => model.id === selectedTelefunModel)?.telefunTransport || 'gemini-live';
     const currentSettings = {
       ...localSettings,
       telefunModelId: selectedTelefunModel,

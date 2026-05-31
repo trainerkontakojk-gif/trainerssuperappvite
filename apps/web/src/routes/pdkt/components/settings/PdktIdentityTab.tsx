@@ -1,6 +1,8 @@
 import React from "react";
 import { User, Settings, Trash2 } from "lucide-react";
 
+type ConsumerNameMentionPattern = "random" | "upfront" | "middle" | "late" | "none";
+
 interface PdktIdentityTabProps {
   customSenderName: string;
   setCustomSenderName: (val: string) => void;
@@ -10,8 +12,8 @@ interface PdktIdentityTabProps {
   setCustomEmail: (val: string) => void;
   customCity: string;
   setCustomCity: (val: string) => void;
-  consumerNameMentionPattern: "random" | "upfront" | "middle" | "late" | "none";
-  setConsumerNameMentionPattern: (val: any) => void;
+  consumerNameMentionPattern: ConsumerNameMentionPattern;
+  setConsumerNameMentionPattern: (val: ConsumerNameMentionPattern) => void;
   handleResetDefaults: () => void;
 }
 
@@ -127,7 +129,11 @@ export function PdktIdentityTab({
               <select
                 className="w-full rounded-2xl border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none font-medium transition-all focus:bg-foreground/10"
                 value={consumerNameMentionPattern}
-                onChange={(e) => setConsumerNameMentionPattern(e.target.value as any)}
+                onChange={(e) =>
+                  setConsumerNameMentionPattern(
+                    e.target.value as ConsumerNameMentionPattern,
+                  )
+                }
               >
                 <option value="random">Acak</option>
                 <option value="upfront">Nama disebut di awal</option>

@@ -17,7 +17,10 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
   setLocalSettings,
 }) => {
 
-  const handleIdentityChange = (field: keyof ConsumerIdentitySettings, value: string) => {
+  const handleIdentityChange = <K extends keyof ConsumerIdentitySettings>(
+    field: K,
+    value: ConsumerIdentitySettings[K],
+  ) => {
     setLocalSettings((prev: AppSettings) => {
       const updatedSettings = {
         ...prev.identitySettings,
@@ -67,7 +70,12 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
               <select
                 className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
                 value={identitySettings?.gender || 'random'}
-                onChange={(e) => handleIdentityChange('gender', e.target.value as any)}
+                onChange={(e) =>
+                  handleIdentityChange(
+                    'gender',
+                    e.target.value as ConsumerIdentitySettings["gender"],
+                  )
+                }
               >
                 <option value="random">Acak</option>
                 <option value="male">Laki-laki</option>
