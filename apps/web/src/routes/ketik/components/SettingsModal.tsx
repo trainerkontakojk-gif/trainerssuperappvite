@@ -1,33 +1,22 @@
-import { useState, useEffect, useRef } from "react";
-import type {
-  KetikAppSettings,
-  KetikScenario,
-  KetikConsumerType,
-  KetikQuickTemplate,
-} from "@trainers/types";
-import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import { useRef } from "react";
+import type { KetikAppSettings } from "@trainers/types";
 import { useKetikSettingsDraft } from "./settings/useKetikSettingsDraft";
 import { KetikSystemTab } from "./settings/KetikSystemTab";
+import { KetikScenariosTab } from "./settings/KetikScenariosTab";
+import { KetikConsumersTab } from "./settings/KetikConsumersTab";
+import { KetikIdentityTab } from "./settings/KetikIdentityTab";
+import { KetikTemplateTab } from "./settings/KetikTemplateTab";
 import {
-  Clock,
-  Trash2,
   X,
-  Plus,
-  Check,
-  Edit2,
   RotateCcw,
   Save,
-  Image as ImageIcon,
   Settings,
   FileText,
   Users,
   Fingerprint,
-  Zap,
   MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { notify } from "../../../lib/toast";
-import { TEXT_SIMULATION_MODELS as TEXT_MODELS } from "../../../lib/aiModels";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -49,72 +38,17 @@ export function SettingsModal({
     setActiveTab,
     localSettings,
     setLocalSettings,
-    isScenarioFormOpen,
-    setIsScenarioFormOpen,
-    isConsumerFormOpen,
-    setIsConsumerFormOpen,
-    isTemplateFormOpen,
-    setIsTemplateFormOpen,
-    editingScenarioId,
-    setEditingScenarioId,
-    newScenarioCategory,
-    setNewScenarioCategory,
-    isNewCategoryInput,
-    setIsNewCategoryInput,
-    newScenarioTitle,
-    setNewScenarioTitle,
-    newScenarioDesc,
-    setNewScenarioDesc,
-    newScenarioScript,
-    setNewScenarioScript,
-    isScenarioScriptEnabled,
-    setIsScenarioScriptEnabled,
-    newScenarioImages,
-    setNewScenarioImages,
-    editingConsumerId,
-    setEditingConsumerId,
-    newConsumerName,
-    setNewConsumerName,
-    newConsumerDesc,
-    setNewConsumerDesc,
-    newConsumerDifficulty,
-    setNewConsumerDifficulty,
-    editingTemplateId,
-    setEditingTemplateId,
-    newTemplateKeyword,
-    setNewTemplateKeyword,
-    newTemplateContent,
-    setNewTemplateContent,
+    scenarioForm,
+    consumerForm,
+    templateForm,
     customInputValue,
-    setCustomInputValue,
     durationValidationError,
-    setDurationValidationError,
-    categories,
-    activeCount,
-    totalScenarios,
-    allSelected,
-    noneSelected,
     durationMode,
     handlePresetClick,
     handleCustomClick,
     handleDurationInputChange,
     handleDurationBlur,
     handleIdentityChange,
-    handleSelectAll,
-    handleUnselectAll,
-    handleToggleScenario,
-    handleDeleteScenario,
-    handleSelectConsumerType,
-    resetScenarioForm,
-    handleEditScenario,
-    handleSaveScenario,
-    handleImageUpload,
-    resetConsumerForm,
-    handleEditConsumer,
-    handleSaveConsumer,
-    handleDeleteConsumer,
-    handleSaveTemplate,
-    handleDeleteTemplate,
     handleSave,
     handleResetDefaults,
   } = useKetikSettingsDraft({ settings, isOpen, onSave, onClose });
@@ -198,795 +132,62 @@ export function SettingsModal({
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 sm:px-6 pb-6 sm:pb-8">
-              {activeTab === "scenarios" && (
-                <div className="space-y-8 pb-10">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 bg-card/50 p-6 rounded-[2rem] border border-border/50">
-                    <div>
-                      <h3 className="font-black text-foreground text-xl tracking-tighter">
-                        Daftar Skenario
-                      </h3>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-primary mt-1 opacity-80">
-                        {activeCount} / {totalScenarios} AKTIF
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleSelectAll}
-                        disabled={allSelected}
-                        className="px-5 py-2.5 bg-foreground/5 border border-border/50 rounded-xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/10 hover:text-foreground transition-all disabled:opacity-30 shadow-sm"
-                      >
-                        Pilih Semua
-                      </button>
-                      <button
-                        onClick={handleUnselectAll}
-                        disabled={noneSelected}
-                        className="px-5 py-2.5 bg-foreground/5 border border-border/50 rounded-xl text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:bg-red-500/10 hover:text-red-500 transition-all disabled:opacity-30 shadow-sm"
-                      >
-                        Hapus Semua
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    {localSettings.scenarios.map((scenario) => (
-                      <div
-                        key={scenario.id}
-                        className={`flex items-start p-6 rounded-[2rem] border transition-all ${scenario.isActive ? "bg-card border-primary/30" : "bg-card/40 border-border/50 opacity-40 grayscale hover:grayscale-0 hover:opacity-100"}`}
-                      >
-                        <div className="pt-1 mr-5">
-                          <button
-                            onClick={() => handleToggleScenario(scenario.id)}
-                            className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all ${scenario.isActive ? "bg-primary border-primary text-white" : "border-foreground/10 bg-foreground/5 text-transparent"}`}
-                          >
-                            <Check
-                              className={`w-4 h-4 ${scenario.isActive ? "scale-100 opacity-100" : "scale-50 opacity-0"} transition-all`}
-                            />
-                          </button>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-primary/10 text-primary border border-primary/20">
-                              {scenario.category}
-                            </span>
-                            <h4 className="text-base font-black text-foreground tracking-tight truncate">
-                              {scenario.title}
-                            </h4>
-                          </div>
-                          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed font-medium">
-                            {scenario.description}
-                          </p>
-                          {scenario.images && scenario.images.length > 0 && (
-                            <div className="mt-3">
-                              <span className="text-[10px] bg-foreground/5 text-muted-foreground px-3 py-1.5 rounded-xl inline-flex items-center gap-2 font-black uppercase tracking-widest border border-border/50">
-                                <ImageIcon className="w-3.5 h-3.5" />{" "}
-                                {scenario.images.length} Lampiran
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => handleEditScenario(scenario)}
-                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteScenario(scenario.id)}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {!isScenarioFormOpen ? (
-                    <button
-                      onClick={() => {
-                        resetScenarioForm();
-                        setIsScenarioFormOpen(true);
-                      }}
-                      className="w-full py-6 flex flex-col items-center justify-center gap-3 bg-card/40 backdrop-blur-md border border-dashed border-border/50 rounded-[2rem] text-muted-foreground hover:text-primary hover:border-primary/30 transition-all font-black text-xs uppercase tracking-widest shadow-sm group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                        <Plus className="w-6 h-6" />
-                      </div>
-                      <span>Tambah Skenario Baru</span>
-                    </button>
-                  ) : (
-                    <div
-                      id="scenario-form"
-                      className="bg-card border border-border/50 rounded-[2rem] shadow-3xl overflow-hidden relative"
-                    >
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5 relative z-10">
-                        <h3 className="font-black text-foreground text-lg tracking-tighter">
-                          {editingScenarioId
-                            ? "Edit Skenario"
-                            : "Tambah Skenario Baru"}
-                        </h3>
-                      </div>
-                      <div className="p-8 grid grid-cols-2 gap-6 relative z-10">
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Kategori
-                          </label>
-                          {!isNewCategoryInput ? (
-                            <div className="relative">
-                              <select
-                                className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none appearance-none transition-all"
-                                value={newScenarioCategory}
-                                onChange={(e) => {
-                                  if (e.target.value === "NEW") {
-                                    setIsNewCategoryInput(true);
-                                    setNewScenarioCategory("");
-                                  } else setNewScenarioCategory(e.target.value);
-                                }}
-                              >
-                                <option value="">Pilih Kategori</option>
-                                {categories.map((c) => (
-                                  <option key={c} value={c}>
-                                    {c}
-                                  </option>
-                                ))}
-                                <option value="NEW">
-                                  + Tambah Kategori Lainnya
-                                </option>
-                              </select>
-                              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                                <svg
-                                  width="10"
-                                  height="6"
-                                  viewBox="0 0 10 6"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <path
-                                    d="M1 1L5 5L9 1"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex gap-3">
-                              <input
-                                type="text"
-                                className="flex-1 rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
-                                placeholder="Kategori Baru"
-                                value={newScenarioCategory}
-                                onChange={(e) =>
-                                  setNewScenarioCategory(e.target.value)
-                                }
-                              />
-                              <button
-                                onClick={() => setIsNewCategoryInput(false)}
-                                className="px-5 text-[10px] font-black uppercase tracking-widest text-red-500 bg-red-500/5 border border-red-500/20 rounded-2xl hover:bg-red-500/10 transition-all"
-                              >
-                                Batal
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Judul Masalah
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-foreground/20"
-                            placeholder="Contoh: Gagal Transfer"
-                            value={newScenarioTitle}
-                            onChange={(e) =>
-                              setNewScenarioTitle(e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Deskripsi Masalah
-                          </label>
-                          <textarea
-                            className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all"
-                            rows={3}
-                            value={newScenarioDesc}
-                            onChange={(e) => setNewScenarioDesc(e.target.value)}
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <div className="flex items-center justify-between gap-4 mb-3">
-                            <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
-                              Skrip Percakapan
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setIsScenarioScriptEnabled((prev) => !prev)
-                              }
-                              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isScenarioScriptEnabled ? "bg-primary/10 text-primary border-primary/20" : "bg-foreground/5 text-muted-foreground border-border/50"}`}
-                            >
-                              <span
-                                className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isScenarioScriptEnabled ? "bg-primary border-primary text-white" : "border-foreground/20 bg-transparent text-transparent"}`}
-                              >
-                                <Check className="w-3 h-3" />
-                              </span>
-                              {isScenarioScriptEnabled
-                                ? "Ikuti Skrip"
-                                : "Sangat Kreatif"}
-                            </button>
-                          </div>
-                          <textarea
-                            className={`w-full rounded-2xl border p-4 text-sm outline-none resize-none transition-all ${isScenarioScriptEnabled ? "border-border/50 bg-foreground/5 text-foreground focus:ring-2 focus:ring-primary" : "border-border/30 bg-foreground/[0.03] text-muted-foreground cursor-not-allowed"}`}
-                            rows={12}
-                            value={newScenarioScript}
-                            onChange={(e) =>
-                              setNewScenarioScript(e.target.value)
-                            }
-                            disabled={!isScenarioScriptEnabled}
-                            placeholder={`Contoh format 1 - Dialog:
-Agent: Selamat pagi, ada yang bisa saya bantu?
-Konsumen: Mas saya ada masalah transaksi.
-Agent: Baik, transaksi seperti apa ya?
-Konsumen: Tadi pagi ada transaksi kartu kredit yang saya tidak kenal.
-
-Contoh format 2 - Alur:
-Awal:
-- Konsumen membuka chat dengan nada panik dan singkat.
-- Menyebut ada transaksi kartu kredit yang tidak dikenali.
-
-Jika agen bertanya detail:
-- Konsumen menyebut transaksi terjadi tadi pagi.
-- Nilai transaksi sekitar Rp3.250.000.
-- Konsumen tidak pernah memberikan OTP ke siapa pun.
-
-Jika agen memberi arahan pemblokiran:
-- Konsumen mulai sedikit tenang.
-- Lalu bertanya apakah dana masih bisa diselamatkan.
-
-Akhir:
-- Konsumen berterima kasih setelah mendapat langkah lanjut.`}
-                          />
-                          <p className="mt-3 text-xs text-muted-foreground leading-relaxed font-medium">
-                            Checklist{" "}
-                            <span className="font-black text-foreground">
-                              Ikuti Skrip
-                            </span>{" "}
-                            untuk mengaktifkan kolom ini. Saat tidak dicentang,
-                            konsumen akan dibiarkan lebih bebas dan kreatif
-                            mengikuti konteks skenario. Saat dicentang, AI akan
-                            berusaha mengikuti skrip sebagai panduan alur.
-                          </p>
-                          <p className="mt-2 text-xs text-muted-foreground leading-relaxed font-medium">
-                            Anda bisa menulis skrip dalam format dialog seperti{" "}
-                            <span className="font-black text-foreground">
-                              Agent:
-                            </span>{" "}
-                            /
-                            <span className="font-black text-foreground">
-                              {" "}
-                              Konsumen:
-                            </span>{" "}
-                            atau dalam format poin alur seperti
-                            <span className="font-black text-foreground">
-                              {" "}
-                              Awal
-                            </span>
-                            ,{" "}
-                            <span className="font-black text-foreground">
-                              Jika agen bertanya
-                            </span>
-                            , dan{" "}
-                            <span className="font-black text-foreground">
-                              Akhir
-                            </span>
-                            . AI akan tetap menjawab secara natural sesuai
-                            pertanyaan agen dan situasi percakapan.
-                          </p>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Lampiran Gambar
-                          </label>
-                          <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-border/50 rounded-[2rem] cursor-pointer bg-foreground/5 hover:bg-foreground/10 hover:border-primary/30 transition-all group">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <div className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                              </div>
-                              <p className="mb-1 text-xs font-black uppercase tracking-widest text-muted-foreground">
-                                Drop File atau Klik
-                              </p>
-                              <p className="text-[10px] font-medium text-muted-foreground italic">
-                                PNG, JPG (MAX. 500KB)
-                              </p>
-                            </div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={handleImageUpload}
-                              className="hidden"
-                            />
-                          </label>
-                          {newScenarioImages.length > 0 && (
-                            <div className="flex gap-4 mt-6 overflow-x-auto pb-4">
-                              {newScenarioImages.map((img, idx) => (
-                                <div
-                                  key={idx}
-                                  className="relative w-24 h-24 shrink-0 group"
-                                >
-                                  <img
-                                    src={img}
-                                    alt={`Preview ${idx}`}
-                                    className="object-cover w-full h-full rounded-2xl border border-border/50 shadow-md"
-                                  />
-                                  <button
-                                    onClick={() =>
-                                      setNewScenarioImages((prev) =>
-                                        prev.filter((_, i) => i !== idx),
-                                      )
-                                    }
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="col-span-2 flex justify-end gap-3 pt-6 border-t border-border/50">
-                          <button
-                            onClick={() => {
-                              resetScenarioForm();
-                              setIsScenarioFormOpen(false);
-                            }}
-                            className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/5 transition-all"
-                          >
-                            Batal
-                          </button>
-                          <button
-                            onClick={handleSaveScenario}
-                            disabled={!newScenarioTitle}
-                            className="px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30"
-                          >
-                            Simpan
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {activeTab === "scenarios" && (
+                    <KetikScenariosTab
+                      scenarios={localSettings.scenarios}
+                      scenarioForm={scenarioForm}
+                      setLocalSettings={setLocalSettings}
+                    />
                   )}
-                </div>
-              )}
 
-              {activeTab === "consumers" && (
-                <div className="space-y-8 pb-10">
-                  <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                    <div className="flex items-start gap-6 relative z-10">
-                      <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0 border border-orange-500/20">
-                        <Users className="w-7 h-7 text-orange-500" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-foreground text-xl tracking-tighter">
-                          Pilih Karakter Pelanggan
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">
-                          Pilih satu kepribadian pelanggan yang akan Anda
-                          hadapi. Karakter ini akan digunakan untuk{" "}
-                          <span className="text-foreground font-black">
-                            semua skenario
-                          </span>{" "}
-                          yang aktif.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div
-                      onClick={() => handleSelectConsumerType("random")}
-                      className={`cursor-pointer p-8 rounded-[2.5rem] border-2 transition-all ${localSettings.activeConsumerTypeId === "random" ? "border-primary bg-primary/5" : "border-transparent bg-card border-border/50 hover:bg-foreground/5"}`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-black text-foreground tracking-tight flex items-center gap-2 text-lg">
-                          Acak
-                        </h4>
-                        {localSettings.activeConsumerTypeId === "random" && (
-                          <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-3 font-medium leading-relaxed">
-                        Sistem akan memilih salah satu karakter secara acak
-                        setiap kali sesi simulasi dimulai.
-                      </p>
-                    </div>
-                    {localSettings.consumerTypes.map((c) => (
-                      <div
-                        key={c.id}
-                        onClick={() => handleSelectConsumerType(c.id)}
-                        className={`cursor-pointer p-8 rounded-[2.5rem] border-2 transition-all relative group ${localSettings.activeConsumerTypeId === c.id ? "border-primary bg-primary/5" : "border-transparent bg-card border-border/50 hover:bg-foreground/5"}`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-black text-foreground tracking-tight text-lg">
-                            {c.name}
-                          </h4>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-[9px] px-3 py-1 rounded-lg font-black uppercase tracking-widest border ${c.difficulty === "Mudah" ? "bg-green-500/10 text-green-500 border-green-500/20" : c.difficulty === "Sedang" ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"}`}
-                            >
-                              {c.difficulty}
-                            </span>
-                            {localSettings.activeConsumerTypeId === c.id ? (
-                              <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center">
-                                <Check className="w-4 h-4 text-white" />
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditConsumer(c);
-                                  }}
-                                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-border/50"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteConsumer(c.id);
-                                  }}
-                                  className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-border/50"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed font-medium">
-                          {c.description}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {!isConsumerFormOpen && (
-                    <button
-                      onClick={() => {
-                        resetConsumerForm();
-                        setIsConsumerFormOpen(true);
-                      }}
-                      className="w-full py-6 flex flex-col items-center justify-center gap-3 bg-card/40 border border-dashed border-border/50 rounded-[2.5rem] text-muted-foreground hover:text-primary hover:border-primary/30 transition-all font-black text-xs uppercase tracking-widest group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                        <Plus className="w-6 h-6" />
-                      </div>
-                      <span>Buat Karakteristik Baru</span>
-                    </button>
+                  {activeTab === "consumers" && (
+                    <KetikConsumersTab
+                      consumerTypes={localSettings.consumerTypes}
+                      activeConsumerTypeId={localSettings.activeConsumerTypeId}
+                      consumerForm={consumerForm}
+                      setLocalSettings={setLocalSettings}
+                    />
                   )}
-                  {isConsumerFormOpen && (
-                    <div
-                      id="consumer-form"
-                      className="bg-card border border-border/50 rounded-[2.5rem] shadow-3xl overflow-hidden relative"
-                    >
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5 relative z-10">
-                        <h3 className="font-black text-foreground text-lg tracking-tighter">
-                          {editingConsumerId
-                            ? "Edit Karakter"
-                            : "Tambah Karakter Baru"}
-                        </h3>
-                      </div>
-                      <div className="p-8 space-y-6 relative z-10">
-                        <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Nama Karakter
-                          </label>
-                          <input
-                            className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
-                            value={newConsumerName}
-                            onChange={(e) => setNewConsumerName(e.target.value)}
-                            placeholder="Contoh: Pelanggan Marah"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Tingkat Kesulitan
-                          </label>
-                          <select
-                            className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none appearance-none transition-all"
-                            value={newConsumerDifficulty}
-                            onChange={(e) =>
-                              setNewConsumerDifficulty(e.target.value as any)
-                            }
-                          >
-                            <option value="Mudah">Mudah</option>
-                            <option value="Sedang">Sedang</option>
-                            <option value="Sulit">Sulit</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Deskripsi / AI Prompt
-                          </label>
-                          <textarea
-                            className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all"
-                            rows={3}
-                            value={newConsumerDesc}
-                            onChange={(e) => setNewConsumerDesc(e.target.value)}
-                            placeholder="Deskripsikan bagaimana karakter ini berperilaku..."
-                          />
-                        </div>
-                        <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
-                          <button
-                            onClick={() => {
-                              resetConsumerForm();
-                              setIsConsumerFormOpen(false);
-                            }}
-                            className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/5 transition-all"
-                          >
-                            Batal
-                          </button>
-                          <button
-                            onClick={handleSaveConsumer}
-                            className="px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                          >
-                            Simpan
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {activeTab === "identity" && (
-                <div className="space-y-8 pb-10">
-                  <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                    <div className="flex items-start gap-6 relative z-10">
-                      <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-                        <Fingerprint className="w-7 h-7 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-foreground text-xl tracking-tighter">
-                          Identitas &amp; Greeting
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">
-                          Konfigurasi profil konsumen dan identitas agen untuk
-                          salam pembuka yang lebih personal.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-10 rounded-[2.5rem] border border-border/50 bg-card shadow-sm relative overflow-hidden">
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -ml-32 -mb-32 pointer-events-none" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-                      <div>
-                        <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                          Nama Konsumen
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-base text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
-                          placeholder="Contoh: Agus Setiawan"
-                          value={localSettings.identitySettings.displayName}
-                          onChange={(e) =>
-                            handleIdentityChange("displayName", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                          Nama Agen (Greeting)
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-base text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
-                          placeholder="Contoh: Fajar"
-                          value={localSettings.identitySettings.signatureName}
-                          onChange={(e) =>
-                            handleIdentityChange(
-                              "signatureName",
-                              e.target.value,
-                            )
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                          Nomor Telepon
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-base text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
-                          placeholder="Contoh: 0812..."
-                          value={localSettings.identitySettings.phoneNumber}
-                          onChange={(e) =>
-                            handleIdentityChange("phoneNumber", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                          Kota Asal
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-base text-foreground focus:ring-2 focus:ring-primary outline-none transition-all"
-                          placeholder="Contoh: Jakarta"
-                          value={localSettings.identitySettings.city}
-                          onChange={(e) =>
-                            handleIdentityChange("city", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "template" && (
-                <div className="space-y-8 pb-10">
-                  <div className="bg-card p-8 rounded-[2rem] border border-border/50 shadow-sm">
-                    <div className="flex items-start gap-6">
-                      <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-                        <MessageSquare className="w-7 h-7 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-black text-foreground text-xl tracking-tighter">
-                          Template Cepat
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1 leading-relaxed font-medium">
-                          Kelola pesan template yang dapat Anda panggil dengan
-                          shortcut &quot;/&quot; di area chat.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    {(localSettings.quickTemplates || []).map((t) => (
-                      <div
-                        key={t.id}
-                        className="p-6 rounded-[2rem] border border-border/50 bg-card hover:bg-foreground/5 transition-all group"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-wider border border-primary/20">
-                            /{t.keyword}
-                          </div>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => {
-                                setEditingTemplateId(t.id);
-                                setNewTemplateKeyword(t.keyword);
-                                setNewTemplateContent(t.content);
-                                setIsTemplateFormOpen(true);
-                              }}
-                              className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-border/50"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTemplate(t.id)}
-                              className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all border border-border/50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed font-medium line-clamp-2">
-                          {t.content}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {!isTemplateFormOpen && (
-                    <button
-                      onClick={() => {
-                        setEditingTemplateId(null);
-                        setNewTemplateKeyword("");
-                        setNewTemplateContent("");
-                        setIsTemplateFormOpen(true);
-                      }}
-                      className="w-full py-6 flex flex-col items-center justify-center gap-3 bg-card/40 border border-dashed border-border/50 rounded-[2.5rem] text-muted-foreground hover:text-primary hover:border-primary/30 transition-all font-black text-xs uppercase tracking-widest group"
-                    >
-                      <Plus className="w-6 h-6" />
-                      <span>Tambah Template Baru</span>
-                    </button>
+                  {activeTab === "identity" && (
+                    <KetikIdentityTab
+                      identitySettings={localSettings.identitySettings}
+                      handleIdentityChange={handleIdentityChange}
+                    />
                   )}
-                  {isTemplateFormOpen && (
-                    <div
-                      id="template-form"
-                      className="bg-card border border-border/50 rounded-[2.5rem] shadow-3xl overflow-hidden relative"
-                    >
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                      <div className="px-8 py-6 border-b border-border/50 bg-foreground/5 relative z-10">
-                        <h3 className="font-black text-foreground text-lg tracking-tighter">
-                          {editingTemplateId
-                            ? "Edit Template"
-                            : "Tambah Template Baru"}
-                        </h3>
-                      </div>
-                      <div className="p-8 space-y-6 relative z-10">
-                        <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Shortcut Keyword (Tanpa Spasi)
-                          </label>
-                          <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black">
-                              /
-                            </span>
-                            <input
-                              className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none transition-all placeholder:text-foreground/20 pl-8"
-                              value={newTemplateKeyword}
-                              onChange={(e) =>
-                                setNewTemplateKeyword(
-                                  e.target.value
-                                    .toLowerCase()
-                                    .replace(/\s+/g, "-"),
-                                )
-                              }
-                              placeholder="contoh: salam"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 ml-1">
-                            Isi Template
-                          </label>
-                          <textarea
-                            className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-4 text-sm text-foreground focus:ring-2 focus:ring-primary outline-none resize-none transition-all font-medium leading-relaxed"
-                            rows={5}
-                            value={newTemplateContent}
-                            onChange={(e) =>
-                              setNewTemplateContent(e.target.value)
-                            }
-                            placeholder="Masukkan isi pesan yang akan muncul saat shortcut dipanggil..."
-                          />
-                        </div>
-                        <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
-                          <button
-                            onClick={() => {
-                              setEditingTemplateId(null);
-                              setNewTemplateKeyword("");
-                              setNewTemplateContent("");
-                              setIsTemplateFormOpen(false);
-                            }}
-                            className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/5 transition-all"
-                          >
-                            Batal
-                          </button>
-                          <button
-                            onClick={handleSaveTemplate}
-                            className="px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                          >
-                            Simpan
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {activeTab === "system" && (
-                <KetikSystemTab
-                  localSettings={localSettings}
-                  setLocalSettings={setLocalSettings}
-                  durationMode={durationMode}
-                  handlePresetClick={handlePresetClick}
-                  handleCustomClick={handleCustomClick}
-                  customInputValue={customInputValue}
-                  handleDurationInputChange={handleDurationInputChange}
-                  handleDurationBlur={handleDurationBlur}
-                  durationValidationError={durationValidationError}
-                  inputRef={inputRef}
-                />
-              )}
+                  {activeTab === "template" && (
+                    <KetikTemplateTab
+                      quickTemplates={localSettings.quickTemplates || []}
+                      templateForm={templateForm}
+                      setLocalSettings={setLocalSettings}
+                    />
+                  )}
+
+                  {activeTab === "system" && (
+                    <KetikSystemTab
+                      localSettings={localSettings}
+                      setLocalSettings={setLocalSettings}
+                      durationMode={durationMode}
+                      handlePresetClick={handlePresetClick}
+                      handleCustomClick={handleCustomClick}
+                      customInputValue={customInputValue}
+                      handleDurationInputChange={handleDurationInputChange}
+                      handleDurationBlur={handleDurationBlur}
+                      durationValidationError={durationValidationError}
+                      inputRef={inputRef}
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
             </div>
 
             <div className="px-10 py-8 border-t border-border/50 flex justify-between items-center bg-card/50 backdrop-blur-2xl shrink-0">

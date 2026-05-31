@@ -271,8 +271,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 80. **Telefun Route Full Decomposition** — Completed full decomposition of monolithic `routes/telefun.ts` (1,240 → 21 lines, 12 handlers across 4 sub-modules: sessions, recordings, settings, annotations). All helpers re-exported for test backward compatibility. Graphify synced. (DONE)
 81. **KETIK ChatInterface Message Utils & Pacing Extraction** — Extracted inline constants, helpers, and pacing functions from `ChatInterface.tsx` (277 → 16 lines) into `ketik/lib/message-utils.ts` (193 lines) and `ketik/lib/pacing.ts` (69 lines). Pure extraction, zero logic change. (DONE)
 82. **KETIK Service Decomposition** — Decomposed monolithic `ketik-service.ts` (1,400 → 5 lines barrel file) into 5 sub-modules under `apps/api/src/services/ketik/`: `shared-utils.ts` (9 lines — `extractJsonObjectText`), `consumer-response.ts` (347 lines — scenario defaults, consumer response generation), `review-lifecycle.ts` (317 lines — `triggerKetikAIReview` lifecycle), `review-processor.ts` (353 lines — `processKetikReviewJob` with AI scoring), `settings-history.ts` (369 lines — session CRUD, settings history). Backward compatible — all consumers import via barrel unchanged. 484 API tests passing. (DONE)
+83. **Settings Modal Full Decomposition** — Decomposed 3 monolithic SettingsModal components (Telefun 1,232→78, KETIK 915→58, PDKT 976→63 lines) into per-tab sub-modules. Created shared `useCrudForm` hook (87 lines) with generic CRUD form state management (openAdd/openEdit/close, save/remove, isDirty/isValid). Extracted all tab content to dedicated components: Telefun (Scenarios/Consumers/Identity/SystemTabs), KETIK (Scenarios/Consumers/Identity/TemplateTabs), PDKT (Scenarios/Consumers/IdentityTabs). 18 files modified/added, pure decomposition with zero logic change. (DONE)
 
-## Key Files Changed (Phase 58 — 82)
+## Key Files Changed (Phase 58 — 83)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -442,6 +443,22 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/services/ketik/review-lifecycle.ts` — **NEW Phase 82**: `triggerKetikAIReview()` lifecycle (317 lines)
 - `apps/api/src/services/ketik/review-processor.ts` — **NEW Phase 82**: `processKetikReviewJob()` with AI scoring (353 lines)
 - `apps/api/src/services/ketik/settings-history.ts` — **NEW Phase 82**: Session CRUD, settings history (369 lines)
+- `apps/web/src/hooks/useCrudForm.ts` — **NEW Phase 83**: Shared generic CRUD form hook (87 lines) with openAdd/openEdit/close, save/remove, isDirty/isValid
+- `apps/web/src/routes/telefun/components/SettingsModal.tsx` — **Phase 83**: Reduced from 1,232 to 78 lines — barrel component for tab routing
+- `apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx` — **NEW Phase 83**: Scenarios CRUD tab (16.8K)
+- `apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx` — **NEW Phase 83**: Consumers CRUD tab (11.2K)
+- `apps/web/src/routes/telefun/components/settings/TelefunIdentityTab.tsx` — **NEW Phase 83**: Identity settings tab (6.8K)
+- `apps/web/src/routes/telefun/components/settings/TelefunSystemTab.tsx` — **NEW Phase 83**: System/model settings tab (14.3K)
+- `apps/web/src/routes/ketik/components/SettingsModal.tsx` — **Phase 83**: Reduced from 915 to 58 lines — barrel component for tab routing
+- `apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx` — **NEW Phase 83**: Scenarios CRUD tab (20.8K)
+- `apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx` — **NEW Phase 83**: Consumers CRUD tab (11.2K)
+- `apps/web/src/routes/ketik/components/settings/KetikIdentityTab.tsx` — **NEW Phase 83**: Identity settings tab (4.3K)
+- `apps/web/src/routes/ketik/components/settings/KetikTemplateTab.tsx` — **NEW Phase 83**: Template CRUD tab (8.3K)
+- `apps/web/src/routes/pdkt/components/SettingsModal.tsx` — **Phase 83**: Reduced from 976 to 63 lines — barrel component for tab routing
+- `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **NEW Phase 83**: Scenarios CRUD tab (28.7K)
+- `apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx` — **NEW Phase 83**: Consumers CRUD tab (14.0K)
+- `apps/web/src/routes/pdkt/components/settings/PdktIdentityTab.tsx` — **NEW Phase 83**: Identity settings tab (7.7K)
+- `docs/rebuild-logs/phase-83-settings-modal-decomposition.md` — **NEW Phase 83**: Documentation for settings modal decomposition
 
 ## Routes Reference (apps/web)
 
