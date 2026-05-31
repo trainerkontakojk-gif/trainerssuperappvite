@@ -1,12 +1,12 @@
 import React from "react";
 import { MessageSquare, Edit2, Trash2, Plus } from "lucide-react";
-import { KetikQuickTemplate } from "@trainers/types";
+import { KetikAppSettings, KetikQuickTemplate } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 
 interface KetikTemplateTabProps {
   quickTemplates: KetikQuickTemplate[];
   templateForm: ReturnType<typeof useCrudForm<KetikQuickTemplate>>;
-  setLocalSettings: React.Dispatch<React.SetStateAction<any>>;
+  setLocalSettings: React.Dispatch<React.SetStateAction<KetikAppSettings>>;
 }
 
 export function KetikTemplateTab({
@@ -17,9 +17,9 @@ export function KetikTemplateTab({
 
   const handleDeleteTemplate = (id: string) => {
     if (window.confirm("Hapus template ini?"))
-      setLocalSettings((prev: any) => ({
+      setLocalSettings((prev) => ({
         ...prev,
-        quickTemplates: (prev.quickTemplates || []).filter((t: any) => t.id !== id),
+        quickTemplates: (prev.quickTemplates || []).filter((t) => t.id !== id),
       }));
   };
 
@@ -44,28 +44,15 @@ export function KetikTemplateTab({
       .toLowerCase()
       .replace(/\s+/g, "-");
 
-    setLocalSettings((prev: any) => {
-      let updatedTemplates = prev.quickTemplates || [];
-      const updatedDraft = {
-        ...templateForm.draft,
-        keyword: sanitizedKeyword,
-        content: templateForm.draft.content.trim(),
-      };
-      if (templateForm.editingId) {
-        updatedTemplates = updatedTemplates.map((t: any) =>
-          t.id === templateForm.editingId ? { ...t, ...updatedDraft } : t
-        );
-      } else {
-        updatedTemplates = [
-          ...updatedTemplates,
-          {
-            id: `qt-${Date.now()}`,
-            ...updatedDraft,
-          },
-        ];
-      }
-      return { ...prev, quickTemplates: updatedTemplates };
-    });
+    const normalizedDraft: Omit<KetikQuickTemplate, "id"> = {
+      keyword: sanitizedKeyword,
+      content: templateForm.draft.content.trim(),
+    };
+
+    setLocalSettings((prev) => ({
+      ...prev,
+      quickTemplates: templateForm.save(prev.quickTemplates || [], normalizedDraft),
+    }));
 
     templateForm.close();
   };
