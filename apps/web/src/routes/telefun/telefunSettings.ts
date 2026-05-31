@@ -307,6 +307,40 @@ export function resolveFinalIdentity(
   };
 }
 
+const TELEFUN_GENDERS = ["random", "male", "female"] as const;
+const RESPONSE_PACING_MODES = ["realistic", "training_fast"] as const;
+const TELEFUN_TRANSPORTS = ["gemini-live", "openai-audio"] as const;
+
+function coerceTelefunGender(value: unknown): TelefunIdentitySettings["gender"] {
+  return TELEFUN_GENDERS.includes(value as TelefunIdentitySettings["gender"])
+    ? (value as TelefunIdentitySettings["gender"])
+    : "random";
+}
+
+function coerceResponsePacingMode(value: unknown): TelefunAppSettings["responsePacingMode"] {
+  return RESPONSE_PACING_MODES.includes(value as TelefunAppSettings["responsePacingMode"])
+    ? (value as TelefunAppSettings["responsePacingMode"])
+    : "realistic";
+}
+
+function coerceTelefunTransport(value: unknown): TelefunTransport {
+  return TELEFUN_TRANSPORTS.includes(value as TelefunTransport)
+    ? (value as TelefunTransport)
+    : "gemini-live";
+}
+
+function coerceTelefunScenarios(value: unknown): TelefunScenario[] {
+  return Array.isArray(value)
+    ? (value as TelefunScenario[])
+    : DEFAULT_TELEFUN_SETTINGS.scenarios;
+}
+
+function coerceTelefunConsumerTypes(value: unknown): TelefunConsumerType[] {
+  return Array.isArray(value)
+    ? (value as TelefunConsumerType[])
+    : DEFAULT_TELEFUN_SETTINGS.consumerTypes;
+}
+
 export function parseTelefunSettings(
   parsed: Record<string, unknown>,
 ): TelefunAppSettings {
@@ -323,7 +357,7 @@ export function parseTelefunSettings(
       identitySettings = {
         displayName: oldMode === "fixed" ? oldFixedName : "",
         gender:
-          oldMode === "fixed" ? (oldFixedGender as any) || "random" : "random",
+          oldMode === "fixed" ? coerceTelefunGender(oldFixedGender) : "random",
         phoneNumber: (identityRaw.fixedPhone as string) || "",
         city: (identityRaw.fixedCity as string) || "",
         signatureName: "",
@@ -334,7 +368,7 @@ export function parseTelefunSettings(
     } else {
       identitySettings = {
         displayName: (identityRaw.displayName as string) || "",
-        gender: (identityRaw.gender as any) || "random",
+        gender: coerceTelefunGender(identityRaw.gender),
         phoneNumber: (identityRaw.phoneNumber as string) || "",
         city: (identityRaw.city as string) || "",
         signatureName: (identityRaw.signatureName as string) || "",
@@ -355,26 +389,21 @@ export function parseTelefunSettings(
   return {
     ...DEFAULT_TELEFUN_SETTINGS,
     ...parsed,
-    scenarios: (parsed.scenarios as any) || DEFAULT_TELEFUN_SETTINGS.scenarios,
-    consumerTypes:
-      (parsed.consumerTypes as any) || DEFAULT_TELEFUN_SETTINGS.consumerTypes,
+    scenarios: coerceTelefunScenarios(parsed.scenarios),
+    consumerTypes: coerceTelefunConsumerTypes(parsed.consumerTypes),
     identitySettings,
     maxCallDuration:
       typeof parsed.maxCallDuration === "number"
         ? parsed.maxCallDuration
         : DEFAULT_TELEFUN_SETTINGS.maxCallDuration,
-    responsePacingMode:
-      (parsed.responsePacingMode as any) ||
-      DEFAULT_TELEFUN_SETTINGS.responsePacingMode,
+    responsePacingMode: coerceResponsePacingMode(parsed.responsePacingMode),
     realisticModeEnabled: parsed.realisticModeEnabled === true,
     realisticModeDisruptionTypes: Array.isArray(
       parsed.realisticModeDisruptionTypes,
     )
       ? parsed.realisticModeDisruptionTypes.slice(0, 3)
       : [],
-    telefunTransport:
-      (parsed.telefunTransport as any) ||
-      DEFAULT_TELEFUN_SETTINGS.telefunTransport,
+    telefunTransport: coerceTelefunTransport(parsed.telefunTransport),
   };
 }
 

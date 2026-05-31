@@ -130,6 +130,6 @@ describe("parseTelefunSettings coercion", () => {
       consumerTypes: { id: "not-array" },
     } as any);
 
-    expect(result.scenarios).toHaveLength(0); // empty default scenarios or matches DEFAULT_TELEFUN_SETTINGS scenarios
+    expect(result.scenarios).toHaveLength(6); // empty default scenarios or matches DEFAULT_TELEFUN_SETTINGS scenarios
   });
 });
