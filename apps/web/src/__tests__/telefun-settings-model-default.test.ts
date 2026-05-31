@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseTelefunSettings } from "../routes/telefun/telefunSettings";
+import {
+  DEFAULT_TELEFUN_SETTINGS,
+  parseTelefunSettings,
+} from "../routes/telefun/telefunSettings";
 
 describe("parseTelefunSettings", () => {
   it("returns defaults for empty input", () => {
@@ -120,8 +123,8 @@ describe("parseTelefunSettings coercion", () => {
       responsePacingMode: "slow-motion",
     } as any);
 
-    expect(result.telefunTransport).toBe("gemini-live");
-    expect(result.responsePacingMode).toBe("realistic");
+    expect(result.telefunTransport).toBe(DEFAULT_TELEFUN_SETTINGS.telefunTransport);
+    expect(result.responsePacingMode).toBe(DEFAULT_TELEFUN_SETTINGS.responsePacingMode);
   });
 
   it("falls back to default collections when persisted collections are not arrays", () => {
@@ -130,6 +133,7 @@ describe("parseTelefunSettings coercion", () => {
       consumerTypes: { id: "not-array" },
     } as any);
 
-    expect(result.scenarios).toHaveLength(6); // empty default scenarios or matches DEFAULT_TELEFUN_SETTINGS scenarios
+    expect(result.scenarios).toBe(DEFAULT_TELEFUN_SETTINGS.scenarios);
+    expect(result.consumerTypes).toBe(DEFAULT_TELEFUN_SETTINGS.consumerTypes);
   });
 });

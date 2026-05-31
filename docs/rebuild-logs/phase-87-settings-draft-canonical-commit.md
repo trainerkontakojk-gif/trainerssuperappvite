@@ -9,6 +9,7 @@ Refactor maintainability untuk menyatukan jalur penyimpanan draft settings KETIK
 - `useCrudForm.save(items, draftOverride)` menjadi canonical commit path untuk add/edit item.
 - `applyCollectionDraft` dihapus karena menjadi helper tipis yang menduplikasi commit behavior.
 - Scenario/consumer/template tabs sekarang menormalisasi draft lokal lalu memanggil `form.save(...)`.
+- Toggle script KETIK dan Telefun sekarang membersihkan draft script saat dimatikan agar modal-level save tidak menyimpan script stale.
 - `KetikTemplateTab` memakai tipe `KetikAppSettings` tanpa `any`.
 - Telefun settings parser memakai coercion helpers untuk persisted values yang enum-like.
 
@@ -21,7 +22,8 @@ Refactor maintainability untuk menyatukan jalur penyimpanan draft settings KETIK
 
 ## Verifikasi
 
-- `pnpm --filter @trainers/web test useCrudForm.test.tsx settings-draft-helpers.test.ts telefun-settings-model-default.test.ts`
-- `pnpm --filter @trainers/web test ketik-settings-modal.test.tsx pdkt-settings-modal.test.tsx`
-- `node node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p apps/web/tsconfig.json --noEmit`
-- `rg -n "applyCollectionDraft|useCollectionDraft|React.Dispatch<React.SetStateAction<any>>|\bprev: any\b|\bas any\b" apps/web/src`
+- `rtk pnpm --filter @trainers/web test useCrudForm.test.tsx settings-draft-helpers.test.ts telefun-settings-model-default.test.ts`
+- `rtk pnpm --filter @trainers/web test ketik-settings-modal.test.tsx pdkt-settings-modal.test.tsx telefun-settings-model-default.test.ts`
+- `rtk node node_modules/.pnpm/typescript@5.9.3/node_modules/typescript/bin/tsc -p apps/web/tsconfig.json --noEmit`
+- `rtk rg -n "applyCollectionDraft|useCollectionDraft" apps/web/src`
+- `rtk rg -n "React.Dispatch<React.SetStateAction<any>>|\bprev: any\b|\bas any\b" apps/web/src/routes/ketik/components/settings apps/web/src/routes/pdkt/components/settings apps/web/src/routes/telefun/components/settings apps/web/src/routes/telefun/telefunSettings.ts apps/web/src/hooks/useCrudForm.ts`

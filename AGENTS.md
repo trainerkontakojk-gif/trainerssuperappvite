@@ -275,8 +275,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 84. **SIDAK Input Hooks Decomposition** — Extracted 3 custom hooks from monolithic `input.tsx` (767→274 lines): `useTemuanEdit` (106 lines — edit/delete state + save handler), `useTemuanForm` (217 lines — manual form entries, validation, duplicate check, batch save, perfect score), `useTemuanImport` (327 lines — Excel template download, file parse, import save with duplicate/preview). Also extracted `newEntry()` helper and `FormEntry` interface. Pure decomposition, zero logic change. (DONE)
 85. **Thermo Quality Gate Hardening** — Post-decomposition cleanup: immutable settings draft saves, typed collection-draft helper, SIDAK input rule indicator source-of-truth, whitespace/lint blockers cleared. (DONE)
 86. **Settings Draft Type Safety Hardening** — Eliminated 15+ `as T`/`as any` assertions from settings draft system. Added `createItem`/`updateItem` factories to `useCrudForm`, `create` factory to `useCollectionDraft` (replacing `idPrefix`/`extraDefaults`), `isEqual` comparator (replacing `JSON.stringify`), typed all `setLocalSettings` dispatches and inline callbacks, added `TelefunTransport` type alias + `TelefunVoiceModel` interface. 14 files modified, behavior-preserving. (DONE)
+87. **Settings Draft Canonical Commit** — Unified tab-level save and modal-level save into canonical commit path via `useCrudForm.save(items, draftOverride)`. Removed `applyCollectionDraft` helper that duplicated commit behavior. KETIK/Telefun scenario script toggle now clears draft script when disabled to prevent stale saves. Telefun settings parser uses coercion helpers for persisted enum-like values. 4 files modified, 0 new tests. (DONE)
 
-## Key Files Changed (Phase 58 — 86)
+## Key Files Changed (Phase 58 — 87)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -348,6 +349,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **Phase 86**: Typed `setLocalSettings`, `create` factory, removed `as any`
 - `apps/web/src/routes/pdkt/components/settings/PdktIdentityTab.tsx` — **Phase 86**: Added `ConsumerNameMentionPattern` type, removed `as any`
 - `apps/web/src/__tests__/settings-draft-helpers.test.ts` — **Phase 86**: Updated to use `create` factory pattern
+- `apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx` — **Phase 87**: Scenario script toggle clears draft script when disabled to prevent stale saves
+- `apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx` — **Phase 87**: Scenario script toggle clears draft script when disabled to prevent stale saves
+- `apps/web/src/__tests__/telefun-settings-model-default.test.ts` — **Phase 87**: Updated test assertions to use `DEFAULT_TELEFUN_SETTINGS` constants instead of hardcoded values
+- `docs/rebuild-logs/phase-87-settings-draft-canonical-commit.md` — **NEW Phase 87**: Documentation for settings draft canonical commit refactor
 
 ## Relevant Files
 

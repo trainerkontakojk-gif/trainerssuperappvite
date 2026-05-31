@@ -331,9 +331,14 @@ export function KetikScenariosTab({
                 </label>
                 <button
                   type="button"
-                  onClick={() =>
-                    setIsScenarioScriptEnabled((prev) => !prev)
-                  }
+                  onClick={() => {
+                    setIsScenarioScriptEnabled((prev) => {
+                      if (prev) {
+                        scenarioForm.setDraft({ script: "" });
+                      }
+                      return !prev;
+                    });
+                  }}
                   className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isScenarioScriptEnabled ? "bg-primary/10 text-primary border-primary/20" : "bg-foreground/5 text-muted-foreground border-border/50"}`}
                 >
                   <span

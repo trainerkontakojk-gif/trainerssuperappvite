@@ -256,7 +256,14 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Skrip Percakapan</label>
                 <button
                   type="button"
-                  onClick={() => setIsScenarioScriptEnabled((prev) => !prev)}
+                  onClick={() => {
+                    setIsScenarioScriptEnabled((prev) => {
+                      if (prev) {
+                        scenarioForm.setDraft({ script: '' });
+                      }
+                      return !prev;
+                    });
+                  }}
                   className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-widest transition-all ${
                     isScenarioScriptEnabled
                       ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20'
