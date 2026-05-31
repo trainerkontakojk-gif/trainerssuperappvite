@@ -57,7 +57,14 @@ export function useTelefunSettingsDraft({
       isActive: true,
     },
     validate: (draft) => !!(draft.title && draft.instruction && draft.category),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      category: draft.category || "Umum",
+      title: draft.title,
+      instruction: draft.instruction,
+      script: draft.script ?? "",
+      isActive: draft.isActive ?? true,
+    }),
   });
 
   const consumerForm = useCrudForm<ConsumerType>({
@@ -69,7 +76,13 @@ export function useTelefunSettingsDraft({
       gender: 'random',
     },
     validate: (draft) => !!(draft.name && draft.description),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      name: draft.name,
+      description: draft.description,
+      difficulty: draft.difficulty ?? ConsumerDifficulty.Medium,
+      gender: draft.gender ?? "random",
+    }),
   });
 
   // Sync settings when modal opens

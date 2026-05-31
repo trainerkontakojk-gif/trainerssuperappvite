@@ -61,7 +61,15 @@ export function useKetikSettingsDraft({
       images: [],
     },
     validate: (draft) => !!(draft.title && draft.description && draft.category),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      category: draft.category || "Umum",
+      title: draft.title,
+      description: draft.description,
+      script: draft.script ?? "",
+      isActive: draft.isActive ?? true,
+      images: draft.images ?? [],
+    }),
   });
 
   const consumerForm = useCrudForm<KetikConsumerType>({
@@ -73,7 +81,13 @@ export function useKetikSettingsDraft({
       isCustom: true,
     },
     validate: (draft) => !!(draft.name && draft.description),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      name: draft.name,
+      description: draft.description,
+      difficulty: draft.difficulty ?? "Sedang",
+      isCustom: true,
+    }),
   });
 
   const templateForm = useCrudForm<KetikQuickTemplate>({
@@ -83,7 +97,11 @@ export function useKetikSettingsDraft({
       content: "",
     },
     validate: (draft) => !!(draft.keyword && draft.content),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      keyword: draft.keyword.trim().toLowerCase().replace(/\s+/g, "-"),
+      content: draft.content.trim(),
+    }),
   });
 
   const PRESET_DURATIONS = [5, 10, 15];

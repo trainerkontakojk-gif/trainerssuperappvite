@@ -107,7 +107,18 @@ export function usePdktSettingsDraft({
       attachmentImages: [],
     },
     validate: (draft) => !!(draft.title && draft.description && draft.category),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      category: draft.category || "Umum",
+      title: draft.title,
+      description: draft.description,
+      sampleEmailTemplate: draft.sampleEmailTemplate ?? { subject: "", body: "" },
+      alwaysUseSampleEmail: draft.alwaysUseSampleEmail ?? false,
+      isLicensed: draft.isLicensed ?? false,
+      isActive: draft.isActive ?? true,
+      script: draft.script,
+      attachmentImages: draft.attachmentImages ?? [],
+    }),
   });
 
   const consumerForm = useCrudForm<PdktConsumerType>({
@@ -120,7 +131,14 @@ export function usePdktSettingsDraft({
       isCustom: true,
     },
     validate: (draft) => !!(draft.name && draft.description),
-    createItem: (id, draft) => ({ id, ...draft }),
+    createItem: (id, draft) => ({
+      id,
+      name: draft.name,
+      description: draft.description,
+      difficulty: draft.difficulty ?? "Medium",
+      tone: draft.tone ?? "",
+      isCustom: true,
+    }),
   });
 
   // Sync state when modal opens to ensure fresh data
