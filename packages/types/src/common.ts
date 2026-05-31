@@ -1,3 +1,10 @@
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue =
+  | JsonPrimitive
+  | { [key: string]: JsonValue }
+  | JsonValue[];
+export type JsonObject = { [key: string]: JsonValue };
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -9,4 +16,4 @@ export interface UserProfile {
 
 export type ApiResponse<T> =
   | { success: true; data: T }
-  | { success: false; error: { code: string; message: string; details?: any } };
+  | { success: false; error: { code: string; message: string; details?: JsonValue } };

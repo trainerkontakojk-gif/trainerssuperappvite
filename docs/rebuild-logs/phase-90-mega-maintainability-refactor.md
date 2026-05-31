@@ -1,7 +1,7 @@
 # Phase 90 — Mega Maintainability Refactor: Profiler, Settings, Types, Scripts & Tests
 
 ## Summary
-Massive maintainability decomposition across 5 areas: Profiler pages (export/slides/table), SIDAK Settings, `packages/types` barrel, data integrity scripts, and API test suites (RLS, SIDAK dashboard, data integrity). ~9,081 lines removed from monolithic files, ~38 new files created. Pure decomposition — zero logic change.
+Massive maintainability decomposition across 5 areas: Profiler pages (export/slides/table), SIDAK Settings, `packages/types` barrel, data integrity scripts, and API test suites (RLS, SIDAK dashboard, data integrity). ~9,081 lines removed from monolithic files, ~38 new files created. Pure decomposition — zero logic change. Phase 90 achieved the goal of keeping files under 1000 lines, and subsequent hardening (Phase 90 Quality Hardening) addressed remaining ownership boundaries, type contracts, and honest test verification.
 
 ## Changes
 
@@ -9,9 +9,9 @@ Massive maintainability decomposition across 5 areas: Profiler pages (export/sli
 3 monolithic route components (~2,982 total lines → ~1,170 lines). Inline constants, helpers, and rendering logic extracted into 11 new component files, 1 hook, and 5 utility files.
 
 **Modified files:**
-- `apps/web/src/routes/profiler/export.tsx` — 1,490→28 lines (barrel page)
-- `apps/web/src/routes/profiler/slides.tsx` — 682→~200 lines (barrel page)
-- `apps/web/src/routes/profiler/table.tsx` — 810→~200 lines (barrel page)
+- `apps/web/src/routes/profiler/export.tsx` — 1,490→102 lines
+- `apps/web/src/routes/profiler/slides.tsx` — 682→510 lines
+- `apps/web/src/routes/profiler/table.tsx` — 810→558 lines
 
 **New files:**
 - `apps/web/src/routes/profiler/components/export/ProfilerExportToolbar.tsx`
@@ -33,20 +33,26 @@ Massive maintainability decomposition across 5 areas: Profiler pages (export/sli
 - `apps/web/src/__tests__/profiler-formatters.test.ts` — formatter unit tests
 
 ### 2. SIDAK Settings Page Decomposition
-`settings.tsx` reduced from 416→44 lines. Inline constants and modals extracted into dedicated components.
+`settings.tsx` logic separated to clean up monolithic states. Inline constants and modals extracted into dedicated components.
 
 **Modified files:**
-- `apps/web/src/routes/sidak/settings.tsx` — 416→44 lines
+- `apps/web/src/routes/sidak/settings.tsx` — reduced to 390 lines
 
 **New files:**
+- `apps/web/src/routes/sidak/settings/types.ts`
+- `apps/web/src/routes/sidak/settings/utils.ts`
 - `apps/web/src/routes/sidak/settings/constants.ts` — SERVICE_LABELS, CAT_LABEL, CAT_COLOR, formatPeriodLabel
 - `apps/web/src/routes/sidak/settings/components/RuleVersionPicker.tsx`
 - `apps/web/src/routes/sidak/settings/components/ServiceWeightsPanel.tsx`
 - `apps/web/src/routes/sidak/settings/components/RuleIndicatorsPanel.tsx`
 - `apps/web/src/routes/sidak/settings/components/PublishRulePanel.tsx`
+- `apps/web/src/routes/sidak/settings/components/AddIndicatorModal.tsx`
+- `apps/web/src/routes/sidak/settings/components/EditIndicatorModal.tsx`
+- `apps/web/src/routes/sidak/settings/components/PublishPreviewModal.tsx`
+- `apps/web/src/__tests__/sidak-settings-form-utils.test.ts`
 
 ### 3. packages/types Barrel Decomposition
-`packages/types/src/index.ts` reduced from 1,158→9 lines (pure re-export barrel). Types split into 8 domain files:
+`packages/types/src/index.ts` reduced from 1,158→9 lines (pure re-export barrel). Types split into 8 domain files, and loose `any` types tightened:
 
 **Modified files:**
 - `packages/types/src/index.ts` — 1,158→9 lines
@@ -77,13 +83,17 @@ Massive maintainability decomposition across 5 areas: Profiler pages (export/sli
 
 ### 5. API Test Restructuring
 
-**RLS Tests:** `rls-verification.test.ts` reduced from 1,309→181 lines (smoke-only). Config + logic extracted to shared fixtures + 3 per-pattern test files:
-- `apps/api/src/__tests__/fixtures/rls-config.ts` — 839 lines
+**RLS Tests:** `rls-verification.test.ts` reduced from 1,309→137 lines (smoke + source alignment tests). Config + logic extracted to shared fixtures + per-pattern files:
+- `apps/api/src/__tests__/fixtures/rls-config.ts` — 54 lines (facade)
+- `apps/api/src/__tests__/fixtures/rls-owner-only-config.ts` — new
+- `apps/api/src/__tests__/fixtures/rls-role-based-config.ts` — new
+- `apps/api/src/__tests__/fixtures/rls-mixed-access-config.ts` — new
+- `apps/api/src/__tests__/helpers/rls-policy-source.ts` — new
 - `apps/api/src/__tests__/helpers/rls-policy-evaluator.ts` — 154 lines
 - `apps/api/src/__tests__/rls-owner-only.test.ts` — new
 - `apps/api/src/__tests__/rls-role-based.test.ts` — new
 - `apps/api/src/__tests__/rls-mixed-access.test.ts` — new
-- `apps/api/src/__tests__/rls-verification.test.ts` — 1,309→181 lines
+- `apps/api/src/__tests__/rls-verification.test.ts` — 1,309→137 lines
 
 **SIDAK Dashboard Tests:** `sidak-service-dashboard.test.ts` deleted (1,012 lines). Replaced by 4 focused tests + shared fixtures:
 - `apps/api/src/__tests__/helpers/sidak-dashboard-fixtures.ts` — shared fixtures
@@ -98,8 +108,8 @@ Massive maintainability decomposition across 5 areas: Profiler pages (export/sli
 - `apps/api/src/__tests__/data-integrity-duplicate-detector.test.ts` — new
 - `apps/api/src/__tests__/data-integrity-name-consistency.test.ts` — new
 
-## Stats
-- **9 modified** files (+170 / -9,081)
-- **2 deleted** files (data-integrity-checker.test.ts, sidak-service-dashboard.test.ts)
-- **~38 new files** across 6 categories
-- **Zero logic change** — pure extraction and restructuring
+## Verification
+- `pnpm --filter @trainers/web test -- sidak-settings-form-utils`
+- `pnpm --filter @trainers/api test -- rls`
+- TypeScript direct compiles for web (`apps/web/tsconfig.json`) and API (`apps/api/tsconfig.json`)
+- Line-count guard (`> 1000` lines verification script)

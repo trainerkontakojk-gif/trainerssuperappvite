@@ -1,7 +1,16 @@
+import type { JsonObject, JsonValue } from "./common";
+
 export interface SpeechSegment {
   startMs: number;
   endMs: number;
   durationMs: number;
+}
+
+export interface TelefunMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp?: string;
+  [key: string]: JsonValue | undefined;
 }
 
 export interface SessionMetrics {
@@ -71,7 +80,7 @@ export interface TelefunHistory {
   duration_seconds: number;
   status: "pending" | "active" | "completed" | "failed";
   score?: number | null;
-  messages?: any[] | null;
+  messages?: TelefunMessage[] | null;
   ai_summary?: string | null;
   strengths?: string[] | null;
   weaknesses?: string[] | null;
@@ -80,10 +89,10 @@ export interface TelefunHistory {
   agent_recording_path?: string | null;
   voice_assessment?: VoiceQualityAssessment | null;
   session_metrics?: SessionMetrics | null;
-  voice_dashboard_metrics?: any | null;
-  disruption_config?: any | null;
-  disruption_results?: any | null;
-  persona_config?: any | null;
+  voice_dashboard_metrics?: JsonObject | null;
+  disruption_config?: JsonObject | null;
+  disruption_results?: JsonObject | null;
+  persona_config?: JsonObject | null;
   realistic_mode_enabled: boolean;
   configured_duration?: number | null;
   response_pacing_mode?: string | null;

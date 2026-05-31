@@ -14,6 +14,12 @@ export interface ProfilerFolder {
   created_at?: string;
 }
 
+export interface PhotoFrameValue {
+  scale?: number;
+  x?: number;
+  y?: number;
+}
+
 export interface ProfilerPeserta {
   id: string;
   trainer_id?: string | null;
@@ -23,7 +29,7 @@ export interface ProfilerPeserta {
   tim: string;
   jabatan: string;
   foto_url?: string | null;
-  photo_frame?: any;
+  photo_frame?: PhotoFrameValue | null;
   nik_ojk?: string | null;
   bergabung_date?: string | null;
   email_ojk?: string | null;

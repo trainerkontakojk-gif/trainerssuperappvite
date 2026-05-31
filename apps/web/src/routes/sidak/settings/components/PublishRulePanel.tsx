@@ -5,20 +5,12 @@ interface PublishRulePanelProps {
   selectedVersion: RuleVersion;
   getPeriodLabel: (periodId: string) => string;
   setShowAddForm: (show: boolean) => void;
-  newThreshold?: string;
-  setNewThreshold?: (val: string) => void;
-  newSortOrder?: string;
-  setNewSortOrder?: (val: string) => void;
 }
 
 export function PublishRulePanel({
   selectedVersion,
   getPeriodLabel,
   setShowAddForm,
-  newThreshold,
-  setNewThreshold,
-  newSortOrder,
-  setNewSortOrder,
 }: PublishRulePanelProps) {
   if (selectedVersion.status === "published") {
     return (
@@ -78,30 +70,6 @@ export function PublishRulePanel({
           </div>
         </div>
       </div>
-      {setNewThreshold && setNewSortOrder && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Threshold</label>
-            <input
-              type="number"
-              value={newThreshold}
-              onChange={(e) => setNewThreshold(e.target.value)}
-              placeholder="0"
-              className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase text-muted-foreground px-1">Urutan (sort_order)</label>
-            <input
-              type="number"
-              value={newSortOrder}
-              onChange={(e) => setNewSortOrder(e.target.value)}
-              placeholder="0"
-              className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none"
-            />
-          </div>
-        </div>
-      )}
       <button
         onClick={() => setShowAddForm(true)}
         className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 transition"

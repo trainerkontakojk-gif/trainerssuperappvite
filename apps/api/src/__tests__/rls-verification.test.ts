@@ -1,17 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ALL_RLS_TABLES, RLSTestFailure } from "./fixtures/rls-config";
 import { evaluateRLSPolicy, collectRLSFailures } from "./helpers/rls-policy-evaluator";
+import { readMigrationSqlSource, findMissingPolicyReferences } from "./helpers/rls-policy-source";
 
 /**
  * RLS Verification Test Suite (Smoke & Structure Validation)
  * Validates: Requirements 7.1, 7.2, 7.3, 7.4
  *
- * This test suite requires a running Supabase instance (supabase start).
- * Tests are skipped when no connection is available.
+ * Live Supabase operation checks are intentionally not implemented here.
+ * This suite validates the static RLS expectation model and its SQL references.
  */
-
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const HAS_SUPABASE = !!SUPABASE_URL;
 
 describe("RLS Verification Test Suite", () => {
   describe("Test Structure Validation", () => {
@@ -44,6 +42,14 @@ describe("RLS Verification Test Suite", () => {
           expect(policy.deniedRoles).toContain("anon");
         }
       }
+    });
+
+    it("policy expectations are backed by migration SQL references", () => {
+      const sqlSource = readMigrationSqlSource();
+      expect(sqlSource.length).toBeGreaterThan(0);
+
+      const missing = findMissingPolicyReferences(ALL_RLS_TABLES, sqlSource);
+      expect(missing).toEqual([]);
     });
   });
 
@@ -123,59 +129,9 @@ describe("RLS Verification Test Suite", () => {
     });
   });
 
-  describe("Integration Tests (requires supabase start)", () => {
-    // These tests require a running Supabase instance.
-    // They are skipped when SUPABASE_URL is not available.
-    // To run: `supabase start` then set SUPABASE_URL env var.
-
-    const describeIntegration = HAS_SUPABASE ? describe : describe.skip;
-
-    describeIntegration("Live RLS policy verification", () => {
-      beforeAll(() => {
-        // Integration setup would create test users with different roles
-        // and attempt actual database operations via Supabase client
-        console.log("Integration tests require supabase start");
-        console.log(`SUPABASE_URL: ${SUPABASE_URL}`);
-      });
-
-      afterAll(() => {
-        // Cleanup test data
-      });
-
-      it("placeholder: would test actual SELECT with anon key returns empty/error", () => {
-        // In a real integration test:
-        // const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        // const { data, error } = await anonClient.from('profiles').select('*');
-        // expect(data).toHaveLength(0); // or expect error
-        expect(true).toBe(true);
-      });
-
-      it("placeholder: would test authenticated user can SELECT own profile", () => {
-        // In a real integration test:
-        // const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { ... });
-        // await userClient.auth.signInWithPassword({ email, password });
-        // const { data } = await userClient.from('profiles').select('*');
-        // expect(data).toHaveLength(1);
-        // expect(data[0].id).toBe(userId);
-        expect(true).toBe(true);
-      });
-
-      it("placeholder: would test admin can SELECT all profiles", () => {
-        // In a real integration test:
-        // const adminClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { ... });
-        // await adminClient.auth.signInWithPassword({ email: adminEmail, password });
-        // const { data } = await adminClient.from('profiles').select('*');
-        // expect(data.length).toBeGreaterThan(1);
-        expect(true).toBe(true);
-      });
-
-      it("placeholder: would test service_role can INSERT into ai_usage_logs", () => {
-        // In a real integration test:
-        // const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-        // const { error } = await serviceClient.from('ai_usage_logs').insert({...});
-        // expect(error).toBeNull();
-        expect(true).toBe(true);
-      });
+  describe.skip("Live RLS policy verification", () => {
+    it("requires a dedicated seeded Supabase integration harness", () => {
+      throw new Error("Skipped until the harness creates role-scoped users and cleanup data.");
     });
   });
 });
