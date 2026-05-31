@@ -270,8 +270,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 79. **SIDAK Route Full Decomposition** — Completed full decomposition of monolithic `routes/sidak.ts` (1,503 → 19 lines, 27 handlers across 5 sub-modules: core, dashboard, temuan, rule-versions, reports). All helpers preserved. Graphify synced. (DONE)
 80. **Telefun Route Full Decomposition** — Completed full decomposition of monolithic `routes/telefun.ts` (1,240 → 21 lines, 12 handlers across 4 sub-modules: sessions, recordings, settings, annotations). All helpers re-exported for test backward compatibility. Graphify synced. (DONE)
 81. **KETIK ChatInterface Message Utils & Pacing Extraction** — Extracted inline constants, helpers, and pacing functions from `ChatInterface.tsx` (277 → 16 lines) into `ketik/lib/message-utils.ts` (193 lines) and `ketik/lib/pacing.ts` (69 lines). Pure extraction, zero logic change. (DONE)
+82. **KETIK Service Decomposition** — Decomposed monolithic `ketik-service.ts` (1,400 → 5 lines barrel file) into 5 sub-modules under `apps/api/src/services/ketik/`: `shared-utils.ts` (9 lines — `extractJsonObjectText`), `consumer-response.ts` (347 lines — scenario defaults, consumer response generation), `review-lifecycle.ts` (317 lines — `triggerKetikAIReview` lifecycle), `review-processor.ts` (353 lines — `processKetikReviewJob` with AI scoring), `settings-history.ts` (369 lines — session CRUD, settings history). Backward compatible — all consumers import via barrel unchanged. 484 API tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 79)
+## Key Files Changed (Phase 58 — 82)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -435,6 +436,12 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/ketik/lib/message-utils.ts` — **NEW Phase 81**: Extracted message normalization, image tag, system tag, and allowSolutionAcknowledgement utilities (193 lines)
 - `apps/web/src/routes/ketik/lib/pacing.ts` — **NEW Phase 81**: Extracted session timing, text band classification, and pacing ranges (69 lines)
 - `docs/rebuild-logs/phase-81-ketik-chatinterface-extraction.md` — **NEW Phase 81**: Documentation for KETIK ChatInterface extraction
+- `apps/api/src/services/ketik-service.ts` — **Phase 82**: Reduced from 1,400 to 5 lines — barrel file re-exporting 5 sub-modules
+- `apps/api/src/services/ketik/shared-utils.ts` — **NEW Phase 82**: `extractJsonObjectText()` utility (9 lines)
+- `apps/api/src/services/ketik/consumer-response.ts` — **NEW Phase 82**: Scenario defaults, consumer response generation (347 lines)
+- `apps/api/src/services/ketik/review-lifecycle.ts` — **NEW Phase 82**: `triggerKetikAIReview()` lifecycle (317 lines)
+- `apps/api/src/services/ketik/review-processor.ts` — **NEW Phase 82**: `processKetikReviewJob()` with AI scoring (353 lines)
+- `apps/api/src/services/ketik/settings-history.ts` — **NEW Phase 82**: Session CRUD, settings history (369 lines)
 
 ## Routes Reference (apps/web)
 
@@ -484,7 +491,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 | Prefix             | Endpoints    | Service                         |
 | ------------------ | ------------ | ------------------------------- |
 | `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports) |
-| `/api/v1/ketik`    | 4 endpoints  | `ketik-service.ts`              |
+| `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history) |
 | `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
 | `/api/v1/ai`       | 7 endpoints  | —                               |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |

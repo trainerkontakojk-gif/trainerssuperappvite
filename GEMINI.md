@@ -274,9 +274,14 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 75. **Maintainability Refactor & Recording Fix** — SIDAK service decomposition into 13 sub-modules (shared-constants, access-scope, period-indicator, temuan-service, agent-directory, rule-versions, service-trends, dashboard-data, dashboard-aggregation, dashboard-trends, dashboard-types, report-data, report-archives) + extracted ranking-service.ts + shared math-utils.ts; Telefun API adapter replacing raw `fetch()`, shared AI model registry eliminating duplicate model lists, KETIK/PDKT settings modal layout decomposition. Post-review fix: Telefun recording endpoint `{ success, url }` → `{ success, data: { url }, url }` (fetchApi unwrap compat + backward-compat), fixed 3 frontend recording consumers. 28 files modified/added. Full suite: build pass, API 475 + web 468 tests pass, 0 failures. (DONE)
 76. **Types Circular Dependency Fix** — Resolved circular dependencies between `packages/types/src/index.ts` and `packages/types/src/ai-models.ts` causing Railway deployment syntax crashes during build/runtime. Moved types to be self-contained in `ai-models.ts` and unidirectional in `index.ts`. All tasks build successfully. (DONE)
 77. **SIDAK Service Thermo-Nuclear Code Quality Refactor** — Performed code quality refactor on decomposed SIDAK service modules: simplified barrel file `sidak-service.ts` using `export * from` statements (reduced from 176 lines to 14), extracted shared `buildTrendResult` helper to eliminate ~100 lines of duplicated trend aggregation in `service-trends.ts`, defined unified `REPORT_ADMIN_ROLES` constant to clean up repeated inline arrays in `report-archives.ts`, and optimized array allocation loops (from `concat`/spread to `.push(...)`) in `agent-directory.ts` and `service-trends.ts`. All 479 API + 468 web tests passing. (DONE)
+78. **SIDAK Route AI Report & Folders/Agents Extraction** — Extracted AI report generation (`generateAiReport`, `aiReportSchema`) from `routes/sidak.ts` into new `sidak/ai-report-service.ts` sub-module. Extracted `getAllFolders()` and `getAgentsByFolder()` into `sidak/access-scope.ts`. Replaced ~150 lines of inline route logic with delegated service calls. Added gemini/openrouter mocks to sidak-service.test.ts for AI report test coverage. 1 new file, 4 modified, 479 API + 468 web tests passing. (DONE)
+79. **SIDAK Route Full Decomposition** — Completed full decomposition of monolithic `routes/sidak.ts` (1,503 → 19 lines, 27 handlers across 5 sub-modules: core, dashboard, temuan, rule-versions, reports). All helpers preserved. Graphify synced. (DONE)
+80. **Telefun Route Full Decomposition** — Completed full decomposition of monolithic `routes/telefun.ts` (1,240 → 21 lines, 12 handlers across 4 sub-modules: sessions, recordings, settings, annotations). All helpers re-exported for test backward compatibility. Graphify synced. (DONE)
+81. **KETIK ChatInterface Message Utils & Pacing Extraction** — Extracted inline constants, helpers, and pacing functions from `ChatInterface.tsx` (277 → 16 lines) into `ketik/lib/message-utils.ts` (193 lines) and `ketik/lib/pacing.ts` (69 lines). Pure extraction, zero logic change. (DONE)
+82. **KETIK Service Decomposition** — Decomposed monolithic `ketik-service.ts` (1,400 → 5 lines barrel file) into 5 sub-modules under `apps/api/src/services/ketik/`: `shared-utils.ts` (9 lines — `extractJsonObjectText`), `consumer-response.ts` (347 lines — scenario defaults, consumer response generation), `review-lifecycle.ts` (317 lines — `triggerKetikAIReview` lifecycle), `review-processor.ts` (353 lines — `processKetikReviewJob` with AI scoring), `settings-history.ts` (369 lines — session CRUD, settings history). Backward compatible — all consumers import via barrel unchanged. 484 API tests passing. (DONE)
 
 
-## Key Files Changed (Phase 58 — 74)
+## Key Files Changed (Phase 58 — 82)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -332,6 +337,12 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - `apps/api/src/routes/sidak.ts` — **Phase 63**: Added `POST /temuan/perfect-session` endpoint with RBAC, activity logging, and dashboard summary refresh
 - `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 63**: 4 regression tests for `createPerfectScoreSession`
 - `apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx` — **Phase 63**: 7 regression tests for hasBadFindings logic + component contract
+- `apps/api/src/services/ketik-service.ts` — **Phase 82**: Reduced from 1,400 to 5 lines — barrel file re-exporting 5 sub-modules
+- `apps/api/src/services/ketik/shared-utils.ts` — **NEW Phase 82**: `extractJsonObjectText()` utility (9 lines)
+- `apps/api/src/services/ketik/consumer-response.ts` — **NEW Phase 82**: Scenario defaults, consumer response generation (347 lines)
+- `apps/api/src/services/ketik/review-lifecycle.ts` — **NEW Phase 82**: `triggerKetikAIReview()` lifecycle (317 lines)
+- `apps/api/src/services/ketik/review-processor.ts` — **NEW Phase 82**: `processKetikReviewJob()` with AI scoring (353 lines)
+- `apps/api/src/services/ketik/settings-history.ts` — **NEW Phase 82**: Session CRUD, settings history (369 lines)
 
 ## Relevant Files
 
@@ -405,6 +416,11 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
 - `apps/api/src/__tests__/monitoring-history-enrichment.test.ts` — **Phase 70 update**: Mock data aligned to Vite schema columns
+- `apps/api/src/services/ketik/` — **Phase 82**: KETIK service decomposition into 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history)
+- `apps/api/src/services/ketik-service.ts` — **Phase 82**: Reduced from 1,400 to 5 lines — barrel file re-exporting 5 sub-modules
+- `apps/api/src/services/sidak/` — **Phase 75**: SIDAK service decomposition into 13 sub-modules; **Phase 78**: Added ai-report-service.ts
+- `apps/api/src/routes/sidak/` — **Phase 79**: SIDAK route full decomposition into 5 sub-modules (core, dashboard, temuan, rule-versions, reports)
+- `apps/api/src/routes/telefun/` — **Phase 80**: Telefun route full decomposition into 4 sub-modules (sessions, recordings, settings, annotations)
 
 ## Routes Reference (apps/web)
 
@@ -453,10 +469,10 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 
 | Prefix             | Endpoints    | Service                         |
 | ------------------ | ------------ | ------------------------------- |
-| `/api/v1/sidak`    | 16 endpoints | `sidak-service.ts`              |
-| `/api/v1/ketik`    | 4 endpoints  | `ketik-service.ts`              |
+| `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports) |
+| `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history) |
 | `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
 | `/api/v1/ai`       | 7 endpoints  | —                               |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
 | `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |
-| `/api/v1/telefun`  | 2 endpoints  | `telefun.ts` (settings GET/PUT) |
+| `/api/v1/telefun`  | 5 endpoints  | `routes/telefun/` — 4 sub-modules (sessions, recordings, settings, annotations) |
