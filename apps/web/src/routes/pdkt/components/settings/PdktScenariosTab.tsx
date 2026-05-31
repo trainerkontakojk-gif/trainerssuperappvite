@@ -3,7 +3,6 @@ import { Check, Edit2, Trash2, Plus, X, Image as ImageIcon, Sparkles, Loader2, F
 import { motion } from "framer-motion";
 import { PdktScenario, PdktIdentity } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
-import { applyCollectionDraft } from "../../../../hooks/useCollectionDraft";
 import { notify } from "../../../../lib/toast";
 import { postApi } from "../../../../hooks/useApi";
 import ScenarioImage from "../ScenarioImage";
@@ -185,25 +184,22 @@ export function PdktScenariosTab({
 
     const category = isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category || "Umum";
 
+    const normalizedDraft: Omit<PdktScenario, "id"> = {
+      ...scenarioForm.draft,
+      category,
+      sampleEmailTemplate: scenarioForm.draft.sampleEmailTemplate ?? {
+        subject: "",
+        body: "",
+      },
+      alwaysUseSampleEmail: scenarioForm.draft.alwaysUseSampleEmail ?? false,
+      isLicensed: scenarioForm.draft.isLicensed ?? false,
+      isActive: scenarioForm.draft.isActive ?? true,
+      attachmentImages: scenarioForm.draft.attachmentImages ?? [],
+    };
+
     setLocalSettings((prev) => ({
       ...prev,
-      scenarios: applyCollectionDraft<PdktScenario>({
-        items: prev.scenarios,
-        draft: { ...scenarioForm.draft, category },
-        editingId: scenarioForm.editingId,
-        create: (draft) => ({
-          id: `s-${Date.now()}`,
-          category: draft.category ?? "Umum",
-          title: draft.title ?? "",
-          description: draft.description ?? "",
-          isActive: true,
-          script: draft.script,
-          sampleEmailTemplate: draft.sampleEmailTemplate,
-          alwaysUseSampleEmail: draft.alwaysUseSampleEmail,
-          isLicensed: draft.isLicensed,
-          attachmentImages: draft.attachmentImages ?? [],
-        }),
-      }),
+      scenarios: scenarioForm.save(prev.scenarios, normalizedDraft),
     }));
 
     scenarioForm.close();

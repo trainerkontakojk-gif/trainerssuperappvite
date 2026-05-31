@@ -2,7 +2,6 @@ import React from 'react';
 import { Users, Check, Edit2, Trash2, Plus } from 'lucide-react';
 import { TelefunAppSettings as AppSettings, TelefunConsumerType as ConsumerType, ConsumerDifficulty } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
-import { applyCollectionDraft } from '../../../../hooks/useCollectionDraft';
 
 interface TelefunConsumersTabProps {
   consumerTypes: ConsumerType[];
@@ -39,20 +38,17 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
+    const normalizedDraft: Omit<ConsumerType, "id"> = {
+      ...consumerForm.draft,
+      name: consumerForm.draft.name,
+      description: consumerForm.draft.description,
+      difficulty: consumerForm.draft.difficulty ?? ConsumerDifficulty.Medium,
+      gender: "random",
+    };
+
     setLocalSettings((prev) => ({
       ...prev,
-      consumerTypes: applyCollectionDraft<ConsumerType>({
-        items: prev.consumerTypes,
-        draft: { ...consumerForm.draft, gender: 'random' },
-        editingId: consumerForm.editingId,
-        create: (draft) => ({
-          id: `c-${Date.now()}`,
-          name: draft.name ?? "",
-          description: draft.description ?? "",
-          difficulty: draft.difficulty ?? ConsumerDifficulty.Medium,
-          gender: draft.gender ?? "random",
-        }),
-      }),
+      consumerTypes: consumerForm.save(prev.consumerTypes, normalizedDraft),
     }));
 
     consumerForm.close();

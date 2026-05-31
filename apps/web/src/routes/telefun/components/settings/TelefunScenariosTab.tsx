@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Check, Edit2, Trash2, Plus, X } from 'lucide-react';
 import { TelefunAppSettings as AppSettings, TelefunScenario as Scenario } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
-import { applyCollectionDraft } from '../../../../hooks/useCollectionDraft';
 
 interface TelefunScenariosTabProps {
   scenarios: Scenario[];
@@ -60,22 +59,17 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : '';
 
+    const normalizedDraft: Omit<Scenario, "id"> = {
+      ...scenarioForm.draft,
+      category,
+      script: draftScript,
+      isActive: scenarioForm.draft.isActive ?? true,
+    };
+
     // Save draft to local settings
     setLocalSettings((prev) => ({
       ...prev,
-      scenarios: applyCollectionDraft<Scenario>({
-        items: prev.scenarios,
-        draft: { ...scenarioForm.draft, category, script: draftScript },
-        editingId: scenarioForm.editingId,
-        create: (draft) => ({
-          id: `s-${Date.now()}`,
-          category: draft.category ?? "Umum",
-          title: draft.title ?? "",
-          instruction: draft.instruction ?? "",
-          script: draft.script ?? "",
-          isActive: true,
-        }),
-      }),
+      scenarios: scenarioForm.save(prev.scenarios, normalizedDraft),
     }));
 
     scenarioForm.close();
