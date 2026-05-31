@@ -1,3 +1,10 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+allowBuilds:
+  "@google/genai": true
+  "core-js": true
+  "ecc-universal": true
+  "esbuild": true
+  "protobufjs": true

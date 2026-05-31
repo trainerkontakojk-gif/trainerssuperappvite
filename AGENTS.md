@@ -63,6 +63,7 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 
 - **Install:** `pnpm install`
 - **Dev:** `pnpm dev` (Menjalankan web, api, dan telefun secara paralel)
+- **Install (CI mode):** `CI=true pnpm install` (pnpm 11 requires `CI=true` to skip TTY prompts on module recreation)
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint` (ESLint 9 flat config — `eslint.config.mjs` di root)
 - **Lint (single workspace):** `pnpm --filter @trainers/web lint`
@@ -277,8 +278,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 86. **Settings Draft Type Safety Hardening** — Eliminated 15+ `as T`/`as any` assertions from settings draft system. Added `createItem`/`updateItem` factories to `useCrudForm`, `create` factory to `useCollectionDraft` (replacing `idPrefix`/`extraDefaults`), `isEqual` comparator (replacing `JSON.stringify`), typed all `setLocalSettings` dispatches and inline callbacks, added `TelefunTransport` type alias + `TelefunVoiceModel` interface. 14 files modified, behavior-preserving. (DONE)
 87. **Settings Draft Canonical Commit** — Unified tab-level save and modal-level save into canonical commit path via `useCrudForm.save(items, draftOverride)`. Removed `applyCollectionDraft` helper that duplicated commit behavior. KETIK/Telefun scenario script toggle now clears draft script when disabled to prevent stale saves. Telefun settings parser uses coercion helpers for persisted enum-like values. 4 files modified, 0 new tests. (DONE)
 88. **Settings Draft Normalization Hardening** — Extracted default entity logic from tab-level saves and `createItem` factories into pure per-domain normalizer functions for KETIK (scenario, consumer, quick template), PDKT (scenario, consumer), and Telefun (scenario, consumer). Hardened Telefun persisted settings parser with item-level validation for `scenarios` and `consumerTypes`. Normalizers reused from both tab-level saves and modal-level `createItem` factories, eliminating drift risk between save paths. 4 new normalizer files, 1 new test file (134 lines, 5 test cases), 6 modified tab files. 35 tests passing, 0 TS errors. (DONE)
+89. **pnpm 11 Migration** — Upgraded pnpm from 9.0.0 → 11.5.0. Two breaking changes fixed: (1) `allowBuilds` block added to `pnpm-workspace.yaml` for 5 packages (pnpm 11 blocks all build scripts by default), (2) `CI=true` required to skip TTY prompt on module recreation. No pnpm config in `package.json` or `.npmrc` meant other migration rules were moot. 3 files modified, 504 API + 485 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 88)
+## Key Files Changed (Phase 58 — 89)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -367,6 +369,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeTelefunScenarioDraft`
 - `apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeTelefunConsumerDraft`
 - `docs/rebuild-logs/phase-88-settings-draft-normalization-hardening.md` — **NEW Phase 88**: Documentation for settings draft normalization hardening
+- `package.json` — **Phase 89**: Updated `packageManager` from `pnpm@9.0.0` to `pnpm@11.5.0`
+- `pnpm-workspace.yaml` — **Phase 89**: Added `allowBuilds` block for 5 packages (`@google/genai`, `core-js`, `ecc-universal`, `esbuild`, `protobufjs`)
+- `docs/rebuild-logs/phase-89-pnpm-11-migration.md` — **NEW Phase 89**: Documentation for pnpm 11 migration with breaking changes
 
 ## Relevant Files
 
