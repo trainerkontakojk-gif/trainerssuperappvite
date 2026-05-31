@@ -44,16 +44,17 @@ export function useCrudForm<T extends { id: string }>({
     setDraftState({ ...defaultValues });
   }, [defaultValues]);
 
-  const save = useCallback((items: T[]): T[] => {
-    if (!validate(draft)) return items;
+  const save = useCallback((items: T[], draftOverride?: Omit<T, "id">): T[] => {
+    const nextDraft = draftOverride ?? draft;
+    if (!validate(nextDraft)) return items;
     if (editingId) {
       return items.map((item) =>
         item.id === editingId
-          ? (updateItem?.(item, draft) ?? { ...item, ...draft })
+          ? (updateItem?.(item, nextDraft) ?? { ...item, ...nextDraft })
           : item
       );
     } else {
-      return [...items, createItem(generateId(), draft)];
+      return [...items, createItem(generateId(), nextDraft)];
     }
   }, [editingId, draft, generateId, validate, createItem, updateItem]);
 
@@ -72,8 +73,8 @@ export function useCrudForm<T extends { id: string }>({
     return !isEqual(draft, defaultValues);
   }, [isOpen, editingId, draft, defaultValues, isEqual]);
 
-  const isValid = useCallback(() => {
-    return validate(draft);
+  const isValid = useCallback((draftOverride?: Omit<T, "id">) => {
+    return validate(draftOverride ?? draft);
   }, [draft, validate]);
 
   return {
