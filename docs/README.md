@@ -42,7 +42,7 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 ## Verifikasi Umum
 
 - Jalankan `pnpm lint` untuk validasi lint cepat.
-- Jalankan `pnpm test` untuk menjalankan seluruh test suite (475 API + 468 web = 943 tests).
+- Jalankan `pnpm test` untuk menjalankan seluruh test suite (504 API + 485 web = 989 tests).
 - Jalankan `pnpm --filter @trainers/api test` untuk test API service saja.
 - Jalankan `pnpm --filter @trainers/web test` untuk test frontend saja.
 - Jalankan `pnpm build` untuk validasi build production.

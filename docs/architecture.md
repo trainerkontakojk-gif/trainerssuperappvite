@@ -90,14 +90,14 @@ Struktur folder monorepo:
 │       └── src/                # Server, auth, usage, env handling
 ├── packages/
 │   └── types/                  # Shared Zod schemas & TypeScript interfaces
-│       └── src/index.ts        # Semua shared types (Profiler, Admin, SIDAK, dll)
+│       └── src/                # 8 domain files + barrel index.ts (common, sidak, ketik, pdkt, telefun, ai, profiler, admin)
 ├── reference-repo/             # Sumber referensi logic dari codebase lama (Next.js)
 │   ├── app/                    # Next.js App Router (referensi saja)
 │   └── docs/                   # Dokumentasi legacy (referensi)
 ├── supabase/
 │   └── migrations/             # DB schemas (000 profiles, 001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin, 005 carbon copy, 006 user settings, 007 report archives, 008 profile admin policies, 009 storage RLS, 010 activity_logs index)
 ├── docs/                       # Dokumentasi teknis sistem
-│   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-18)
+│   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-90)
 │   └── superpowers/            # Plans dan specs dari superpowers skills
 ├── opencode.json               # Project-level opencode config dengan context7 MCP
 ├── AGENTS.md                   # Panduan development untuk AI agents
@@ -175,7 +175,7 @@ pnpm build
 # Lint seluruh workspace
 pnpm lint
 
-# Test seluruh workspace (108 API + 61 web = 169 tests)
+# Test seluruh workspace (504 API + 485 web = 989 tests)
 pnpm test
 
 # Test API only
