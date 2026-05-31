@@ -29,7 +29,7 @@ export function buildTelefunSettingsForSave(params: {
     ...params.localSettings,
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes,
-    telefunTransport: (selectedModel?.telefunTransport ?? "gemini-live") as any,
+    telefunTransport: (selectedModel?.telefunTransport as AppSettings["telefunTransport"]) ?? "gemini-live",
     telefunModelId: params.selectedTelefunModel,
   };
 }

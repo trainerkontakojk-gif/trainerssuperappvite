@@ -28,8 +28,9 @@ export function useCrudForm<T extends { id: string }>({
   const openEdit = useCallback((item: T) => {
     setEditingId(item.id);
     setIsOpen(true);
-    const { id, ...rest } = item;
-    setDraftState(rest as any);
+    const { id: _, ...rest } = item;
+    // rest is Omit<T, "id"> which is assignable to the state type without as any
+    setDraftState(rest);
   }, []);
 
   const close = useCallback(() => {
@@ -42,9 +43,12 @@ export function useCrudForm<T extends { id: string }>({
     if (!validate(draft)) return items;
     if (editingId) {
       return items.map((item) =>
+        // Cast 'as T' is necessary because spreading generic T and Omit<T, "id">
+        // is not automatically assignable to type parameter T in TypeScript.
         item.id === editingId ? ({ ...item, ...draft } as T) : item
       );
     } else {
+      // Cast 'as T' is necessary because generic T cannot be instantiated with a concrete object type.
       const newItem = { id: generateId(), ...draft } as T;
       return [...items, newItem];
     }
@@ -59,7 +63,9 @@ export function useCrudForm<T extends { id: string }>({
     if (editingId) {
       const original = items.find((item) => item.id === editingId);
       if (!original) return true;
-      const { id, ...rest } = original;
+      const { id: _, ...rest } = original;
+      // Flat object key-order comparison via JSON.stringify is safe and non-brittle here
+      // because both objects have the exact same shape/keys of type Omit<T, "id">.
       return JSON.stringify(draft) !== JSON.stringify(rest);
     }
     return JSON.stringify(draft) !== JSON.stringify(defaultValues);
