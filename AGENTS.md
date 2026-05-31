@@ -276,8 +276,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 85. **Thermo Quality Gate Hardening** — Post-decomposition cleanup: immutable settings draft saves, typed collection-draft helper, SIDAK input rule indicator source-of-truth, whitespace/lint blockers cleared. (DONE)
 86. **Settings Draft Type Safety Hardening** — Eliminated 15+ `as T`/`as any` assertions from settings draft system. Added `createItem`/`updateItem` factories to `useCrudForm`, `create` factory to `useCollectionDraft` (replacing `idPrefix`/`extraDefaults`), `isEqual` comparator (replacing `JSON.stringify`), typed all `setLocalSettings` dispatches and inline callbacks, added `TelefunTransport` type alias + `TelefunVoiceModel` interface. 14 files modified, behavior-preserving. (DONE)
 87. **Settings Draft Canonical Commit** — Unified tab-level save and modal-level save into canonical commit path via `useCrudForm.save(items, draftOverride)`. Removed `applyCollectionDraft` helper that duplicated commit behavior. KETIK/Telefun scenario script toggle now clears draft script when disabled to prevent stale saves. Telefun settings parser uses coercion helpers for persisted enum-like values. 4 files modified, 0 new tests. (DONE)
+88. **Settings Draft Normalization Hardening** — Extracted default entity logic from tab-level saves and `createItem` factories into pure per-domain normalizer functions for KETIK (scenario, consumer, quick template), PDKT (scenario, consumer), and Telefun (scenario, consumer). Hardened Telefun persisted settings parser with item-level validation for `scenarios` and `consumerTypes`. Normalizers reused from both tab-level saves and modal-level `createItem` factories, eliminating drift risk between save paths. 4 new normalizer files, 1 new test file (134 lines, 5 test cases), 6 modified tab files. 35 tests passing, 0 TS errors. (DONE)
 
-## Key Files Changed (Phase 58 — 87)
+## Key Files Changed (Phase 58 — 88)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -353,6 +354,19 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx` — **Phase 87**: Scenario script toggle clears draft script when disabled to prevent stale saves
 - `apps/web/src/__tests__/telefun-settings-model-default.test.ts` — **Phase 87**: Updated test assertions to use `DEFAULT_TELEFUN_SETTINGS` constants instead of hardcoded values
 - `docs/rebuild-logs/phase-87-settings-draft-canonical-commit.md` — **NEW Phase 87**: Documentation for settings draft canonical commit refactor
+- `apps/web/src/routes/ketik/components/settings/ketikDraftNormalizers.ts` — **NEW Phase 88**: KETIK draft normalizers (scenario, consumer, quick template)
+- `apps/web/src/routes/pdkt/components/settings/pdktDraftNormalizers.ts` — **NEW Phase 88**: PDKT draft normalizers (scenario, consumer)
+- `apps/web/src/routes/telefun/components/settings/telefunDraftNormalizers.ts` — **NEW Phase 88**: Telefun draft normalizers (scenario, consumer)
+- `apps/web/src/__tests__/settings-draft-normalizers.test.ts` — **NEW Phase 88**: 5 test cases covering all 7 normalizer functions across 3 domains
+- `apps/web/src/routes/telefun/telefunSettings.ts` — **Phase 88**: Hardened persisted settings parser with item-level validation for `scenarios` and `consumerTypes`
+- `apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeKetikScenarioDraft`
+- `apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeKetikConsumerDraft`
+- `apps/web/src/routes/ketik/components/settings/KetikTemplateTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeKetikQuickTemplateDraft`
+- `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizePdktScenarioDraft`
+- `apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizePdktConsumerDraft`
+- `apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeTelefunScenarioDraft`
+- `apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx` — **Phase 88**: Replaced inline default entity logic with `normalizeTelefunConsumerDraft`
+- `docs/rebuild-logs/phase-88-settings-draft-normalization-hardening.md` — **NEW Phase 88**: Documentation for settings draft normalization hardening
 
 ## Relevant Files
 

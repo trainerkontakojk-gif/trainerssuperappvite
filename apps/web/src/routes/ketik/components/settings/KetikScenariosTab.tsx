@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { KetikAppSettings, KetikScenario } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
+import { normalizeKetikScenarioDraft } from "./ketikDraftNormalizers";
 
 interface KetikScenariosTabProps {
   scenarios: KetikScenario[];
@@ -80,13 +81,11 @@ export function KetikScenariosTab({
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : "";
 
-    const normalizedDraft: Omit<KetikScenario, "id"> = {
+    const normalizedDraft = normalizeKetikScenarioDraft({
       ...scenarioForm.draft,
       category,
       script: draftScript,
-      images: scenarioForm.draft.images ?? [],
-      isActive: scenarioForm.draft.isActive ?? true,
-    };
+    });
 
     setLocalSettings((prev) => ({
       ...prev,

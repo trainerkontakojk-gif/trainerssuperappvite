@@ -3,6 +3,7 @@ import { Users, Check, Edit2, Trash2, Plus, X } from "lucide-react";
 import { PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
+import { normalizePdktConsumerDraft } from "./pdktDraftNormalizers";
 
 interface PdktConsumersTabProps {
   consumerTypes: PdktConsumerType[];
@@ -49,14 +50,7 @@ export function PdktConsumersTab({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    const normalizedDraft: Omit<PdktConsumerType, "id"> = {
-      ...consumerForm.draft,
-      name: consumerForm.draft.name,
-      description: consumerForm.draft.description,
-      difficulty: consumerForm.draft.difficulty ?? "Medium",
-      tone: consumerForm.draft.tone ?? "",
-      isCustom: true,
-    };
+    const normalizedDraft = normalizePdktConsumerDraft(consumerForm.draft);
 
     setLocalSettings((prev) => ({
       ...prev,

@@ -7,6 +7,10 @@ import {
   ConsumerDifficulty,
   VOICE_MODELS as TELEFUN_AUDIO_MODELS
 } from '../../telefunSettings';
+import {
+  normalizeTelefunConsumerDraft,
+  normalizeTelefunScenarioDraft,
+} from "./telefunDraftNormalizers";
 
 interface UseTelefunSettingsDraftProps {
   settings: AppSettings;
@@ -59,11 +63,7 @@ export function useTelefunSettingsDraft({
     validate: (draft) => !!(draft.title && draft.instruction && draft.category),
     createItem: (id, draft) => ({
       id,
-      category: draft.category || "Umum",
-      title: draft.title,
-      instruction: draft.instruction,
-      script: draft.script ?? "",
-      isActive: draft.isActive ?? true,
+      ...normalizeTelefunScenarioDraft(draft),
     }),
   });
 
@@ -78,10 +78,7 @@ export function useTelefunSettingsDraft({
     validate: (draft) => !!(draft.name && draft.description),
     createItem: (id, draft) => ({
       id,
-      name: draft.name,
-      description: draft.description,
-      difficulty: draft.difficulty ?? ConsumerDifficulty.Medium,
-      gender: draft.gender ?? "random",
+      ...normalizeTelefunConsumerDraft(draft),
     }),
   });
 

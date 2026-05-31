@@ -2,6 +2,7 @@ import React from "react";
 import { Users, Check, Edit2, Trash2, Plus } from "lucide-react";
 import { KetikAppSettings, KetikConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
+import { normalizeKetikConsumerDraft } from "./ketikDraftNormalizers";
 
 interface KetikConsumersTabProps {
   consumerTypes: KetikConsumerType[];
@@ -50,13 +51,7 @@ export function KetikConsumersTab({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    const normalizedDraft: Omit<KetikConsumerType, "id"> = {
-      ...consumerForm.draft,
-      name: consumerForm.draft.name,
-      description: consumerForm.draft.description,
-      difficulty: consumerForm.draft.difficulty ?? "Sedang",
-      isCustom: true,
-    };
+    const normalizedDraft = normalizeKetikConsumerDraft(consumerForm.draft);
 
     setLocalSettings((prev) => ({
       ...prev,

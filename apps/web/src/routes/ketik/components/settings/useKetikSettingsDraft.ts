@@ -8,6 +8,11 @@ import type {
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
+import {
+  normalizeKetikScenarioDraft,
+  normalizeKetikConsumerDraft,
+  normalizeKetikQuickTemplateDraft,
+} from "./ketikDraftNormalizers";
 
 export interface UseKetikSettingsDraftProps {
   settings: KetikAppSettings;
@@ -63,12 +68,7 @@ export function useKetikSettingsDraft({
     validate: (draft) => !!(draft.title && draft.description && draft.category),
     createItem: (id, draft) => ({
       id,
-      category: draft.category || "Umum",
-      title: draft.title,
-      description: draft.description,
-      script: draft.script ?? "",
-      isActive: draft.isActive ?? true,
-      images: draft.images ?? [],
+      ...normalizeKetikScenarioDraft(draft),
     }),
   });
 
@@ -83,10 +83,7 @@ export function useKetikSettingsDraft({
     validate: (draft) => !!(draft.name && draft.description),
     createItem: (id, draft) => ({
       id,
-      name: draft.name,
-      description: draft.description,
-      difficulty: draft.difficulty ?? "Sedang",
-      isCustom: true,
+      ...normalizeKetikConsumerDraft(draft),
     }),
   });
 
@@ -99,8 +96,7 @@ export function useKetikSettingsDraft({
     validate: (draft) => !!(draft.keyword && draft.content),
     createItem: (id, draft) => ({
       id,
-      keyword: draft.keyword.trim().toLowerCase().replace(/\s+/g, "-"),
-      content: draft.content.trim(),
+      ...normalizeKetikQuickTemplateDraft(draft),
     }),
   });
 

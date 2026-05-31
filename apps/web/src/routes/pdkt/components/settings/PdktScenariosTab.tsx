@@ -7,6 +7,7 @@ import { notify } from "../../../../lib/toast";
 import { postApi } from "../../../../hooks/useApi";
 import ScenarioImage from "../ScenarioImage";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
+import { normalizePdktScenarioDraft } from "./pdktDraftNormalizers";
 
 interface PdktScenariosTabProps {
   scenarios: PdktScenario[];
@@ -184,18 +185,10 @@ export function PdktScenariosTab({
 
     const category = isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category || "Umum";
 
-    const normalizedDraft: Omit<PdktScenario, "id"> = {
+    const normalizedDraft = normalizePdktScenarioDraft({
       ...scenarioForm.draft,
       category,
-      sampleEmailTemplate: scenarioForm.draft.sampleEmailTemplate ?? {
-        subject: "",
-        body: "",
-      },
-      alwaysUseSampleEmail: scenarioForm.draft.alwaysUseSampleEmail ?? false,
-      isLicensed: scenarioForm.draft.isLicensed ?? false,
-      isActive: scenarioForm.draft.isActive ?? true,
-      attachmentImages: scenarioForm.draft.attachmentImages ?? [],
-    };
+    });
 
     setLocalSettings((prev) => ({
       ...prev,

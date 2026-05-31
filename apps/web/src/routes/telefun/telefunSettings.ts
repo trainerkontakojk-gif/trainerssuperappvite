@@ -323,6 +323,20 @@ function coerceResponsePacingMode(value: unknown): TelefunAppSettings["responseP
     : "realistic";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function coerceString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function coerceTelefunDifficulty(value: unknown): ConsumerDifficulty {
+  return Object.values(ConsumerDifficulty).includes(value as ConsumerDifficulty)
+    ? (value as ConsumerDifficulty)
+    : ConsumerDifficulty.Medium;
+}
+
 function coerceTelefunTransport(value: unknown): TelefunTransport {
   return TELEFUN_TRANSPORTS.includes(value as TelefunTransport)
     ? (value as TelefunTransport)
@@ -330,14 +344,51 @@ function coerceTelefunTransport(value: unknown): TelefunTransport {
 }
 
 function coerceTelefunScenarios(value: unknown): TelefunScenario[] {
-  return Array.isArray(value)
-    ? (value as TelefunScenario[])
-    : DEFAULT_TELEFUN_SETTINGS.scenarios;
+  if (!Array.isArray(value)) return DEFAULT_TELEFUN_SETTINGS.scenarios;
+
+  const scenarios = value
+    .filter(isRecord)
+    .map((item): TelefunScenario | null => {
+      const id = coerceString(item.id);
+      const title = coerceString(item.title);
+      const instruction = coerceString(item.instruction);
+      if (!id || !title || !instruction) return null;
+      return {
+        id,
+        title,
+        instruction,
+        isActive: item.isActive !== false,
+        category: coerceString(item.category) || "Umum",
+        script: coerceString(item.script),
+      };
+    })
+    .filter((item): item is TelefunScenario => item !== null);
+
+  return scenarios.length > 0 ? scenarios : DEFAULT_TELEFUN_SETTINGS.scenarios;
 }
 
 function coerceTelefunConsumerTypes(value: unknown): TelefunConsumerType[] {
-  return Array.isArray(value)
-    ? (value as TelefunConsumerType[])
+  if (!Array.isArray(value)) return DEFAULT_TELEFUN_SETTINGS.consumerTypes;
+
+  const consumerTypes = value
+    .filter(isRecord)
+    .map((item): TelefunConsumerType | null => {
+      const id = coerceString(item.id);
+      const name = coerceString(item.name);
+      const description = coerceString(item.description);
+      if (!id || !name || !description) return null;
+      return {
+        id,
+        name,
+        description,
+        difficulty: coerceTelefunDifficulty(item.difficulty),
+        gender: coerceString(item.gender) || "random",
+      };
+    })
+    .filter((item): item is TelefunConsumerType => item !== null);
+
+  return consumerTypes.length > 0
+    ? consumerTypes
     : DEFAULT_TELEFUN_SETTINGS.consumerTypes;
 }
 

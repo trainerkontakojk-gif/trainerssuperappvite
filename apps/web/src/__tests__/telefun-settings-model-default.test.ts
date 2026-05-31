@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TELEFUN_SETTINGS,
   parseTelefunSettings,
+  ConsumerDifficulty,
 } from "../routes/telefun/telefunSettings";
 
 describe("parseTelefunSettings", () => {
@@ -135,5 +136,65 @@ describe("parseTelefunSettings coercion", () => {
 
     expect(result.scenarios).toBe(DEFAULT_TELEFUN_SETTINGS.scenarios);
     expect(result.consumerTypes).toBe(DEFAULT_TELEFUN_SETTINGS.consumerTypes);
+  });
+
+  it("normalizes malformed scenario rows instead of casting them blindly", () => {
+    const result = parseTelefunSettings({
+      scenarios: [
+        {
+          id: "s-valid",
+          title: "Valid",
+          instruction: "Instruksi",
+          isActive: "yes",
+          category: 123,
+          script: null,
+        },
+        {
+          id: "",
+          title: "",
+          instruction: "",
+        },
+      ],
+    } as any);
+
+    expect(result.scenarios).toEqual([
+      {
+        id: "s-valid",
+        title: "Valid",
+        instruction: "Instruksi",
+        isActive: true,
+        category: "Umum",
+        script: "",
+      },
+    ]);
+  });
+
+  it("normalizes malformed consumer rows instead of casting them blindly", () => {
+    const result = parseTelefunSettings({
+      consumerTypes: [
+        {
+          id: "c-valid",
+          name: "Valid",
+          description: "Deskripsi",
+          difficulty: "not-valid",
+          gender: 123,
+        },
+        {
+          id: "",
+          name: "",
+          description: "",
+        },
+      ],
+    } as any);
+
+    expect(result.consumerTypes).toEqual([
+      {
+        id: "c-valid",
+        name: "Valid",
+        description: "Deskripsi",
+        difficulty: ConsumerDifficulty.Medium,
+        gender: "random",
+      },
+    ]);
   });
 });

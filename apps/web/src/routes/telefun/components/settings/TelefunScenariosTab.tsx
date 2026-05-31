@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Check, Edit2, Trash2, Plus, X } from 'lucide-react';
 import { TelefunAppSettings as AppSettings, TelefunScenario as Scenario } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
+import { normalizeTelefunScenarioDraft } from './telefunDraftNormalizers';
 
 interface TelefunScenariosTabProps {
   scenarios: Scenario[];
@@ -59,12 +60,11 @@ export const TelefunScenariosTab: React.FC<TelefunScenariosTabProps> = ({
 
     const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : '';
 
-    const normalizedDraft: Omit<Scenario, "id"> = {
+    const normalizedDraft = normalizeTelefunScenarioDraft({
       ...scenarioForm.draft,
       category,
       script: draftScript,
-      isActive: scenarioForm.draft.isActive ?? true,
-    };
+    });
 
     // Save draft to local settings
     setLocalSettings((prev) => ({

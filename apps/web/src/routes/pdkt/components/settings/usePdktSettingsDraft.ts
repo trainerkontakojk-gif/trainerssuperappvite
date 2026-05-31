@@ -8,6 +8,10 @@ import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { DEFAULT_PDKT_MODEL_ID, coercePdktModelId } from "../../pdktSettings";
 import { TEXT_MODELS } from "../../pdktSettings";
+import {
+  normalizePdktConsumerDraft,
+  normalizePdktScenarioDraft,
+} from "./pdktDraftNormalizers";
 
 export interface UsePdktSettingsDraftProps {
   settings: AppSettings;
@@ -109,15 +113,7 @@ export function usePdktSettingsDraft({
     validate: (draft) => !!(draft.title && draft.description && draft.category),
     createItem: (id, draft) => ({
       id,
-      category: draft.category || "Umum",
-      title: draft.title,
-      description: draft.description,
-      sampleEmailTemplate: draft.sampleEmailTemplate ?? { subject: "", body: "" },
-      alwaysUseSampleEmail: draft.alwaysUseSampleEmail ?? false,
-      isLicensed: draft.isLicensed ?? false,
-      isActive: draft.isActive ?? true,
-      script: draft.script,
-      attachmentImages: draft.attachmentImages ?? [],
+      ...normalizePdktScenarioDraft(draft),
     }),
   });
 
@@ -133,11 +129,7 @@ export function usePdktSettingsDraft({
     validate: (draft) => !!(draft.name && draft.description),
     createItem: (id, draft) => ({
       id,
-      name: draft.name,
-      description: draft.description,
-      difficulty: draft.difficulty ?? "Medium",
-      tone: draft.tone ?? "",
-      isCustom: true,
+      ...normalizePdktConsumerDraft(draft),
     }),
   });
 

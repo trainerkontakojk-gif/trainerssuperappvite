@@ -2,6 +2,7 @@ import React from 'react';
 import { Users, Check, Edit2, Trash2, Plus } from 'lucide-react';
 import { TelefunAppSettings as AppSettings, TelefunConsumerType as ConsumerType, ConsumerDifficulty } from '../../telefunSettings';
 import { useCrudForm } from '../../../../hooks/useCrudForm';
+import { normalizeTelefunConsumerDraft } from './telefunDraftNormalizers';
 
 interface TelefunConsumersTabProps {
   consumerTypes: ConsumerType[];
@@ -38,13 +39,10 @@ export const TelefunConsumersTab: React.FC<TelefunConsumersTabProps> = ({
   const handleSaveConsumer = () => {
     if (!consumerForm.draft.name || !consumerForm.draft.description) return;
 
-    const normalizedDraft: Omit<ConsumerType, "id"> = {
+    const normalizedDraft = normalizeTelefunConsumerDraft({
       ...consumerForm.draft,
-      name: consumerForm.draft.name,
-      description: consumerForm.draft.description,
-      difficulty: consumerForm.draft.difficulty ?? ConsumerDifficulty.Medium,
       gender: "random",
-    };
+    });
 
     setLocalSettings((prev) => ({
       ...prev,

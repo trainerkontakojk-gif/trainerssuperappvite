@@ -2,6 +2,7 @@ import React from "react";
 import { MessageSquare, Edit2, Trash2, Plus } from "lucide-react";
 import { KetikAppSettings, KetikQuickTemplate } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
+import { normalizeKetikQuickTemplateDraft } from "./ketikDraftNormalizers";
 
 interface KetikTemplateTabProps {
   quickTemplates: KetikQuickTemplate[];
@@ -39,15 +40,8 @@ export function KetikTemplateTab({
 
   const handleSaveTemplate = () => {
     if (!templateForm.draft.keyword || !templateForm.draft.content) return;
-    const sanitizedKeyword = templateForm.draft.keyword
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "-");
 
-    const normalizedDraft: Omit<KetikQuickTemplate, "id"> = {
-      keyword: sanitizedKeyword,
-      content: templateForm.draft.content.trim(),
-    };
+    const normalizedDraft = normalizeKetikQuickTemplateDraft(templateForm.draft);
 
     setLocalSettings((prev) => ({
       ...prev,
