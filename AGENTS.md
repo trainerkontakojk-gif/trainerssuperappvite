@@ -272,8 +272,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 81. **KETIK ChatInterface Message Utils & Pacing Extraction** — Extracted inline constants, helpers, and pacing functions from `ChatInterface.tsx` (277 → 16 lines) into `ketik/lib/message-utils.ts` (193 lines) and `ketik/lib/pacing.ts` (69 lines). Pure extraction, zero logic change. (DONE)
 82. **KETIK Service Decomposition** — Decomposed monolithic `ketik-service.ts` (1,400 → 5 lines barrel file) into 5 sub-modules under `apps/api/src/services/ketik/`: `shared-utils.ts` (9 lines — `extractJsonObjectText`), `consumer-response.ts` (347 lines — scenario defaults, consumer response generation), `review-lifecycle.ts` (317 lines — `triggerKetikAIReview` lifecycle), `review-processor.ts` (353 lines — `processKetikReviewJob` with AI scoring), `settings-history.ts` (369 lines — session CRUD, settings history). Backward compatible — all consumers import via barrel unchanged. 484 API tests passing. (DONE)
 83. **Settings Modal Full Decomposition** — Decomposed 3 monolithic SettingsModal components (Telefun 1,232→78, KETIK 915→58, PDKT 976→63 lines) into per-tab sub-modules. Created shared `useCrudForm` hook (87 lines) with generic CRUD form state management (openAdd/openEdit/close, save/remove, isDirty/isValid). Extracted all tab content to dedicated components: Telefun (Scenarios/Consumers/Identity/SystemTabs), KETIK (Scenarios/Consumers/Identity/TemplateTabs), PDKT (Scenarios/Consumers/IdentityTabs). 18 files modified/added, pure decomposition with zero logic change. (DONE)
+84. **SIDAK Input Hooks Decomposition** — Extracted 3 custom hooks from monolithic `input.tsx` (767→274 lines): `useTemuanEdit` (106 lines — edit/delete state + save handler), `useTemuanForm` (217 lines — manual form entries, validation, duplicate check, batch save, perfect score), `useTemuanImport` (327 lines — Excel template download, file parse, import save with duplicate/preview). Also extracted `newEntry()` helper and `FormEntry` interface. Pure decomposition, zero logic change. (DONE)
 
-## Key Files Changed (Phase 58 — 83)
+## Key Files Changed (Phase 58 — 84)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -459,6 +460,11 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx` — **NEW Phase 83**: Consumers CRUD tab (14.0K)
 - `apps/web/src/routes/pdkt/components/settings/PdktIdentityTab.tsx` — **NEW Phase 83**: Identity settings tab (7.7K)
 - `docs/rebuild-logs/phase-83-settings-modal-decomposition.md` — **NEW Phase 83**: Documentation for settings modal decomposition
+- `apps/web/src/routes/sidak/hooks/useTemuanEdit.ts` — **NEW Phase 84**: Edit/delete state + save handler for temuan (106 lines)
+- `apps/web/src/routes/sidak/hooks/useTemuanForm.ts` — **NEW Phase 84**: Manual form entries, validation, duplicate check, batch save, perfect score (217 lines)
+- `apps/web/src/routes/sidak/hooks/useTemuanImport.ts` — **NEW Phase 84**: Excel template download, file parse, import save with duplicate/preview (327 lines)
+- `apps/web/src/routes/sidak/input.tsx` — **Phase 84**: Reduced from 767 to 274 lines — delegates to extracted hooks useTemuanEdit/useTemuanForm/useTemuanImport
+- `docs/rebuild-logs/phase-84-sidak-input-hooks-decomposition.md` — **NEW Phase 84**: Documentation for SIDAK input hooks decomposition
 
 ## Routes Reference (apps/web)
 
