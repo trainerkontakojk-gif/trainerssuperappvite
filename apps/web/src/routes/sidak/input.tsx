@@ -19,6 +19,7 @@ import {
 import { useTemuanEdit } from "./hooks/useTemuanEdit";
 import { useTemuanForm, newEntry } from "./hooks/useTemuanForm";
 import { useTemuanImport } from "./hooks/useTemuanImport";
+import { useSidakInputRuleModel, type SidakRuleIndicatorRow } from "./hooks/useSidakInputRuleModel";
 
 const MONTHS = [
   "Januari", "Februari", "Maret", "April",
@@ -77,8 +78,15 @@ export default function SidakInputPage() {
   // Rule version snapshot for input
   const [activeRuleVersionId, setActiveRuleVersionId] = useState<string | null>(null);
   const [hasDraftVersion, setHasDraftVersion] = useState(false);
-  const [ruleIndicatorsRaw, setRuleIndicatorsRaw] = useState<any[]>([]);
+  const [ruleIndicatorsRaw, setRuleIndicatorsRaw] = useState<SidakRuleIndicatorRow[]>([]);
   const [loadingRuleIndicators, setLoadingRuleIndicators] = useState(false);
+
+  // Rule indicators derivation via hook
+  const { activeIndicators, unlinkedIndicatorIds } = useSidakInputRuleModel({
+    ruleIndicatorsRaw,
+    globalIndicators: indicators ?? [],
+    selectedService,
+  });
 
   // Initialize Hooks
   const editHook = useTemuanEdit({
@@ -92,29 +100,8 @@ export default function SidakInputPage() {
     selectedAgent,
     selectedPeriod,
     selectedService,
-    activeIndicators: useMemo(() => {
-      if (ruleIndicatorsRaw.length > 0) {
-        return ruleIndicatorsRaw.map((ri) => ({
-          id: ri.legacyIndicatorId || ri.ruleIndicatorId,
-          service_type: selectedService,
-          name: ri.name,
-          category: ri.category,
-          bobot: ri.bobot,
-          has_na: ri.has_na,
-          ruleIndicatorId: ri.ruleIndicatorId,
-          legacyIndicatorId: ri.legacyIndicatorId,
-        })) as QAIndicator[];
-      }
-      return indicators ?? [];
-    }, [ruleIndicatorsRaw, indicators, selectedService]),
-    unlinkedIndicatorIds: useMemo(() => {
-      if (ruleIndicatorsRaw.length === 0) return new Set<string>();
-      return new Set(
-        ruleIndicatorsRaw
-          .filter((ri: any) => !ri.legacyIndicatorId)
-          .map((ri: any) => ri.ruleIndicatorId as string),
-      );
-    }, [ruleIndicatorsRaw]),
+    activeIndicators,
+    unlinkedIndicatorIds,
     temuan,
     setTemuan,
     setErrorMsg,
@@ -125,29 +112,8 @@ export default function SidakInputPage() {
     selectedAgent,
     selectedPeriod,
     selectedService,
-    activeIndicators: useMemo(() => {
-      if (ruleIndicatorsRaw.length > 0) {
-        return ruleIndicatorsRaw.map((ri) => ({
-          id: ri.legacyIndicatorId || ri.ruleIndicatorId,
-          service_type: selectedService,
-          name: ri.name,
-          category: ri.category,
-          bobot: ri.bobot,
-          has_na: ri.has_na,
-          ruleIndicatorId: ri.ruleIndicatorId,
-          legacyIndicatorId: ri.legacyIndicatorId,
-        })) as QAIndicator[];
-      }
-      return indicators ?? [];
-    }, [ruleIndicatorsRaw, indicators, selectedService]),
-    unlinkedIndicatorIds: useMemo(() => {
-      if (ruleIndicatorsRaw.length === 0) return new Set<string>();
-      return new Set(
-        ruleIndicatorsRaw
-          .filter((ri: any) => !ri.legacyIndicatorId)
-          .map((ri: any) => ri.ruleIndicatorId as string),
-      );
-    }, [ruleIndicatorsRaw]),
+    activeIndicators,
+    unlinkedIndicatorIds,
     temuan,
     setTemuan,
     setErrorMsg,
@@ -200,22 +166,6 @@ export default function SidakInputPage() {
     }
   }, [selectedService, fetchRuleVersionIndicators]);
 
-  const activeIndicators = useMemo(() => {
-    if (ruleIndicatorsRaw.length > 0) {
-      return ruleIndicatorsRaw.map((ri) => ({
-        id: ri.legacyIndicatorId || ri.ruleIndicatorId,
-        service_type: selectedService,
-        name: ri.name,
-        category: ri.category,
-        bobot: ri.bobot,
-        has_na: ri.has_na,
-        ruleIndicatorId: ri.ruleIndicatorId,
-        legacyIndicatorId: ri.legacyIndicatorId,
-      })) as QAIndicator[];
-    }
-    return indicators ?? [];
-  }, [ruleIndicatorsRaw, indicators, selectedService]);
-
   const indicatorLookup = useMemo(() => {
     const map = new Map<string, QAIndicator>();
     activeIndicators.forEach((i) => map.set(i.id, i));
@@ -227,15 +177,6 @@ export default function SidakInputPage() {
     activeIndicators.forEach((i) => map.set(i.id, i.name));
     return map;
   }, [activeIndicators]);
-
-  const unlinkedIndicatorIds = useMemo(() => {
-    if (ruleIndicatorsRaw.length === 0) return new Set<string>();
-    return new Set(
-      ruleIndicatorsRaw
-        .filter((ri: any) => !ri.legacyIndicatorId)
-        .map((ri: any) => ri.ruleIndicatorId as string),
-    );
-  }, [ruleIndicatorsRaw]);
 
   const displayFolders = folders ?? [];
 
