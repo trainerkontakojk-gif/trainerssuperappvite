@@ -97,3 +97,39 @@ describe("parseTelefunSettings", () => {
     expect(result.identitySettings.gender).toBe("random");
   });
 });
+
+describe("parseTelefunSettings coercion", () => {
+  it("falls back to random identity gender for invalid persisted gender", () => {
+    const result = parseTelefunSettings({
+      identitySettings: {
+        displayName: "Customer",
+        gender: "invalid-gender",
+        phoneNumber: "",
+        city: "",
+        signatureName: "",
+        voiceName: "",
+      },
+    } as any);
+
+    expect(result.identitySettings.gender).toBe("random");
+  });
+
+  it("falls back to default transport and pacing mode for invalid persisted values", () => {
+    const result = parseTelefunSettings({
+      telefunTransport: "legacy-transport",
+      responsePacingMode: "slow-motion",
+    } as any);
+
+    expect(result.telefunTransport).toBe("gemini-live");
+    expect(result.responsePacingMode).toBe("realistic");
+  });
+
+  it("falls back to default collections when persisted collections are not arrays", () => {
+    const result = parseTelefunSettings({
+      scenarios: { id: "not-array" },
+      consumerTypes: { id: "not-array" },
+    } as any);
+
+    expect(result.scenarios).toHaveLength(0); // empty default scenarios or matches DEFAULT_TELEFUN_SETTINGS scenarios
+  });
+});
