@@ -18,6 +18,34 @@ export interface UsePdktSettingsDraftProps {
   defaultConsumerTypes: PdktConsumerType[];
 }
 
+interface PdktSystemDraft {
+  enableImageGeneration: boolean;
+  globalConsumerTypeId: string;
+  selectedModel: string;
+  consumerNameMentionPattern: AppSettings["consumerNameMentionPattern"];
+  writingStyleMode: AppSettings["writingStyleMode"];
+  customIdentity: NonNullable<AppSettings["customIdentity"]>;
+}
+
+export function buildPdktSettingsForSave(params: {
+  localSettings: AppSettings;
+  scenarios: PdktScenario[];
+  consumerTypes: PdktConsumerType[];
+  system: PdktSystemDraft;
+}): AppSettings {
+  return {
+    ...params.localSettings,
+    scenarios: params.scenarios,
+    consumerTypes: params.consumerTypes,
+    enableImageGeneration: params.system.enableImageGeneration,
+    globalConsumerTypeId: params.system.globalConsumerTypeId,
+    selectedModel: params.system.selectedModel,
+    consumerNameMentionPattern: params.system.consumerNameMentionPattern,
+    writingStyleMode: params.system.writingStyleMode,
+    customIdentity: params.system.customIdentity,
+  };
+}
+
 export function usePdktSettingsDraft({
   settings,
   isOpen,
@@ -163,31 +191,39 @@ export function usePdktSettingsDraft({
       return;
     }
 
-    let finalSettings = localSettings;
-    if (scenarioDirty) {
-      finalSettings.scenarios = scenarioForm.save(finalSettings.scenarios);
-      scenarioForm.close();
-    }
-    if (consumerDirty) {
-      finalSettings.consumerTypes = consumerForm.save(finalSettings.consumerTypes);
-      consumerForm.close();
-    }
+    const nextScenarios = scenarioDirty
+      ? scenarioForm.save(localSettings.scenarios)
+      : localSettings.scenarios;
+    const nextConsumerTypes = consumerDirty
+      ? consumerForm.save(localSettings.consumerTypes)
+      : localSettings.consumerTypes;
 
     try {
-      const settingsToSave: AppSettings = {
-        ...finalSettings,
-        enableImageGeneration,
-        globalConsumerTypeId,
-        selectedModel,
-        consumerNameMentionPattern,
-        writingStyleMode,
-        customIdentity: {
-          senderName: customSenderName,
-          bodyName: customBodyName,
-          email: customEmail,
-          city: customCity,
+      const settingsToSave = buildPdktSettingsForSave({
+        localSettings,
+        scenarios: nextScenarios,
+        consumerTypes: nextConsumerTypes,
+        system: {
+          enableImageGeneration,
+          globalConsumerTypeId,
+          selectedModel,
+          consumerNameMentionPattern,
+          writingStyleMode,
+          customIdentity: {
+            senderName: customSenderName,
+            bodyName: customBodyName,
+            email: customEmail,
+            city: customCity,
+          },
         },
-      };
+      });
+
+      if (scenarioDirty) {
+        scenarioForm.close();
+      }
+      if (consumerDirty) {
+        consumerForm.close();
+      }
 
       onSave(settingsToSave);
       onClose();

@@ -15,6 +15,25 @@ interface UseTelefunSettingsDraftProps {
   onClose: () => void;
 }
 
+export function buildTelefunSettingsForSave(params: {
+  localSettings: AppSettings;
+  scenarios: Scenario[];
+  consumerTypes: ConsumerType[];
+  selectedTelefunModel: string;
+}): AppSettings {
+  const selectedModel = TELEFUN_AUDIO_MODELS.find(
+    (model) => model.id === params.selectedTelefunModel,
+  );
+
+  return {
+    ...params.localSettings,
+    scenarios: params.scenarios,
+    consumerTypes: params.consumerTypes,
+    telefunTransport: (selectedModel?.telefunTransport ?? "gemini-live") as any,
+    telefunModelId: params.selectedTelefunModel,
+  };
+}
+
 export function useTelefunSettingsDraft({
   settings,
   isOpen,
@@ -148,23 +167,28 @@ export function useTelefunSettingsDraft({
       return;
     }
 
-    const selectedTelefunTransport = TELEFUN_AUDIO_MODELS.find((m: any) => m.id === selectedTelefunModel)?.telefunTransport || 'gemini-live';
-    let finalSettings: AppSettings = {
-      ...localSettings,
-      telefunTransport: selectedTelefunTransport as any,
-      telefunModelId: selectedTelefunModel,
-    };
+    const nextScenarios = scenarioDirty
+      ? scenarioForm.save(localSettings.scenarios)
+      : localSettings.scenarios;
+    const nextConsumerTypes = consumerDirty
+      ? consumerForm.save(localSettings.consumerTypes)
+      : localSettings.consumerTypes;
+
+    const settingsToSave = buildTelefunSettingsForSave({
+      localSettings,
+      scenarios: nextScenarios,
+      consumerTypes: nextConsumerTypes,
+      selectedTelefunModel,
+    });
 
     if (scenarioDirty) {
-      finalSettings.scenarios = scenarioForm.save(finalSettings.scenarios);
       scenarioForm.close();
     }
     if (consumerDirty) {
-      finalSettings.consumerTypes = consumerForm.save(finalSettings.consumerTypes);
       consumerForm.close();
     }
 
-    onSave(finalSettings);
+    onSave(settingsToSave);
     onClose();
   };
 

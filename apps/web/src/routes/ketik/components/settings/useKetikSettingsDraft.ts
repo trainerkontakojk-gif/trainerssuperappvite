@@ -16,6 +16,20 @@ export interface UseKetikSettingsDraftProps {
   onClose: () => void;
 }
 
+export function buildKetikSettingsForSave(params: {
+  localSettings: KetikAppSettings;
+  scenarios: KetikScenario[];
+  consumerTypes: KetikConsumerType[];
+  quickTemplates: KetikQuickTemplate[];
+}): KetikAppSettings {
+  return {
+    ...params.localSettings,
+    scenarios: params.scenarios,
+    consumerTypes: params.consumerTypes,
+    quickTemplates: params.quickTemplates,
+  };
+}
+
 export function useKetikSettingsDraft({
   settings,
   isOpen,
@@ -195,21 +209,34 @@ export function useKetikSettingsDraft({
       return;
     }
 
-    let finalSettings = localSettings;
+    const nextScenarios = scenarioDirty
+      ? scenarioForm.save(localSettings.scenarios)
+      : localSettings.scenarios;
+    const nextConsumerTypes = consumerDirty
+      ? consumerForm.save(localSettings.consumerTypes)
+      : localSettings.consumerTypes;
+    const nextQuickTemplates = templateDirty
+      ? templateForm.save(localSettings.quickTemplates || [])
+      : (localSettings.quickTemplates || []);
+
+    const settingsToSave = buildKetikSettingsForSave({
+      localSettings,
+      scenarios: nextScenarios,
+      consumerTypes: nextConsumerTypes,
+      quickTemplates: nextQuickTemplates,
+    });
+
     if (scenarioDirty) {
-      finalSettings.scenarios = scenarioForm.save(finalSettings.scenarios);
       scenarioForm.close();
     }
     if (consumerDirty) {
-      finalSettings.consumerTypes = consumerForm.save(finalSettings.consumerTypes);
       consumerForm.close();
     }
     if (templateDirty) {
-      finalSettings.quickTemplates = templateForm.save(finalSettings.quickTemplates || []);
       templateForm.close();
     }
 
-    onSave(finalSettings);
+    onSave(settingsToSave);
     onClose();
   };
 
