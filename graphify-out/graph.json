@@ -1728,7 +1728,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L5",
       "id": "src_index_userprofile",
-      "community": 7,
+      "community": 37,
       "norm_label": "userprofile"
     },
     {
@@ -1755,7 +1755,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L28",
       "id": "src_index_servicetype",
-      "community": 48,
+      "community": 24,
       "norm_label": "servicetype"
     },
     {
@@ -1791,7 +1791,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L35",
       "id": "src_index_scoringmode",
-      "community": 60,
+      "community": 290,
       "norm_label": "scoringmode"
     },
     {
@@ -1827,7 +1827,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L56",
       "id": "src_index_qaindicator",
-      "community": 67,
+      "community": 118,
       "norm_label": "qaindicator"
     },
     {
@@ -1881,7 +1881,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L104",
       "id": "src_index_serviceweight",
-      "community": 24,
+      "community": 290,
       "norm_label": "serviceweight"
     },
     {
@@ -1917,7 +1917,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L144",
       "id": "src_index_ruleversion",
-      "community": 5,
+      "community": 96,
       "norm_label": "ruleversion"
     },
     {
@@ -1935,7 +1935,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L160",
       "id": "src_index_qaruleindicator",
-      "community": 5,
+      "community": 96,
       "norm_label": "qaruleindicator"
     },
     {
@@ -1998,7 +1998,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L219",
       "id": "src_index_agentdirectoryresponse",
-      "community": 292,
+      "community": 75,
       "norm_label": "agentdirectoryresponse"
     },
     {
@@ -2043,7 +2043,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L280",
       "id": "src_index_agentdetaildata",
-      "community": 9,
+      "community": 277,
       "norm_label": "agentdetaildata"
     },
     {
@@ -2133,7 +2133,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L493",
       "id": "src_index_ketiksessionhistoryitem",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketiksessionhistoryitem"
     },
     {
@@ -2142,7 +2142,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L510",
       "id": "src_index_ketikreviewdetail",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketikreviewdetail"
     },
     {
@@ -2151,7 +2151,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L523",
       "id": "src_index_ketikconsumertype",
-      "community": 37,
+      "community": 117,
       "norm_label": "ketikconsumertype"
     },
     {
@@ -2160,7 +2160,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L531",
       "id": "src_index_ketikscenario",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketikscenario"
     },
     {
@@ -2187,7 +2187,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L566",
       "id": "src_index_ketiksessionreview",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketiksessionreview"
     },
     {
@@ -2196,7 +2196,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L576",
       "id": "src_index_ketiktypofinding",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketiktypofinding"
     },
     {
@@ -2466,7 +2466,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L865",
       "id": "src_index_chatmessage",
-      "community": 37,
+      "community": 1,
       "norm_label": "chatmessage"
     },
     {
@@ -2493,7 +2493,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L877",
       "id": "src_index_generatemessageschema",
-      "community": 5,
+      "community": 74,
       "norm_label": "generatemessageschema"
     },
     {
@@ -2601,7 +2601,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1012",
       "id": "src_index_manageduser",
-      "community": 53,
+      "community": 20,
       "norm_label": "manageduser"
     },
     {
@@ -2628,7 +2628,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1041",
       "id": "src_index_accessgrouprow",
-      "community": 73,
+      "community": 292,
       "norm_label": "accessgrouprow"
     },
     {
@@ -2637,7 +2637,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1051",
       "id": "src_index_accessgroupitemrow",
-      "community": 73,
+      "community": 292,
       "norm_label": "accessgroupitemrow"
     },
     {
@@ -2655,7 +2655,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1067",
       "id": "src_index_accessscopeoptions",
-      "community": 73,
+      "community": 20,
       "norm_label": "accessscopeoptions"
     },
     {
@@ -2673,7 +2673,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1084",
       "id": "src_index_updateuserstatusschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "updateuserstatusschema"
     },
     {
@@ -2682,7 +2682,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1088",
       "id": "src_index_updateuserroleschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "updateuserroleschema"
     },
     {
@@ -2691,7 +2691,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1092",
       "id": "src_index_createaccessgroupschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "createaccessgroupschema"
     },
     {
@@ -2700,7 +2700,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1097",
       "id": "src_index_updateaccessgroupschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "updateaccessgroupschema"
     },
     {
@@ -2709,7 +2709,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1103",
       "id": "src_index_addaccessgroupitemschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "addaccessgroupitemschema"
     },
     {
@@ -2718,7 +2718,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1108",
       "id": "src_index_approveleaderrequestschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "approveleaderrequestschema"
     },
     {
@@ -2727,7 +2727,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1112",
       "id": "src_index_rejectleaderrequestschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "rejectleaderrequestschema"
     },
     {
@@ -2736,7 +2736,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1116",
       "id": "src_index_revokeleaderrequestschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "revokeleaderrequestschema"
     },
     {
@@ -2745,7 +2745,7 @@
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1120",
       "id": "src_index_reassignleaderrequestgroupsschema",
-      "community": 20,
+      "community": 5,
       "norm_label": "reassignleaderrequestgroupsschema"
     },
     {
@@ -4473,7 +4473,7 @@
       "source_file": "apps/web/src/router.tsx",
       "source_location": "L25",
       "id": "src_router_sidakdashboard",
-      "community": 292,
+      "community": 47,
       "norm_label": "sidakdashboard"
     },
     {
@@ -4590,7 +4590,7 @@
       "source_file": "apps/web/src/router.tsx",
       "source_location": "L38",
       "id": "src_router_monitoringpage",
-      "community": 7,
+      "community": 73,
       "norm_label": "monitoringpage"
     },
     {
@@ -5382,7 +5382,7 @@
       "source_file": "apps/web/src/components/PageHeroHeader.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_pageheroheader_tsx",
-      "community": 90,
+      "community": 203,
       "norm_label": "pageheroheader.tsx"
     },
     {
@@ -5391,7 +5391,7 @@
       "source_file": "apps/web/src/components/PageHeroHeader.tsx",
       "source_location": "L6",
       "id": "components_pageheroheader_pageheroheaderprops",
-      "community": 90,
+      "community": 203,
       "norm_label": "pageheroheaderprops"
     },
     {
@@ -5400,7 +5400,7 @@
       "source_file": "apps/web/src/components/PageHeroHeader.tsx",
       "source_location": "L16",
       "id": "components_pageheroheader_pageheroheader",
-      "community": 90,
+      "community": 203,
       "norm_label": "pageheroheader()"
     },
     {
@@ -5463,7 +5463,7 @@
       "source_file": "apps/web/src/components/ThemeToggle.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_themetoggle_tsx",
-      "community": 90,
+      "community": 203,
       "norm_label": "themetoggle.tsx"
     },
     {
@@ -5472,7 +5472,7 @@
       "source_file": "apps/web/src/components/ThemeToggle.tsx",
       "source_location": "L5",
       "id": "components_themetoggle_themetoggle",
-      "community": 90,
+      "community": 203,
       "norm_label": "themetoggle()"
     },
     {
@@ -5481,7 +5481,7 @@
       "source_file": "apps/web/src/components/LeaderAccessGate.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_leaderaccessgate_tsx",
-      "community": 7,
+      "community": 37,
       "norm_label": "leaderaccessgate.tsx"
     },
     {
@@ -5490,7 +5490,7 @@
       "source_file": "apps/web/src/components/LeaderAccessGate.tsx",
       "source_location": "L5",
       "id": "components_leaderaccessgate_leaderaccessgateprops",
-      "community": 7,
+      "community": 37,
       "norm_label": "leaderaccessgateprops"
     },
     {
@@ -5499,7 +5499,7 @@
       "source_file": "apps/web/src/components/LeaderAccessGate.tsx",
       "source_location": "L11",
       "id": "components_leaderaccessgate_statusconfig",
-      "community": 7,
+      "community": 37,
       "norm_label": "statusconfig"
     },
     {
@@ -5508,7 +5508,7 @@
       "source_file": "apps/web/src/components/LeaderAccessGate.tsx",
       "source_location": "L86",
       "id": "components_leaderaccessgate_leaderaccessgate",
-      "community": 7,
+      "community": 37,
       "norm_label": "leaderaccessgate()"
     },
     {
@@ -5580,7 +5580,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_errorboundary_tsx",
-      "community": 75,
+      "community": 276,
       "norm_label": "errorboundary.tsx"
     },
     {
@@ -5589,7 +5589,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L3",
       "id": "components_errorboundary_props",
-      "community": 75,
+      "community": 276,
       "norm_label": "props"
     },
     {
@@ -5598,7 +5598,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L7",
       "id": "components_errorboundary_state",
-      "community": 75,
+      "community": 276,
       "norm_label": "state"
     },
     {
@@ -5607,7 +5607,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L12",
       "id": "components_errorboundary_errorboundary",
-      "community": 75,
+      "community": 276,
       "norm_label": "errorboundary"
     },
     {
@@ -5616,7 +5616,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L13",
       "id": "components_errorboundary_errorboundary_constructor",
-      "community": 75,
+      "community": 276,
       "norm_label": ".constructor()"
     },
     {
@@ -5625,7 +5625,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L18",
       "id": "components_errorboundary_errorboundary_getderivedstatefromerror",
-      "community": 75,
+      "community": 276,
       "norm_label": ".getderivedstatefromerror()"
     },
     {
@@ -5634,7 +5634,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L22",
       "id": "components_errorboundary_errorboundary_componentdidcatch",
-      "community": 75,
+      "community": 276,
       "norm_label": ".componentdidcatch()"
     },
     {
@@ -5643,7 +5643,7 @@
       "source_file": "apps/web/src/components/ErrorBoundary.tsx",
       "source_location": "L26",
       "id": "components_errorboundary_errorboundary_render",
-      "community": 75,
+      "community": 276,
       "norm_label": ".render()"
     },
     {
@@ -5715,7 +5715,7 @@
       "source_file": "apps/web/src/components/ui/QaStatePanel.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_ui_qastatepanel_tsx",
-      "community": 115,
+      "community": 25,
       "norm_label": "qastatepanel.tsx"
     },
     {
@@ -5724,7 +5724,7 @@
       "source_file": "apps/web/src/components/ui/QaStatePanel.tsx",
       "source_location": "L10",
       "id": "ui_qastatepanel_qastatepanelprops",
-      "community": 115,
+      "community": 25,
       "norm_label": "qastatepanelprops"
     },
     {
@@ -5733,7 +5733,7 @@
       "source_file": "apps/web/src/components/ui/QaStatePanel.tsx",
       "source_location": "L19",
       "id": "ui_qastatepanel_qastatepanel",
-      "community": 115,
+      "community": 25,
       "norm_label": "qastatepanel()"
     },
     {
@@ -5796,7 +5796,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_temuangroupcard_tsx",
-      "community": 60,
+      "community": 196,
       "norm_label": "temuangroupcard.tsx"
     },
     {
@@ -5805,7 +5805,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L5",
       "id": "sidak_temuangroupcard_temuanitem",
-      "community": 60,
+      "community": 196,
       "norm_label": "temuanitem"
     },
     {
@@ -5814,7 +5814,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L15",
       "id": "sidak_temuangroupcard_props",
-      "community": 60,
+      "community": 196,
       "norm_label": "props"
     },
     {
@@ -5823,7 +5823,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L35",
       "id": "sidak_temuangroupcard_nilai_options",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilai_options"
     },
     {
@@ -5832,7 +5832,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L42",
       "id": "sidak_temuangroupcard_nilai_badge",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilai_badge"
     },
     {
@@ -5841,7 +5841,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L46",
       "id": "sidak_temuangroupcard_nilai_label_color",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilai_label_color"
     },
     {
@@ -5850,7 +5850,7 @@
       "source_file": "apps/web/src/components/sidak/TemuanGroupCard.tsx",
       "source_location": "L50",
       "id": "sidak_temuangroupcard_temuangroupcard",
-      "community": 60,
+      "community": 196,
       "norm_label": "temuangroupcard()"
     },
     {
@@ -5859,7 +5859,7 @@
       "source_file": "apps/web/src/components/sidak/ScoreDetailCard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_scoredetailcard_tsx",
-      "community": 276,
+      "community": 41,
       "norm_label": "scoredetailcard.tsx"
     },
     {
@@ -5868,7 +5868,7 @@
       "source_file": "apps/web/src/components/sidak/ScoreDetailCard.tsx",
       "source_location": "L3",
       "id": "sidak_scoredetailcard_props",
-      "community": 276,
+      "community": 41,
       "norm_label": "props"
     },
     {
@@ -5877,7 +5877,7 @@
       "source_file": "apps/web/src/components/sidak/ScoreDetailCard.tsx",
       "source_location": "L11",
       "id": "sidak_scoredetailcard_scorecolor",
-      "community": 276,
+      "community": 41,
       "norm_label": "scorecolor()"
     },
     {
@@ -5886,7 +5886,7 @@
       "source_file": "apps/web/src/components/sidak/ScoreDetailCard.tsx",
       "source_location": "L17",
       "id": "sidak_scoredetailcard_scorelabel",
-      "community": 276,
+      "community": 41,
       "norm_label": "scorelabel()"
     },
     {
@@ -5895,7 +5895,7 @@
       "source_file": "apps/web/src/components/sidak/ScoreDetailCard.tsx",
       "source_location": "L23",
       "id": "sidak_scoredetailcard_scoredetailcard",
-      "community": 276,
+      "community": 41,
       "norm_label": "scoredetailcard()"
     },
     {
@@ -5904,7 +5904,7 @@
       "source_file": "apps/web/src/components/sidak/KpiCard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_kpicard_tsx",
-      "community": 292,
+      "community": 47,
       "norm_label": "kpicard.tsx"
     },
     {
@@ -5913,7 +5913,7 @@
       "source_file": "apps/web/src/components/sidak/KpiCard.tsx",
       "source_location": "L5",
       "id": "sidak_kpicard_props",
-      "community": 292,
+      "community": 47,
       "norm_label": "props"
     },
     {
@@ -5922,7 +5922,7 @@
       "source_file": "apps/web/src/components/sidak/KpiCard.tsx",
       "source_location": "L16",
       "id": "sidak_kpicard_color_map",
-      "community": 292,
+      "community": 47,
       "norm_label": "color_map"
     },
     {
@@ -5931,7 +5931,7 @@
       "source_file": "apps/web/src/components/sidak/KpiCard.tsx",
       "source_location": "L51",
       "id": "sidak_kpicard_kpicard",
-      "community": 292,
+      "community": 47,
       "norm_label": "kpicard()"
     },
     {
@@ -6021,7 +6021,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputManualForm.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_sidakinputmanualform_tsx",
-      "community": 60,
+      "community": 118,
       "norm_label": "sidakinputmanualform.tsx"
     },
     {
@@ -6030,7 +6030,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputManualForm.tsx",
       "source_location": "L6",
       "id": "sidak_sidakinputmanualform_nilai_options",
-      "community": 60,
+      "community": 118,
       "norm_label": "nilai_options"
     },
     {
@@ -6039,7 +6039,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputManualForm.tsx",
       "source_location": "L13",
       "id": "sidak_sidakinputmanualform_entry",
-      "community": 60,
+      "community": 118,
       "norm_label": "entry"
     },
     {
@@ -6048,7 +6048,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputManualForm.tsx",
       "source_location": "L21",
       "id": "sidak_sidakinputmanualform_props",
-      "community": 60,
+      "community": 118,
       "norm_label": "props"
     },
     {
@@ -6057,7 +6057,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputManualForm.tsx",
       "source_location": "L36",
       "id": "sidak_sidakinputmanualform_newentry",
-      "community": 60,
+      "community": 118,
       "norm_label": "newentry()"
     },
     {
@@ -6066,7 +6066,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputManualForm.tsx",
       "source_location": "L42",
       "id": "sidak_sidakinputmanualform_sidakinputmanualform",
-      "community": 60,
+      "community": 118,
       "norm_label": "sidakinputmanualform()"
     },
     {
@@ -6075,7 +6075,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_agentprofilebar_tsx",
-      "community": 41,
+      "community": 298,
       "norm_label": "agentprofilebar.tsx"
     },
     {
@@ -6084,7 +6084,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L3",
       "id": "sidak_agentprofilebar_props",
-      "community": 41,
+      "community": 298,
       "norm_label": "props"
     },
     {
@@ -6093,7 +6093,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L15",
       "id": "sidak_agentprofilebar_computetenure",
-      "community": 41,
+      "community": 298,
       "norm_label": "computetenure()"
     },
     {
@@ -6102,7 +6102,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L28",
       "id": "sidak_agentprofilebar_agentprofilebar",
-      "community": 41,
+      "community": 298,
       "norm_label": "agentprofilebar()"
     },
     {
@@ -6255,7 +6255,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_topticketscard_tsx",
-      "community": 303,
+      "community": 41,
       "norm_label": "topticketscard.tsx"
     },
     {
@@ -6264,7 +6264,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L3",
       "id": "sidak_topticketscard_ticketitem",
-      "community": 303,
+      "community": 41,
       "norm_label": "ticketitem"
     },
     {
@@ -6273,7 +6273,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L11",
       "id": "sidak_topticketscard_props",
-      "community": 303,
+      "community": 41,
       "norm_label": "props"
     },
     {
@@ -6282,7 +6282,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L15",
       "id": "sidak_topticketscard_topticketscard",
-      "community": 303,
+      "community": 41,
       "norm_label": "topticketscard()"
     },
     {
@@ -6291,7 +6291,7 @@
       "source_file": "apps/web/src/components/sidak/QaStatePanel.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_qastatepanel_tsx",
-      "community": 196,
+      "community": 86,
       "norm_label": "qastatepanel.tsx"
     },
     {
@@ -6300,7 +6300,7 @@
       "source_file": "apps/web/src/components/sidak/QaStatePanel.tsx",
       "source_location": "L4",
       "id": "sidak_qastatepanel_icons",
-      "community": 196,
+      "community": 86,
       "norm_label": "icons"
     },
     {
@@ -6309,7 +6309,7 @@
       "source_file": "apps/web/src/components/sidak/QaStatePanel.tsx",
       "source_location": "L12",
       "id": "sidak_qastatepanel_tones",
-      "community": 196,
+      "community": 86,
       "norm_label": "tones"
     },
     {
@@ -6318,7 +6318,7 @@
       "source_file": "apps/web/src/components/sidak/QaStatePanel.tsx",
       "source_location": "L20",
       "id": "sidak_qastatepanel_props",
-      "community": 196,
+      "community": 86,
       "norm_label": "props"
     },
     {
@@ -6327,7 +6327,7 @@
       "source_file": "apps/web/src/components/sidak/QaStatePanel.tsx",
       "source_location": "L29",
       "id": "sidak_qastatepanel_qastatepanel",
-      "community": 196,
+      "community": 86,
       "norm_label": "qastatepanel()"
     },
     {
@@ -6462,7 +6462,7 @@
       "source_file": "apps/web/src/components/sidak/FatalDonutChart.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_fataldonutchart_tsx",
-      "community": 292,
+      "community": 47,
       "norm_label": "fataldonutchart.tsx"
     },
     {
@@ -6471,7 +6471,7 @@
       "source_file": "apps/web/src/components/sidak/FatalDonutChart.tsx",
       "source_location": "L3",
       "id": "sidak_fataldonutchart_props",
-      "community": 292,
+      "community": 47,
       "norm_label": "props"
     },
     {
@@ -6480,7 +6480,7 @@
       "source_file": "apps/web/src/components/sidak/FatalDonutChart.tsx",
       "source_location": "L9",
       "id": "sidak_fataldonutchart_colors",
-      "community": 292,
+      "community": 47,
       "norm_label": "colors"
     },
     {
@@ -6489,7 +6489,7 @@
       "source_file": "apps/web/src/components/sidak/FatalDonutChart.tsx",
       "source_location": "L11",
       "id": "sidak_fataldonutchart_fataldonutchart",
-      "community": 292,
+      "community": 47,
       "norm_label": "fataldonutchart()"
     },
     {
@@ -6498,7 +6498,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputScoreCard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_sidakinputscorecard_tsx",
-      "community": 60,
+      "community": 290,
       "norm_label": "sidakinputscorecard.tsx"
     },
     {
@@ -6507,7 +6507,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputScoreCard.tsx",
       "source_location": "L5",
       "id": "sidak_sidakinputscorecard_props",
-      "community": 60,
+      "community": 290,
       "norm_label": "props"
     },
     {
@@ -6516,7 +6516,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputScoreCard.tsx",
       "source_location": "L12",
       "id": "sidak_sidakinputscorecard_modeindicator",
-      "community": 60,
+      "community": 290,
       "norm_label": "modeindicator()"
     },
     {
@@ -6525,7 +6525,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputScoreCard.tsx",
       "source_location": "L23",
       "id": "sidak_sidakinputscorecard_sidakinputscorecard",
-      "community": 60,
+      "community": 290,
       "norm_label": "sidakinputscorecard()"
     },
     {
@@ -6633,7 +6633,7 @@
       "source_file": "apps/web/src/components/sidak/TopAgentsTable.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_topagentstable_tsx",
-      "community": 196,
+      "community": 86,
       "norm_label": "topagentstable.tsx"
     },
     {
@@ -6642,7 +6642,7 @@
       "source_file": "apps/web/src/components/sidak/TopAgentsTable.tsx",
       "source_location": "L4",
       "id": "sidak_topagentstable_agent",
-      "community": 196,
+      "community": 86,
       "norm_label": "agent"
     },
     {
@@ -6651,7 +6651,7 @@
       "source_file": "apps/web/src/components/sidak/TopAgentsTable.tsx",
       "source_location": "L14",
       "id": "sidak_topagentstable_props",
-      "community": 196,
+      "community": 86,
       "norm_label": "props"
     },
     {
@@ -6660,7 +6660,7 @@
       "source_file": "apps/web/src/components/sidak/TopAgentsTable.tsx",
       "source_location": "L20",
       "id": "sidak_topagentstable_topagentstable",
-      "community": 196,
+      "community": 86,
       "norm_label": "topagentstable()"
     },
     {
@@ -6705,7 +6705,7 @@
       "source_file": "apps/web/src/components/sidak/IndicatorDropdown.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_indicatordropdown_tsx",
-      "community": 60,
+      "community": 118,
       "norm_label": "indicatordropdown.tsx"
     },
     {
@@ -6714,7 +6714,7 @@
       "source_file": "apps/web/src/components/sidak/IndicatorDropdown.tsx",
       "source_location": "L4",
       "id": "sidak_indicatordropdown_indicator",
-      "community": 60,
+      "community": 118,
       "norm_label": "indicator"
     },
     {
@@ -6723,7 +6723,7 @@
       "source_file": "apps/web/src/components/sidak/IndicatorDropdown.tsx",
       "source_location": "L11",
       "id": "sidak_indicatordropdown_props",
-      "community": 60,
+      "community": 118,
       "norm_label": "props"
     },
     {
@@ -6732,7 +6732,7 @@
       "source_file": "apps/web/src/components/sidak/IndicatorDropdown.tsx",
       "source_location": "L18",
       "id": "sidak_indicatordropdown_indicatordropdown",
-      "community": 60,
+      "community": 118,
       "norm_label": "indicatordropdown()"
     },
     {
@@ -6741,7 +6741,7 @@
       "source_file": "apps/web/src/components/sidak/NilaiBadge.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_nilaibadge_tsx",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilaibadge.tsx"
     },
     {
@@ -6750,7 +6750,7 @@
       "source_file": "apps/web/src/components/sidak/NilaiBadge.tsx",
       "source_location": "L1",
       "id": "sidak_nilaibadge_nilai_config",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilai_config"
     },
     {
@@ -6759,7 +6759,7 @@
       "source_file": "apps/web/src/components/sidak/NilaiBadge.tsx",
       "source_location": "L8",
       "id": "sidak_nilaibadge_props",
-      "community": 60,
+      "community": 196,
       "norm_label": "props"
     },
     {
@@ -6768,7 +6768,7 @@
       "source_file": "apps/web/src/components/sidak/NilaiBadge.tsx",
       "source_location": "L13",
       "id": "sidak_nilaibadge_nilaibadge",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilaibadge()"
     },
     {
@@ -6777,7 +6777,7 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_paretochart_tsx",
-      "community": 292,
+      "community": 47,
       "norm_label": "paretochart.tsx"
     },
     {
@@ -6786,7 +6786,7 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L3",
       "id": "sidak_paretochart_paretoitem",
-      "community": 292,
+      "community": 47,
       "norm_label": "paretoitem"
     },
     {
@@ -6795,7 +6795,7 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L11",
       "id": "sidak_paretochart_props",
-      "community": 292,
+      "community": 47,
       "norm_label": "props"
     },
     {
@@ -6804,7 +6804,7 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L15",
       "id": "sidak_paretochart_paretochart",
-      "community": 292,
+      "community": 47,
       "norm_label": "paretochart()"
     },
     {
@@ -6966,7 +6966,7 @@
       "source_file": "apps/web/src/__tests__/fetchAuthProfile.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_fetchauthprofile_test_ts",
-      "community": 7,
+      "community": 37,
       "norm_label": "fetchauthprofile.test.ts"
     },
     {
@@ -6975,7 +6975,7 @@
       "source_file": "apps/web/src/__tests__/fetchAuthProfile.test.ts",
       "source_location": "L4",
       "id": "tests_fetchauthprofile_test_mockmaybesingle",
-      "community": 30,
+      "community": 37,
       "norm_label": "mockmaybesingle"
     },
     {
@@ -7119,7 +7119,7 @@
       "source_file": "apps/web/src/__tests__/telefun-prompt-builder.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_telefun_prompt_builder_test_ts",
-      "community": 118,
+      "community": 85,
       "norm_label": "telefun-prompt-builder.test.ts"
     },
     {
@@ -7128,7 +7128,7 @@
       "source_file": "apps/web/src/__tests__/telefun-prompt-builder.test.ts",
       "source_location": "L9",
       "id": "tests_telefun_prompt_builder_test_makeconsumertype",
-      "community": 118,
+      "community": 85,
       "norm_label": "makeconsumertype()"
     },
     {
@@ -7236,7 +7236,7 @@
       "source_file": "apps/web/src/__tests__/sidak-input-agents-shape.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_input_agents_shape_test_ts",
-      "community": 60,
+      "community": 115,
       "norm_label": "sidak-input-agents-shape.test.ts"
     },
     {
@@ -7299,7 +7299,7 @@
       "source_file": "apps/web/src/__tests__/sidak-dashboard-parity.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_dashboard_parity_test_tsx",
-      "community": 292,
+      "community": 47,
       "norm_label": "sidak-dashboard-parity.test.tsx"
     },
     {
@@ -7308,7 +7308,7 @@
       "source_file": "apps/web/src/__tests__/sidak-dashboard-parity.test.tsx",
       "source_location": "L4",
       "id": "tests_sidak_dashboard_parity_test_useapimock",
-      "community": 292,
+      "community": 47,
       "norm_label": "useapimock"
     },
     {
@@ -7317,7 +7317,7 @@
       "source_file": "apps/web/src/__tests__/sidak-dashboard-parity.test.tsx",
       "source_location": "L50",
       "id": "tests_sidak_dashboard_parity_test_mockdashboarddata",
-      "community": 292,
+      "community": 47,
       "norm_label": "mockdashboarddata"
     },
     {
@@ -7353,7 +7353,7 @@
       "source_file": "apps/web/src/__tests__/leader-access-gate.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_leader_access_gate_test_tsx",
-      "community": 7,
+      "community": 37,
       "norm_label": "leader-access-gate.test.tsx"
     },
     {
@@ -7362,7 +7362,7 @@
       "source_file": "apps/web/src/__tests__/leader-access-gate.test.tsx",
       "source_location": "L4",
       "id": "tests_leader_access_gate_test_mockuseaccessstatus",
-      "community": 7,
+      "community": 37,
       "norm_label": "mockuseaccessstatus"
     },
     {
@@ -7371,7 +7371,7 @@
       "source_file": "apps/web/src/__tests__/leader-access-gate.test.tsx",
       "source_location": "L5",
       "id": "tests_leader_access_gate_test_mockuseauthstore",
-      "community": 7,
+      "community": 37,
       "norm_label": "mockuseauthstore"
     },
     {
@@ -7380,7 +7380,7 @@
       "source_file": "apps/web/src/__tests__/authInit.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_authinit_test_ts",
-      "community": 7,
+      "community": 37,
       "norm_label": "authinit.test.ts"
     },
     {
@@ -7389,7 +7389,7 @@
       "source_file": "apps/web/src/__tests__/authInit.test.ts",
       "source_location": "L8",
       "id": "tests_authinit_test_mockonauthstatechange",
-      "community": 7,
+      "community": 37,
       "norm_label": "mockonauthstatechange"
     },
     {
@@ -7398,7 +7398,7 @@
       "source_file": "apps/web/src/__tests__/authInit.test.ts",
       "source_location": "L9",
       "id": "tests_authinit_test_mockgetuser",
-      "community": 7,
+      "community": 37,
       "norm_label": "mockgetuser"
     },
     {
@@ -7407,7 +7407,7 @@
       "source_file": "apps/web/src/__tests__/authInit.test.ts",
       "source_location": "L10",
       "id": "tests_authinit_test_mockgetsession",
-      "community": 7,
+      "community": 37,
       "norm_label": "mockgetsession"
     },
     {
@@ -7416,7 +7416,7 @@
       "source_file": "apps/web/src/__tests__/sidak-input-parity.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_input_parity_test_tsx",
-      "community": 60,
+      "community": 115,
       "norm_label": "sidak-input-parity.test.tsx"
     },
     {
@@ -7425,7 +7425,7 @@
       "source_file": "apps/web/src/__tests__/ketik-review-progress.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_ketik_review_progress_test_tsx",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketik-review-progress.test.tsx"
     },
     {
@@ -7434,7 +7434,7 @@
       "source_file": "apps/web/src/__tests__/ketik-review-progress.test.tsx",
       "source_location": "L7",
       "id": "tests_ketik_review_progress_test_mocksession",
-      "community": 37,
+      "community": 1,
       "norm_label": "mocksession"
     },
     {
@@ -7443,7 +7443,7 @@
       "source_file": "apps/web/src/__tests__/ketik-review-progress.test.tsx",
       "source_location": "L16",
       "id": "tests_ketik_review_progress_test_mockreview",
-      "community": 37,
+      "community": 1,
       "norm_label": "mockreview"
     },
     {
@@ -7452,7 +7452,7 @@
       "source_file": "apps/web/src/__tests__/ketik-review-progress.test.tsx",
       "source_location": "L26",
       "id": "tests_ketik_review_progress_test_mocktypos",
-      "community": 37,
+      "community": 1,
       "norm_label": "mocktypos"
     },
     {
@@ -7461,7 +7461,7 @@
       "source_file": "apps/web/src/__tests__/ketik-review-progress.test.tsx",
       "source_location": "L30",
       "id": "tests_ketik_review_progress_test_rendermodal",
-      "community": 75,
+      "community": 276,
       "norm_label": "rendermodal()"
     },
     {
@@ -7470,7 +7470,7 @@
       "source_file": "apps/web/src/__tests__/pdkt-landing.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_pdkt_landing_test_tsx",
-      "community": 299,
+      "community": 105,
       "norm_label": "pdkt-landing.test.tsx"
     },
     {
@@ -7479,7 +7479,7 @@
       "source_file": "apps/web/src/__tests__/pdkt-landing.test.tsx",
       "source_location": "L5",
       "id": "tests_pdkt_landing_test_mockuseapi",
-      "community": 299,
+      "community": 105,
       "norm_label": "mockuseapi"
     },
     {
@@ -7488,7 +7488,7 @@
       "source_file": "apps/web/src/__tests__/pdkt-landing.test.tsx",
       "source_location": "L6",
       "id": "tests_pdkt_landing_test_mockgetapi",
-      "community": 299,
+      "community": 105,
       "norm_label": "mockgetapi"
     },
     {
@@ -7497,7 +7497,7 @@
       "source_file": "apps/web/src/__tests__/pdkt-landing.test.tsx",
       "source_location": "L7",
       "id": "tests_pdkt_landing_test_mockpostapi",
-      "community": 299,
+      "community": 105,
       "norm_label": "mockpostapi"
     },
     {
@@ -7506,7 +7506,7 @@
       "source_file": "apps/web/src/__tests__/pdkt-landing.test.tsx",
       "source_location": "L8",
       "id": "tests_pdkt_landing_test_mockdeleteapi",
-      "community": 299,
+      "community": 105,
       "norm_label": "mockdeleteapi"
     },
     {
@@ -7515,7 +7515,7 @@
       "source_file": "apps/web/src/__tests__/useApi.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_useapi_test_ts",
-      "community": 14,
+      "community": 292,
       "norm_label": "useapi.test.ts"
     },
     {
@@ -7524,7 +7524,7 @@
       "source_file": "apps/web/src/__tests__/useApi.test.ts",
       "source_location": "L5",
       "id": "tests_useapi_test_mocklocalstorage",
-      "community": 14,
+      "community": 292,
       "norm_label": "mocklocalstorage()"
     },
     {
@@ -7569,7 +7569,7 @@
       "source_file": "apps/web/src/__tests__/app-config.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_app_config_test_ts",
-      "community": 16,
+      "community": 56,
       "norm_label": "app-config.test.ts"
     },
     {
@@ -7596,7 +7596,7 @@
       "source_file": "apps/web/src/__tests__/ketik-landing.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_ketik_landing_test_tsx",
-      "community": 7,
+      "community": 37,
       "norm_label": "ketik-landing.test.tsx"
     },
     {
@@ -7614,7 +7614,7 @@
       "source_file": "apps/web/src/__tests__/top-tickets-legacy-parity.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_top_tickets_legacy_parity_test_ts",
-      "community": 67,
+      "community": 118,
       "norm_label": "top-tickets-legacy-parity.test.ts"
     },
     {
@@ -7623,7 +7623,7 @@
       "source_file": "apps/web/src/__tests__/top-tickets-legacy-parity.test.ts",
       "source_location": "L8",
       "id": "tests_top_tickets_legacy_parity_test_makeindicator",
-      "community": 67,
+      "community": 118,
       "norm_label": "makeindicator()"
     },
     {
@@ -7632,8 +7632,26 @@
       "source_file": "apps/web/src/__tests__/top-tickets-legacy-parity.test.ts",
       "source_location": "L24",
       "id": "tests_top_tickets_legacy_parity_test_makefinding",
-      "community": 67,
+      "community": 118,
       "norm_label": "makefinding()"
+    },
+    {
+      "label": "settings-draft-helpers.test.ts",
+      "file_type": "code",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L1",
+      "id": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "community": 26,
+      "norm_label": "settings-draft-helpers.test.ts"
+    },
+    {
+      "label": "TestItem",
+      "file_type": "code",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L85",
+      "id": "tests_settings_draft_helpers_test_testitem",
+      "community": 26,
+      "norm_label": "testitem"
     },
     {
       "label": "telefun-session-finalizer.test.ts",
@@ -7776,7 +7794,7 @@
       "source_file": "apps/web/src/__tests__/sidak-ranking-fatal-parity.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_ranking_fatal_parity_test_tsx",
-      "community": 292,
+      "community": 285,
       "norm_label": "sidak-ranking-fatal-parity.test.tsx"
     },
     {
@@ -7785,7 +7803,7 @@
       "source_file": "apps/web/src/__tests__/sidak-ranking-fatal-parity.test.tsx",
       "source_location": "L5",
       "id": "tests_sidak_ranking_fatal_parity_test_useapimock",
-      "community": 292,
+      "community": 285,
       "norm_label": "useapimock"
     },
     {
@@ -7794,7 +7812,7 @@
       "source_file": "apps/web/src/__tests__/sidak-ranking-fatal-parity.test.tsx",
       "source_location": "L29",
       "id": "tests_sidak_ranking_fatal_parity_test_mockrankingresponse",
-      "community": 292,
+      "community": 285,
       "norm_label": "mockrankingresponse"
     },
     {
@@ -7803,7 +7821,7 @@
       "source_file": "apps/web/src/__tests__/sidak-agents-load-more-copy.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_agents_load_more_copy_test_tsx",
-      "community": 292,
+      "community": 75,
       "norm_label": "sidak-agents-load-more-copy.test.tsx"
     },
     {
@@ -7812,7 +7830,7 @@
       "source_file": "apps/web/src/__tests__/sidak-agents-load-more-copy.test.tsx",
       "source_location": "L4",
       "id": "tests_sidak_agents_load_more_copy_test_useapimock",
-      "community": 292,
+      "community": 75,
       "norm_label": "useapimock"
     },
     {
@@ -7821,7 +7839,7 @@
       "source_file": "apps/web/src/__tests__/sidak-agents-load-more-copy.test.tsx",
       "source_location": "L18",
       "id": "tests_sidak_agents_load_more_copy_test_makeagents",
-      "community": 292,
+      "community": 75,
       "norm_label": "makeagents()"
     },
     {
@@ -8059,6 +8077,24 @@
       "norm_label": "usequeryparams()"
     },
     {
+      "label": "useCollectionDraft.ts",
+      "file_type": "code",
+      "source_file": "apps/web/src/hooks/useCollectionDraft.ts",
+      "source_location": "L1",
+      "id": "apps_web_src_hooks_usecollectiondraft_ts",
+      "community": 117,
+      "norm_label": "usecollectiondraft.ts"
+    },
+    {
+      "label": "applyCollectionDraft()",
+      "file_type": "code",
+      "source_file": "apps/web/src/hooks/useCollectionDraft.ts",
+      "source_location": "L1",
+      "id": "hooks_usecollectiondraft_applycollectiondraft",
+      "community": 117,
+      "norm_label": "applycollectiondraft()"
+    },
+    {
       "label": "useThemeMode.ts",
       "file_type": "code",
       "source_file": "apps/web/src/hooks/useThemeMode.ts",
@@ -8163,7 +8199,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L1",
       "id": "apps_web_src_hooks_useapi_ts",
-      "community": 14,
+      "community": 292,
       "norm_label": "useapi.ts"
     },
     {
@@ -8172,7 +8208,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L5",
       "id": "hooks_useapi_fetchapi",
-      "community": 14,
+      "community": 292,
       "norm_label": "fetchapi()"
     },
     {
@@ -8190,7 +8226,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L64",
       "id": "hooks_useapi_postapi",
-      "community": 14,
+      "community": 292,
       "norm_label": "postapi()"
     },
     {
@@ -8208,7 +8244,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L72",
       "id": "hooks_useapi_patchapi",
-      "community": 14,
+      "community": 292,
       "norm_label": "patchapi()"
     },
     {
@@ -8235,7 +8271,7 @@
       "source_file": "apps/web/src/hooks/useAccessStatus.ts",
       "source_location": "L1",
       "id": "apps_web_src_hooks_useaccessstatus_ts",
-      "community": 30,
+      "community": 37,
       "norm_label": "useaccessstatus.ts"
     },
     {
@@ -8244,7 +8280,7 @@
       "source_file": "apps/web/src/hooks/useAccessStatus.ts",
       "source_location": "L5",
       "id": "hooks_useaccessstatus_accessstatus",
-      "community": 30,
+      "community": 37,
       "norm_label": "accessstatus"
     },
     {
@@ -8253,7 +8289,7 @@
       "source_file": "apps/web/src/hooks/useAccessStatus.ts",
       "source_location": "L7",
       "id": "hooks_useaccessstatus_accessstatusitem",
-      "community": 30,
+      "community": 37,
       "norm_label": "accessstatusitem"
     },
     {
@@ -8262,7 +8298,7 @@
       "source_file": "apps/web/src/hooks/useAccessStatus.ts",
       "source_location": "L13",
       "id": "hooks_useaccessstatus_accessstatusmap",
-      "community": 30,
+      "community": 37,
       "norm_label": "accessstatusmap"
     },
     {
@@ -8271,7 +8307,7 @@
       "source_file": "apps/web/src/hooks/useAccessStatus.ts",
       "source_location": "L18",
       "id": "hooks_useaccessstatus_useaccessstatus",
-      "community": 7,
+      "community": 37,
       "norm_label": "useaccessstatus()"
     },
     {
@@ -8307,7 +8343,7 @@
       "source_file": "apps/web/src/lib/app-config.ts",
       "source_location": "L1",
       "id": "apps_web_src_lib_app_config_ts",
-      "community": 16,
+      "community": 56,
       "norm_label": "app-config.ts"
     },
     {
@@ -8316,7 +8352,7 @@
       "source_file": "apps/web/src/lib/app-config.ts",
       "source_location": "L11",
       "id": "lib_app_config_appmoduleconfig",
-      "community": 16,
+      "community": 56,
       "norm_label": "appmoduleconfig"
     },
     {
@@ -8325,7 +8361,7 @@
       "source_file": "apps/web/src/lib/app-config.ts",
       "source_location": "L24",
       "id": "lib_app_config_app_modules",
-      "community": 16,
+      "community": 56,
       "norm_label": "app_modules"
     },
     {
@@ -8334,7 +8370,7 @@
       "source_file": "apps/web/src/lib/app-config.ts",
       "source_location": "L102",
       "id": "lib_app_config_normalizerolelabel",
-      "community": 16,
+      "community": 56,
       "norm_label": "normalizerolelabel()"
     },
     {
@@ -8586,7 +8622,7 @@
       "source_file": "apps/web/src/lib/toast.ts",
       "source_location": "L1",
       "id": "apps_web_src_lib_toast_ts",
-      "community": 43,
+      "community": 14,
       "norm_label": "toast.ts"
     },
     {
@@ -8595,7 +8631,7 @@
       "source_file": "apps/web/src/lib/toast.ts",
       "source_location": "L3",
       "id": "lib_toast_notify",
-      "community": 43,
+      "community": 14,
       "norm_label": "notify"
     },
     {
@@ -8919,7 +8955,7 @@
       "source_file": "apps/web/src/lib/photo-frame.ts",
       "source_location": "L112",
       "id": "lib_photo_frame_getphotoimagestyle",
-      "community": 115,
+      "community": 25,
       "norm_label": "getphotoimagestyle()"
     },
     {
@@ -9000,7 +9036,7 @@
       "source_file": "apps/web/src/lib/scoring.ts",
       "source_location": "L116",
       "id": "lib_scoring_nilai_labels",
-      "community": 60,
+      "community": 196,
       "norm_label": "nilai_labels"
     },
     {
@@ -9027,7 +9063,7 @@
       "source_file": "apps/web/src/lib/scoring.ts",
       "source_location": "L138",
       "id": "lib_scoring_qascoreresult",
-      "community": 60,
+      "community": 290,
       "norm_label": "qascoreresult"
     },
     {
@@ -9144,7 +9180,7 @@
       "source_file": "apps/web/src/routes/dashboard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_dashboard_tsx",
-      "community": 16,
+      "community": 14,
       "norm_label": "dashboard.tsx"
     },
     {
@@ -9171,7 +9207,7 @@
       "source_file": "apps/web/src/routes/dashboard.tsx",
       "source_location": "L53",
       "id": "routes_dashboard_formattimeago",
-      "community": 16,
+      "community": 14,
       "norm_label": "formattimeago()"
     },
     {
@@ -9180,7 +9216,7 @@
       "source_file": "apps/web/src/routes/dashboard.tsx",
       "source_location": "L76",
       "id": "routes_dashboard_normalizeactiontext",
-      "community": 16,
+      "community": 14,
       "norm_label": "normalizeactiontext()"
     },
     {
@@ -9189,7 +9225,7 @@
       "source_file": "apps/web/src/routes/dashboard.tsx",
       "source_location": "L84",
       "id": "routes_dashboard_getmodulecolors",
-      "community": 16,
+      "community": 14,
       "norm_label": "getmodulecolors()"
     },
     {
@@ -9198,7 +9234,7 @@
       "source_file": "apps/web/src/routes/dashboard.tsx",
       "source_location": "L119",
       "id": "routes_dashboard_dashboardpage",
-      "community": 16,
+      "community": 37,
       "norm_label": "dashboardpage()"
     },
     {
@@ -9207,7 +9243,7 @@
       "source_file": "apps/web/src/routes/account.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_account_tsx",
-      "community": 7,
+      "community": 37,
       "norm_label": "account.tsx"
     },
     {
@@ -9216,7 +9252,7 @@
       "source_file": "apps/web/src/routes/account.tsx",
       "source_location": "L5",
       "id": "routes_account_accountpage",
-      "community": 7,
+      "community": 37,
       "norm_label": "accountpage()"
     },
     {
@@ -9306,7 +9342,7 @@
       "source_file": "apps/web/src/routes/telefun/telefunSettings.ts",
       "source_location": "L8",
       "id": "telefun_telefunsettings_telefunscenario",
-      "community": 26,
+      "community": 117,
       "norm_label": "telefunscenario"
     },
     {
@@ -9333,7 +9369,7 @@
       "source_file": "apps/web/src/routes/telefun/telefunSettings.ts",
       "source_location": "L34",
       "id": "telefun_telefunsettings_telefunidentity",
-      "community": 118,
+      "community": 26,
       "norm_label": "telefunidentity"
     },
     {
@@ -9351,7 +9387,7 @@
       "source_file": "apps/web/src/routes/telefun/telefunSettings.ts",
       "source_location": "L57",
       "id": "telefun_telefunsettings_telefunappsettings",
-      "community": 215,
+      "community": 26,
       "norm_label": "telefunappsettings"
     },
     {
@@ -9531,7 +9567,7 @@
       "source_file": "apps/web/src/routes/telefun/replay.tsx",
       "source_location": "L26",
       "id": "telefun_replay_telefunreplay",
-      "community": 14,
+      "community": 292,
       "norm_label": "telefunreplay()"
     },
     {
@@ -10449,7 +10485,7 @@
       "source_file": "apps/web/src/routes/telefun/components/SettingsModal.tsx",
       "source_location": "L11",
       "id": "apps_web_src_routes_telefun_components_settingsmodal_tsx_components_settingsmodal_settingsmodalprops",
-      "community": 215,
+      "community": 26,
       "norm_label": "settingsmodalprops"
     },
     {
@@ -10480,10 +10516,19 @@
       "norm_label": "usetelefunsettingsdraftprops"
     },
     {
-      "label": "useTelefunSettingsDraft()",
+      "label": "buildTelefunSettingsForSave()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts",
       "source_location": "L18",
+      "id": "settings_usetelefunsettingsdraft_buildtelefunsettingsforsave",
+      "community": 26,
+      "norm_label": "buildtelefunsettingsforsave()"
+    },
+    {
+      "label": "useTelefunSettingsDraft()",
+      "file_type": "code",
+      "source_file": "apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts",
+      "source_location": "L37",
       "id": "settings_usetelefunsettingsdraft_usetelefunsettingsdraft",
       "community": 26,
       "norm_label": "usetelefunsettingsdraft()"
@@ -10501,7 +10546,7 @@
       "label": "TelefunConsumersTabProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx",
-      "source_location": "L6",
+      "source_location": "L7",
       "id": "settings_telefunconsumerstab_telefunconsumerstabprops",
       "community": 26,
       "norm_label": "telefunconsumerstabprops"
@@ -10510,7 +10555,7 @@
       "label": "TelefunConsumersTab()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx",
-      "source_location": "L15",
+      "source_location": "L16",
       "id": "settings_telefunconsumerstab_telefunconsumerstab",
       "community": 26,
       "norm_label": "telefunconsumerstab()"
@@ -10521,7 +10566,7 @@
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunSystemTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_components_settings_telefunsystemtab_tsx",
-      "community": 294,
+      "community": 26,
       "norm_label": "telefunsystemtab.tsx"
     },
     {
@@ -10530,7 +10575,7 @@
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunSystemTab.tsx",
       "source_location": "L9",
       "id": "settings_telefunsystemtab_telefunsystemtabprops",
-      "community": 294,
+      "community": 26,
       "norm_label": "telefunsystemtabprops"
     },
     {
@@ -10539,7 +10584,7 @@
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunSystemTab.tsx",
       "source_location": "L16",
       "id": "settings_telefunsystemtab_telefunsystemtab",
-      "community": 294,
+      "community": 26,
       "norm_label": "telefunsystemtab()"
     },
     {
@@ -10548,25 +10593,25 @@
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_components_settings_telefunscenariostab_tsx",
-      "community": 26,
+      "community": 117,
       "norm_label": "telefunscenariostab.tsx"
     },
     {
       "label": "TelefunScenariosTabProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx",
-      "source_location": "L7",
+      "source_location": "L8",
       "id": "settings_telefunscenariostab_telefunscenariostabprops",
-      "community": 26,
+      "community": 117,
       "norm_label": "telefunscenariostabprops"
     },
     {
       "label": "TelefunScenariosTab()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx",
-      "source_location": "L17",
+      "source_location": "L18",
       "id": "settings_telefunscenariostab_telefunscenariostab",
-      "community": 26,
+      "community": 117,
       "norm_label": "telefunscenariostab()"
     },
     {
@@ -10890,7 +10935,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_services_promptbuilder_ts",
-      "community": 118,
+      "community": 85,
       "norm_label": "promptbuilder.ts"
     },
     {
@@ -10899,7 +10944,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L7",
       "id": "services_promptbuilder_buildtelefunlivesysteminstruction",
-      "community": 118,
+      "community": 85,
       "norm_label": "buildtelefunlivesysteminstruction()"
     },
     {
@@ -10908,7 +10953,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L98",
       "id": "services_promptbuilder_getconsumertypehint",
-      "community": 0,
+      "community": 85,
       "norm_label": "getconsumertypehint()"
     },
     {
@@ -10917,7 +10962,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L128",
       "id": "services_promptbuilder_gettimecueinstruction",
-      "community": 118,
+      "community": 85,
       "norm_label": "gettimecueinstruction()"
     },
     {
@@ -10926,7 +10971,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L143",
       "id": "services_promptbuilder_getemotioninstruction",
-      "community": 118,
+      "community": 85,
       "norm_label": "getemotioninstruction()"
     },
     {
@@ -10935,7 +10980,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L159",
       "id": "services_promptbuilder_gethighurgencyreasonhint",
-      "community": 118,
+      "community": 85,
       "norm_label": "gethighurgencyreasonhint()"
     },
     {
@@ -10944,7 +10989,7 @@
       "source_file": "apps/web/src/routes/telefun/services/promptBuilder.ts",
       "source_location": "L169",
       "id": "services_promptbuilder_getlowurgencyreasonhint",
-      "community": 118,
+      "community": 85,
       "norm_label": "getlowurgencyreasonhint()"
     },
     {
@@ -12627,7 +12672,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-groups.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_dashboard_access_groups_tsx",
-      "community": 73,
+      "community": 292,
       "norm_label": "access-groups.tsx"
     },
     {
@@ -12636,7 +12681,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-groups.tsx",
       "source_location": "L19",
       "id": "dashboard_access_groups_accessgroup",
-      "community": 73,
+      "community": 292,
       "norm_label": "accessgroup"
     },
     {
@@ -12645,7 +12690,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-groups.tsx",
       "source_location": "L27",
       "id": "dashboard_access_groups_groupitem",
-      "community": 73,
+      "community": 292,
       "norm_label": "groupitem"
     },
     {
@@ -12654,7 +12699,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-groups.tsx",
       "source_location": "L35",
       "id": "dashboard_access_groups_ruletype",
-      "community": 73,
+      "community": 292,
       "norm_label": "ruletype"
     },
     {
@@ -12663,7 +12708,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-groups.tsx",
       "source_location": "L37",
       "id": "dashboard_access_groups_rule_type_labels",
-      "community": 73,
+      "community": 292,
       "norm_label": "rule_type_labels"
     },
     {
@@ -12672,7 +12717,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-groups.tsx",
       "source_location": "L44",
       "id": "dashboard_access_groups_accessgroupspage",
-      "community": 73,
+      "community": 292,
       "norm_label": "accessgroupspage()"
     },
     {
@@ -12996,7 +13041,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_profiler_slides_tsx",
-      "community": 285,
+      "community": 32,
       "norm_label": "slides.tsx"
     },
     {
@@ -13005,7 +13050,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L26",
       "id": "profiler_slides_labeltim",
-      "community": 285,
+      "community": 32,
       "norm_label": "labeltim"
     },
     {
@@ -13014,7 +13059,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L32",
       "id": "profiler_slides_timtheme",
-      "community": 285,
+      "community": 32,
       "norm_label": "timtheme()"
     },
     {
@@ -13023,7 +13068,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L71",
       "id": "profiler_slides_hitungmasadinas",
-      "community": 285,
+      "community": 32,
       "norm_label": "hitungmasadinas()"
     },
     {
@@ -13032,7 +13077,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L84",
       "id": "profiler_slides_hitungusia",
-      "community": 285,
+      "community": 32,
       "norm_label": "hitungusia()"
     },
     {
@@ -13041,7 +13086,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L93",
       "id": "profiler_slides_formattanggal",
-      "community": 285,
+      "community": 32,
       "norm_label": "formattanggal()"
     },
     {
@@ -13050,7 +13095,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L102",
       "id": "profiler_slides_cell",
-      "community": 285,
+      "community": 32,
       "norm_label": "cell()"
     },
     {
@@ -13059,7 +13104,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L130",
       "id": "profiler_slides_slidemode",
-      "community": 285,
+      "community": 32,
       "norm_label": "slidemode"
     },
     {
@@ -13068,7 +13113,7 @@
       "source_file": "apps/web/src/routes/profiler/slides.tsx",
       "source_location": "L132",
       "id": "profiler_slides_profilerslides",
-      "community": 285,
+      "community": 32,
       "norm_label": "profilerslides()"
     },
     {
@@ -13167,7 +13212,7 @@
       "source_file": "apps/web/src/routes/profiler/analytics.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_profiler_analytics_tsx",
-      "community": 90,
+      "community": 43,
       "norm_label": "analytics.tsx"
     },
     {
@@ -13176,7 +13221,7 @@
       "source_file": "apps/web/src/routes/profiler/analytics.tsx",
       "source_location": "L38",
       "id": "profiler_analytics_colors",
-      "community": 90,
+      "community": 43,
       "norm_label": "colors"
     },
     {
@@ -13185,7 +13230,7 @@
       "source_file": "apps/web/src/routes/profiler/analytics.tsx",
       "source_location": "L49",
       "id": "profiler_analytics_charttooltip",
-      "community": 90,
+      "community": 43,
       "norm_label": "charttooltip()"
     },
     {
@@ -13203,7 +13248,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_profiler_table_tsx",
-      "community": 115,
+      "community": 25,
       "norm_label": "table.tsx"
     },
     {
@@ -13212,7 +13257,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L32",
       "id": "profiler_table_movefoldermodal",
-      "community": 115,
+      "community": 25,
       "norm_label": "movefoldermodal()"
     },
     {
@@ -13221,7 +13266,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L206",
       "id": "profiler_table_sectiontitle",
-      "community": 115,
+      "community": 25,
       "norm_label": "sectiontitle()"
     },
     {
@@ -13230,7 +13275,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L213",
       "id": "profiler_table_field",
-      "community": 115,
+      "community": 25,
       "norm_label": "field()"
     },
     {
@@ -13239,7 +13284,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L220",
       "id": "profiler_table_sectioncard",
-      "community": 115,
+      "community": 25,
       "norm_label": "sectioncard()"
     },
     {
@@ -13248,7 +13293,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L227",
       "id": "profiler_table_editmodal",
-      "community": 115,
+      "community": 25,
       "norm_label": "editmodal()"
     },
     {
@@ -13257,7 +13302,7 @@
       "source_file": "apps/web/src/routes/profiler/table.tsx",
       "source_location": "L566",
       "id": "profiler_table_selectableid",
-      "community": 115,
+      "community": 25,
       "norm_label": "selectableid()"
     },
     {
@@ -13626,7 +13671,7 @@
       "source_file": "apps/web/src/routes/pdkt/simulation.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_simulation_tsx",
-      "community": 10,
+      "community": 8,
       "norm_label": "simulation.tsx"
     },
     {
@@ -13635,7 +13680,7 @@
       "source_file": "apps/web/src/routes/pdkt/simulation.tsx",
       "source_location": "L24",
       "id": "pdkt_simulation_defaultconsumertypes",
-      "community": 10,
+      "community": 8,
       "norm_label": "defaultconsumertypes"
     },
     {
@@ -13644,7 +13689,7 @@
       "source_file": "apps/web/src/routes/pdkt/simulation.tsx",
       "source_location": "L69",
       "id": "pdkt_simulation_pdktsimulationprops",
-      "community": 10,
+      "community": 8,
       "norm_label": "pdktsimulationprops"
     },
     {
@@ -13878,7 +13923,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/HistoryModal.tsx",
       "source_location": "L21",
       "id": "components_historymodal_sessionhistory",
-      "community": 10,
+      "community": 8,
       "norm_label": "sessionhistory"
     },
     {
@@ -13932,7 +13977,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_replycomposer_tsx",
-      "community": 298,
+      "community": 8,
       "norm_label": "replycomposer.tsx"
     },
     {
@@ -13941,7 +13986,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
       "source_location": "L4",
       "id": "components_replycomposer_replycomposerprops",
-      "community": 298,
+      "community": 8,
       "norm_label": "replycomposerprops"
     },
     {
@@ -13950,7 +13995,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
       "source_location": "L12",
       "id": "components_replycomposer_replycomposer",
-      "community": 298,
+      "community": 8,
       "norm_label": "replycomposer()"
     },
     {
@@ -13986,7 +14031,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/EmailComposer.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_emailcomposer_tsx",
-      "community": 298,
+      "community": 8,
       "norm_label": "emailcomposer.tsx"
     },
     {
@@ -13995,7 +14040,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/EmailComposer.tsx",
       "source_location": "L4",
       "id": "components_emailcomposer_emailcomposerprops",
-      "community": 298,
+      "community": 8,
       "norm_label": "emailcomposerprops"
     },
     {
@@ -14004,7 +14049,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/EmailComposer.tsx",
       "source_location": "L13",
       "id": "components_emailcomposer_emailcomposer",
-      "community": 298,
+      "community": 8,
       "norm_label": "emailcomposer()"
     },
     {
@@ -14040,25 +14085,25 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_settings_pdktscenariostab_tsx",
-      "community": 117,
+      "community": 10,
       "norm_label": "pdktscenariostab.tsx"
     },
     {
       "label": "PdktScenariosTabProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx",
-      "source_location": "L10",
+      "source_location": "L11",
       "id": "settings_pdktscenariostab_pdktscenariostabprops",
-      "community": 117,
+      "community": 10,
       "norm_label": "pdktscenariostabprops"
     },
     {
       "label": "PdktScenariosTab()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx",
-      "source_location": "L20",
+      "source_location": "L21",
       "id": "settings_pdktscenariostab_pdktscenariostab",
-      "community": 117,
+      "community": 10,
       "norm_label": "pdktscenariostab()"
     },
     {
@@ -14101,7 +14146,7 @@
       "label": "PdktConsumersTabProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
-      "source_location": "L6",
+      "source_location": "L7",
       "id": "settings_pdktconsumerstab_pdktconsumerstabprops",
       "community": 117,
       "norm_label": "pdktconsumerstabprops"
@@ -14110,7 +14155,7 @@
       "label": "PdktConsumersTab()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
-      "source_location": "L14",
+      "source_location": "L15",
       "id": "settings_pdktconsumerstab_pdktconsumerstab",
       "community": 117,
       "norm_label": "pdktconsumerstab()"
@@ -14134,10 +14179,28 @@
       "norm_label": "usepdktsettingsdraftprops"
     },
     {
-      "label": "usePdktSettingsDraft()",
+      "label": "PdktSystemDraft",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
       "source_location": "L21",
+      "id": "settings_usepdktsettingsdraft_pdktsystemdraft",
+      "community": 10,
+      "norm_label": "pdktsystemdraft"
+    },
+    {
+      "label": "buildPdktSettingsForSave()",
+      "file_type": "code",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
+      "source_location": "L30",
+      "id": "settings_usepdktsettingsdraft_buildpdktsettingsforsave",
+      "community": 26,
+      "norm_label": "buildpdktsettingsforsave()"
+    },
+    {
+      "label": "usePdktSettingsDraft()",
+      "file_type": "code",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
+      "source_location": "L49",
       "id": "settings_usepdktsettingsdraft_usepdktsettingsdraft",
       "community": 10,
       "norm_label": "usepdktsettingsdraft()"
@@ -14175,7 +14238,7 @@
       "source_file": "apps/web/src/routes/monitoring/index.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_index_tsx",
-      "community": 7,
+      "community": 73,
       "norm_label": "index.tsx"
     },
     {
@@ -14184,7 +14247,7 @@
       "source_file": "apps/web/src/routes/monitoring/MonitoringPage.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_monitoringpage_tsx",
-      "community": 7,
+      "community": 73,
       "norm_label": "monitoringpage.tsx"
     },
     {
@@ -14193,7 +14256,7 @@
       "source_file": "apps/web/src/routes/monitoring/MonitoringPage.tsx",
       "source_location": "L17",
       "id": "monitoring_monitoringpage_monitoringpage",
-      "community": 7,
+      "community": 73,
       "norm_label": "monitoringpage()"
     },
     {
@@ -14229,7 +14292,7 @@
       "source_file": "apps/web/src/routes/monitoring/utils/formatting.tsx",
       "source_location": "L52",
       "id": "utils_formatting_formatidr",
-      "community": 7,
+      "community": 73,
       "norm_label": "formatidr()"
     },
     {
@@ -14283,7 +14346,7 @@
       "source_file": "apps/web/src/routes/monitoring/utils/formatting.tsx",
       "source_location": "L114",
       "id": "utils_formatting_getscoregrade",
-      "community": 7,
+      "community": 11,
       "norm_label": "getscoregrade()"
     },
     {
@@ -14292,7 +14355,7 @@
       "source_file": "apps/web/src/routes/monitoring/utils/formatting.tsx",
       "source_location": "L148",
       "id": "utils_formatting_maperror",
-      "community": 7,
+      "community": 73,
       "norm_label": "maperror()"
     },
     {
@@ -14400,7 +14463,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingRow.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_pricingrow_tsx",
-      "community": 7,
+      "community": 73,
       "norm_label": "pricingrow.tsx"
     },
     {
@@ -14409,7 +14472,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingRow.tsx",
       "source_location": "L4",
       "id": "components_pricingrow_pricingrow",
-      "community": 7,
+      "community": 73,
       "norm_label": "pricingrow()"
     },
     {
@@ -14436,7 +14499,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx",
       "source_location": "L51",
       "id": "components_telefunreviewpanel_metriccard",
-      "community": 7,
+      "community": 11,
       "norm_label": "metriccard()"
     },
     {
@@ -14445,7 +14508,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx",
       "source_location": "L88",
       "id": "components_telefunreviewpanel_telefunreviewpanel",
-      "community": 7,
+      "community": 11,
       "norm_label": "telefunreviewpanel()"
     },
     {
@@ -14454,7 +14517,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/constants.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_constants_ts",
-      "community": 7,
+      "community": 73,
       "norm_label": "constants.ts"
     },
     {
@@ -14463,7 +14526,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/constants.ts",
       "source_location": "L1",
       "id": "components_constants_module_options",
-      "community": 7,
+      "community": 73,
       "norm_label": "module_options"
     },
     {
@@ -14472,7 +14535,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_pricingtab_tsx",
-      "community": 7,
+      "community": 73,
       "norm_label": "pricingtab.tsx"
     },
     {
@@ -14481,7 +14544,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L7",
       "id": "components_pricingtab_pricingentry",
-      "community": 7,
+      "community": 73,
       "norm_label": "pricingentry"
     },
     {
@@ -14490,7 +14553,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L15",
       "id": "components_pricingtab_pricingtabprops",
-      "community": 7,
+      "community": 73,
       "norm_label": "pricingtabprops"
     },
     {
@@ -14499,7 +14562,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L22",
       "id": "components_pricingtab_pricingtab",
-      "community": 7,
+      "community": 73,
       "norm_label": "pricingtab()"
     },
     {
@@ -14526,7 +14589,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_usagetab_tsx",
-      "community": 7,
+      "community": 73,
       "norm_label": "usagetab.tsx"
     },
     {
@@ -14535,7 +14598,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L10",
       "id": "components_usagetab_usageaggregation",
-      "community": 7,
+      "community": 73,
       "norm_label": "usageaggregation"
     },
     {
@@ -14544,7 +14607,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L35",
       "id": "components_usagetab_usagetabprops",
-      "community": 7,
+      "community": 73,
       "norm_label": "usagetabprops"
     },
     {
@@ -14553,7 +14616,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L46",
       "id": "components_usagetab_usagetab",
-      "community": 7,
+      "community": 73,
       "norm_label": "usagetab()"
     },
     {
@@ -14562,7 +14625,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PdktEvaluationPanel.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_pdktevaluationpanel_tsx",
-      "community": 14,
+      "community": 292,
       "norm_label": "pdktevaluationpanel.tsx"
     },
     {
@@ -14571,7 +14634,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PdktEvaluationPanel.tsx",
       "source_location": "L16",
       "id": "components_pdktevaluationpanel_pdktreviewdata",
-      "community": 14,
+      "community": 292,
       "norm_label": "pdktreviewdata"
     },
     {
@@ -14580,7 +14643,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PdktEvaluationPanel.tsx",
       "source_location": "L37",
       "id": "components_pdktevaluationpanel_formattime",
-      "community": 14,
+      "community": 292,
       "norm_label": "formattime()"
     },
     {
@@ -14589,7 +14652,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PdktEvaluationPanel.tsx",
       "source_location": "L44",
       "id": "components_pdktevaluationpanel_pdktevaluationpanel",
-      "community": 14,
+      "community": 292,
       "norm_label": "pdktevaluationpanel()"
     },
     {
@@ -14688,7 +14751,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_settings_tsx",
-      "community": 5,
+      "community": 96,
       "norm_label": "settings.tsx"
     },
     {
@@ -14697,7 +14760,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L12",
       "id": "sidak_settings_ruleversionmeta",
-      "community": 5,
+      "community": 96,
       "norm_label": "ruleversionmeta"
     },
     {
@@ -14706,7 +14769,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L20",
       "id": "sidak_settings_teams",
-      "community": 5,
+      "community": 96,
       "norm_label": "teams"
     },
     {
@@ -14715,7 +14778,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L22",
       "id": "sidak_settings_service_labels",
-      "community": 5,
+      "community": 96,
       "norm_label": "service_labels"
     },
     {
@@ -14724,7 +14787,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L32",
       "id": "sidak_settings_cat_label",
-      "community": 5,
+      "community": 96,
       "norm_label": "cat_label"
     },
     {
@@ -14733,7 +14796,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L38",
       "id": "sidak_settings_cat_color",
-      "community": 5,
+      "community": 96,
       "norm_label": "cat_color"
     },
     {
@@ -14742,7 +14805,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L44",
       "id": "sidak_settings_formatperiodlabel",
-      "community": 5,
+      "community": 96,
       "norm_label": "formatperiodlabel()"
     },
     {
@@ -14751,7 +14814,7 @@
       "source_file": "apps/web/src/routes/sidak/settings.tsx",
       "source_location": "L53",
       "id": "sidak_settings_sidaksettingspage",
-      "community": 5,
+      "community": 96,
       "norm_label": "sidaksettingspage()"
     },
     {
@@ -14760,7 +14823,7 @@
       "source_file": "apps/web/src/routes/sidak/index.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_index_tsx",
-      "community": 7,
+      "community": 37,
       "norm_label": "index.tsx"
     },
     {
@@ -14769,7 +14832,7 @@
       "source_file": "apps/web/src/routes/sidak/index.tsx",
       "source_location": "L14",
       "id": "sidak_index_cards",
-      "community": 7,
+      "community": 37,
       "norm_label": "cards"
     },
     {
@@ -14778,7 +14841,7 @@
       "source_file": "apps/web/src/routes/sidak/index.tsx",
       "source_location": "L46",
       "id": "sidak_index_colorconfig",
-      "community": 7,
+      "community": 37,
       "norm_label": "colorconfig"
     },
     {
@@ -14787,7 +14850,7 @@
       "source_file": "apps/web/src/routes/sidak/index.tsx",
       "source_location": "L89",
       "id": "sidak_index_sidaklanding",
-      "community": 7,
+      "community": 37,
       "norm_label": "sidaklanding()"
     },
     {
@@ -14796,7 +14859,7 @@
       "source_file": "apps/web/src/routes/sidak/reports-data.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_reports_data_tsx",
-      "community": 53,
+      "community": 292,
       "norm_label": "reports-data.tsx"
     },
     {
@@ -14805,7 +14868,7 @@
       "source_file": "apps/web/src/routes/sidak/reports-data.tsx",
       "source_location": "L11",
       "id": "sidak_reports_data_service_types",
-      "community": 53,
+      "community": 292,
       "norm_label": "service_types"
     },
     {
@@ -14814,7 +14877,7 @@
       "source_file": "apps/web/src/routes/sidak/reports-data.tsx",
       "source_location": "L12",
       "id": "sidak_reports_data_service_labels",
-      "community": 53,
+      "community": 292,
       "norm_label": "service_labels"
     },
     {
@@ -14823,7 +14886,7 @@
       "source_file": "apps/web/src/routes/sidak/reports-data.tsx",
       "source_location": "L17",
       "id": "sidak_reports_data_sidakreportsdata",
-      "community": 53,
+      "community": 292,
       "norm_label": "sidakreportsdata()"
     },
     {
@@ -14832,7 +14895,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_ranking_tsx",
-      "community": 292,
+      "community": 285,
       "norm_label": "ranking.tsx"
     },
     {
@@ -14841,7 +14904,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L16",
       "id": "sidak_ranking_service_labels",
-      "community": 292,
+      "community": 285,
       "norm_label": "service_labels"
     },
     {
@@ -14850,7 +14913,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L26",
       "id": "sidak_ranking_months",
-      "community": 292,
+      "community": 285,
       "norm_label": "months"
     },
     {
@@ -14859,7 +14922,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L32",
       "id": "sidak_ranking_rankingresponse",
-      "community": 22,
+      "community": 67,
       "norm_label": "rankingresponse"
     },
     {
@@ -14868,7 +14931,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L40",
       "id": "sidak_ranking_sortkey",
-      "community": 292,
+      "community": 285,
       "norm_label": "sortkey"
     },
     {
@@ -14877,7 +14940,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L41",
       "id": "sidak_ranking_sortdirection",
-      "community": 292,
+      "community": 285,
       "norm_label": "sortdirection"
     },
     {
@@ -14886,7 +14949,7 @@
       "source_file": "apps/web/src/routes/sidak/ranking.tsx",
       "source_location": "L43",
       "id": "sidak_ranking_sidakrankingpage",
-      "community": 292,
+      "community": 285,
       "norm_label": "sidakrankingpage()"
     },
     {
@@ -14940,7 +15003,7 @@
       "source_file": "apps/web/src/routes/sidak/dashboard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_dashboard_tsx",
-      "community": 292,
+      "community": 47,
       "norm_label": "dashboard.tsx"
     },
     {
@@ -14949,7 +15012,7 @@
       "source_file": "apps/web/src/routes/sidak/dashboard.tsx",
       "source_location": "L26",
       "id": "sidak_dashboard_dashboardskeleton",
-      "community": 292,
+      "community": 47,
       "norm_label": "dashboardskeleton()"
     },
     {
@@ -14958,7 +15021,7 @@
       "source_file": "apps/web/src/routes/sidak/dashboard.tsx",
       "source_location": "L71",
       "id": "sidak_dashboard_sidakdashboardpage",
-      "community": 292,
+      "community": 47,
       "norm_label": "sidakdashboardpage()"
     },
     {
@@ -14967,7 +15030,7 @@
       "source_file": "apps/web/src/routes/sidak/agents.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_agents_tsx",
-      "community": 292,
+      "community": 75,
       "norm_label": "agents.tsx"
     },
     {
@@ -14976,7 +15039,7 @@
       "source_file": "apps/web/src/routes/sidak/agents.tsx",
       "source_location": "L10",
       "id": "sidak_agents_sidakagentspage",
-      "community": 292,
+      "community": 75,
       "norm_label": "sidakagentspage()"
     },
     {
@@ -15057,7 +15120,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_input_tsx",
-      "community": 60,
+      "community": 115,
       "norm_label": "input.tsx"
     },
     {
@@ -15066,7 +15129,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L23",
       "id": "sidak_input_months",
-      "community": 60,
+      "community": 115,
       "norm_label": "months"
     },
     {
@@ -15075,7 +15138,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L29",
       "id": "sidak_input_step",
-      "community": 60,
+      "community": 115,
       "norm_label": "step"
     },
     {
@@ -15084,7 +15147,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L31",
       "id": "sidak_input_service_types",
-      "community": 60,
+      "community": 115,
       "norm_label": "service_types"
     },
     {
@@ -15093,7 +15156,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L32",
       "id": "sidak_input_service_labels",
-      "community": 60,
+      "community": 115,
       "norm_label": "service_labels"
     },
     {
@@ -15102,7 +15165,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L37",
       "id": "sidak_input_agententry",
-      "community": 60,
+      "community": 115,
       "norm_label": "agententry"
     },
     {
@@ -15111,7 +15174,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L45",
       "id": "sidak_input_normalizeagentsresponse",
-      "community": 60,
+      "community": 115,
       "norm_label": "normalizeagentsresponse()"
     },
     {
@@ -15120,7 +15183,7 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L53",
       "id": "sidak_input_sidakinputpage",
-      "community": 60,
+      "community": 115,
       "norm_label": "sidakinputpage()"
     },
     {
@@ -15129,7 +15192,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "community": 14,
+      "community": 67,
       "norm_label": "usetemuanedit.ts"
     },
     {
@@ -15138,7 +15201,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L5",
       "id": "hooks_usetemuanedit_usetemuaneditparams",
-      "community": 14,
+      "community": 67,
       "norm_label": "usetemuaneditparams"
     },
     {
@@ -15147,7 +15210,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L12",
       "id": "hooks_usetemuanedit_usetemuanedit",
-      "community": 60,
+      "community": 115,
       "norm_label": "usetemuanedit()"
     },
     {
@@ -15192,7 +15255,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L41",
       "id": "hooks_usetemuanimport_usetemuanimport",
-      "community": 60,
+      "community": 115,
       "norm_label": "usetemuanimport()"
     },
     {
@@ -15201,7 +15264,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "community": 67,
+      "community": 115,
       "norm_label": "usetemuanform.ts"
     },
     {
@@ -15210,7 +15273,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L5",
       "id": "hooks_usetemuanform_agententry",
-      "community": 67,
+      "community": 115,
       "norm_label": "agententry"
     },
     {
@@ -15228,7 +15291,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L25",
       "id": "hooks_usetemuanform_formentry",
-      "community": 67,
+      "community": 115,
       "norm_label": "formentry"
     },
     {
@@ -15237,7 +15300,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L33",
       "id": "hooks_usetemuanform_newentry",
-      "community": 60,
+      "community": 115,
       "norm_label": "newentry()"
     },
     {
@@ -15246,7 +15309,7 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L43",
       "id": "hooks_usetemuanform_usetemuanform",
-      "community": 60,
+      "community": 115,
       "norm_label": "usetemuanform()"
     },
     {
@@ -15273,7 +15336,7 @@
       "source_file": "apps/web/src/routes/ketik/index.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_ketik_index_tsx",
-      "community": 37,
+      "community": 1,
       "norm_label": "index.tsx"
     },
     {
@@ -15318,7 +15381,7 @@
       "source_file": "apps/web/src/routes/ketik/ketikApi.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_ketik_ketikapi_ts",
-      "community": 37,
+      "community": 1,
       "norm_label": "ketikapi.ts"
     },
     {
@@ -15327,7 +15390,7 @@
       "source_file": "apps/web/src/routes/ketik/ketikApi.ts",
       "source_location": "L12",
       "id": "ketik_ketikapi_apifetch",
-      "community": 37,
+      "community": 1,
       "norm_label": "apifetch()"
     },
     {
@@ -15399,7 +15462,7 @@
       "source_file": "apps/web/src/routes/ketik/components/HistoryModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_ketik_components_historymodal_tsx",
-      "community": 37,
+      "community": 1,
       "norm_label": "historymodal.tsx"
     },
     {
@@ -15408,7 +15471,7 @@
       "source_file": "apps/web/src/routes/ketik/components/HistoryModal.tsx",
       "source_location": "L19",
       "id": "components_historymodal_downloadtranscript",
-      "community": 37,
+      "community": 1,
       "norm_label": "downloadtranscript()"
     },
     {
@@ -15417,7 +15480,7 @@
       "source_file": "apps/web/src/routes/ketik/components/HistoryModal.tsx",
       "source_location": "L72",
       "id": "apps_web_src_routes_ketik_components_historymodal_tsx_components_historymodal_historymodalprops",
-      "community": 37,
+      "community": 1,
       "norm_label": "historymodalprops"
     },
     {
@@ -15426,7 +15489,7 @@
       "source_file": "apps/web/src/routes/ketik/components/HistoryModal.tsx",
       "source_location": "L81",
       "id": "apps_web_src_routes_ketik_components_historymodal_tsx_components_historymodal_historymodal",
-      "community": 37,
+      "community": 1,
       "norm_label": "historymodal()"
     },
     {
@@ -15462,7 +15525,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReplayModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_ketik_components_sessionreplaymodal_tsx",
-      "community": 37,
+      "community": 1,
       "norm_label": "sessionreplaymodal.tsx"
     },
     {
@@ -15471,7 +15534,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReplayModal.tsx",
       "source_location": "L15",
       "id": "components_sessionreplaymodal_sessionreplaymodalprops",
-      "community": 37,
+      "community": 1,
       "norm_label": "sessionreplaymodalprops"
     },
     {
@@ -15480,7 +15543,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReplayModal.tsx",
       "source_location": "L24",
       "id": "components_sessionreplaymodal_sessionreplaymodal",
-      "community": 37,
+      "community": 1,
       "norm_label": "sessionreplaymodal()"
     },
     {
@@ -15489,7 +15552,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReviewModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_ketik_components_sessionreviewmodal_tsx",
-      "community": 37,
+      "community": 1,
       "norm_label": "sessionreviewmodal.tsx"
     },
     {
@@ -15498,7 +15561,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReviewModal.tsx",
       "source_location": "L24",
       "id": "components_sessionreviewmodal_getscoregrade",
-      "community": 37,
+      "community": 1,
       "norm_label": "getscoregrade()"
     },
     {
@@ -15507,7 +15570,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReviewModal.tsx",
       "source_location": "L31",
       "id": "components_sessionreviewmodal_scorebar",
-      "community": 37,
+      "community": 1,
       "norm_label": "scorebar()"
     },
     {
@@ -15516,7 +15579,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReviewModal.tsx",
       "source_location": "L44",
       "id": "components_sessionreviewmodal_sessionreviewmodalprops",
-      "community": 37,
+      "community": 1,
       "norm_label": "sessionreviewmodalprops"
     },
     {
@@ -15525,7 +15588,7 @@
       "source_file": "apps/web/src/routes/ketik/components/SessionReviewModal.tsx",
       "source_location": "L69",
       "id": "components_sessionreviewmodal_sessionreviewmodal",
-      "community": 37,
+      "community": 1,
       "norm_label": "sessionreviewmodal()"
     },
     {
@@ -15574,10 +15637,19 @@
       "norm_label": "useketiksettingsdraftprops"
     },
     {
-      "label": "useKetikSettingsDraft()",
+      "label": "buildKetikSettingsForSave()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts",
       "source_location": "L19",
+      "id": "settings_useketiksettingsdraft_buildketiksettingsforsave",
+      "community": 26,
+      "norm_label": "buildketiksettingsforsave()"
+    },
+    {
+      "label": "useKetikSettingsDraft()",
+      "file_type": "code",
+      "source_file": "apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts",
+      "source_location": "L33",
       "id": "settings_useketiksettingsdraft_useketiksettingsdraft",
       "community": 117,
       "norm_label": "useketiksettingsdraft()"
@@ -15622,7 +15694,7 @@
       "label": "KetikConsumersTabProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx",
-      "source_location": "L6",
+      "source_location": "L8",
       "id": "settings_ketikconsumerstab_ketikconsumerstabprops",
       "community": 117,
       "norm_label": "ketikconsumerstabprops"
@@ -15631,7 +15703,7 @@
       "label": "KetikConsumersTab()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx",
-      "source_location": "L13",
+      "source_location": "L15",
       "id": "settings_ketikconsumerstab_ketikconsumerstab",
       "community": 117,
       "norm_label": "ketikconsumerstab()"
@@ -15703,7 +15775,7 @@
       "label": "KetikScenariosTabProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx",
-      "source_location": "L8",
+      "source_location": "L9",
       "id": "settings_ketikscenariostab_ketikscenariostabprops",
       "community": 117,
       "norm_label": "ketikscenariostabprops"
@@ -15712,7 +15784,7 @@
       "label": "KetikScenariosTab()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx",
-      "source_location": "L14",
+      "source_location": "L15",
       "id": "settings_ketikscenariostab_ketikscenariostab",
       "community": 117,
       "norm_label": "ketikscenariostab()"
@@ -15903,7 +15975,7 @@
       "source_file": "apps/web/src/store/authStore.ts",
       "source_location": "L1",
       "id": "apps_web_src_store_authstore_ts",
-      "community": 7,
+      "community": 37,
       "norm_label": "authstore.ts"
     },
     {
@@ -15912,7 +15984,7 @@
       "source_file": "apps/web/src/store/authStore.ts",
       "source_location": "L5",
       "id": "store_authstore_authstate",
-      "community": 7,
+      "community": 37,
       "norm_label": "authstate"
     },
     {
@@ -15921,7 +15993,7 @@
       "source_file": "apps/web/src/store/authStore.ts",
       "source_location": "L12",
       "id": "store_authstore_useauthstore",
-      "community": 7,
+      "community": 37,
       "norm_label": "useauthstore"
     },
     {
@@ -16416,7 +16488,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L1",
       "id": "apps_api_src_middleware_ratelimit_ts",
-      "community": 27,
+      "community": 74,
       "norm_label": "ratelimit.ts"
     },
     {
@@ -16425,7 +16497,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L3",
       "id": "middleware_ratelimit_ratelimitentry",
-      "community": 27,
+      "community": 74,
       "norm_label": "ratelimitentry"
     },
     {
@@ -16434,7 +16506,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L8",
       "id": "middleware_ratelimit_globalstore",
-      "community": 27,
+      "community": 74,
       "norm_label": "globalstore"
     },
     {
@@ -16443,7 +16515,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L9",
       "id": "middleware_ratelimit_aistore",
-      "community": 27,
+      "community": 74,
       "norm_label": "aistore"
     },
     {
@@ -16452,7 +16524,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L15",
       "id": "middleware_ratelimit_getkey",
-      "community": 27,
+      "community": 74,
       "norm_label": "getkey()"
     },
     {
@@ -16461,7 +16533,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L25",
       "id": "middleware_ratelimit_ratelimitmiddleware",
-      "community": 27,
+      "community": 74,
       "norm_label": "ratelimitmiddleware()"
     },
     {
@@ -16470,7 +16542,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L64",
       "id": "middleware_ratelimit_airatelimitmiddleware",
-      "community": 27,
+      "community": 74,
       "norm_label": "airatelimitmiddleware()"
     },
     {
@@ -16524,7 +16596,7 @@
       "source_file": "apps/api/src/__tests__/sidak-service.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_sidak_service_test_ts",
-      "community": 9,
+      "community": 299,
       "norm_label": "sidak-service.test.ts"
     },
     {
@@ -16533,7 +16605,7 @@
       "source_file": "apps/api/src/__tests__/sidak-service.test.ts",
       "source_location": "L3",
       "id": "tests_sidak_service_test_buildquery",
-      "community": 9,
+      "community": 299,
       "norm_label": "buildquery()"
     },
     {
@@ -16542,7 +16614,7 @@
       "source_file": "apps/api/src/__tests__/sidak-service.test.ts",
       "source_location": "L18",
       "id": "tests_sidak_service_test_pendingresolve",
-      "community": 9,
+      "community": 299,
       "norm_label": "pendingresolve()"
     },
     {
@@ -16596,7 +16668,7 @@
       "source_file": "apps/api/src/__tests__/profiler-scope-filter.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_profiler_scope_filter_test_ts",
-      "community": 301,
+      "community": 17,
       "norm_label": "profiler-scope-filter.test.ts"
     },
     {
@@ -16605,7 +16677,7 @@
       "source_file": "apps/api/src/__tests__/profiler-scope-filter.test.ts",
       "source_location": "L3",
       "id": "tests_profiler_scope_filter_test_tableresults",
-      "community": 301,
+      "community": 17,
       "norm_label": "tableresults"
     },
     {
@@ -16614,7 +16686,7 @@
       "source_file": "apps/api/src/__tests__/profiler-scope-filter.test.ts",
       "source_location": "L5",
       "id": "tests_profiler_scope_filter_test_buildquery",
-      "community": 301,
+      "community": 17,
       "norm_label": "buildquery()"
     },
     {
@@ -16623,7 +16695,7 @@
       "source_file": "apps/api/src/__tests__/profiler-scope-filter.test.ts",
       "source_location": "L18",
       "id": "tests_profiler_scope_filter_test_pendingresolve",
-      "community": 301,
+      "community": 17,
       "norm_label": "pendingresolve()"
     },
     {
@@ -16992,7 +17064,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_pdkt_reply_route_test_ts",
-      "community": 290,
+      "community": 27,
       "norm_label": "pdkt-reply-route.test.ts"
     },
     {
@@ -17001,7 +17073,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L5",
       "id": "tests_pdkt_reply_route_test_mockrpc",
-      "community": 290,
+      "community": 27,
       "norm_label": "mockrpc"
     },
     {
@@ -17010,7 +17082,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L6",
       "id": "tests_pdkt_reply_route_test_mocksingle",
-      "community": 290,
+      "community": 27,
       "norm_label": "mocksingle"
     },
     {
@@ -17019,7 +17091,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L7",
       "id": "tests_pdkt_reply_route_test_mockmaybesingle",
-      "community": 290,
+      "community": 27,
       "norm_label": "mockmaybesingle"
     },
     {
@@ -17028,7 +17100,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L9",
       "id": "tests_pdkt_reply_route_test_buildmockclient",
-      "community": 290,
+      "community": 27,
       "norm_label": "buildmockclient()"
     },
     {
@@ -17037,7 +17109,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L26",
       "id": "tests_pdkt_reply_route_test_mocksupabaseadmin",
-      "community": 290,
+      "community": 27,
       "norm_label": "mocksupabaseadmin"
     },
     {
@@ -17046,7 +17118,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
       "source_location": "L66",
       "id": "tests_pdkt_reply_route_test_createauthenticatedapp",
-      "community": 290,
+      "community": 27,
       "norm_label": "createauthenticatedapp()"
     },
     {
@@ -17118,7 +17190,7 @@
       "source_file": "apps/api/src/__tests__/ketik-review-route.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_ketik_review_route_test_ts",
-      "community": 13,
+      "community": 74,
       "norm_label": "ketik-review-route.test.ts"
     },
     {
@@ -17127,7 +17199,7 @@
       "source_file": "apps/api/src/__tests__/ketik-review-route.test.ts",
       "source_location": "L4",
       "id": "tests_ketik_review_route_test_mockfrom_mockcreateadminclient",
-      "community": 13,
+      "community": 74,
       "norm_label": "{ mockfrom, mockcreateadminclient }"
     },
     {
@@ -17136,7 +17208,7 @@
       "source_file": "apps/api/src/__tests__/ketik-review-route.test.ts",
       "source_location": "L37",
       "id": "tests_ketik_review_route_test_buildapp",
-      "community": 13,
+      "community": 74,
       "norm_label": "buildapp()"
     },
     {
@@ -17145,7 +17217,7 @@
       "source_file": "apps/api/src/__tests__/ketik-review-route.test.ts",
       "source_location": "L552",
       "id": "tests_ketik_review_route_test_mockdefaultquery",
-      "community": 13,
+      "community": 74,
       "norm_label": "mockdefaultquery()"
     },
     {
@@ -18117,7 +18189,7 @@
       "source_file": "apps/api/src/lib/ai-usage.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_ai_usage_ts",
-      "community": 34,
+      "community": 45,
       "norm_label": "ai-usage.ts"
     },
     {
@@ -18144,7 +18216,7 @@
       "source_file": "apps/api/src/lib/ai-usage.ts",
       "source_location": "L15",
       "id": "lib_ai_usage_logaiusage",
-      "community": 34,
+      "community": 45,
       "norm_label": "logaiusage()"
     },
     {
@@ -18666,7 +18738,7 @@
       "source_file": "apps/api/src/lib/scoring.ts",
       "source_location": "L19",
       "id": "lib_scoring_isservicetype",
-      "community": 31,
+      "community": 24,
       "norm_label": "isservicetype()"
     },
     {
@@ -18837,7 +18909,7 @@
       "source_file": "apps/api/src/lib/openrouter.ts",
       "source_location": "L12",
       "id": "lib_openrouter_generateopenroutercontent",
-      "community": 34,
+      "community": 45,
       "norm_label": "generateopenroutercontent()"
     },
     {
@@ -18846,7 +18918,7 @@
       "source_file": "apps/api/src/lib/supabase.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_supabase_ts",
-      "community": 87,
+      "community": 48,
       "norm_label": "supabase.ts"
     },
     {
@@ -18855,7 +18927,7 @@
       "source_file": "apps/api/src/lib/supabase.ts",
       "source_location": "L4",
       "id": "lib_supabase_supabaseadmin",
-      "community": 87,
+      "community": 48,
       "norm_label": "supabaseadmin"
     },
     {
@@ -19035,7 +19107,7 @@
       "source_file": "apps/api/src/routes/ketik.ts",
       "source_location": "L1",
       "id": "apps_api_src_routes_ketik_ts",
-      "community": 13,
+      "community": 74,
       "norm_label": "ketik.ts"
     },
     {
@@ -19044,7 +19116,7 @@
       "source_file": "apps/api/src/routes/ketik.ts",
       "source_location": "L11",
       "id": "routes_ketik_variables",
-      "community": 13,
+      "community": 74,
       "norm_label": "variables"
     },
     {
@@ -19053,7 +19125,7 @@
       "source_file": "apps/api/src/routes/ketik.ts",
       "source_location": "L13",
       "id": "routes_ketik_ketik",
-      "community": 13,
+      "community": 74,
       "norm_label": "ketik"
     },
     {
@@ -19062,7 +19134,7 @@
       "source_file": "apps/api/src/routes/admin.ts",
       "source_location": "L1",
       "id": "apps_api_src_routes_admin_ts",
-      "community": 20,
+      "community": 5,
       "norm_label": "admin.ts"
     },
     {
@@ -19071,7 +19143,7 @@
       "source_file": "apps/api/src/routes/admin.ts",
       "source_location": "L19",
       "id": "routes_admin_variables",
-      "community": 20,
+      "community": 5,
       "norm_label": "variables"
     },
     {
@@ -19638,7 +19710,7 @@
       "source_file": "apps/api/src/services/pdkt-service.ts",
       "source_location": "L202",
       "id": "services_pdkt_service_getconsumertypes",
-      "community": 118,
+      "community": 85,
       "norm_label": "getconsumertypes()"
     },
     {
@@ -19728,7 +19800,7 @@
       "source_file": "apps/api/src/services/pdkt-service.ts",
       "source_location": "L416",
       "id": "services_pdkt_service_callai",
-      "community": 34,
+      "community": 19,
       "norm_label": "callai()"
     },
     {
@@ -20160,7 +20232,7 @@
       "source_file": "apps/api/src/services/admin-service.ts",
       "source_location": "L31",
       "id": "services_admin_service_updateuserstatus",
-      "community": 59,
+      "community": 20,
       "norm_label": "updateuserstatus()"
     },
     {
@@ -20169,7 +20241,7 @@
       "source_file": "apps/api/src/services/admin-service.ts",
       "source_location": "L66",
       "id": "services_admin_service_updateuserrole",
-      "community": 59,
+      "community": 20,
       "norm_label": "updateuserrole()"
     },
     {
@@ -20178,7 +20250,7 @@
       "source_file": "apps/api/src/services/admin-service.ts",
       "source_location": "L100",
       "id": "services_admin_service_deleteuser",
-      "community": 59,
+      "community": 20,
       "norm_label": "deleteuser()"
     },
     {
@@ -20187,7 +20259,7 @@
       "source_file": "apps/api/src/services/admin-service.ts",
       "source_location": "L138",
       "id": "services_admin_service_resetuserpassword",
-      "community": 59,
+      "community": 20,
       "norm_label": "resetuserpassword()"
     },
     {
@@ -20340,7 +20412,7 @@
       "source_file": "apps/api/src/services/admin-service.ts",
       "source_location": "L652",
       "id": "services_admin_service_getleaderaccessstatus",
-      "community": 88,
+      "community": 20,
       "norm_label": "getleaderaccessstatus()"
     },
     {
@@ -20385,7 +20457,7 @@
       "source_file": "apps/api/src/services/sidak-ranking-service.ts",
       "source_location": "L24",
       "id": "services_sidak_ranking_service_getrankingdata",
-      "community": 22,
+      "community": 59,
       "norm_label": "getrankingdata()"
     },
     {
@@ -20439,7 +20511,7 @@
       "source_file": "apps/api/src/services/leader-access-service.ts",
       "source_location": "L33",
       "id": "services_leader_access_service_fetchleadermodulerequests",
-      "community": 88,
+      "community": 20,
       "norm_label": "fetchleadermodulerequests()"
     },
     {
@@ -20745,7 +20817,7 @@
       "source_file": "apps/api/src/services/sidak/access-scope.ts",
       "source_location": "L6",
       "id": "sidak_access_scope_sidakfilterscope",
-      "community": 48,
+      "community": 24,
       "norm_label": "sidakfilterscope"
     },
     {
@@ -21168,7 +21240,7 @@
       "source_file": "apps/api/src/services/sidak/period-indicator.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_sidak_period_indicator_ts",
-      "community": 87,
+      "community": 81,
       "norm_label": "period-indicator.ts"
     },
     {
@@ -21186,7 +21258,7 @@
       "source_file": "apps/api/src/services/sidak/period-indicator.ts",
       "source_location": "L13",
       "id": "sidak_period_indicator_createperiod",
-      "community": 87,
+      "community": 81,
       "norm_label": "createperiod()"
     },
     {
@@ -21195,7 +21267,7 @@
       "source_file": "apps/api/src/services/sidak/period-indicator.ts",
       "source_location": "L27",
       "id": "sidak_period_indicator_deleteperiod",
-      "community": 87,
+      "community": 81,
       "norm_label": "deleteperiod()"
     },
     {
@@ -21213,7 +21285,7 @@
       "source_file": "apps/api/src/services/sidak/period-indicator.ts",
       "source_location": "L78",
       "id": "sidak_period_indicator_hasdraftruleversion",
-      "community": 87,
+      "community": 81,
       "norm_label": "hasdraftruleversion()"
     },
     {
@@ -21231,7 +21303,7 @@
       "source_file": "apps/api/src/services/sidak/period-indicator.ts",
       "source_location": "L98",
       "id": "sidak_period_indicator_createindicator",
-      "community": 87,
+      "community": 81,
       "norm_label": "createindicator()"
     },
     {
@@ -21285,7 +21357,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_sidak_report_archives_ts",
-      "community": 87,
+      "community": 48,
       "norm_label": "report-archives.ts"
     },
     {
@@ -21294,7 +21366,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L6",
       "id": "sidak_report_archives_reportarchiveinput",
-      "community": 87,
+      "community": 48,
       "norm_label": "reportarchiveinput"
     },
     {
@@ -21303,7 +21375,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L16",
       "id": "sidak_report_archives_savereportarchive",
-      "community": 87,
+      "community": 48,
       "norm_label": "savereportarchive()"
     },
     {
@@ -21312,7 +21384,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L35",
       "id": "sidak_report_archives_getreportarchives",
-      "community": 87,
+      "community": 48,
       "norm_label": "getreportarchives()"
     },
     {
@@ -21321,7 +21393,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L50",
       "id": "sidak_report_archives_getreportarchivebyid",
-      "community": 87,
+      "community": 48,
       "norm_label": "getreportarchivebyid()"
     },
     {
@@ -21330,7 +21402,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L68",
       "id": "sidak_report_archives_deletereportarchive",
-      "community": 87,
+      "community": 48,
       "norm_label": "deletereportarchive()"
     },
     {
@@ -21447,7 +21519,7 @@
       "source_file": "apps/api/src/services/ketik/review-processor.ts",
       "source_location": "L54",
       "id": "ketik_review_processor_generateketikreviewairesponse",
-      "community": 34,
+      "community": 45,
       "norm_label": "generateketikreviewairesponse()"
     },
     {
@@ -21474,7 +21546,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_ketik_settings_history_ts",
-      "community": 47,
+      "community": 13,
       "norm_label": "settings-history.ts"
     },
     {
@@ -21483,7 +21555,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L13",
       "id": "ketik_settings_history_coerceketikmodelid",
-      "community": 47,
+      "community": 13,
       "norm_label": "coerceketikmodelid()"
     },
     {
@@ -21492,7 +21564,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L18",
       "id": "ketik_settings_history_coerceduration",
-      "community": 47,
+      "community": 13,
       "norm_label": "coerceduration()"
     },
     {
@@ -21501,7 +21573,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L23",
       "id": "ketik_settings_history_parsesettings",
-      "community": 47,
+      "community": 13,
       "norm_label": "parsesettings()"
     },
     {
@@ -21510,7 +21582,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L68",
       "id": "ketik_settings_history_getsettings",
-      "community": 47,
+      "community": 13,
       "norm_label": "getsettings()"
     },
     {
@@ -21519,7 +21591,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L84",
       "id": "ketik_settings_history_savesettings",
-      "community": 47,
+      "community": 13,
       "norm_label": "savesettings()"
     },
     {
@@ -21528,7 +21600,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L115",
       "id": "ketik_settings_history_gethistory",
-      "community": 47,
+      "community": 13,
       "norm_label": "gethistory()"
     },
     {
@@ -21537,7 +21609,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L192",
       "id": "ketik_settings_history_persistsession",
-      "community": 47,
+      "community": 13,
       "norm_label": "persistsession()"
     },
     {
@@ -21546,7 +21618,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L259",
       "id": "ketik_settings_history_deletesession",
-      "community": 47,
+      "community": 13,
       "norm_label": "deletesession()"
     },
     {
@@ -21555,7 +21627,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L284",
       "id": "ketik_settings_history_clearhistory",
-      "community": 47,
+      "community": 13,
       "norm_label": "clearhistory()"
     },
     {
@@ -21564,7 +21636,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L305",
       "id": "ketik_settings_history_getreviewdetail",
-      "community": 47,
+      "community": 13,
       "norm_label": "getreviewdetail()"
     },
     {
@@ -21600,7 +21672,7 @@
       "source_file": "apps/api/src/services/ketik/review-lifecycle.ts",
       "source_location": "L4",
       "id": "ketik_review_lifecycle_triggerketikaireview",
-      "community": 45,
+      "community": 13,
       "norm_label": "triggerketikaireview()"
     },
     {
@@ -21618,7 +21690,7 @@
       "source_file": "apps/api/src/services/ketik/review-lifecycle.ts",
       "source_location": "L161",
       "id": "ketik_review_lifecycle_getketikreviewstatus",
-      "community": 45,
+      "community": 13,
       "norm_label": "getketikreviewstatus()"
     },
     {
@@ -22801,19 +22873,19 @@
       "norm_label": "phase progress"
     },
     {
-      "label": "Key Files Changed (Phase 58 \u2014 83)",
+      "label": "Key Files Changed (Phase 58 \u2014 84)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L276",
-      "id": "trainerssuperappvite_agents_key_files_changed_phase_58_83",
+      "source_location": "L277",
+      "id": "trainerssuperappvite_agents_key_files_changed_phase_58_84",
       "community": 52,
-      "norm_label": "key files changed (phase 58 \u2014 83)"
+      "norm_label": "key files changed (phase 58 \u2014 84)"
     },
     {
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L334",
+      "source_location": "L335",
       "id": "trainerssuperappvite_agents_relevant_files",
       "community": 52,
       "norm_label": "relevant files"
@@ -22822,7 +22894,7 @@
       "label": "Routes Reference (apps/web)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L463",
+      "source_location": "L469",
       "id": "trainerssuperappvite_agents_routes_reference_apps_web",
       "community": 52,
       "norm_label": "routes reference (apps/web)"
@@ -22831,7 +22903,7 @@
       "label": "API Endpoints Reference (apps/api)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L506",
+      "source_location": "L512",
       "id": "trainerssuperappvite_agents_api_endpoints_reference_apps_api",
       "community": 52,
       "norm_label": "api endpoints reference (apps/api)"
@@ -22840,7 +22912,7 @@
       "label": "graphify",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L518",
+      "source_location": "L524",
       "id": "trainerssuperappvite_agents_graphify",
       "community": 52,
       "norm_label": "graphify"
@@ -22849,7 +22921,7 @@
       "label": "WAJIB: Gunakan graphify secara otomatis",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L524",
+      "source_location": "L530",
       "id": "trainerssuperappvite_agents_wajib_gunakan_graphify_secara_otomatis",
       "community": 52,
       "norm_label": "wajib: gunakan graphify secara otomatis"
@@ -22858,7 +22930,7 @@
       "label": "Untuk Planning",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L528",
+      "source_location": "L534",
       "id": "trainerssuperappvite_agents_untuk_planning",
       "community": 52,
       "norm_label": "untuk planning"
@@ -22867,7 +22939,7 @@
       "label": "Untuk Eksekusi (Bug Fix / Fitur Baru)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L533",
+      "source_location": "L539",
       "id": "trainerssuperappvite_agents_untuk_eksekusi_bug_fix_fitur_baru",
       "community": 52,
       "norm_label": "untuk eksekusi (bug fix / fitur baru)"
@@ -22876,7 +22948,7 @@
       "label": "Untuk Subagent (Task tool)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L539",
+      "source_location": "L545",
       "id": "trainerssuperappvite_agents_untuk_subagent_task_tool",
       "community": 52,
       "norm_label": "untuk subagent (task tool)"
@@ -22885,7 +22957,7 @@
       "label": "Aturan Penting",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L543",
+      "source_location": "L549",
       "id": "trainerssuperappvite_agents_aturan_penting",
       "community": 52,
       "norm_label": "aturan penting"
@@ -31590,7 +31662,7 @@
       "source_file": "apps/web/src/lib/photo-frame.ts",
       "source_location": "L122",
       "id": "lib_photo_frame_getphotoframe",
-      "community": 285,
+      "community": 32,
       "norm_label": "getphotoframe"
     },
     {
@@ -31599,7 +31671,7 @@
       "source_file": "apps/web/src/lib/photo-frame.ts",
       "source_location": "L123",
       "id": "lib_photo_frame_setphotoframe",
-      "community": 115,
+      "community": 25,
       "norm_label": "setphotoframe"
     },
     {
@@ -31608,15 +31680,24 @@
       "source_file": "apps/web/src/lib/photo-frame.ts",
       "source_location": "L124",
       "id": "lib_photo_frame_normalizephotoframe",
-      "community": 115,
+      "community": 25,
       "norm_label": "normalizephotoframe"
+    },
+    {
+      "label": "Key Files Changed (Phase 58 \u2014 83)",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L276",
+      "community": 52,
+      "norm_label": "key files changed (phase 58 \u2014 83)",
+      "id": "trainerssuperappvite_agents_key_files_changed_phase_58_83"
     },
     {
       "label": "newEntry()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L36",
-      "community": 60,
+      "community": 115,
       "norm_label": "newentry()",
       "id": "sidak_input_newentry"
     },
@@ -31787,7 +31868,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/ketik-service.ts",
       "source_location": "L232",
-      "community": 34,
+      "community": 13,
       "norm_label": "generateconsumerresponse()",
       "id": "services_ketik_service_generateconsumerresponse"
     },
@@ -32201,7 +32282,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L4",
-      "community": 87,
+      "community": 48,
       "norm_label": "adminroles",
       "id": "sidak_report_archives_adminroles"
     },
@@ -32228,7 +32309,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L32",
-      "community": 9,
+      "community": 48,
       "norm_label": "getaccessibleagentids()",
       "id": "services_sidak_service_getaccessibleagentids"
     },
@@ -32237,7 +32318,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L55",
-      "community": 9,
+      "community": 24,
       "norm_label": "sidakfilterscope",
       "id": "services_sidak_service_sidakfilterscope"
     },
@@ -32246,7 +32327,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L62",
-      "community": 9,
+      "community": 48,
       "norm_label": "getaccessiblesidakfilters()",
       "id": "services_sidak_service_getaccessiblesidakfilters"
     },
@@ -32890,7 +32971,7 @@
       "label": "Phase 38: Database Legacy Parity Remediation",
       "file_type": "rationale",
       "source_file": "docs/rebuild-logs/phase-38-database-legacy-parity-remediation.md",
-      "community": 9,
+      "community": 301,
       "norm_label": "phase 38: database legacy parity remediation",
       "id": "phase_38_database_legacy_parity_remediation"
     },
@@ -32994,7 +33075,7 @@
       "label": "Phase 37: Database Legacy Parity Audit",
       "file_type": "rationale",
       "source_file": "docs/rebuild-logs/phase-37-database-legacy-parity-audit.md",
-      "community": 9,
+      "community": 301,
       "norm_label": "phase 37: database legacy parity audit",
       "id": "phase_37_database_legacy_parity_audit"
     },
@@ -37196,9 +37277,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "packages_types_src_index_ts",
-      "confidence_score": 1.0
+      "target": "packages_types_src_index_ts"
     },
     {
       "relation": "imports_from",
@@ -37207,9 +37288,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "packages_types_src_index_ts",
-      "confidence_score": 1.0
+      "target": "packages_types_src_index_ts"
     },
     {
       "relation": "imports_from",
@@ -37218,9 +37299,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "packages_types_src_index_ts",
-      "confidence_score": 1.0
+      "target": "packages_types_src_index_ts"
     },
     {
       "relation": "imports_from",
@@ -37441,6 +37522,17 @@
       "confidence_score": 1.0,
       "source": "apps_web_src_tests_pdkt_settings_test_ts",
       "target": "packages_types_src_index_ts"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "packages_types_src_index_ts",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -39429,9 +39521,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "src_index_qaperiod",
-      "confidence_score": 1.0
+      "target": "src_index_qaperiod"
     },
     {
       "relation": "imports",
@@ -39440,9 +39532,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "src_index_qaperiod",
-      "confidence_score": 1.0
+      "target": "src_index_qaperiod"
     },
     {
       "relation": "imports",
@@ -39484,9 +39576,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanform_usetemuanformparams",
-      "target": "src_index_qaperiod",
-      "confidence_score": 1.0
+      "target": "src_index_qaperiod"
     },
     {
       "relation": "references",
@@ -39495,9 +39587,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L31",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanimport_usetemuanimportparams",
-      "target": "src_index_qaperiod",
-      "confidence_score": 1.0
+      "target": "src_index_qaperiod"
     },
     {
       "relation": "references",
@@ -39605,9 +39697,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "src_index_qaindicator",
-      "confidence_score": 1.0
+      "target": "src_index_qaindicator"
     },
     {
       "relation": "imports",
@@ -39616,9 +39708,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "src_index_qaindicator",
-      "confidence_score": 1.0
+      "target": "src_index_qaindicator"
     },
     {
       "relation": "imports",
@@ -39660,9 +39752,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L17",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanform_usetemuanformparams",
-      "target": "src_index_qaindicator",
-      "confidence_score": 1.0
+      "target": "src_index_qaindicator"
     },
     {
       "relation": "references",
@@ -39671,9 +39763,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L33",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanimport_usetemuanimportparams",
-      "target": "src_index_qaindicator",
-      "confidence_score": 1.0
+      "target": "src_index_qaindicator"
     },
     {
       "relation": "imports",
@@ -39737,9 +39829,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "src_index_qatemuan",
-      "confidence_score": 1.0
+      "target": "src_index_qatemuan"
     },
     {
       "relation": "imports",
@@ -39748,9 +39840,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "src_index_qatemuan",
-      "confidence_score": 1.0
+      "target": "src_index_qatemuan"
     },
     {
       "relation": "imports",
@@ -39759,9 +39851,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "src_index_qatemuan",
-      "confidence_score": 1.0
+      "target": "src_index_qatemuan"
     },
     {
       "relation": "imports",
@@ -39781,9 +39873,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanedit_usetemuaneditparams",
-      "target": "src_index_qatemuan",
-      "confidence_score": 1.0
+      "target": "src_index_qatemuan"
     },
     {
       "relation": "references",
@@ -39792,9 +39884,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanform_usetemuanformparams",
-      "target": "src_index_qatemuan",
-      "confidence_score": 1.0
+      "target": "src_index_qatemuan"
     },
     {
       "relation": "references",
@@ -39803,9 +39895,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L36",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanimport_usetemuanimportparams",
-      "target": "src_index_qatemuan",
-      "confidence_score": 1.0
+      "target": "src_index_qatemuan"
     },
     {
       "relation": "imports",
@@ -40862,6 +40954,17 @@
       "confidence_score": 1.0,
       "source": "apps_web_src_routes_ketik_index_tsx",
       "target": "src_index_default_ketik_settings"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "src_index_default_ketik_settings",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -51768,9 +51871,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "apps_web_src_components_sidak_sidakinputimportpanel_tsx",
-      "confidence_score": 1.0
+      "target": "apps_web_src_components_sidak_sidakinputimportpanel_tsx"
     },
     {
       "relation": "imports_from",
@@ -51790,9 +51893,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L4",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "sidak_sidakinputimportpanel_parsedimportrow",
-      "confidence_score": 1.0
+      "target": "sidak_sidakinputimportpanel_parsedimportrow"
     },
     {
       "relation": "imports",
@@ -53780,6 +53883,148 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "apps_web_src_routes_ketik_components_settings_useketiksettingsdraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "apps_web_src_routes_pdkt_components_settings_usepdktsettingsdraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "apps_web_src_routes_pdkt_pdktsettings_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "apps_web_src_routes_telefun_components_settings_usetelefunsettingsdraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "apps_web_src_routes_telefun_telefunsettings_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "pdkt_pdktsettings_pdktappsettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "settings_useketiksettingsdraft_buildketiksettingsforsave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "settings_usepdktsettingsdraft_buildpdktsettingsforsave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "settings_usetelefunsettingsdraft_buildtelefunsettingsforsave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "telefun_telefunsettings_default_telefun_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/settings-draft-helpers.test.ts",
+      "source_location": "L85",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_settings_draft_helpers_test_ts",
+      "target": "tests_settings_draft_helpers_test_testitem",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/src/__tests__/telefun-session-finalizer.test.ts",
       "source_location": "L2",
       "weight": 1.0,
@@ -54853,6 +55098,148 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/hooks/useCollectionDraft.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "apps_web_src_hooks_usecollectiondraft_ts",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_ketik_components_settings_ketikconsumerstab_tsx",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_ketik_components_settings_ketikscenariostab_tsx",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_pdkt_components_settings_pdktconsumerstab_tsx",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_pdkt_components_settings_pdktscenariostab_tsx",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_telefun_components_settings_telefunconsumerstab_tsx",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_telefun_components_settings_telefunscenariostab_tsx",
+      "target": "apps_web_src_hooks_usecollectiondraft_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/ketik/components/settings/KetikConsumersTab.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_ketik_components_settings_ketikconsumerstab_tsx",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/ketik/components/settings/KetikScenariosTab.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_ketik_components_settings_ketikscenariostab_tsx",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_pdkt_components_settings_pdktconsumerstab_tsx",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_pdkt_components_settings_pdktscenariostab_tsx",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/telefun/components/settings/TelefunConsumersTab.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_telefun_components_settings_telefunconsumerstab_tsx",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/telefun/components/settings/TelefunScenariosTab.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_telefun_components_settings_telefunscenariostab_tsx",
+      "target": "hooks_usecollectiondraft_applycollectiondraft",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "apps/web/src/hooks/useThemeMode.ts",
       "source_location": "L18",
       "weight": 1.0,
@@ -55851,9 +56238,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "apps_web_src_hooks_useapi_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_hooks_useapi_ts"
     },
     {
       "relation": "imports_from",
@@ -55862,9 +56249,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "apps_web_src_hooks_useapi_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_hooks_useapi_ts"
     },
     {
       "relation": "imports_from",
@@ -55873,9 +56260,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "apps_web_src_hooks_useapi_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_hooks_useapi_ts"
     },
     {
       "relation": "imports_from",
@@ -56643,9 +57030,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_useapi_postapi",
-      "confidence_score": 1.0
+      "target": "hooks_useapi_postapi"
     },
     {
       "relation": "imports",
@@ -56654,9 +57041,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "hooks_useapi_postapi",
-      "confidence_score": 1.0
+      "target": "hooks_useapi_postapi"
     },
     {
       "relation": "imports",
@@ -56863,9 +57250,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "hooks_useapi_putapi",
-      "confidence_score": 1.0
+      "target": "hooks_useapi_putapi"
     },
     {
       "relation": "imports",
@@ -57028,9 +57415,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "hooks_useapi_deleteapi",
-      "confidence_score": 1.0
+      "target": "hooks_useapi_deleteapi"
     },
     {
       "relation": "imports",
@@ -57248,9 +57635,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_useapi_getapi",
-      "confidence_score": 1.0
+      "target": "hooks_useapi_getapi"
     },
     {
       "relation": "imports",
@@ -57259,9 +57646,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "hooks_useapi_getapi",
-      "confidence_score": 1.0
+      "target": "hooks_useapi_getapi"
     },
     {
       "relation": "imports",
@@ -65372,6 +65759,16 @@
       "source_file": "apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts",
       "source_location": "L18",
       "weight": 1.0,
+      "source": "apps_web_src_routes_telefun_components_settings_usetelefunsettingsdraft_ts",
+      "target": "settings_usetelefunsettingsdraft_buildtelefunsettingsforsave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/telefun/components/settings/useTelefunSettingsDraft.ts",
+      "source_location": "L18",
+      "weight": 1.0,
       "confidence_score": 1.0,
       "source": "apps_web_src_routes_telefun_components_settings_usetelefunsettingsdraft_ts",
       "target": "settings_usetelefunsettingsdraft_usetelefunsettingsdraft"
@@ -72013,6 +72410,17 @@
     },
     {
       "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "settings_usepdktsettingsdraft_pdktsystemdraft",
+      "target": "pdkt_pdktsettings_pdktappsettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
       "context": "field",
       "confidence": "EXTRACTED",
       "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
@@ -72808,6 +73216,26 @@
       "confidence_score": 1.0,
       "source": "apps_web_src_routes_pdkt_components_settings_pdktconsumerstab_tsx",
       "target": "settings_pdktconsumerstab_pdktconsumerstabprops"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_pdkt_components_settings_usepdktsettingsdraft_ts",
+      "target": "settings_usepdktsettingsdraft_buildpdktsettingsforsave",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_pdkt_components_settings_usepdktsettingsdraft_ts",
+      "target": "settings_usepdktsettingsdraft_pdktsystemdraft",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -75032,9 +75460,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts"
     },
     {
       "relation": "imports_from",
@@ -75043,9 +75471,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_routes_sidak_hooks_usetemuanform_ts"
     },
     {
       "relation": "imports_from",
@@ -75054,9 +75482,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts"
     },
     {
       "relation": "imports_from",
@@ -75076,9 +75504,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "hooks_usetemuanedit_usetemuanedit",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanedit_usetemuanedit"
     },
     {
       "relation": "imports",
@@ -75087,9 +75515,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "hooks_usetemuanform_newentry",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_newentry"
     },
     {
       "relation": "imports",
@@ -75098,9 +75526,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "hooks_usetemuanform_usetemuanform",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_usetemuanform"
     },
     {
       "relation": "imports",
@@ -75109,9 +75537,9 @@
       "source_file": "apps/web/src/routes/sidak/input.tsx",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_input_tsx",
-      "target": "hooks_usetemuanimport_usetemuanimport",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanimport_usetemuanimport"
     },
     {
       "relation": "contains",
@@ -75265,9 +75693,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L12",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "hooks_usetemuanedit_usetemuanedit",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanedit_usetemuanedit"
     },
     {
       "relation": "contains",
@@ -75275,9 +75703,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanEdit.ts",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanedit_ts",
-      "target": "hooks_usetemuanedit_usetemuaneditparams",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanedit_usetemuaneditparams"
     },
     {
       "relation": "contains",
@@ -75285,9 +75713,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "hooks_usetemuanimport_agententry",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanimport_agententry"
     },
     {
       "relation": "contains",
@@ -75295,9 +75723,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "hooks_usetemuanimport_months",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanimport_months"
     },
     {
       "relation": "contains",
@@ -75305,9 +75733,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L41",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "hooks_usetemuanimport_usetemuanimport",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanimport_usetemuanimport"
     },
     {
       "relation": "contains",
@@ -75315,9 +75743,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanImport.ts",
       "source_location": "L29",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanimport_ts",
-      "target": "hooks_usetemuanimport_usetemuanimportparams",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanimport_usetemuanimportparams"
     },
     {
       "relation": "contains",
@@ -75325,9 +75753,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_usetemuanform_agententry",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_agententry"
     },
     {
       "relation": "contains",
@@ -75335,9 +75763,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L25",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_usetemuanform_formentry",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_formentry"
     },
     {
       "relation": "contains",
@@ -75345,9 +75773,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L33",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_usetemuanform_newentry",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_newentry"
     },
     {
       "relation": "contains",
@@ -75355,9 +75783,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L43",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_usetemuanform_usetemuanform",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_usetemuanform"
     },
     {
       "relation": "contains",
@@ -75365,9 +75793,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L13",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_hooks_usetemuanform_ts",
-      "target": "hooks_usetemuanform_usetemuanformparams",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_usetemuanformparams"
     },
     {
       "relation": "calls",
@@ -75376,9 +75804,9 @@
       "source_file": "apps/web/src/routes/sidak/hooks/useTemuanForm.ts",
       "source_location": "L56",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "hooks_usetemuanform_usetemuanform",
-      "target": "hooks_usetemuanform_newentry",
-      "confidence_score": 1.0
+      "target": "hooks_usetemuanform_newentry"
     },
     {
       "relation": "contains",
@@ -76495,6 +76923,16 @@
       "weight": 1.0,
       "source": "apps_web_src_routes_ketik_components_settingsmodal_tsx_components_settingsmodal_settingsmodal",
       "target": "settings_useketiksettingsdraft_useketiksettingsdraft"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/routes/ketik/components/settings/useKetikSettingsDraft.ts",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "apps_web_src_routes_ketik_components_settings_useketiksettingsdraft_ts",
+      "target": "settings_useketiksettingsdraft_buildketiksettingsforsave",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -93880,6 +94318,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "AGENTS.md",
+      "source_location": "L277",
+      "weight": 1.0,
+      "source": "trainerssuperappvite_agents_agents_md_trainers_superapp_rebuild",
+      "target": "trainerssuperappvite_agents_key_files_changed_phase_58_84",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
       "source_location": "L3",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -104581,5 +105029,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "e667a15f9aadfccbe44b797e00bc31367a799129"
+  "built_at_commit": "3d253602a82697dfc65b389c9baaf50dc00a4167"
 }
