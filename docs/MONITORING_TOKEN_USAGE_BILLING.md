@@ -131,10 +131,14 @@ Action `usageContext` yang saat ini aktif:
 
 | Modul         | Action                                                                          |
 | ------------- | ------------------------------------------------------------------------------- |
-| `ketik`       | `chat_response`, `session_timeout`                                              |
+| `ketik`       | `chat_response`, `session_timeout`, `generate_consumer_response`               |
 | `pdkt`        | `init_email`, `evaluate_response`                                               |
 | `telefun`     | `voice_live`, `voice_tts`, `chat_response`, `first_message`, `score_generation` |
 | `qa-analyzer` | `report_generation`                                                             |
+
+Catatan:
+
+- `generate_consumer_response` dihitung sebagai biaya simulasi KETIK pada ringkasan usage bulanan.
 
 ## Pricing dan Kurs
 

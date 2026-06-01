@@ -124,4 +124,41 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
     expect(body.data.reviewCostIdr).toBe(0);
     expect(body.data.totalCalls).toBe(0);
   });
+
+  it("classifies KETIK generate_consumer_response as simulation cost", async () => {
+    const mockLogs = [
+      {
+        action: "generate_consumer_response",
+        input_tokens: 100,
+        output_tokens: 200,
+        total_tokens: 300,
+        estimated_cost_usd: 0.001,
+        estimated_cost_idr: 1500,
+      },
+    ];
+
+    mockFrom.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+
+    const app = buildApp();
+    const res = await app.request("/usage/summary?module=ketik");
+    const body = (await res.json()) as any;
+
+    expect(body.success).toBe(true);
+    expect(body.data.totalCalls).toBe(1);
+    expect(body.data.totalCostIdr).toBe(1500);
+    expect(body.data.simulationCostIdr).toBe(1500);
+    expect(body.data.reviewCostIdr).toBe(0);
+  });
 });

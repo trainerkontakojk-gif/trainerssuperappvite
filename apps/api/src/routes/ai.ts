@@ -17,6 +17,7 @@ import { getMonitoringHistory } from "../services/monitoring-history-service";
 const SIMULATION_ACTIONS = new Set([
   "chat_response",
   "ai_generate",
+  "generate_consumer_response",
   "session_timeout",
   "init_email",
   "generate_template",

@@ -5,7 +5,6 @@ import { requireRole } from "../../middleware/role";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 import * as sidakService from "../../services/sidak-service";
 import { logActivity } from "../../services/activity-log-service";
-import { buildAiReportDocx } from "../../lib/report-docx-builder";
 import { buildHtmlReport } from "../../lib/report-html-builder";
 import { buildAiReportPdf } from "../../lib/report-pdf-builder";
 
@@ -142,6 +141,9 @@ sidakReports.post(
       );
     }
     try {
+      const { buildAiReportDocx } = await import(
+        "../../lib/report-docx-builder"
+      );
       const buf = await buildAiReportDocx(parsed.data);
       return c.newResponse(new Uint8Array(buf), 200, {
         "Content-Type":
