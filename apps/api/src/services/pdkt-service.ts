@@ -463,30 +463,45 @@ export async function generateScenarioEmailTemplate(
       mentionPattern: config.resolvedConsumerNameMentionPattern,
     });
 
-    if (resolved.leftoverPlaceholders.length > 0) {
-      throw new Error(
-        `Template masih mengandung placeholder: ${resolved.leftoverPlaceholders.join(", ")}`,
-      );
-    }
-
     const subject = normalizeSubject(resolved.subject) || resolved.subject;
     const body = resolved.body;
     const wordCount = body.split(/\s+/).filter(Boolean).length;
 
-    return { subject, body, wordCount };
+    return {
+      subject,
+      body,
+      wordCount,
+      leftoverPlaceholders: resolved.leftoverPlaceholders,
+    };
   };
 
   try {
     let result = await executeGeneration();
 
-    // Retry once if body is shorter than requested minimum.
-    if (result.wordCount < 500) {
+    if (result.leftoverPlaceholders.length > 0 || result.wordCount < 500) {
+      const placeholderHint =
+        result.leftoverPlaceholders.length > 0
+          ? `Template sebelumnya masih mengandung placeholder ${result.leftoverPlaceholders.join(", ")}. Ganti semuanya dengan teks konkret tanpa tanda kurung siku atau kurung kurawal.`
+          : "";
+      const lengthHint =
+        result.wordCount < 500
+          ? "Template sebelumnya terlalu pendek. Buat jauh lebih panjang, detail, dan bertele-tele (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
+          : "";
+
       result = await executeGeneration(
-        "Hasil sebelumnya terlalu pendek. Tolong buat jauh lebih panjang, detail, dan bertele-tele (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points). Setiap paragraf harus membahas aspek berbeda.",
+        [placeholderHint, lengthHint]
+          .filter(Boolean)
+          .join(" "),
       );
     }
 
-    // Final validation after retry.
+    if (result.leftoverPlaceholders.length > 0) {
+      return {
+        success: false,
+        error: `Template masih mengandung placeholder: ${result.leftoverPlaceholders.join(", ")}`,
+      };
+    }
+
     if (result.wordCount < 500) {
       return {
         success: false,

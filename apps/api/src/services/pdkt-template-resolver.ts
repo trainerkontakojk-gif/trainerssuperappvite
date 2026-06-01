@@ -18,6 +18,26 @@ export interface PdktTemplateResolutionInput {
   pickIndex?: number;
 }
 
+const CONSUMER_PLACEHOLDER_PATTERNS = [
+  /\{\{\s*consumer_name\s*\}\}/gi,
+  /\[(?:nama\s*)?(?:konsumen|nasabah|pengirim|pelapor|diri)(?:\s+[^\]]+)?\]/gi,
+] as const;
+
+const COMPANY_PLACEHOLDER_PATTERNS = [
+  /\{\{\s*(?:company_name|company|institution_name|ljk_name)\s*\}\}/gi,
+  /\[(?:nama\s*)?(?:perusahaan|ljk|bank|asuransi|entitas|lembaga)(?:\s+[^\]]+)?\]/gi,
+] as const;
+
+const ANY_PLACEHOLDER_PATTERN = /\{\{[^}]+\}\}|\[[^\]]+\]/g;
+
+function replaceAllPatterns(
+  text: string,
+  patterns: readonly RegExp[],
+  replacement: string,
+): string {
+  return patterns.reduce((acc, pattern) => acc.replace(pattern, replacement), text);
+}
+
 export function resolvePdktCompanyName(scenario: PdktScenario, pickIndex = Date.now()) {
   const category = SCENARIO_COMPANY_CATEGORY_MAP[scenario.title] || scenario.category || "default";
   const pool = scenario.isLicensed
@@ -37,7 +57,11 @@ export function renderPdktConsumerName(
   identity: PdktIdentity,
   pattern: ResolvedConsumerNameMentionPattern,
 ): string {
-  const text = body.replace(/\{\{\s*consumer_name\s*\}\}/gi, "").trim();
+  const text = replaceAllPatterns(
+    body,
+    CONSUMER_PLACEHOLDER_PATTERNS,
+    identity.name,
+  ).trim();
   if (pattern === "none") return text;
   if (pattern === "upfront") return `Halo, saya ${identity.name}.\n\n${text}`;
   if (pattern === "late") return `${text}\n\nSalam,\n${identity.name}`;
@@ -54,32 +78,35 @@ export function renderPdktConsumerName(
   return `${text}\n\n(Saya ${identity.name})`;
 }
 
-const PLACEHOLDER_PATTERNS = [
-  /\{\{\s*consumer_name\s*\}\}/gi,
-  /\{\{\s*(?:company_name|company|institution_name|ljk_name)\s*\}\}/gi,
-  /\[(?:nama\s*)?(?:konsumen|nasabah|pengirim|perusahaan|ljk|bank|asuransi|entitas|lembaga)(?:\s+[^\]]+)?\]/gi,
-];
-
 export function findPdktPlaceholders(value: string): string[] {
-  return [...new Set(PLACEHOLDER_PATTERNS.flatMap((pattern) => value.match(pattern) || []))];
+  return [...new Set(value.match(ANY_PLACEHOLDER_PATTERN) || [])];
+}
+
+function sanitizePdktTemplateText(
+  text: string,
+  companyName: string,
+  identityName: string,
+): string {
+  let resolved = replaceAllPatterns(text, COMPANY_PLACEHOLDER_PATTERNS, companyName);
+  resolved = replaceAllPatterns(resolved, CONSUMER_PLACEHOLDER_PATTERNS, identityName);
+  return resolved;
 }
 
 export function resolvePdktTemplateBody(input: PdktTemplateResolutionInput) {
   const company = resolvePdktCompanyName(input.scenario, input.pickIndex);
-  let body = input.body;
-
-  body = body.replace(
-    /\{\{\s*(?:company_name|company|institution_name|ljk_name)\s*\}\}/gi,
+  const subject = sanitizePdktTemplateText(
+    input.subject,
     company.name,
+    input.identity.name,
   );
-  body = body.replace(
-    /\[(?:nama\s*)?(?:perusahaan|ljk|bank|asuransi|entitas|lembaga)(?:\s+[^\]]+)?\]/gi,
-    company.name,
+  const body = renderPdktConsumerName(
+    sanitizePdktTemplateText(input.body, company.name, input.identity.name),
+    input.identity,
+    input.mentionPattern,
   );
-  body = renderPdktConsumerName(body, input.identity, input.mentionPattern);
 
   return {
-    subject: input.subject,
+    subject,
     body,
     company,
     leftoverPlaceholders: findPdktPlaceholders(body),

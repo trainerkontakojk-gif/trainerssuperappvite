@@ -100,6 +100,23 @@ describe("PDKT Service", () => {
         "Budi",
       );
     });
+
+    it("replaces consumer aliases in bracket placeholders", () => {
+      const identity = {
+        name: "Budi",
+        email: "b@b.com",
+        city: "Jakarta",
+        bodyName: "Budi",
+      };
+
+      const rendered = renderPdktConsumerName(
+        "Saya [Nama Nasabah] menulis ini.",
+        identity,
+        "none",
+      );
+
+      expect(rendered).toBe("Saya Budi menulis ini.");
+    });
   });
 });
 

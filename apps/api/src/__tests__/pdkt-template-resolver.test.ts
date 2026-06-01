@@ -58,9 +58,8 @@ describe("pdkt template resolver", () => {
   });
 
   it("reports leftover identity and company placeholders after sanitize", () => {
-    expect(
-      findPdktPlaceholders("Halo [Nama Nasabah], ini [Nama Lembaga]."),
-    ).toEqual(["[Nama Nasabah]", "[Nama Lembaga]"]);
+    expect(findPdktPlaceholders("Halo [Nama Nasabah], ini [Nama Lembaga]."))
+      .toEqual(["[Nama Nasabah]", "[Nama Lembaga]"]);
   });
 
   it("handles variations of company placeholders", () => {
@@ -91,5 +90,21 @@ describe("pdkt template resolver", () => {
       expect(result.leftoverPlaceholders).toEqual([]);
       expect(result.body).toContain("Prudential Indonesia");
     }
+  });
+
+  it("normalizes consumer aliases and subjects as well as bodies", () => {
+    const result = resolvePdktTemplateBody({
+      subject: "Halo [Nama Nasabah]",
+      body: "Saya [Nama Pengirim] bertanya ke [Nama Perusahaan].",
+      scenario: asuransiScenario,
+      identity,
+      mentionPattern: "none",
+      pickIndex: 0,
+    });
+
+    expect(result.subject).toBe("Halo Budi Santoso");
+    expect(result.body).toContain("Budi Santoso");
+    expect(result.body).toContain("Prudential Indonesia");
+    expect(result.leftoverPlaceholders).toEqual([]);
   });
 });
