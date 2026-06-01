@@ -17,12 +17,13 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { Suspense, useState, useEffect, useRef } from "react";
+import { supabase } from "../lib/supabase";
+import { clearAuthLocalState } from "../lib/authLocalState";
 import {
   APP_MODULES,
   isRoleAllowed,
   normalizeRoleLabel,
 } from "../lib/app-config";
-import { supabase } from "../lib/supabase";
 import { ThemeToggle } from "./ThemeToggle";
 import { useThemeMode } from "../hooks/useThemeMode";
 import { TelefunWarningProvider, useTelefunWarning } from "../context/TelefunWarningContext";
@@ -243,14 +244,16 @@ export function DashboardLayoutContent() {
     .toUpperCase();
 
   const handleLogout = async () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_profile");
-    localStorage.removeItem("trainers_login_time");
-    localStorage.removeItem("trainers_last_activity");
+    clearAuthLocalState({ markLoggedOut: true });
     useAuthStore.getState().setSession(null);
     useAuthStore.getState().setProfile(null);
-    await supabase.auth.signOut();
-    window.location.href = "/";
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn("[Layout] signOut failed during logout:", error);
+    } finally {
+      window.location.href = "/";
+    }
   };
 
   return (

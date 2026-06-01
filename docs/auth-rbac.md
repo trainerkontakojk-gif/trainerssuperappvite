@@ -134,6 +134,16 @@ Tanpa lapisan kedua (RLS policy), user `authenticated` akan mendapatkan 0 baris 
 - Login akun `rejected` harus memutus sesi dan menampilkan pesan penolakan.
 - Setelah login `agent`, akses route terbatas seperti `/profiler` atau route SIDAK manajerial harus tetap ditolak sesuai matrix akses.
 
+## Logout & Guest Lock Mechanism
+
+Untuk mencegah masalah auto-login otomatis (di mana user yang baru saja logout kembali masuk secara otomatis ke dashboard akibat token/session stale di Supabase), aplikasi menerapkan **Logout Guest Lock**:
+
+1. **Logout Cleanup**: Saat user menekan tombol "Keluar", aplikasi menjalankan `clearAuthLocalState({ markLoggedOut: true })` yang menghapus semua data autentikasi lokal (`auth_token`, `auth_profile`, dll) dan menulis penanda/marker `trainers_logout_guest_lock = "1"` di `localStorage`.
+2. **Init & Event Guard**:
+   - Selama marker guest lock ini aktif, `initAuth` dan `LandingAuthProvider` akan memblokir/mengabaikan pemulihan sesi otomatis dan event `SIGNED_IN` yang berasal dari data cache Supabase.
+   - Halaman landing akan tetap berada dalam guest mode dan menampilkan tombol "Masuk" (bukan "Dashboard").
+3. **Pelepasan Lock**: Marker guest lock dilepas secara otomatis (`clearLogoutGuestLock()`) ketika user melakukan aksi login eksplisit (mengirimkan form login/register, melakukan OAuth Google, atau meminta reset password). Hal ini menjamin login baru berjalan normal tanpa hambatan.
+
 ## Monitoring Usage & Billing Access
 
 Route `/dashboard` (tab monitoring) memakai guard untuk `trainer`, `leader`, `admin`.

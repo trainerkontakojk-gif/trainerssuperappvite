@@ -83,6 +83,19 @@ describe("initAuth", () => {
     expect(useAuthStore.getState().profile).toBeNull();
   });
 
+  it("ignores stale signed-in events while logout guest lock is active", () => {
+    localStorage.setItem("trainers_logout_guest_lock", "1");
+    localStorage.setItem("auth_token", "stale-token");
+    const fakeSession = { access_token: "stale-token", user: { id: "u1" } } as Session;
+
+    initAuth();
+    authStateCallback!("SIGNED_IN", fakeSession);
+
+    expect(localStorage.getItem("auth_token")).toBeNull();
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(mockGetUser).not.toHaveBeenCalled();
+  });
+
   it("restores session from stored token", async () => {
     localStorage.setItem("auth_token", "tok1");
     mockGetUser.mockResolvedValue({

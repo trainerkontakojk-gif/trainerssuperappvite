@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Clock, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { normalizeProfileStatus } from "../lib/profile";
+import { clearAuthLocalState } from "../lib/authLocalState";
 
 type WaitingApprovalProfile = {
   status?: string | null;
@@ -14,12 +15,14 @@ export default function WaitingApprovalPage() {
   const [email, setEmail] = useState("");
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_profile");
-    localStorage.removeItem("trainers_login_time");
-    localStorage.removeItem("trainers_last_activity");
-    navigate({ to: "/" });
+    clearAuthLocalState({ markLoggedOut: true });
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn("[WaitingApproval] signOut failed during logout:", error);
+    } finally {
+      navigate({ to: "/" });
+    }
   };
 
   useEffect(() => {
@@ -54,24 +57,34 @@ export default function WaitingApprovalPage() {
       const profileStatus = normalizeProfileStatus(resolvedProfile?.status);
 
       if (resolvedProfile?.is_deleted) {
-        await supabase.auth.signOut();
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_profile");
-        localStorage.removeItem("trainers_login_time");
-        localStorage.removeItem("trainers_last_activity");
-        navigate({ to: "/" });
+        clearAuthLocalState({ markLoggedOut: true });
+        try {
+          await supabase.auth.signOut();
+        } catch (error) {
+          console.warn(
+            "[WaitingApproval] signOut failed during deleted-account cleanup:",
+            error,
+          );
+        } finally {
+          navigate({ to: "/" });
+        }
         return;
       }
 
       if (profileStatus === "active") {
         navigate({ to: "/dashboard" });
       } else if (profileStatus === "inactive") {
-        await supabase.auth.signOut();
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_profile");
-        localStorage.removeItem("trainers_login_time");
-        localStorage.removeItem("trainers_last_activity");
-        navigate({ to: "/" });
+        clearAuthLocalState({ markLoggedOut: true });
+        try {
+          await supabase.auth.signOut();
+        } catch (error) {
+          console.warn(
+            "[WaitingApproval] signOut failed during inactive-account cleanup:",
+            error,
+          );
+        } finally {
+          navigate({ to: "/" });
+        }
       }
     };
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import {
   RouterProvider,
   createRouter,
@@ -7,11 +7,24 @@ import {
 } from "@tanstack/react-router";
 import {
   AuthContext,
+  LandingAuthProvider,
   HeroAuthActions,
   NavbarAuthActions,
   FooterAuthActions,
 } from "../components/LandingAuthClient";
 import type { ReactNode } from "react";
+
+const { mockGetUser } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+}));
+
+vi.mock("../lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getUser: () => mockGetUser(),
+    },
+  },
+}));
 
 function TestApp({
   children,
@@ -48,6 +61,11 @@ function renderWithRouter(
 }
 
 describe("HeroAuthActions", () => {
+  beforeEach(() => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    localStorage.clear();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -66,6 +84,42 @@ describe("HeroAuthActions", () => {
   it('shows "Buka Dashboard" when logged in', async () => {
     renderWithRouter(<HeroAuthActions />, false, true);
     expect(await screen.findByText("Buka Dashboard")).toBeDefined();
+  });
+});
+
+describe("LandingAuthProvider", () => {
+  beforeEach(() => {
+    mockGetUser.mockReset();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps landing in guest mode after logout even when Supabase still returns a stale user", async () => {
+    localStorage.setItem("trainers_logout_guest_lock", "1");
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "u1", email: "stale@example.com" } },
+      error: null,
+    });
+
+    const rootRoute = createRootRoute({
+      component: () => (
+        <LandingAuthProvider>
+          <NavbarAuthActions />
+        </LandingAuthProvider>
+      ),
+    });
+    const router = createRouter({ routeTree: rootRoute });
+
+    const view = render(<RouterProvider router={router} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Masuk")).toBeDefined();
+    });
+    expect(screen.queryByText("Dashboard")).toBeNull();
+    view.unmount();
   });
 });
 

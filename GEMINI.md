@@ -44,24 +44,6 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Format:** `pnpm format`
 - **Telefun standalone:** `pnpm --filter @trainers/telefun dev`
 
-## RTK (Rust Token Killer)
-
-Gunakan **RTK** (`rtk`) sebagai prefix untuk setiap perintah shell untuk mengoptimalkan konsumsi token. RTK memfilter dan mengompresi output perintah sebelum masuk ke konteks LLM, menghemat 60-90% token pada operasi umum.
-
-```bash
-rtk git status        # Lihat status git (token-efficient)
-rtk pnpm test         # Jalankan test
-rtk ls src/           # List direktori
-rtk grep "pattern"    # Cari pattern di file
-```
-
-**Meta commands:**
-```bash
-rtk gain              # Lihat token savings
-rtk gain --history    # Riwayat perintah dengan savings
-rtk discover          # Temukan missed RTK opportunities
-```
-
 ## Verified Structure
 
 Monorepo dengan pembagian tanggung jawab yang jelas:

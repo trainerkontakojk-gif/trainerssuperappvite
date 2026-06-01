@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import { useAuthStore } from "./authStore";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
+import { hasLogoutGuestLock, clearAuthLocalState } from "../lib/authLocalState";
 
 export async function initAuth() {
   // Subscribe to authentication state changes
@@ -8,6 +9,12 @@ export async function initAuth() {
   // Profile hydration is deferred via queueMicrotask.
   supabase.auth.onAuthStateChange((event, session) => {
     if (session?.access_token) {
+      if (hasLogoutGuestLock()) {
+        clearAuthLocalState();
+        useAuthStore.getState().setSession(null);
+        useAuthStore.getState().setProfile(null);
+        return;
+      }
       localStorage.setItem("auth_token", session.access_token);
       useAuthStore.getState().setSession(session);
       queueMicrotask(() => {
@@ -16,10 +23,7 @@ export async function initAuth() {
         );
       });
     } else {
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_profile");
-      localStorage.removeItem("trainers_login_time");
-      localStorage.removeItem("trainers_last_activity");
+      clearAuthLocalState();
       useAuthStore.getState().setSession(null);
       useAuthStore.getState().setProfile(null);
       
@@ -30,6 +34,13 @@ export async function initAuth() {
       }
     }
   });
+
+  if (hasLogoutGuestLock()) {
+    clearAuthLocalState();
+    useAuthStore.getState().setSession(null);
+    useAuthStore.getState().setProfile(null);
+    return;
+  }
 
   const token = localStorage.getItem("auth_token");
   if (!token) return;

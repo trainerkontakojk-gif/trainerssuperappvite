@@ -12,6 +12,8 @@ import { supabase } from "../lib/supabase";
 import { ThemeToggle } from "./ThemeToggle";
 import AuthModal from "./AuthModal";
 
+import { hasLogoutGuestLock } from "../lib/authLocalState";
+
 type AuthContextType = {
   isLoggedIn: boolean;
   isCheckingAuth: boolean;
@@ -69,6 +71,12 @@ export function LandingAuthProvider({
   }, [search.auth]);
 
   useEffect(() => {
+    if (hasLogoutGuestLock()) {
+      setIsLoggedIn(false);
+      setIsCheckingAuth(false);
+      return;
+    }
+
     let cancelled = false;
     const timeoutId = setTimeout(() => {
       if (!cancelled) {

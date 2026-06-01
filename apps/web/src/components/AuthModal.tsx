@@ -11,6 +11,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { normalizeProfileStatus } from "../lib/profile";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
+import { clearAuthLocalState, clearLogoutGuestLock } from "../lib/authLocalState";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -103,13 +104,6 @@ export default function AuthModal({
     return null;
   }
 
-  function clearAuthLocalStorage() {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_profile");
-    localStorage.removeItem("trainers_login_time");
-    localStorage.removeItem("trainers_last_activity");
-  }
-
   async function resolvePostLoginPath(userId: string) {
     const profile = await fetchAuthProfile(userId);
 
@@ -120,7 +114,7 @@ export default function AuthModal({
 
     if (profile.is_deleted) {
       await supabase.auth.signOut();
-      clearAuthLocalStorage();
+      clearAuthLocalState();
       throw new Error(
         "Akun Anda telah dinonaktifkan. Silakan hubungi administrator.",
       );
@@ -132,7 +126,7 @@ export default function AuthModal({
 
     if (profile.status === "inactive") {
       await supabase.auth.signOut();
-      clearAuthLocalStorage();
+      clearAuthLocalState();
       throw new Error(
         "Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.",
       );
@@ -143,6 +137,7 @@ export default function AuthModal({
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    clearLogoutGuestLock();
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -254,6 +249,7 @@ export default function AuthModal({
 
   async function handleForgotPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    clearLogoutGuestLock();
     setForgotLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -293,6 +289,7 @@ export default function AuthModal({
   }
 
   async function handleGoogleLogin() {
+    clearLogoutGuestLock();
     setGoogleLoading(true);
     setError(null);
     setSuccessMessage(null);
