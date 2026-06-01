@@ -2,6 +2,7 @@ import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
 import type { VoiceQualityAssessment } from "@trainers/types";
 import { enrichAssessmentWithCommunicationProfile } from "./telefun-communication-profile";
+import { parseJsonFromModelText } from "./ai-json";
 
 export type { VoiceQualityAssessment };
 
@@ -215,7 +216,7 @@ export async function analyzeVoiceQuality(
 
   if (response.success && response.text) {
     try {
-      const parsed = JSON.parse(response.text) as VoiceQualityAssessment;
+      const parsed = parseJsonFromModelText(response.text) as VoiceQualityAssessment;
       const assessment = enrichAssessmentWithCommunicationProfile(parsed);
 
       // Save to DB
@@ -297,7 +298,7 @@ export async function generateCoachingSummary(
 
   if (response.success && response.text) {
     try {
-      const recommendations = JSON.parse(response.text);
+      const recommendations = parseJsonFromModelText(response.text);
 
       // Upsert via RPC
       const { data, error: rpcError } = await adminClient.rpc(

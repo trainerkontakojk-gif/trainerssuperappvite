@@ -18,6 +18,8 @@ import {
 } from "./pdkt-company-names";
 import { resolvePdktTemplateBody } from "./pdkt-template-resolver";
 import { generatePdktScenarioImages } from "./pdkt/image-generation";
+import { parseJsonFromModelText } from "../lib/ai-json";
+export { parseJsonFromModelText };
 import {
   buildPdktEmailGenerationPolicy,
   buildPdktSystemInstruction,
@@ -219,28 +221,6 @@ export function normalizeSubject(raw: string | undefined | null): string {
     if (pattern.test(trimmed)) return "";
   }
   return trimmed;
-}
-
-export function parseJsonFromModelText(raw: string): any {
-  const trimmed = raw.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    /* fallthrough */
-  }
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced?.[1]) {
-    try {
-      return JSON.parse(fenced[1].trim());
-    } catch {
-      /* fallthrough */
-    }
-  }
-  const bracketMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (bracketMatch?.[0]) {
-    return JSON.parse(bracketMatch[0]);
-  }
-  throw new Error("Tidak ada data JSON valid dari model.");
 }
 
 export function isTransientAiError(error: unknown): boolean {

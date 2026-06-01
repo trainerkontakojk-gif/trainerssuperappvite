@@ -3,6 +3,7 @@ import { getDataReportRows } from "./report-data";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenRouterContent } from "../../lib/openrouter";
 import { resolveModelProvider } from "../../lib/ai-models";
+import { parseJsonFromModelText } from "../../lib/ai-json";
 
 export const aiReportSchema = z.object({
   modelId: z.string().optional(),
@@ -107,10 +108,7 @@ Buat laporan dengan format JSON:
 
   let parsedReport;
   try {
-    const cleaned = (result.text || "")
-      .replace(/^```(?:json)?\s*/, "")
-      .replace(/\s*```$/, "");
-    parsedReport = JSON.parse(cleaned);
+    parsedReport = parseJsonFromModelText(result.text || "");
   } catch {
     parsedReport = { executiveSummary: result.text };
   }
