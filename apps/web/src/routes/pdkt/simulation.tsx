@@ -437,31 +437,21 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
         fallbackIdentity,
       );
 
-      // 3. Generate template or bypass if specified
-      let subject = "";
-      let body = "";
-
-      if (scenario.alwaysUseSampleEmail && scenario.sampleEmailTemplate?.body) {
-        subject =
-          scenario.sampleEmailTemplate.subject ||
-          `Pertanyaan mengenai ${scenario.title}`;
-        body = scenario.sampleEmailTemplate.body;
-      } else {
-        const templateRes = await postApi<{ subject: string; body: string }>(
-          "/pdkt/generate-template",
-          {
-            scenarioDraft: scenario,
-            consumerTypeId: config.consumerType.id,
-            identity: config.identity,
-            selectedModel: config.selectedModel,
-            resolvedConsumerNameMentionPattern:
-              config.resolvedConsumerNameMentionPattern,
-            writingStyleMode: config.writingStyleMode,
-          },
-        );
-        subject = templateRes.subject;
-        body = templateRes.body;
-      }
+      // 3. Generate template
+      const templateRes = await postApi<{ subject: string; body: string }>(
+        "/pdkt/generate-template",
+        {
+          scenarioDraft: scenario,
+          consumerTypeId: config.consumerType.id,
+          identity: config.identity,
+          selectedModel: config.selectedModel,
+          resolvedConsumerNameMentionPattern:
+            config.resolvedConsumerNameMentionPattern,
+          writingStyleMode: config.writingStyleMode,
+        },
+      );
+      const subject = templateRes.subject;
+      const body = templateRes.body;
 
       // 4. Submit new mailbox batch
       const clientRequestId = crypto.randomUUID();

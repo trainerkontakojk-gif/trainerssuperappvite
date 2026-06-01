@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as pdktService from "../services/pdkt-service";
+import { renderPdktConsumerName } from "../services/pdkt-template-resolver";
 
 vi.mock("../lib/supabase", () => ({
   createAdminClient: () => ({
@@ -89,13 +90,13 @@ describe("PDKT Service", () => {
       };
       const body = "Ini isi email.";
 
-      expect(pdktService.renderTemplate(body, identity, "upfront")).toContain(
+      expect(renderPdktConsumerName(body, identity, "upfront")).toContain(
         "Halo, saya Budi.",
       );
-      expect(pdktService.renderTemplate(body, identity, "late")).toContain(
+      expect(renderPdktConsumerName(body, identity, "late")).toContain(
         "Salam,\nBudi",
       );
-      expect(pdktService.renderTemplate(body, identity, "none")).not.toContain(
+      expect(renderPdktConsumerName(body, identity, "none")).not.toContain(
         "Budi",
       );
     });

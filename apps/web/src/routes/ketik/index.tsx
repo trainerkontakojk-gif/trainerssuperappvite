@@ -28,8 +28,13 @@ import { UsageModal } from "../../components/UsageModal";
 import { SessionReviewModal } from "./components/SessionReviewModal";
 import { useAuthStore } from "../../store/authStore";
 import { notify } from "../../lib/toast";
-import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta } from "../../lib/usage-snapshot";
+import {
+  pollUsageDelta,
+  formatUsageDeltaLabel,
+  type UsageDelta,
+} from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
+import { resolveKetikSessionIdentity } from "./ketikIdentity";
 
 const accentClassName = "text-emerald-600";
 const accentSoftClassName = "bg-emerald-100";
@@ -37,7 +42,9 @@ const accentSoftClassName = "bg-emerald-100";
 export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
-  const canStartReview = ["admin", "trainer", "qa"].includes(profile?.role || "");
+  const canStartReview = ["admin", "trainer", "qa"].includes(
+    profile?.role || "",
+  );
   const [view, setView] = useState<"home" | "chat">("home");
   const [settings, setSettings] = useState<KetikAppSettings>(
     DEFAULT_KETIK_SETTINGS,
@@ -249,40 +256,7 @@ export default function KetikLanding() {
         ) || settings.consumerTypes[0];
     }
 
-    const dummyNames = [
-      "Budi Santoso",
-      "Siti Aminah",
-      "Agus Setiawan",
-      "Dewi Lestari",
-      "Rina Wati",
-      "Eko Prasetyo",
-    ];
-    const dummyCities = [
-      "Jakarta Selatan",
-      "Jakarta Pusat",
-      "Jakarta Barat",
-      "Jakarta Timur",
-      "Kota Bogor",
-      "Kota Depok",
-    ];
-    const phonePrefixes = ["0812", "0813", "0821", "0852"];
-
-    const identity = {
-      name:
-        settings.identitySettings.displayName ||
-        dummyNames[Math.floor(Math.random() * dummyNames.length)],
-      city:
-        settings.identitySettings.city ||
-        dummyCities[Math.floor(Math.random() * dummyCities.length)],
-      phone:
-        settings.identitySettings.phoneNumber ||
-        `${phonePrefixes[Math.floor(Math.random() * phonePrefixes.length)]}${Math.floor(
-          Math.random() * 100000000,
-        )
-          .toString()
-          .padStart(8, "0")}`,
-      signatureName: settings.identitySettings.signatureName,
-    };
+    const identity = resolveKetikSessionIdentity(settings.identitySettings);
 
     const config: KetikSessionConfig = {
       scenarios: activeScenarios,
@@ -408,7 +382,10 @@ export default function KetikLanding() {
     if (!baseline) return;
     setSessionDeltaPending(true);
     try {
-      const delta = await pollUsageDelta(() => fetchUsageSummary("ketik"), baseline);
+      const delta = await pollUsageDelta(
+        () => fetchUsageSummary("ketik"),
+        baseline,
+      );
       setSessionDelta(delta);
       if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
         const format = (v: number) =>

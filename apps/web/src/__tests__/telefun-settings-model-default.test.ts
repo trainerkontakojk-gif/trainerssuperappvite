@@ -1,9 +1,47 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_TELEFUN_SETTINGS,
   parseTelefunSettings,
   ConsumerDifficulty,
+  resolveFinalIdentity,
 } from "../routes/telefun/telefunSettings";
+
+describe("resolveFinalIdentity fallback", () => {
+  it("uses default pool when all identity fields are empty", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const identity = resolveFinalIdentity({
+      displayName: "",
+      gender: "random",
+      phoneNumber: "",
+      city: "",
+      signatureName: "",
+      voiceName: "",
+    });
+
+    expect(identity.name).not.toBe("");
+    expect(identity.phone).not.toBe("");
+    expect(identity.city).not.toBe("");
+  });
+
+  it("preserves user-filled name and fills missing phone/city from fallback", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const identity = resolveFinalIdentity({
+      displayName: "Nadia",
+      gender: "female",
+      phoneNumber: "",
+      city: "",
+      signatureName: "",
+      voiceName: "",
+    });
+
+    expect(identity.name).toBe("Nadia");
+    expect(identity.phone).not.toBe("");
+    expect(identity.city).not.toBe("");
+    expect(identity.gender).toBe("female");
+  });
+});
 
 describe("parseTelefunSettings", () => {
   it("returns defaults for empty input", () => {

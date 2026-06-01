@@ -12,48 +12,13 @@ import { generateOpenRouterContent } from "../lib/openrouter";
 import { resolveModelProvider } from "../lib/ai-models";
 import { UsageContext } from "../lib/ai-usage";
 import { createAdminClient } from "../lib/supabase";
+import {
+  LICENSED_COMPANY_NAMES,
+  SCENARIO_COMPANY_CATEGORY_MAP,
+} from "./pdkt-company-names";
+import { resolvePdktTemplateBody } from "./pdkt-template-resolver";
 
 // ── Constants ───────────────────────────────────────────
-
-const LICENSED_COMPANY_NAMES: Record<string, string[]> = {
-  Perbankan: [
-    "Bank Central Asia (BCA)",
-    "Bank Mandiri",
-    "Bank Rakyat Indonesia (BRI)",
-    "Bank Negara Indonesia (BNI)",
-    "Bank Tabungan Negara (BTN)",
-    "Bank CIMB Niaga",
-    "Bank Danamon Indonesia",
-    "Bank Permata",
-    "Bank Maybank Indonesia",
-    "Bank Panin",
-    "Bank OCBC NISP",
-    "Bank Syariah Indonesia (BSI)",
-    "Bank Mega",
-    "Bank UOB Indonesia",
-    "Bank Sinarmas",
-  ],
-  Asuransi: [
-    "Prudential Indonesia",
-    "Allianz Life Indonesia",
-    "AXA Mandiri Financial Services",
-    "Manulife Indonesia",
-    "AIA Financial",
-    "BNI Life Insurance",
-    "BRI Life",
-    "Sinarmas MSIG Life",
-    "Sequis Life",
-    "FWD Insurance Indonesia",
-    "Great Eastern Life Indonesia",
-    "Sun Life Financial Indonesia",
-  ],
-};
-
-const SCENARIO_COMPANY_CATEGORY_MAP: Record<string, string> = {
-  "Pengecekan SLIK": "Perbankan",
-  "Tagihan Kartu Kredit": "Perbankan",
-  "Klaim Asuransi Ditolak": "Asuransi",
-};
 
 const DEFAULT_SCENARIOS: PdktScenario[] = [
   {
@@ -282,37 +247,6 @@ export function isTransientAiError(error: unknown): boolean {
   );
 }
 
-export function renderTemplate(
-  body: string,
-  identity: PdktIdentity,
-  pattern: ResolvedConsumerNameMentionPattern,
-): string {
-  const text = body.replace(/\{\{consumer_name\}\}/g, "").trim();
-
-  if (pattern === "none") return text;
-
-  const name = identity.name;
-
-  if (pattern === "upfront") {
-    return `Halo, saya ${name}.\n\n${text}`;
-  } else if (pattern === "late") {
-    return `${text}\n\nSalam,\n${name}`;
-  } else {
-    // Middle: try to find a middle spot (between paragraphs) or just append
-    const paragraphs = text.split("\n\n");
-    if (paragraphs.length >= 2) {
-      const mid = Math.floor(paragraphs.length / 2);
-      paragraphs.splice(
-        mid,
-        0,
-        `Oya, saya ${name} mau menambahkan sedikit detail lagi.`,
-      );
-      return paragraphs.join("\n\n");
-    }
-    return `${text}\n\n(Saya ${name})`;
-  }
-}
-
 export function getRealisticWritingInstruction(mode: WritingStyleMode): string {
   if (mode !== "realistic") return "";
 
@@ -346,7 +280,10 @@ export function getCompanyNameInstruction(scenario?: PdktScenario): string {
     return `1. PENAMAAN PERUSAHAAN: WAJIB mengarang NAMA entitas/perusahaan fiktif yang diadukan. JANGAN menggunakan kata "Bank", "Asuransi", atau "Sekuritas" karena entitas ilegal tidak berhak menggunakan nama tersebut. Contoh: "Pinjaman Kilat Nusantara", "Dana Cepat 88", "Investasi Cuan Jaya".`;
   }
 
-  const category = SCENARIO_COMPANY_CATEGORY_MAP[scenario.title] || "Perbankan";
+  const category =
+    SCENARIO_COMPANY_CATEGORY_MAP[scenario.title] ||
+    scenario.category ||
+    "Perbankan";
   const names = LICENSED_COMPANY_NAMES[category] || [];
   const namesList = names.map((n) => `- ${n}`).join("\n");
 
@@ -451,6 +388,30 @@ export async function generateScenarioEmailTemplate(
   body?: string;
   error?: string;
 }> {
+  // Handle Forced Sample Template if specified in scenario
+  if (scenario.alwaysUseSampleEmail && scenario.sampleEmailTemplate?.body) {
+    const resolved = resolvePdktTemplateBody({
+      subject: scenario.sampleEmailTemplate.subject || "",
+      body: scenario.sampleEmailTemplate.body,
+      scenario,
+      identity: config.identity,
+      mentionPattern: config.resolvedConsumerNameMentionPattern,
+    });
+
+    if (resolved.leftoverPlaceholders.length > 0) {
+      return {
+        success: false,
+        error: `Template masih mengandung placeholder: ${resolved.leftoverPlaceholders.join(", ")}`,
+      };
+    }
+
+    return {
+      success: true,
+      subject: resolved.subject,
+      body: resolved.body,
+    };
+  }
+
   const modelId = config.selectedModel || "gemini-3.1-flash-lite";
 
   const systemInstruction = `
@@ -494,8 +455,22 @@ export async function generateScenarioEmailTemplate(
     const responseText = response.text || "{}";
     const jsonResponse = parseJsonFromModelText(responseText);
 
-    const subject = normalizeSubject(jsonResponse.subject);
-    const body = jsonResponse.body || "";
+    const resolved = resolvePdktTemplateBody({
+      subject: jsonResponse.subject || "",
+      body: jsonResponse.body || "",
+      scenario,
+      identity: config.identity,
+      mentionPattern: config.resolvedConsumerNameMentionPattern,
+    });
+
+    if (resolved.leftoverPlaceholders.length > 0) {
+      throw new Error(
+        `Template masih mengandung placeholder: ${resolved.leftoverPlaceholders.join(", ")}`,
+      );
+    }
+
+    const subject = normalizeSubject(resolved.subject) || resolved.subject;
+    const body = resolved.body;
     const wordCount = body.split(/\s+/).filter(Boolean).length;
 
     return { subject, body, wordCount };
@@ -544,19 +519,29 @@ export async function initializeEmailSession(
 
   // Handle Forced Template
   if (scenario.alwaysUseSampleEmail && scenario.sampleEmailTemplate?.body) {
-    const renderedBody = renderTemplate(
-      scenario.sampleEmailTemplate.body,
-      config.identity,
-      config.resolvedConsumerNameMentionPattern,
-    );
+    const rendered = resolvePdktTemplateBody({
+      subject: scenario.sampleEmailTemplate.subject || "",
+      body: scenario.sampleEmailTemplate.body,
+      scenario,
+      identity: config.identity,
+      mentionPattern: config.resolvedConsumerNameMentionPattern,
+    });
+
+    if (rendered.leftoverPlaceholders.length > 0) {
+      return {
+        success: false,
+        error: `Template masih mengandung placeholder: ${rendered.leftoverPlaceholders.join(", ")}`,
+      };
+    }
+
     return {
       success: true,
       message: {
         id: Date.now().toString(),
         from: config.identity.email,
         to: "konsumen@ojk.go.id",
-        subject: scenario.sampleEmailTemplate.subject || "",
-        body: renderedBody,
+        subject: rendered.subject,
+        body: rendered.body,
         timestamp: new Date().toISOString(),
         isAgent: false,
         attachments: [],
