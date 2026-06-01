@@ -51,20 +51,26 @@ describe("PDKT AI Image Rendering", () => {
     expect(img.src).toContain("data:image/png;base64,ai-generated-image");
   });
 
-  it("should render AI attachment warning when attachments are empty but warning is present", () => {
-    const itemWithWarning: PdktMailboxItem = {
+  it("does not render provider diagnostics as a consumer email warning", () => {
+    const itemWithDiagnostics: PdktMailboxItem = {
       ...mockItem,
       inbound_email: {
         ...mockItem.inbound_email,
         attachments: [],
         attachmentSource: "none",
         attachmentWarning: "Model tidak mengembalikan gambar valid.",
-      },
+        attachmentDiagnostics: {
+          source: "none",
+          status: "failed",
+          reason: "empty-output",
+          message: "Model tidak mengembalikan gambar valid.",
+        },
+      } as any,
     };
 
     render(
       <EmailDetailPane
-        item={itemWithWarning}
+        item={itemWithDiagnostics}
         onReply={() => {}}
         onDelete={() => {}}
         evaluation={null}
@@ -74,13 +80,8 @@ describe("PDKT AI Image Rendering", () => {
       />
     );
 
-    // Should show the warning title
-    expect(screen.getByText(/Peringatan Lampiran AI/i)).toBeDefined();
-
-    // Should show the warning message
-    expect(screen.getByText(/Model tidak mengembalikan gambar valid./i)).toBeDefined();
-
-    // Should not show "Lampiran" title
+    expect(screen.queryByText(/Peringatan Lampiran AI/i)).toBeNull();
+    expect(screen.queryByText(/Model tidak mengembalikan gambar valid./i)).toBeNull();
     expect(screen.queryByText(/Lampiran \(/i)).toBeNull();
   });
 });

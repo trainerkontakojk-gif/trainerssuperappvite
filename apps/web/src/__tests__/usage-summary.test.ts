@@ -34,6 +34,7 @@ describe("fetchUsageSummary", () => {
       reviewCostIdr: 2000,
       periodLabel: undefined,
       breakdown: emptyUsageBreakdown(),
+      breakdownItems: [],
     });
   });
 
@@ -53,6 +54,33 @@ describe("fetchUsageSummary", () => {
     const result = await fetchUsageSummary("pdkt");
     expect(result?.breakdown?.review.calls).toBe(1);
     expect(result?.breakdown?.review.costIdr).toBe(0);
+  });
+
+  it("normalizes itemized breakdown from API", async () => {
+    mockGetApi.mockResolvedValueOnce({
+      totalCalls: 3,
+      totalTokens: 1500,
+      totalCostIdr: 9000,
+      breakdownItems: [
+        {
+          key: "pdkt_create_email",
+          label: "Create Email",
+          category: "simulation",
+          calls: 1,
+          inputTokens: 100,
+          outputTokens: 300,
+          totalTokens: 400,
+          costIdr: 1500,
+          costUsd: 0.001,
+        },
+      ],
+    });
+
+    const result = await fetchUsageSummary("pdkt");
+
+    expect(result?.breakdownItems).toEqual([
+      expect.objectContaining({ key: "pdkt_create_email", label: "Create Email", costIdr: 1500 }),
+    ]);
   });
 
   it("returns null on fetch error", async () => {

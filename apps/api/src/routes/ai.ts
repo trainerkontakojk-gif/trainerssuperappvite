@@ -14,23 +14,11 @@ import { requireRole } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
 import { getMonitoringHistory } from "../services/monitoring-history-service";
+import { getAiUsageSummary } from "../services/ai-usage-summary-service";
 
-const SIMULATION_ACTIONS = new Set([
-  "chat_response",
-  "ai_generate",
-  "generate_consumer_response",
-  "session_timeout",
-  "init_email",
-  "generate_template",
-  "voice_live",
-]);
-
-const REVIEW_ACTIONS = new Set([
-  "coaching_review",
-  "evaluate_response",
-  "voice_assessment",
-  "coaching_summary",
-]);
+import {
+  isUsageActionInCategory,
+} from "../lib/ai-usage-categories";
 
 type Variables = { user: User; profile: any };
 
@@ -122,40 +110,6 @@ ai.get("/usage", async (c) => {
   return c.json({ success: true, data });
 });
 
-type UsageCategory = "simulation" | "review" | "uncategorized";
-
-interface UsageBreakdownItem {
-  calls: number;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  costIdr: number;
-  costUsd: number;
-}
-
-interface UsageBreakdown {
-  simulation: UsageBreakdownItem;
-  review: UsageBreakdownItem;
-  uncategorized: UsageBreakdownItem;
-}
-
-function emptyUsageBreakdownItem(): UsageBreakdownItem {
-  return {
-    calls: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-    costIdr: 0,
-    costUsd: 0,
-  };
-}
-
-function resolveUsageCategory(action: string): UsageCategory {
-  if (SIMULATION_ACTIONS.has(action)) return "simulation";
-  if (REVIEW_ACTIONS.has(action)) return "review";
-  return "uncategorized";
-}
-
 ai.get("/usage/summary", async (c) => {
   const user = c.get("user");
   const userId = user?.id;
@@ -175,18 +129,6 @@ ai.get("/usage/summary", async (c) => {
   end.setUTCHours(end.getUTCHours() - 7);
 
   try {
-    const { data: logs, error } = await admin
-      .from("ai_usage_logs")
-      .select(
-        "action, input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr",
-      )
-      .eq("user_id", userId)
-      .eq("module", moduleParam)
-      .gte("created_at", start.toISOString())
-      .lte("created_at", end.toISOString());
-
-    if (error) throw error;
-
     const months = [
       "Januari", "Februari", "Maret", "April", "Mei", "Juni",
       "Juli", "Agustus", "September", "Oktober", "November", "Desember",
@@ -195,66 +137,18 @@ ai.get("/usage/summary", async (c) => {
     const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const periodLabel = `1 ${startMonth} ${year} - ${lastDay} ${startMonth} ${year} WIB`;
 
-    let totalCalls = 0;
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-    let totalTokens = 0;
-    let totalCostUsd = 0;
-    let totalCostIdr = 0;
-    let simulationCostIdr = 0;
-    let reviewCostIdr = 0;
-
-    const breakdown: UsageBreakdown = {
-      simulation: emptyUsageBreakdownItem(),
-      review: emptyUsageBreakdownItem(),
-      uncategorized: emptyUsageBreakdownItem(),
-    };
-
-    if (logs) {
-      totalCalls = logs.length;
-      for (const log of logs) {
-        totalInputTokens += log.input_tokens || 0;
-        totalOutputTokens += log.output_tokens || 0;
-        totalTokens += log.total_tokens || 0;
-        totalCostUsd += Number(log.estimated_cost_usd || 0);
-        totalCostIdr += Number(log.estimated_cost_idr || 0);
-
-        const category = resolveUsageCategory(log.action);
-        const bucket = breakdown[category];
-        bucket.calls += 1;
-        bucket.inputTokens += log.input_tokens || 0;
-        bucket.outputTokens += log.output_tokens || 0;
-        bucket.totalTokens += log.total_tokens || 0;
-        bucket.costUsd += Number(log.estimated_cost_usd || 0);
-        bucket.costIdr += Number(log.estimated_cost_idr || 0);
-
-        const cost = Number(log.estimated_cost_idr || 0);
-        if (SIMULATION_ACTIONS.has(log.action)) {
-          simulationCostIdr += cost;
-        } else if (REVIEW_ACTIONS.has(log.action)) {
-          reviewCostIdr += cost;
-        }
-      }
-    }
-
-    return c.json({
-      success: true,
-      data: {
-        module: moduleParam,
-        year,
-        month,
-        periodLabel,
-        totalCalls,
-        totalInputTokens,
-        totalOutputTokens,
-        totalTokens,
-        totalCostUsd,
-        totalCostIdr,
-        simulationCostIdr,
-        reviewCostIdr,
-        breakdown,
-      },
+    const summary = await getAiUsageSummary({
+      admin,
+      userId,
+      module: moduleParam,
+      startIso: start.toISOString(),
+      endIso: end.toISOString(),
+      year,
+      month,
+      periodLabel,
     });
+
+    return c.json({ success: true, data: summary });
   } catch (error: any) {
     return c.json(
       {
@@ -589,9 +483,9 @@ ai.get(
 
     // Filter by action_category AFTER fetch (since action is a derived field)
     if (actionCategory === "simulation") {
-      logs = logs.filter((l) => SIMULATION_ACTIONS.has(l.action));
+      logs = logs.filter((l) => isUsageActionInCategory(l.action, "simulation"));
     } else if (actionCategory === "review") {
-      logs = logs.filter((l) => REVIEW_ACTIONS.has(l.action));
+      logs = logs.filter((l) => isUsageActionInCategory(l.action, "review"));
     }
 
     if (logs.length === 0) return c.json({ success: true, data: [] });
@@ -630,9 +524,9 @@ ai.get(
       agg.total_tokens += log.total_tokens || 0;
       agg.total_cost_idr += cost;
 
-      if (SIMULATION_ACTIONS.has(log.action)) {
+      if (isUsageActionInCategory(log.action, "simulation")) {
         agg.simulation_cost_idr += cost;
-      } else if (REVIEW_ACTIONS.has(log.action)) {
+      } else if (isUsageActionInCategory(log.action, "review")) {
         agg.review_cost_idr += cost;
       }
 
@@ -642,9 +536,9 @@ ai.get(
           model_id: log.model_id,
           module: log.module,
           action: log.action,
-          action_category: SIMULATION_ACTIONS.has(log.action)
+          action_category: isUsageActionInCategory(log.action, "simulation")
             ? "simulation"
-            : REVIEW_ACTIONS.has(log.action)
+            : isUsageActionInCategory(log.action, "review")
               ? "review"
               : "other",
           calls: 0,

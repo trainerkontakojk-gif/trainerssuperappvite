@@ -7,6 +7,12 @@ export interface UsageBreakdownItem {
   costUsd: number;
 }
 
+export interface UsageBreakdownDisplayItem extends UsageBreakdownItem {
+  key: string;
+  label: string;
+  category: "simulation" | "review" | "uncategorized";
+}
+
 export interface UsageBreakdown {
   simulation: UsageBreakdownItem;
   review: UsageBreakdownItem;
@@ -39,6 +45,7 @@ export interface UsageSnapshot {
   reviewCostIdr?: number;
   periodLabel?: string;
   breakdown?: UsageBreakdown;
+  breakdownItems?: UsageBreakdownDisplayItem[];
 }
 
 export interface UsageDelta {
@@ -50,6 +57,7 @@ export interface UsageDelta {
   simulationCostIdr: number;
   reviewCostIdr: number;
   breakdown: UsageBreakdown;
+  breakdownItems?: UsageBreakdownDisplayItem[];
 }
 
 export function computeUsageDelta(
@@ -73,6 +81,23 @@ export function computeUsageDelta(
     };
   };
 
+  const beforeItems = new Map((before.breakdownItems || []).map((item) => [item.key, item]));
+  const afterItems = after.breakdownItems || [];
+  const breakdownItems = afterItems.map((item) => {
+    const previous = beforeItems.get(item.key);
+    return {
+      key: item.key,
+      label: item.label,
+      category: item.category,
+      calls: Math.max(0, item.calls - (previous?.calls ?? 0)),
+      inputTokens: Math.max(0, item.inputTokens - (previous?.inputTokens ?? 0)),
+      outputTokens: Math.max(0, item.outputTokens - (previous?.outputTokens ?? 0)),
+      totalTokens: Math.max(0, item.totalTokens - (previous?.totalTokens ?? 0)),
+      costIdr: Math.max(0, item.costIdr - (previous?.costIdr ?? 0)),
+      costUsd: Math.max(0, item.costUsd - (previous?.costUsd ?? 0)),
+    };
+  }).filter((item) => item.calls > 0 || item.totalTokens > 0 || item.costIdr > 0);
+
   return {
     costIdr: Math.max(0, after.totalCostIdr - before.totalCostIdr),
     inputTokens: Math.max(0, (after.totalInputTokens ?? 0) - (before.totalInputTokens ?? 0)),
@@ -86,6 +111,7 @@ export function computeUsageDelta(
       review: calcBucketDelta("review"),
       uncategorized: calcBucketDelta("uncategorized"),
     },
+    breakdownItems,
   };
 }
 

@@ -2,6 +2,7 @@ import { getApi } from "../hooks/useApi";
 import {
   type UsageBreakdown,
   type UsageSnapshot,
+  type UsageBreakdownDisplayItem,
   emptyUsageBreakdown,
 } from "./usage-snapshot";
 
@@ -17,6 +18,7 @@ interface UsageSummaryApiResponse {
   reviewCostIdr?: number;
   periodLabel?: string;
   breakdown?: UsageBreakdown;
+  breakdownItems?: UsageBreakdownDisplayItem[];
 }
 
 export async function fetchUsageSummary(module: UsageModule): Promise<UsageSnapshot | null> {
@@ -34,6 +36,7 @@ export async function fetchUsageSummary(module: UsageModule): Promise<UsageSnaps
       reviewCostIdr: data.reviewCostIdr || 0,
       periodLabel: data.periodLabel || undefined,
       breakdown: data.breakdown || emptyUsageBreakdown(),
+      breakdownItems: Array.isArray(data.breakdownItems) ? data.breakdownItems : [],
     };
   } catch (err) {
     return null;

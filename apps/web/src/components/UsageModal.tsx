@@ -6,6 +6,7 @@ import {
   type UsageBreakdownItem,
   type UsageSnapshot,
   type UsageDelta,
+  type UsageBreakdownDisplayItem,
 } from "../lib/usage-snapshot";
 import { fetchUsageSummary, type UsageModule } from "../lib/usage-summary";
 
@@ -111,6 +112,41 @@ function UsageBreakdownRows({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function UsageBreakdownItemRows({
+  items,
+  isDelta = false,
+}: {
+  items?: UsageBreakdownDisplayItem[] | null;
+  isDelta?: boolean;
+}) {
+  const visibleItems = (items || []).filter(
+    (item) => item.calls > 0 || item.totalTokens > 0 || item.costIdr > 0,
+  );
+  if (visibleItems.length === 0) return null;
+
+  const prefix = isDelta ? "+" : "";
+  return (
+    <div className="space-y-1.5 mt-2 pt-2 border-t border-current/10">
+      {visibleItems.map((item) => (
+        <div key={item.key} className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5">
+            <BarChart3 className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] font-bold text-muted-foreground">{item.label}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-foreground">
+              {prefix}{formatIdr(item.costIdr)}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium">
+              {prefix}{formatTokenCount(item.totalTokens)} tkn | {prefix}{item.calls} call
+            </span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -236,12 +272,11 @@ export function UsageModal({
                       </span>
                     )}
                   </div>
-                  {sessionDelta && (
-                    <UsageBreakdownRows
-                      breakdown={sessionDelta.breakdown}
-                      isDelta
-                    />
-                  )}
+                  {sessionDelta && sessionDelta.breakdownItems && sessionDelta.breakdownItems.length > 0 ? (
+                    <UsageBreakdownItemRows items={sessionDelta.breakdownItems} isDelta />
+                  ) : sessionDelta ? (
+                    <UsageBreakdownRows breakdown={sessionDelta.breakdown} isDelta />
+                  ) : null}
                 </div>
               )}
 
@@ -257,9 +292,11 @@ export function UsageModal({
                   <div className={`text-3xl font-black ${meta.accent}`}>
                     {formatIdr(usage.totalCostIdr)}
                   </div>
-                  {usage.breakdown && (
+                  {usage.breakdownItems && usage.breakdownItems.length > 0 ? (
+                    <UsageBreakdownItemRows items={usage.breakdownItems} />
+                  ) : usage.breakdown ? (
                     <UsageBreakdownRows breakdown={usage.breakdown} />
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="bg-foreground/[0.02] rounded-xl p-4">

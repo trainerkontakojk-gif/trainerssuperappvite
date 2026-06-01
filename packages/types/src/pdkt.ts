@@ -76,6 +76,27 @@ export interface PdktEvaluationResult {
 
 export type MailboxStatus = "open" | "replied" | "deleted";
 
+export const pdktAttachmentDiagnosticsSchema = z.object({
+  source: z.enum(["manual", "ai", "none"]),
+  status: z.enum(["attached", "skipped", "failed"]),
+  reason: z
+    .enum([
+      "manual-attachment",
+      "disabled",
+      "provider-error",
+      "empty-output",
+      "oversized-output",
+      "unsupported-model",
+    ])
+    .optional(),
+  attemptedModel: z.string().optional(),
+  provider: z.enum(["gemini", "openrouter"]).optional(),
+  message: z.string().optional(),
+});
+export type PdktAttachmentDiagnostics = z.infer<
+  typeof pdktAttachmentDiagnosticsSchema
+>;
+
 export const emailMessageSchema = z.object({
   id: z.string(),
   from: z.string(),
@@ -87,6 +108,7 @@ export const emailMessageSchema = z.object({
   attachments: z.array(z.string()).optional(),
   attachmentSource: z.enum(["manual", "ai", "none"]).optional(),
   attachmentWarning: z.string().optional(),
+  attachmentDiagnostics: pdktAttachmentDiagnosticsSchema.optional(),
 });
 export type EmailMessage = z.infer<typeof emailMessageSchema>;
 

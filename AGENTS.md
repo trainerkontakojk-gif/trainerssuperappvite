@@ -288,8 +288,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 96. **PDKT Full Decomposition** — Completed full decomposition of monolithic PDKT route and service layer (analogous to Phase 79 SIDAK and Phase 80 Telefun). `routes/pdkt.ts` reduced 723→8 lines, `services/pdkt-service.ts` reduced 980→15 lines (both pure barrel/facade files). New route sub-modules under `routes/pdkt/`: `index.ts` (16), `simulation.ts` (162), `mailbox.ts` (167), `history.ts` (185), `settings.ts` (82), `route-utils.ts` (91). New service sub-modules under `services/pdkt/`: `catalog-service.ts` (167), `session-service.ts` (407), `evaluation-service.ts` (234), `mailbox-service.ts` (108), `shared-utils.ts` (90). Frontend `PdktScenariosTab.tsx` reduced 467→263 lines, decomposed into 5 sub-components under `scenarios/`: `ScenarioList`, `ScenarioForm`, `ScenarioAttachments`, `ScenarioAIGenerator`, `ScenarioTemplateField`. `mailbox-session.ts` (Phase 95) and `image-generation.ts` retained as orchestrator + provider-agnostic image gen. Typed `SupabaseClient` parameters and `unknown` error narrowing across `mailbox-service.ts`/`mailbox-session.ts`/`image-generation.ts`. 519 API + 503 web tests passing. (DONE)
 
 97. **PDKT Natural Name, Clues, and AI Image Diagnostics** — Fixed 3 critical issues in PDKT: (1) Identity name leakage — `bodyName` (e.g. "Susanto") now correctly used in email body instead of header `name` (e.g. "Black Cat"), with forbidden name cleaning post-render; (2) Generic intro elimination — replaced hardcoded fallbacks with 11 natural context clue templates (document/SLIK/billing context) across upfront/middle/late placements, deterministic seed-based indexing; (3) Structured AI image diagnostics — `generatePdktScenarioImages` returns `PdktImageGenerationDiagnostics` with `warning`/`reason`/`error`, propagated as `attachmentWarning` to frontend via `emailMessageSchema`, rendered as amber AlertCard. Added compliance validation for forbidden name leakage and generic intro phrases (`"Perkenalkan, nama saya..."`). 9 files modified, ~318 lines added. (DONE)
+98. **Lint Debt & Gemini 3.5 Flash** — Cleaned up lint debt (unused imports, `require()` → static import, Error `cause` param) and integrated Gemini 3.5 Flash model across all modules via shared `TEXT_SIMULATION_MODELS` registry. Added smoke test, unit tests, and SIDAK Report AI model filtering. 15+ files modified. (DONE)
+99. **AI Usage Categories Extraction & KETIK Review State Machine** — Centralized AI action classification into `ai-usage-categories.ts` with 14-action definition map replacing inline `SIMULATION_ACTIONS`/`REVIEW_ACTIONS` sets. Extracted `/usage/summary` inline logic into `ai-usage-summary-service.ts` with enriched `breakdownItems` (per-key labeled items). Extracted KETIK review lifecycle state logic into pure `resolveKetikReviewState()` function with 12 deterministic transition cases. Added PDKT `attachmentWarning` AlertCard rendering. 5 new files, 13 files modified. (DONE)
 
-## Key Files Changed (Phase 58 — 97)
+## Key Files Changed (Phase 58 — 99)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -486,7 +488,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-98)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-99)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
@@ -612,6 +614,26 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/sidak-reports-ai.test.tsx` — **NEW Phase 98**: Unit tests for SIDAK Report AI model rendering (shows Gemini 3.5 Flash, excludes gemini-3.1-flash-image)
 - `apps/api/scripts/smoke-gemini-model.mjs` — **NEW Phase 98**: Smoke test for Gemini model ID validation
 - `docs/rebuild-logs/phase-98-lint-debt-and-gemini-35-flash.md` — **NEW Phase 98**: Documentation for lint debt cleanup and Gemini 3.5 Flash integration
+- `apps/api/src/lib/ai-usage-categories.ts` — **NEW Phase 99**: Centralized AI action classification with 14-action definition map (`USAGE_ACTION_DEFINITIONS`), `getUsageActionDefinition()`, and `isUsageActionInCategory()` replacing inline set lookups
+- `apps/api/src/services/ai-usage-summary-service.ts` — **NEW Phase 99**: Extracted `/usage/summary` inline logic into `getAiUsageSummary()` with enriched `breakdownItems` (per-key labeled items per action category)
+- `apps/api/src/services/ketik/review-state.ts` — **NEW Phase 99**: Pure `resolveKetikReviewState()` function with 12 deterministic transition cases replacing complex inline state logic
+- `apps/api/src/routes/ai.ts` — **Phase 99**: Reduced /usage/summary handler from 127→21 lines, delegated to `getAiUsageSummary()`; replaced inline `SIMULATION_ACTIONS`/`REVIEW_ACTIONS` sets with `isUsageActionInCategory()`
+- `apps/api/src/services/ketik/review-lifecycle.ts` — **Phase 99**: Reduced from 153→50 lines, delegates state computation to `resolveKetikReviewState()` with clean decision-based DB writes
+- `apps/api/src/services/pdkt/evaluation-service.ts` — **Phase 99**: Enhanced evaluation prompt handling and error wrapping
+- `apps/api/src/services/pdkt/session-service.ts` — **Phase 99**: Added `attachmentWarning` passthrough in session init response
+- `packages/types/src/pdkt.ts` — **Phase 99**: Added `attachmentWarning` optional field to `emailMessageSchema`
+- `apps/web/src/routes/pdkt/components/EmailDetailPane.tsx` — **Phase 99**: Renders amber AlertCard with `attachmentWarning` when no attachments and AI diagnostics present
+- `apps/web/src/components/UsageModal.tsx` — **Phase 99**: Enhanced breakdown display with enriched `breakdownItems` from API
+- `apps/web/src/lib/usage-snapshot.ts` — **Phase 99**: Extended type for enriched breakdown items
+- `apps/web/src/lib/usage-summary.ts` — **Phase 99**: Updated to handle new `breakdownItems` response shape
+- `apps/api/src/__tests__/ai-usage-summary-breakdown.test.ts` — **Phase 99**: Enriched breakdownItems contract test
+- `apps/api/src/__tests__/ketik-review-lifecycle.test.ts` — **NEW Phase 99**: Tests for extracted review state machine transitions
+- `apps/api/src/__tests__/pdkt-evaluation-prompt.test.ts` — **NEW Phase 99**: Tests for evaluation prompt edge cases
+- `apps/api/src/__tests__/pdkt-image-generation.test.ts` — **Phase 99**: Added attachment warning capture test
+- `apps/web/src/__tests__/usage-modal-breakdown.test.tsx` — **Phase 99**: Updated for enriched breakdown shape
+- `apps/web/src/__tests__/usage-summary.test.ts` — **Phase 99**: Updated for enriched breakdown shape
+- `apps/web/src/__tests__/pdkt-ai-image-rendering.test.tsx` — **Phase 99**: Attachment warning AlertCard rendering test
+- `docs/rebuild-logs/phase-99-ai-usage-categories-and-review-state-machine.md` — **NEW Phase 99**: Documentation for AI usage categories extraction and KETIK review state machine
 
 ## Routes Reference (apps/web)
 

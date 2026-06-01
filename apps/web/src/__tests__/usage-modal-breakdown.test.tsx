@@ -133,4 +133,64 @@ describe("UsageModal — simulation/review breakdown", () => {
     expect(screen.queryByText("Simulasi")).toBeNull();
     expect(screen.queryByText("Penilaian AI")).toBeNull();
   });
+
+  it("renders PDKT itemized create email, attachment, and review costs", async () => {
+    (usageSummaryModule.fetchUsageSummary as any).mockResolvedValue({
+      totalCalls: 3,
+      totalTokens: 1500,
+      totalCostIdr: 9000,
+      breakdownItems: [
+        {
+          key: "pdkt_create_email",
+          label: "Create Email",
+          category: "simulation",
+          calls: 1,
+          inputTokens: 100,
+          outputTokens: 300,
+          totalTokens: 400,
+          costIdr: 1500,
+          costUsd: 0.001,
+        },
+        {
+          key: "pdkt_image_generation",
+          label: "Lampiran AI",
+          category: "simulation",
+          calls: 1,
+          inputTokens: 200,
+          outputTokens: 0,
+          totalTokens: 200,
+          costIdr: 3000,
+          costUsd: 0.002,
+        },
+        {
+          key: "pdkt_review",
+          label: "Penilaian AI",
+          category: "review",
+          calls: 1,
+          inputTokens: 400,
+          outputTokens: 500,
+          totalTokens: 900,
+          costIdr: 4500,
+          costUsd: 0.003,
+        },
+      ],
+    });
+
+    render(
+      <UsageModal
+        isOpen={true}
+        onClose={vi.fn()}
+        module="pdkt"
+        sessionDelta={null}
+        sessionDeltaPending={false}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("Create Email")).toBeTruthy());
+    expect(screen.getByText("Lampiran AI")).toBeTruthy();
+    expect(screen.getByText("Penilaian AI")).toBeTruthy();
+    expect(screen.getByText(/Rp\s?1\.500/)).toBeTruthy();
+    expect(screen.getByText(/Rp\s?3\.000/)).toBeTruthy();
+    expect(screen.getByText(/Rp\s?4\.500/)).toBeTruthy();
+  });
 });

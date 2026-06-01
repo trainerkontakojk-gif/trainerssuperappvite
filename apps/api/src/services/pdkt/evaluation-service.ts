@@ -12,6 +12,44 @@ import { callAI, isTransientAiError } from "./shared-utils";
  * AI-powered agent response evaluation.
  * Returns score, feedback, and granular issues (typos, clarity, content gaps).
  */
+export function buildPdktEvaluationPrompt(input: {
+  consumerComplaint: string;
+  agentReply: string;
+  scenarioTitle?: string;
+  scenarioCategory?: string;
+}): { systemInstruction: string; prompt: string } {
+  const systemInstruction = [
+    "Anda adalah supervisor QA untuk pelatihan agent kontak OJK 157.",
+    "Trainee yang dinilai adalah agent contact center OJK 157, bukan pegawai perusahaan terlapor.",
+    "Jangan menyebut trainee sebagai agent asuransi, agent bank, agent leasing, atau agent perusahaan jasa keuangan lain.",
+    "Berikan evaluasi objektif dalam JSON berbahasa Indonesia.",
+  ].join(" ");
+
+  const prompt = `
+    KONTEKS PELATIHAN:
+    - Kanal: Email/contact center OJK 157.
+    - Peran trainee: agent kontak OJK 157 yang menerima pengaduan konsumen sektor jasa keuangan.
+    - Skenario: ${input.scenarioCategory || "Umum"} - ${input.scenarioTitle || "Tidak disebutkan"}.
+    - Catatan penting: perusahaan terlapor dapat berupa bank/asuransi/leasing/pinjol, tetapi agent yang dinilai tetap agent OJK 157.
+
+    KELUHAN KONSUMEN:
+    "${input.consumerComplaint}"
+
+    JAWABAN AGENT OJK 157:
+    "${input.agentReply}"
+
+    TUGAS: Nilai jawaban agent OJK 157 (Skor Awal 100).
+    1. TYPO: Salah ketik.
+    2. CLARITY: Apakah mudah dimengerti? Struktur logis?
+    3. RELEVANSI: Apakah menjawab masalah inti dan mengarahkan konsumen dengan tepat sebagai OJK 157?
+
+    OUTPUT JSON:
+    { "score": number, "typos": string[], "clarityIssues": string[], "contentGaps": string[], "feedback": string }
+  `;
+
+  return { systemInstruction, prompt };
+}
+
 export async function evaluateAgentResponse(
   config: PdktSessionConfig,
   emails: EmailMessage[],
@@ -35,23 +73,13 @@ export async function evaluateAgentResponse(
     return { success: false, error: "Missing email context for evaluation." };
   }
 
-  const evaluationPrompt = `
-    Anda adalah SUPERVISOR QA OJK.
-    
-    KELUHAN KONSUMEN:
-    "${firstInbound.body}"
-    
-    JAWABAN AGEN:
-    "${lastAgentReply.body}"
-    
-    TUGAS: Nilai jawaban agen (Skor Awal 100).
-    1. TYPO: Salah ketik.
-    2. CLARITY: Apakah mudah dimengerti? Struktur logis?
-    3. RELEVANSI: Apakah menjawab masalah inti?
-    
-    OUTPUT JSON:
-    { "score": number, "typos": string[], "clarityIssues": string[], "contentGaps": string[], "feedback": string }
-  `;
+  const scenario = config.scenarios?.[0];
+  const { systemInstruction, prompt: evaluationPrompt } = buildPdktEvaluationPrompt({
+    consumerComplaint: firstInbound.body,
+    agentReply: lastAgentReply.body,
+    scenarioTitle: scenario?.title,
+    scenarioCategory: scenario?.category,
+  });
 
   let lastError: unknown;
   const retryDelaysMs = [250, 500];
@@ -61,8 +89,7 @@ export async function evaluateAgentResponse(
       const response = await callAI({
         model: modelId,
         prompt: evaluationPrompt,
-        systemInstruction:
-          "Anda adalah supervisor QA yang memberikan penilaian objektif dalam format JSON.",
+        systemInstruction,
         responseMimeType: "application/json",
         temperature: 0.2,
         usageContext: usageContext || {

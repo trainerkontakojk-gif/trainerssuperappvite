@@ -132,13 +132,17 @@ Action `usageContext` yang saat ini aktif:
 | Modul         | Action                                                                          |
 | ------------- | ------------------------------------------------------------------------------- |
 | `ketik`       | `chat_response`, `session_timeout`, `generate_consumer_response`               |
-| `pdkt`        | `init_email`, `evaluate_response`                                               |
+| `pdkt`        | `init_email`, `generate_ai_images`, `generate_scenario_images`, `generate_template`, `evaluate_response`, `async_evaluate_agent_response` |
 | `telefun`     | `voice_live`, `voice_tts`, `chat_response`, `first_message`, `score_generation` |
 | `qa-analyzer` | `report_generation`                                                             |
 
 Catatan:
 
 - `generate_consumer_response` dihitung sebagai biaya simulasi KETIK pada ringkasan usage bulanan.
+- `init_email` dihitung sebagai biaya create email PDKT.
+- `generate_ai_images` dan `generate_scenario_images` dihitung sebagai biaya lampiran AI PDKT.
+- `evaluate_response` dan `async_evaluate_agent_response` dihitung sebagai biaya penilaian AI PDKT.
+- `/ai/usage/summary` tetap mengembalikan `simulationCostIdr` dan `reviewCostIdr`, serta menambahkan `breakdownItems` untuk label detail seperti `Create Email`, `Lampiran AI`, dan `Penilaian AI`.
 
 ## Pricing dan Kurs
 

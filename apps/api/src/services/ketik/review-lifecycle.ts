@@ -1,5 +1,6 @@
 import { createAdminClient } from "../../lib/supabase";
 import { processKetikReviewJob } from "./review-processor";
+import { resolveKetikReviewState } from "./review-state";
 
 export async function triggerKetikAIReview(
   sessionId: string,
@@ -175,122 +176,68 @@ export async function getKetikReviewStatus(
 
   if (error || !history) return null;
 
-  let status = history.review_status || "pending";
-  let resultReady = false;
-  let scores = null;
-  let errorMessage: string | undefined = undefined;
+  const historyStatus = history.review_status || "pending";
 
-  if (status === "completed") {
-    // Auto-heal check: verify review row actually exists
-    const { data: review, error: reviewError } = await adminClient
-      .from("ketik_session_reviews")
-      .select("id")
-      .eq("session_id", sessionId)
-      .maybeSingle();
-
-    if (!review || reviewError) {
-      status = "failed";
-      errorMessage = "Hasil analisis tidak ditemukan. Silakan jalankan ulang.";
-      await adminClient
-        .from("ketik_history")
-        .update({ review_status: "failed" })
-        .eq("id", sessionId);
-      await adminClient
-        .from("ketik_review_jobs")
-        .update({ status: "failed", error_message: errorMessage })
-        .eq("session_id", sessionId);
-    } else {
-      resultReady = true;
-      scores = {
-        final: history.final_score,
-        empathy: history.empathy_score,
-        probing: history.probing_score,
-        typo: history.typo_score,
-        compliance: history.compliance_score,
-      };
-    }
-  }
-
-  // Reconcile with job status when history is not terminal
-  if (status !== "completed" && status !== "failed") {
-    const { data: job } = await adminClient
+  let job: any = null;
+  if (historyStatus !== "completed" && historyStatus !== "failed") {
+    const { data: jobData } = await adminClient
       .from("ketik_review_jobs")
       .select("status, lease_expires_at, error_message, updated_at")
       .eq("session_id", sessionId)
       .maybeSingle();
-
-    if (!job) {
-      // No job at all — mark failed so UI can retry
-      status = "failed";
-      errorMessage = "Pekerjaan analisis tidak ditemukan. Silakan jalankan ulang.";
-      await adminClient
-        .from("ketik_history")
-        .update({ review_status: "failed" })
-        .eq("id", sessionId);
-    } else if (job.status === "failed") {
-      status = "failed";
-      errorMessage = job.error_message || "Analisis AI gagal diproses. Silakan jalankan ulang.";
-      await adminClient
-        .from("ketik_history")
-        .update({ review_status: "failed" })
-        .eq("id", sessionId);
-    } else if (job.status === "processing") {
-      // Check if lease has expired (with 30s grace period)
-      const gracePeriodMs = 30_000;
-      const now = new Date();
-      const leaseExpired =
-        job.lease_expires_at &&
-        new Date(job.lease_expires_at).getTime() + gracePeriodMs < now.getTime();
-      if (leaseExpired) {
-        // Stale processing — mark failed to enable retry
-        status = "failed";
-        errorMessage = "Analisis AI melebihi batas waktu. Silakan jalankan ulang.";
-        await adminClient
-          .from("ketik_review_jobs")
-          .update({
-            status: "failed",
-            error_message: "Processing timeout — lease expired",
-          })
-          .eq("session_id", sessionId);
-        await adminClient
-          .from("ketik_history")
-          .update({ review_status: "failed" })
-          .eq("id", sessionId);
-      } else {
-        status = "processing";
-      }
-    } else if (job.status === "queued") {
-      // Check if queued too long (5 min TTL)
-      const queueTTL = 5 * 60 * 1000;
-      if (
-        job.updated_at &&
-        new Date().getTime() - new Date(job.updated_at).getTime() > queueTTL
-      ) {
-        status = "failed";
-        errorMessage = "Analisis AI terlalu lama mengantre. Silakan jalankan ulang.";
-        await adminClient
-          .from("ketik_review_jobs")
-          .update({
-            status: "failed",
-            error_message: "Queue timeout — no worker picked up the job",
-          })
-          .eq("session_id", sessionId);
-        await adminClient
-          .from("ketik_history")
-          .update({ review_status: "failed" })
-          .eq("id", sessionId);
-      } else {
-        status = "processing";
-      }
-    }
+    job = jobData;
   }
 
-  // Queue lifecycle is internal; UI should treat queued as processing.
-  if (status === "queued") {
-    status = "processing";
+  let hasReviewRow: boolean | null = null;
+  if (historyStatus === "completed" || (job && job.status === "completed")) {
+    const { data: review } = await adminClient
+      .from("ketik_session_reviews")
+      .select("id")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    hasReviewRow = !!review;
   }
 
-  return { status, resultReady, scores, errorMessage };
+  const decision = resolveKetikReviewState({
+    historyStatus,
+    job,
+    hasReviewRow,
+  });
+
+  if (decision.shouldMarkJobFailed) {
+    await adminClient
+      .from("ketik_review_jobs")
+      .update({
+        status: "failed",
+        error_message: decision.jobFailureMessage || decision.errorMessage || "Failed",
+      })
+      .eq("session_id", sessionId);
+  }
+
+  if (decision.shouldMarkHistoryFailed) {
+    await adminClient
+      .from("ketik_history")
+      .update({ review_status: "failed" })
+      .eq("id", sessionId);
+  }
+
+  let scores = null;
+  if (decision.status === "completed" && hasReviewRow) {
+    scores = {
+      final: history.final_score,
+      empathy: history.empathy_score,
+      probing: history.probing_score,
+      typo: history.typo_score,
+      compliance: history.compliance_score,
+    };
+  }
+
+  return {
+    status: decision.status,
+    resultReady: decision.resultReady,
+    scores,
+    errorMessage: decision.errorMessage,
+  };
 }
 
 export async function processOldestQueuedJob(

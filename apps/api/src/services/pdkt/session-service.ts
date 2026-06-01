@@ -4,6 +4,7 @@ import {
   PdktIdentity,
   EmailMessage,
   PdktSessionConfig,
+  type PdktAttachmentDiagnostics,
   WritingStyleMode,
   ResolvedConsumerNameMentionPattern,
 } from "@trainers/types";
@@ -295,9 +296,19 @@ export async function initializeEmailSession(
     // Resolve attachments: Manual has priority over AI
     let attachments = customAttachments;
     let attachmentSource: "manual" | "ai" | "none" = hasCustomImages ? "manual" : "none";
-    let attachmentWarning: string | undefined = undefined;
+    let attachmentDiagnostics: PdktAttachmentDiagnostics = {
+      source: attachmentSource,
+      status: hasCustomImages ? "attached" : "skipped",
+      reason: hasCustomImages ? "manual-attachment" : undefined,
+    };
 
-    if (!hasCustomImages && config.enableImageGeneration) {
+    if (!hasCustomImages && !config.enableImageGeneration) {
+      attachmentDiagnostics = {
+        source: "none",
+        status: "skipped",
+        reason: "disabled",
+      };
+    } else if (!hasCustomImages && config.enableImageGeneration) {
       try {
         const imageResult = await generatePdktScenarioImages(
           scenario,
@@ -310,12 +321,30 @@ export async function initializeEmailSession(
         if (imageResult.success && imageResult.images.length > 0) {
           attachments = imageResult.images;
           attachmentSource = "ai";
+          attachmentDiagnostics = {
+            source: "ai",
+            status: "attached",
+            attemptedModel: imageResult.diagnostics?.attemptedModel,
+            provider: imageResult.diagnostics?.provider,
+          };
         } else {
-          attachmentWarning = imageResult.warning || "Gagal membuat bukti gambar.";
+          attachmentDiagnostics = {
+            source: "none",
+            status: "failed",
+            reason: imageResult.diagnostics?.reason || "empty-output",
+            attemptedModel: imageResult.diagnostics?.attemptedModel,
+            provider: imageResult.diagnostics?.provider,
+            message: imageResult.warning || "Gagal membuat bukti gambar.",
+          };
         }
       } catch (imgError) {
         console.warn("[PDKT] AI Image generation failed, continuing with no attachments:", imgError);
-        attachmentWarning = imgError instanceof Error ? imgError.message : String(imgError);
+        attachmentDiagnostics = {
+          source: "none",
+          status: "failed",
+          reason: "provider-error",
+          message: imgError instanceof Error ? imgError.message : String(imgError),
+        };
       }
     }
 
@@ -331,7 +360,7 @@ export async function initializeEmailSession(
         isAgent: false,
         attachments,
         attachmentSource,
-        attachmentWarning,
+        attachmentDiagnostics,
       },
     };
   } catch (error: unknown) {

@@ -205,4 +205,83 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       costUsd: 0,
     });
   });
+
+  it("classifies PDKT create email, image generation, and async evaluation into itemized breakdown", async () => {
+    const mockLogs = [
+      {
+        action: "init_email",
+        input_tokens: 100,
+        output_tokens: 300,
+        total_tokens: 400,
+        estimated_cost_usd: 0.001,
+        estimated_cost_idr: 1500,
+      },
+      {
+        action: "generate_ai_images",
+        input_tokens: 200,
+        output_tokens: 0,
+        total_tokens: 200,
+        estimated_cost_usd: 0.002,
+        estimated_cost_idr: 3000,
+      },
+      {
+        action: "async_evaluate_agent_response",
+        input_tokens: 400,
+        output_tokens: 500,
+        total_tokens: 900,
+        estimated_cost_usd: 0.003,
+        estimated_cost_idr: 4500,
+      },
+    ];
+
+    mockFrom.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+
+    const app = buildApp();
+    const res = await app.request("/usage/summary?module=pdkt");
+    const body = (await res.json()) as any;
+
+    expect(body.success).toBe(true);
+    expect(body.data.simulationCostIdr).toBe(4500);
+    expect(body.data.reviewCostIdr).toBe(4500);
+    expect(body.data.breakdown.simulation.calls).toBe(2);
+    expect(body.data.breakdown.review.calls).toBe(1);
+    expect(body.data.breakdown.uncategorized.calls).toBe(0);
+    expect(body.data.breakdownItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "pdkt_create_email",
+          label: "Create Email",
+          category: "simulation",
+          calls: 1,
+          costIdr: 1500,
+        }),
+        expect.objectContaining({
+          key: "pdkt_image_generation",
+          label: "Lampiran AI",
+          category: "simulation",
+          calls: 1,
+          costIdr: 3000,
+        }),
+        expect.objectContaining({
+          key: "pdkt_review",
+          label: "Penilaian AI",
+          category: "review",
+          calls: 1,
+          costIdr: 4500,
+        }),
+      ]),
+    );
+  });
 });

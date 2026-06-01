@@ -73,6 +73,13 @@ describe("PDKT Image Generation Integration", () => {
     expect(pdktImageGen.generatePdktScenarioImages).not.toHaveBeenCalled();
     expect(result.message?.attachments).toHaveLength(0);
     expect(result.message?.attachmentSource).toBe("none");
+    expect((result.message as any)?.attachmentDiagnostics).toEqual(
+      expect.objectContaining({
+        source: "none",
+        status: "skipped",
+        reason: "disabled",
+      }),
+    );
   });
 
   it("should continue with no attachments if AI image generation fails", async () => {
@@ -114,7 +121,15 @@ describe("PDKT Image Generation Integration", () => {
     expect(result.success).toBe(true);
     expect(result.message?.attachments).toHaveLength(0);
     expect(result.message?.attachmentSource).toBe("none");
-    expect(result.message?.attachmentWarning).toBe("Model tidak mengembalikan gambar valid.");
+    expect(result.message?.attachmentWarning).toBeUndefined();
+    expect((result.message as any)?.attachmentDiagnostics).toEqual(
+      expect.objectContaining({
+        source: "none",
+        status: "failed",
+        reason: "empty-output",
+        message: "Model tidak mengembalikan gambar valid.",
+      }),
+    );
   });
 
   describe("generatePdktScenarioImages unit tests", () => {
