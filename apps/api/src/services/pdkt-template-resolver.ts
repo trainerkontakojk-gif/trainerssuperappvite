@@ -8,6 +8,10 @@ import {
   SCENARIO_COMPANY_CATEGORY_MAP,
   UNLICENSED_COMPANY_NAMES,
 } from "./pdkt-company-names";
+import {
+  buildPdktEmailGenerationPolicy,
+  renderPdktIdentityByMentionPattern,
+} from "./pdkt-email-policy";
 
 export interface PdktTemplateResolutionInput {
   subject: string;
@@ -17,11 +21,6 @@ export interface PdktTemplateResolutionInput {
   mentionPattern: ResolvedConsumerNameMentionPattern;
   pickIndex?: number;
 }
-
-const CONSUMER_PLACEHOLDER_PATTERNS = [
-  /\{\{\s*consumer_name\s*\}\}/gi,
-  /\[(?:nama\s*)?(?:konsumen|nasabah|pengirim|pelapor|diri)(?:\s+[^\]]+)?\]/gi,
-] as const;
 
 const COMPANY_PLACEHOLDER_PATTERNS = [
   /\{\{\s*(?:company_name|company|institution_name|ljk_name)\s*\}\}/gi,
@@ -57,52 +56,51 @@ export function renderPdktConsumerName(
   identity: PdktIdentity,
   pattern: ResolvedConsumerNameMentionPattern,
 ): string {
-  const text = replaceAllPatterns(
-    body,
-    CONSUMER_PLACEHOLDER_PATTERNS,
-    identity.name,
-  ).trim();
-  if (pattern === "none") return text;
-  if (pattern === "upfront") return `Halo, saya ${identity.name}.\n\n${text}`;
-  if (pattern === "late") return `${text}\n\nSalam,\n${identity.name}`;
-
-  const paragraphs = text.split("\n\n");
-  if (paragraphs.length >= 2) {
-    paragraphs.splice(
-      Math.floor(paragraphs.length / 2),
-      0,
-      `Oya, saya ${identity.name} mau menambahkan sedikit detail lagi.`,
-    );
-    return paragraphs.join("\n\n");
-  }
-  return `${text}\n\n(Saya ${identity.name})`;
+  const config = {
+    scenarios: [],
+    consumerType: {} as any,
+    identity,
+    enableImageGeneration: false,
+    resolvedConsumerNameMentionPattern: pattern,
+    writingStyleMode: "training" as const,
+  };
+  const policy = buildPdktEmailGenerationPolicy(config, {} as any, "template");
+  const { body: resolvedBody } = renderPdktIdentityByMentionPattern(body, "", policy);
+  return resolvedBody;
 }
 
 export function findPdktPlaceholders(value: string): string[] {
   return [...new Set(value.match(ANY_PLACEHOLDER_PATTERN) || [])];
 }
 
-function sanitizePdktTemplateText(
-  text: string,
-  companyName: string,
-  identityName: string,
-): string {
-  let resolved = replaceAllPatterns(text, COMPANY_PLACEHOLDER_PATTERNS, companyName);
-  resolved = replaceAllPatterns(resolved, CONSUMER_PLACEHOLDER_PATTERNS, identityName);
-  return resolved;
-}
-
 export function resolvePdktTemplateBody(input: PdktTemplateResolutionInput) {
   const company = resolvePdktCompanyName(input.scenario, input.pickIndex);
-  const subject = sanitizePdktTemplateText(
+
+  const subjectWithCompany = replaceAllPatterns(
     input.subject,
+    COMPANY_PLACEHOLDER_PATTERNS,
     company.name,
-    input.identity.name,
   );
-  const body = renderPdktConsumerName(
-    sanitizePdktTemplateText(input.body, company.name, input.identity.name),
-    input.identity,
-    input.mentionPattern,
+  const bodyWithCompany = replaceAllPatterns(
+    input.body,
+    COMPANY_PLACEHOLDER_PATTERNS,
+    company.name,
+  );
+
+  const config = {
+    scenarios: [input.scenario],
+    consumerType: {} as any,
+    identity: input.identity,
+    enableImageGeneration: false,
+    resolvedConsumerNameMentionPattern: input.mentionPattern,
+    writingStyleMode: "training" as const,
+  };
+  const policy = buildPdktEmailGenerationPolicy(config, input.scenario, "template");
+
+  const { subject, body } = renderPdktIdentityByMentionPattern(
+    bodyWithCompany,
+    subjectWithCompany,
+    policy,
   );
 
   return {

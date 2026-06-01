@@ -98,7 +98,7 @@ describe("pdkt template resolver", () => {
       body: "Saya [Nama Pengirim] bertanya ke [Nama Perusahaan].",
       scenario: asuransiScenario,
       identity,
-      mentionPattern: "none",
+      mentionPattern: "upfront",
       pickIndex: 0,
     });
 
@@ -106,5 +106,20 @@ describe("pdkt template resolver", () => {
     expect(result.body).toContain("Budi Santoso");
     expect(result.body).toContain("Prudential Indonesia");
     expect(result.leftoverPlaceholders).toEqual([]);
+  });
+
+  it("ensures name is omitted from body and subject in none pattern", () => {
+    const result = resolvePdktTemplateBody({
+      subject: "Halo [Nama Nasabah] - tolong bantu",
+      body: "Saya [Nama Pengirim] ingin mengadu soal [Nama Perusahaan]. Nama saya adalah Budi Santoso.",
+      scenario: asuransiScenario,
+      identity,
+      mentionPattern: "none",
+      pickIndex: 0,
+    });
+
+    expect(result.subject).not.toContain("Budi");
+    expect(result.body).not.toContain("Budi");
+    expect(result.body).toContain("Prudential Indonesia");
   });
 });

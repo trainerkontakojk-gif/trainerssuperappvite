@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import * as pdktService from "../services/pdkt-service";
 import { renderPdktConsumerName } from "../services/pdkt-template-resolver";
 
+vi.mock("../lib/gemini", () => ({
+  generateGeminiContent: vi.fn(),
+}));
+
+vi.mock("../lib/openrouter", () => ({
+  generateOpenRouterContent: vi.fn(),
+}));
+
 vi.mock("../lib/supabase", () => ({
   createAdminClient: () => ({
     from: vi.fn().mockReturnThis(),
@@ -112,10 +120,77 @@ describe("PDKT Service", () => {
       const rendered = renderPdktConsumerName(
         "Saya [Nama Nasabah] menulis ini.",
         identity,
+        "upfront",
+      );
+
+      expect(rendered).toContain("Budi");
+    });
+
+    it("ensures consumer aliases are omitted in bracket placeholders for none pattern", () => {
+      const identity = {
+        name: "Budi",
+        email: "b@b.com",
+        city: "Jakarta",
+        bodyName: "Budi",
+      };
+
+      const rendered = renderPdktConsumerName(
+        "Saya [Nama Nasabah] menulis ini.",
+        identity,
         "none",
       );
 
-      expect(rendered).toBe("Saya Budi menulis ini.");
+      expect(rendered).not.toContain("Budi");
+    });
+
+    it("fails closed when template generation keeps violating policy after retry", async () => {
+      const { generateGeminiContent } = await import("../lib/gemini");
+      vi.mocked(generateGeminiContent).mockResolvedValue({
+        success: true,
+        text: JSON.stringify({
+          subject: "Halo Budi",
+          body: `${"keluhan ".repeat(520)}Sebagai AI saya akan menjelaskan skenario ini kepada user.`,
+        }),
+      } as any);
+
+      const testIdentity = {
+        name: "Budi",
+        email: "b@b.com",
+        city: "Jakarta",
+        bodyName: "Budi",
+      };
+
+      const scenario = {
+        id: "test-scenario",
+        category: "Test",
+        title: "Test Scenario",
+        description: "Description",
+        isActive: true,
+        isLicensed: true,
+      };
+      const config = {
+        scenarios: [scenario],
+        consumerType: {
+          id: "c1",
+          name: "Normal",
+          description: "Normal",
+        },
+        identity: testIdentity,
+        enableImageGeneration: false,
+        selectedModel: "gemini-3.1-flash-lite",
+        resolvedConsumerNameMentionPattern: "none",
+        writingStyleMode: "realistic",
+      } as any;
+
+      const result = await pdktService.generateScenarioEmailTemplate(
+        scenario as any,
+        config,
+        undefined,
+        "user-1",
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("melanggar");
     });
   });
 });

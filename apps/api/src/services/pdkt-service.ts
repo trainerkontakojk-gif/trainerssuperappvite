@@ -17,6 +17,16 @@ import {
   SCENARIO_COMPANY_CATEGORY_MAP,
 } from "./pdkt-company-names";
 import { resolvePdktTemplateBody } from "./pdkt-template-resolver";
+import {
+  buildPdktEmailGenerationPolicy,
+  buildPdktSystemInstruction,
+  renderPdktIdentityByMentionPattern,
+  validatePdktEmailPolicyCompliance,
+  buildPdktRetryHint,
+  getRealisticWritingInstruction as policyGetRealisticWritingInstruction,
+  getConsumerNameMentionInstruction as policyGetConsumerNameMentionInstruction,
+  getCompanyNameInstruction as policyGetCompanyNameInstruction,
+} from "./pdkt-email-policy";
 
 // ── Constants ───────────────────────────────────────────
 
@@ -248,46 +258,17 @@ export function isTransientAiError(error: unknown): boolean {
 }
 
 export function getRealisticWritingInstruction(mode: WritingStyleMode): string {
-  if (mode !== "realistic") return "";
-
-  return `
-    GAYA PENULISAN REALISTIS (WAJIB):
-    - Tambahkan minimal 2 dan maksimal 5 typo (salah ketik) acak pada kata-kata di dalam email.
-    - Gunakan CAPSLOCK pada 1 hingga 3 kata atau frasa pendek untuk menunjukkan penekanan emosi atau kebingungan.
-    - Gunakan minimal 3 kata atau ungkapan bahasa informal/bahasa sehari-hari yang tidak baku.
-    - Sertakan minimal 1 bagian di mana Anda menjelaskan masalah secara sedikit berbelit-belit atau mengulang poin yang sama untuk menunjukkan kesulitan dalam menjelaskan masalah.
-    - Meskipun gaya penulisan tidak sempurna, pastikan informasi inti keluhan (jenis masalah, nama LJK, dan dampak) tetap dapat diidentifikasi.
-  `;
+  return policyGetRealisticWritingInstruction(mode);
 }
 
 export function getConsumerNameMentionInstruction(
   pattern: ResolvedConsumerNameMentionPattern,
 ): string {
-  switch (pattern) {
-    case "upfront":
-      return "ATURAN NAMA KONSUMEN: Anda boleh menyebut nama di awal email, termasuk pada salam pembuka atau paragraf pertama.";
-    case "middle":
-      return "ATURAN NAMA KONSUMEN: Jangan sebut nama di awal email atau salam pembuka. Jika nama muncul, letakkan di bagian tengah isi email.";
-    case "late":
-      return "ATURAN NAMA KONSUMEN: Jangan sebut nama di awal email atau bagian tengah. Jika nama muncul, letakkan menjelang akhir email atau dekat penutup.";
-    case "none":
-      return "ATURAN NAMA KONSUMEN: Jangan sebut nama Anda sama sekali di salam, body, maupun penutup email. Jangan mengarang nama konsumen jika nama tidak disebut.";
-  }
+  return policyGetConsumerNameMentionInstruction(pattern);
 }
 
 export function getCompanyNameInstruction(scenario?: PdktScenario): string {
-  if (!scenario?.isLicensed) {
-    return `1. PENAMAAN PERUSAHAAN: WAJIB mengarang NAMA entitas/perusahaan fiktif yang diadukan. JANGAN menggunakan kata "Bank", "Asuransi", atau "Sekuritas" karena entitas ilegal tidak berhak menggunakan nama tersebut. Contoh: "Pinjaman Kilat Nusantara", "Dana Cepat 88", "Investasi Cuan Jaya".`;
-  }
-
-  const category =
-    SCENARIO_COMPANY_CATEGORY_MAP[scenario.title] ||
-    scenario.category ||
-    "Perbankan";
-  const names = LICENSED_COMPANY_NAMES[category] || [];
-  const namesList = names.map((n) => `- ${n}`).join("\n");
-
-  return `1. PENAMAAN PERUSAHAAN: Gunakan SALAH SATU NAMA RESMI perusahaan berikut untuk LJK yang diadukan:\n${namesList}\nPilih salah satu nama dari daftar di atas. JANGAN mengarang nama perusahaan lain.`;
+  return policyGetCompanyNameInstruction(scenario);
 }
 
 export function getSystemInstruction(
@@ -295,57 +276,9 @@ export function getSystemInstruction(
   hasCustomImages: boolean,
 ): string {
   const scenario = config.scenarios[0];
-  const scenarioDescription = scenario
-    ? `[${scenario.category}] ${scenario.title}: ${scenario.description}`
-    : "Tidak ada skenario spesifik.";
-
-  const templateGuidance = scenario?.sampleEmailTemplate?.body
-    ? `TEMPLATE REFERENSI: Anda bisa merujuk pada gaya bahasa template berikut, namun buatlah versi yang lebih panjang dan bertele-tele:\n"${scenario.sampleEmailTemplate.body}"`
-    : "";
-
-  let imageInstruction: string;
-  if (hasCustomImages) {
-    imageInstruction =
-      "User (Program) sudah melampirkan bukti gambar secara manual. Fokus saja pada cerita keluhannya.";
-  } else if (config.enableImageGeneration) {
-    imageInstruction =
-      "Buatlah 1 sampai 3 prompt visual (deskripsi gambar) untuk bukti lampiran.";
-  } else {
-    imageInstruction = "JANGAN membuat prompt gambar visual apapun.";
-  }
-
-  const writingStyleMode = config.writingStyleMode || "training";
-
-  return `
-    Anda adalah Simulator Konsumen untuk pelatihan Agen Email Kontak OJK 157.
-    
-    PROFIL PENGIRIM:
-    Nama Akun: ${config.identity.name}
-    Email: ${config.identity.email}
-    Nama Panggilan/Asli: ${config.identity.bodyName || config.identity.name}
-    Kota Domisili: ${config.identity.city}
-
-    PENTING: Gunakan profil di atas secara KONSISTEN.
-    ${getConsumerNameMentionInstruction(config.resolvedConsumerNameMentionPattern)}
-    ${config.resolvedConsumerNameMentionPattern === "none" ? "Jangan menyebut nama diri Anda sama sekali." : ""}
-    
-    KARAKTER: ${config.consumerType.name} (${config.consumerType.description})
-    
-    MASALAH: ${scenarioDescription}
-    ${templateGuidance}
-    ${imageInstruction}
-    ${getRealisticWritingInstruction(writingStyleMode)}
-    
-    ATURAN WAJIB:
-    ${getCompanyNameInstruction(scenario)}
-    2. GAYA PENULISAN: Buatlah isi email yang SANGAT PANJANG (500-1000 kata), BERTELE-TELE, dan PENUH DETAIL curhatan tidak relevan. Jangan gunakan bullet points. Gunakan 5-8 paragraf yang dipisahkan dengan baris kosong (\n\n). JANGAN menulis dalam 1 paragraf saja — setiap paragraf harus membahas aspek berbeda (kronologi, detail masalah, dampak emosional, harapan, dll).
-    3. FORMAT OUTPUT: HANYA JSON.
-    { 
-      "subject": "Subjek singkat & samar (maks 6 kata), atau kosong.", 
-      "body": "Paragraf 1...\n\nParagraf 2...\n\nParagraf 3...\n\nParagraf 4...\n\nParagraf 5...",
-      "imagePrompts": ["Deskripsi gambar 1"]
-    }
-   `;
+  if (!scenario) return "Tidak ada skenario.";
+  const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
+  return buildPdktSystemInstruction(policy, hasCustomImages);
 }
 
 // ── AI Services ─────────────────────────────────────────
@@ -413,22 +346,8 @@ export async function generateScenarioEmailTemplate(
   }
 
   const modelId = config.selectedModel || "gemini-3.1-flash-lite";
-
-  const systemInstruction = `
-    Anda adalah Simulator Konsumen untuk pelatihan Agen Email Kontak OJK 157.
-    Tugas Anda adalah membuat SATU CONTOH TEMPLATE EMAIL pengaduan berdasarkan skenario yang diberikan.
-    
-    ATURAN:
-    ${getCompanyNameInstruction(scenario)}
-    2. SUBJECT: Singkat (maks 6 kata), samar, tidak mengandung kata terlarang (fraud, penipuan, pinjol, dll).
-    3. BODY: Gunakan placeholder {{consumer_name}} jika ingin menyebut nama diri sendiri.
-    4. GAYA BAHASA: Sangat PANJANG (500-1000 kata), natural, bertele-tele, penuh detail kronologi curhatan, tanpa bullet points. Wajib 5-8 paragraf yang dipisahkan dengan baris kosong (\n\n). JANGAN menulis dalam 1 paragraf saja — setiap paragraf harus membahas aspek berbeda (kronologi awal, detail masalah, upaya yang sudah dilakukan, dampak emosional/finansial, harapan penyelesaian, dll).
-    5. JANGAN menyertakan prompt gambar.
-    6. JANGAN menyertakan identitas spesifik (kota, email asli) selain placeholder.
-    
-    FORMAT OUTPUT JSON:
-    { "subject": "...", "body": "Paragraf 1...\n\nParagraf 2...\n\nParagraf 3...\n\nParagraf 4...\n\nParagraf 5..." }
-  `;
+  const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
+  const systemInstruction = buildPdktSystemInstruction(policy);
 
   const prompt = `Buat template email panjang dan natural untuk skenario: [${scenario.category}] ${scenario.title}. Detail: ${scenario.description}. PENTING: Email harus 500-1000 kata, terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;
 
@@ -466,19 +385,25 @@ export async function generateScenarioEmailTemplate(
     const subject = normalizeSubject(resolved.subject) || resolved.subject;
     const body = resolved.body;
     const wordCount = body.split(/\s+/).filter(Boolean).length;
+    const violations = validatePdktEmailPolicyCompliance({ subject, body }, policy);
 
     return {
       subject,
       body,
       wordCount,
       leftoverPlaceholders: resolved.leftoverPlaceholders,
+      violations,
     };
   };
 
   try {
     let result = await executeGeneration();
 
-    if (result.leftoverPlaceholders.length > 0 || result.wordCount < 500) {
+    if (
+      result.leftoverPlaceholders.length > 0 ||
+      result.wordCount < 500 ||
+      result.violations.length > 0
+    ) {
       const placeholderHint =
         result.leftoverPlaceholders.length > 0
           ? `Template sebelumnya masih mengandung placeholder ${result.leftoverPlaceholders.join(", ")}. Ganti semuanya dengan teks konkret tanpa tanda kurung siku atau kurung kurawal.`
@@ -487,12 +412,18 @@ export async function generateScenarioEmailTemplate(
         result.wordCount < 500
           ? "Template sebelumnya terlalu pendek. Buat jauh lebih panjang, detail, dan bertele-tele (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
           : "";
+      const violationHint =
+        result.violations.length > 0
+          ? buildPdktRetryHint(result.violations, policy)
+          : "";
 
-      result = await executeGeneration(
-        [placeholderHint, lengthHint]
-          .filter(Boolean)
-          .join(" "),
-      );
+      try {
+        result = await executeGeneration(
+          [placeholderHint, lengthHint, violationHint].filter(Boolean).join(" "),
+        );
+      } catch (err) {
+        console.warn("[PDKT] Template retry failed, using first attempt:", err);
+      }
     }
 
     if (result.leftoverPlaceholders.length > 0) {
@@ -507,6 +438,14 @@ export async function generateScenarioEmailTemplate(
         success: false,
         error:
           "Hasil template terlalu pendek. Silakan klik Generate ulang untuk mencoba lagi.",
+      };
+    }
+
+    if (result.violations.length > 0) {
+      return {
+        success: false,
+        error:
+          "Hasil template masih melanggar aturan nama atau gaya penulisan. Silakan klik Generate ulang untuk mencoba lagi.",
       };
     }
 
@@ -568,28 +507,81 @@ export async function initializeEmailSession(
   const customAttachments: string[] = scenario.attachmentImages || [];
   const hasCustomImages = customAttachments.length > 0;
   const model = config.selectedModel || "gemini-3.1-flash-lite";
+  const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
+  const systemInstruction = buildPdktSystemInstruction(policy, hasCustomImages);
 
   const prompt = `Tulis email pengaduan pertama Anda sekarang. Masalah: ${scenario.title}. Karakter: ${config.consumerType.name}. PENTING: Email harus 500-1000 kata, terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;
 
-  try {
+  const executeSessionGeneration = async (retryPrompt?: string) => {
+    const finalPrompt = retryPrompt
+      ? `${prompt}\n\nREVISI: ${retryPrompt}`
+      : prompt;
     const response = await callAI({
       model,
-      prompt,
-      systemInstruction: getSystemInstruction(config, hasCustomImages),
+      prompt: finalPrompt,
+      systemInstruction,
       responseMimeType: "application/json",
       usageContext: usageContext || { module: "pdkt", action: "init_email" },
       userId,
     });
 
     if (!response.success) {
-      return {
-        success: false,
-        error: response.error || "Layanan AI tidak tersedia.",
-      };
+      throw new Error(response.error || "Layanan AI tidak tersedia.");
     }
 
     const responseText = response.text || "{}";
     const jsonResponse = parseJsonFromModelText(responseText);
+
+    const { subject, body } = renderPdktIdentityByMentionPattern(
+      jsonResponse.body || "",
+      jsonResponse.subject || "",
+      policy,
+    );
+
+    const normalizedSubject = normalizeSubject(subject) || subject;
+    const wordCount = body.split(/\s+/).filter(Boolean).length;
+    const violations = validatePdktEmailPolicyCompliance(
+      { subject: normalizedSubject, body },
+      policy,
+    );
+
+    return {
+      subject: normalizedSubject,
+      body,
+      wordCount,
+      violations,
+    };
+  };
+
+  try {
+    let result = await executeSessionGeneration();
+
+    if (result.violations.length > 0 || result.wordCount < 500) {
+      const violationHint =
+        result.violations.length > 0
+          ? buildPdktRetryHint(result.violations, policy)
+          : "";
+      const lengthHint =
+        result.wordCount < 500
+          ? "Email terlalu pendek. Buat jauh lebih panjang (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
+          : "";
+
+      try {
+        result = await executeSessionGeneration(
+          [violationHint, lengthHint].filter(Boolean).join(" "),
+        );
+      } catch (err) {
+        console.warn("[PDKT] Session init retry failed, using first attempt:", err);
+      }
+    }
+
+    if (result.violations.length > 0) {
+      return {
+        success: false,
+        error:
+          "Email awal masih melanggar aturan nama atau gaya penulisan. Silakan coba lagi.",
+      };
+    }
 
     return {
       success: true,
@@ -597,8 +589,8 @@ export async function initializeEmailSession(
         id: Date.now().toString(),
         from: config.identity.email,
         to: "konsumen@ojk.go.id",
-        subject: normalizeSubject(jsonResponse.subject),
-        body: jsonResponse.body || "Gagal memuat isi email.",
+        subject: result.subject,
+        body: result.body,
         timestamp: new Date().toISOString(),
         isAgent: false,
         attachments: customAttachments,
