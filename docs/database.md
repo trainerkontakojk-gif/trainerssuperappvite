@@ -197,3 +197,13 @@ Aplikasi menggunakan Supabase Storage bucket:
 - `telefun-recordings`: Menyimpan rekaman Telefun jika fitur rekaman digunakan.
 
 Backup database via `pg_dump` hanya mencakup schema/data PostgreSQL dan metadata storage. File fisik di bucket Storage harus dibackup terpisah; lihat `docs/SUPABASE_LOCAL_BACKUP.md`.
+
+## Troubleshooting & Schema Cache
+
+Jika Anda menambahkan kolom baru atau melakukan DDL di database namun aplikasi (atau PostgREST) merespons dengan pesan error terkait kolom hilang (misalnya `PGRST204` "Could not find the '...' column in the schema cache"), PostgREST cache mungkin menjadi usang (_stale_).
+
+Untuk memuat ulang schema cache PostgREST:
+1. Hubungkan ke database menggunakan `supabase db query --linked` (jika remote) atau tool SQL client apa pun.
+2. Jalankan perintah `NOTIFY pgrst, 'reload schema';`
+
+Ini sering terjadi pada environment _hosted_ setelah proses migrasi yang menambahkan fitur secara ad-hoc tanpa me-restart service PostgREST. Codebase aplikasi ini secara defensif menangani error `42703` dan `PGRST204` (seperti pada logging AI Usage), namun perbaikan ideal tetaplah memastikan schema dan cache remote tetap termutakhir.

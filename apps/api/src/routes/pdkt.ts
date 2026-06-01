@@ -220,6 +220,13 @@ pdkt.post(
       const data = await pdktService.createMailboxItem(userClient, body);
       return c.json({ success: true, data });
     } catch (error: any) {
+      console.error("[PDKT /mailbox/batch] Raw error:", error);
+      console.error("[PDKT /mailbox/batch] Error detail:", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+      });
       return c.json(
         {
           success: false,

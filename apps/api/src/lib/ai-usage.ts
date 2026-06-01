@@ -12,6 +12,21 @@ interface TokenUsage {
   totalTokens: number;
 }
 
+function isMissingAiUsageStatusColumnError(error: any): boolean {
+  if (!error) return false;
+  const msg = (error.message || "").toLowerCase();
+  
+  if (error.code === "42703") {
+    return /ai_usage_logs\.(status|error_message)|column .*status|column .*error_message/.test(msg);
+  }
+  
+  if (error.code === "PGRST204") {
+    return msg.includes("schema cache") && (msg.includes("status") || msg.includes("error_message"));
+  }
+  
+  return false;
+}
+
 export async function logAiUsage(options: {
   requestId: string;
   userId: string;
@@ -83,7 +98,7 @@ export async function logAiUsage(options: {
       (inputTokens / 1_000_000) * inputPricePerMillion +
       (outputTokens / 1_000_000) * outputPricePerMillion;
 
-    await admin.from("ai_usage_logs").insert({
+    const payload = {
       request_id: options.requestId,
       user_id: options.userId,
       provider: options.provider,
@@ -100,7 +115,24 @@ export async function logAiUsage(options: {
       estimated_cost_idr: Math.round(estimatedCostUsd * usdToIdrRate),
       status: requestStatus,
       error_message: errorMessageValue,
-    });
+    };
+
+    const insertResult = await admin.from("ai_usage_logs").insert(payload);
+    if (insertResult.error) {
+      if (!isMissingAiUsageStatusColumnError(insertResult.error)) {
+        throw insertResult.error;
+      }
+
+      const {
+        status: _status,
+        error_message: _errorMessage,
+        ...legacyPayload
+      } = payload;
+      const legacyResult = await admin
+        .from("ai_usage_logs")
+        .insert(legacyPayload);
+      if (legacyResult.error) throw legacyResult.error;
+    }
   } catch (error) {
     const err = error as { code?: string };
     if (err?.code === "23505") {
