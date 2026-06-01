@@ -29,6 +29,7 @@ import { SessionReviewModal } from "./components/SessionReviewModal";
 import { useAuthStore } from "../../store/authStore";
 import { notify } from "../../lib/toast";
 import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta } from "../../lib/usage-snapshot";
+import { fetchUsageSummary } from "../../lib/usage-summary";
 
 const accentClassName = "text-emerald-600";
 const accentSoftClassName = "bg-emerald-100";
@@ -301,15 +302,9 @@ export default function KetikLanding() {
     setIsLoading(true);
 
     try {
-      const usage = await ketikApi.getUsageSummary();
+      const usage = await fetchUsageSummary("ketik");
       if (usage && runId === sessionRunIdRef.current) {
-        sessionBaselineRef.current = {
-          totalCalls: usage.totalCalls ?? 0,
-          totalTokens: usage.totalTokens ?? 0,
-          totalCostIdr: usage.totalCostIdr ?? 0,
-          simulationCostIdr: usage.simulationCostIdr ?? 0,
-          reviewCostIdr: usage.reviewCostIdr ?? 0,
-        };
+        sessionBaselineRef.current = usage;
       }
     } catch (e) {
       console.warn("[Ketik] Failed to fetch usage baseline");
@@ -367,24 +362,37 @@ export default function KetikLanding() {
 
     // Poll for usage delta (covers /ketik/generate calls)
     if (baseline && runId === sessionRunIdRef.current) {
-      pollUsageDelta(
-        () => ketikApi.getUsageSummary(),
-        baseline,
-      ).then((delta) => {
-        if (runId === sessionRunIdRef.current) {
-          setSessionDelta(delta);
-          if (delta && delta.costIdr > 0) {
-            const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
-            if (delta.simulationCostIdr > 0) parts.push(`Simulasi Rp${delta.simulationCostIdr.toLocaleString("id-ID")}`);
-            if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
-            notify.success(parts.join(" | "));
+      pollUsageDelta(() => fetchUsageSummary("ketik"), baseline)
+        .then((delta) => {
+          if (runId === sessionRunIdRef.current) {
+            setSessionDelta(delta);
+            if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+              const format = (v: number) =>
+                v.toLocaleString("id-ID", {
+                  style: "currency",
+                  currency: "IDR",
+                  minimumFractionDigits: 0,
+                });
+              const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
+              const sim = delta.breakdown.simulation;
+              const rev = delta.breakdown.review;
+
+              if (sim.costIdr > 0 || sim.calls > 0) {
+                parts.push(`Simulasi ${format(sim.costIdr)}`);
+              }
+              if (rev.costIdr > 0 || rev.calls > 0) {
+                parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+              }
+              notify.success(parts.join(" | "));
+            }
           }
-        }
-      }).catch(() => {}).finally(() => {
-        if (runId === sessionRunIdRef.current) {
-          setSessionDeltaPending(false);
-        }
-      });
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (runId === sessionRunIdRef.current) {
+            setSessionDeltaPending(false);
+          }
+        });
     } else {
       setSessionDeltaPending(false);
     }
@@ -400,14 +408,21 @@ export default function KetikLanding() {
     if (!baseline) return;
     setSessionDeltaPending(true);
     try {
-      const delta = await pollUsageDelta(
-        () => ketikApi.getUsageSummary(),
-        baseline,
-      );
+      const delta = await pollUsageDelta(() => fetchUsageSummary("ketik"), baseline);
       setSessionDelta(delta);
-      if (delta && delta.costIdr > 0) {
+      if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+        const format = (v: number) =>
+          v.toLocaleString("id-ID", {
+            style: "currency",
+            currency: "IDR",
+            minimumFractionDigits: 0,
+          });
         const parts = [`Biaya penilaian: ${formatUsageDeltaLabel(delta)}`];
-        if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
+        const rev = delta.breakdown.review;
+
+        if (rev.costIdr > 0 || rev.calls > 0) {
+          parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+        }
         notify.success(parts.join(" | "));
       }
     } catch (e) {

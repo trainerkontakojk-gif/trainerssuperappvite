@@ -12,6 +12,7 @@ import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
 import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import { notify } from "../../lib/toast";
 import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
+import { fetchUsageSummary } from "../../lib/usage-summary";
 
 const accentClassName = "text-purple-500";
 const accentSoftClassName = "bg-purple-100";
@@ -166,34 +167,12 @@ export default function PdktLanding() {
 
   const captureUsageBaseline = async () => {
     try {
-      const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
+      const summary = await fetchUsageSummary("pdkt");
       if (summary) {
-        usageSnapshotRef.current = {
-          totalCalls: summary.totalCalls ?? 0,
-          totalTokens: summary.totalTokens ?? 0,
-          totalCostIdr: summary.totalCostIdr ?? 0,
-          simulationCostIdr: summary.simulationCostIdr ?? 0,
-          reviewCostIdr: summary.reviewCostIdr ?? 0,
-        };
+        usageSnapshotRef.current = summary;
       }
     } catch (err) {
       console.error("[PDKT] Failed to capture usage baseline:", err);
-    }
-  };
-
-  const fetchPdktSummary = async (): Promise<UsageSnapshot | null> => {
-    try {
-      const summary = await getApi<any>("/ai/usage/summary?module=pdkt");
-      if (!summary) return null;
-      return {
-        totalCalls: summary.totalCalls ?? 0,
-        totalTokens: summary.totalTokens ?? 0,
-        totalCostIdr: summary.totalCostIdr ?? 0,
-        simulationCostIdr: summary.simulationCostIdr ?? 0,
-        reviewCostIdr: summary.reviewCostIdr ?? 0,
-      };
-    } catch {
-      return null;
     }
   };
 
@@ -201,12 +180,28 @@ export default function PdktLanding() {
     if (!usageSnapshotRef.current) return;
     setSessionDeltaPending(true);
     try {
-      const delta = await pollUsageDelta(fetchPdktSummary, usageSnapshotRef.current);
+      const delta = await pollUsageDelta(
+        () => fetchUsageSummary("pdkt"),
+        usageSnapshotRef.current,
+      );
       setSessionDelta(delta);
-      if (delta && delta.costIdr > 0) {
+      if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+        const format = (v: number) =>
+          v.toLocaleString("id-ID", {
+            style: "currency",
+            currency: "IDR",
+            minimumFractionDigits: 0,
+          });
         const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
-        if (delta.simulationCostIdr > 0) parts.push(`Simulasi Rp${delta.simulationCostIdr.toLocaleString("id-ID")}`);
-        if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
+        const sim = delta.breakdown.simulation;
+        const rev = delta.breakdown.review;
+
+        if (sim.costIdr > 0 || sim.calls > 0) {
+          parts.push(`Simulasi ${format(sim.costIdr)}`);
+        }
+        if (rev.costIdr > 0 || rev.calls > 0) {
+          parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+        }
         notify.success(parts.join(" | "));
       }
     } catch (err) {

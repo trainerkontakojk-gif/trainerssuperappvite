@@ -186,6 +186,7 @@ Setelah pengguna lolos dari lapisan hak akses tabel, RLS memastikan mereka hanya
 
 - `leader` hanya mendapatkan visibilitas usage monitoring dari backend API yang sudah di-gate role.
 - Editor pricing dan kurs hanya tersedia untuk `trainer` dan `admin`.
+- **Category Breakdown**: API `/ai/usage/summary` sekarang menyediakan rincian penggunaan per kategori (`simulation`, `review`, `uncategorized`), memungkinkan frontend menampilkan rincian biaya simulasi vs penilaian AI secara akurat.
 - Akses aplikasi untuk permukaan monitoring dijelaskan lebih detail di `docs/auth-rbac.md` dan `docs/MONITORING_TOKEN_USAGE_BILLING.md`.
 
 ## Storage

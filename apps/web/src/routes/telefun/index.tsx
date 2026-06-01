@@ -18,6 +18,7 @@ import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import { finalizeTelefunSession } from "./sessionFinalizer";
 import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
+import { fetchUsageSummary } from "../../lib/usage-summary";
 import {
   getTelefunSettings,
   saveTelefunSettings,
@@ -200,15 +201,9 @@ export default function TelefunLanding() {
     sessionBaselineRef.current = null;
 
     try {
-      const data = await getApi<any>("/ai/usage/summary?module=telefun");
+      const data = await fetchUsageSummary("telefun");
       if (data && runId === sessionRunIdRef.current) {
-        sessionBaselineRef.current = {
-          totalCalls: data.totalCalls || 0,
-          totalTokens: data.totalTokens || 0,
-          totalCostIdr: data.totalCostIdr || 0,
-          simulationCostIdr: data.simulationCostIdr || 0,
-          reviewCostIdr: data.reviewCostIdr || 0,
-        };
+        sessionBaselineRef.current = data;
       }
     } catch {
       // best-effort
@@ -361,40 +356,37 @@ export default function TelefunLanding() {
 
     if (baseline && runId === sessionRunIdRef.current) {
       setSessionDeltaPending(true);
-      pollUsageDelta(
-        async () => {
-          try {
-            const data = await getApi<any>("/ai/usage/summary?module=telefun");
-            if (data) {
-              return {
-                totalCalls: data.totalCalls || 0,
-                totalTokens: data.totalTokens || 0,
-                totalCostIdr: data.totalCostIdr || 0,
-                simulationCostIdr: data.simulationCostIdr || 0,
-                reviewCostIdr: data.reviewCostIdr || 0,
-              };
+      pollUsageDelta(() => fetchUsageSummary("telefun"), baseline)
+        .then((delta) => {
+          if (runId === sessionRunIdRef.current) {
+            setSessionDelta(delta);
+            if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+              const format = (v: number) =>
+                v.toLocaleString("id-ID", {
+                  style: "currency",
+                  currency: "IDR",
+                  minimumFractionDigits: 0,
+                });
+              const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
+              const sim = delta.breakdown.simulation;
+              const rev = delta.breakdown.review;
+
+              if (sim.costIdr > 0 || sim.calls > 0) {
+                parts.push(`Simulasi ${format(sim.costIdr)}`);
+              }
+              if (rev.costIdr > 0 || rev.calls > 0) {
+                parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+              }
+              notify.success(parts.join(" | "));
             }
-          } catch {
-            // ignore
           }
-          return null;
-        },
-        baseline,
-      ).then((delta) => {
-        if (runId === sessionRunIdRef.current) {
-          setSessionDelta(delta);
-          if (delta && delta.costIdr > 0) {
-            const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
-            if (delta.simulationCostIdr > 0) parts.push(`Simulasi Rp${delta.simulationCostIdr.toLocaleString("id-ID")}`);
-            if (delta.reviewCostIdr > 0) parts.push(`Penilaian AI Rp${delta.reviewCostIdr.toLocaleString("id-ID")}`);
-            notify.success(parts.join(" | "));
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (runId === sessionRunIdRef.current) {
+            setSessionDeltaPending(false);
           }
-        }
-      }).catch(() => {}).finally(() => {
-        if (runId === sessionRunIdRef.current) {
-          setSessionDeltaPending(false);
-        }
-      });
+        });
     }
   };
 

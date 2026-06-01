@@ -161,4 +161,48 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
     expect(body.data.simulationCostIdr).toBe(1500);
     expect(body.data.reviewCostIdr).toBe(0);
   });
+
+  it("returns breakdown with simulation and review detailed stats", async () => {
+    const mockLogs = [
+      { action: "chat_response", input_tokens: 100, output_tokens: 200, total_tokens: 300, estimated_cost_usd: 0.001, estimated_cost_idr: 1500 },
+      { action: "coaching_review", input_tokens: 500, output_tokens: 800, total_tokens: 1300, estimated_cost_usd: 0, estimated_cost_idr: 0 },
+    ];
+
+    mockFrom.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              lte: vi.fn().mockReturnValue({
+                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+
+    const app = buildApp();
+    const res = await app.request("/usage/summary?module=ketik");
+    const body = (await res.json()) as any;
+
+    expect(body.success).toBe(true);
+    expect(body.data).toHaveProperty("breakdown");
+    expect(body.data.breakdown.simulation).toEqual({
+      calls: 1,
+      inputTokens: 100,
+      outputTokens: 200,
+      totalTokens: 300,
+      costIdr: 1500,
+      costUsd: 0.001,
+    });
+    expect(body.data.breakdown.review).toEqual({
+      calls: 1,
+      inputTokens: 500,
+      outputTokens: 800,
+      totalTokens: 1300,
+      costIdr: 0,
+      costUsd: 0,
+    });
+  });
 });

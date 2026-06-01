@@ -1,0 +1,63 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { fetchUsageSummary } from "../lib/usage-summary";
+import { emptyUsageBreakdown } from "../lib/usage-snapshot";
+
+const mockGetApi = vi.fn();
+
+vi.mock("../hooks/useApi", () => ({
+  getApi: (...args: any[]) => mockGetApi(...args),
+}));
+
+describe("fetchUsageSummary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("normalizes old API shape with empty breakdown", async () => {
+    mockGetApi.mockResolvedValueOnce({
+      totalCalls: 5,
+      totalTokens: 1000,
+      totalCostIdr: 5000,
+      simulationCostIdr: 3000,
+      reviewCostIdr: 2000,
+    });
+
+    const result = await fetchUsageSummary("ketik");
+    expect(mockGetApi).toHaveBeenCalledWith("/ai/usage/summary?module=ketik");
+    expect(result).toEqual({
+      totalCalls: 5,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalTokens: 1000,
+      totalCostIdr: 5000,
+      simulationCostIdr: 3000,
+      reviewCostIdr: 2000,
+      periodLabel: undefined,
+      breakdown: emptyUsageBreakdown(),
+    });
+  });
+
+  it("returns new API shape correctly", async () => {
+    const mockBreakdown = emptyUsageBreakdown();
+    mockBreakdown.review.calls = 1;
+    mockBreakdown.review.costIdr = 0;
+    mockBreakdown.review.totalTokens = 100;
+
+    mockGetApi.mockResolvedValueOnce({
+      totalCalls: 1,
+      totalTokens: 100,
+      totalCostIdr: 0,
+      breakdown: mockBreakdown,
+    });
+
+    const result = await fetchUsageSummary("pdkt");
+    expect(result?.breakdown?.review.calls).toBe(1);
+    expect(result?.breakdown?.review.costIdr).toBe(0);
+  });
+
+  it("returns null on fetch error", async () => {
+    mockGetApi.mockRejectedValueOnce(new Error("Network Error"));
+    const result = await fetchUsageSummary("telefun");
+    expect(result).toBeNull();
+  });
+});

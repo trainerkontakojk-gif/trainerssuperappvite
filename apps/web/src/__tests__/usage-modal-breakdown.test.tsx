@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { UsageModal } from "../components/UsageModal";
-import * as useApiModule from "../hooks/useApi";
+import * as usageSummaryModule from "../lib/usage-summary";
+import { emptyUsageBreakdown } from "../lib/usage-snapshot";
 
-vi.mock("../hooks/useApi", () => ({
-  getApi: vi.fn(),
+vi.mock("../lib/usage-summary", () => ({
+  fetchUsageSummary: vi.fn(),
 }));
 
 describe("UsageModal — simulation/review breakdown", () => {
@@ -12,8 +13,12 @@ describe("UsageModal — simulation/review breakdown", () => {
     vi.clearAllMocks();
   });
 
-  it("renders simulation and review cost cards when data is available", async () => {
-    (useApiModule.getApi as any).mockResolvedValue({
+  it("renders breakdown rows when data is available", async () => {
+    const mockBreakdown = emptyUsageBreakdown();
+    mockBreakdown.simulation.costIdr = 30000;
+    mockBreakdown.review.costIdr = 20000;
+
+    (usageSummaryModule.fetchUsageSummary as any).mockResolvedValue({
       totalCalls: 10,
       totalInputTokens: 5000,
       totalOutputTokens: 3000,
@@ -22,6 +27,7 @@ describe("UsageModal — simulation/review breakdown", () => {
       simulationCostIdr: 30000,
       reviewCostIdr: 20000,
       periodLabel: "Mei 2026",
+      breakdown: mockBreakdown,
     });
 
     render(
@@ -35,24 +41,23 @@ describe("UsageModal — simulation/review breakdown", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Biaya Simulasi")).toBeTruthy();
+      expect(screen.getByText("Simulasi")).toBeTruthy();
     });
-    expect(screen.getByText("Biaya Penilaian AI")).toBeTruthy();
-    expect(screen.getByText("Rp 30.000")).toBeTruthy();
-    expect(screen.getByText("Rp 20.000")).toBeTruthy();
+    expect(screen.getByText("Penilaian AI")).toBeTruthy();
+    expect(screen.getByText(/Rp\s?30\.000/)).toBeTruthy();
+    expect(screen.getByText(/Rp\s?20\.000/)).toBeTruthy();
   });
 
-  it("shows session delta with simulation/review split", async () => {
-    (useApiModule.getApi as any).mockResolvedValue({
+  it("shows session delta with simulation/review split in breakdown rows", async () => {
+    (usageSummaryModule.fetchUsageSummary as any).mockResolvedValue({
       totalCalls: 10,
-      totalInputTokens: 5000,
-      totalOutputTokens: 3000,
       totalTokens: 8000,
       totalCostIdr: 50000,
-      simulationCostIdr: 30000,
-      reviewCostIdr: 20000,
-      periodLabel: "Mei 2026",
     });
+
+    const mockDeltaBreakdown = emptyUsageBreakdown();
+    mockDeltaBreakdown.simulation.costIdr = 3000;
+    mockDeltaBreakdown.review.costIdr = 2000;
 
     render(
       <UsageModal
@@ -61,31 +66,31 @@ describe("UsageModal — simulation/review breakdown", () => {
         module="pdkt"
         sessionDelta={{
           costIdr: 5000,
+          inputTokens: 800,
+          outputTokens: 200,
           totalTokens: 1000,
           totalCalls: 2,
           simulationCostIdr: 3000,
           reviewCostIdr: 2000,
+          breakdown: mockDeltaBreakdown,
         }}
         sessionDeltaPending={false}
       />
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Simulasi \+Rp/)).toBeTruthy();
+      expect(screen.getAllByText("Simulasi").length).toBeGreaterThan(0);
     });
-    expect(screen.getByText(/Penilaian AI \+Rp/)).toBeTruthy();
+    expect(screen.getAllByText(/\+Rp\s?3\.000/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Penilaian AI").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\+Rp\s?2\.000/).length).toBeGreaterThan(0);
   });
 
   it("shows pending state when sessionDeltaPending is true", async () => {
-    (useApiModule.getApi as any).mockResolvedValue({
+    (usageSummaryModule.fetchUsageSummary as any).mockResolvedValue({
       totalCalls: 5,
-      totalInputTokens: 2000,
-      totalOutputTokens: 1000,
       totalTokens: 3000,
       totalCostIdr: 20000,
-      simulationCostIdr: 15000,
-      reviewCostIdr: 5000,
-      periodLabel: "Mei 2026",
     });
 
     render(
@@ -103,16 +108,12 @@ describe("UsageModal — simulation/review breakdown", () => {
     });
   });
 
-  it("hides simulation/review cards when values are 0", async () => {
-    (useApiModule.getApi as any).mockResolvedValue({
+  it("hides empty categories in breakdown rows", async () => {
+    (usageSummaryModule.fetchUsageSummary as any).mockResolvedValue({
       totalCalls: 3,
-      totalInputTokens: 1000,
-      totalOutputTokens: 500,
       totalTokens: 1500,
       totalCostIdr: 8000,
-      simulationCostIdr: 0,
-      reviewCostIdr: 0,
-      periodLabel: "Mei 2026",
+      breakdown: emptyUsageBreakdown(),
     });
 
     render(
@@ -128,8 +129,8 @@ describe("UsageModal — simulation/review breakdown", () => {
     await waitFor(() => {
       expect(screen.getByText("Estimasi Biaya Bulan Ini")).toBeTruthy();
     });
-    // When both are 0, the cards show "-" dash
-    const simCards = screen.getAllByText("-");
-    expect(simCards.length).toBeGreaterThanOrEqual(2);
+    // Category rows should NOT be rendered if all are 0
+    expect(screen.queryByText("Simulasi")).toBeNull();
+    expect(screen.queryByText("Penilaian AI")).toBeNull();
   });
 });

@@ -280,8 +280,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 88. **Settings Draft Normalization Hardening** — Extracted default entity logic from tab-level saves and `createItem` factories into pure per-domain normalizer functions for KETIK (scenario, consumer, quick template), PDKT (scenario, consumer), and Telefun (scenario, consumer). Hardened Telefun persisted settings parser with item-level validation for `scenarios` and `consumerTypes`. Normalizers reused from both tab-level saves and modal-level `createItem` factories, eliminating drift risk between save paths. 4 new normalizer files, 1 new test file (134 lines, 5 test cases), 6 modified tab files. 35 tests passing, 0 TS errors. (DONE)
 89. **pnpm 11 Migration** — Upgraded pnpm from 9.0.0 → 11.5.0. Two breaking changes fixed: (1) `allowBuilds` block added to `pnpm-workspace.yaml` for 5 packages (pnpm 11 blocks all build scripts by default), (2) `CI=true` required to skip TTY prompt on module recreation. No pnpm config in `package.json` or `.npmrc` meant other migration rules were moot. 3 files modified, 504 API + 485 web tests passing. (DONE)
 90. **Mega Maintainability Refactor** — Massive decomposition across 5 areas: (1) Profiler pages (export/slides/table) → 11 components + 5 utils + 1 hook, (2) SIDAK Settings → 4 components + constants, (3) `packages/types` barrel → 8 domain files, (4) data integrity scripts → 6 sub-modules, (5) API test suites (RLS, SIDAK dashboard, data integrity) → 10 focused test files + shared fixtures. ~9,081 lines removed from monolithic files, ~38 new files created. Zero logic change. (DONE)
+91. **AI Usage Post-Session Detail Breakdown** — Extended `/ai/usage/summary` API to return `breakdown: { simulation, review, uncategorized }` per-category stats (calls, input/output tokens, cost IDR/USD) classified via `SIMULATION_ACTIONS`/`REVIEW_ACTIONS`. Frontend: new `fetchUsageSummary()` shared helper, `UsageBreakdownRows` component (3 categories with icon+label+cost+token+call), upgraded `UsageModal`, toast with category split (`Biaya sesi ini: +RpX | Simulasi RpY | Penilaian AI RpZ`), post-session delta computed per-category. Refactored all 3 module landing pages (KETIK, PDKT, Telefun) to use shared helper. 6 files modified + 2 new (`usage-summary.ts` lib + test), 19 new tests. Zero new deps, zero new migrations. 493 API + 477 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 90)
+## Key Files Changed (Phase 58 — 91)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -379,6 +380,20 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `package.json` — **Phase 89**: Updated `packageManager` from `pnpm@9.0.0` to `pnpm@11.5.0`
 - `pnpm-workspace.yaml` — **Phase 89**: Added `allowBuilds` block for 5 packages (`@google/genai`, `core-js`, `ecc-universal`, `esbuild`, `protobufjs`)
 - `docs/rebuild-logs/phase-89-pnpm-11-migration.md` — **NEW Phase 89**: Documentation for pnpm 11 migration with breaking changes
+- `apps/api/src/routes/ai.ts` — **Phase 91**: `/ai/usage/summary` returns `breakdown: { simulation, review, uncategorized }` per-category stats with `resolveUsageCategory()` classifier
+- `apps/web/src/lib/usage-snapshot.ts` — **Phase 91**: Added `UsageBreakdown`/`UsageBreakdownItem` types, `emptyUsageBreakdown()` helper, `computeUsageDelta()` extended with per-category delta + `inputTokens`/`outputTokens` fields
+- `apps/web/src/lib/usage-summary.ts` — **NEW Phase 91**: Shared `fetchUsageSummary(module)` helper normalizing API response to `UsageSnapshot` with safe defaults
+- `apps/web/src/components/UsageModal.tsx` — **Phase 91**: Upgraded with `UsageBreakdownRows` component (3-category icon+cost+token+call rows), per-category session delta display, `fetchUsageSummary` integration
+- `apps/web/src/routes/ketik/index.tsx` — **Phase 91**: Replaced inline `ketikApi.getUsageSummary()` mapping with shared `fetchUsageSummary("ketik")`, baseline captures full snapshot, post-session toast shows simulation/review split
+- `apps/web/src/routes/pdkt/index.tsx` — **Phase 91**: Removed local `fetchPdktSummary` adapter, uses shared `fetchUsageSummary("pdkt")`, IDR-formatted toast breakdown
+- `apps/web/src/routes/telefun/index.tsx` — **Phase 91**: Replaced inline `getApi` mapping with shared `fetchUsageSummary("telefun")`, IDR-formatted post-call toast with category split
+- `apps/web/src/__tests__/usage-summary.test.ts` — **NEW Phase 91**: 3 tests (old shape normalization, new shape pass-through, fetch error returns null)
+- `apps/api/src/__tests__/ai-usage-summary-breakdown.test.ts` — **Phase 91**: +1 regression test verifying `breakdown` field with simulation/review detailed stats
+- `apps/web/src/__tests__/usage-modal-breakdown.test.tsx` — **Phase 91**: Updated to mock `fetchUsageSummary`, removed `getApi` import, added `emptyUsageBreakdown()` shape, `getAllByText` for multiple matches
+- `apps/web/src/__tests__/usage-snapshot.test.ts` — **Phase 91**: Changed `toEqual` to `toMatchObject` to accommodate new breakdown + input/output token fields
+- `apps/web/src/__tests__/ketik-landing.test.tsx` & `pdkt-landing.test.tsx` — **Phase 91**: Added `vi.mock("../lib/usage-summary")` mocks
+- `docs/database.md` — **Phase 91**: Documented category breakdown in Monitoring AI Usage section
+- `docs/rebuild-logs/phase-91-ai-usage-post-session-breakdown.md` — **NEW Phase 91**: Documentation for category breakdown + shared helper pattern
 
 ## Relevant Files
 

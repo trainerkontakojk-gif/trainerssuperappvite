@@ -20,21 +20,21 @@ describe("computeUsageDelta", () => {
     const before: UsageSnapshot = { totalCalls: 5, totalTokens: 1000, totalCostIdr: 5000, simulationCostIdr: 3000, reviewCostIdr: 2000 };
     const after: UsageSnapshot = { totalCalls: 7, totalTokens: 1500, totalCostIdr: 8000, simulationCostIdr: 5000, reviewCostIdr: 3000 };
     const delta = computeUsageDelta(before, after);
-    expect(delta).toEqual({ totalCalls: 2, totalTokens: 500, costIdr: 3000, simulationCostIdr: 2000, reviewCostIdr: 1000 });
+    expect(delta).toMatchObject({ totalCalls: 2, totalTokens: 500, costIdr: 3000, simulationCostIdr: 2000, reviewCostIdr: 1000 });
   });
 
   it("clamps negative values to 0", () => {
     const before: UsageSnapshot = { totalCalls: 10, totalTokens: 2000, totalCostIdr: 10000, simulationCostIdr: 6000, reviewCostIdr: 4000 };
     const after: UsageSnapshot = { totalCalls: 5, totalTokens: 500, totalCostIdr: 2000, simulationCostIdr: 1000, reviewCostIdr: 1000 };
     const delta = computeUsageDelta(before, after);
-    expect(delta).toEqual({ totalCalls: 0, totalTokens: 0, costIdr: 0, simulationCostIdr: 0, reviewCostIdr: 0 });
+    expect(delta).toMatchObject({ totalCalls: 0, totalTokens: 0, costIdr: 0, simulationCostIdr: 0, reviewCostIdr: 0 });
   });
 
   it("handles missing simulation/review fields gracefully", () => {
     const before: UsageSnapshot = { totalCalls: 5, totalTokens: 1000, totalCostIdr: 5000 };
     const after: UsageSnapshot = { totalCalls: 7, totalTokens: 1500, totalCostIdr: 8000 };
     const delta = computeUsageDelta(before, after);
-    expect(delta).toEqual({ totalCalls: 2, totalTokens: 500, costIdr: 3000, simulationCostIdr: 0, reviewCostIdr: 0 });
+    expect(delta).toMatchObject({ totalCalls: 2, totalTokens: 500, costIdr: 3000, simulationCostIdr: 0, reviewCostIdr: 0 });
   });
 });
 
@@ -88,7 +88,7 @@ describe("pollUsageDelta", () => {
     await vi.advanceTimersByTimeAsync(100);
 
     const delta = await promise;
-    expect(delta).toEqual({ totalCalls: 2, totalTokens: 500, costIdr: 3000, simulationCostIdr: 2000, reviewCostIdr: 1000 });
+    expect(delta).toMatchObject({ totalCalls: 2, totalTokens: 500, costIdr: 3000, simulationCostIdr: 2000, reviewCostIdr: 1000 });
   });
 
   it("returns null on timeout when no new calls", async () => {
@@ -138,7 +138,7 @@ describe("pollUsageDelta", () => {
     await vi.advanceTimersByTimeAsync(50);
 
     const delta = await promise;
-    expect(delta).toEqual({ totalCalls: 1, totalTokens: 200, costIdr: 1000, simulationCostIdr: 1000, reviewCostIdr: 0 });
+    expect(delta).toMatchObject({ totalCalls: 1, totalTokens: 200, costIdr: 1000, simulationCostIdr: 1000, reviewCostIdr: 0 });
   });
 
   it("returns null when fetch returns null", async () => {
@@ -169,7 +169,7 @@ describe("computeUsageDelta — simulation/review breakdown", () => {
       simulationCostIdr: 16000, reviewCostIdr: 12000,
     };
     const delta = computeUsageDelta(before, after);
-    expect(delta).toEqual({
+    expect(delta).toMatchObject({
       totalCalls: 4, totalTokens: 2000, costIdr: 8000,
       simulationCostIdr: 4000, reviewCostIdr: 4000,
     });
@@ -179,7 +179,7 @@ describe("computeUsageDelta — simulation/review breakdown", () => {
     const before: UsageSnapshot = { totalCalls: 1, totalTokens: 100, totalCostIdr: 500 };
     const after: UsageSnapshot = { totalCalls: 2, totalTokens: 200, totalCostIdr: 1000 };
     const delta = computeUsageDelta(before, after);
-    expect(delta).toEqual({
+    expect(delta).toMatchObject({
       totalCalls: 1, totalTokens: 100, costIdr: 500,
       simulationCostIdr: 0, reviewCostIdr: 0,
     });

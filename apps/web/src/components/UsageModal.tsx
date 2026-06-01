@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { X, BarChart3, Loader2, TrendingUp, Sparkles, Zap } from "lucide-react";
-import { getApi } from "../hooks/useApi";
-import type { UsageDelta } from "../lib/usage-snapshot";
+import {
+  type UsageBreakdown,
+  type UsageBreakdownItem,
+  type UsageSnapshot,
+  type UsageDelta,
+} from "../lib/usage-snapshot";
+import { fetchUsageSummary, type UsageModule } from "../lib/usage-summary";
 
 interface UsageModalProps {
   isOpen: boolean;
   onClose: () => void;
-  module: "ketik" | "pdkt" | "telefun";
+  module: UsageModule;
   sessionDelta?: UsageDelta | null;
   sessionDeltaPending?: boolean;
 }
@@ -46,6 +51,70 @@ const MODULE_META: Record<string, { label: string; accent: string; bg: string; b
   },
 };
 
+function UsageBreakdownRows({
+  breakdown,
+  isDelta = false,
+}: {
+  breakdown?: UsageBreakdown | null;
+  isDelta?: boolean;
+}) {
+  if (!breakdown) return null;
+
+  const categories = [
+    {
+      key: "simulation",
+      label: "Simulasi",
+      icon: Zap,
+      color: "text-emerald-600",
+    },
+    {
+      key: "review",
+      label: "Penilaian AI",
+      icon: Sparkles,
+      color: "text-amber-600",
+    },
+    {
+      key: "uncategorized",
+      label: "Lainnya",
+      icon: BarChart3,
+      color: "text-muted-foreground",
+    },
+  ] as const;
+
+  const prefix = isDelta ? "+" : "";
+  const isVisible = (item: UsageBreakdownItem) =>
+    item.calls > 0 || item.totalTokens > 0 || item.costIdr > 0;
+
+  return (
+    <div className="space-y-1.5 mt-2 pt-2 border-t border-current/10">
+      {categories.map(({ key, label, icon: Icon, color }) => {
+        const item = breakdown[key];
+        if (!item || !isVisible(item)) {
+          return null;
+        }
+
+        return (
+          <div key={key} className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
+              <Icon className={`w-3 h-3 ${color}`} />
+              <span className={`text-[10px] font-bold ${color}`}>{label}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-foreground">
+                {prefix}{formatIdr(item.costIdr)}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                {prefix}{formatTokenCount(item.totalTokens)} tkn | {prefix}
+                {item.calls} call
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function UsageModal({
   isOpen,
   onClose,
@@ -54,18 +123,7 @@ export function UsageModal({
   sessionDeltaPending,
 }: UsageModalProps) {
   const [loading, setLoading] = useState(false);
-  const [usage, setUsage] = useState<{
-    totalCalls: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    totalTokens: number;
-    totalCostIdr: number;
-    simulationCostIdr: number;
-    reviewCostIdr: number;
-    periodLabel?: string;
-    year?: number;
-    month?: number;
-  } | null>(null);
+  const [usage, setUsage] = useState<UsageSnapshot | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,9 +131,7 @@ export function UsageModal({
     const fetchUsage = async () => {
       setLoading(true);
       try {
-        const data = await getApi<any>(
-          `/ai/usage/summary?module=${module}`,
-        );
+        const data = await fetchUsageSummary(module);
         setUsage(data);
       } catch (error) {
         console.error(`[UsageModal:${module}] Failed to fetch usage:`, error);
@@ -90,16 +146,6 @@ export function UsageModal({
   if (!isOpen) return null;
 
   const meta = MODULE_META[module];
-  const months = [
-    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-    "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-  ];
-
-  const periodLabel =
-    usage?.periodLabel ||
-    (usage?.year && usage?.month
-      ? `${months[usage.month - 1]} ${usage.year}`
-      : "");
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
@@ -118,7 +164,9 @@ export function UsageModal({
       >
         <header className="px-5 py-4 sm:px-6 sm:py-5 border-b flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-xl ${meta.bg} flex items-center justify-center border ${meta.border}`}>
+            <div
+              className={`w-11 h-11 rounded-xl ${meta.bg} flex items-center justify-center border ${meta.border}`}
+            >
               <BarChart3 className={`w-5 h-5 ${meta.accent}`} />
             </div>
             <div>
@@ -150,15 +198,19 @@ export function UsageModal({
             <>
               <div className="text-center mb-4">
                 <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-                  {periodLabel}
+                  {usage.periodLabel || "Bulan Ini"}
                 </p>
               </div>
 
               {(sessionDelta || sessionDeltaPending) && (
-                <div className={`${meta.bg}/30 border ${meta.border} rounded-xl p-4 mb-4`}>
+                <div
+                  className={`${meta.bg}/30 border ${meta.border} rounded-xl p-4 mb-4`}
+                >
                   <div className="flex items-center gap-2 mb-1">
                     <TrendingUp className={`w-4 h-4 ${meta.accent}`} />
-                    <p className={`text-xs font-black uppercase tracking-widest ${meta.accent}`}>
+                    <p
+                      className={`text-xs font-black uppercase tracking-widest ${meta.accent}`}
+                    >
                       Kenaikan setelah sesi terakhir
                     </p>
                   </div>
@@ -184,62 +236,32 @@ export function UsageModal({
                       </span>
                     )}
                   </div>
-                  {sessionDelta && (sessionDelta.simulationCostIdr > 0 || sessionDelta.reviewCostIdr > 0) && (
-                    <div className="flex items-center gap-3 mt-2 pt-2 border-t border-current/10">
-                      {sessionDelta.simulationCostIdr > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600">
-                          <Zap className="w-3 h-3" />
-                          Simulasi +{formatIdr(sessionDelta.simulationCostIdr)}
-                        </span>
-                      )}
-                      {sessionDelta.reviewCostIdr > 0 && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600">
-                          <Sparkles className="w-3 h-3" />
-                          Penilaian AI +{formatIdr(sessionDelta.reviewCostIdr)}
-                        </span>
-                      )}
-                    </div>
+                  {sessionDelta && (
+                    <UsageBreakdownRows
+                      breakdown={sessionDelta.breakdown}
+                      isDelta
+                    />
                   )}
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <div className={`${meta.bg}/30 rounded-xl p-4 col-span-2 border ${meta.border}`}>
-                  <div className={`text-[10px] font-black uppercase tracking-widest ${meta.accent} mb-1`}>
+                <div
+                  className={`${meta.bg}/30 rounded-xl p-4 col-span-2 border ${meta.border}`}
+                >
+                  <div
+                    className={`text-[10px] font-black uppercase tracking-widest ${meta.accent} mb-1`}
+                  >
                     Estimasi Biaya Bulan Ini
                   </div>
                   <div className={`text-3xl font-black ${meta.accent}`}>
                     {formatIdr(usage.totalCostIdr)}
                   </div>
+                  {usage.breakdown && (
+                    <UsageBreakdownRows breakdown={usage.breakdown} />
+                  )}
                 </div>
-                <div className="bg-emerald-500/5 rounded-xl p-4 border border-emerald-500/10">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Zap className="w-3 h-3 text-emerald-600" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                      Biaya Simulasi
-                    </span>
-                  </div>
-                  <div className="text-lg font-black text-emerald-600">
-                    {(usage.simulationCostIdr ?? 0) > 0 ? formatIdr(usage.simulationCostIdr) : "-"}
-                  </div>
-                  <p className="text-[10px] text-emerald-600/60 mt-0.5">
-                    Chat, email, panggilan suara
-                  </p>
-                </div>
-                <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/10">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Sparkles className="w-3 h-3 text-amber-600" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
-                      Biaya Penilaian AI
-                    </span>
-                  </div>
-                  <div className="text-lg font-black text-amber-600">
-                    {(usage.reviewCostIdr ?? 0) > 0 ? formatIdr(usage.reviewCostIdr) : "-"}
-                  </div>
-                  <p className="text-[10px] text-amber-600/60 mt-0.5">
-                    Evaluasi, coaching, analisis suara
-                  </p>
-                </div>
+
                 <div className="bg-foreground/[0.02] rounded-xl p-4">
                   <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
                     Total Tokens
@@ -259,7 +281,7 @@ export function UsageModal({
                     Input Tokens
                   </div>
                   <div className="text-base font-bold text-muted-foreground">
-                    {formatTokenCount(usage.totalInputTokens)}
+                    {formatTokenCount(usage.totalInputTokens || 0)}
                   </div>
                 </div>
                 <div className="bg-foreground/[0.02] rounded-xl p-4">
@@ -267,7 +289,7 @@ export function UsageModal({
                     Output Tokens
                   </div>
                   <div className="text-base font-bold text-muted-foreground">
-                    {formatTokenCount(usage.totalOutputTokens)}
+                    {formatTokenCount(usage.totalOutputTokens || 0)}
                   </div>
                 </div>
               </div>

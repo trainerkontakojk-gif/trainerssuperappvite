@@ -121,6 +121,40 @@ ai.get("/usage", async (c) => {
   return c.json({ success: true, data });
 });
 
+type UsageCategory = "simulation" | "review" | "uncategorized";
+
+interface UsageBreakdownItem {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costIdr: number;
+  costUsd: number;
+}
+
+interface UsageBreakdown {
+  simulation: UsageBreakdownItem;
+  review: UsageBreakdownItem;
+  uncategorized: UsageBreakdownItem;
+}
+
+function emptyUsageBreakdownItem(): UsageBreakdownItem {
+  return {
+    calls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    costIdr: 0,
+    costUsd: 0,
+  };
+}
+
+function resolveUsageCategory(action: string): UsageCategory {
+  if (SIMULATION_ACTIONS.has(action)) return "simulation";
+  if (REVIEW_ACTIONS.has(action)) return "review";
+  return "uncategorized";
+}
+
 ai.get("/usage/summary", async (c) => {
   const user = c.get("user");
   const userId = user?.id;
@@ -169,6 +203,12 @@ ai.get("/usage/summary", async (c) => {
     let simulationCostIdr = 0;
     let reviewCostIdr = 0;
 
+    const breakdown: UsageBreakdown = {
+      simulation: emptyUsageBreakdownItem(),
+      review: emptyUsageBreakdownItem(),
+      uncategorized: emptyUsageBreakdownItem(),
+    };
+
     if (logs) {
       totalCalls = logs.length;
       for (const log of logs) {
@@ -177,6 +217,15 @@ ai.get("/usage/summary", async (c) => {
         totalTokens += log.total_tokens || 0;
         totalCostUsd += Number(log.estimated_cost_usd || 0);
         totalCostIdr += Number(log.estimated_cost_idr || 0);
+
+        const category = resolveUsageCategory(log.action);
+        const bucket = breakdown[category];
+        bucket.calls += 1;
+        bucket.inputTokens += log.input_tokens || 0;
+        bucket.outputTokens += log.output_tokens || 0;
+        bucket.totalTokens += log.total_tokens || 0;
+        bucket.costUsd += Number(log.estimated_cost_usd || 0);
+        bucket.costIdr += Number(log.estimated_cost_idr || 0);
 
         const cost = Number(log.estimated_cost_idr || 0);
         if (SIMULATION_ACTIONS.has(log.action)) {
@@ -202,6 +251,7 @@ ai.get("/usage/summary", async (c) => {
         totalCostIdr,
         simulationCostIdr,
         reviewCostIdr,
+        breakdown,
       },
     });
   } catch (error: any) {

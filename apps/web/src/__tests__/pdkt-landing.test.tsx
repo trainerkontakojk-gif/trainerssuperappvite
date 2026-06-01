@@ -14,6 +14,19 @@ vi.mock("../hooks/useApi", () => ({
   deleteApi: (...args: any[]) => mockDeleteApi(...args),
 }));
 
+vi.mock("../lib/usage-summary", () => ({
+  fetchUsageSummary: vi.fn().mockResolvedValue({
+    totalCalls: 10,
+    totalTokens: 1500,
+    totalCostIdr: 5000,
+    periodLabel: "Mei 2026",
+    breakdown: {
+      simulation: { calls: 8, totalTokens: 1000, costIdr: 3000 },
+      review: { calls: 2, totalTokens: 500, costIdr: 2000 },
+    },
+  }),
+}));
+
 import PdktLanding from "../routes/pdkt/index";
 
 describe("PDKT Landing Page", () => {

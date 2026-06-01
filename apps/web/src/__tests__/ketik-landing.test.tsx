@@ -71,6 +71,19 @@ vi.mock("../routes/ketik/ketikApi", () => ({
   },
 }));
 
+vi.mock("../lib/usage-summary", () => ({
+  fetchUsageSummary: vi.fn().mockResolvedValue({
+    totalCalls: 10,
+    totalTokens: 1500,
+    totalCostIdr: 5000,
+    periodLabel: "Januari 2025",
+    breakdown: {
+      simulation: { calls: 8, totalTokens: 1000, costIdr: 3000 },
+      review: { calls: 2, totalTokens: 500, costIdr: 2000 },
+    },
+  }),
+}));
+
 import KetikLanding from "../routes/ketik/index";
 
 describe("KETIK Landing Page", () => {
