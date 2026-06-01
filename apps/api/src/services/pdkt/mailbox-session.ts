@@ -1,3 +1,4 @@
+import { SupabaseClient } from "@supabase/supabase-js";
 import {
   EmailMessage,
   PdktIdentity,
@@ -6,13 +7,13 @@ import {
   WritingStyleMode,
 } from "@trainers/types";
 import {
-  createMailboxItem,
   initializeEmailSession,
   resolvePdktGenerationConfig,
 } from "../pdkt-service";
+import { createMailboxItem } from "./mailbox-service";
 
 export async function createMailboxSession(
-  supabaseClient: any,
+  supabaseClient: SupabaseClient,
   payload: {
     scenarioId?: string;
     scenarioDraft?: PdktScenario;
@@ -29,10 +30,15 @@ export async function createMailboxSession(
   let configInfo;
   try {
     configInfo = resolvePdktGenerationConfig(payload);
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
-      error: err.message || "Scenario atau consumer type tidak ditemukan.",
+      error:
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : "Scenario atau consumer type tidak ditemukan.",
     };
   }
 

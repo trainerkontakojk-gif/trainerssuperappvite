@@ -285,8 +285,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 93. **PDKT Consumer Name & Realistic Mode Hardening** — Centralized PDKT prompt policy module (`pdkt-email-policy.ts`) as single source of truth for name mention patterns (upfront/middle/late/none), realistic writing style rules, and compliance validators. Refactored `pdkt-service.ts` to delegate prompt generation to policy module. Added meta-language and mention pattern compliance validation with retry-once-then-fail-closed. Template resolver updated to respect name positioning rules. 514 API tests passing. (DONE)
 94. **PDKT Settings Visual Polish** — Aligned PDKT SettingsModal visual language with KETIK and Telefun modals: lighter overlay (`bg-background/80 backdrop-blur-md`), smoother spring animations (bounce 0.1, duration 0.4), consistent `bg-muted/20` header bar, `border-l-2 border-primary` left-border banner pattern, compact card styling (`p-5`, `gap-3`), `rounded-lg` interactive elements with `cursor-pointer`, consistent typography scale (`text-xs` body, `text-[10px] font-bold uppercase tracking-widest` labels), "Lampiran" label for attachment badges. 5 files modified, pure visual refinement with zero logic change. (DONE)
 95. **PDKT AI Image Generation Remediation & Robust JSON Parsing** — Created decoupled backend image generation service (`pdkt/image-generation.ts`) with provider-agnostic fallback. Updated model registry with `AiModelCapabilities` metadata (`supportsImage`, `imageGenerationMode`). Refactored `initializeEmailSession` to orchestrate pipeline: generate email → resolve attachment policy (Manual > AI > None) → generate AI images. Graceful fallback: AI image failure doesn't break session. Updated Gemini/OpenRouter multimodal parsers for `inlineData` and `message.images`. New unified `POST /session/init` endpoint, simplified frontend start-session flow. Added explanatory microcopy under AI toggle. **Follow-up**: Extracted robust JSON parsing library `ai-json.ts` with iterative brace-matching algorithm, replacing fragile regex-based parsing across PDKT, KETIK, SIDAK AI report, and Telefun analysis services. 12 files modified + 4 new files, 4 API + 1 web regression tests passing. (DONE)
+96. **PDKT Full Decomposition** — Completed full decomposition of monolithic PDKT route and service layer (analogous to Phase 79 SIDAK and Phase 80 Telefun). `routes/pdkt.ts` reduced 723→8 lines, `services/pdkt-service.ts` reduced 980→15 lines (both pure barrel/facade files). New route sub-modules under `routes/pdkt/`: `index.ts` (16), `simulation.ts` (162), `mailbox.ts` (167), `history.ts` (185), `settings.ts` (82), `route-utils.ts` (91). New service sub-modules under `services/pdkt/`: `catalog-service.ts` (167), `session-service.ts` (407), `evaluation-service.ts` (234), `mailbox-service.ts` (108), `shared-utils.ts` (90). Frontend `PdktScenariosTab.tsx` reduced 467→263 lines, decomposed into 5 sub-components under `scenarios/`: `ScenarioList`, `ScenarioForm`, `ScenarioAttachments`, `ScenarioAIGenerator`, `ScenarioTemplateField`. `mailbox-session.ts` (Phase 95) and `image-generation.ts` retained as orchestrator + provider-agnostic image gen. Typed `SupabaseClient` parameters and `unknown` error narrowing across `mailbox-service.ts`/`mailbox-session.ts`/`image-generation.ts`. 519 API + 503 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 95)
+## Key Files Changed (Phase 58 — 96)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -572,6 +573,15 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/services/pdkt-service.ts` — **Phase 95**: Removed inline `parseJsonFromModelText`, delegates to shared ai-json.ts
 - `apps/api/src/services/sidak/ai-report-service.ts` — **Phase 95**: Replaced fragile regex cleaning with `parseJsonFromModelText`
 
+- `apps/api/src/routes/pdkt.ts` — **Phase 96**: Reduced 723→8 lines — barrel re-export from `./pdkt/index`
+- `apps/api/src/services/pdkt-service.ts` — **Phase 96**: Reduced 980→15 lines — barrel re-exporting 5 sub-modules + `parseJsonFromModelText`
+- `apps/api/src/routes/pdkt/` — **Phase 96**: Full route decomposition into 6 sub-modules (index, simulation, mailbox, history, settings, route-utils) covering 16 route handlers
+- `apps/api/src/services/pdkt/` — **Phase 96**: Service decomposition into 7 modules total — new: catalog-service (scenarios/consumerTypes/identity), session-service (template/init/config), evaluation-service (agent eval + background worker), mailbox-service (RPC wrappers), shared-utils (callAI + transient detection + subject norm); retained from Phase 95: image-generation (multimodal), mailbox-session (orchestrator)
+- `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **Phase 96**: Reduced 467→263 lines — delegates to 5 sub-components under `scenarios/`
+- `apps/web/src/routes/pdkt/components/settings/scenarios/` — **NEW Phase 96**: 5 sub-components — `ScenarioList.tsx` (187), `ScenarioForm.tsx` (172), `ScenarioAttachments.tsx` (62), `ScenarioAIGenerator.tsx` (36), `ScenarioTemplateField.tsx` (71)
+- `apps/api/src/__tests__/pdkt.test.ts` — **Phase 96**: Updated mockSupabase type-cast to `Parameters<typeof pdktService.fetchMailboxItems>[0]` after `SupabaseClient` strict typing
+- `docs/rebuild-logs/phase-96-pdkt-full-decomposition.md` — **NEW Phase 96**: Documentation for PDKT full route + service + frontend decomposition
+
 ## Routes Reference (apps/web)
 
 | #   | Route                        | Page Type    | Notes                                                    |
@@ -621,7 +631,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 | ------------------ | ------------ | ------------------------------- |
 | `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports) |
 | `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history) |
-| `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
+| `/api/v1/pdkt`     | 16 endpoints | `routes/pdkt/` — 6 sub-modules (index, simulation, mailbox, history, settings, route-utils) + `services/pdkt/` — 7 service modules (catalog, session, evaluation, mailbox, shared-utils, image-generation, mailbox-session) |
 | `/api/v1/ai`       | 7 endpoints  | —                               |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
 | `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |

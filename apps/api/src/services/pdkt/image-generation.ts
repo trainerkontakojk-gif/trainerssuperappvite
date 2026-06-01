@@ -87,9 +87,18 @@ export async function generatePdktScenarioImages(
         error: response.error,
       };
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[PDKT Image Gen] Error:", error);
-    return { success: false, images: [], error: error.message };
+    return {
+      success: false,
+      images: [],
+      error:
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Gagal generate gambar.",
+    };
   }
 }
 

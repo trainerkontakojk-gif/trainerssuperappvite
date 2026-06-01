@@ -292,6 +292,7 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 93. **PDKT Consumer Name & Realistic Mode Hardening** — Centralized PDKT prompt policy module (`pdkt-email-policy.ts`) as single source of truth for name mention patterns and realistic writing style rules. Refactored `pdkt-service.ts` to delegate prompt generation to policy module. (DONE)
 94. **PDKT Settings Visual Polish** — Aligned PDKT SettingsModal visual language with KETIK and Telefun modals: lighter overlay, smoother spring animations, consistent header bar, left-border banner pattern, compact card styling, consistent typography scale. 5 files modified, pure visual refinement. (DONE)
 95. **PDKT AI Image Generation Remediation** — Created decoupled backend image generation service with automatic fallback, updated model registry with multimodal capabilities, refactored session orchestration to move attachment policy logic to backend, simplified frontend start-session flow, added explanatory microcopy, and implemented robust AI JSON parsing logic to handle multiple blocks and trailing garbage across all AI services. (DONE)
+96. **PDKT Full Decomposition** — Completed full decomposition of monolithic PDKT route and service layer (analogous to Phase 79 SIDAK and Phase 80 Telefun). `routes/pdkt.ts` reduced 723→8 lines, `services/pdkt-service.ts` reduced 980→15 lines (both pure barrel/facade files). New route sub-modules under `routes/pdkt/`: `index.ts` (16), `simulation.ts` (162), `mailbox.ts` (167), `history.ts` (185), `settings.ts` (82), `route-utils.ts` (91). New service sub-modules under `services/pdkt/`: `catalog-service.ts` (167), `session-service.ts` (407), `evaluation-service.ts` (234), `mailbox-service.ts` (108), `shared-utils.ts` (90). Frontend `PdktScenariosTab.tsx` reduced 467→263 lines, decomposed into 5 sub-components under `scenarios/`: `ScenarioList`, `ScenarioForm`, `ScenarioAttachments`, `ScenarioAIGenerator`, `ScenarioTemplateField`. `mailbox-session.ts` (Phase 95) and `image-generation.ts` retained as orchestrator + provider-agnostic image gen. Typed `SupabaseClient` parameters and `unknown` error narrowing across `mailbox-service.ts`/`mailbox-session.ts`/`image-generation.ts`. 519 API + 503 web tests passing. (DONE)
 
 
 ## Key Files Changed (Phase 58 — 95)
@@ -438,7 +439,7 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-95)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-96)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
@@ -448,6 +449,9 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - `apps/api/src/services/sidak/` — **Phase 75**: SIDAK service decomposition into 13 sub-modules; **Phase 78**: Added ai-report-service.ts
 - `apps/api/src/routes/sidak/` — **Phase 79**: SIDAK route full decomposition into 5 sub-modules (core, dashboard, temuan, rule-versions, reports)
 - `apps/api/src/routes/telefun/` — **Phase 80**: Telefun route full decomposition into 4 sub-modules (sessions, recordings, settings, annotations)
+- `apps/api/src/routes/pdkt/` — **Phase 96**: PDKT route full decomposition into 6 sub-modules (index, simulation, mailbox, history, settings, route-utils)
+- `apps/api/src/services/pdkt/` — **Phase 96**: PDKT service decomposition into 7 modules (catalog, session, evaluation, mailbox, shared-utils, image-generation, mailbox-session)
+- `apps/web/src/routes/pdkt/components/settings/scenarios/` — **Phase 96**: 5 frontend sub-components (ScenarioList, ScenarioForm, ScenarioAttachments, ScenarioAIGenerator, ScenarioTemplateField)
 
 ## Routes Reference (apps/web)
 
@@ -498,7 +502,7 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 | ------------------ | ------------ | ------------------------------- |
 | `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports) |
 | `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history) |
-| `/api/v1/pdkt`     | 6 endpoints  | `pdkt-service.ts`               |
+| `/api/v1/pdkt`     | 16 endpoints | `routes/pdkt/` — 6 sub-modules (index, simulation, mailbox, history, settings, route-utils) + `services/pdkt/` — 7 service modules (catalog, session, evaluation, mailbox, shared-utils, image-generation, mailbox-session) |
 | `/api/v1/ai`       | 7 endpoints  | —                               |
 | `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
 | `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |

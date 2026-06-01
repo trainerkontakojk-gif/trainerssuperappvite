@@ -44,7 +44,10 @@ describe("PDKT Service", () => {
       neq: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: [{ id: "1" }], error: null }),
     };
-    const items = await pdktService.fetchMailboxItems(mockSupabase, "user1");
+    const items = await pdktService.fetchMailboxItems(
+      mockSupabase as unknown as Parameters<typeof pdktService.fetchMailboxItems>[0],
+      "user1",
+    );
     expect(items).toHaveLength(1);
     expect(mockSupabase.from).toHaveBeenCalledWith("pdkt_mailbox_items");
   });
@@ -58,8 +61,11 @@ describe("PDKT Service", () => {
       sender_email: "test@example.com",
       subject: "Hello",
       snippet: "Hi",
-    };
-    const id = await pdktService.createMailboxItem(mockSupabase, payload);
+    } as unknown as Parameters<typeof pdktService.createMailboxItem>[1];
+    const id = await pdktService.createMailboxItem(
+      mockSupabase as unknown as Parameters<typeof pdktService.createMailboxItem>[0],
+      payload,
+    );
     expect(id).toBe("new-id");
     expect(mockSupabase.rpc).toHaveBeenCalledWith(
       "submit_pdkt_mailbox_batch",

@@ -65,7 +65,8 @@ Struktur folder monorepo:
 │   │   │   │   ├── telefun.ts  #   barrel (import + route registration 4 sub-modules)
 │   │   │   │   ├── telefun/    #   sub-modules: sessions, recordings, settings, annotations
 │   │   │   │   ├── ketik.ts    #   KETIK endpoints
-│   │   │   │   ├── pdkt.ts     #   PDKT endpoints
+│   │   │   │   ├── pdkt.ts     #   barrel (re-export from ./pdkt/index)
+│   │   │   │   ├── pdkt/       #   sub-modules: index, simulation, mailbox, history, settings, route-utils
 │   │   │   │   ├── ai.ts       #   AI monitoring endpoints
 │   │   │   │   ├── profiler.ts #   Profiler endpoints
 │   │   │   │   └── admin.ts    #   Admin endpoints
@@ -76,7 +77,9 @@ Struktur folder monorepo:
 │   │   │   │   ├── sidak/            #   SIDAK sub-modules
 │   │   │   │   ├── sidak-ranking-service.ts  #   Ranking extraction
 │   │   │   │   ├── ketik-service.ts
-│   │   │   │   ├── pdkt-service.ts
+│   │   │   │   ├── pdkt-service.ts  #   barrel (re-export 5 sub-modules + ai-json)
+│   │   │   │   ├── pdkt/            #   PDKT sub-modules: catalog, session, evaluation,
+│   │   │   │   │                   #   mailbox, shared-utils, image-generation, mailbox-session
 │   │   │   │   ├── profiler-service.ts
 │   │   │   │   ├── admin-service.ts
 │   │   │   │   ├── monitoring-history-service.ts
@@ -97,7 +100,7 @@ Struktur folder monorepo:
 ├── supabase/
 │   └── migrations/             # DB schemas (000 profiles, 001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin, 005 carbon copy, 006 user settings, 007 report archives, 008 profile admin policies, 009 storage RLS, 010 activity_logs index)
 ├── docs/                       # Dokumentasi teknis sistem
-│   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-90)
+│   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-96)
 │   └── superpowers/            # Plans dan specs dari superpowers skills
 ├── opencode.json               # Project-level opencode config dengan context7 MCP
 ├── AGENTS.md                   # Panduan development untuk AI agents
@@ -110,7 +113,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 
 - Logic database tidak diletakkan langsung di dalam komponen UI frontend.
 - Semua query kompleks berada di `apps/api/src/services/` (contoh: `sidak-service.ts` — barrel dari 13 sub-modules, `profiler-service.ts`).
-- Route handlers didekomposisi per modul: sub-modul di `apps/api/src/routes/sidak/` (5 file) dan `apps/api/src/routes/telefun/` (4 file), dengan barrel file `sidak.ts`/`telefun.ts` sebagai entry point.
+- Route handlers didekomposisi per modul: sub-modul di `apps/api/src/routes/sidak/` (5 file), `apps/api/src/routes/telefun/` (4 file), dan `apps/api/src/routes/pdkt/` (6 file), dengan barrel file `sidak.ts`/`telefun.ts`/`pdkt.ts` sebagai entry point.
 - Frontend mengonsumsi API via Hono RPC client (`hc<AppType>`) untuk full type-safety.
 - Hybrid Client Pattern untuk Supabase:
   - Default: Gunakan User JWT untuk menghormati RLS.
