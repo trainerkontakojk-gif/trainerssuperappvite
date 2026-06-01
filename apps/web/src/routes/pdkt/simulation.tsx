@@ -402,9 +402,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       setSelectedId(syntheticId);
     }
     setIsHistoryOpen(false);
-  };
-
-  // Start new simulation session
+  };  // Start new simulation session
   const handleStartNew = async (scenario: PdktScenario) => {
     setIsStartingNew(true);
     try {
@@ -431,9 +429,10 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
         fallbackIdentity,
       );
 
-      // 3. Initialize session in backend (Generates email AND AI images if enabled)
-      const inboundMessage = await postApi<EmailMessage>(
-        "/pdkt/session/init",
+      // 3. Create session in backend (Orchestrated single boundary call)
+      const clientRequestId = crypto.randomUUID();
+      const result = await postApi<{ id: string; message: EmailMessage }>(
+        "/pdkt/session/create",
         {
           scenarioId: scenario.id,
           consumerTypeId: config.consumerType.id,
@@ -443,26 +442,13 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
           resolvedConsumerNameMentionPattern:
             config.resolvedConsumerNameMentionPattern,
           writingStyleMode: config.writingStyleMode,
+          client_request_id: clientRequestId,
         },
       );
 
-      // 4. Submit new mailbox batch using the inbound message from AI
-      const clientRequestId = crypto.randomUUID();
-
-      const newItemId = await postApi<string>("/pdkt/mailbox/batch", {
-        client_request_id: clientRequestId,
-        sender_name: config.identity.name,
-        sender_email: config.identity.email,
-        subject: inboundMessage.subject,
-        snippet: inboundMessage.body.substring(0, 100),
-        scenario_snapshot: scenario,
-        config_snapshot: config,
-        inbound_email: inboundMessage,
-      });
-
       await refetch();
       await fetchHistory(); // update history list as well
-      setSelectedId(newItemId);
+      setSelectedId(result.id);
       setIsNewModalOpen(false);
     } catch (err) {
       console.error("[PDKT] Failed to start new simulation:", err);

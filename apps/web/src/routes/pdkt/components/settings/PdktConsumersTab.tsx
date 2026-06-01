@@ -1,9 +1,15 @@
 import React from "react";
-import { Users, Check, Edit2, Trash2, Plus, X } from "lucide-react";
+import { Users, Edit2, Trash2, Plus, X } from "lucide-react";
 import { PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { normalizePdktConsumerDraft } from "./pdktDraftNormalizers";
+import {
+  SettingsField,
+  SettingsInput,
+  SettingsSelect,
+  SettingsCardOption,
+} from "./SettingsPrimitives";
 
 interface PdktConsumersTabProps {
   consumerTypes: PdktConsumerType[];
@@ -87,38 +93,13 @@ export function PdktConsumersTab({
       {/* Grid List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {/* Random Option */}
-        <div
+        <SettingsCardOption
+          isSelected={globalConsumerTypeId === "random"}
           onClick={() => setGlobalConsumerTypeId("random")}
-          className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
-            globalConsumerTypeId === "random"
-              ? "bg-card border-primary shadow-sm"
-              : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
-          }`}
+          title="Acak (Random)"
         >
-          {globalConsumerTypeId === "random" && (
-            <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-          )}
-          <div className="flex justify-between items-start mb-2.5">
-            <h4 className="font-semibold text-sm tracking-tight flex items-center gap-2 text-foreground">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  globalConsumerTypeId === "random"
-                    ? "bg-primary animate-pulse"
-                    : "bg-foreground/20"
-                }`}
-              />
-              Acak (Random)
-            </h4>
-            {globalConsumerTypeId === "random" && (
-              <div className="bg-primary/10 text-primary p-1 rounded-md backdrop-blur-md">
-                <Check className="w-3.5 h-3.5 stroke-[3px]" />
-              </div>
-            )}
-          </div>
-          <p className="text-xs font-medium leading-relaxed text-muted-foreground">
-            Sistem akan memilih tipe konsumen secara acak untuk setiap sesi simulasi untuk variasi maksimal.
-          </p>
-        </div>
+          Sistem akan memilih tipe konsumen secara acak untuk setiap sesi simulasi untuk variasi maksimal.
+        </SettingsCardOption>
 
         {/* Consumer Types List */}
         {consumerTypes.map((c) => {
@@ -134,33 +115,20 @@ export function PdktConsumersTab({
                   : "bg-muted border-border text-muted-foreground";
 
           return (
-            <div
+            <SettingsCardOption
               key={c.id}
+              isSelected={isSelected}
               onClick={() => setGlobalConsumerTypeId(c.id)}
-              className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
-                isSelected
-                  ? "bg-card border-primary shadow-sm"
-                  : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
-              }`}
-            >
-              {isSelected && (
-                <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-              )}
-              <div className="flex justify-between items-start mb-2.5">
-                <h4 className="font-semibold text-sm tracking-tight flex items-center gap-2 pr-8 text-foreground">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      isSelected ? "bg-primary" : "bg-foreground/20"
-                    }`}
-                  />
-                  {c.name}
-                </h4>
-                <div className="flex items-center gap-1.5 relative z-10">
-                  {isSelected && (
-                    <div className="bg-primary/10 text-primary p-1 rounded-md backdrop-blur-md mr-0.5">
-                      <Check className="w-3.5 h-3.5 stroke-[3px]" />
-                    </div>
-                  )}
+              title={c.name}
+              badge={
+                <span
+                  className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${badgeClass}`}
+                >
+                  {c.difficulty}
+                </span>
+              }
+              actions={
+                <>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -181,19 +149,11 @@ export function PdktConsumersTab({
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              </div>
-              <div className="flex gap-2 mb-2.5">
-                <span
-                  className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${badgeClass}`}
-                >
-                  {c.difficulty}
-                </span>
-              </div>
-              <p className="text-xs font-medium leading-relaxed text-muted-foreground line-clamp-2">
-                {c.description}
-              </p>
-            </div>
+                </>
+              }
+            >
+              {c.description}
+            </SettingsCardOption>
           );
         })}
       </div>
@@ -231,24 +191,20 @@ export function PdktConsumersTab({
           </div>
           <div className="p-6 grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Nama Karakter / Tipe
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30"
-                placeholder="Contoh: Konsumen Milenial Galak"
-                value={consumerForm.draft.name || ""}
-                onChange={(e) => consumerForm.setDraft({ name: e.target.value })}
-              />
+              <SettingsField label="Nama Karakter / Tipe" id="consumer-name">
+                <SettingsInput
+                  id="consumer-name"
+                  type="text"
+                  placeholder="Contoh: Konsumen Milenial Galak"
+                  value={consumerForm.draft.name || ""}
+                  onChange={(e) => consumerForm.setDraft({ name: e.target.value })}
+                />
+              </SettingsField>
             </div>
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Tingkat Kesulitan
-              </label>
-              <div className="relative group">
-                <select
-                  className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium appearance-none cursor-pointer"
+              <SettingsField label="Tingkat Kesulitan" id="consumer-difficulty">
+                <SettingsSelect
+                  id="consumer-difficulty"
                   value={consumerForm.draft.difficulty || "Medium"}
                   onChange={(e) =>
                     consumerForm.setDraft({
@@ -259,49 +215,31 @@ export function PdktConsumersTab({
                   <option value="Easy">Mudah (Sopan)</option>
                   <option value="Medium">Menengah (Netral)</option>
                   <option value="Hard">Sulit (Marah/Kritis)</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                  <svg
-                    width="8"
-                    height="5"
-                    viewBox="0 0 10 6"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M1 1L5 5L9 1"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </div>
+                </SettingsSelect>
+              </SettingsField>
             </div>
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Tone Bicara / Keyword
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30"
-                placeholder="Contoh: ketus, menggunakan 'saya', menuntut"
-                value={consumerForm.draft.tone || ""}
-                onChange={(e) => consumerForm.setDraft({ tone: e.target.value })}
-              />
+              <SettingsField label="Tone Bicara / Keyword" id="consumer-tone">
+                <SettingsInput
+                  id="consumer-tone"
+                  type="text"
+                  placeholder="Contoh: ketus, menggunakan 'saya', menuntut"
+                  value={consumerForm.draft.tone || ""}
+                  onChange={(e) => consumerForm.setDraft({ tone: e.target.value })}
+                />
+              </SettingsField>
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Deskripsi Karakteristik
-              </label>
-              <textarea
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none font-medium placeholder:text-muted-foreground/30"
-                rows={3}
-                placeholder="Jelaskan detail perilaku karakter ini agar AI dapat menirunya..."
-                value={consumerForm.draft.description || ""}
-                onChange={(e) => consumerForm.setDraft({ description: e.target.value })}
-              />
+              <SettingsField label="Deskripsi Karakteristik" id="consumer-description">
+                <textarea
+                  id="consumer-description"
+                  className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none font-medium placeholder:text-muted-foreground/30"
+                  rows={3}
+                  placeholder="Jelaskan detail perilaku karakter ini agar AI dapat menirunya..."
+                  value={consumerForm.draft.description || ""}
+                  onChange={(e) => consumerForm.setDraft({ description: e.target.value })}
+                />
+              </SettingsField>
             </div>
             <div className="col-span-2 flex justify-end gap-2 pt-4 border-t border-border/40 mt-2">
               <button

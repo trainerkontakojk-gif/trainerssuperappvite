@@ -4,15 +4,17 @@ import {
   AIProvider,
   AI_MODELS,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  TEXT_MODELS,
+  IMAGE_GENERATION_MODELS,
 } from "@trainers/types";
-export { AI_MODELS, DEFAULT_IMAGE_GENERATION_MODEL_ID };
+export { AI_MODELS, DEFAULT_IMAGE_GENERATION_MODEL_ID, TEXT_MODELS, IMAGE_GENERATION_MODELS };
 
 const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite";
 
-export const TEXT_SIMULATION_MODELS = AI_MODELS.filter(
+export const TEXT_SIMULATION_MODELS = TEXT_MODELS.filter(
   (m) => !m.id.includes("tts"),
 );
-export const DIRECT_GEMINI_MODELS = AI_MODELS.filter(
+export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (m) => m.provider === "gemini",
 );
 
@@ -62,15 +64,15 @@ export function getModelsForModule(
 
 export function supportsImageGeneration(modelId: string): boolean {
   const normalized = normalizeModelId(modelId);
-  const model = AI_MODELS.find((m) => m.id === normalized);
-  return model?.capabilities?.supportsImage ?? false;
+  const model = IMAGE_GENERATION_MODELS.find((m) => m.id === normalized);
+  return !!model;
 }
 
 export function getImageGenerationMode(
   modelId: string,
 ): "native" | "openrouter-modalities" | "none" {
   const normalized = normalizeModelId(modelId);
-  const model = AI_MODELS.find((m) => m.id === normalized);
+  const model = IMAGE_GENERATION_MODELS.find((m) => m.id === normalized);
   return model?.capabilities?.imageGenerationMode ?? "none";
 }
 

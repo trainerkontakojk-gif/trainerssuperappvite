@@ -550,20 +550,23 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/sidak/input.tsx` — **Phase 84**: Reduced from 767 to 274 lines — delegates to extracted hooks useTemuanEdit/useTemuanForm/useTemuanImport
 - `docs/rebuild-logs/phase-84-sidak-input-hooks-decomposition.md` — **NEW Phase 84**: Documentation for SIDAK input hooks decomposition
 
-- `apps/api/src/services/pdkt/image-generation.ts` — **NEW Phase 95**: Decoupled image generation service with provider-agnostic fallback, auto-fallback to supported image model if active simulation model lacks image capability
+- `apps/api/src/services/pdkt/image-generation.ts` — **NEW Phase 95**: Decoupled image generation service with provider-agnostic fallback, auto-fallback to supported image model if active simulation model lacks image capability; added `normalizeAttachments()` helper with `MAX_ATTACHMENTS=3` and `MAX_DATA_URI_LENGTH=650_000` guard
 - `apps/api/src/lib/gemini.ts` — **Phase 95**: Added `resolveResponseImages()` parser for `inlineData` and `responseModalities` config support; updated return contract to include `images` field
 - `apps/api/src/lib/openrouter.ts` — **Phase 95**: Added `modalities: ["image"]` support and `normalizeOpenRouterImages()` parser for `message.images`; updated return contract with `images` field
-- `packages/types/src/ai-models.ts` — **Phase 95**: Added `AiModelCapabilities` interface with `supportsImage`/`imageGenerationMode` metadata; tagged Gemini and OpenRouter multimodal models; exported `DEFAULT_IMAGE_GENERATION_MODEL_ID`
+- `packages/types/src/ai-models.ts` — **Phase 95**: Added `AiModelCapabilities` interface with `supportsImage`/`imageGenerationMode` metadata; tagged Gemini and OpenRouter multimodal models; exported `DEFAULT_IMAGE_GENERATION_MODEL_ID`; added `TEXT_MODELS` and `IMAGE_GENERATION_MODELS` pre-filtered arrays
 - `packages/types/src/pdkt.ts` — **Phase 95**: Added `attachmentSource` metadata field (`"manual" | "ai" | "none"`)
-- `apps/api/src/lib/ai-models.ts` — **Phase 95**: Added `supportsImageGeneration()` and `getImageGenerationMode()` helpers; exported `DEFAULT_IMAGE_GENERATION_MODEL_ID`
-- `apps/api/src/services/pdkt-service.ts` — **Phase 95**: Refactored `initializeEmailSession` to orchestrate: generate email → resolve attachment policy (Manual > AI > None) → generate AI images → final message; graceful fallback if image generation fails
-- `apps/api/src/routes/pdkt.ts` — **Phase 95**: Added `POST /session/init` unified endpoint returning ready-to-use inbound message; simplified frontend start-session flow
-- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 95**: Simplified to consume backend init endpoint; removed inline template generation and inbound email crafting logic
+- `apps/api/src/lib/ai-models.ts` — **Phase 95**: Added `supportsImageGeneration()` and `getImageGenerationMode()` helpers; exported `DEFAULT_IMAGE_GENERATION_MODEL_ID`; `TEXT_SIMULATION_MODELS`/`DIRECT_GEMINI_MODELS` now use `TEXT_MODELS` instead of filtering `AI_MODELS`; `supportsImageGeneration`/`getImageGenerationMode` query `IMAGE_GENERATION_MODELS` directly
+- `apps/api/src/services/pdkt-service.ts` — **Phase 95**: Refactored `initializeEmailSession` to orchestrate: generate email → resolve attachment policy (Manual > AI > None) → generate AI images → final message; graceful fallback if image generation fails; added `resolvePdktGenerationConfig()` to centralize scenario/consumerType/config resolution and reduce route duplication
+- `apps/api/src/routes/pdkt.ts` — **Phase 95**: Added `POST /session/init` unified endpoint returning ready-to-use inbound message; simplified frontend start-session flow; added `POST /session/create` endpoint with `client_request_id` idempotency support, delegating mailbox session creation to `mailbox-session.ts`; extracted `resolvePdktGenerationConfig()` to eliminate inline config duplication
+- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 95**: Simplified to consume backend init endpoint; removed inline template generation and inbound email crafting logic; streamlined to single `POST /session/create` call
 - `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **Phase 95**: Added explanatory microcopy under AI toggle about manual attachment priority
 - `docs/rebuild-logs/phase-95-pdkt-ai-image-generation.md` — **NEW Phase 95**: Documentation for PDKT AI Image Generation remediation
 - `apps/api/src/__tests__/pdkt-image-generation.test.ts` — **NEW Phase 95**: 4 API tests verifying attachment policy, toggle off behavior, and failure safety
+- `apps/api/src/__tests__/pdkt-session-create-route.test.ts` — **NEW Phase 95**: Tests for `POST /session/create` route with `client_request_id` idempotency
 - `apps/web/src/__tests__/pdkt-ai-image-rendering.test.tsx` — **NEW Phase 95**: 1 web test verifying AI attachment rendering in EmailDetailPane
 - `apps/api/src/lib/ai-json.ts` — **NEW Phase 95**: Robust JSON parsing library with iterative brace-matching algorithm, replacing fragile regex parsing across all AI services
+- `apps/api/src/services/pdkt/mailbox-session.ts` — **NEW Phase 95**: Boundary service for mailbox session create+persist, extracted from route handler for maintainability
+- `apps/web/src/routes/pdkt/components/settings/SettingsPrimitives.tsx` — **NEW Phase 95**: Shared settings UI primitives (`SettingsField`, `SettingsInput`, `SettingsSelect`, `SettingsCardOption`) used by PdktConsumersTab, PdktIdentityTab, PdktScenariosTab
 - `apps/api/src/lib/telefun-analysis.ts` — **Phase 95**: Replaced `JSON.parse` with `parseJsonFromModelText` for robust analysis parsing
 - `apps/api/src/services/ketik/shared-utils.ts` — **Phase 95**: Replaced inline fragile JSON extraction with `extractJsonObjectText` from ai-json.ts
 - `apps/api/src/services/pdkt-service.ts` — **Phase 95**: Removed inline `parseJsonFromModelText`, delegates to shared ai-json.ts

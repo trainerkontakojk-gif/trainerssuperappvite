@@ -508,7 +508,7 @@ export async function initializeEmailSession(
       prompt: finalPrompt,
       systemInstruction,
       responseMimeType: "application/json",
-      usageContext: usageContext || { module: "pdkt", action: "init_email" },
+      usageContext: { module: "pdkt", action: "init_email" },
       userId,
     });
 
@@ -585,7 +585,7 @@ export async function initializeEmailSession(
           scenario,
           { subject: result.subject, body: result.body },
           config,
-          usageContext || { module: "pdkt", action: "generate_ai_images" },
+          { module: "pdkt", action: "generate_ai_images" },
           userId,
         );
 
@@ -621,6 +621,47 @@ export async function initializeEmailSession(
       error: error.message || "Gagal memulai sesi email.",
     };
   }
+}
+
+export function resolvePdktGenerationConfig(body: {
+  scenarioId?: string;
+  scenarioDraft?: PdktScenario;
+  consumerTypeId: string;
+  identity: PdktIdentity;
+  enableImageGeneration?: boolean;
+  selectedModel?: string;
+  resolvedConsumerNameMentionPattern?: ResolvedConsumerNameMentionPattern;
+  writingStyleMode?: WritingStyleMode;
+}): {
+  scenario: PdktScenario;
+  consumerType: PdktConsumerType;
+  config: PdktSessionConfig;
+} {
+  const scenarios = getScenarios();
+  const consumerTypes = getConsumerTypes();
+  const scenario = body.scenarioId
+    ? scenarios.find((s) => s.id === body.scenarioId)
+    : body.scenarioDraft;
+  const consumerType = consumerTypes.find(
+    (ct) => ct.id === body.consumerTypeId,
+  );
+
+  if (!scenario || !consumerType) {
+    throw new Error("Scenario atau consumer type tidak ditemukan.");
+  }
+
+  const config: PdktSessionConfig = {
+    scenarios: [scenario],
+    consumerType,
+    identity: body.identity,
+    enableImageGeneration: body.enableImageGeneration ?? true,
+    selectedModel: body.selectedModel || "gemini-3.1-flash-lite",
+    resolvedConsumerNameMentionPattern:
+      body.resolvedConsumerNameMentionPattern || "none",
+    writingStyleMode: body.writingStyleMode || "training",
+  };
+
+  return { scenario, consumerType, config };
 }
 
 export async function evaluateAgentResponse(

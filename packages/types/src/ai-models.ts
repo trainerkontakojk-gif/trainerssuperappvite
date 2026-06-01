@@ -16,9 +16,9 @@ export interface AiModelInfo {
 export type AIProvider = "gemini" | "openrouter";
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.1-flash-lite";
-export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-lite";
+export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-image";
 
-export const AI_MODELS: AiModelInfo[] = [
+export const TEXT_MODELS: AiModelInfo[] = [
   {
     id: "gemini-3.1-flash-lite",
     name: "Gemini 3.1 Flash Lite",
@@ -28,7 +28,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "native",
     },
   },
   {
@@ -41,7 +40,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "native",
     },
   },
   {
@@ -53,7 +51,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "native",
     },
   },
   {
@@ -65,7 +62,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "native",
     },
   },
   {
@@ -85,7 +81,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "openrouter-modalities",
     },
   },
   {
@@ -97,7 +92,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "openrouter-modalities",
     },
   },
   {
@@ -109,7 +103,6 @@ export const AI_MODELS: AiModelInfo[] = [
     capabilities: {
       supportsText: true,
       supportsImage: true,
-      imageGenerationMode: "openrouter-modalities",
     },
   },
   {
@@ -120,4 +113,48 @@ export const AI_MODELS: AiModelInfo[] = [
     timeoutMs: 120_000,
     capabilities: { supportsText: true, supportsImage: false },
   },
+];
+
+export const IMAGE_GENERATION_MODELS: AiModelInfo[] = [
+  {
+    id: "gemini-3.1-flash-image",
+    name: "Gemini 3.1 Flash Image",
+    description: "Model native Gemini untuk generate gambar.",
+    provider: "gemini",
+    timeoutMs: 120_000,
+    capabilities: {
+      supportsText: false,
+      supportsImage: true,
+      imageGenerationMode: "native",
+    },
+  },
+  {
+    id: "google/gemini-3.1-flash-image-preview",
+    name: "Gemini 3.1 Flash Image Preview (OR)",
+    description: "Model Gemini 3.1 Flash Image via OpenRouter.",
+    provider: "openrouter",
+    timeoutMs: 120_000,
+    capabilities: {
+      supportsText: false,
+      supportsImage: true,
+      imageGenerationMode: "openrouter-modalities",
+    },
+  },
+  {
+    id: "google/gemini-2.5-flash-image",
+    name: "Gemini 2.5 Flash Image (OR)",
+    description: "Model Gemini 2.5 Flash Image via OpenRouter.",
+    provider: "openrouter",
+    timeoutMs: 120_000,
+    capabilities: {
+      supportsText: false,
+      supportsImage: true,
+      imageGenerationMode: "openrouter-modalities",
+    },
+  },
+];
+
+export const AI_MODELS: AiModelInfo[] = [
+  ...TEXT_MODELS,
+  ...IMAGE_GENERATION_MODELS,
 ];

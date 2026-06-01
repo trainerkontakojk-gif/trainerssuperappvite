@@ -93,7 +93,7 @@ export function buildPdktSystemInstruction(
     ? `TEMPLATE REFERENSI: Anda bisa merujuk pada gaya bahasa template berikut, namun buatlah versi yang lebih panjang dan bertele-tele:\n"${scenario.sampleEmailTemplate.body}"`
     : "";
 
-  let imageInstruction = "";
+  let imageInstruction: string;
   if (mode === "initial_email") {
     if (hasCustomImages) {
       imageInstruction =
@@ -106,7 +106,7 @@ export function buildPdktSystemInstruction(
     imageInstruction = "JANGAN menyertakan prompt gambar.";
   }
 
-  let nameInstruction = "";
+  let nameInstruction: string;
   if (mode === "template") {
     nameInstruction = `
     ATURAN NAMA KONSUMEN (PLACEHOLDER):

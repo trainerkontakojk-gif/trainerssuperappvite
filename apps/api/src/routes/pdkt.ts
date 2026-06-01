@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import {
@@ -13,6 +14,7 @@ import { readPdktSettings, writePdktSettings } from "../lib/pdkt-settings";
 import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import { createUserClient, createAdminClient } from "../lib/supabase";
+import { createMailboxSession } from "../services/pdkt/mailbox-session";
 
 type Variables = { user: User; profile: any };
 
@@ -76,38 +78,22 @@ pdkt.post(
     const user = c.get("user");
     const userId = user?.id;
 
-    const scenarios = pdktService.getScenarios();
-    const consumerTypes = pdktService.getConsumerTypes();
-    const scenario = body.scenarioId
-      ? scenarios.find((s) => s.id === body.scenarioId)
-      : body.scenarioDraft;
-    const consumerType = consumerTypes.find(
-      (ct) => ct.id === body.consumerTypeId,
-    );
-
-    if (!scenario || !consumerType) {
+    let configInfo;
+    try {
+      configInfo = pdktService.resolvePdktGenerationConfig(body);
+    } catch (err: any) {
       return c.json(
         {
           success: false,
           error: {
             code: "NOT_FOUND",
-            message: "Scenario atau consumer type tidak ditemukan.",
+            message: err.message || "Scenario atau consumer type tidak ditemukan.",
           },
         },
         404,
       );
     }
-
-    const config: PdktSessionConfig = {
-      scenarios: [scenario],
-      consumerType,
-      identity: body.identity,
-      enableImageGeneration: body.enableImageGeneration ?? true,
-      selectedModel: body.selectedModel,
-      resolvedConsumerNameMentionPattern:
-        body.resolvedConsumerNameMentionPattern,
-      writingStyleMode: body.writingStyleMode,
-    };
+    const { scenario, config } = configInfo;
 
     const result = await pdktService.generateScenarioEmailTemplate(
       scenario,
@@ -146,38 +132,22 @@ pdkt.post(
     const user = c.get("user");
     const userId = user?.id;
 
-    const scenarios = pdktService.getScenarios();
-    const consumerTypes = pdktService.getConsumerTypes();
-    const scenario = body.scenarioId
-      ? scenarios.find((s) => s.id === body.scenarioId)
-      : body.scenarioDraft;
-    const consumerType = consumerTypes.find(
-      (ct) => ct.id === body.consumerTypeId,
-    );
-
-    if (!scenario || !consumerType) {
+    let configInfo;
+    try {
+      configInfo = pdktService.resolvePdktGenerationConfig(body);
+    } catch (err: any) {
       return c.json(
         {
           success: false,
           error: {
             code: "NOT_FOUND",
-            message: "Scenario atau consumer type tidak ditemukan.",
+            message: err.message || "Scenario atau consumer type tidak ditemukan.",
           },
         },
         404,
       );
     }
-
-    const config: PdktSessionConfig = {
-      scenarios: [scenario],
-      consumerType,
-      identity: body.identity,
-      enableImageGeneration: body.enableImageGeneration ?? true,
-      selectedModel: body.selectedModel,
-      resolvedConsumerNameMentionPattern:
-        body.resolvedConsumerNameMentionPattern,
-      writingStyleMode: body.writingStyleMode,
-    };
+    const { config } = configInfo;
 
     const result = await pdktService.initializeEmailSession(
       config,
@@ -201,6 +171,53 @@ pdkt.post(
     return c.json({
       success: true,
       data: result.message,
+    });
+  },
+);
+
+pdkt.post(
+  "/session/create",
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  aiRateLimitMiddleware,
+  zValidator(
+    "json",
+    generateEmailSchema.extend({
+      client_request_id: z.string().optional(),
+    }),
+  ),
+  async (c) => {
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    const userId = user?.id;
+    const authHeader = c.req.header("Authorization") || "";
+    const token = (authHeader.split(" ")[1]) || "";
+    const userClient = createUserClient(token);
+
+    const result = await createMailboxSession(
+      userClient,
+      body,
+      userId,
+    );
+
+    if (!result.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "AI_ERROR",
+            message: result.error || "Gagal inisialisasi sesi email.",
+          },
+        },
+        502,
+      );
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        id: result.data,
+        message: result.message,
+      },
     });
   },
 );

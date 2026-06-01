@@ -1,5 +1,10 @@
 import React from "react";
 import { User, Settings, Trash2 } from "lucide-react";
+import {
+  SettingsField,
+  SettingsInput,
+  SettingsSelect,
+} from "./SettingsPrimitives";
 
 type ConsumerNameMentionPattern = "random" | "upfront" | "middle" | "late" | "none";
 
@@ -61,30 +66,24 @@ export function PdktIdentityTab({
           </div>
 
           <div className="space-y-3">
-            <div className="group">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Nama Pengirim (Header)
-              </label>
-              <input
+            <SettingsField label="Nama Pengirim (Header)" id="custom-sender-name">
+              <SettingsInput
+                id="custom-sender-name"
                 type="text"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30 transition-all"
                 placeholder="Contoh: Ahmad Fauzi"
                 value={customSenderName}
                 onChange={(e) => setCustomSenderName(e.target.value)}
               />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Nama Panggilan (Body)
-              </label>
-              <input
+            </SettingsField>
+            <SettingsField label="Nama Panggilan (Body)" id="custom-body-name">
+              <SettingsInput
+                id="custom-body-name"
                 type="text"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30 transition-all"
                 placeholder="Contoh: Fauzi"
                 value={customBodyName}
                 onChange={(e) => setCustomBodyName(e.target.value)}
               />
-            </div>
+            </SettingsField>
           </div>
         </div>
 
@@ -100,72 +99,45 @@ export function PdktIdentityTab({
           </div>
 
           <div className="space-y-3">
-            <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Email Kantor
-              </label>
-              <input
+            <SettingsField label="Email Kantor" id="custom-email">
+              <SettingsInput
+                id="custom-email"
                 type="email"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30 transition-all"
                 placeholder="fauzi@ojk.go.id"
                 value={customEmail}
                 onChange={(e) => setCustomEmail(e.target.value)}
               />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Kota Tugas
-              </label>
-              <input
+            </SettingsField>
+            <SettingsField label="Kota Tugas" id="custom-city">
+              <SettingsInput
+                id="custom-city"
                 type="text"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30 transition-all"
                 placeholder="Contoh: Jakarta"
                 value={customCity}
                 onChange={(e) => setCustomCity(e.target.value)}
               />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Pola Penyebutan Nama Konsumen
-              </label>
-              <div className="relative">
-                <select
-                  className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium transition-all appearance-none cursor-pointer"
-                  value={consumerNameMentionPattern}
-                  onChange={(e) =>
-                    setConsumerNameMentionPattern(
-                      e.target.value as ConsumerNameMentionPattern,
-                    )
-                  }
-                >
-                  <option value="random">Acak</option>
-                  <option value="upfront">Nama disebut di awal</option>
-                  <option value="middle">Nama disebut di tengah</option>
-                  <option value="late">Nama disebut di akhir</option>
-                  <option value="none">Tidak menyebut nama</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                  <svg
-                    width="8"
-                    height="5"
-                    viewBox="0 0 10 6"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M1 1L5 5L9 1"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-              <p className="mt-1.5 ml-1 text-[10px] text-muted-foreground font-medium leading-relaxed">
-                Mengatur kapan nama konsumen boleh muncul di email awal simulasi.
-              </p>
-            </div>
+            </SettingsField>
+            <SettingsField
+              label="Pola Penyebutan Nama Konsumen"
+              id="consumer-mention-pattern"
+              helperText="Mengatur kapan nama konsumen boleh muncul di email awal simulasi."
+            >
+              <SettingsSelect
+                id="consumer-mention-pattern"
+                value={consumerNameMentionPattern}
+                onChange={(e) =>
+                  setConsumerNameMentionPattern(
+                    e.target.value as ConsumerNameMentionPattern,
+                  )
+                }
+              >
+                <option value="random">Acak</option>
+                <option value="upfront">Nama disebut di awal</option>
+                <option value="middle">Nama disebut di tengah</option>
+                <option value="late">Nama disebut di akhir</option>
+                <option value="none">Tidak menyebut nama</option>
+              </SettingsSelect>
+            </SettingsField>
           </div>
         </div>
 

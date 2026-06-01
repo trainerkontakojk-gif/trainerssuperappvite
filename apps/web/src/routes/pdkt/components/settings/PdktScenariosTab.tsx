@@ -8,6 +8,11 @@ import { postApi } from "../../../../hooks/useApi";
 import ScenarioImage from "../ScenarioImage";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { normalizePdktScenarioDraft } from "./pdktDraftNormalizers";
+import {
+  SettingsField,
+  SettingsInput,
+  SettingsSelect,
+} from "./SettingsPrimitives";
 
 interface PdktScenariosTabProps {
   scenarios: PdktScenario[];
@@ -371,13 +376,10 @@ export function PdktScenariosTab({
           </div>
           <div className="p-6 grid grid-cols-2 gap-4">
             <div className="col-span-2 md:col-span-1">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Kategori Masalah
-              </label>
-              {!isNewCategoryInput ? (
-                <div className="relative group">
-                  <select
-                    className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium appearance-none transition-all cursor-pointer"
+              <SettingsField label="Kategori Masalah" id="scenario-category">
+                {!isNewCategoryInput ? (
+                  <SettingsSelect
+                    id="scenario-category"
                     value={scenarioForm.draft.category || ""}
                     onChange={(e) => {
                       if (e.target.value === "NEW") {
@@ -399,74 +401,56 @@ export function PdktScenariosTab({
                     <option value="NEW">
                       + Tambah Kategori Lainnya
                     </option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
-                    <svg
-                      width="8"
-                      height="5"
-                      viewBox="0 0 10 6"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
+                  </SettingsSelect>
+                ) : (
+                  <div className="flex gap-2">
+                    <SettingsInput
+                      id="scenario-category-new"
+                      type="text"
+                      placeholder="Nama Kategori Baru"
+                      value={newScenarioCategory}
+                      onChange={(e) => {
+                        setNewScenarioCategory(e.target.value);
+                        scenarioForm.setDraft({ category: e.target.value });
+                      }}
+                    />
+                    <button
+                      onClick={() => setIsNewCategoryInput(false)}
+                      className="px-3 text-xs font-semibold text-red-500 hover:bg-red-500/5 rounded-lg transition-all cursor-pointer"
                     >
-                      <path
-                        d="M1 1L5 5L9 1"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                      Batal
+                    </button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="flex-1 rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium"
-                    placeholder="Nama Kategori Baru"
-                    value={newScenarioCategory}
-                    onChange={(e) => {
-                      setNewScenarioCategory(e.target.value);
-                      scenarioForm.setDraft({ category: e.target.value });
-                    }}
-                  />
-                  <button
-                    onClick={() => setIsNewCategoryInput(false)}
-                    className="px-3 text-xs font-semibold text-red-500 hover:bg-red-500/5 rounded-lg transition-all cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                </div>
-              )}
+                )}
+              </SettingsField>
             </div>
 
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Judul Skenario
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30"
-                placeholder="Contoh: Kesalahan Transaksi Real-time"
-                value={scenarioForm.draft.title || ""}
-                onChange={(e) =>
-                  scenarioForm.setDraft({ title: e.target.value })
-                }
-              />
+              <SettingsField label="Judul Skenario" id="scenario-title">
+                <SettingsInput
+                  id="scenario-title"
+                  type="text"
+                  placeholder="Contoh: Kesalahan Transaksi Real-time"
+                  value={scenarioForm.draft.title || ""}
+                  onChange={(e) =>
+                    scenarioForm.setDraft({ title: e.target.value })
+                  }
+                />
+              </SettingsField>
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 ml-1">
-                Deskripsi Detail Masalah
-              </label>
-              <textarea
-                className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none font-medium placeholder:text-muted-foreground/30"
-                rows={3}
-                placeholder="Jelaskan konteks masalah yang harus diselesaikan oleh agen..."
-                value={scenarioForm.draft.description || ""}
-                onChange={(e) =>
-                  scenarioForm.setDraft({ description: e.target.value })
-                }
-              />
+              <SettingsField label="Deskripsi Detail Masalah" id="scenario-description">
+                <textarea
+                  id="scenario-description"
+                  className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none font-medium placeholder:text-muted-foreground/30"
+                  rows={3}
+                  placeholder="Jelaskan konteks masalah yang harus diselesaikan oleh agen..."
+                  value={scenarioForm.draft.description || ""}
+                  onChange={(e) =>
+                    scenarioForm.setDraft({ description: e.target.value })
+                  }
+                />
+              </SettingsField>
             </div>
 
             <div className="col-span-2 p-4 rounded-lg border border-border/80 bg-muted/10 flex items-center justify-between gap-4">
@@ -534,9 +518,8 @@ export function PdktScenariosTab({
                 </label>
               </div>
               <div className="space-y-2">
-                <input
+                <SettingsInput
                   type="text"
-                  className="w-full rounded-lg border border-border bg-background p-2.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30"
                   placeholder="Subjek email template (opsional)..."
                   value={scenarioForm.draft.sampleEmailTemplate?.subject || ""}
                   onChange={(e) =>

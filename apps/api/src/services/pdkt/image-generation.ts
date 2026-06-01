@@ -9,6 +9,9 @@ import { generateOpenRouterContent } from "../../lib/openrouter";
 import { UsageContext } from "../../lib/ai-usage";
 import { Modality } from "@google/genai";
 
+const MAX_ATTACHMENTS = 3;
+const MAX_DATA_URI_LENGTH = 650_000;
+
 /**
  * Service to generate AI images for PDKT scenarios.
  * This is decoupled from text generation to maintain maintainability.
@@ -65,7 +68,7 @@ export async function generatePdktScenarioImages(
 
       return {
         success: response.success,
-        images: (response.images || []).slice(0, 3),
+        images: normalizeAttachments(response.images),
         error: response.error,
       };
     } else {
@@ -80,7 +83,7 @@ export async function generatePdktScenarioImages(
 
       return {
         success: response.success,
-        images: (response.images || []).slice(0, 3),
+        images: normalizeAttachments(response.images),
         error: response.error,
       };
     }
@@ -88,4 +91,28 @@ export async function generatePdktScenarioImages(
     console.error("[PDKT Image Gen] Error:", error);
     return { success: false, images: [], error: error.message };
   }
+}
+
+function normalizeAttachments(images?: string[]): string[] {
+  if (!images || images.length === 0) return [];
+
+  const result: string[] = [];
+  for (const image of images) {
+    if (!image || typeof image !== "string") continue;
+
+    const trimmed = image.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith("data:") && trimmed.length > MAX_DATA_URI_LENGTH) {
+      console.warn(
+        "[PDKT Image Gen] Skipping oversized data URI attachment.",
+      );
+      continue;
+    }
+
+    result.push(trimmed);
+    if (result.length >= MAX_ATTACHMENTS) break;
+  }
+
+  return result;
 }
