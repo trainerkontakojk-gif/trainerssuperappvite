@@ -45,7 +45,8 @@ describe("pdkt template resolver", () => {
     expect(result.body).not.toContain("{{consumer_name}}");
     expect(result.body).not.toContain("[Nama Perusahaan Asuransi]");
     expect(result.body).toContain("Prudential Indonesia");
-    expect(result.body).toContain("Budi Santoso");
+    expect(result.body).toContain("Budi");
+    expect(result.body).not.toContain("Budi Santoso");
     expect(result.leftoverPlaceholders).toEqual([]);
   });
 
@@ -103,7 +104,8 @@ describe("pdkt template resolver", () => {
     });
 
     expect(result.subject).toBe("Halo Budi Santoso");
-    expect(result.body).toContain("Budi Santoso");
+    expect(result.body).toContain("Budi");
+    expect(result.body).not.toContain("Budi Santoso");
     expect(result.body).toContain("Prudential Indonesia");
     expect(result.leftoverPlaceholders).toEqual([]);
   });

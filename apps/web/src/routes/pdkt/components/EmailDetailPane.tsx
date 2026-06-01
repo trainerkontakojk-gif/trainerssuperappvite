@@ -87,11 +87,13 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   const inboundEmail = (item.inbound_email as any) || {
     body: "",
     attachments: [],
+    attachmentWarning: undefined,
   };
   const inboundBody = inboundEmail.body || "";
   const inboundAttachments = Array.isArray(inboundEmail.attachments)
     ? inboundEmail.attachments
     : [];
+  const attachmentWarning = inboundEmail.attachmentWarning;
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-white relative h-full">
@@ -218,6 +220,19 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                   className="cursor-pointer hover:opacity-95 transition-opacity"
                 />
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Attachment Warning */}
+        {!inboundAttachments.length && attachmentWarning && (
+          <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 flex items-start gap-2.5 text-xs text-amber-800">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-bold text-[9px] uppercase tracking-wider block mb-0.5 text-amber-900">
+                Peringatan Lampiran AI
+              </span>
+              <span className="font-medium text-gray-700 leading-relaxed text-[11px]">{attachmentWarning}</span>
             </div>
           </div>
         )}

@@ -215,12 +215,101 @@ export function cleanNameOccurrences(
   return resolved;
 }
 
+export type NameCluePlacement = "upfront" | "middle" | "late";
+
+export interface NameClueTemplate {
+  placement: NameCluePlacement;
+  render: (mentionName: string) => string;
+}
+
+export const NAME_CLUE_TEMPLATES: NameClueTemplate[] = [
+  {
+    placement: "upfront",
+    render: (name) => `Di dokumen awal pengajuan, data saya tercatat atas nama ${name}, dan dari situ masalah ini mulai saya sadari.`,
+  },
+  {
+    placement: "upfront",
+    render: (name) => `Saya ingin melaporkan permasalahan administratif yang terdaftar atas nama ${name}.`,
+  },
+  {
+    placement: "upfront",
+    render: (name) => `Surat pengaduan ini saya ajukan atas nama ${name} terkait kendala layanan yang saya alami.`,
+  },
+  {
+    placement: "middle",
+    render: (name) => `Waktu saya cek lagi berkas administrasinya, nama yang tertera di sana ${name}, jadi saya makin bingung kenapa prosesnya dianggap tidak cocok.`,
+  },
+  {
+    placement: "middle",
+    render: (name) => `Pihak penagihan juga beberapa kali menyebut nama ${name}, tapi penjelasan mereka tetap berubah-ubah dan tidak membantu.`,
+  },
+  {
+    placement: "middle",
+    render: (name) => `Dalam surat pemberitahuan yang dikirimkan, nama penerima yang tertulis adalah ${name}, padahal data pendukungnya sudah lengkap.`,
+  },
+  {
+    placement: "middle",
+    render: (name) => `Saya sempat memastikan ke petugas, dan mereka mengonfirmasi data tersebut atas nama ${name}.`,
+  },
+  {
+    placement: "late",
+    render: (name) => `Kalau nanti perlu dicocokkan, data pengaduan ini bisa dicek atas nama ${name}.`,
+  },
+  {
+    placement: "late",
+    render: (name) => `Semua bukti transaksi dan keluhan ini dicatat atas nama ${name}.`,
+  },
+  {
+    placement: "late",
+    render: (name) => `Besar harapan saya agar laporan atas nama ${name} ini segera diproses.`,
+  },
+  {
+    placement: "late",
+    render: (name) => `Demikian laporan ini saya sampaikan, selaku pemilik akun atas nama ${name}.`,
+  },
+];
+
+export function getPdktMentionName(identity: PdktIdentity): string {
+  return identity.bodyName?.trim() || identity.name.trim();
+}
+
+export function getPdktForbiddenBodyNames(identity: PdktIdentity): string[] {
+  const mentionName = getPdktMentionName(identity).toLowerCase();
+  return [identity.name, identity.bodyName]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+    .filter((value) => value.toLowerCase() !== mentionName);
+}
+
+function getDeterministicIndex(seed: string, length: number): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % length;
+}
+
+export function pickNameClueTemplate(
+  placement: NameCluePlacement,
+  seedText: string,
+): NameClueTemplate {
+  const filtered = NAME_CLUE_TEMPLATES.filter((t) => t.placement === placement);
+  if (filtered.length === 0) {
+    throw new Error(`No templates found for placement: ${placement}`);
+  }
+  const idx = getDeterministicIndex(seedText, filtered.length);
+  return filtered[idx];
+}
+
 export function renderPdktIdentityByMentionPattern(
   body: string,
   subject: string,
   policy: PdktEmailPolicy,
 ): { body: string; subject: string } {
   const { identity, mentionPattern } = policy;
+  const mentionName = getPdktMentionName(identity);
+  const forbiddenNames = getPdktForbiddenBodyNames(identity);
 
   let resolvedSubject = subject;
   if (mentionPattern === "upfront") {
@@ -236,6 +325,7 @@ export function renderPdktIdentityByMentionPattern(
   resolvedSubject = resolvedSubject.replace(/\s+/g, " ").trim();
 
   let resolvedBody = body;
+  const seedText = `${policy.scenario?.id || ""}:${policy.scenario?.title || ""}:${body.length}:${mentionPattern}`;
 
   if (mentionPattern === "none") {
     resolvedBody = replaceConsumerPlaceholders(resolvedBody, "");
@@ -249,9 +339,10 @@ export function renderPdktIdentityByMentionPattern(
       p.test(resolvedBody),
     );
     if (hasPlaceholder) {
-      resolvedBody = replaceConsumerPlaceholders(resolvedBody, identity.name);
+      resolvedBody = replaceConsumerPlaceholders(resolvedBody, mentionName);
     } else {
-      resolvedBody = `Halo, saya ${identity.name}.\n\n${resolvedBody.trim()}`;
+      const clue = pickNameClueTemplate("upfront", seedText).render(mentionName);
+      resolvedBody = `${clue}\n\n${resolvedBody.trim()}`;
     }
   } else if (mentionPattern === "middle") {
     let paragraphs = resolvedBody
@@ -273,20 +364,21 @@ export function renderPdktIdentityByMentionPattern(
         p.test(paragraphs[i]),
       );
       if (hasPl) {
-        paragraphs[i] = replaceConsumerPlaceholders(paragraphs[i], identity.name);
+        paragraphs[i] = replaceConsumerPlaceholders(paragraphs[i], mentionName);
         replacedPlaceholder = true;
       }
     }
 
     if (!replacedPlaceholder) {
+      const clue = pickNameClueTemplate("middle", seedText).render(mentionName);
       if (paragraphs.length >= 2) {
         paragraphs.splice(
           Math.floor(paragraphs.length / 2),
           0,
-          `Oya, saya ${identity.name} mau menambahkan sedikit detail lagi.`,
+          clue,
         );
       } else {
-        paragraphs.push(`(Saya ${identity.name})`);
+        paragraphs.push(clue);
       }
     }
     resolvedBody = paragraphs.join("\n\n");
@@ -313,12 +405,18 @@ export function renderPdktIdentityByMentionPattern(
     if (hasPl) {
       paragraphs[lastIdx] = replaceConsumerPlaceholders(
         paragraphs[lastIdx],
-        identity.name,
+        mentionName,
       );
     } else {
-      paragraphs.push(`Salam,\n${identity.name}`);
+      const clue = pickNameClueTemplate("late", seedText).render(mentionName);
+      paragraphs.push(clue);
     }
     resolvedBody = paragraphs.join("\n\n");
+  }
+
+  // Clean forbidden names from body to avoid leakage
+  for (const fName of forbiddenNames) {
+    resolvedBody = cleanNameOccurrences(resolvedBody, fName);
   }
 
   resolvedBody = resolvedBody
@@ -341,6 +439,8 @@ export function validatePdktEmailPolicyCompliance(
 
   const name = identity.name.toLowerCase();
   const bodyName = identity.bodyName ? identity.bodyName.toLowerCase() : "";
+  const mentionNameLower = getPdktMentionName(identity).toLowerCase();
+  const forbiddenNames = getPdktForbiddenBodyNames(identity).map(n => n.toLowerCase());
 
   const subjectLower = email.subject.toLowerCase();
   const bodyLower = email.body.toLowerCase();
@@ -370,6 +470,22 @@ export function validatePdktEmailPolicyCompliance(
     );
   }
 
+  // Check forbidden name leakage
+  if (mentionPattern !== "none") {
+    for (const fName of forbiddenNames) {
+      if (bodyLower.includes(fName)) {
+        violations.push(`Nama akun/header "${identity.name}" bocor ke body email padahal nama panggilan asli adalah "${identity.bodyName}"`);
+      }
+    }
+  }
+
+  const introPhrases = [
+    "perkenalkan nama saya",
+    "perkenalkan, nama saya",
+    "perkenalkan saya",
+    "perkenalkan, saya",
+  ];
+
   if (mentionPattern === "none") {
     if (
       subjectLower.includes(name) ||
@@ -390,22 +506,21 @@ export function validatePdktEmailPolicyCompliance(
       .filter(Boolean);
     if (paragraphs.length > 0) {
       const firstParaLower = paragraphs[0].toLowerCase();
-      if (
-        firstParaLower.includes(name) ||
-        (bodyName && firstParaLower.includes(bodyName))
-      ) {
+      if (firstParaLower.includes(mentionNameLower)) {
         violations.push(
           "Nama konsumen muncul di paragraf pertama/salam pembuka pada pattern 'middle'",
         );
       }
     }
-    if (
-      !bodyLower.includes(name) &&
-      (!bodyName || !bodyLower.includes(bodyName))
-    ) {
+    if (!bodyLower.includes(mentionNameLower)) {
       violations.push(
         "Nama konsumen tidak disebutkan sama sekali pada pattern 'middle'",
       );
+    }
+    for (const phrase of introPhrases) {
+      if (bodyLower.includes(phrase)) {
+        violations.push(`Menggunakan frasa perkenalan diri generik "${phrase}" pada pattern middle`);
+      }
     }
   } else if (mentionPattern === "late") {
     const paragraphs = email.body
@@ -415,23 +530,22 @@ export function validatePdktEmailPolicyCompliance(
     if (paragraphs.length > 1) {
       for (let i = 0; i < paragraphs.length - 1; i++) {
         const paraLower = paragraphs[i].toLowerCase();
-        if (
-          paraLower.includes(name) ||
-          (bodyName && paraLower.includes(bodyName))
-        ) {
+        if (paraLower.includes(mentionNameLower)) {
           violations.push(
             `Nama konsumen muncul di paragraf awal/tengah (${i + 1}) pada pattern 'late'`,
           );
         }
       }
     }
-    if (
-      !bodyLower.includes(name) &&
-      (!bodyName || !bodyLower.includes(bodyName))
-    ) {
+    if (!bodyLower.includes(mentionNameLower)) {
       violations.push(
         "Nama konsumen tidak disebutkan sama sekali pada pattern 'late'",
       );
+    }
+    for (const phrase of introPhrases) {
+      if (bodyLower.includes(phrase)) {
+        violations.push(`Menggunakan frasa perkenalan diri generik "${phrase}" pada pattern late`);
+      }
     }
   }
 
@@ -448,7 +562,8 @@ export function buildPdktRetryHint(
     
     Mohon perbaiki email tersebut dengan mematuhi aturan berikut secara ketat:
     1. ${getConsumerNameMentionInstruction(policy.mentionPattern)}
-    2. Jangan menulis bahasa meta seperti "sebagai AI", "simulasi ini", atau menjelaskan instruksi.
-    3. Kembalikan HANYA format JSON valid tanpa penjelasan tambahan.
+    2. Jika nama harus muncul, sebutkan sebagai clue natural dalam konteks dokumen, tagihan, data klaim, data SLIK, administrasi, atau penagihan. Jangan memakai frasa "Perkenalkan, nama saya..." kecuali pattern awal secara eksplisit membutuhkan gaya formal.
+    3. Jangan menulis bahasa meta seperti "sebagai AI", "simulasi ini", atau menjelaskan instruksi.
+    4. Kembalikan HANYA format JSON valid tanpa penjelasan tambahan.
   `;
 }

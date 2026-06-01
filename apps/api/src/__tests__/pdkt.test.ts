@@ -104,11 +104,11 @@ describe("PDKT Service", () => {
       };
       const body = "Ini isi email.";
 
-      expect(renderPdktConsumerName(body, identity, "upfront")).toContain(
-        "Halo, saya Budi.",
+      expect(renderPdktConsumerName(body, identity, "upfront")).toMatch(
+        /atas nama Budi|administratif.*Budi|pengaduan.*Budi/i,
       );
-      expect(renderPdktConsumerName(body, identity, "late")).toContain(
-        "Salam,\nBudi",
+      expect(renderPdktConsumerName(body, identity, "late")).toMatch(
+        /atas nama Budi|laporan.*Budi|akun.*Budi/i,
       );
       expect(renderPdktConsumerName(body, identity, "none")).not.toContain(
         "Budi",

@@ -50,4 +50,37 @@ describe("PDKT AI Image Rendering", () => {
     const img = screen.getByAltText(/Attachment 1/i) as HTMLImageElement;
     expect(img.src).toContain("data:image/png;base64,ai-generated-image");
   });
+
+  it("should render AI attachment warning when attachments are empty but warning is present", () => {
+    const itemWithWarning: PdktMailboxItem = {
+      ...mockItem,
+      inbound_email: {
+        ...mockItem.inbound_email,
+        attachments: [],
+        attachmentSource: "none",
+        attachmentWarning: "Model tidak mengembalikan gambar valid.",
+      },
+    };
+
+    render(
+      <EmailDetailPane
+        item={itemWithWarning}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />
+    );
+
+    // Should show the warning title
+    expect(screen.getByText(/Peringatan Lampiran AI/i)).toBeDefined();
+
+    // Should show the warning message
+    expect(screen.getByText(/Model tidak mengembalikan gambar valid./i)).toBeDefined();
+
+    // Should not show "Lampiran" title
+    expect(screen.queryByText(/Lampiran \(/i)).toBeNull();
+  });
 });

@@ -142,4 +142,67 @@ describe("PDKT Unified Session Create Route", () => {
       p_inbound_email: expect.any(Object),
     });
   });
+
+  it("handles custom body name in the payload correctly", async () => {
+    await createAuthenticatedApp("trainer");
+    const res = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scenarioId: "pinjol",
+        consumerTypeId: "marah",
+        identity: {
+          name: "Black Cat",
+          email: "blackcat@mail.com",
+          city: "Jakarta",
+          bodyName: "Susanto",
+        },
+        enableImageGeneration: false,
+        selectedModel: "gemini-3.1-flash-lite",
+        resolvedConsumerNameMentionPattern: "upfront",
+        writingStyleMode: "training",
+        client_request_id: "req-xyz-456",
+      }),
+    });
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data.message.from).toBe("blackcat@mail.com");
+    expect(json.data.message.body).toContain("Susanto");
+    expect(json.data.message.body).not.toContain("Black Cat");
+  });
+
+  it("handles resolvedConsumerNameMentionPattern 'middle' correctly", async () => {
+    await createAuthenticatedApp("trainer");
+    const res = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scenarioId: "pinjol",
+        consumerTypeId: "marah",
+        identity: {
+          name: "Black Cat",
+          email: "blackcat@mail.com",
+          city: "Jakarta",
+          bodyName: "Susanto",
+        },
+        enableImageGeneration: false,
+        selectedModel: "gemini-3.1-flash-lite",
+        resolvedConsumerNameMentionPattern: "middle",
+        writingStyleMode: "training",
+        client_request_id: "req-xyz-789",
+      }),
+    });
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data.message.body).toContain("Susanto");
+    expect(json.data.message.body).not.toContain("Black Cat");
+  });
 });

@@ -6,7 +6,7 @@ interface ScenarioAttachmentsProps {
   attachmentImages: string[];
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: (index: number) => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
 export function ScenarioAttachments({

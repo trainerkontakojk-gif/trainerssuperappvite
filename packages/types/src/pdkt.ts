@@ -86,6 +86,7 @@ export const emailMessageSchema = z.object({
   isAgent: z.boolean(),
   attachments: z.array(z.string()).optional(),
   attachmentSource: z.enum(["manual", "ai", "none"]).optional(),
+  attachmentWarning: z.string().optional(),
 });
 export type EmailMessage = z.infer<typeof emailMessageSchema>;
 

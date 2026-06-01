@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PdktIdentity, PdktScenario, PdktSessionConfig } from "@trainers/types";
+import type { PdktIdentity, PdktScenario } from "@trainers/types";
 import {
   buildPdktEmailGenerationPolicy,
   buildPdktSystemInstruction,
@@ -55,7 +55,7 @@ describe("pdkt-email-policy", () => {
       const result = renderPdktIdentityByMentionPattern("Saya mau mengadu.", "Klaim ditolak", policy);
 
       expect(result.subject).toBe("Klaim ditolak");
-      expect(result.body).toContain("Halo, saya Budi Santoso.");
+      expect(result.body).toMatch(/atas nama Budi|administratif.*Budi|pengaduan.*Budi/i);
       expect(result.body).toContain("Saya mau mengadu.");
     });
 
@@ -76,7 +76,7 @@ describe("pdkt-email-policy", () => {
       );
 
       expect(result.subject).toBe("Klaim Budi Santoso");
-      expect(result.body).toBe("Halo, Budi Santoso di sini.");
+      expect(result.body).toBe("Halo, Budi di sini.");
     });
 
     it("handles none pattern by cleaning all names and placeholders", () => {
@@ -120,6 +120,57 @@ describe("pdkt-email-policy", () => {
       const paragraphs = result.body.split("\n\n");
       expect(paragraphs[0]).not.toContain("Budi");
       expect(paragraphs.some(p => p.includes("Budi"))).toBe(true);
+    });
+
+    it("uses bodyName instead of name in the body and avoids name leakage", () => {
+      const config: any = {
+        scenarios: [scenario],
+        consumerType: {} as any,
+        identity: {
+          name: "Black Cat",
+          email: "kucing.hitam@gmail.com",
+          city: "Bandung",
+          bodyName: "Susanto",
+        },
+        enableImageGeneration: false,
+        resolvedConsumerNameMentionPattern: "middle",
+        writingStyleMode: "training",
+      };
+      const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
+      const result = renderPdktIdentityByMentionPattern(
+        "Paragraph 1 isi aduan.\n\nParagraph 2 detail kronologi.\n\nParagraph 3 penutup aduan.",
+        "Aduan KPR",
+        policy,
+      );
+
+      expect(result.body).toContain("Susanto");
+      expect(result.body).not.toContain("Black Cat");
+    });
+
+    it("handles natural middle clue placement without generic intro phrases", () => {
+      const config: any = {
+        scenarios: [scenario],
+        consumerType: {} as any,
+        identity: {
+          name: "Black Cat",
+          email: "kucing.hitam@gmail.com",
+          city: "Bandung",
+          bodyName: "Susanto",
+        },
+        enableImageGeneration: false,
+        resolvedConsumerNameMentionPattern: "middle",
+        writingStyleMode: "training",
+      };
+      const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
+      const result = renderPdktIdentityByMentionPattern(
+        "Paragraph 1 isi aduan.\n\nParagraph 2 detail kronologi.\n\nParagraph 3 penutup aduan.",
+        "Aduan KPR",
+        policy,
+      );
+
+      expect(result.body.toLowerCase()).not.toContain("perkenalkan");
+      expect(result.body).not.toContain("Oya, saya Susanto mau menambahkan sedikit detail lagi.");
+      expect(result.body).toMatch(/atas nama Susanto|nama yang tertera.*Susanto|nama Susanto|penyebutan nama.*Susanto/i);
     });
 
     it("handles late pattern by ensuring name is only in the last paragraph/salam", () => {

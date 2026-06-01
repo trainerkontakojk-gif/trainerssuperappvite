@@ -1,7 +1,7 @@
 import { PdktScenario, PdktSessionConfig } from "@trainers/types";
 import {
   resolveModelProvider,
-  supportsImageGeneration,
+  getImageGenerationMode,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
 } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
@@ -16,28 +16,85 @@ const MAX_DATA_URI_LENGTH = 650_000;
  * Service to generate AI images for PDKT scenarios.
  * This is decoupled from text generation to maintain maintainability.
  */
+export type PdktImageGenerationDiagnostics = {
+  attemptedModel: string;
+  provider: "gemini" | "openrouter";
+  imageGenerationMode: "native" | "openrouter-modalities" | "none";
+  reason?: "disabled" | "manual-attachment" | "provider-error" | "empty-output" | "oversized-output";
+  error?: string;
+};
+
+export interface PdktImageGenerationResult {
+  success: boolean;
+  images: string[];
+  warning?: string;
+  diagnostics: PdktImageGenerationDiagnostics;
+}
+
+/**
+ * Service to generate AI images for PDKT scenarios.
+ * This is decoupled from text generation to maintain maintainability.
+ */
 export async function generatePdktScenarioImages(
   scenario: PdktScenario,
   emailContent: { subject: string; body: string },
   config: PdktSessionConfig,
   usageContext?: UsageContext,
   userId?: string,
-): Promise<{ success: boolean; images: string[]; error?: string }> {
-  // If image generation is disabled in config, skip
-  if (!config.enableImageGeneration) {
-    return { success: true, images: [] };
-  }
-
+): Promise<PdktImageGenerationResult> {
   const modelId = config.selectedModel || DEFAULT_IMAGE_GENERATION_MODEL_ID;
-
-  // Resolve model and provider
   let { modelId: resolvedModel, provider } = resolveModelProvider(modelId);
+  let mode = getImageGenerationMode(resolvedModel);
 
-  // Fallback if model doesn't support image generation
-  if (!supportsImageGeneration(resolvedModel)) {
+  // If the model cannot generate images, try using the default fallback model
+  if (mode === "none") {
     const fallback = resolveModelProvider(DEFAULT_IMAGE_GENERATION_MODEL_ID);
     resolvedModel = fallback.modelId;
     provider = fallback.provider;
+    mode = getImageGenerationMode(resolvedModel);
+  }
+
+  // If model mode is still none, abort image generation
+  if (mode === "none") {
+    return {
+      success: false,
+      images: [],
+      warning: "Model tidak mendukung pembuatan gambar/bukti lampiran.",
+      diagnostics: {
+        attemptedModel: resolvedModel,
+        provider: provider as "gemini" | "openrouter",
+        imageGenerationMode: "none",
+        reason: "disabled",
+      },
+    };
+  }
+
+  // If image generation is disabled in config, skip
+  if (!config.enableImageGeneration) {
+    return {
+      success: true,
+      images: [],
+      diagnostics: {
+        attemptedModel: resolvedModel,
+        provider: provider as "gemini" | "openrouter",
+        imageGenerationMode: mode,
+        reason: "disabled",
+      },
+    };
+  }
+
+  // If scenario already has manual attachments, skip AI image generation
+  if (scenario.attachmentImages && scenario.attachmentImages.length > 0) {
+    return {
+      success: true,
+      images: [],
+      diagnostics: {
+        attemptedModel: resolvedModel,
+        provider: provider as "gemini" | "openrouter",
+        imageGenerationMode: mode,
+        reason: "manual-attachment",
+      },
+    };
   }
 
   const prompt = `Generate a realistic evidence/attachment image for this consumer complaint email. 
@@ -56,8 +113,6 @@ export async function generatePdktScenarioImages(
 
   try {
     if (provider === "gemini") {
-      // Note: In official Gemini API, Imagen models might require specific handling 
-      // but generateContent often works if the model supports it.
       const response = await generateGeminiContent({
         model: resolvedModel,
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -66,10 +121,44 @@ export async function generatePdktScenarioImages(
         userId,
       });
 
+      if (!response.success) {
+        return {
+          success: false,
+          images: [],
+          warning: `Gagal membuat bukti gambar (${response.error || "Gemini provider error"}).`,
+          diagnostics: {
+            attemptedModel: resolvedModel,
+            provider: "gemini",
+            imageGenerationMode: mode,
+            reason: "provider-error",
+            error: response.error,
+          },
+        };
+      }
+
+      const normalized = normalizeAttachments(response.images);
+      if (normalized.length === 0) {
+        return {
+          success: false,
+          images: [],
+          warning: "Model Gemini tidak menghasilkan data gambar valid.",
+          diagnostics: {
+            attemptedModel: resolvedModel,
+            provider: "gemini",
+            imageGenerationMode: mode,
+            reason: "empty-output",
+          },
+        };
+      }
+
       return {
-        success: response.success,
-        images: normalizeAttachments(response.images),
-        error: response.error,
+        success: true,
+        images: normalized,
+        diagnostics: {
+          attemptedModel: resolvedModel,
+          provider: "gemini",
+          imageGenerationMode: mode,
+        },
       };
     } else {
       // OpenRouter uses modalities: ["image"] for image generation models
@@ -81,23 +170,64 @@ export async function generatePdktScenarioImages(
         userId,
       });
 
+      if (!response.success) {
+        return {
+          success: false,
+          images: [],
+          warning: `Gagal membuat bukti gambar (${response.error || "OpenRouter provider error"}).`,
+          diagnostics: {
+            attemptedModel: resolvedModel,
+            provider: "openrouter",
+            imageGenerationMode: mode,
+            reason: "provider-error",
+            error: response.error,
+          },
+        };
+      }
+
+      const normalized = normalizeAttachments(response.images);
+      if (normalized.length === 0) {
+        return {
+          success: false,
+          images: [],
+          warning: "Model OpenRouter tidak menghasilkan data gambar valid.",
+          diagnostics: {
+            attemptedModel: resolvedModel,
+            provider: "openrouter",
+            imageGenerationMode: mode,
+            reason: "empty-output",
+          },
+        };
+      }
+
       return {
-        success: response.success,
-        images: normalizeAttachments(response.images),
-        error: response.error,
+        success: true,
+        images: normalized,
+        diagnostics: {
+          attemptedModel: resolvedModel,
+          provider: "openrouter",
+          imageGenerationMode: mode,
+        },
       };
     }
   } catch (error: unknown) {
+    const errorStr = error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "Gagal generate gambar.";
     console.error("[PDKT Image Gen] Error:", error);
     return {
       success: false,
       images: [],
-      error:
-        error instanceof Error
-          ? error.message
-          : typeof error === "string"
-            ? error
-            : "Gagal generate gambar.",
+      warning: `Gagal membuat bukti gambar (${errorStr}).`,
+      diagnostics: {
+        attemptedModel: resolvedModel,
+        provider: provider as "gemini" | "openrouter",
+        imageGenerationMode: mode,
+        reason: "provider-error",
+        error: errorStr,
+      },
     };
   }
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
 import { PdktScenario } from "@trainers/types";
-import { useCrudForm } from "../../../../hooks/useCrudForm";
+import { useCrudForm } from "../../../../../hooks/useCrudForm";
 import {
   SettingsField,
   SettingsInput,

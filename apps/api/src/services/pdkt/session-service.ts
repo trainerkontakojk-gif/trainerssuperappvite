@@ -295,6 +295,7 @@ export async function initializeEmailSession(
     // Resolve attachments: Manual has priority over AI
     let attachments = customAttachments;
     let attachmentSource: "manual" | "ai" | "none" = hasCustomImages ? "manual" : "none";
+    let attachmentWarning: string | undefined = undefined;
 
     if (!hasCustomImages && config.enableImageGeneration) {
       try {
@@ -309,9 +310,12 @@ export async function initializeEmailSession(
         if (imageResult.success && imageResult.images.length > 0) {
           attachments = imageResult.images;
           attachmentSource = "ai";
+        } else {
+          attachmentWarning = imageResult.warning || "Gagal membuat bukti gambar.";
         }
       } catch (imgError) {
         console.warn("[PDKT] AI Image generation failed, continuing with no attachments:", imgError);
+        attachmentWarning = imgError instanceof Error ? imgError.message : String(imgError);
       }
     }
 
@@ -327,6 +331,7 @@ export async function initializeEmailSession(
         isAgent: false,
         attachments,
         attachmentSource,
+        attachmentWarning,
       },
     };
   } catch (error: unknown) {
