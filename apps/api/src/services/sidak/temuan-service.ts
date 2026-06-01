@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "../../lib/supabase";
 import { roundTo } from "../../lib/math-utils";
 import { isCountableFinding } from "./shared-constants";
-import { getPeriods, getIndicators, resolveActivePublishedRuleVersion } from "./period-indicator";
+import { getIndicators, resolveActivePublishedRuleVersion } from "./period-indicator";
 import { getScoreRows } from "./dashboard-aggregation";
 import {
   calculateQAScoreFromTemuan,

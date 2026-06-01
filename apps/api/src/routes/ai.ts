@@ -7,6 +7,7 @@ import {
   getModelsForModule,
   resolveModelProvider,
 } from "../lib/ai-models";
+import type { AiModelModule } from "@trainers/types";
 import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenRouterContent } from "../lib/openrouter";
 import { requireRole } from "../middleware/role";
@@ -36,7 +37,7 @@ type Variables = { user: User; profile: any };
 const ai = new Hono<{ Variables: Variables }>();
 
 ai.get("/models", (c) => {
-  const module = c.req.query("module") as "ketik" | "pdkt" | undefined;
+  const module = c.req.query("module") as AiModelModule | undefined;
   const models = module ? getModelsForModule(module) : AI_MODELS;
   return c.json({ success: true, data: models });
 });

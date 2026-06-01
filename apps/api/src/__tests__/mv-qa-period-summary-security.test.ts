@@ -27,10 +27,6 @@ describe("mv_qa_period_summary security hardening", () => {
     ROLLBACK_DIR,
     "rollback_017_harden_mv_qa_period_summary.sql",
   );
-  const migrationPathRestore = resolve(
-    MIGRATION_DIR,
-    "20260525000200_restore_mv_qa_period_summary_contract.sql",
-  );
   const migrationPathTerminal = resolve(
     MIGRATION_DIR,
     "20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql",

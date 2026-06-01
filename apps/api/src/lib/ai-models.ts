@@ -4,16 +4,20 @@ import {
   AIProvider,
   AI_MODELS,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  TEXT_SIMULATION_MODELS,
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
 } from "@trainers/types";
-export { AI_MODELS, DEFAULT_IMAGE_GENERATION_MODEL_ID, TEXT_MODELS, IMAGE_GENERATION_MODELS };
+import type { AiModelModule } from "@trainers/types";
+export { 
+  AI_MODELS,
+  DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  TEXT_MODELS,
+  IMAGE_GENERATION_MODELS,
+  TEXT_SIMULATION_MODELS,
+};
 
 const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite";
-
-export const TEXT_SIMULATION_MODELS = TEXT_MODELS.filter(
-  (m) => !m.id.includes("tts"),
-);
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (m) => m.provider === "gemini",
 );
@@ -55,10 +59,14 @@ export function resolveModelProvider(modelId?: string | null): {
   };
 }
 
-export function getModelsForModule(
-  module: "ketik" | "pdkt" | "default" = "default",
-): AiModelInfo[] {
-  if (module === "ketik" || module === "pdkt") return TEXT_SIMULATION_MODELS;
+export function getModelsForModule(module: AiModelModule = "default"): AiModelInfo[] {
+  if (
+    module === "ketik" ||
+    module === "pdkt" ||
+    module === "qa-analyzer"
+  ) {
+    return TEXT_SIMULATION_MODELS;
+  }
   return AI_MODELS;
 }
 

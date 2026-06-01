@@ -36,7 +36,7 @@ vi.mock("../lib/supabase", () => ({
           if (table === "telefun_history") capturedTelefunSelect = cols;
           return chain;
         },
-        order: (col: string, opts?: any) => {
+        order: (col: string, _opts?: any) => {
           if (table === "telefun_history") capturedTelefunOrder = col;
           return chain;
         },

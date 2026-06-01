@@ -301,7 +301,7 @@ export async function generateCoachingSummary(
       const recommendations = parseJsonFromModelText(response.text);
 
       // Upsert via RPC
-      const { data, error: rpcError } = await adminClient.rpc(
+      const { error: rpcError } = await adminClient.rpc(
         "upsert_telefun_coaching_summary",
         {
           p_session_id: sessionId,

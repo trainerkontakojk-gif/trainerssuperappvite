@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DEFAULT_SERVICE_WEIGHTS } from "../lib/scoring";
 import type { ServiceType, ServiceWeight } from "@trainers/types";
 

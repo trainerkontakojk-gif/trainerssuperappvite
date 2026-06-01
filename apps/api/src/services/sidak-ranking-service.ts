@@ -1,4 +1,4 @@
-import type { ServiceType, TopAgentData } from "@trainers/types";
+import type { TopAgentData } from "@trainers/types";
 import { supabaseAdmin } from "../lib/supabase";
 import * as sidakService from "./sidak-service";
 

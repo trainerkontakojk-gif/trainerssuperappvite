@@ -72,6 +72,6 @@ export function parseJsonFromModelText(raw: string): any {
   try {
     return JSON.parse(extracted);
   } catch (err) {
-    throw new Error("Tidak ada data JSON valid dari model.");
+    throw new Error("Tidak ada data JSON valid dari model.", { cause: err });
   }
 }

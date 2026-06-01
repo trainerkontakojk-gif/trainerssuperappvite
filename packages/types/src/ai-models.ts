@@ -14,11 +14,24 @@ export interface AiModelInfo {
 }
 
 export type AIProvider = "gemini" | "openrouter";
+export type AiModelModule = "ketik" | "pdkt" | "qa-analyzer" | "default";
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.1-flash-lite";
 export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-image";
 
 export const TEXT_MODELS: AiModelInfo[] = [
+  {
+    id: "gemini-3.5-flash",
+    name: "Gemini 3.5 Flash",
+    description:
+      "Model Flash terbaru untuk reasoning, coding, workflow agentic, dan analisis multimodal.",
+    provider: "gemini",
+    timeoutMs: 180_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+    },
+  },
   {
     id: "gemini-3.1-flash-lite",
     name: "Gemini 3.1 Flash Lite",
@@ -158,3 +171,7 @@ export const AI_MODELS: AiModelInfo[] = [
   ...TEXT_MODELS,
   ...IMAGE_GENERATION_MODELS,
 ];
+
+export const TEXT_SIMULATION_MODELS = TEXT_MODELS.filter(
+  (model) => !model.id.includes("tts"),
+);

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { TableRLSConfig } from "../fixtures/rls-config";
 
@@ -6,7 +6,6 @@ const MIGRATIONS_DIR = join(process.cwd(), "..", "..", "supabase", "migrations")
 
 export function readMigrationSqlSource(): string {
   if (!existsSync(MIGRATIONS_DIR)) return "";
-  const { readdirSync } = require("node:fs") as typeof import("node:fs");
   return readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith(".sql"))
     .sort()

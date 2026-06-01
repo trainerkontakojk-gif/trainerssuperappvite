@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import type { ZodError } from "zod";
 
 const mockRpc = vi.fn();
 const mockSingle = vi.fn();

@@ -82,6 +82,7 @@ describe("KETIK SettingsModal Characterization Tests", () => {
 
     // Click on Gemini 2.0 Flash Lite card
     const gemini2Card = screen.getByText("Gemini 2.0 Flash Lite");
+    expect(screen.getByText("Gemini 3.5 Flash")).toBeDefined();
     await user.click(gemini2Card);
 
     // Click Save Changes (Simpan Perubahan)

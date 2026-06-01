@@ -295,7 +295,7 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 96. **PDKT Full Decomposition** — Completed full decomposition of monolithic PDKT route and service layer (analogous to Phase 79 SIDAK and Phase 80 Telefun). `routes/pdkt.ts` reduced 723→8 lines, `services/pdkt-service.ts` reduced 980→15 lines (both pure barrel/facade files). New route sub-modules under `routes/pdkt/`: `index.ts` (16), `simulation.ts` (162), `mailbox.ts` (167), `history.ts` (185), `settings.ts` (82), `route-utils.ts` (91). New service sub-modules under `services/pdkt/`: `catalog-service.ts` (167), `session-service.ts` (407), `evaluation-service.ts` (234), `mailbox-service.ts` (108), `shared-utils.ts` (90). Frontend `PdktScenariosTab.tsx` reduced 467→263 lines, decomposed into 5 sub-components under `scenarios/`: `ScenarioList`, `ScenarioForm`, `ScenarioAttachments`, `ScenarioAIGenerator`, `ScenarioTemplateField`. `mailbox-session.ts` (Phase 95) and `image-generation.ts` retained as orchestrator + provider-agnostic image gen. Typed `SupabaseClient` parameters and `unknown` error narrowing across `mailbox-service.ts`/`mailbox-session.ts`/`image-generation.ts`. 519 API + 503 web tests passing. (DONE)
 
 
-## Key Files Changed (Phase 58 — 95)
+## Key Files Changed (Phase 58 — 98)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -439,7 +439,7 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-96)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-98)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
@@ -452,6 +452,33 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - `apps/api/src/routes/pdkt/` — **Phase 96**: PDKT route full decomposition into 6 sub-modules (index, simulation, mailbox, history, settings, route-utils)
 - `apps/api/src/services/pdkt/` — **Phase 96**: PDKT service decomposition into 7 modules (catalog, session, evaluation, mailbox, shared-utils, image-generation, mailbox-session)
 - `apps/web/src/routes/pdkt/components/settings/scenarios/` — **Phase 96**: 5 frontend sub-components (ScenarioList, ScenarioForm, ScenarioAttachments, ScenarioAIGenerator, ScenarioTemplateField)
+- `apps/api/src/services/pdkt-email-policy.ts` — **Phase 97**: Added `NameClueTemplate` system with 11 natural context clue templates, `getPdktMentionName()`, `getPdktForbiddenBodyNames()`, `pickNameClueTemplate()` with deterministic seed-based indexing, forbidden name leakage detection, and generic intro phrase compliance validation
+- `apps/api/src/services/pdkt/image-generation.ts` — **Phase 97**: Added `PdktImageGenerationDiagnostics` and `PdktImageGenerationResult` types with structured error diagnostics, fallback model resolution, manual attachment guard, and provider-specific error handling
+- `apps/api/src/services/pdkt/session-service.ts` — **Phase 97**: Added `attachmentWarning` passthrough in session init response
+- `packages/types/src/pdkt.ts` — **Phase 97**: Added `attachmentWarning` optional field to `emailMessageSchema`
+- `apps/web/src/routes/pdkt/components/EmailDetailPane.tsx` — **Phase 97**: Renders amber AlertCard with warning message when `attachmentWarning` is present and no attachments exist
+- `apps/api/src/__tests__/pdkt-email-policy.test.ts` — **Phase 97**: Added bodyName leakage test, natural middle clue placement test
+- `apps/api/src/__tests__/pdkt-image-generation.test.ts` — **Phase 97**: Added attachmentWarning capture test, disabled image gen diagnostics test, fallback model diagnostics test
+- `apps/api/src/__tests__/pdkt-session-create-route.test.ts` — **Phase 97**: Added route-level bodyName and middle mention pattern regression tests
+- `apps/api/src/__tests__/pdkt-template-resolver.test.ts` — **Phase 97**: Updated expectations to use bodyName instead of full name
+- `apps/api/src/__tests__/pdkt.test.ts` — **Phase 97**: Updated expectations to match context clue patterns
+- `apps/web/src/__tests__/pdkt-ai-image-rendering.test.tsx` — **Phase 97**: Added attachment warning AlertCard rendering test
+- `docs/rebuild-logs/phase-97-pdkt-natural-name-and-image-fix.md` — **NEW Phase 97**: Documentation for PDKT natural name, clues, and AI image diagnostics
+- `packages/types/src/ai-models.ts` — **Phase 98**: Added `AiModelModule` type, `gemini-3.5-flash` model entry (180s timeout, text/image capabilities), `TEXT_SIMULATION_MODELS` filtered constant
+- `apps/api/src/lib/ai-models.ts` — **Phase 98**: Moved `TEXT_SIMULATION_MODELS` to shared types, added `qa-analyzer` module support in `getModelsForModule()`
+- `apps/web/src/lib/aiModels.ts` — **Phase 98**: Replaced duplicate `TEXT_SIMULATION_MODELS` with re-export, typed `AiModelModule`
+- `apps/web/src/routes/sidak/reports-ai.tsx` — **Phase 98**: Replaced `AI_MODELS` with `TEXT_SIMULATION_MODELS` to filter image-only models
+- `apps/api/src/lib/ai-json.ts` — **Phase 98**: Added `cause` parameter to Error constructor for better stack traces
+- `apps/api/src/app.ts` — **Phase 98**: Removed unused `UserProfile` import
+- `apps/api/src/routes/ai.ts` — **Phase 98**: Typed `module` query param as `AiModelModule`
+- `apps/api/src/__tests__/helpers/rls-policy-source.ts` — **Phase 98**: Statically imported `readdirSync` instead of `require()`
+- Various test/service files — **Phase 98**: Removed unused imports (beforeEach, ZodError, pendingResolve) and unused function params across 10 files
+- `apps/web/src/__tests__/ketik-settings-modal.test.tsx` — **Phase 98**: Added `Gemini 3.5 Flash` assertion
+- `apps/web/src/__tests__/pdkt-settings-modal.test.tsx` — **Phase 98**: Added `Gemini 3.5 Flash` assertion
+- `apps/api/src/__tests__/ai-models.test.ts` — **NEW Phase 98**: Unit tests for Gemini 3.5 Flash provider routing and qa-analyzer text model filtering
+- `apps/web/src/__tests__/sidak-reports-ai.test.tsx` — **NEW Phase 98**: Unit tests for SIDAK Report AI model rendering (shows Gemini 3.5 Flash, excludes gemini-3.1-flash-image)
+- `apps/api/scripts/smoke-gemini-model.mjs` — **NEW Phase 98**: Smoke test for Gemini model ID validation
+- `docs/rebuild-logs/phase-98-lint-debt-and-gemini-35-flash.md` — **NEW Phase 98**: Documentation for lint debt cleanup and Gemini 3.5 Flash integration
 
 ## Routes Reference (apps/web)
 

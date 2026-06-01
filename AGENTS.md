@@ -486,7 +486,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-67)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-98)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
@@ -597,6 +597,21 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/__tests__/pdkt.test.ts` — **Phase 97**: Updated expectations to match context clue patterns
 - `apps/web/src/__tests__/pdkt-ai-image-rendering.test.tsx` — **Phase 97**: Added attachment warning AlertCard rendering test
 - `docs/rebuild-logs/phase-97-pdkt-natural-name-and-image-fix.md` — **NEW Phase 97**: Documentation for PDKT natural name, clues, and AI image diagnostics
+- `packages/types/src/ai-models.ts` — **Phase 98**: Added `AiModelModule` type, `gemini-3.5-flash` model entry (180s timeout, text/image capabilities), `TEXT_SIMULATION_MODELS` filtered constant
+- `apps/api/src/lib/ai-models.ts` — **Phase 98**: Moved `TEXT_SIMULATION_MODELS` to shared types, added `qa-analyzer` module support in `getModelsForModule()`
+- `apps/web/src/lib/aiModels.ts` — **Phase 98**: Replaced duplicate `TEXT_SIMULATION_MODELS` with re-export, typed `AiModelModule`
+- `apps/web/src/routes/sidak/reports-ai.tsx` — **Phase 98**: Replaced `AI_MODELS` with `TEXT_SIMULATION_MODELS` to filter image-only models
+- `apps/api/src/lib/ai-json.ts` — **Phase 98**: Added `cause` parameter to Error constructor for better stack traces
+- `apps/api/src/app.ts` — **Phase 98**: Removed unused `UserProfile` import
+- `apps/api/src/routes/ai.ts` — **Phase 98**: Typed `module` query param as `AiModelModule`
+- `apps/api/src/__tests__/helpers/rls-policy-source.ts` — **Phase 98**: Statically imported `readdirSync` instead of `require()`
+- Various test/service files — **Phase 98**: Removed unused imports (beforeEach, ZodError, pendingResolve) and unused function params across 10 files
+- `apps/web/src/__tests__/ketik-settings-modal.test.tsx` — **Phase 98**: Added `Gemini 3.5 Flash` assertion
+- `apps/web/src/__tests__/pdkt-settings-modal.test.tsx` — **Phase 98**: Added `Gemini 3.5 Flash` assertion
+- `apps/api/src/__tests__/ai-models.test.ts` — **NEW Phase 98**: Unit tests for Gemini 3.5 Flash provider routing and qa-analyzer text model filtering
+- `apps/web/src/__tests__/sidak-reports-ai.test.tsx` — **NEW Phase 98**: Unit tests for SIDAK Report AI model rendering (shows Gemini 3.5 Flash, excludes gemini-3.1-flash-image)
+- `apps/api/scripts/smoke-gemini-model.mjs` — **NEW Phase 98**: Smoke test for Gemini model ID validation
+- `docs/rebuild-logs/phase-98-lint-debt-and-gemini-35-flash.md` — **NEW Phase 98**: Documentation for lint debt cleanup and Gemini 3.5 Flash integration
 
 ## Routes Reference (apps/web)
 

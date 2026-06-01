@@ -11,7 +11,7 @@ import {
 } from "./usage.js";
 import { createSession, updateSession, getOwnedSessionId } from "./db.js";
 import { SilenceDetector, UtteranceBuffer } from "./silence.js";
-import { TurnManager, TurnState } from "./turn-taking.js";
+import { TurnManager } from "./turn-taking.js";
 import {
   isGeminiForwardableMessage,
   isGeminiSetupMessage,

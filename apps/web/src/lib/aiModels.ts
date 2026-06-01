@@ -1,7 +1,15 @@
-import { AI_MODELS, DEFAULT_AI_MODEL_ID, TEXT_MODELS } from "@trainers/types";
+import {
+  AI_MODELS,
+  DEFAULT_AI_MODEL_ID,
+  TEXT_MODELS,
+  TEXT_SIMULATION_MODELS,
+} from "@trainers/types";
+import type { AiModelModule } from "@trainers/types";
 import { getApi } from "../hooks/useApi";
 
-export async function fetchAiModels(module: "ketik" | "pdkt" | "default" = "default") {
+export async function fetchAiModels(
+  module: AiModelModule = "default",
+) {
   try {
     return await getApi<typeof AI_MODELS>(`/ai/models?module=${module}`);
   } catch {
@@ -10,6 +18,4 @@ export async function fetchAiModels(module: "ketik" | "pdkt" | "default" = "defa
 }
 
 export { AI_MODELS, DEFAULT_AI_MODEL_ID, TEXT_MODELS };
-export const TEXT_SIMULATION_MODELS = TEXT_MODELS.filter(
-  (m) => !m.id.includes("tts"),
-);
+export { TEXT_SIMULATION_MODELS };

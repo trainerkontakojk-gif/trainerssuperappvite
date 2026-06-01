@@ -15,8 +15,6 @@ function buildQuery(onAwait: () => any) {
   return q;
 }
 
-let pendingResolve: () => any = () => ({ data: [], error: null });
-
 // Track which table was queried to return different results per table
 vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
@@ -35,7 +33,6 @@ import * as profilerService from "../services/profiler-service";
 describe("getAccessiblePesertaIds", () => {
   beforeEach(() => {
     tableResults = {};
-    pendingResolve = () => ({ data: [], error: null });
   });
 
   it("returns null for admin role", async () => {

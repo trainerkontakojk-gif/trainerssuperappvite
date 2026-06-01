@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import { ApiResponse, UserProfile } from "@trainers/types";
+import { ApiResponse } from "@trainers/types";
 import { env } from "./lib/env";
 import { authMiddleware } from "./middleware/auth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";

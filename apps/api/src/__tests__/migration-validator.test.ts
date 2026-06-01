@@ -215,7 +215,7 @@ describe("Property 2: Migration Validator Halt-on-Failure and Report Correctness
       fc.assert(
         fc.property(
           migrationSequenceWithFailureArb,
-          ({ allOutcomes, failIndex, totalFiles, beforeCount }) => {
+          ({ allOutcomes, failIndex, totalFiles: _totalFiles, beforeCount }) => {
             const report = buildMigrationReport(allOutcomes);
 
             // Only files up to and including the failure should appear in results

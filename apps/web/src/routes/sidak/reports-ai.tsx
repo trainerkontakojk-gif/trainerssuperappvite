@@ -6,7 +6,7 @@ import {
   FileText, Printer, Download, Sparkles, Users,
 } from "lucide-react";
 import { useApi, postApi } from "../../hooks/useApi";
-import { AI_MODELS } from "../../lib/aiModels";
+import { TEXT_SIMULATION_MODELS } from "../../lib/aiModels";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
 const SERVICE_LABELS: Record<string, string> = {
@@ -162,7 +162,7 @@ export default function SidakReportsAi() {
                 <select value={modelId} onChange={(e) => setModelId(e.target.value)}
                   className="rounded-xl border border-border px-3 py-2 text-sm bg-card outline-none focus:border-primary"
                 >
-                  {AI_MODELS.map((m) => (
+                  {TEXT_SIMULATION_MODELS.map((m) => (
                     <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
                 </select>
