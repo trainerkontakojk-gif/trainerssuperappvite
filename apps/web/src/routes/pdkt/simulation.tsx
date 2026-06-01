@@ -11,6 +11,7 @@ import type {
   PdktScenario,
   PdktConsumerType,
   PdktIdentity,
+  EmailMessage,
 } from "@trainers/types";
 import { Link } from "@tanstack/react-router";
 import { Loader2, Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
@@ -414,13 +415,6 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       );
 
       // 2. Build Config
-      if (!defaultScenarios || defaultScenarios.length === 0) {
-        console.warn("[PDKT] Scenarios list empty/not loaded. CreateEmailModal may show no scenarios.");
-      }
-      if (!defaultConsumerTypesFromApi) {
-        console.warn("[PDKT] Consumer types not loaded from API. Using hardcoded defaults.");
-      }
-
       const currentSettings: PdktAppSettings = settings || {
         scenarios: defaultScenarios || [],
         consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
@@ -437,42 +431,33 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
         fallbackIdentity,
       );
 
-      // 3. Generate template
-      const templateRes = await postApi<{ subject: string; body: string }>(
-        "/pdkt/generate-template",
+      // 3. Initialize session in backend (Generates email AND AI images if enabled)
+      const inboundMessage = await postApi<EmailMessage>(
+        "/pdkt/session/init",
         {
-          scenarioDraft: scenario,
+          scenarioId: scenario.id,
           consumerTypeId: config.consumerType.id,
           identity: config.identity,
+          enableImageGeneration: config.enableImageGeneration,
           selectedModel: config.selectedModel,
           resolvedConsumerNameMentionPattern:
             config.resolvedConsumerNameMentionPattern,
           writingStyleMode: config.writingStyleMode,
         },
       );
-      const subject = templateRes.subject;
-      const body = templateRes.body;
 
-      // 4. Submit new mailbox batch
+      // 4. Submit new mailbox batch using the inbound message from AI
       const clientRequestId = crypto.randomUUID();
 
       const newItemId = await postApi<string>("/pdkt/mailbox/batch", {
         client_request_id: clientRequestId,
         sender_name: config.identity.name,
         sender_email: config.identity.email,
-        subject: subject,
-        snippet: body.substring(0, 100),
+        subject: inboundMessage.subject,
+        snippet: inboundMessage.body.substring(0, 100),
         scenario_snapshot: scenario,
         config_snapshot: config,
-        inbound_email: {
-          id: "msg_" + Date.now(),
-          from: config.identity.email,
-          to: "ojk@kontak157.go.id",
-          subject,
-          body,
-          timestamp: new Date().toISOString(),
-          isAgent: false,
-        },
+        inbound_email: inboundMessage,
       });
 
       await refetch();

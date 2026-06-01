@@ -224,17 +224,24 @@ export function PdktScenariosTab({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setEnableImageGeneration(!enableImageGeneration)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
-              enableImageGeneration
-                ? "bg-primary border-primary/20 text-primary-foreground shadow-sm"
-                : "bg-background border-border text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <ImageIcon className="w-4 h-4" />
-            {enableImageGeneration ? "AI Aktif" : "AI Mati"}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={() => setEnableImageGeneration(!enableImageGeneration)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-2 cursor-pointer ${
+                enableImageGeneration
+                  ? "bg-primary border-primary/20 text-primary-foreground shadow-sm"
+                  : "bg-background border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <ImageIcon className="w-4 h-4" />
+              {enableImageGeneration ? "AI Aktif" : "AI Mati"}
+            </button>
+            {enableImageGeneration && (
+              <p className="text-[9px] text-muted-foreground italic max-w-[150px] text-right leading-tight">
+                AI akan generate gambar relevan jika skenario tidak memiliki lampiran manual.
+              </p>
+            )}
+          </div>
           <div className="h-6 w-px bg-border/60 mx-1" />
           <button
             onClick={handleSelectAll}

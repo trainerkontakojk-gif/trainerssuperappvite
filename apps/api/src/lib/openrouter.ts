@@ -6,6 +6,7 @@ import { sanitizeAiResponse } from "./ai-sanitize";
 export interface OpenRouterResponse {
   success: boolean;
   text?: string;
+  images?: string[];
   error?: string;
 }
 
@@ -15,6 +16,7 @@ export async function generateOpenRouterContent(options: {
   contents: { role: string; parts: { text: string }[] }[];
   temperature?: number;
   responseMimeType?: string;
+  modalities?: string[];
   usageContext?: UsageContext;
   userId?: string;
   sanitizeOutput?: boolean;
@@ -65,6 +67,7 @@ export async function generateOpenRouterContent(options: {
               model: modelId,
               messages,
               temperature: options.temperature ?? 0.7,
+              modalities: options.modalities,
               response_format:
                 options.responseMimeType === "application/json" &&
                 !modelId.includes(":free")
@@ -116,7 +119,9 @@ export async function generateOpenRouterContent(options: {
         error: data.error.message || "Model tidak tersedia.",
       };
 
-    const rawContent = data.choices?.[0]?.message?.content || "";
+    const choice = data.choices?.[0];
+    const rawContent = choice?.message?.content || "";
+    const images = normalizeOpenRouterImages(choice?.message?.images);
     const shouldSanitize = options.sanitizeOutput !== false;
     const text = shouldSanitize ? sanitizeAiResponse(rawContent) : rawContent;
 
@@ -149,9 +154,37 @@ export async function generateOpenRouterContent(options: {
       }
     }
 
-    return { success: true, text };
+    return {
+      success: true,
+      text,
+      images: images.length > 0 ? images : undefined,
+    };
   } catch (error) {
     console.error("[OpenRouter] Error:", error);
     return { success: false, error: "Terjadi kesalahan koneksi ke server AI." };
   }
+}
+
+function normalizeOpenRouterImages(images: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+
+  return images
+    .map((image) => {
+      if (typeof image === "string") return image;
+      if (!image || typeof image !== "object") return "";
+
+      const record = image as {
+        image_url?: { url?: string };
+        imageUrl?: { url?: string };
+        url?: string;
+      };
+
+      return (
+        record.image_url?.url ||
+        record.imageUrl?.url ||
+        record.url ||
+        ""
+      );
+    })
+    .filter((value): value is string => Boolean(value));
 }

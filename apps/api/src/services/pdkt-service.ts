@@ -17,6 +17,7 @@ import {
   SCENARIO_COMPANY_CATEGORY_MAP,
 } from "./pdkt-company-names";
 import { resolvePdktTemplateBody } from "./pdkt-template-resolver";
+import { generatePdktScenarioImages } from "./pdkt/image-generation";
 import {
   buildPdktEmailGenerationPolicy,
   buildPdktSystemInstruction,
@@ -488,6 +489,7 @@ export async function initializeEmailSession(
       };
     }
 
+    const attachments = scenario.attachmentImages || [];
     return {
       success: true,
       message: {
@@ -498,7 +500,8 @@ export async function initializeEmailSession(
         body: rendered.body,
         timestamp: new Date().toISOString(),
         isAgent: false,
-        attachments: [],
+        attachments,
+        attachmentSource: attachments.length > 0 ? "manual" : "none",
       },
     };
   }
@@ -507,7 +510,11 @@ export async function initializeEmailSession(
   const customAttachments: string[] = scenario.attachmentImages || [];
   const hasCustomImages = customAttachments.length > 0;
   const model = config.selectedModel || "gemini-3.1-flash-lite";
-  const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
+  const policy = buildPdktEmailGenerationPolicy(
+    config,
+    scenario,
+    "initial_email",
+  );
   const systemInstruction = buildPdktSystemInstruction(policy, hasCustomImages);
 
   const prompt = `Tulis email pengaduan pertama Anda sekarang. Masalah: ${scenario.title}. Karakter: ${config.consumerType.name}. PENTING: Email harus 500-1000 kata, terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;
@@ -571,7 +578,10 @@ export async function initializeEmailSession(
           [violationHint, lengthHint].filter(Boolean).join(" "),
         );
       } catch (err) {
-        console.warn("[PDKT] Session init retry failed, using first attempt:", err);
+        console.warn(
+          "[PDKT] Session init retry failed, using first attempt:",
+          err,
+        );
       }
     }
 
@@ -581,6 +591,34 @@ export async function initializeEmailSession(
         error:
           "Email awal masih melanggar aturan nama atau gaya penulisan. Silakan coba lagi.",
       };
+    }
+
+    // Resolve attachments: Manual has priority over AI
+    let attachments = customAttachments;
+    let attachmentSource: "manual" | "ai" | "none" = hasCustomImages
+      ? "manual"
+      : "none";
+
+    if (!hasCustomImages && config.enableImageGeneration) {
+      try {
+        const imageResult = await generatePdktScenarioImages(
+          scenario,
+          { subject: result.subject, body: result.body },
+          config,
+          usageContext || { module: "pdkt", action: "generate_ai_images" },
+          userId,
+        );
+
+        if (imageResult.success && imageResult.images.length > 0) {
+          attachments = imageResult.images;
+          attachmentSource = "ai";
+        }
+      } catch (imgError) {
+        console.warn(
+          "[PDKT] AI Image generation failed, continuing with no attachments:",
+          imgError,
+        );
+      }
     }
 
     return {
@@ -593,7 +631,8 @@ export async function initializeEmailSession(
         body: result.body,
         timestamp: new Date().toISOString(),
         isAgent: false,
-        attachments: customAttachments,
+        attachments,
+        attachmentSource,
       },
     };
   } catch (error: any) {

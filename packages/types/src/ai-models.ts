@@ -1,14 +1,22 @@
+export interface AiModelCapabilities {
+  supportsText: boolean;
+  supportsImage: boolean;
+  imageGenerationMode?: "native" | "openrouter-modalities" | "none";
+}
+
 export interface AiModelInfo {
   id: string;
   name: string;
   description: string;
   provider: AIProvider;
   timeoutMs?: number;
+  capabilities?: AiModelCapabilities;
 }
 
 export type AIProvider = "gemini" | "openrouter";
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.1-flash-lite";
+export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-lite";
 
 export const AI_MODELS: AiModelInfo[] = [
   {
@@ -17,6 +25,11 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Cepat dan efisien untuk percakapan natural.",
     provider: "gemini",
     timeoutMs: 120_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "native",
+    },
   },
   {
     id: "gemini-3-flash-preview",
@@ -25,6 +38,11 @@ export const AI_MODELS: AiModelInfo[] = [
       "Model Gemini 3 paling cepat untuk percakapan natural dan tugas ringan.",
     provider: "gemini",
     timeoutMs: 120_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "native",
+    },
   },
   {
     id: "gemini-3.1-pro-preview",
@@ -32,6 +50,11 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model Gemini 3.1 paling powerful untuk tugas kompleks.",
     provider: "gemini",
     timeoutMs: 180_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "native",
+    },
   },
   {
     id: "gemini-2.0-flash-lite",
@@ -39,6 +62,11 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model ringan Gemini 2.0 untuk respons cepat dan hemat biaya.",
     provider: "gemini",
     timeoutMs: 120_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "native",
+    },
   },
   {
     id: "openai/gpt-oss-120b:free",
@@ -46,6 +74,7 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model open-weight yang kuat untuk tugas kompleks.",
     provider: "openrouter",
     timeoutMs: 90_000,
+    capabilities: { supportsText: true, supportsImage: false },
   },
   {
     id: "google/gemini-3.1-flash-lite",
@@ -53,6 +82,11 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model ringan Google via OpenRouter.",
     provider: "openrouter",
     timeoutMs: 120_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "openrouter-modalities",
+    },
   },
   {
     id: "google/gemini-2.0-flash-lite",
@@ -60,6 +94,11 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model Gemini 2.0 ringan via OpenRouter.",
     provider: "openrouter",
     timeoutMs: 120_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "openrouter-modalities",
+    },
   },
   {
     id: "openai/gpt-4o-mini",
@@ -67,6 +106,11 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model OpenAI compact dan efisien.",
     provider: "openrouter",
     timeoutMs: 90_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+      imageGenerationMode: "openrouter-modalities",
+    },
   },
   {
     id: "qwen/qwen3.5-flash-02-23",
@@ -74,5 +118,6 @@ export const AI_MODELS: AiModelInfo[] = [
     description: "Model Qwen cepat dan efisien.",
     provider: "openrouter",
     timeoutMs: 120_000,
+    capabilities: { supportsText: true, supportsImage: false },
   },
 ];

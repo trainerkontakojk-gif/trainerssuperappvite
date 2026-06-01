@@ -1,4 +1,4 @@
-import { Content } from "@google/genai";
+import { Content, Modality } from "@google/genai";
 import { randomUUID } from "crypto";
 import {
   AI_MODELS,
@@ -11,6 +11,7 @@ import { sanitizeAiResponse } from "./ai-sanitize";
 export interface GeminiResponse {
   success: boolean;
   text?: string;
+  images?: string[];
   error?: string;
 }
 
@@ -19,13 +20,29 @@ function resolveResponseText(response: {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
 }): string {
   if (typeof response.text === "function") {
-    return (response as { text: () => string }).text();
+    try {
+      return (response as { text: () => string }).text();
+    } catch {
+      /* fallthrough */
+    }
   }
   if (typeof response.text === "string") {
     return response.text;
   }
   const parts = response.candidates?.[0]?.content?.parts ?? [];
-  return parts.map((p) => p.text ?? "").join("");
+  return parts
+    .filter((p) => typeof p.text === "string")
+    .map((p) => p.text)
+    .join("");
+}
+
+function resolveResponseImages(response: any): string[] {
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  return parts
+    .filter((p: any) => p.inlineData)
+    .map(
+      (p: any) => `data:${p.inlineData.mimeType};base64,${p.inlineData.data}`,
+    );
 }
 
 export async function generateGeminiContent(options: {
@@ -34,6 +51,7 @@ export async function generateGeminiContent(options: {
   contents: Content[];
   responseMimeType?: string;
   responseSchema?: any;
+  responseModalities?: Modality[];
   temperature?: number;
   usageContext?: UsageContext;
   userId?: string;
@@ -82,14 +100,15 @@ export async function generateGeminiContent(options: {
             systemInstruction,
             responseMimeType: options.responseMimeType,
             responseSchema: options.responseSchema,
+            responseModalities: options.responseModalities,
             temperature: options.temperature ?? 0.7,
-          },
+          } as any,
         }),
         timeoutPromise,
       ]);
     };
 
-    let response;
+    let response: any;
     try {
       response = await generateWithTimeout();
     } catch (firstError: unknown) {
@@ -122,8 +141,9 @@ export async function generateGeminiContent(options: {
             config: {
               responseMimeType: options.responseMimeType,
               responseSchema: options.responseSchema,
+              responseModalities: options.responseModalities,
               temperature: options.temperature ?? 0.7,
-            },
+            } as any,
           }),
           retryTimeout,
         ]);
@@ -165,8 +185,13 @@ export async function generateGeminiContent(options: {
     }
 
     const rawText = resolveResponseText(response);
+    const images = resolveResponseImages(response);
     const shouldSanitize = options.sanitizeOutput !== false;
-    return { success: true, text: shouldSanitize ? sanitizeAiResponse(rawText) : rawText };
+    return {
+      success: true,
+      text: shouldSanitize ? sanitizeAiResponse(rawText) : rawText,
+      images: images.length > 0 ? images : undefined,
+    };
   } catch (error) {
     console.error("[Gemini] Error:", error);
     return {

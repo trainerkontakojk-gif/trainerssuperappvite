@@ -85,6 +85,7 @@ export const emailMessageSchema = z.object({
   timestamp: z.string(),
   isAgent: z.boolean(),
   attachments: z.array(z.string()).optional(),
+  attachmentSource: z.enum(["manual", "ai", "none"]).optional(),
 });
 export type EmailMessage = z.infer<typeof emailMessageSchema>;
 
@@ -133,6 +134,7 @@ export const generateEmailSchema = z.object({
   scenarioDraft: pdktScenarioSchema.optional(),
   consumerTypeId: z.string(),
   identity: pdktIdentitySchema,
+  enableImageGeneration: z.boolean().default(true),
   selectedModel: z.string().default("gemini-3.1-flash-lite"),
   resolvedConsumerNameMentionPattern: z
     .enum(["upfront", "middle", "late", "none"])

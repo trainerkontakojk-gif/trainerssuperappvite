@@ -102,7 +102,7 @@ pdkt.post(
       scenarios: [scenario],
       consumerType,
       identity: body.identity,
-      enableImageGeneration: true,
+      enableImageGeneration: body.enableImageGeneration ?? true,
       selectedModel: body.selectedModel,
       resolvedConsumerNameMentionPattern:
         body.resolvedConsumerNameMentionPattern,
@@ -132,6 +132,75 @@ pdkt.post(
     return c.json({
       success: true,
       data: { subject: result.subject, body: result.body },
+    });
+  },
+);
+
+pdkt.post(
+  "/session/init",
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  aiRateLimitMiddleware,
+  zValidator("json", generateEmailSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    const userId = user?.id;
+
+    const scenarios = pdktService.getScenarios();
+    const consumerTypes = pdktService.getConsumerTypes();
+    const scenario = body.scenarioId
+      ? scenarios.find((s) => s.id === body.scenarioId)
+      : body.scenarioDraft;
+    const consumerType = consumerTypes.find(
+      (ct) => ct.id === body.consumerTypeId,
+    );
+
+    if (!scenario || !consumerType) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "NOT_FOUND",
+            message: "Scenario atau consumer type tidak ditemukan.",
+          },
+        },
+        404,
+      );
+    }
+
+    const config: PdktSessionConfig = {
+      scenarios: [scenario],
+      consumerType,
+      identity: body.identity,
+      enableImageGeneration: body.enableImageGeneration ?? true,
+      selectedModel: body.selectedModel,
+      resolvedConsumerNameMentionPattern:
+        body.resolvedConsumerNameMentionPattern,
+      writingStyleMode: body.writingStyleMode,
+    };
+
+    const result = await pdktService.initializeEmailSession(
+      config,
+      { module: "pdkt", action: "start_session" },
+      userId,
+    );
+
+    if (!result.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "AI_ERROR",
+            message: result.error || "Gagal inisialisasi sesi email.",
+          },
+        },
+        502,
+      );
+    }
+
+    return c.json({
+      success: true,
+      data: result.message,
     });
   },
 );

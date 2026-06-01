@@ -279,9 +279,22 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 80. **Telefun Route Full Decomposition** — Completed full decomposition of monolithic `routes/telefun.ts` (1,240 → 21 lines, 12 handlers across 4 sub-modules: sessions, recordings, settings, annotations). All helpers re-exported for test backward compatibility. Graphify synced. (DONE)
 81. **KETIK ChatInterface Message Utils & Pacing Extraction** — Extracted inline constants, helpers, and pacing functions from `ChatInterface.tsx` (277 → 16 lines) into `ketik/lib/message-utils.ts` (193 lines) and `ketik/lib/pacing.ts` (69 lines). Pure extraction, zero logic change. (DONE)
 82. **KETIK Service Decomposition** — Decomposed monolithic `ketik-service.ts` (1,400 → 5 lines barrel file) into 5 sub-modules under `apps/api/src/services/ketik/`: `shared-utils.ts` (9 lines — `extractJsonObjectText`), `consumer-response.ts` (347 lines — scenario defaults, consumer response generation), `review-lifecycle.ts` (317 lines — `triggerKetikAIReview` lifecycle), `review-processor.ts` (353 lines — `processKetikReviewJob` with AI scoring), `settings-history.ts` (369 lines — session CRUD, settings history). Backward compatible — all consumers import via barrel unchanged. 484 API tests passing. (DONE)
+83. **Settings Modal Full Decomposition** — Decomposed 3 monolithic SettingsModal components (Telefun 1,232→78, KETIK 915→58, PDKT 976→63 lines) into per-tab sub-modules. Created shared `useCrudForm` hook (87 lines) with generic CRUD form state management. 18 files modified/added, pure decomposition with zero logic change. (DONE)
+84. **SIDAK Input Hooks Decomposition** — Extracted 3 custom hooks from monolithic `input.tsx` (767→274 lines): `useTemuanEdit`, `useTemuanForm`, `useTemuanImport`. Pure decomposition, zero logic change. (DONE)
+85. **Thermo Quality Gate Hardening** — Post-decomposition cleanup: immutable settings draft saves, typed collection-draft helper, SIDAK input rule indicator source-of-truth, whitespace/lint blockers cleared. (DONE)
+86. **Settings Draft Type Safety Hardening** — Eliminated 15+ `as T`/`as any` assertions from settings draft system. Added `createItem`/`updateItem` factories to `useCrudForm`, `create` factory to `useCollectionDraft`. 14 files modified, behavior-preserving. (DONE)
+87. **Settings Draft Canonical Commit** — Unified tab-level save and modal-level save into canonical commit path via `useCrudForm.save(items, draftOverride)`. Removed `applyCollectionDraft` helper. 4 files modified, 0 new tests. (DONE)
+88. **Settings Draft Normalization Hardening** — Extracted default entity logic into pure per-domain normalizer functions for KETIK, PDKT, and Telefun. 4 new normalizer files, 1 new test file. (DONE)
+89. **PNPM 11 Migration** — Upgraded pnpm from 9.0.0 → 11.5.0. Two breaking changes fixed: `allowBuilds` block and `CI=true` requirement. 3 files modified. (DONE)
+90. **Mega Maintainability Refactor** — Massive decomposition across 5 areas: Profiler pages, SIDAK Settings, `packages/types` barrel, data integrity scripts, API test suites. ~9,081 lines removed from monolithic files, ~38 new files created. Zero logic change. (DONE)
+91. **AI Usage Post-Session Detail Breakdown** — Extended `/ai/usage/summary` API with per-category breakdown. New shared `fetchUsageSummary()` helper, `UsageBreakdownRows` component, upgraded `UsageModal` and all 3 module landing pages. 6 files modified + 2 new, 19 new tests. (DONE)
+92. **Identity & Company Context Fallback** — Ensured KETIK, PDKT, and Telefun never display identity/company placeholders when fields are blank. New `pdkt-template-resolver.ts` + `pdkt-company-names.ts` services. Follow-up: broadened placeholder regex, applied sanitization to subject+body, unified retry path. 5 files modified + 2 new. (DONE)
+93. **PDKT Consumer Name & Realistic Mode Hardening** — Centralized PDKT prompt policy module (`pdkt-email-policy.ts`) as single source of truth for name mention patterns and realistic writing style rules. Refactored `pdkt-service.ts` to delegate prompt generation to policy module. (DONE)
+94. **PDKT Settings Visual Polish** — Aligned PDKT SettingsModal visual language with KETIK and Telefun modals: lighter overlay, smoother spring animations, consistent header bar, left-border banner pattern, compact card styling, consistent typography scale. 5 files modified, pure visual refinement. (DONE)
+95. **PDKT AI Image Generation Remediation** — Created decoupled backend image generation service with automatic fallback, updated model registry with multimodal capabilities, refactored session orchestration to move attachment policy logic to backend, simplified frontend start-session flow, and added explanatory microcopy for user-uploaded vs AI-generated attachment priority. 4 API + 1 web regression tests passing. (DONE)
 
 
-## Key Files Changed (Phase 58 — 82)
+## Key Files Changed (Phase 58 — 95)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -343,6 +356,20 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - `apps/api/src/services/ketik/review-lifecycle.ts` — **NEW Phase 82**: `triggerKetikAIReview()` lifecycle (317 lines)
 - `apps/api/src/services/ketik/review-processor.ts` — **NEW Phase 82**: `processKetikReviewJob()` with AI scoring (353 lines)
 - `apps/api/src/services/ketik/settings-history.ts` — **NEW Phase 82**: Session CRUD, settings history (369 lines)
+
+- `apps/api/src/services/pdkt/image-generation.ts` — **NEW Phase 95**: Decoupled image generation service with provider-agnostic fallback, auto-fallback to supported image model if active simulation model lacks image capability
+- `apps/api/src/lib/gemini.ts` — **Phase 95**: Added `resolveResponseImages()` parser for `inlineData` and `responseModalities` config support; updated return contract to include `images` field
+- `apps/api/src/lib/openrouter.ts` — **Phase 95**: Added `modalities: ["image"]` support and `normalizeOpenRouterImages()` parser for `message.images`; updated return contract with `images` field
+- `packages/types/src/ai-models.ts` — **Phase 95**: Added `AiModelCapabilities` interface with `supportsImage`/`imageGenerationMode` metadata; tagged Gemini and OpenRouter multimodal models; exported `DEFAULT_IMAGE_GENERATION_MODEL_ID`
+- `packages/types/src/pdkt.ts` — **Phase 95**: Added `attachmentSource` metadata field (`"manual" | "ai" | "none"`)
+- `apps/api/src/lib/ai-models.ts` — **Phase 95**: Added `supportsImageGeneration()` and `getImageGenerationMode()` helpers; exported `DEFAULT_IMAGE_GENERATION_MODEL_ID`
+- `apps/api/src/services/pdkt-service.ts` — **Phase 95**: Refactored `initializeEmailSession` to orchestrate: generate email → resolve attachment policy (Manual > AI > None) → generate AI images → final message; graceful fallback if image generation fails
+- `apps/api/src/routes/pdkt.ts` — **Phase 95**: Added `POST /session/init` unified endpoint returning ready-to-use inbound message; simplified frontend start-session flow
+- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 95**: Simplified to consume backend init endpoint; removed inline template generation and inbound email crafting logic
+- `apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx` — **Phase 95**: Added explanatory microcopy under AI toggle about manual attachment priority
+- `docs/rebuild-logs/phase-95-pdkt-ai-image-generation.md` — **NEW Phase 95**: Documentation for PDKT AI Image Generation remediation
+- `apps/api/src/__tests__/pdkt-image-generation.test.ts` — **NEW Phase 95**: 4 API tests verifying attachment policy, toggle off behavior, and failure safety
+- `apps/web/src/__tests__/pdkt-ai-image-rendering.test.tsx` — **NEW Phase 95**: 1 web test verifying AI attachment rendering in EmailDetailPane
 
 ## Relevant Files
 
@@ -411,7 +438,7 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-67)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-95)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query

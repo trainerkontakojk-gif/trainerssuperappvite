@@ -1,6 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
-import { AiModelInfo, AIProvider, AI_MODELS } from "@trainers/types";
-export { AI_MODELS };
+import {
+  AiModelInfo,
+  AIProvider,
+  AI_MODELS,
+  DEFAULT_IMAGE_GENERATION_MODEL_ID,
+} from "@trainers/types";
+export { AI_MODELS, DEFAULT_IMAGE_GENERATION_MODEL_ID };
 
 const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite";
 
@@ -53,6 +58,20 @@ export function getModelsForModule(
 ): AiModelInfo[] {
   if (module === "ketik" || module === "pdkt") return TEXT_SIMULATION_MODELS;
   return AI_MODELS;
+}
+
+export function supportsImageGeneration(modelId: string): boolean {
+  const normalized = normalizeModelId(modelId);
+  const model = AI_MODELS.find((m) => m.id === normalized);
+  return model?.capabilities?.supportsImage ?? false;
+}
+
+export function getImageGenerationMode(
+  modelId: string,
+): "native" | "openrouter-modalities" | "none" {
+  const normalized = normalizeModelId(modelId);
+  const model = AI_MODELS.find((m) => m.id === normalized);
+  return model?.capabilities?.imageGenerationMode ?? "none";
 }
 
 export function getGeminiClient(): GoogleGenAI {
