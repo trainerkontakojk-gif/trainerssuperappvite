@@ -90,37 +90,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-background/80 backdrop-blur-md"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[86vh] rounded-xl flex flex-col overflow-hidden shadow-xl bg-card border border-border/50"
+            exit={{ opacity: 0, scale: 0.96, y: 15 }}
+            className="relative w-full max-w-4xl max-h-[88vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl bg-card border border-border/80"
           >
             {/* Modal Header */}
-            <div className="px-5 py-4 sm:px-6 sm:py-5 border-b border-border/50 flex justify-between items-center shrink-0 relative overflow-hidden">
-              <div className="relative z-10">
-                <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+            <div className="px-6 py-5 border-b border-border/40 flex justify-between items-center shrink-0 bg-muted/20 relative overflow-hidden">
+              <div>
+                <h2 className="text-xl font-bold text-foreground tracking-tight">
                   Pengaturan Simulasi
                 </h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                    Module PDKT
-                  </span>
-                </div>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
+                  Modul PDKT
+                </p>
               </div>
-              <div className="flex items-center gap-4 relative z-10">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={handleSave}
-                  className="px-5 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold text-[10px] uppercase tracking-widest transition-all shadow-sm flex items-center gap-2.5 group"
+                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-primary-foreground rounded-xl font-semibold text-xs transition-all shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/15 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 group cursor-pointer"
                 >
-                  <Save className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <Save className="w-4 h-4 group-hover:scale-105 transition-transform" />
                   <span>Simpan Perubahan</span>
                 </button>
                 <button
                   onClick={onClose}
-                  className="w-10 h-10 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-xl text-muted-foreground hover:text-foreground transition-all border border-transparent hover:border-border/50"
+                  className="w-9 h-9 flex items-center justify-center hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer border border-border/30 hover:border-border/60"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -128,32 +126,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Segmented Control Tabs */}
-            <div className="px-5 sm:px-6 pt-5 pb-3 shrink-0 bg-transparent">
-              <div className="flex p-2 rounded-2xl bg-foreground/5">
+            <div className="px-6 py-4 border-b border-border/30 bg-muted/5 shrink-0">
+              <div className="flex p-1 rounded-xl bg-muted border border-border/30">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-3 py-3.5 text-[11px] font-medium uppercase tracking-wide rounded-xl transition-all relative group ${
+                    className={`flex-1 flex items-center justify-center gap-2.5 py-2.5 text-xs font-semibold rounded-lg transition-all relative group cursor-pointer ${
                       activeTab === tab.id
-                        ? "text-primary"
-                        : "text-muted-foreground hover:text-muted-foreground"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {activeTab === tab.id && (
                       <motion.div
                         layoutId="activeTabPDKT"
-                        className="absolute inset-0 shadow-sm rounded-xl bg-card border border-border/50"
+                        className="absolute inset-0 shadow-sm rounded-lg bg-card border border-border/40"
                         transition={{
                           type: "spring",
-                          bounce: 0.15,
-                          duration: 0.6,
+                          bounce: 0.1,
+                          duration: 0.4,
                         }}
                       />
                     )}
-                    <span className="relative z-10 flex items-center gap-2.5">
+                    <span className="relative z-10 flex items-center gap-2">
                       <tab.icon
-                        className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === tab.id ? "text-primary" : ""}`}
+                        className={`w-4 h-4 transition-transform group-hover:scale-105 ${activeTab === tab.id ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
                       />
                       {tab.label}
                     </span>
@@ -163,13 +161,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto px-5 sm:px-6 pb-6 sm:pb-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar bg-card">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.15 }}
                 >
                   {activeTab === "scenarios" && (

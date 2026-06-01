@@ -21499,7 +21499,7 @@
       "label": "initializeEmailSession()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L458",
+      "source_location": "L466",
       "id": "services_pdkt_service_initializeemailsession",
       "community": 300,
       "norm_label": "initializeemailsession()"
@@ -21508,7 +21508,7 @@
       "label": "evaluateAgentResponse()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L591",
+      "source_location": "L607",
       "id": "services_pdkt_service_evaluateagentresponse",
       "community": 300,
       "norm_label": "evaluateagentresponse()"
@@ -21517,7 +21517,7 @@
       "label": "fetchMailboxItems()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L683",
+      "source_location": "L699",
       "id": "services_pdkt_service_fetchmailboxitems",
       "community": 300,
       "norm_label": "fetchmailboxitems()"
@@ -21526,7 +21526,7 @@
       "label": "createMailboxItem()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L703",
+      "source_location": "L719",
       "id": "services_pdkt_service_createmailboxitem",
       "community": 300,
       "norm_label": "createmailboxitem()"
@@ -21535,7 +21535,7 @@
       "label": "softDeleteMailboxItem()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L734",
+      "source_location": "L750",
       "id": "services_pdkt_service_softdeletemailboxitem",
       "community": 300,
       "norm_label": "softdeletemailboxitem()"
@@ -21544,7 +21544,7 @@
       "label": "submitMailboxReply()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L749",
+      "source_location": "L765",
       "id": "services_pdkt_service_submitmailboxreply",
       "community": 300,
       "norm_label": "submitmailboxreply()"
@@ -21553,7 +21553,7 @@
       "label": "processPdktEvaluation()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-service.ts",
-      "source_location": "L770",
+      "source_location": "L786",
       "id": "services_pdkt_service_processpdktevaluation",
       "community": 300,
       "norm_label": "processpdktevaluation()"
@@ -21976,7 +21976,7 @@
       "label": "PdktEmailPolicy",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L13",
+      "source_location": "L12",
       "id": "services_pdkt_email_policy_pdktemailpolicy",
       "community": 300,
       "norm_label": "pdktemailpolicy"
@@ -21985,7 +21985,7 @@
       "label": "buildPdktEmailGenerationPolicy()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L21",
+      "source_location": "L20",
       "id": "services_pdkt_email_policy_buildpdktemailgenerationpolicy",
       "community": 300,
       "norm_label": "buildpdktemailgenerationpolicy()"
@@ -21994,7 +21994,7 @@
       "label": "getCompanyNameInstruction()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L39",
+      "source_location": "L38",
       "id": "services_pdkt_email_policy_getcompanynameinstruction",
       "community": 300,
       "norm_label": "getcompanynameinstruction()"
@@ -22003,7 +22003,7 @@
       "label": "getConsumerNameMentionInstruction()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L54",
+      "source_location": "L53",
       "id": "services_pdkt_email_policy_getconsumernamementioninstruction",
       "community": 300,
       "norm_label": "getconsumernamementioninstruction()"
@@ -22012,7 +22012,7 @@
       "label": "getRealisticWritingInstruction()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L69",
+      "source_location": "L68",
       "id": "services_pdkt_email_policy_getrealisticwritinginstruction",
       "community": 300,
       "norm_label": "getrealisticwritinginstruction()"
@@ -22021,7 +22021,7 @@
       "label": "buildPdktSystemInstruction()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L83",
+      "source_location": "L82",
       "id": "services_pdkt_email_policy_buildpdktsysteminstruction",
       "community": 300,
       "norm_label": "buildpdktsysteminstruction()"
@@ -22030,7 +22030,7 @@
       "label": "escapeRegExp()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L163",
+      "source_location": "L162",
       "id": "services_pdkt_email_policy_escaperegexp",
       "community": 300,
       "norm_label": "escaperegexp()"
@@ -22039,7 +22039,7 @@
       "label": "CONSUMER_PLACEHOLDER_PATTERNS",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L167",
+      "source_location": "L166",
       "id": "services_pdkt_email_policy_consumer_placeholder_patterns",
       "community": 300,
       "norm_label": "consumer_placeholder_patterns"
@@ -22048,7 +22048,7 @@
       "label": "replaceConsumerPlaceholders()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L172",
+      "source_location": "L171",
       "id": "services_pdkt_email_policy_replaceconsumerplaceholders",
       "community": 300,
       "norm_label": "replaceconsumerplaceholders()"
@@ -22057,7 +22057,7 @@
       "label": "cleanNameOccurrences()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L179",
+      "source_location": "L178",
       "id": "services_pdkt_email_policy_cleannameoccurrences",
       "community": 300,
       "norm_label": "cleannameoccurrences()"
@@ -22066,7 +22066,7 @@
       "label": "renderPdktIdentityByMentionPattern()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L219",
+      "source_location": "L218",
       "id": "services_pdkt_email_policy_renderpdktidentitybymentionpattern",
       "community": 300,
       "norm_label": "renderpdktidentitybymentionpattern()"
@@ -22075,7 +22075,7 @@
       "label": "validatePdktEmailPolicyCompliance()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L336",
+      "source_location": "L335",
       "id": "services_pdkt_email_policy_validatepdktemailpolicycompliance",
       "community": 300,
       "norm_label": "validatepdktemailpolicycompliance()"
@@ -22084,7 +22084,7 @@
       "label": "buildPdktRetryHint()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt-email-policy.ts",
-      "source_location": "L442",
+      "source_location": "L441",
       "id": "services_pdkt_email_policy_buildpdktretryhint",
       "community": 300,
       "norm_label": "buildpdktretryhint()"
@@ -37381,7 +37381,7 @@
       "label": "Phase 38: Database Legacy Parity Remediation",
       "file_type": "rationale",
       "source_file": "docs/rebuild-logs/phase-38-database-legacy-parity-remediation.md",
-      "community": 322,
+      "community": 9,
       "norm_label": "phase 38: database legacy parity remediation",
       "id": "phase_38_database_legacy_parity_remediation"
     },
@@ -37485,7 +37485,7 @@
       "label": "Phase 37: Database Legacy Parity Audit",
       "file_type": "rationale",
       "source_file": "docs/rebuild-logs/phase-37-database-legacy-parity-audit.md",
-      "community": 322,
+      "community": 9,
       "norm_label": "phase 37: database legacy parity audit",
       "id": "phase_37_database_legacy_parity_audit"
     },
@@ -121261,9 +121261,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_md",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_phase_93_pdkt_consumer_name_realistic_mode_hardening",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_phase_93_pdkt_consumer_name_realistic_mode_hardening"
     },
     {
       "relation": "contains",
@@ -121271,9 +121271,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_phase_93_pdkt_consumer_name_realistic_mode_hardening",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_implementation_details",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_implementation_details"
     },
     {
       "relation": "contains",
@@ -121281,9 +121281,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L23",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_phase_93_pdkt_consumer_name_realistic_mode_hardening",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_structural_changes",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_structural_changes"
     },
     {
       "relation": "contains",
@@ -121291,9 +121291,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L17",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_phase_93_pdkt_consumer_name_realistic_mode_hardening",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_verification_results",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_verification_results"
     },
     {
       "relation": "contains",
@@ -121301,9 +121301,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L7",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_implementation_details",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_centralized_policy_module",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_centralized_policy_module"
     },
     {
       "relation": "contains",
@@ -121311,9 +121311,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L12",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_implementation_details",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_template_session_integration",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_template_session_integration"
     },
     {
       "relation": "contains",
@@ -121321,9 +121321,9 @@
       "source_file": "docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md",
       "source_location": "L19",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_verification_results",
-      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_automated_tests",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_93_pdkt_consumer_name_realistic_mode_automated_tests"
     },
     {
       "relation": "contains",
@@ -124291,5 +124291,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "90d15e5db68ef1695ad74a56510ae083e3130aa7"
+  "built_at_commit": "16bb87a07364da7996c078dfe32559297a2d7080"
 }

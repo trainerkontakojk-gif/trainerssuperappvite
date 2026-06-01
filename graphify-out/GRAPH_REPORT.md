@@ -1,16 +1,16 @@
 # Graph Report - trainerssuperappvite  (2026-06-01)
 
 ## Corpus Check
-- 631 files · ~374,948 words
+- 631 files · ~375,216 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4216 nodes · 8220 edges · 333 communities (271 shown, 62 thin omitted)
+- 4216 nodes · 8220 edges · 332 communities (271 shown, 61 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 14 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `90d15e5d`
+- Built from commit: `16bb87a0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -322,7 +322,6 @@
 - [[_COMMUNITY_Community 319|Community 319]]
 - [[_COMMUNITY_Community 320|Community 320]]
 - [[_COMMUNITY_Community 321|Community 321]]
-- [[_COMMUNITY_Community 322|Community 322]]
 - [[_COMMUNITY_Community 323|Community 323]]
 - [[_COMMUNITY_Community 324|Community 324]]
 - [[_COMMUNITY_Community 325|Community 325]]
@@ -353,12 +352,12 @@
   docs/modules.md → apps/api/src/index.ts
 - `SIDAK (QA Analyzer)` --implements--> `Backend Hono API`  [INFERRED]
   docs/modules.md → apps/api/src/index.ts
-- `Phase 38: Database Legacy Parity Remediation` --references--> `SIDAK Service`  [EXTRACTED]
-  docs/rebuild-logs/phase-38-database-legacy-parity-remediation.md → apps/api/src/services/sidak-service.ts
 - `Backend Hono API` --calls--> `AI Usage Monitoring`  [EXTRACTED]
   apps/api/src/index.ts → docs/MONITORING_TOKEN_USAGE_BILLING.md
+- `Backend Hono API` --references--> `Supabase Postgres`  [EXTRACTED]
+  apps/api/src/index.ts → docs/database.md
 
-## Communities (333 total, 62 thin omitted)
+## Communities (332 total, 61 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.15
@@ -398,7 +397,7 @@ Nodes (15): AddIndicatorModalProps, EditIndicatorModalProps, IndicatorCategory, 
 
 ### Community 9 - "Community 9"
 Cohesion: 0.05
-Nodes (69): Phase 16: Dashboard Carbon Copy Parity, Phase 30: SIDAK Input Stability & QA Baseline Recovery, Phase 32: SIDAK Period Delete Fail-Closed Guard, Phase 57: SIDAK Import Duplicate Logic Fix, Phase 60: Top 5 Pengurang Skor Terbesar Legacy Parity, Phase 62: SIDAK Ranking Service Filter Fix, Phase 63: SIDAK Sesi Tanpa Temuan Legacy Parity, Phase 75: Maintainability Refactor (+61 more)
+Nodes (71): Phase 16: Dashboard Carbon Copy Parity, Phase 30: SIDAK Input Stability & QA Baseline Recovery, Phase 32: SIDAK Period Delete Fail-Closed Guard, Phase 37: Database Legacy Parity Audit, Phase 38: Database Legacy Parity Remediation, Phase 57: SIDAK Import Duplicate Logic Fix, Phase 60: Top 5 Pengurang Skor Terbesar Legacy Parity, Phase 62: SIDAK Ranking Service Filter Fix (+63 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.14
@@ -1387,7 +1386,7 @@ Nodes (9): 1. Backend: Accumulator Breakdown Kategori, 2. Frontend: Shared Usage
 ## Knowledge Gaps
 - **1686 isolated node(s):** `$schema`, `dependsOn`, `outputs`, `dependsOn`, `cache` (+1681 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **62 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **61 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -1396,7 +1395,7 @@ _Questions this graph is uniquely positioned to answer:_
   _High betweenness centrality (0.018) - this node is a cross-community bridge._
 - **Why does `LiveSession` connect `Community 100` to `Community 320`, `Community 67`, `Community 39`, `Community 74`, `Community 19`, `Community 215`?**
   _High betweenness centrality (0.009) - this node is a cross-community bridge._
-- **Why does `SIDAK Service` connect `Community 9` to `Community 322`, `Community 5`, `Community 88`, `Community 75`, `Community 301`, `Community 115`, `Community 53`, `Community 24`, `Community 59`, `Community 31`?**
+- **Why does `SIDAK Service` connect `Community 9` to `Community 5`, `Community 59`, `Community 75`, `Community 301`, `Community 115`, `Community 53`, `Community 24`, `Community 88`, `Community 31`?**
   _High betweenness centrality (0.009) - this node is a cross-community bridge._
 - **What connects `$schema`, `dependsOn`, `outputs` to the rest of the system?**
   _1741 weakly-connected nodes found - possible documentation gaps or missing edges._
