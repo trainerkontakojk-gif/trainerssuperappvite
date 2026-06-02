@@ -145,7 +145,37 @@ sidakRuleVersions.put("/rule-versions/:id", requireRole("admin", "trainer"), asy
   }
 });
 
+sidakRuleVersions.delete(
+  "/rule-versions/:id",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user");
+    try {
+      await sidakService.deleteRuleVersionDraft(id);
+      await logActivity({
+        user_id: user.id,
+        user_name: user.email ?? "",
+        action: `Menghapus draft QA Rule Version ID: ${id}`,
+        module: "SIDAK",
+        type: "delete",
+      });
+      return c.json({ success: true, message: "Draft berhasil dihapus" });
+    } catch (error: any) {
+      const isNotFound = error.message?.includes("tidak ditemukan");
+      return c.json(
+        {
+          success: false,
+          error: { code: isNotFound ? "NOT_FOUND" : "INTERNAL_ERROR", message: error.message },
+        },
+        isNotFound ? 404 : 400,
+      );
+    }
+  },
+);
+
 sidakRuleVersions.post(
+
   "/rule-versions/:id/publish",
   requireRole("admin", "trainer"),
   async (c) => {

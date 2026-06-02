@@ -43,11 +43,31 @@ export async function getRuleVersions(serviceType?: string) {
           (countMap[row.rule_version_id] || 0) + 1;
       }
     }
-    return data.map((v: any) => ({
+    const mapped = data.map((v: any) => ({
       ...v,
       created_by_user: profileMap.get(v.created_by) ?? null,
       indicator_count: countMap[v.id] || 0,
     }));
+
+    return mapped.sort((a: any, b: any) => {
+      const getVersionPeriodSortValue = (version: any) => {
+        const period = version.qa_periods;
+        if (!period) return 0;
+        return period.year * 100 + period.month;
+      };
+
+      const periodDelta = getVersionPeriodSortValue(b) - getVersionPeriodSortValue(a);
+      if (periodDelta !== 0) return periodDelta;
+
+      const statusRank = { draft: 3, published: 2, superseded: 1 } as const;
+      const aRank = (statusRank as any)[a.status] || 0;
+      const bRank = (statusRank as any)[b.status] || 0;
+      const statusDelta = bRank - aRank;
+      if (statusDelta !== 0) return statusDelta;
+
+      if (b.version_number !== a.version_number) return b.version_number - a.version_number;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
   }
 
   return data ?? [];
@@ -194,7 +214,28 @@ export async function createRuleVersion(
   return result;
 }
 
+export async function deleteRuleVersionDraft(id: string): Promise<void> {
+  const { data: existing, error: loadError } = await supabaseAdmin
+    .from("qa_service_rule_versions")
+    .select("id, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError) throw new Error(`Gagal memuat versi aturan: ${loadError.message}`);
+  if (!existing) throw new Error("Versi aturan tidak ditemukan");
+  if (existing.status !== "draft") throw new Error("Hanya versi draft yang bisa dihapus");
+
+  const { error } = await supabaseAdmin
+    .from("qa_service_rule_versions")
+    .delete()
+    .eq("id", id)
+    .eq("status", "draft");
+
+  if (error) throw new Error(`Gagal menghapus draft: ${error.message}`);
+}
+
 export async function updateRuleVersion(
+
   id: string,
   data: {
     critical_weight?: number;
@@ -261,6 +302,7 @@ export async function publishRuleVersion(
     .from("qa_service_rule_versions")
     .select("id")
     .eq("service_type", existing.service_type)
+    .eq("effective_period_id", targetPeriodId)
     .eq("status", "published")
     .neq("id", id);
 

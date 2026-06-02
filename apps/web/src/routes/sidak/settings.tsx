@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { notify } from "../../lib/toast";
 import type { ServiceType, RuleVersion, QARuleIndicator } from "@trainers/types";
-import { formatPeriodLabel } from "./settings/constants";
+import { formatPeriodLabel, SERVICE_LABELS } from "./settings/constants";
 import { RuleVersionPicker } from "./settings/components/RuleVersionPicker";
 import { ServiceWeightsPanel } from "./settings/components/ServiceWeightsPanel";
 import { RuleIndicatorsPanel } from "./settings/components/RuleIndicatorsPanel";
@@ -133,7 +133,13 @@ export default function SidakSettingsPage() {
   };
 
   const handleDeleteDraft = async (id: string) => {
-    if (!confirm("Hapus draft ini?")) return;
+    const v = versions?.find((x) => x.id === id);
+    const periodLabel = v ? getPeriodLabel(v.effective_period_id) : "";
+    const svcLabel = SERVICE_LABELS[activeTeam] || activeTeam;
+    const msg = v
+      ? `Hapus draft v${v.version_number} untuk ${svcLabel} efektif ${periodLabel}? Versi published tidak akan berubah.`
+      : "Hapus draft ini?";
+    if (!confirm(msg)) return;
     try {
       await deleteApi(`/sidak/rule-versions/${id}`);
       notify.success("Draft berhasil dihapus");

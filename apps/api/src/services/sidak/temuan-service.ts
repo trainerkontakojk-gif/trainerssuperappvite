@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "../../lib/supabase";
 import { roundTo } from "../../lib/math-utils";
 import { isCountableFinding } from "./shared-constants";
-import { getIndicators, resolveActivePublishedRuleVersion } from "./period-indicator";
+import { getIndicators } from "./period-indicator";
+import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import { getScoreRows } from "./dashboard-aggregation";
 import {
   calculateQAScoreFromTemuan,
@@ -33,6 +34,7 @@ export interface PreviewResult {
     no_tiket?: string | null;
   }[];
   stats: { valid_count: number; invalid_count: number; skipped_count: number };
+  active_rule_version_id?: string | null;
 }
 
 export async function getTemuan(params: {
@@ -88,7 +90,7 @@ export async function createPerfectScoreSession(
     throw new Error("Sesi tanpa temuan untuk periode ini sudah pernah dibuat.");
   }
 
-  const activeVersion = await resolveActivePublishedRuleVersion(service_type);
+  const activeVersion = await resolveEffectiveRuleVersionForPeriod(service_type, period_id);
   let indicators: { id: string; rule_indicator_id: string | null }[];
   let rule_version_id: string | null = null;
 
@@ -169,7 +171,8 @@ export async function validateTemuanBatch(items: {
   }[];
 }): Promise<PreviewResult> {
   const [activeVersion, validIndicators, existing] = await Promise.all([
-    resolveActivePublishedRuleVersion(items.service_type),
+    resolveEffectiveRuleVersionForPeriod(items.service_type, items.period_id),
+
     supabaseAdmin
       .from("qa_indicators")
       .select("id, name, service_type")
@@ -262,7 +265,9 @@ export async function validateTemuanBatch(items: {
       invalid_count: invalid.length,
       skipped_count: skipped.length,
     },
+    active_rule_version_id: activeVersion?.id ?? null,
   };
+
 }
 
 export async function createTemuanBatch(
@@ -301,8 +306,8 @@ export async function createTemuanBatch(
     };
   }
 
-  const activeVersion = await resolveActivePublishedRuleVersion(items.service_type);
-  const ruleVersionId = activeVersion?.id ?? null;
+  const ruleVersionId = validation.active_rule_version_id ?? null;
+
 
   const rows = validation.valid.map((item) => {
     const rawTicket = item.no_tiket ?? items.no_tiket ?? null;
@@ -454,15 +459,63 @@ export async function refreshDashboardSummary(
     findings_count: number;
   }[] = [];
 
+  const ruleWeightCache = new Map<string, any>();
+  const ruleIndicatorsCache = new Map<string, any[]>();
+
+  const getRuleWeight = async (svcType: string) => {
+    if (ruleWeightCache.has(svcType)) return ruleWeightCache.get(svcType);
+    const rule = await resolveEffectiveRuleVersionForPeriod(svcType, periodId);
+    let resolved = null;
+    if (rule) {
+      resolved = {
+        critical_weight: rule.critical_weight,
+        non_critical_weight: rule.non_critical_weight,
+        scoring_mode: rule.scoring_mode,
+      };
+    }
+    ruleWeightCache.set(svcType, resolved);
+    return resolved;
+  };
+
+  const getRuleIndicators = async (svcType: string) => {
+    if (ruleIndicatorsCache.has(svcType)) return ruleIndicatorsCache.get(svcType)!;
+    const rule = await resolveEffectiveRuleVersionForPeriod(svcType, periodId);
+    let resolvedInds: any[] = [];
+    if (rule) {
+      const { data: snapshotInds } = await supabaseAdmin
+        .from("qa_service_rule_indicators")
+        .select("*")
+        .eq("rule_version_id", rule.id);
+      if (snapshotInds && snapshotInds.length > 0) {
+        resolvedInds = snapshotInds.map((ri: any) => ({
+          id: ri.legacy_indicator_id || ri.id,
+          name: ri.name,
+          category: ri.category,
+          bobot: Number(ri.bobot),
+          has_na: ri.has_na,
+        }));
+      }
+    }
+    if (resolvedInds.length === 0) {
+      resolvedInds = indicators.filter((i) => i.service_type === svcType);
+    }
+    ruleIndicatorsCache.set(svcType, resolvedInds);
+    return resolvedInds;
+  };
+
   for (const agent of auditedAgents) {
     const agentSvc = agent.rows[0]?.service_type ?? svc;
+    const ruleWeight = await getRuleWeight(agentSvc);
     const weight =
+      ruleWeight ??
       weightMap[agentSvc] ??
       DEFAULT_SERVICE_WEIGHTS[agentSvc as ServiceType] ??
       DEFAULT_SERVICE_WEIGHTS.call;
 
+    const agentIndicators = await getRuleIndicators(agentSvc);
     const scoreRows = getScoreRows(agent.rows as DashboardTemuanRow[]);
-    const score = calculateQAScoreFromTemuan(indicators, scoreRows as any, weight);
+    const score = calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight);
+
 
     const findingRows = agent.rows.filter((r: any) => isCountableFinding(r));
     const agentFindings = findingRows.length;

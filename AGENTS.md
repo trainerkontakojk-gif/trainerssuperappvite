@@ -292,6 +292,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 99. **AI Usage Categories Extraction & KETIK Review State Machine** — Centralized AI action classification into `ai-usage-categories.ts` with 14-action definition map replacing inline `SIMULATION_ACTIONS`/`REVIEW_ACTIONS` sets. Extracted `/usage/summary` inline logic into `ai-usage-summary-service.ts` with enriched `breakdownItems` (per-key labeled items). Extracted KETIK review lifecycle state logic into pure `resolveKetikReviewState()` function with 12 deterministic transition cases. Added PDKT `attachmentWarning` AlertCard rendering. 5 new files, 13 files modified. (DONE)
 100. **Profiler Reorder Auth & Grid View** — Fix reorder authorization (bulk_reorder_profiler_peserta now handles service_role properly with auth.uid() bypass). Terminal migration `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` with dedup/validity checks. Backend error mapping (`mapReorderError` with human-friendly messages, removed fallback row-by-row update). Frontend API transport cleanup (replaced custom fetchApi with unified `getApi` helper). New grid view components: `ProfilerParticipantCard` (glassmorphism card) and `ProfilerParticipantGrid` (responsive CSS grid 1→4 cols). Sort disabled on filter with tooltip. 540 API + 509 web tests passing. (DONE)
 101. **SIDAK Input Selection Grid & Card Refactor** — Extracted shared `SidakSelectionCard`, `SidakSelectionGrid`, and `TemuanGroupGrid` components from inline code in `input.tsx`. Changed folder/agent/period selection from single-column vertical list to responsive multi-column grid (1→3 cols). Changed card layout from horizontal to vertical (`flex-col min-h-32 p-5`). Changed temuan list from `space-y-3` to responsive grid (1→3 cols). Exported `TemuanItem`/`TemuanGroup`/`TemuanGroupCardProps` interfaces. Updated all tests. 0 logic changes. (DONE)
+102. **SIDAK Parameter Period Isolation** — Period-aware rule version resolution with `resolveEffectiveRuleVersionForPeriod()`. Period-scoped superseding: publish hanya menggantikan versi published di periode target yang sama. Dashboard & summary menggunakan snapshot bobot/indikator per `(service_type, period_id)`. New `DELETE /rule-versions/:id` endpoint untuk hapus draft. Rule versions sorted newest-first di backend. Frontend: dynamic confirm dialog copy, sorted period dropdown, clarified publish warning. Tests updated with table-aware mock pattern. (DONE)
 
 ## Key Files Changed (Phase 58 — 100)
 
@@ -656,6 +657,19 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/components/sidak/TemuanGroupCard.tsx` — **Phase 101**: Exported TemuanItem/TemuanGroup/TemuanGroupCardProps interfaces; switched div→article; responsive edit button layout
 - `apps/web/src/__tests__/sidak-input-parity.test.tsx` — **Phase 101**: Updated vertical-list assertions to multi-column grid assertions
 - `docs/SIDAK_LOGIC_AND_SCORING.md` — **Phase 101**: Added UI note about responsive grid layout
+- `apps/api/src/services/sidak/rule-version-resolver.ts` — **NEW Phase 102**: Canonical `resolveEffectiveRuleVersionForPeriod(serviceType, periodId)` resolver — finds the latest published version whose effective period ≤ target period
+- `apps/api/src/routes/sidak/rule-versions.ts` — **Phase 102**: Added `DELETE /rule-versions/:id` endpoint (admin/trainer), draft-only guard with 404/400 error codes
+- `apps/api/src/services/sidak/rule-versions.ts` — **Phase 102**: Added `deleteRuleVersionDraft()` with status validation; `publishRuleVersion()` scoped to `effective_period_id`; version list sorted newest-first by target period
+- `apps/api/src/services/sidak/dashboard-data.ts` — **Phase 102**: Per-(service_type, period_id) rule weight & indicator resolution via concurrent `Promise.all` map; dashboard scoring uses period-specific snapshot
+- `apps/api/src/services/sidak/dashboard-trends.ts` — **Phase 102**: `calculateScore` callback now receives `periodId` for period-aware scoring
+- `apps/api/src/services/sidak/temuan-service.ts` — **Phase 102**: `validateTemuanBatch` and `createPerfectScoreSession` use `resolveEffectiveRuleVersionForPeriod`; `refreshDashboardSummary` uses per-period cached weights/indicators
+- `apps/api/src/services/sidak-service.ts` — **Phase 102**: Re-exports `rule-version-resolver` for test compatibility
+- `apps/web/src/routes/sidak/settings.tsx` — **Phase 102**: Dynamic confirm dialog with version/service/period name; imports `SERVICE_LABELS` and `getPeriodLabel`
+- `apps/web/src/routes/sidak/settings/components/PublishPreviewModal.tsx` — **Phase 102**: Period dropdown sorted newest-first; publish warning copy clarified to mention same-period-only superseding
+- `apps/api/src/__tests__/sidak-service.test.ts` — **Phase 102**: Refactored mock `pendingResolve` to table-aware pattern; updated `createPerfectScoreSession` tests with period/multi-version data
+- `apps/api/src/__tests__/sidak-versioning-parity.test.ts` — **Phase 102**: New tests for `publishRuleVersion` period-scoped superseding, `deleteRuleVersionDraft` (success, published-rejection, not-found), `resolveEffectiveRuleVersionForPeriod` (same period, earlier period, before-all)
+- `apps/web/src/__tests__/sidak-settings-parity.test.tsx` — **Phase 102**: New test for delete draft button triggering `deleteApi` with correct path and dynamic confirm message
+- `docs/rebuild-logs/phase-102-sidak-parameter-period-isolation.md` — **NEW Phase 102**: Documentation for parameter period isolation
 
 ## Routes Reference (apps/web)
 

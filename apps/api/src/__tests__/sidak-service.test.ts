@@ -15,14 +15,15 @@ function buildQuery(onAwait: () => any) {
   return q;
 }
 
-let pendingResolve: () => any = () => ({ data: [], error: null });
+let pendingResolve: (table?: string) => any = () => ({ data: [], error: null });
 
 vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
-    from: vi.fn(() => buildQuery(() => pendingResolve())),
+    from: vi.fn((table) => buildQuery(() => pendingResolve(table))),
   },
   createAdminClient: vi.fn(),
 }));
+
 
 vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn().mockResolvedValue({ success: true, text: '{"executiveSummary": "test summary"}' }),
@@ -143,17 +144,16 @@ describe("sidak-service", () => {
   describe("createTemuanBatch", () => {
     it("inserts valid rows after validation", async () => {
       let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null }; // rule_versions (validate)
-        if (callCount === 2)
-          return {
-            data: [{ id: "i1", name: "Test", service_type: "call" }],
-            error: null,
-          }; // indicators (validate)
-        if (callCount === 3) return { data: [], error: null }; // existing (validate)
-        if (callCount === 4) return { data: null, error: null }; // rule_versions (create)
-        return { data: [{ id: "t1" }], error: null }; // insert
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") return { data: [{ id: "i1", name: "Test", service_type: "call" }], error: null };
+        if (table === "qa_temuan") {
+          callCount++;
+          if (callCount === 1) return { data: [], error: null }; // select (existing)
+          return { data: [{ id: "t1" }], error: null }; // insert
+        }
+        return { data: [], error: null };
       };
       const r = await sidakService.createTemuanBatch({
         peserta_id: "p1",
@@ -165,16 +165,12 @@ describe("sidak-service", () => {
     });
 
     it("returns 0 for indicator not matching service_type", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null }; // rule_versions
-        if (callCount === 2)
-          return {
-            data: [{ id: "i1", name: "Wrong", service_type: "email" }],
-            error: null,
-          }; // indicators
-        return { data: [], error: null }; // existing
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") return { data: [{ id: "i1", name: "Wrong", service_type: "email" }], error: null };
+        if (table === "qa_temuan") return { data: [], error: null };
+        return { data: [], error: null };
       };
       const r = await sidakService.createTemuanBatch({
         peserta_id: "p1",
@@ -187,20 +183,19 @@ describe("sidak-service", () => {
 
     it("friendly msg for FK error", async () => {
       let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null }; // rule_versions (validate)
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") return { data: [{ id: "i1", name: "Test", service_type: "call" }], error: null };
+        if (table === "qa_temuan") {
+          callCount++;
+          if (callCount === 1) return { data: [], error: null }; // select (existing)
           return {
-            data: [{ id: "i1", name: "Test", service_type: "call" }],
-            error: null,
-          }; // indicators (validate)
-        if (callCount === 3) return { data: [], error: null }; // existing (validate)
-        if (callCount === 4) return { data: null, error: null }; // rule_versions (create)
-        return {
-          data: null,
-          error: { message: "violates foreign key constraint" },
-        }; // insert fails
+            data: null,
+            error: { message: "violates foreign key constraint" },
+          }; // insert fails
+        }
+        return { data: [], error: null };
       };
       await expect(
         sidakService.createTemuanBatch({
@@ -211,6 +206,7 @@ describe("sidak-service", () => {
         }),
       ).rejects.toThrow("Data tidak valid");
     });
+
   });
 
   describe("getTemuan", () => {
@@ -404,16 +400,16 @@ describe("sidak-service", () => {
 
   describe("validateTemuanBatch", () => {
     it("returns all valid when no issues", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null }; // rule_versions (none)
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
-          }; // indicators
-        return { data: [], error: null }; // existing (no dupes)
+          };
+        }
+        return { data: [], error: null };
       };
       const r = await sidakService.validateTemuanBatch({
         peserta_id: "p1",
@@ -428,16 +424,16 @@ describe("sidak-service", () => {
     });
 
     it("flags invalid indicator (wrong service_type)", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null }; // rule_versions
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Wrong", service_type: "email" }],
             error: null,
-          }; // indicators
-        return { data: [], error: null }; // existing
+          };
+        }
+        return { data: [], error: null };
       };
       const r = await sidakService.validateTemuanBatch({
         peserta_id: "p1",
@@ -450,19 +446,22 @@ describe("sidak-service", () => {
     });
 
     it("skips duplicates already in db", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null };
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
-        return {
-          data: [{ indicator_id: "i1", no_tiket: "TKT-123", service_type: "call" }],
-          error: null,
-        }; // already exists
+        }
+        if (table === "qa_temuan") {
+          return {
+            data: [{ indicator_id: "i1", no_tiket: "TKT-123", service_type: "call" }],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
       };
       const r = await sidakService.validateTemuanBatch({
         peserta_id: "p1",
@@ -476,20 +475,27 @@ describe("sidak-service", () => {
     });
 
     it("mentions Settings QA when indicator not in active rule version", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: { id: "v-active" }, error: null };
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") {
+          return {
+            data: [{ id: "v-active", service_type: "call", status: "published", effective_period_id: "per1", qa_periods: { id: "per1", month: 5, year: 2025 } }],
+            error: null,
+          };
+        }
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
-        if (callCount === 3) return { data: [], error: null };
-        return {
-          data: [{ legacy_indicator_id: "gi-other" }],
-          error: null,
-        };
+        }
+        if (table === "qa_service_rule_indicators") {
+          return {
+            data: [{ legacy_indicator_id: "gi-other" }],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
       };
       const r = await sidakService.validateTemuanBatch({
         peserta_id: "p1",
@@ -501,6 +507,7 @@ describe("sidak-service", () => {
       expect(r.invalid[0].error).toMatch(/Settings QA/);
     });
   });
+
 
   describe("resolveActivePublishedRuleVersion", () => {
     it("returns published version id", async () => {
@@ -532,19 +539,22 @@ describe("sidak-service", () => {
 
   describe("validateTemuanBatch - duplicate checks regression", () => {
     it("allows different tickets for same indicator", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null }; // rule version
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
-        return {
-          data: [{ indicator_id: "i1", no_tiket: "TKT-123", service_type: "call" }],
-          error: null,
-        }; // existing
+        }
+        if (table === "qa_temuan") {
+          return {
+            data: [{ indicator_id: "i1", no_tiket: "TKT-123", service_type: "call" }],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
       };
 
       const r = await sidakService.validateTemuanBatch({
@@ -552,7 +562,7 @@ describe("sidak-service", () => {
         period_id: "per1",
         service_type: "call",
         items: [
-          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-456" }, // Different ticket
+          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-456" },
         ],
       });
       expect(r.stats.skipped_count).toBe(0);
@@ -560,19 +570,22 @@ describe("sidak-service", () => {
     });
 
     it("skips duplicate in case-insensitive and trimmed matching", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null };
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
-        return {
-          data: [{ indicator_id: "i1", no_tiket: "  tkt-123  ", service_type: "call" }],
-          error: null,
-        };
+        }
+        if (table === "qa_temuan") {
+          return {
+            data: [{ indicator_id: "i1", no_tiket: "  tkt-123  ", service_type: "call" }],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
       };
 
       const r = await sidakService.validateTemuanBatch({
@@ -580,7 +593,7 @@ describe("sidak-service", () => {
         period_id: "per1",
         service_type: "call",
         items: [
-          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-123" }, // Should match case-insensitively and ignoring whitespace
+          { indicator_id: "i1", nilai: 2, no_tiket: "TKT-123" },
         ],
       });
       expect(r.stats.skipped_count).toBe(1);
@@ -588,19 +601,22 @@ describe("sidak-service", () => {
     });
 
     it("allows duplicate parameters if no_tiket is empty or null", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null };
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
-        return {
-          data: [{ indicator_id: "i1", no_tiket: null, service_type: "call" }],
-          error: null,
-        };
+        }
+        if (table === "qa_temuan") {
+          return {
+            data: [{ indicator_id: "i1", no_tiket: null, service_type: "call" }],
+            error: null,
+          };
+        }
+        return { data: [], error: null };
       };
 
       const r = await sidakService.validateTemuanBatch({
@@ -617,15 +633,15 @@ describe("sidak-service", () => {
     });
 
     it("handles intra-batch duplicate detection", async () => {
-      let callCount = 0;
-      pendingResolve = () => {
-        callCount++;
-        if (callCount === 1) return { data: null, error: null };
-        if (callCount === 2)
+      pendingResolve = (table) => {
+        if (table === "qa_periods") return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (table === "qa_service_rule_versions") return { data: null, error: null };
+        if (table === "qa_indicators") {
           return {
             data: [{ id: "i1", name: "Test", service_type: "call" }],
             error: null,
           };
+        }
         return { data: [], error: null };
       };
 
@@ -635,13 +651,14 @@ describe("sidak-service", () => {
         service_type: "call",
         items: [
           { indicator_id: "i1", nilai: 2, no_tiket: "TKT-999" },
-          { indicator_id: "i1", nilai: 1, no_tiket: "TKT-999" }, // duplicate within batch
+          { indicator_id: "i1", nilai: 1, no_tiket: "TKT-999" },
         ],
       });
       expect(r.stats.skipped_count).toBe(1);
       expect(r.stats.valid_count).toBe(1);
     });
   });
+
 
   describe("createPerfectScoreSession", () => {
     it("creates 5 × N phantom rows with nilai=3 and is_phantom_padding=true", async () => {
@@ -650,8 +667,9 @@ describe("sidak-service", () => {
         callCount++;
         if (callCount === 1) return { data: { year: 2025 }, error: null };
         if (callCount === 2) return { count: 0, error: null };
-        if (callCount === 3) return { data: { id: "ver1" }, error: null };
-        if (callCount === 4) return { data: [{ id: "ri1", indicator_id: "ind1" }, { id: "ri2", indicator_id: "ind2" }], error: null };
+        if (callCount === 3) return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (callCount === 4) return { data: [{ id: "ver1", service_type: "call", status: "published", effective_period_id: "per1", qa_periods: { id: "per1", month: 5, year: 2025 } }], error: null };
+        if (callCount === 5) return { data: [{ id: "ri1", indicator_id: "ind1" }, { id: "ri2", indicator_id: "ind2" }], error: null };
         return { data: [{ id: "p1", nilai: 3, is_phantom_padding: true, no_tiket: "__PHANTOM__batch_1" }], error: null };
       };
 
@@ -682,8 +700,9 @@ describe("sidak-service", () => {
         callCount++;
         if (callCount === 1) return { data: { year: 2025 }, error: null };
         if (callCount === 2) return { count: 0, error: null };
-        if (callCount === 3) return { data: null, error: null };
-        if (callCount >= 4) return { data: [], error: null };
+        if (callCount === 3) return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (callCount === 4) return { data: [], error: null };
+        if (callCount >= 5) return { data: [], error: null };
         return { data: null, error: null };
       };
 
@@ -698,9 +717,10 @@ describe("sidak-service", () => {
         callCount++;
         if (callCount === 1) return { data: { year: 2025 }, error: null };
         if (callCount === 2) return { count: 0, error: null };
-        if (callCount === 3) return { data: { id: "ver1" }, error: null };
-        if (callCount === 4) return { data: [], error: null };
-        if (callCount === 5) return { data: [{ id: "ind1" }, { id: "ind2" }], error: null };
+        if (callCount === 3) return { data: { id: "per1", month: 5, year: 2025 }, error: null };
+        if (callCount === 4) return { data: [{ id: "ver1", service_type: "call", status: "published", effective_period_id: "per1", qa_periods: { id: "per1", month: 5, year: 2025 } }], error: null };
+        if (callCount === 5) return { data: [], error: null };
+        if (callCount === 6) return { data: [{ id: "ind1" }, { id: "ind2" }], error: null };
         return { data: [{ id: "p1", nilai: 3, is_phantom_padding: true }], error: null };
       };
 
@@ -708,6 +728,7 @@ describe("sidak-service", () => {
       expect(result.length).toBeGreaterThan(0);
     });
   });
+
 
   describe("getAllFolders", () => {
     it("returns sorted folders from database", async () => {

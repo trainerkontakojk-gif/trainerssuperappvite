@@ -34,6 +34,10 @@ export function PublishPreviewModal({
   onPublish,
   onClose,
 }: PublishPreviewModalProps) {
+  const sortedPeriods = periods
+    ? [...periods].sort((a, b) => b.year - a.year || b.month - a.month)
+    : [];
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-background/80 backdrop-blur-md" onClick={onClose}>
       <motion.div
@@ -57,7 +61,7 @@ export function PublishPreviewModal({
             onChange={(e) => setPublishPeriodId(e.target.value)}
             className="w-full px-4 py-4 rounded-2xl border border-border bg-foreground/5 text-sm font-bold outline-none cursor-pointer hover:border-primary transition-all"
           >
-            {periods?.map((p) => (
+            {sortedPeriods.map((p) => (
               <option key={p.id} value={p.id}>
                 {formatPeriodLabel(p.month, p.year)}
               </option>
@@ -126,7 +130,7 @@ export function PublishPreviewModal({
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-[10px] font-bold text-amber-700 leading-relaxed uppercase tracking-wider">
-            Setelah dipublish, rule ini tidak dapat diubah lagi (Immutable). Versi published sebelumnya akan menjadi superseded.
+            Setelah dipublish, rule ini tidak dapat diubah lagi (Immutable). Hanya versi published di periode target yang sama yang akan digantikan.
           </p>
         </div>
 

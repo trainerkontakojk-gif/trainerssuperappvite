@@ -16,7 +16,7 @@ export type BuildDashboardTrendsParams = {
   startMonth?: number;
   endMonth?: number;
   isCountableFinding: (row: DashboardTemuanRow) => boolean;
-  calculateScore: (rows: DashboardTemuanRow[], serviceType: string) => number;
+  calculateScore: (rows: DashboardTemuanRow[], serviceType: string, periodId: string) => number;
 };
 
 export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
@@ -72,7 +72,7 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         const agentRows = agentPeriodGroups.get(agentKey)!;
         const svc = agentRows[0]?.service_type ?? "call";
         const scoreRows = getScoreRows(agentRows);
-        const finalScore = params.calculateScore(scoreRows, svc);
+        const finalScore = params.calculateScore(scoreRows, svc, period.id);
 
         const findingRows = agentRows.filter((r: any) => params.isCountableFinding(r));
         if (findingRows.length === 0) zeroCount++;

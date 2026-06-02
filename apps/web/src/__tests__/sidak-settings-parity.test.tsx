@@ -20,6 +20,7 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
 
+import { deleteApi } from "../hooks/useApi";
 import SidakSettingsPage from "../routes/sidak/settings";
 
 const mockPeriods = [
@@ -282,6 +283,39 @@ describe("Sidak settings page legacy parity", () => {
 
     await screen.findByText("Belum ada parameter baseline untuk service ini.", {}, { timeout: 3000 });
     expect(screen.getByText("Buat Baseline")).toBeInTheDocument();
+
+    vi.useFakeTimers();
+  });
+
+  it("calls deleteApi and refetches when clicking Hapus Draft", async () => {
+    vi.useRealTimers();
+    const refetchVersionsMock = vi.fn();
+    useApiMock.mockImplementation((path: string) => {
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: mockVersions, loading: false, error: null, refetch: refetchVersionsMock };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
+    });
+
+    vi.spyOn(window, "confirm").mockImplementation(() => true);
+
+    render(<SidakSettingsPage />);
+
+    // Click Hapus Draft
+    const deleteBtn = screen.getByRole("button", { name: /^Hapus Draft$/i });
+    fireEvent.click(deleteBtn);
+
+    expect(window.confirm).toHaveBeenCalledWith("Hapus draft v2 untuk Call efektif Mei 2026? Versi published tidak akan berubah.");
+    expect(deleteApi).toHaveBeenCalledWith("/sidak/rule-versions/v-draft");
+    
+    // Wait for the async call of deleteApi to resolve (since handleDeleteDraft has await deleteApi)
+    // The component should call refetchVersions()
+    await vi.waitFor(() => {
+      expect(refetchVersionsMock).toHaveBeenCalled();
+    });
 
     vi.useFakeTimers();
   });

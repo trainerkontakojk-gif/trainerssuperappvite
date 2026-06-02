@@ -23,6 +23,7 @@ import { roundTo } from "../../lib/math-utils";
 import { getFolderNamesByIds, getFoldersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
+import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 
 export async function getDashboardData(params: {
   period_ids?: string[];
@@ -127,6 +128,46 @@ export async function getDashboardData(params: {
     {},
   );
 
+  // 1. Find all unique combinations of (service_type, period_id) in rows
+  const uniqueCombos = new Set<string>();
+  for (const r of rows) {
+    if (r.service_type && r.period_id) {
+      uniqueCombos.add(`${r.service_type}:${r.period_id}`);
+    }
+  }
+
+  // 2. Resolve effective rule versions for each combo concurrently
+  const ruleWeightMap: Record<string, any> = {};
+  const ruleIndicatorsMap: Record<string, any[]> = {};
+
+  await Promise.all(
+    Array.from(uniqueCombos).map(async (combo) => {
+      const [svc, pid] = combo.split(":");
+      const rule = await resolveEffectiveRuleVersionForPeriod(svc, pid);
+      if (rule) {
+        ruleWeightMap[combo] = {
+          critical_weight: rule.critical_weight,
+          non_critical_weight: rule.non_critical_weight,
+          scoring_mode: rule.scoring_mode,
+        };
+        // Fetch indicators snapshot
+        const { data: snapshotInds } = await supabaseAdmin
+          .from("qa_service_rule_indicators")
+          .select("*")
+          .eq("rule_version_id", rule.id);
+        if (snapshotInds && snapshotInds.length > 0) {
+          ruleIndicatorsMap[combo] = snapshotInds.map((ri: any) => ({
+            id: ri.legacy_indicator_id || ri.id,
+            name: ri.name,
+            category: ri.category,
+            bobot: Number(ri.bobot),
+            has_na: ri.has_na,
+          }));
+        }
+      }
+    })
+  );
+
   const auditedAgents = groupTemuanByAgent(rows as DashboardTemuanRow[]);
   let totalFindings = 0;
   let totalScore = 0;
@@ -143,40 +184,79 @@ export async function getDashboardData(params: {
   let nonCriticalCount = 0;
 
   for (const agent of auditedAgents) {
-    const svc = agent.rows[0]?.service_type ?? "call";
-    const weight =
-      weightMap[svc] ??
-      DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ??
-      DEFAULT_SERVICE_WEIGHTS["call"];
+    // Group this agent's rows by period_id
+    const rowsByPeriod = new Map<string, DashboardTemuanRow[]>();
+    for (const r of agent.rows) {
+      if (!rowsByPeriod.has(r.period_id)) {
+        rowsByPeriod.set(r.period_id, []);
+      }
+      rowsByPeriod.get(r.period_id)!.push(r);
+    }
 
-    const scoreRows = getScoreRows(agent.rows);
-    const score = calculateQAScoreFromTemuan(indicators, scoreRows as any, weight);
+    let agentScoreSum = 0;
+    let agentPeriodsCount = 0;
+    let agentFindings = 0;
+    let hasCritical = false;
 
-    const findingRows = agent.rows.filter((r) => isCountableFinding(r));
-    const agentFindings = findingRows.length;
-    totalFindings += agentFindings;
-    totalScore += score.finalScore;
+    for (const [pid, periodRows] of rowsByPeriod) {
+      const svc = periodRows[0]?.service_type ?? "call";
+      const comboKey = `${svc}:${pid}`;
+      const weight =
+        ruleWeightMap[comboKey] ??
+        weightMap[svc] ??
+        DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ??
+        DEFAULT_SERVICE_WEIGHTS["call"];
 
-    if (agentFindings === 0) zeroErrorCount++;
-    if (score.finalScore >= complianceThreshold) complianceCount++;
+      const agentIndicators =
+        ruleIndicatorsMap[comboKey] ??
+        indicators.filter((i) => i.service_type === svc);
 
-    const agentServiceType = agent.rows[0]?.service_type ?? "unknown";
-    serviceDefects[agentServiceType] =
-      (serviceDefects[agentServiceType] ?? 0) + agentFindings;
+      const scoreRows = getScoreRows(periodRows);
+      const score = calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight);
 
-    for (const row of findingRows) {
-      const ind = indicators.find((i) => i.id === row.indicator_id);
-      if (ind) {
-        const key = ind.name;
-        paretoMap.set(key, {
-          name: key,
-          count: (paretoMap.get(key)?.count ?? 0) + 1,
-          cat: ind.category,
-        });
-        if (ind.category === "critical") criticalCount++;
-        else if (ind.category === "non_critical") nonCriticalCount++;
+      agentScoreSum += score.finalScore;
+      agentPeriodsCount++;
+
+      const findingRows = periodRows.filter((r) => isCountableFinding(r));
+      agentFindings += findingRows.length;
+
+      const agentServiceType = svc;
+      serviceDefects[agentServiceType] =
+        (serviceDefects[agentServiceType] ?? 0) + findingRows.length;
+
+      const periodHasCritical = periodRows.some((r) => {
+        if (r.is_phantom_padding === true) return false;
+        if (r.nilai === null || r.nilai === undefined || Number(r.nilai) !== 0) return false;
+        const ind = agentIndicators.find((i) => i.id === r.indicator_id) || indicators.find((i) => i.id === r.indicator_id);
+        return ind?.category === "critical";
+      });
+      if (periodHasCritical) hasCritical = true;
+
+      for (const row of findingRows) {
+        const ind = agentIndicators.find((i) => i.id === row.indicator_id) || indicators.find((i) => i.id === row.indicator_id);
+        if (ind) {
+          const key = ind.name;
+          paretoMap.set(key, {
+            name: key,
+            count: (paretoMap.get(key)?.count ?? 0) + 1,
+            cat: ind.category,
+          });
+          if (ind.category === "critical") criticalCount++;
+          else if (ind.category === "non_critical") nonCriticalCount++;
+        }
       }
     }
+
+    const finalAgentScore = agentPeriodsCount > 0 ? agentScoreSum / agentPeriodsCount : 100;
+    (agent as any).finalAgentScore = finalAgentScore;
+    (agent as any).agentFindings = agentFindings;
+    (agent as any).hasCritical = hasCritical;
+
+    totalFindings += agentFindings;
+    totalScore += finalAgentScore;
+
+    if (agentFindings === 0) zeroErrorCount++;
+    if (finalAgentScore >= complianceThreshold) complianceCount++;
   }
 
   const totalAgents = auditedAgents.length;
@@ -248,29 +328,16 @@ export async function getDashboardData(params: {
 
   const limit = params.limit !== undefined ? params.limit : 20;
   const topAgentsAll: TopAgentData[] = auditedAgents
-    .map((agent) => {
-      const svc = agent.rows[0]?.service_type ?? "call";
-      const weight =
-        weightMap[svc] ??
-        DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ??
-        DEFAULT_SERVICE_WEIGHTS["call"];
-      const scoreRows = getScoreRows(agent.rows);
-      const score = calculateQAScoreFromTemuan(indicators, scoreRows as any, weight);
-      const findingRows = agent.rows.filter((r) => isCountableFinding(r));
+    .map((agent: any) => {
       return {
         agentId: agent.id,
         nama: agent.nama,
         batch: agent.batch_name,
         tim: agent.tim,
         jabatan: agent.jabatan,
-        defects: findingRows.length,
-        score: roundTo(score.finalScore, 2),
-        hasCritical: agent.rows.some((r) => {
-          if (r.is_phantom_padding === true) return false;
-          if (r.nilai === null || r.nilai === undefined || Number(r.nilai) !== 0) return false;
-          const ind = indicators.find((i) => i.id === r.indicator_id);
-          return ind?.category === "critical";
-        }),
+        defects: agent.agentFindings,
+        score: roundTo(agent.finalAgentScore, 2),
+        hasCritical: agent.hasCritical,
       };
     })
     .sort((a, b) => b.defects - a.defects || a.nama.localeCompare(b.nama));
@@ -352,12 +419,17 @@ export async function getDashboardData(params: {
       startMonth: params.startMonth,
       endMonth: params.endMonth,
       isCountableFinding,
-      calculateScore: (scoreRows, serviceType) => {
+      calculateScore: (scoreRows, serviceType, periodId) => {
+        const comboKey = `${serviceType}:${periodId}`;
         const weight =
+          ruleWeightMap[comboKey] ??
           weightMap[serviceType] ??
           DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
           DEFAULT_SERVICE_WEIGHTS.call;
-        return calculateQAScoreFromTemuan(indicators, scoreRows as any, weight).finalScore;
+        const agentIndicators =
+          ruleIndicatorsMap[comboKey] ??
+          indicators.filter((i) => i.service_type === serviceType);
+        return calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight).finalScore;
       },
     }),
     availableYears,
