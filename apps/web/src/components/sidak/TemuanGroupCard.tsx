@@ -1,8 +1,7 @@
-import { Check, Pencil, Trash2, X } from "lucide-react";
-import NilaiBadge from "./NilaiBadge";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import { NILAI_LABELS } from "../../lib/scoring";
 
-interface TemuanItem {
+export interface TemuanItem {
   id: string;
   indicator_id: string;
   nilai: number;
@@ -12,8 +11,14 @@ interface TemuanItem {
   [key: string]: unknown;
 }
 
-interface Props {
-  group: { key: string; label: string | null; items: TemuanItem[] };
+export interface TemuanGroup {
+  key: string;
+  label: string | null;
+  items: TemuanItem[];
+}
+
+export interface TemuanGroupCardProps {
+  group: TemuanGroup;
   gIdx: number;
   indicatorLabelMap: Map<string, string>;
   categoryMap: Map<string, string>;
@@ -52,9 +57,9 @@ export default function TemuanGroupCard({
   editKetidaksesuaian, editSebaiknya, deletingId, canEdit,
   onStartEdit, onCancelEdit, onSaveEdit, onDelete,
   setEditNilai, setEditKetidaksesuaian, setEditSebaiknya,
-}: Props) {
+}: TemuanGroupCardProps) {
   return (
-    <div className="border border-border rounded-2xl overflow-hidden bg-card shadow-sm">
+    <article className="min-w-0 border border-border rounded-2xl overflow-hidden bg-card shadow-sm">
       {/* Session header */}
       <div className="flex items-center gap-3 px-5 py-3 bg-foreground/[0.02] border-b border-border">
         <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 font-black text-[10px]">
@@ -115,7 +120,7 @@ export default function TemuanGroupCard({
                       />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => onSaveEdit(item.id)}
@@ -200,6 +205,6 @@ export default function TemuanGroupCard({
           );
         })}
       </div>
-    </div>
+    </article>
   );
 }

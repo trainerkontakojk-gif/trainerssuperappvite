@@ -52,33 +52,49 @@ describe("SidakInputPage — navigation pre-fill contract", () => {
   });
 });
 
-describe("SidakInputPage — vertical list layout parity", () => {
-  it("uses single-column layout (grid gap-2, not multi-column grid-cols-*)", () => {
-    const gridSingleCol = "grid gap-2";
-    expect(gridSingleCol).toContain("gap-2");
-    expect(gridSingleCol).not.toContain("grid-cols-");
+describe("SidakInputPage — temuan grid layout", () => {
+  it("uses a responsive multi-column grid for temuan groups", () => {
+    const gridClass = "grid grid-cols-1 items-start gap-4 md:grid-cols-2 2xl:grid-cols-3";
+    expect(gridClass).toContain("grid-cols-1");
+    expect(gridClass).toContain("md:grid-cols-2");
+    expect(gridClass).toContain("2xl:grid-cols-3");
+    expect(gridClass).toContain("items-start");
+    expect(gridClass).not.toContain("space-y-3");
+  });
+});
+
+describe("SidakInputPage — selection card layout", () => {
+  it("uses a wider container for selection steps so the grid can actually breathe", () => {
+    const containerClass = "mx-auto max-w-6xl space-y-6";
+    expect(containerClass).toContain("max-w-6xl");
+    expect(containerClass).not.toContain("max-w-3xl");
   });
 
-  it("folder card has icon|name|chevron pattern", () => {
+  it("folder selection uses responsive grid and selection card layout", () => {
+    const gridClass = "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3";
     const cardClass =
-      "flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left";
-    expect(cardClass).toContain("flex items-center gap-4");
-    expect(cardClass).toContain("px-5 py-4");
-    expect(cardClass).toContain("rounded-2xl");
+      "group flex min-h-32 cursor-pointer flex-col items-start justify-between rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.03] focus:outline-none focus:ring-2 focus:ring-primary/40";
+
+    expect(gridClass).toContain("grid-cols-1");
+    expect(gridClass).toContain("sm:grid-cols-2");
+    expect(gridClass).toContain("xl:grid-cols-3");
+    expect(cardClass).toContain("min-h-32");
+    expect(cardClass).toContain("flex-col");
+    expect(cardClass).not.toContain("px-5 py-4");
   });
 
-  it("agent card has avatar|name+tim|chevron pattern", () => {
+  it("agent card has selection card layout", () => {
     const cardClass =
-      "flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left";
-    expect(cardClass).toContain("flex items-center gap-4");
-    expect(cardClass).toContain("px-5 py-4");
+      "group flex min-h-32 cursor-pointer flex-col items-start justify-between rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.03] focus:outline-none focus:ring-2 focus:ring-primary/40";
+    expect(cardClass).toContain("min-h-32");
+    expect(cardClass).toContain("flex-col");
   });
 
-  it("period card has month-badge|name+year|chevron pattern", () => {
+  it("period card has selection card layout", () => {
     const cardClass =
-      "flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left";
-    expect(cardClass).toContain("flex items-center gap-4");
-    expect(cardClass).toContain("px-5 py-4");
+      "group flex min-h-32 cursor-pointer flex-col items-start justify-between rounded-2xl border border-border bg-card p-5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.03] focus:outline-none focus:ring-2 focus:ring-primary/40";
+    expect(cardClass).toContain("min-h-32");
+    expect(cardClass).toContain("flex-col");
   });
 });
 

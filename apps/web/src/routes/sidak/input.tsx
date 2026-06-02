@@ -9,8 +9,10 @@ import {
   AlertTriangle, Eye, EyeOff,
 } from "lucide-react";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
-import TemuanGroupCard from "../../components/sidak/TemuanGroupCard";
+import TemuanGroupGrid from "../../components/sidak/TemuanGroupGrid";
 import SidakInputScoreCard from "../../components/sidak/SidakInputScoreCard";
+import SidakSelectionCard from "../../components/sidak/SidakSelectionCard";
+import SidakSelectionGrid from "../../components/sidak/SidakSelectionGrid";
 import SidakInputManualForm from "../../components/sidak/SidakInputManualForm";
 import SidakInputImportPanel from "../../components/sidak/SidakInputImportPanel";
 import {
@@ -378,7 +380,7 @@ export default function SidakInputPage() {
   return (
     <main className="flex-1 flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className={`mx-auto space-y-6 ${step === "list" ? "max-w-6xl" : "max-w-3xl"}`}>
+        <div className="mx-auto max-w-6xl space-y-6">
           {/* COMPACT BREADCRUMB */}
           <div className="flex items-center gap-1 text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap overflow-x-auto pb-1">
             <button
@@ -489,27 +491,18 @@ export default function SidakInputPage() {
                   description="Tidak ada folder yang tersedia untuk input temuan."
                 />
               ) : (
-                <div className="grid gap-2">
+                <SidakSelectionGrid testId="folder-selection-grid">
                   {displayFolders.map((f, i) => (
-                    <motion.button
+                    <SidakSelectionCard
                       key={f.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.02 }}
-                      type="button"
+                      delay={i * 0.02}
+                      icon={<FolderOpen className="h-5 w-5" />}
+                      title={f.name}
                       onClick={() => handleFolderClick(f.name)}
-                      className="flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <FolderOpen className="w-5 h-5" />
-                      </div>
-                      <span className="flex-1 font-semibold text-sm text-foreground/90 truncate">
-                        {f.name}
-                      </span>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                    </motion.button>
+                      testId="folder-selection-card"
+                    />
                   ))}
-                </div>
+                </SidakSelectionGrid>
               )}
             </motion.div>
           )}
@@ -531,17 +524,15 @@ export default function SidakInputPage() {
               </div>
 
               {loading ? (
-                <div className="grid gap-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-card/50 border border-border animate-pulse">
-                      <div className="w-10 h-10 rounded-full bg-foreground/10 shrink-0" />
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-3 w-28 bg-foreground/10 rounded" />
-                        <div className="h-2.5 w-20 bg-foreground/10 rounded" />
-                      </div>
+                <SidakSelectionGrid testId="agent-selection-skeleton">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="min-h-32 rounded-2xl border border-border bg-card/50 p-5 animate-pulse">
+                      <div className="h-11 w-11 rounded-xl bg-foreground/10" />
+                      <div className="mt-5 h-3 w-28 rounded bg-foreground/10" />
+                      <div className="mt-2 h-2.5 w-20 rounded bg-foreground/10" />
                     </div>
                   ))}
-                </div>
+                </SidakSelectionGrid>
               ) : agents.length === 0 ? (
                 <QaStatePanel
                   type="empty"
@@ -549,32 +540,19 @@ export default function SidakInputPage() {
                   description={`Tidak ditemukan agen untuk folder "${selectedFolder}".`}
                 />
               ) : (
-                <div className="grid gap-2">
+                <SidakSelectionGrid testId="agent-selection-grid">
                   {agents.map((agent, i) => (
-                    <motion.button
+                    <SidakSelectionCard
                       key={agent.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.02 }}
-                      type="button"
+                      delay={i * 0.02}
+                      icon={<span className="text-sm font-black">{agent.nama.charAt(0).toUpperCase()}</span>}
+                      title={agent.nama}
+                      subtitle={agent.batch_name || agent.tim || "-"}
                       onClick={() => handleAgentClick(agent)}
-                      className="flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-sm shrink-0">
-                        {agent.nama.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-foreground/90 truncate">
-                          {agent.nama}
-                        </div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {agent.batch_name || agent.tim || "-"}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                    </motion.button>
+                      testId="agent-selection-card"
+                    />
                   ))}
-                </div>
+                </SidakSelectionGrid>
               )}
             </motion.div>
           )}
@@ -596,17 +574,15 @@ export default function SidakInputPage() {
               </div>
 
               {loading ? (
-                <div className="grid gap-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-card/50 border border-border animate-pulse">
-                      <div className="w-10 h-10 rounded-xl bg-foreground/10 shrink-0" />
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-3 w-24 bg-foreground/10 rounded" />
-                        <div className="h-2.5 w-16 bg-foreground/10 rounded" />
-                      </div>
+                <SidakSelectionGrid testId="period-selection-skeleton">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="min-h-32 rounded-2xl border border-border bg-card/50 p-5 animate-pulse">
+                      <div className="h-11 w-11 rounded-xl bg-foreground/10" />
+                      <div className="mt-5 h-3 w-24 rounded bg-foreground/10" />
+                      <div className="mt-2 h-2.5 w-16 rounded bg-foreground/10" />
                     </div>
                   ))}
-                </div>
+                </SidakSelectionGrid>
               ) : !periods || periods.length === 0 ? (
                 <QaStatePanel
                   type="empty"
@@ -614,32 +590,19 @@ export default function SidakInputPage() {
                   description="Tidak ada periode audit yang tersedia."
                 />
               ) : (
-                <div className="grid gap-2">
+                <SidakSelectionGrid testId="period-selection-grid">
                   {periods.map((p, i) => (
-                    <motion.button
+                    <SidakSelectionCard
                       key={p.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.02 }}
-                      type="button"
+                      delay={i * 0.02}
+                      icon={<span className="text-sm font-black text-indigo-500">{String(p.month).padStart(2, "0")}</span>}
+                      title={MONTHS[p.month - 1]}
+                      subtitle={String(p.year)}
                       onClick={() => handlePeriodClick(p)}
-                      className="flex items-center gap-4 px-5 py-4 bg-card border border-border hover:border-primary/40 rounded-2xl group transition-all text-left"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-black text-sm shrink-0">
-                        {String(p.month).padStart(2, "0")}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-foreground/90">
-                          {MONTHS[p.month - 1]}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {p.year}
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                    </motion.button>
+                      testId="period-selection-card"
+                    />
                   ))}
-                </div>
+                </SidakSelectionGrid>
               )}
             </motion.div>
           )}
@@ -837,11 +800,14 @@ export default function SidakInputPage() {
 
               {/* TEMUAN LIST */}
               {loading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  data-testid="temuan-grid-skeleton"
+                  className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3"
+                >
+                  {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
-                      className="h-24 rounded-2xl bg-card/50 border border-border animate-pulse"
+                      className="min-h-40 rounded-2xl bg-card/50 border border-border animate-pulse"
                     />
                   ))}
                 </div>
@@ -861,30 +827,24 @@ export default function SidakInputPage() {
                   }
                 />
               ) : (
-                <div className="space-y-3">
-                  {groupedTemuan.map((group, gIdx) => (
-                    <TemuanGroupCard
-                      key={group.key}
-                      group={group as any}
-                      gIdx={gIdx}
-                      indicatorLabelMap={indicatorLabelMap}
-                      categoryMap={categoryMap}
-                      editingId={editHook.editingId}
-                      editNilai={editHook.editNilai}
-                      editKetidaksesuaian={editHook.editKetidaksesuaian}
-                      editSebaiknya={editHook.editSebaiknya}
-                      deletingId={editHook.deletingId}
-                      canEdit={role !== "leader"}
-                      onStartEdit={editHook.startEdit}
-                      onCancelEdit={editHook.cancelEdit}
-                      onSaveEdit={editHook.handleSaveEdit}
-                      onDelete={editHook.handleDelete}
-                      setEditNilai={editHook.setEditNilai}
-                      setEditKetidaksesuaian={editHook.setEditKetidaksesuaian}
-                      setEditSebaiknya={editHook.setEditSebaiknya}
-                    />
-                  ))}
-                </div>
+                <TemuanGroupGrid
+                  groups={groupedTemuan}
+                  indicatorLabelMap={indicatorLabelMap}
+                  categoryMap={categoryMap}
+                  editingId={editHook.editingId}
+                  editNilai={editHook.editNilai}
+                  editKetidaksesuaian={editHook.editKetidaksesuaian}
+                  editSebaiknya={editHook.editSebaiknya}
+                  deletingId={editHook.deletingId}
+                  canEdit={role !== "leader"}
+                  onStartEdit={editHook.startEdit}
+                  onCancelEdit={editHook.cancelEdit}
+                  onSaveEdit={editHook.handleSaveEdit}
+                  onDelete={editHook.handleDelete}
+                  setEditNilai={editHook.setEditNilai}
+                  setEditKetidaksesuaian={editHook.setEditKetidaksesuaian}
+                  setEditSebaiknya={editHook.setEditSebaiknya}
+                />
               )}
             </motion.div>
           )}

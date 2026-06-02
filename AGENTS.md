@@ -291,6 +291,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 98. **Lint Debt & Gemini 3.5 Flash** — Cleaned up lint debt (unused imports, `require()` → static import, Error `cause` param) and integrated Gemini 3.5 Flash model across all modules via shared `TEXT_SIMULATION_MODELS` registry. Added smoke test, unit tests, and SIDAK Report AI model filtering. 15+ files modified. (DONE)
 99. **AI Usage Categories Extraction & KETIK Review State Machine** — Centralized AI action classification into `ai-usage-categories.ts` with 14-action definition map replacing inline `SIMULATION_ACTIONS`/`REVIEW_ACTIONS` sets. Extracted `/usage/summary` inline logic into `ai-usage-summary-service.ts` with enriched `breakdownItems` (per-key labeled items). Extracted KETIK review lifecycle state logic into pure `resolveKetikReviewState()` function with 12 deterministic transition cases. Added PDKT `attachmentWarning` AlertCard rendering. 5 new files, 13 files modified. (DONE)
 100. **Profiler Reorder Auth & Grid View** — Fix reorder authorization (bulk_reorder_profiler_peserta now handles service_role properly with auth.uid() bypass). Terminal migration `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` with dedup/validity checks. Backend error mapping (`mapReorderError` with human-friendly messages, removed fallback row-by-row update). Frontend API transport cleanup (replaced custom fetchApi with unified `getApi` helper). New grid view components: `ProfilerParticipantCard` (glassmorphism card) and `ProfilerParticipantGrid` (responsive CSS grid 1→4 cols). Sort disabled on filter with tooltip. 540 API + 509 web tests passing. (DONE)
+101. **SIDAK Input Selection Grid & Card Refactor** — Extracted shared `SidakSelectionCard`, `SidakSelectionGrid`, and `TemuanGroupGrid` components from inline code in `input.tsx`. Changed folder/agent/period selection from single-column vertical list to responsive multi-column grid (1→3 cols). Changed card layout from horizontal to vertical (`flex-col min-h-32 p-5`). Changed temuan list from `space-y-3` to responsive grid (1→3 cols). Exported `TemuanItem`/`TemuanGroup`/`TemuanGroupCardProps` interfaces. Updated all tests. 0 logic changes. (DONE)
 
 ## Key Files Changed (Phase 58 — 100)
 
@@ -646,6 +647,15 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/profiler-grid-view.test.tsx` — **NEW Phase 100**: Frontend tests for ProfilerParticipantCard and ProfilerParticipantGrid
 - `docs/rebuild-logs/phase-100-profiler-reorder-auth-and-grid-view.md` — **NEW Phase 100**: Documentation for profiler reorder auth fix and grid view
 - `apps/web/src/routes/profiler/components/table/ProfilerTableView.tsx` — **Phase 100**: Deleted — replaced by grid view components
+- `apps/web/src/components/sidak/SidakSelectionCard.tsx` — **NEW Phase 101**: Unified vertical selection card (flex-col, min-h-32, rounded-2xl, p-5) with icon/title/subtitle/animation
+- `apps/web/src/components/sidak/SidakSelectionGrid.tsx` — **NEW Phase 101**: Responsive grid container (1→2→3 cols) for selection cards
+- `apps/web/src/components/sidak/TemuanGroupGrid.tsx` — **NEW Phase 101**: Responsive grid container (1→2→3 cols) for temuan group cards with Omit-based handler forwarding
+- `apps/web/src/__tests__/sidak-selection-grid.test.tsx` — **NEW Phase 101**: Grid layout and card contract tests
+- `apps/web/src/__tests__/temuan-group-grid.test.tsx` — **NEW Phase 101**: TemuanGroupGrid responsive class + indicator label tests
+- `apps/web/src/routes/sidak/input.tsx` — **Phase 101**: Replaced inline folder/agent/period card JSX with SidakSelectionCard/SidakSelectionGrid; replaced inline temuan map with TemuanGroupGrid; always max-w-6xl container
+- `apps/web/src/components/sidak/TemuanGroupCard.tsx` — **Phase 101**: Exported TemuanItem/TemuanGroup/TemuanGroupCardProps interfaces; switched div→article; responsive edit button layout
+- `apps/web/src/__tests__/sidak-input-parity.test.tsx` — **Phase 101**: Updated vertical-list assertions to multi-column grid assertions
+- `docs/SIDAK_LOGIC_AND_SCORING.md` — **Phase 101**: Added UI note about responsive grid layout
 
 ## Routes Reference (apps/web)
 
