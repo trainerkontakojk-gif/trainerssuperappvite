@@ -1,16 +1,16 @@
-# Graph Report - trainerssuperappvite  (2026-06-01)
+# Graph Report - trainerssuperappvite  (2026-06-02)
 
 ## Corpus Check
-- 662 files · ~384,932 words
+- 674 files · ~389,626 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4371 nodes · 8683 edges · 345 communities (282 shown, 63 thin omitted)
+- 4431 nodes · 8787 edges · 347 communities (284 shown, 63 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 14 edges (avg confidence: 0.84)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `670e924b`
+- Built from commit: `aa9acc53`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -331,6 +331,7 @@
 - [[_COMMUNITY_Community 328|Community 328]]
 - [[_COMMUNITY_Community 329|Community 329]]
 - [[_COMMUNITY_Community 330|Community 330]]
+- [[_COMMUNITY_Community 331|Community 331]]
 - [[_COMMUNITY_Community 332|Community 332]]
 - [[_COMMUNITY_Community 333|Community 333]]
 - [[_COMMUNITY_Community 334|Community 334]]
@@ -342,7 +343,9 @@
 - [[_COMMUNITY_Community 340|Community 340]]
 - [[_COMMUNITY_Community 341|Community 341]]
 - [[_COMMUNITY_Community 342|Community 342]]
+- [[_COMMUNITY_Community 343|Community 343]]
 - [[_COMMUNITY_Community 344|Community 344]]
+- [[_COMMUNITY_Community 346|Community 346]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `SIDAK Service` - 101 edges
@@ -368,11 +371,11 @@
 - `Backend Hono API` --calls--> `AI Usage Monitoring`  [EXTRACTED]
   apps/api/src/index.ts → docs/MONITORING_TOKEN_USAGE_BILLING.md
 
-## Communities (345 total, 63 thin omitted)
+## Communities (347 total, 63 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.31
-Nodes (8): getConsumerTypes(), buildTelefunLiveSystemInstruction(), getConsumerTypeHint(), getEmotionInstruction(), getHighUrgencyReasonHint(), getLowUrgencyReasonHint(), getTimeCueInstruction(), TelefunIdentity
+Cohesion: 0.16
+Nodes (17): DIRECT_GEMINI_MODELS, getModelsForModule(), LEGACY_ALIASES, fetchAiModels(), AIModule, AiUsageLog, AI_MODELS, AiModelCapabilities (+9 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.14
@@ -383,8 +386,8 @@ Cohesion: 0.02
 Nodes (77): AccountPage, accountRoute, DashboardAccessApproval, dashboardAccessApprovalRoute, DashboardAccessGroups, dashboardAccessGroupsRoute, DashboardActivities, dashboardActivitiesRoute (+69 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.19
-Nodes (24): SettingsModal(), SettingsModalProps, KetikConsumersTab(), KetikConsumersTabProps, normalizeKetikConsumerDraft(), normalizeKetikQuickTemplateDraft(), normalizeKetikScenarioDraft(), KetikIdentityTab() (+16 more)
+Cohesion: 0.14
+Nodes (31): SettingsModal(), SettingsModalProps, useCrudForm(), UseCrudFormOptions, notify, KetikConsumersTab(), KetikConsumersTabProps, normalizeKetikConsumerDraft() (+23 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.06
@@ -392,27 +395,27 @@ Nodes (22): supabase, verifyToken(), admin, createSession(), getOwnedSessionId()
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
-Nodes (68): Variables, AccessGroupRow, AccessScopeAgentOption, ActivityLog, addAccessGroupItemSchema, ApprovedLeaderAccess, approveLeaderRequestSchema, createAccessGroupSchema (+60 more)
+Nodes (56): Variables, AccessGroupRow, AccessScopeAgentOption, addAccessGroupItemSchema, approveLeaderRequestSchema, createAccessGroupSchema, LeaderAccessStatusItem, LeaderAccessStatusMap (+48 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.04
 Nodes (48): dependencies, exceljs, framer-motion, hono, html2canvas, jspdf, lucide-react, pptxgenjs (+40 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.11
-Nodes (27): extractJsonObjectText(), extractRobust(), parseJsonFromModelText(), analyzeVoiceQuality(), generateCoachingSummary(), VOICE_ASSESSMENT_SCHEMA, buildTelefunFeedbackSummary(), buildTelefunSessionInsertPayload() (+19 more)
+Cohesion: 0.12
+Nodes (23): analyzeVoiceQuality(), generateCoachingSummary(), buildTelefunFeedbackSummary(), buildTelefunSessionInsertPayload(), buildTelefunSessionUpdatePayload(), buildTelefunSettingsUpsertPayload(), isTelefunRecordingPathOwnedBySession(), REPLAY_ANNOTATION_SCHEMA (+15 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.15
-Nodes (12): calculateSessionScoreFromTemuan(), DEFAULT_SERVICE_WEIGHTS, scoreSession(), NILAI_BADGE_COLORS, QAScoreResult, ParsedImportRow, Props, SidakInputImportPanel() (+4 more)
+Nodes (13): calculateSessionScoreFromTemuan(), DEFAULT_SERVICE_WEIGHTS, scoreSession(), NILAI_BADGE_COLORS, QAScoreResult, ParsedImportRow, Props, SidakInputImportPanel() (+5 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.06
 Nodes (77): Phase 16: Dashboard Carbon Copy Parity, Phase 30: SIDAK Input Stability & QA Baseline Recovery, Phase 32: SIDAK Period Delete Fail-Closed Guard, Phase 57: SIDAK Import Duplicate Logic Fix, Phase 60: Top 5 Pengurang Skor Terbesar Legacy Parity, Phase 62: SIDAK Ranking Service Filter Fix, Phase 63: SIDAK Sesi Tanpa Temuan Legacy Parity, Phase 75: Maintainability Refactor (+69 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.11
-Nodes (31): createUserClient(), aiRateLimitMiddleware(), aiStore, getKey(), globalStore, RateLimitEntry, rateLimitMiddleware(), requireRole() (+23 more)
+Cohesion: 0.10
+Nodes (31): createUserClient(), aiRateLimitMiddleware(), aiStore, getKey(), globalStore, RateLimitEntry, rateLimitMiddleware(), history (+23 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.16
@@ -423,24 +426,24 @@ Cohesion: 0.10
 Nodes (19): checkFotos(), checkFotoUrl(), DuplicateGroup, DuplicateReport, FotoBroken, FotoMissing, FotoRecord, FotoReport (+11 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.09
-Nodes (37): KETIK Service, TEXT_SIMULATION_MODELS, Phase 48: KETIK Legacy Parity Upgrade, ketik, Variables, buildTimeLimitInstruction(), claimAndProcessKetikReviewJob(), clearHistory() (+29 more)
+Cohesion: 0.13
+Nodes (34): KETIK Service, TEXT_SIMULATION_MODELS, createAdminClient(), Phase 48: KETIK Legacy Parity Upgrade, buildTimeLimitInstruction(), claimAndProcessKetikReviewJob(), clearHistory(), coerceDuration() (+26 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.24
-Nodes (15): AddIndicatorModalProps, EditIndicatorModalProps, IndicatorCategory, IndicatorFormState, IndicatorPayload, RuleScoringMode, createEmptyIndicatorForm(), indicatorFormToPayload() (+7 more)
+Cohesion: 0.22
+Nodes (16): AddIndicatorModal(), AddIndicatorModalProps, EditIndicatorModal(), EditIndicatorModalProps, IndicatorCategory, IndicatorFormState, IndicatorPayload, RuleScoringMode (+8 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.11
 Nodes (16): aiUsageLogRecordArb, applySeedDoNothing(), applySeedDoUpdate(), ConflictStrategy, conflictStrategyArb, IdempotentTable, nonProductionDbUrlArb, nonProductionNodeEnvArb (+8 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.10
-Nodes (24): DashboardLayout(), DashboardLayoutContent(), getHeaderContent(), MANAGEMENT_LINKS, SIDAK_CHILDREN, MaintenanceModal(), MaintenanceModalProps, TelefunWarningContext (+16 more)
+Cohesion: 0.14
+Nodes (17): DashboardLayout(), DashboardLayoutContent(), getHeaderContent(), MANAGEMENT_LINKS, SIDAK_CHILDREN, MaintenanceModal(), MaintenanceModalProps, TelefunWarningContext (+9 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.09
-Nodes (32): checkFotoUrl(), cleanEmptyStrings(), copyPesertaToFolder(), createFolder(), createPeserta(), createTeam(), createYear(), deleteFolder() (+24 more)
+Nodes (34): bulkReorderPeserta(), checkFotoUrl(), cleanEmptyStrings(), copyPesertaToFolder(), createFolder(), createPeserta(), createTeam(), createYear() (+26 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.07
@@ -451,36 +454,36 @@ Cohesion: 0.10
 Nodes (14): CONSUMER_TYPE_ID_TO_PERSONA, InterruptionClassification, InterruptionGuardInput, InterruptionGuardResult, InterruptionGuardState, RealisticModeConfig, resolveTelefunRealisticModeConfig(), StalledResponseAction (+6 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.10
-Nodes (28): Admin Service, Phase 15: Admin Management Parity, Phase 33: Access Approval & Access Group Legacy Parity Hardening, logActivity(), addAccessGroupItem(), deleteActivity(), deleteUser(), getAccessGroups() (+20 more)
+Cohesion: 0.09
+Nodes (32): Admin Service, AccessApprovalPage(), AccessGroup, Phase 15: Admin Management Parity, Phase 33: Access Approval & Access Group Legacy Parity Hardening, logActivity(), addAccessGroupItem(), deleteActivity() (+24 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.13
 Nodes (17): ReviewModalTab, CATEGORY_PRIORITY, ChecksumAnnotation, createReplayAnnotationChecksum(), hasCompleteAiAnnotationSet(), isValidAnnotation(), isValidManualAnnotationText(), ReplayAnnotationCompletionMetadata (+9 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.06
-Nodes (81): createMailboxItem(), createMailboxSession(), PDKT Service, generateScenarioEmailTemplate(), getSystemInstruction(), initializeEmailSession(), resolvePdktGenerationConfig(), normalizeSubject() (+73 more)
+Cohesion: 0.07
+Nodes (49): DEFAULT_CONSUMER_TYPES, DEFAULT_SCENARIOS, DUMMY_CITIES, DUMMY_PROFILES, getConsumerTypes(), getScenarios(), generateScenarioEmailTemplate(), getSystemInstruction() (+41 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.33
-Nodes (5): BuildDashboardTrendsParams, MONTHS_SHORT, DashboardAgentGroup, DashboardTemuanRow, DashboardWeightMap
+Cohesion: 0.10
+Nodes (20): AgentDetailData, AgentPeriodSummary, categorySchema, CreateRuleVersion, createRuleVersionSchema, CreateTemuanBatch, DashboardSummary, ParetoData (+12 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.07
-Nodes (27): getRankingData(), GetRankingDataParams, RankingData, RankingPeriodMode, TopAgentData, AgentPeriodSummary, categorySchema, CreateRuleVersion (+19 more)
+Cohesion: 0.11
+Nodes (18): getRankingData(), GetRankingDataParams, RankingData, RankingPeriodMode, sidakDashboard, Variables, MONTHS, RankingResponse (+10 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.10
-Nodes (25): clamp(), clearPhotoFrameDraft(), DEFAULT_PHOTO_FRAME, getPhotoImageStyle(), getPhotoInlineStyle(), markPhotoFrameAsSaved(), normalizePhotoFrame, PhotoFrame (+17 more)
+Cohesion: 0.11
+Nodes (23): clamp(), clearPhotoFrameDraft(), DEFAULT_PHOTO_FRAME, getPhotoImageStyle(), getPhotoInlineStyle(), markPhotoFrameAsSaved(), normalizePhotoFrame, PhotoFrame (+15 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.18
 Nodes (10): Automated Tests, Implementation Details, KETIK Module, Manual Verification, PDKT Module, Phase 92: Identity & Company Context Fallback, Structural Changes, Telefun Module (+2 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.19
-Nodes (19): HistoryModalProps, SessionReplayModal(), SessionReplayModalProps, getScoreGrade(), ScoreBar(), SessionReviewModal(), SessionReviewModalProps, ChatMessage (+11 more)
+Cohesion: 0.12
+Nodes (30): HistoryModalProps, SessionReplayModal(), SessionReplayModalProps, getScoreGrade(), ScoreBar(), SessionReviewModal(), SessionReviewModalProps, clearHistory() (+22 more)
 
 ### Community 28 - "Community 28"
 Cohesion: 0.09
@@ -491,16 +494,16 @@ Cohesion: 0.10
 Nodes (20): dependencies, @supabase/supabase-js, ws, zod, devDependencies, tsx, @types/node, @types/ws (+12 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.15
-Nodes (17): AUTH_COPY, AuthModal(), AuthModalProps, Feedback(), Field(), fetchAuthProfile(), isMissingIsDeletedColumn(), normalizeProfileStatus() (+9 more)
+Cohesion: 0.17
+Nodes (18): AUTH_COPY, AuthModal(), AuthModalProps, Feedback(), Field(), clearAuthLocalState(), clearLogoutGuestLock(), hasLogoutGuestLock() (+10 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.13
-Nodes (32): claimAndProcessKetikReviewJob(), generateKetikReviewAiResponse(), processKetikReviewJob(), processOldestQueuedJob(), responseSchema, sanitizeKetikReviewResult(), generateKetikReviewAiResponse(), processKetikReviewJob() (+24 more)
+Cohesion: 0.14
+Nodes (28): claimAndProcessKetikReviewJob(), generateKetikReviewAiResponse(), processKetikReviewJob(), processOldestQueuedJob(), responseSchema, sanitizeKetikReviewResult(), triggerKetikAIReview(), generateKetikReviewAiResponse() (+20 more)
 
 ### Community 32 - "Community 32"
 Cohesion: 0.10
-Nodes (26): PageHeroHeader(), PageHeroHeaderProps, ThemeToggle(), READ_ONLY_ROLES, useProfilerAccess(), useQueryParams(), DEFAULT_TIMS, ProfilerAdd() (+18 more)
+Nodes (25): PageHeroHeader(), PageHeroHeaderProps, READ_ONLY_ROLES, useProfilerAccess(), useQueryParams(), DEFAULT_TIMS, ProfilerAdd(), COLORS (+17 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.22
@@ -508,11 +511,11 @@ Nodes (8): 1. Barrel File Simplification, 2. Aggregation Duplication Elimination
 
 ### Community 34 - "Community 34"
 Cohesion: 0.10
-Nodes (21): LeaderAccessGate(), LeaderAccessGateProps, statusConfig, AccessStatus, AccessStatusItem, AccessStatusMap, useAccessStatus(), AccountPage() (+13 more)
+Nodes (22): LeaderAccessGate(), LeaderAccessGateProps, statusConfig, AccessStatus, AccessStatusItem, AccessStatusMap, useAccessStatus(), CoachingInsight (+14 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.22
-Nodes (13): DashboardTrendPanel(), DashboardTrendPanelProps, MONTH_FULL_NAMES, SERVICE_COLORS, SERVICE_LABELS, TrendData, DashboardTrendPanel, DashboardFilters() (+5 more)
+Cohesion: 0.13
+Nodes (36): UsageContext, createMailboxItem(), createMailboxSession(), PDKT Service, resolvePdktGenerationConfig(), buildPdktRetryHint(), callAI(), createMailboxItem() (+28 more)
 
 ### Community 36 - "Community 36"
 Cohesion: 0.16
@@ -527,16 +530,16 @@ Cohesion: 0.16
 Nodes (18): Monitoring History Service, Phase 34: Monitoring & Activity Logs Legacy Parity, createTelefunSignature(), getMonitoringHistory(), ReviewStatus, safeNumber(), safeString(), UnifiedHistoryEntry (+10 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.09
-Nodes (44): SettingsModal(), SettingsModalProps, CreateEmailModal(), CreateEmailModalProps, useCrudForm(), UseCrudFormOptions, PdktAppSettings, ScenarioAIGenerator() (+36 more)
+Cohesion: 0.11
+Nodes (27): CreateEmailModal(), CreateEmailModalProps, ScenarioAIGenerator(), ScenarioAIGeneratorProps, ScenarioAttachments(), ScenarioAttachmentsProps, ScenarioForm(), ScenarioFormProps (+19 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.15
-Nodes (19): buildAiReportDocx(), cellPara(), pngFromBase64(), buildHtmlReport(), BLUE, buildAiReportPdf(), DARK, drawBodyText() (+11 more)
+Cohesion: 0.07
+Nodes (35): buildAiReportDocx(), cellPara(), pngFromBase64(), buildHtmlReport(), BLUE, buildAiReportPdf(), DARK, drawBodyText() (+27 more)
 
 ### Community 41 - "Community 41"
-Cohesion: 0.33
-Nodes (6): AgentTrendTab(), Props, TREND_COLORS, TrendDataset, Props, TrendDataset
+Cohesion: 0.29
+Nodes (7): TrendData, AgentTrendTab(), Props, TREND_COLORS, TrendDataset, Props, TrendDataset
 
 ### Community 42 - "Community 42"
 Cohesion: 0.12
@@ -551,20 +554,20 @@ Cohesion: 0.16
 Nodes (11): apply, args, connect(), connectionString(), INDICATOR_LEGACY_COLS, INDICATOR_TARGET_COLS, loadEnv(), main() (+3 more)
 
 ### Community 45 - "Community 45"
-Cohesion: 0.13
-Nodes (20): DIRECT_GEMINI_MODELS, getImageGenerationMode(), getModelsForModule(), LEGACY_ALIASES, resolveModelProvider(), supportsImageGeneration(), generatePdktScenarioImages(), normalizeAttachments() (+12 more)
+Cohesion: 0.24
+Nodes (12): MODULE_OPTIONS, PricingRow(), PricingEntry, PricingTab(), PricingTabProps, UsageAggregation, UsageTab(), UsageTabProps (+4 more)
 
 ### Community 46 - "Community 46"
 Cohesion: 0.21
 Nodes (13): analyzeIntonation(), CONJUNCTIONS, ContextualSignals, detectConjunction(), detectSentenceFinalParticle(), evaluateTurnTaking(), hasAmbiguousSignals(), hasCompletenessSignal() (+5 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.12
-Nodes (12): SidakDashboardPage(), COLORS, FatalDonutChart(), Props, COLOR_MAP, Props, ParetoItem, Props (+4 more)
+Cohesion: 0.06
+Nodes (30): useApi(), KetikSimulation(), Scenario, PdktSimulation(), SidakDashboardPage(), COLORS, FatalDonutChart(), Props (+22 more)
 
 ### Community 48 - "Community 48"
-Cohesion: 0.18
-Nodes (14): SettingsModal(), SettingsModalProps, generateConsumerId(), generateScenarioId(), TelefunConsumersTab(), TelefunIdentityTab(), TelefunIdentityTabProps, TelefunSystemTab() (+6 more)
+Cohesion: 0.12
+Nodes (28): SettingsModal(), SettingsModalProps, generateConsumerId(), generateScenarioId(), TelefunConsumersTab(), TelefunConsumersTabProps, normalizeTelefunConsumerDraft(), normalizeTelefunScenarioDraft() (+20 more)
 
 ### Community 49 - "Community 49"
 Cohesion: 0.17
@@ -580,11 +583,11 @@ Nodes (23): ATTEMPT_LIMITS, checkResolution(), DISRUPTION_PROMPTS, evaluateDisru
 
 ### Community 52 - "Community 52"
 Cohesion: 0.04
-Nodes (47): 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build, 2. Dokumentasi Wajib Update Sebelum Commit, 3. Dokumentasi Ramah Awam (Human-Readable), 4. File Editing Harus Pakai Unified Diff, 5. Spec-Driven Development Wajib, 6. Plan Wajib Dibuat (wajib di folder `plan/`), 7. Selalu Referensi Context7 + ECC untuk Dokumentasi, 8. Wajib Test Sebelum Push ke GitHub (+39 more)
+Nodes (48): 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build, 2. Dokumentasi Wajib Update Sebelum Commit, 3. Dokumentasi Ramah Awam (Human-Readable), 4. File Editing Harus Pakai Unified Diff, 5. Spec-Driven Development Wajib, 6. Plan Wajib Dibuat (wajib di folder `plan/`), 7. Selalu Referensi Context7 + ECC untuk Dokumentasi, 8. Wajib Test Sebelum Push ke GitHub (+40 more)
 
 ### Community 53 - "Community 53"
-Cohesion: 0.13
-Nodes (29): roundTo(), getFolderNamesByIds(), getFoldersByIds(), getAgentDetail(), getAgentDirectorySummary(), getAgents(), getSoftDeletedPesertaIds(), isAgentExcluded() (+21 more)
+Cohesion: 0.12
+Nodes (16): getLeaderScopeSnapshot(), getAccessibleAgentIds(), getAccessibleSidakFilters(), adminRoles, deleteReportArchive(), getReportArchiveById(), getReportArchives(), ReportArchiveInput (+8 more)
 
 ### Community 54 - "Community 54"
 Cohesion: 0.09
@@ -595,8 +598,8 @@ Cohesion: 0.15
 Nodes (12): compilerOptions, baseUrl, esModuleInterop, module, moduleResolution, outDir, paths, skipLibCheck (+4 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.14
-Nodes (12): ErrorBoundary, Props, State, AuthContext, AuthContextType, FooterAuthActions(), HeroAuthActions(), LandingAuthProvider() (+4 more)
+Cohesion: 0.29
+Nodes (9): AuthContext, AuthContextType, FooterAuthActions(), HeroAuthActions(), LandingAuthProvider(), NavbarAuthActions(), { mockGetUser }, renderWithRouter() (+1 more)
 
 ### Community 57 - "Community 57"
 Cohesion: 0.15
@@ -607,12 +610,12 @@ Cohesion: 0.15
 Nodes (12): compilerOptions, esModuleInterop, forceConsistentCasingInFileNames, module, moduleResolution, outDir, rootDir, skipLibCheck (+4 more)
 
 ### Community 59 - "Community 59"
-Cohesion: 0.12
-Nodes (12): sidak, Variables, sidakCore, Variables, sidakDashboard, Variables, sidakRuleVersions, Variables (+4 more)
+Cohesion: 0.16
+Nodes (14): formatTanggal(), hitungMasaDinas(), hitungUsia(), labelTim, ProfilerSlides(), SlideMode, timTheme(), SlideCanvas (+6 more)
 
 ### Community 60 - "Community 60"
-Cohesion: 0.11
-Nodes (29): Leader Access Service, supabaseAdmin, Phase 52a: Leader Access Status & Route Bypass Fix, Phase 56: Leader Folder/Service Scope Visibility Hardening, getLeaderAccessStatus(), ApprovalStatus, fetchLeaderModuleRequests(), getApprovedRequestIds() (+21 more)
+Cohesion: 0.27
+Nodes (13): Leader Access Service, Phase 52a: Leader Access Status & Route Bypass Fix, Phase 56: Leader Folder/Service Scope Visibility Hardening, getLeaderAccessStatus(), ApprovalStatus, fetchLeaderModuleRequests(), getApprovedRequestIds(), LeaderAccessStatusItem (+5 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.07
@@ -663,8 +666,8 @@ Cohesion: 0.18
 Nodes (10): compilerOptions, declaration, esModuleInterop, module, moduleResolution, outDir, skipLibCheck, strict (+2 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.17
-Nodes (18): EmailComposer(), EmailComposerProps, EmailDetailPane(), EmailDetailPaneProps, EvaluationData, SessionHistory, MailboxSidebar(), MailboxSidebarProps (+10 more)
+Cohesion: 0.12
+Nodes (23): HistoryModalProps, HistoryModalProps, EmailComposer(), EmailComposerProps, EmailDetailPane(), EmailDetailPaneProps, EvaluationData, exportToCSV() (+15 more)
 
 ### Community 74 - "Community 74"
 Cohesion: 0.29
@@ -684,7 +687,7 @@ Nodes (11): accentConfig, ActionToolTile(), ActionToolTileProps, BatchHero(), Ba
 
 ### Community 78 - "Community 78"
 Cohesion: 0.06
-Nodes (32): 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build, 2. Dokumentasi Wajib Update Sebelum Commit, 3. Dokumentasi Ramah Awam (Human-Readable), 4. File Editing Harus Pakai Unified Diff, 5. Spec-Driven Development Wajib, 6. Plan Wajib Dibuat (wajib di folder `plan/`), 7. Selalu Referensi Context7 + ECC untuk Dokumentasi, AI Integration Conventions (+24 more)
+Nodes (33): 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build, 2. Dokumentasi Wajib Update Sebelum Commit, 3. Dokumentasi Ramah Awam (Human-Readable), 4. File Editing Harus Pakai Unified Diff, 5. Spec-Driven Development Wajib, 6. Plan Wajib Dibuat (wajib di folder `plan/`), 7. Selalu Referensi Context7 + ECC untuk Dokumentasi, AI Integration Conventions (+25 more)
 
 ### Community 79 - "Community 79"
 Cohesion: 0.31
@@ -703,8 +706,8 @@ Cohesion: 0.08
 Nodes (23): Access Group Builder UI, Access Status Flow, Admin/Trainer Approval Flow, API: Access Status Endpoint, Architecture, Backend Scope Enforcers, Database Tables, Frontend: Access Status Refetch (+15 more)
 
 ### Community 83 - "Community 83"
-Cohesion: 0.11
-Nodes (15): __dirname, envFile, envSchema, parsed, repoRoot, requestLogger(), admin, pdkt (+7 more)
+Cohesion: 0.12
+Nodes (14): __dirname, envFile, envSchema, parsed, repoRoot, requestLogger(), admin, pdkt (+6 more)
 
 ### Community 84 - "Community 84"
 Cohesion: 0.20
@@ -719,28 +722,28 @@ Cohesion: 0.13
 Nodes (20): buildDuplicateGroups(), countNullFields(), determineResolution(), groupByNormalizedKey(), normalizeForComparison(), checkDuplicates(), DuplicateGroup, ResolutionStrategy (+12 more)
 
 ### Community 87 - "Community 87"
-Cohesion: 0.11
-Nodes (27): AddIndicatorModal(), EditIndicatorModal(), PublishPreviewModal(), PublishPreviewModalProps, PublishRulePanel(), PublishRulePanelProps, RuleIndicatorsPanel(), RuleIndicatorsPanelProps (+19 more)
+Cohesion: 0.13
+Nodes (25): PublishPreviewModal(), PublishPreviewModalProps, PublishRulePanel(), PublishRulePanelProps, RuleIndicatorsPanel(), RuleIndicatorsPanelProps, RuleVersionMeta, RuleVersionPicker() (+17 more)
 
 ### Community 88 - "Community 88"
-Cohesion: 0.11
-Nodes (16): calculateSessionScoreFromTemuan(), DEFAULT_SERVICE_WEIGHTS, resolveServiceTypeFromTeam(), scoreSession(), computeEffectiveService(), EXCLUDED_FOLDERS, EXCLUDED_JABATAN, isAgentExcluded() (+8 more)
+Cohesion: 0.08
+Nodes (30): calculateSessionScoreFromTemuan(), DEFAULT_SERVICE_WEIGHTS, resolveServiceTypeFromTeam(), scoreSession(), roundTo(), computeEffectiveService(), EXCLUDED_FOLDERS, EXCLUDED_JABATAN (+22 more)
 
 ### Community 89 - "Community 89"
 Cohesion: 0.43
 Nodes (6): buildTelefunRecordingPath(), getOwnedRecordingPathOrNull(), isUUID(), isValidRecordingPath(), VALID_EXTENSIONS, VALID_TYPES
 
 ### Community 90 - "Community 90"
-Cohesion: 0.30
-Nodes (9): arrayBufferToBase64(), buildRealtimeAudioMessage(), buildTelefunLiveSetupMessage(), extractGeminiInlineAudioChunks(), mapTelefunCloseEvent(), normalizeTelefunWebSocketUrl(), parsePcmSampleRate(), shouldSendRealtimeAudio() (+1 more)
+Cohesion: 0.17
+Nodes (16): arrayBufferToBase64(), buildRealtimeAudioMessage(), buildTelefunLiveSetupMessage(), extractGeminiInlineAudioChunks(), mapTelefunCloseEvent(), normalizeTelefunWebSocketUrl(), parsePcmSampleRate(), shouldSendRealtimeAudio() (+8 more)
 
 ### Community 91 - "Community 91"
 Cohesion: 0.11
 Nodes (18): 10. API: Reusable Role Middleware (`apps/api/src/middleware/role.ts`), 11. API: CORS Hardening (`apps/api/src/index.ts`), 12. Types: Shared Zod Validation Schemas (`packages/types/src/index.ts`), 1. API: Global Error Handler (`apps/api/src/index.ts`), 2. API: Rate Limiting (`apps/api/src/middleware/rateLimit.ts`), 3. Web: React Error Boundary (`apps/web/src/components/ErrorBoundary.tsx`), 4. Web: Auth Store Initialization (`apps/web/src/store/authInit.ts`), 5. API: Env Validation (`apps/api/src/lib/env.ts`) (+10 more)
 
 ### Community 92 - "Community 92"
-Cohesion: 0.12
-Nodes (12): getWibMonthBounds(), ai, billingUpdateSchema, generateSchema, pricingUpsertSchema, REVIEW_ACTIONS, SIMULATION_ACTIONS, UsageBreakdown (+4 more)
+Cohesion: 0.09
+Nodes (22): ACTION_DEFINITION_MAP, getUsageActionDefinition(), isUsageActionInCategory(), USAGE_ACTION_DEFINITIONS, UsageActionDefinition, UsageCategory, getWibMonthBounds(), ai (+14 more)
 
 ### Community 93 - "Community 93"
 Cohesion: 0.29
@@ -755,8 +758,8 @@ Cohesion: 0.11
 Nodes (18): 1. `public.profiles`, 2. `public.results`, 3. Modul Simulasi, 4. Modul Profiler (KTP), 5. Modul SIDAK (QA Analyzer), 6. Admin & Access Control, 7. Monitoring AI Usage & Billing, Apa itu Struktur Database dan Keamanan Ini? (+10 more)
 
 ### Community 96 - "Community 96"
-Cohesion: 0.37
-Nodes (12): BENCHMARK_DEFAULTS, buildCommunicationProfileFromAssessment(), buildFillersValue(), buildSpeakingRateValue(), buildToneValue(), clamp(), enrichAssessmentWithCommunicationProfile(), evaluateMetricStatus() (+4 more)
+Cohesion: 0.32
+Nodes (13): VOICE_ASSESSMENT_SCHEMA, BENCHMARK_DEFAULTS, buildCommunicationProfileFromAssessment(), buildFillersValue(), buildSpeakingRateValue(), buildToneValue(), clamp(), enrichAssessmentWithCommunicationProfile() (+5 more)
 
 ### Community 97 - "Community 97"
 Cohesion: 0.60
@@ -775,8 +778,8 @@ Cohesion: 0.53
 Nodes (5): Props, scoreBg(), scoreColor(), ScoreDisplay(), scoreLabel()
 
 ### Community 102 - "Community 102"
-Cohesion: 0.12
-Nodes (16): 1. Auth Guard, 2. Guard Logic, 3. Profile Read Contract & Recovery, 4. Access Matrix Ringkas, 5. Role Normalization, 6. Client-Side Session Lifetime Guard, 7. Profil SELECT Bergantung pada RLS Policies, Bukan Hanya Table Grants, 8. Smoke Test Wajib Setelah Auth/Profile Refactor (+8 more)
+Cohesion: 0.11
+Nodes (17): 1. Auth Guard, 2. Guard Logic, 3. Profile Read Contract & Recovery, 4. Access Matrix Ringkas, 5. Role Normalization, 6. Client-Side Session Lifetime Guard, 7. Profil SELECT Bergantung pada RLS Policies, Bukan Hanya Table Grants, 8. Smoke Test Wajib Setelah Auth/Profile Refactor (+9 more)
 
 ### Community 103 - "Community 103"
 Cohesion: 0.12
@@ -787,8 +790,8 @@ Cohesion: 0.40
 Nodes (3): mockGroups, mockScopeOptions, useApiMock
 
 ### Community 105 - "Community 105"
-Cohesion: 0.17
-Nodes (21): formatIdr(), formatTokenCount(), MODULE_META, UsageModal(), UsageModalProps, KetikLanding(), computeUsageDelta(), emptyUsageBreakdown() (+13 more)
+Cohesion: 0.14
+Nodes (24): ModuleWorkspaceIntroProps, formatIdr(), formatTokenCount(), MODULE_META, UsageModal(), UsageModalProps, computeUsageDelta(), emptyUsageBreakdown() (+16 more)
 
 ### Community 106 - "Community 106"
 Cohesion: 0.12
@@ -823,16 +826,16 @@ Cohesion: 0.25
 Nodes (7): Deskripsi, Detail Perubahan, Ekstraksi ke `ketik/lib/message-utils.ts` (193 lines), Ekstraksi ke `ketik/lib/pacing.ts` (69 lines), File Terpengaruh, Pengujian & Verifikasi, Rebuild Log - Phase 81: KETIK ChatInterface Message Utils & Pacing Extraction
 
 ### Community 115 - "Community 115"
-Cohesion: 0.09
-Nodes (32): useSidakInputRuleModel(), useTemuanEdit(), UseTemuanEditParams, AgentEntry, FormEntry, newEntry(), useTemuanForm(), UseTemuanFormParams (+24 more)
+Cohesion: 0.12
+Nodes (28): buildSidakInputRuleModel(), SidakInputRuleModel, SidakRuleIndicatorRow, useSidakInputRuleModel(), useTemuanEdit(), UseTemuanEditParams, AgentEntry, FormEntry (+20 more)
 
 ### Community 116 - "Community 116"
 Cohesion: 0.15
 Nodes (12): 1. Fix `resolveTelefunRealisticModeConfig` — Consumer Type ID Mapping (F15), 2. Fix `getTelefunTimeCueThreshold` — Guard Conditions (Duplicate), 3. Fix `ReviewModal` — Pass Coaching Recommendations, 4. Add `isValidRecordingPath` — Recording Path Validation (H6), 5. Create `replayAnnotationHelpers` — Annotation Utility Module (H1), 6. Test Coverage — 4 New Test Files, Files Changed, Gaps Closed (+4 more)
 
 ### Community 117 - "Community 117"
-Cohesion: 0.25
-Nodes (10): fetchAiModels(), TEXT_SIMULATION_MODELS, KetikSystemTab(), KetikSystemTabProps, ExportFormat, SERVICE_LABELS, SERVICE_TYPES, SidakReportsAi() (+2 more)
+Cohesion: 0.12
+Nodes (23): extractJsonObjectText(), extractRobust(), parseJsonFromModelText(), getImageGenerationMode(), resolveModelProvider(), supportsImageGeneration(), buildPdktEvaluationPrompt(), evaluateAgentResponse() (+15 more)
 
 ### Community 118 - "Community 118"
 Cohesion: 0.10
@@ -871,8 +874,8 @@ Cohesion: 0.17
 Nodes (11): Approach: Client-side computation with shared scoring library, Files Modified, Fix, Fix 1: Railway Build Failure — TypeScript errors in test files, Fix 2: 2 Pre-existing Test Failures (`STACK_TRACE_ERROR`), Phase 60 — Top 5 Pengurang Skor Terbesar Legacy Parity, Post-Commit Fixes, Regression Note (+3 more)
 
 ### Community 196 - "Community 196"
-Cohesion: 0.15
-Nodes (16): formatTanggal(), hitungMasaDinas(), hitungUsia(), labelTim, ProfilerSlides(), SlideMode, timTheme(), ParticipantSlideProps (+8 more)
+Cohesion: 0.22
+Nodes (13): DashboardTrendPanel(), DashboardTrendPanelProps, MONTH_FULL_NAMES, SERVICE_COLORS, SERVICE_LABELS, TrendData, DashboardTrendPanel, DashboardFilters() (+5 more)
 
 ### Community 197 - "Community 197"
 Cohesion: 0.18
@@ -1155,8 +1158,8 @@ Cohesion: 0.40
 Nodes (4): Meta Commands, RTK - Rust Token Killer (Google Antigravity), Rule, Why
 
 ### Community 267 - "Community 267"
-Cohesion: 0.26
-Nodes (14): CommunicationProfileZoomModal(), CommunicationProfileZoomModalProps, MODE_ICONS, STATUS_COLORS, STATUS_LABELS, MetricCard(), TelefunReviewData, TelefunReviewPanel() (+6 more)
+Cohesion: 0.25
+Nodes (15): CommunicationProfileZoomModal(), CommunicationProfileZoomModalProps, MODE_ICONS, STATUS_COLORS, STATUS_LABELS, MetricCard(), TelefunReviewData, TelefunReviewPanel() (+7 more)
 
 ### Community 268 - "Community 268"
 Cohesion: 0.20
@@ -1195,8 +1198,8 @@ Cohesion: 0.33
 Nodes (5): Dampak, Deskripsi, Detail Perubahan, Phase 88: Settings Draft Normalization Hardening, Verifikasi
 
 ### Community 277 - "Community 277"
-Cohesion: 0.18
-Nodes (10): addRuleVersionIndicator(), createRuleVersion(), deleteRuleVersionIndicator(), getRuleVersionIndicators(), getRuleVersionMeta(), getRuleVersions(), publishRuleVersion(), supersedeRuleVersion() (+2 more)
+Cohesion: 0.09
+Nodes (32): supabaseAdmin, getAgentDetail(), getAgentDirectorySummary(), createIndicator(), createPeriod(), deletePeriod(), getIndicators(), getPeriods() (+24 more)
 
 ### Community 278 - "Community 278"
 Cohesion: 0.50
@@ -1227,12 +1230,12 @@ Cohesion: 0.67
 Nodes (3): 4. Scope Modul, Modul prioritas rebuild tahap awal, Modul yang wajib dianalisis dari repo lama
 
 ### Community 285 - "Community 285"
-Cohesion: 0.18
-Nodes (20): hasLegacyPdktShape(), isPlainObject(), JsonRecord, LEGACY_PDKT_KEYS, migratePdktSettings(), readPdktSettings(), writePdktSettings(), coerceConsumerNameMentionPattern() (+12 more)
+Cohesion: 0.13
+Nodes (36): SettingsModal(), SettingsModalProps, TEXT_SIMULATION_MODELS, hasLegacyPdktShape(), isPlainObject(), JsonRecord, LEGACY_PDKT_KEYS, migratePdktSettings() (+28 more)
 
 ### Community 290 - "Community 290"
 Cohesion: 0.24
-Nodes (12): MODULE_OPTIONS, PricingRow(), PricingEntry, PricingTab(), PricingTabProps, UsageAggregation, UsageTab(), UsageTabProps (+4 more)
+Nodes (8): buildTimeLimitInstruction(), DEFAULT_CONSUMER_TYPES, DEFAULT_SCENARIOS, formatDurationLabel(), generateConsumerResponse(), sanitizeConsumerText(), SessionTimingContext, KetikScenario
 
 ### Community 291 - "Community 291"
 Cohesion: 0.16
@@ -1247,8 +1250,8 @@ Cohesion: 0.24
 Nodes (13): AnnotationCard(), AnnotationMoment, CATEGORY_LABELS, CATEGORY_STYLES, CoachingRecommendationItem, formatTimestamp(), MOMENT_LABELS, RecommendationList() (+5 more)
 
 ### Community 294 - "Community 294"
-Cohesion: 0.18
-Nodes (13): CoachingInsight, computeTenure(), EditFormState, MONTHS_FULL, TemuanDisplayItem, TicketScore, useAgentDetail(), SECTIONS (+5 more)
+Cohesion: 0.22
+Nodes (7): UserProfile, UserProfile, AuthState, mockGetSession, mockGetUser, mockOnAuthStateChange, mockMaybeSingle
 
 ### Community 295 - "Community 295"
 Cohesion: 0.20
@@ -1272,35 +1275,35 @@ Nodes (6): ICONS, Props, TONES, Agent, Props, TopAgentsTable()
 
 ### Community 300 - "Community 300"
 Cohesion: 0.12
-Nodes (13): PdktMailboxBatch, PdktMailboxReply, ConsumerNameMentionPattern, emailMessageSchema, MailboxStatus, pdktConsumerTypeSchema, PdktEvaluationResult, pdktIdentitySchema (+5 more)
+Nodes (13): PdktMailboxBatch, PdktMailboxReply, ConsumerNameMentionPattern, emailMessageSchema, MailboxStatus, PdktAttachmentDiagnostics, pdktAttachmentDiagnosticsSchema, pdktConsumerTypeSchema (+5 more)
 
 ### Community 301 - "Community 301"
-Cohesion: 0.06
-Nodes (59): ModuleWorkspaceIntroProps, HistoryModalProps, HistoryModalProps, exportToCSV(), formatDate(), formatDuration(), formatTime(), PdktEvaluationPanel() (+51 more)
+Cohesion: 0.11
+Nodes (29): formatTime(), PdktEvaluationPanel(), PdktReviewData, AccessGroup, AccessGroupsPage(), GroupItem, RULE_TYPE_LABELS, RuleType (+21 more)
 
 ### Community 302 - "Community 302"
-Cohesion: 0.20
-Nodes (13): buildSidakInputRuleModel(), SidakInputRuleModel, SidakRuleIndicatorRow, Indicator, IndicatorDropdown(), Props, Entry, newEntry() (+5 more)
+Cohesion: 0.35
+Nodes (9): Indicator, IndicatorDropdown(), Props, Entry, newEntry(), NILAI_OPTIONS, Props, SidakInputManualForm() (+1 more)
 
 ### Community 303 - "Community 303"
 Cohesion: 0.23
 Nodes (13): checkFotoUrl(), processBatches(), checkFotos(), DuplicateReport, FotoBroken, FotoMissing, FotoRecord, FotoReport (+5 more)
 
 ### Community 304 - "Community 304"
-Cohesion: 0.22
-Nodes (12): TelefunConsumersTabProps, normalizeTelefunConsumerDraft(), normalizeTelefunScenarioDraft(), TelefunScenariosTab(), TelefunScenariosTabProps, buildKetikSettingsForSave(), buildPdktSettingsForSave(), buildTelefunSettingsForSave() (+4 more)
+Cohesion: 0.36
+Nodes (7): ThemeToggle(), applyTheme(), getInitialTheme(), ThemeMode, useThemeMode(), WorkspaceHeader(), WorkspaceHeaderProps
 
 ### Community 305 - "Community 305"
 Cohesion: 0.42
 Nodes (8): classifyDurationMode(), filterDurationInput(), isPresetDuration(), normalizeDurationDisplay(), PRESET_DURATIONS, validateDuration(), DurationSelector(), DurationSelectorProps
 
 ### Community 306 - "Community 306"
-Cohesion: 0.18
-Nodes (12): ApiResponse, JsonObject, JsonPrimitive, JsonValue, CommunicationMetric, CommunicationMetricMode, SpeechSegment, TelefunCoachingSummary (+4 more)
+Cohesion: 0.19
+Nodes (11): ApiResponse, JsonObject, JsonPrimitive, JsonValue, CommunicationMetricMode, SpeechSegment, TelefunCoachingSummary, TelefunHistory (+3 more)
 
 ### Community 307 - "Community 307"
-Cohesion: 0.25
-Nodes (13): getKetikReviewStatus(), triggerKetikAIReview(), clearHistory(), coerceDuration(), coerceKetikModelId(), deleteSession(), getHistory(), getReviewDetail() (+5 more)
+Cohesion: 0.29
+Nodes (4): ketik, Variables, generateMessageSchema, { mockFrom, mockCreateAdminClient }
 
 ### Community 308 - "Community 308"
 Cohesion: 0.20
@@ -1327,20 +1330,20 @@ Cohesion: 0.32
 Nodes (4): generateProfilerTemplate(), ParsedRow, TEMPLATE_COLUMNS, validateImportRows()
 
 ### Community 314 - "Community 314"
-Cohesion: 0.17
-Nodes (14): createIndicator(), createPeriod(), deletePeriod(), hasDraftRuleVersion(), resolveActivePublishedRuleVersion(), createPerfectScoreSession(), createTemuanBatch(), deleteTemuan() (+6 more)
+Cohesion: 0.26
+Nodes (11): resolveActivePublishedRuleVersion(), createPerfectScoreSession(), createTemuanBatch(), deleteTemuan(), getTemuan(), PreviewResult, refreshDashboardSummary(), refreshMaterializedView() (+3 more)
 
 ### Community 315 - "Community 315"
 Cohesion: 0.40
 Nodes (4): File Affected, Phase 97: PDKT Natural Name, Clues, and AI Image Generation Warnings, Progress Summary, Testing & Verification
 
 ### Community 316 - "Community 316"
-Cohesion: 0.27
-Nodes (7): buildTimeLimitInstruction(), DEFAULT_CONSUMER_TYPES, DEFAULT_SCENARIOS, formatDurationLabel(), generateConsumerResponse(), sanitizeConsumerText(), SessionTimingContext
+Cohesion: 0.25
+Nodes (7): 1. Database & Backend API Fixes, 2. Frontend Transport Cleanup, 3. High-Fidelity UI Grid, Architectural Changes & Implementation Details, Phase 100: Profiler Reorder Auth & Grid View, Requirements & Objective, Verification & Testing Results
 
 ### Community 317 - "Community 317"
-Cohesion: 0.38
-Nodes (8): getInitials(), PhoneInterface(), PhoneInterfaceProps, getTelefunTimeCueThreshold(), UseTelefunSettingsDraftProps, SessionMetrics, SessionMetrics, TelefunAppSettings
+Cohesion: 0.47
+Nodes (6): getInitials(), PhoneInterface(), PhoneInterfaceProps, getTelefunTimeCueThreshold(), SessionMetrics, SessionMetrics
 
 ### Community 318 - "Community 318"
 Cohesion: 0.33
@@ -1355,8 +1358,8 @@ Cohesion: 0.33
 Nodes (5): 1. Lint Debt Resolution, 2. Gemini 3.5 Flash Integration, Phase 98: Lint Debt Cleanup & Gemini 3.5 Flash Option, Summary, Verification
 
 ### Community 321 - "Community 321"
-Cohesion: 0.25
-Nodes (6): DEFAULT_CONSUMER_TYPES, DEFAULT_SCENARIOS, DUMMY_CITIES, DUMMY_PROFILES, getConsumerTypes(), getScenarios()
+Cohesion: 0.13
+Nodes (15): ActivitiesPage(), ManagerRole, normalizeRoleLabel(), normalizeStatusLabel(), normalizeStatusValue(), ROLE_OPTIONS, UsersPage(), UserStatus (+7 more)
 
 ### Community 322 - "Community 322"
 Cohesion: 0.31
@@ -1375,8 +1378,8 @@ Cohesion: 0.48
 Nodes (4): AgentTemuanTab(), MONTHS_FULL, Props, TemuanItem
 
 ### Community 327 - "Community 327"
-Cohesion: 0.13
-Nodes (10): createAuthenticatedApp(), mockMaybeSingle, mockRpc, mockSingle, mockSupabaseAdmin, createAuthenticatedApp(), mockMaybeSingle, mockRpc (+2 more)
+Cohesion: 0.29
+Nodes (5): createAuthenticatedApp(), mockMaybeSingle, mockRpc, mockSingle, mockSupabaseAdmin
 
 ### Community 328 - "Community 328"
 Cohesion: 0.33
@@ -1387,8 +1390,12 @@ Cohesion: 0.33
 Nodes (3): MONTHS_SHORT, MonthSummary, Props
 
 ### Community 330 - "Community 330"
-Cohesion: 0.60
-Nodes (5): getSeverityColor(), Props, ServiceBarChart(), ServiceItem, SEVERITY_COLORS
+Cohesion: 0.22
+Nodes (4): ErrorBoundary, Props, State, renderModal()
+
+### Community 331 - "Community 331"
+Cohesion: 0.70
+Nodes (4): Props, scoreColor(), ScoreDetailCard(), scoreLabel()
 
 ### Community 332 - "Community 332"
 Cohesion: 0.40
@@ -1407,48 +1414,56 @@ Cohesion: 0.20
 Nodes (9): 1. Backend: Accumulator Breakdown Kategori, 2. Frontend: Shared Usage Logic & UI, 3. Integrasi Modul (KETIK, PDKT, Telefun), API Test, Dokumentasi, Frontend Test, Perubahan Utama, Phase 91: AI Usage Post-Session Detail Breakdown (+1 more)
 
 ### Community 336 - "Community 336"
-Cohesion: 0.70
-Nodes (4): Props, scoreColor(), ScoreDetailCard(), scoreLabel()
+Cohesion: 0.29
+Nodes (7): AgentProfileBar(), computeTenure(), Props, SECTIONS, SidakAgentDetailPage(), TabSkeleton(), SidakAgentDetail
 
 ### Community 338 - "Community 338"
 Cohesion: 0.40
 Nodes (4): mockDeleteApi, mockGetApi, mockPostApi, mockUseApi
 
 ### Community 339 - "Community 339"
-Cohesion: 0.83
-Nodes (3): AgentProfileBar(), computeTenure(), Props
+Cohesion: 0.29
+Nodes (6): getKetikReviewStatus(), KetikHistoryReviewStatus, KetikJobStatus, KetikReviewJobSnapshot, KetikReviewStateDecision, resolveKetikReviewState()
 
 ### Community 340 - "Community 340"
+Cohesion: 0.25
+Nodes (7): 1. AI Usage Categories Centralization, 2. AI Usage Summary Service Extraction, 3. KETIK Review State Machine, 4. PDKT Attachment Warning Rendering, Phase 99: AI Usage Categories Extraction & KETIK Review State Machine, Summary, Verification
+
+### Community 341 - "Community 341"
+Cohesion: 0.29
+Nodes (5): createAuthenticatedApp(), mockMaybeSingle, mockRpc, mockSingle, mockSupabaseAdmin
+
+### Community 342 - "Community 342"
+Cohesion: 0.19
+Nodes (10): ParticipantSlideProps, JabatanKey, labelTim, PhotoFrameValue, ProfilerPeserta, ProfilerParticipantCard(), ProfilerParticipantCardProps, selectableId() (+2 more)
+
+### Community 343 - "Community 343"
 Cohesion: 0.83
 Nodes (3): AiInsightCard(), CoachingInsight, Props
 
-### Community 341 - "Community 341"
+### Community 344 - "Community 344"
 Cohesion: 0.83
 Nodes (3): Props, TicketItem, TopTicketsCard()
 
-### Community 342 - "Community 342"
-Cohesion: 0.50
-Nodes (3): JabatanKey, labelTim, PhotoFrameValue
-
 ## Knowledge Gaps
-- **1728 isolated node(s):** `$schema`, `dependsOn`, `outputs`, `dependsOn`, `cache` (+1723 more)
+- **1753 isolated node(s):** `$schema`, `dependsOn`, `outputs`, `dependsOn`, `cache` (+1748 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **63 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `LiveSession` connect `Community 100` to `Community 292`, `Community 81`, `Community 306`, `Community 19`, `Community 90`, `Community 317`?**
-  _High betweenness centrality (0.015) - this node is a cross-community bridge._
-- **Why does `createAuthenticatedApp()` connect `Community 327` to `Community 10`?**
-  _High betweenness centrality (0.012) - this node is a cross-community bridge._
 - **Why does `RealisticModeOrchestrator` connect `Community 81` to `Community 226`, `Community 67`, `Community 68`, `Community 36`, `Community 292`, `Community 100`, `Community 46`, `Community 50`, `Community 51`, `Community 90`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Why does `LiveSession` connect `Community 100` to `Community 292`, `Community 81`, `Community 306`, `Community 19`, `Community 90`, `Community 317`?**
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
+- **Why does `SIDAK Service` connect `Community 9` to `Community 5`, `Community 40`, `Community 8`, `Community 75`, `Community 115`, `Community 277`, `Community 53`, `Community 24`, `Community 345`, `Community 346`, `Community 88`, `Community 60`?**
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
 - **What connects `$schema`, `dependsOn`, `outputs` to the rest of the system?**
-  _1783 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1808 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 1` be split into smaller, more focused modules?**
   _Cohesion score 0.13725490196078433 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
   _Cohesion score 0.024390243902439025 - nodes in this community are weakly interconnected._
-- **Should `Community 4` be split into smaller, more focused modules?**
-  _Cohesion score 0.059506531204644414 - nodes in this community are weakly interconnected._
+- **Should `Community 3` be split into smaller, more focused modules?**
+  _Cohesion score 0.13847780126849896 - nodes in this community are weakly interconnected._
