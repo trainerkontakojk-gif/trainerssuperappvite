@@ -14,10 +14,12 @@ function buildQuery(onAwait: () => any) {
 }
 
 let pendingResolve: () => any = () => ({ data: [], error: null });
+let pendingRpcResolve: () => any = () => ({ error: null });
 
 vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
     from: vi.fn(() => buildQuery(() => pendingResolve())),
+    rpc: vi.fn(() => Promise.resolve(pendingRpcResolve())),
   },
   createAdminClient: vi.fn(),
 }));
@@ -27,6 +29,7 @@ import * as profilerService from "../services/profiler-service";
 describe("profiler-service", () => {
   beforeEach(() => {
     pendingResolve = () => ({ data: [], error: null });
+    pendingRpcResolve = () => ({ error: null });
   });
 
   describe("getYears", () => {
@@ -196,6 +199,46 @@ describe("profiler-service", () => {
     it("resolves", async () => {
       pendingResolve = () => ({ error: null });
       await expect(profilerService.deleteTeam("t1")).resolves.toBeUndefined();
+    });
+  });
+
+  describe("reorderPeserta", () => {
+    it("resolves on success", async () => {
+      pendingRpcResolve = () => ({ error: null });
+      await expect(profilerService.reorderPeserta(["p1", "p2"])).resolves.toBeUndefined();
+    });
+
+    it("throws user-friendly error when unauthorized", async () => {
+      pendingRpcResolve = () => ({ error: { message: "Unauthorized role check" } });
+      await expect(profilerService.reorderPeserta(["p1"])).rejects.toThrow(
+        "Konfigurasi reorder belum sinkron. Hubungi administrator."
+      );
+    });
+
+    it("throws user-friendly error when payload is invalid/duplicate", async () => {
+      pendingRpcResolve = () => ({ error: { message: "Payload reorder mengandung id duplikat" } });
+      await expect(profilerService.reorderPeserta(["p1"])).rejects.toThrow(
+        "Payload urutan tidak valid. Muat ulang data lalu coba lagi."
+      );
+    });
+
+    it("throws user-friendly error when data is not found", async () => {
+      pendingRpcResolve = () => ({ error: { message: "Sebagian data reorder tidak ditemukan" } });
+      await expect(profilerService.reorderPeserta(["p1"])).rejects.toThrow(
+        "Sebagian peserta tidak ditemukan. Muat ulang folder lalu coba lagi."
+      );
+    });
+  });
+
+  describe("bulkReorderPeserta", () => {
+    it("resolves on success", async () => {
+      pendingRpcResolve = () => ({ error: null });
+      await expect(profilerService.bulkReorderPeserta([{ id: "p1", nomor_urut: 1 }])).resolves.toBeUndefined();
+    });
+
+    it("throws user-friendly error on failure", async () => {
+      pendingRpcResolve = () => ({ error: { message: "some error" } });
+      await expect(profilerService.bulkReorderPeserta([{ id: "p1", nomor_urut: 1 }])).rejects.toThrow();
     });
   });
 });

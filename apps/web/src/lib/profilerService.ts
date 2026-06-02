@@ -1,4 +1,4 @@
-import { postApi, putApi, deleteApi } from "../hooks/useApi";
+import { postApi, putApi, deleteApi, getApi } from "../hooks/useApi";
 import { supabase } from "./supabase";
 import type {
   ProfilerYear,
@@ -9,31 +9,15 @@ import type {
 
 const BASE = "/profiler";
 
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error?.message || "API Error");
-  return json.data;
-}
-
 export const profilerApi = {
   // Years
-  getYears: () => fetchApi<ProfilerYear[]>(`${BASE}/years`),
+  getYears: () => getApi<ProfilerYear[]>(`${BASE}/years`),
   createYear: (year: number) =>
     postApi<ProfilerYear>(`${BASE}/years`, { year }),
   deleteYear: (id: string) => deleteApi(`${BASE}/years/${id}`),
 
   // Folders
-  getFolders: () => fetchApi<ProfilerFolder[]>(`${BASE}/folders`),
+  getFolders: () => getApi<ProfilerFolder[]>(`${BASE}/folders`),
   createFolder: (data: {
     name: string;
     year_id?: string;
@@ -49,7 +33,7 @@ export const profilerApi = {
     ),
 
   // Counts
-  getFolderCounts: () => fetchApi<Record<string, number>>(`${BASE}/counts`),
+  getFolderCounts: () => getApi<Record<string, number>>(`${BASE}/counts`),
 
   // Peserta
   getPeserta: (params?: {
@@ -62,14 +46,14 @@ export const profilerApi = {
     if (params?.tim) q.set("tim", params.tim);
     if (params?.search) q.set("search", params.search);
     const qs = q.toString();
-    return fetchApi<{ items: ProfilerPeserta[]; total: number }>(
+    return getApi<{ items: ProfilerPeserta[]; total: number }>(
       `${BASE}/peserta${qs ? `?${qs}` : ""}`,
     );
   },
   getPesertaById: (id: string) =>
-    fetchApi<ProfilerPeserta>(`${BASE}/peserta/${id}`),
+    getApi<ProfilerPeserta>(`${BASE}/peserta/${id}`),
   getPesertaByBatch: (batchName: string) =>
-    fetchApi<ProfilerPeserta[]>(
+    getApi<ProfilerPeserta[]>(
       `${BASE}/peserta/batch/${encodeURIComponent(batchName)}`,
     ),
   createPeserta: (data: Partial<ProfilerPeserta>) =>
@@ -97,11 +81,11 @@ export const profilerApi = {
     const q = excludeBatch
       ? `?exclude_batch=${encodeURIComponent(excludeBatch)}`
       : "";
-    return fetchApi<ProfilerPeserta[]>(`${BASE}/peserta/global-pool${q}`);
+    return getApi<ProfilerPeserta[]>(`${BASE}/peserta/global-pool${q}`);
   },
 
   // Teams
-  getTeams: () => fetchApi<ProfilerTim[]>(`${BASE}/teams`),
+  getTeams: () => getApi<ProfilerTim[]>(`${BASE}/teams`),
   createTeam: (nama: string) => postApi<ProfilerTim>(`${BASE}/teams`, { nama }),
   deleteTeam: (id: string) => deleteApi(`${BASE}/teams/${id}`),
 

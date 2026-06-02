@@ -710,6 +710,28 @@ export async function copyPesertaToFolder(
   return data ?? [];
 }
 
+function mapReorderError(message: string): Error {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("unauthorized") ||
+    lower.includes("akses ditolak") ||
+    lower.includes("permission denied")
+  ) {
+    return new Error("Konfigurasi reorder belum sinkron. Hubungi administrator.");
+  }
+  if (
+    lower.includes("duplikat") ||
+    lower.includes("payload reorder tidak valid") ||
+    lower.includes("invalid")
+  ) {
+    return new Error("Payload urutan tidak valid. Muat ulang data lalu coba lagi.");
+  }
+  if (lower.includes("tidak ditemukan") || lower.includes("tidak ter-update")) {
+    return new Error("Sebagian peserta tidak ditemukan. Muat ulang folder lalu coba lagi.");
+  }
+  return new Error(message || "Gagal menyimpan urutan peserta");
+}
+
 export async function reorderPeserta(pesertaIds: string[]): Promise<void> {
   const updates = pesertaIds.map((id, index) => ({
     id,
@@ -721,12 +743,7 @@ export async function reorderPeserta(pesertaIds: string[]): Promise<void> {
   });
 
   if (error) {
-    for (const update of updates) {
-      await supabaseAdmin
-        .from("profiler_peserta")
-        .update({ nomor_urut: update.nomor_urut })
-        .eq("id", update.id);
-    }
+    throw mapReorderError(error.message);
   }
 }
 
@@ -736,7 +753,9 @@ export async function bulkReorderPeserta(
   const { error } = await supabaseAdmin.rpc("bulk_reorder_profiler_peserta", {
     p_updates: updates,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw mapReorderError(error.message);
+  }
 }
 
 export async function movePesertaToBatch(

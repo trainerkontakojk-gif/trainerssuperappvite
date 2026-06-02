@@ -8,7 +8,7 @@ import {
 import { MoveFolderModal } from './components/table/MoveFolderModal';
 import { EditPesertaModal } from './components/table/EditPesertaModal';
 import { ProfilerTableFilters } from './components/table/ProfilerTableFilters';
-import { ProfilerTableView } from './components/table/ProfilerTableView';
+import { ProfilerParticipantGrid } from './components/table/ProfilerParticipantGrid';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import QaStatePanel from '../../components/ui/QaStatePanel';
@@ -435,8 +435,9 @@ export default function ProfilerTable() {
                 ) : (
                   <button
                     onClick={onSortClick}
-                    className="h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title="Atur Urutan"
+                    disabled={hasActiveFilters}
+                    className="h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    title={hasActiveFilters ? "Reset filter terlebih dahulu untuk mengatur urutan" : "Atur Urutan"}
                   >
                     <ArrowUpDown className="w-5 h-5" />
                   </button>
@@ -483,7 +484,7 @@ export default function ProfilerTable() {
         )}
 
         {/* ── List Peserta ── */}
-        <ProfilerTableView
+        <ProfilerParticipantGrid
           displayList={displayList}
           sortMode={sortMode}
           selectMode={selectMode}
@@ -497,6 +498,7 @@ export default function ProfilerTable() {
           onViewAnalysis={onViewAnalysis}
           onAddPeserta={onAddPeserta}
           dragIndex={dragIndex}
+          dragOverIndex={dragOverIndex}
           handleDragStart={handleDragStart}
           handleDragOver={handleDragOver}
           handleDragLeave={handleDragLeave}

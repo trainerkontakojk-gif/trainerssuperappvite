@@ -290,8 +290,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 97. **PDKT Natural Name, Clues, and AI Image Diagnostics** — Fixed 3 critical issues in PDKT: (1) Identity name leakage — `bodyName` (e.g. "Susanto") now correctly used in email body instead of header `name` (e.g. "Black Cat"), with forbidden name cleaning post-render; (2) Generic intro elimination — replaced hardcoded fallbacks with 11 natural context clue templates (document/SLIK/billing context) across upfront/middle/late placements, deterministic seed-based indexing; (3) Structured AI image diagnostics — `generatePdktScenarioImages` returns `PdktImageGenerationDiagnostics` with `warning`/`reason`/`error`, propagated as `attachmentWarning` to frontend via `emailMessageSchema`, rendered as amber AlertCard. Added compliance validation for forbidden name leakage and generic intro phrases (`"Perkenalkan, nama saya..."`). 9 files modified, ~318 lines added. (DONE)
 98. **Lint Debt & Gemini 3.5 Flash** — Cleaned up lint debt (unused imports, `require()` → static import, Error `cause` param) and integrated Gemini 3.5 Flash model across all modules via shared `TEXT_SIMULATION_MODELS` registry. Added smoke test, unit tests, and SIDAK Report AI model filtering. 15+ files modified. (DONE)
 99. **AI Usage Categories Extraction & KETIK Review State Machine** — Centralized AI action classification into `ai-usage-categories.ts` with 14-action definition map replacing inline `SIMULATION_ACTIONS`/`REVIEW_ACTIONS` sets. Extracted `/usage/summary` inline logic into `ai-usage-summary-service.ts` with enriched `breakdownItems` (per-key labeled items). Extracted KETIK review lifecycle state logic into pure `resolveKetikReviewState()` function with 12 deterministic transition cases. Added PDKT `attachmentWarning` AlertCard rendering. 5 new files, 13 files modified. (DONE)
+100. **Profiler Reorder Auth & Grid View** — Fix reorder authorization (bulk_reorder_profiler_peserta now handles service_role properly with auth.uid() bypass). Terminal migration `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` with dedup/validity checks. Backend error mapping (`mapReorderError` with human-friendly messages, removed fallback row-by-row update). Frontend API transport cleanup (replaced custom fetchApi with unified `getApi` helper). New grid view components: `ProfilerParticipantCard` (glassmorphism card) and `ProfilerParticipantGrid` (responsive CSS grid 1→4 cols). Sort disabled on filter with tooltip. 540 API + 509 web tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 99)
+## Key Files Changed (Phase 58 — 100)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -634,6 +635,17 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/usage-summary.test.ts` — **Phase 99**: Updated for enriched breakdown shape
 - `apps/web/src/__tests__/pdkt-ai-image-rendering.test.tsx` — **Phase 99**: Attachment warning AlertCard rendering test
 - `docs/rebuild-logs/phase-99-ai-usage-categories-and-review-state-machine.md` — **NEW Phase 99**: Documentation for AI usage categories extraction and KETIK review state machine
+- `supabase/migrations/20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` — **NEW Phase 100**: Terminal migration fixing bulk_reorder_profiler_peserta authorization for service_role bypass with dedup/validity checks
+- `apps/api/src/services/profiler-service.ts` — **Phase 100**: Added `mapReorderError` with human-friendly messages, removed fallback row-by-row update in `reorderPeserta()`
+- `apps/web/src/lib/profilerService.ts` — **Phase 100**: Replaced custom fetchApi with unified `getApi` helper (CSRF tokens, 401 interception, HTML detection)
+- `apps/web/src/routes/profiler/table.tsx` — **Phase 100**: Disabled sort button with tooltip when filters/search active
+- `apps/web/src/routes/profiler/components/table/ProfilerParticipantCard.tsx` — **NEW Phase 100**: Glassmorphism-inspired premium card with hover transitions, fallback initials
+- `apps/web/src/routes/profiler/components/table/ProfilerParticipantGrid.tsx` — **NEW Phase 100**: Responsive CSS grid layout (1→4 cols) for participant cards
+- `apps/api/src/__tests__/profiler-route-reorder.test.ts` — **NEW Phase 100**: Route-level reorder auth and error mapping tests
+- `apps/api/src/__tests__/profiler-service.test.ts` — **Phase 100**: 6 new unit tests for reorderPeserta/bulkReorderPeserta error mapping
+- `apps/web/src/__tests__/profiler-grid-view.test.tsx` — **NEW Phase 100**: Frontend tests for ProfilerParticipantCard and ProfilerParticipantGrid
+- `docs/rebuild-logs/phase-100-profiler-reorder-auth-and-grid-view.md` — **NEW Phase 100**: Documentation for profiler reorder auth fix and grid view
+- `apps/web/src/routes/profiler/components/table/ProfilerTableView.tsx` — **Phase 100**: Deleted — replaced by grid view components
 
 ## Routes Reference (apps/web)
 
