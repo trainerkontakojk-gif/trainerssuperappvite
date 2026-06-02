@@ -1,5 +1,5 @@
 import { roundTo } from "../../lib/math-utils";
-import type { QAPeriod, ServiceWeight } from "@trainers/types";
+import type { QAPeriod, ServiceWeight, DashboardSparklinePoint } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
 import { getScoreRows } from "./dashboard-aggregation";
 
@@ -87,6 +87,7 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         avg: totalAudited > 0 ? roundTo(totalFindings / totalAudited, 1) : 0,
         zero: totalAudited > 0 ? roundTo((zeroCount / totalAudited) * 100, 1) : 0,
         compliance: complianceCount,
+        complianceRate: totalAudited > 0 ? roundTo((complianceCount / totalAudited) * 100, 1) : 0,
         avgAgentScore: totalAudited > 0 ? roundTo(totalScore / totalAudited, 1) : 0,
         totalAudited,
       };
@@ -136,11 +137,16 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
       "total-defects": periodMetrics.map((m) => ({ label: m.label, value: m.total })),
       "avg-defects": periodMetrics.map((m) => ({ label: m.label, value: m.avg })),
       "avg-score": periodMetrics.map((m) => ({ label: m.label, value: m.avgAgentScore })),
-      "compliance": periodMetrics.map((m) => ({ label: m.label, value: m.compliance })),
+      "compliance": periodMetrics.map((m) => ({
+        label: m.label,
+        value: m.complianceRate,
+        count: m.compliance,
+        totalAudited: m.totalAudited,
+      })),
     };
 
     return { paramTrend: { labels, datasets }, sparklines };
   }
 
-  return { paramTrend: { labels: [], datasets: [] }, sparklines: {} };
+  return { paramTrend: { labels: [], datasets: [] }, sparklines: {} as Record<string, DashboardSparklinePoint[]> };
 }

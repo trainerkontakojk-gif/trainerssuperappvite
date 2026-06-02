@@ -2,13 +2,14 @@ import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import type { KpiDeltaViewModel } from "../../lib/sidak-kpi-delta";
+
 interface Props {
   label: string;
   value: string | number;
   icon: LucideIcon;
   color: string;
-  delta: number | null;
-  invertDelta?: boolean;
+  delta: KpiDeltaViewModel | null;
   desc?: string;
   sparklineData?: { value: number }[];
 }
@@ -48,23 +49,21 @@ const COLOR_MAP: Record<
   },
 };
 
-export default function KpiCard({ label, value, icon: Icon, color, delta, invertDelta, desc, sparklineData }: Props) {
+export default function KpiCard({ label, value, icon: Icon, color, delta, desc, sparklineData }: Props) {
   const c = COLOR_MAP[color] || COLOR_MAP.blue;
-  const isGood = delta === null ? true : invertDelta ? delta <= 0 : delta >= 0;
-  const absDelta = delta !== null ? Math.abs(delta) : null;
 
   let DeltaIcon: LucideIcon | null = null;
   let deltaClass = "";
   if (delta !== null) {
-    if (delta === 0) {
+    if (delta.direction === "flat") {
       DeltaIcon = Minus;
       deltaClass = "text-muted-foreground bg-muted/60 border-border/60";
-    } else if (isGood) {
+    } else if (delta.tone === "good") {
       deltaClass = "text-emerald-600 bg-emerald-500/10 border-emerald-500/20";
-      DeltaIcon = invertDelta ? ArrowDownRight : ArrowUpRight;
+      DeltaIcon = delta.direction === "up" ? ArrowUpRight : ArrowDownRight;
     } else {
       deltaClass = "text-rose-500 bg-rose-500/10 border-rose-500/20";
-      DeltaIcon = invertDelta ? ArrowUpRight : ArrowDownRight;
+      DeltaIcon = delta.direction === "up" ? ArrowUpRight : ArrowDownRight;
     }
   }
 
@@ -80,12 +79,22 @@ export default function KpiCard({ label, value, icon: Icon, color, delta, invert
           <Icon className={`h-4 w-4 ${c.iconFg}`} />
         </div>
 
-        {delta !== null && (
+        {delta ? (
           <div
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.2em] shadow-sm ${deltaClass}`}
+            className={`inline-flex flex-col items-end rounded-xl border px-2.5 py-1 text-right shadow-sm ${deltaClass}`}
+            title={`Sekarang ${delta.current}, sebelumnya ${delta.previous}`}
           >
-            {DeltaIcon && <DeltaIcon className="h-3 w-3" />}
-            <span>{absDelta !== null ? `${absDelta.toFixed(1)}%` : "0.0%"}</span>
+            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.16em]">
+              {DeltaIcon && <DeltaIcon className="h-3 w-3" aria-hidden="true" />}
+              {delta.text}
+            </span>
+            <span className="mt-0.5 text-[9px] font-bold normal-case tracking-normal opacity-80">
+              {delta.comparisonLabel}
+            </span>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border/60 bg-muted/50 px-2.5 py-1 text-right text-[9px] font-bold text-muted-foreground">
+            Belum ada pembanding
           </div>
         )}
       </div>

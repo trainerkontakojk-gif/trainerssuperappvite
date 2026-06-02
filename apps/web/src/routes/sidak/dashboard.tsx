@@ -16,6 +16,7 @@ import {
   ArrowUp,
 } from "lucide-react";
 import KpiCard from "../../components/sidak/KpiCard";
+import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ParetoChart from "../../components/sidak/ParetoChart";
 import FatalDonutChart from "../../components/sidak/FatalDonutChart";
@@ -172,23 +173,67 @@ export default function SidakDashboardPage() {
   }, [paretoSource]);
 
   const sparklines = data?.sparklines ?? {};
-  const calcDelta = (id: string, invert: boolean): number | null => {
+  const buildDelta = (
+    id: string,
+    unit: "relative-percent" | "percentage-point",
+    lowerIsBetter: boolean,
+  ) => {
     const points = sparklines[id];
     if (!points || points.length < 2) return null;
-    const prev = points[points.length - 2].value;
-    const curr = points[points.length - 1].value;
-    if (prev === 0) return null;
-    const delta = ((curr - prev) / prev) * 100;
-    return invert ? -delta : delta;
+    const previous = points[points.length - 2];
+    const current = points[points.length - 1];
+    return buildKpiDelta({
+      current: current.value,
+      previous: previous.value,
+      previousLabel: previous.label,
+      unit,
+      lowerIsBetter,
+    });
   };
 
   const complianceLabel = startMonth !== endMonth ? "Rata-rata Kepatuhan" : "Tingkat Kepatuhan";
 
   const KPI_CARDS = [
-    { id: "total-defects", label: "Total Temuan QA", value: summary?.totalDefects ?? 0, icon: Search, color: "orange" as const, desc: "Kumulatif temuan parameter", invertDelta: true },
-    { id: "avg-defects", label: "Rata-rata Temuan per Agen", value: (summary?.avgDefectsPerAudit ?? 0).toFixed(1), icon: Target, color: "red" as const, desc: "Rasio temuan / sesi audit", invertDelta: true },
-    { id: "avg-score", label: "Rata-rata Skor", value: `${(summary?.avgAgentScore ?? 0).toFixed(1)}%`, icon: BarChart3, color: "blue" as const, desc: "Kualitas performa rata-rata", invertDelta: false },
-    { id: "compliance", label: complianceLabel, value: `${(summary?.complianceRate ?? 0).toFixed(1)}%`, icon: Sparkles, color: "emerald" as const, desc: `${summary?.complianceCount ?? 0} agen dengan skor ≥ 95`, invertDelta: false },
+    {
+      id: "total-defects",
+      label: "Total Temuan QA",
+      value: summary?.totalDefects ?? 0,
+      icon: Search,
+      color: "orange" as const,
+      desc: "Kumulatif temuan parameter",
+      deltaUnit: "relative-percent" as const,
+      lowerIsBetter: true,
+    },
+    {
+      id: "avg-defects",
+      label: "Rata-rata Temuan per Agen",
+      value: (summary?.avgDefectsPerAudit ?? 0).toFixed(1),
+      icon: Target,
+      color: "red" as const,
+      desc: "Rasio temuan / sesi audit",
+      deltaUnit: "relative-percent" as const,
+      lowerIsBetter: true,
+    },
+    {
+      id: "avg-score",
+      label: "Rata-rata Skor",
+      value: `${(summary?.avgAgentScore ?? 0).toFixed(1)}%`,
+      icon: BarChart3,
+      color: "blue" as const,
+      desc: "Kualitas performa rata-rata",
+      deltaUnit: "percentage-point" as const,
+      lowerIsBetter: false,
+    },
+    {
+      id: "compliance",
+      label: complianceLabel,
+      value: `${(summary?.complianceRate ?? 0).toFixed(1)}%`,
+      icon: Sparkles,
+      color: "emerald" as const,
+      desc: `${summary?.complianceCount ?? 0} agen dengan skor ≥ 95`,
+      deltaUnit: "percentage-point" as const,
+      lowerIsBetter: false,
+    },
   ];
 
   return (
@@ -263,8 +308,7 @@ export default function SidakDashboardPage() {
                   value={kpi.value}
                   icon={kpi.icon}
                   color={kpi.color}
-                  delta={calcDelta(kpi.id, kpi.invertDelta)}
-                  invertDelta={kpi.invertDelta}
+                  delta={buildDelta(kpi.id, kpi.deltaUnit, kpi.lowerIsBetter)}
                   desc={kpi.desc}
                   sparklineData={sparklines[kpi.id]}
                 />

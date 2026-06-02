@@ -24,8 +24,19 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("../components/sidak/KpiCard", () => ({
-  default: ({ label, value }: { label: string; value: string | number }) => (
-    <div data-testid={`kpi-${label}`}>{value}</div>
+  default: ({
+    label,
+    value,
+    delta,
+  }: {
+    label: string;
+    value: string | number;
+    delta: { text: string; comparisonLabel: string } | null;
+  }) => (
+    <div data-testid={`kpi-${label}`}>
+      <span>{value}</span>
+      <span>{delta ? `${delta.text} ${delta.comparisonLabel}` : "Belum ada pembanding"}</span>
+    </div>
   ),
 }));
 
@@ -125,8 +136,8 @@ const mockDashboardData = {
       { label: "Mei 26", value: 99.5 },
     ],
     compliance: [
-      { label: "Apr 26", value: 73 },
-      { label: "Mei 26", value: 78 },
+      { label: "Apr 26", value: 98.6, count: 73, totalAudited: 74 },
+      { label: "Mei 26", value: 100, count: 78, totalAudited: 78 },
     ],
   },
   serviceData: [
@@ -182,6 +193,9 @@ describe("SIDAK dashboard legacy parity", () => {
     expect(
       screen.getByRole("heading", { name: "Top Agen (Temuan)" }),
     ).toBeInTheDocument();
+
+    expect(screen.getByTestId("kpi-Rata-rata Skor")).toHaveTextContent("99.5%Naik 0.2 poin vs Apr 26");
+    expect(screen.getByTestId("kpi-Rata-rata Kepatuhan")).toHaveTextContent("100.0%Naik 1.4 poin vs Apr 26");
   });
 
   it("renders a legacy-style loading skeleton on initial load", () => {

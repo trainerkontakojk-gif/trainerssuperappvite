@@ -100,6 +100,13 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 | `avgAgentScore`      | `sum(finalAgentScore) / totalAgents`             |
 | `complianceRate`     | `(agent dengan score >= 95 / totalAgents) * 100` |
 
+## Delta KPI Dashboard
+
+Persentase kenaikan/penurunan (delta) di KPI Dashboard dihitung berdasarkan dua titik terakhir dari data tren (sparkline). Unit delta disesuaikan dengan jenis metrik:
+1. **Metrik Count/Ratio** (`total-defects` dan `avg-defects`): Delta ditampilkan sebagai persentase relatif terhadap periode sebelumnya. Rumusnya: `((current - previous) / previous) * 100`.
+2. **Metrik Persen** (`avg-score` dan `compliance`): Delta ditampilkan sebagai perubahan poin persentase (poin) absolut agar operator tidak bingung. Rumusnya: `current - previous` (dengan nilai mutlak untuk magnitudo).
+3. **Kepatuhan (Compliance)**: Delta kepatuhan dihitung menggunakan `complianceRate` (persentase) alih-alih `complianceCount` (jumlah agen) agar konsisten dengan nilai utama KPI.
+
 Ranking agent diurutkan dari defect terbanyak ke tersedikit, lalu nama agent sebagai tie-break.
 
 Pareto dan donut memakai `findingRows` saja. Phantom tidak dihitung sebagai defect.

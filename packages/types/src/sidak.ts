@@ -237,6 +237,13 @@ export interface ParetoData {
   category: "critical" | "non_critical";
 }
 
+export interface DashboardSparklinePoint {
+  label: string;
+  value: number;
+  count?: number;
+  totalAudited?: number;
+}
+
 export interface DashboardData {
   periods: QAPeriod[];
   folders: { id: string; name: string }[];
@@ -254,7 +261,7 @@ export interface DashboardData {
     labels: string[];
     datasets: { label: string; data: number[]; isTotal: boolean }[];
   };
-  sparklines: Record<string, { label: string; value: number }[]>;
+  sparklines: Record<string, DashboardSparklinePoint[]>;
   availableYears: number[];
   currentYear: number;
   availableServices: ServiceType[];

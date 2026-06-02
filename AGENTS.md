@@ -293,6 +293,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 100. **Profiler Reorder Auth & Grid View** — Fix reorder authorization (bulk_reorder_profiler_peserta now handles service_role properly with auth.uid() bypass). Terminal migration `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` with dedup/validity checks. Backend error mapping (`mapReorderError` with human-friendly messages, removed fallback row-by-row update). Frontend API transport cleanup (replaced custom fetchApi with unified `getApi` helper). New grid view components: `ProfilerParticipantCard` (glassmorphism card) and `ProfilerParticipantGrid` (responsive CSS grid 1→4 cols). Sort disabled on filter with tooltip. 540 API + 509 web tests passing. (DONE)
 101. **SIDAK Input Selection Grid & Card Refactor** — Extracted shared `SidakSelectionCard`, `SidakSelectionGrid`, and `TemuanGroupGrid` components from inline code in `input.tsx`. Changed folder/agent/period selection from single-column vertical list to responsive multi-column grid (1→3 cols). Changed card layout from horizontal to vertical (`flex-col min-h-32 p-5`). Changed temuan list from `space-y-3` to responsive grid (1→3 cols). Exported `TemuanItem`/`TemuanGroup`/`TemuanGroupCardProps` interfaces. Updated all tests. 0 logic changes. (DONE)
 102. **SIDAK Parameter Period Isolation** — Period-aware rule version resolution with `resolveEffectiveRuleVersionForPeriod()`. Period-scoped superseding: publish hanya menggantikan versi published di periode target yang sama. Dashboard & summary menggunakan snapshot bobot/indikator per `(service_type, period_id)`. New `DELETE /rule-versions/:id` endpoint untuk hapus draft. Rule versions sorted newest-first di backend. Frontend: dynamic confirm dialog copy, sorted period dropdown, clarified publish warning. Tests updated with table-aware mock pattern. (DONE)
+103. **SIDAK Dashboard KPI Delta & Compliance Sparkline Fix** — New `buildKpiDelta()` utility with direction/magnitude/tone, two unit modes (relative-percent for counts, percentage-point for percentages). KpiCard refactored to accept `KpiDeltaViewModel` instead of raw `delta`+`invertDelta`. Compliance sparkline now uses `complianceRate` (percentage) instead of raw count. New `DashboardSparklinePoint` type with `count`/`totalAudited`. 3 new test files. (DONE)
 
 ## Key Files Changed (Phase 58 — 100)
 
@@ -670,6 +671,15 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/__tests__/sidak-versioning-parity.test.ts` — **Phase 102**: New tests for `publishRuleVersion` period-scoped superseding, `deleteRuleVersionDraft` (success, published-rejection, not-found), `resolveEffectiveRuleVersionForPeriod` (same period, earlier period, before-all)
 - `apps/web/src/__tests__/sidak-settings-parity.test.tsx` — **Phase 102**: New test for delete draft button triggering `deleteApi` with correct path and dynamic confirm message
 - `docs/rebuild-logs/phase-102-sidak-parameter-period-isolation.md` — **NEW Phase 102**: Documentation for parameter period isolation
+- `apps/web/src/lib/sidak-kpi-delta.ts` — **NEW Phase 103**: KPI delta utility (`buildKpiDelta()`) with direction/magnitude/tone, two unit modes
+- `apps/web/src/__tests__/sidak-kpi-delta.test.ts` — **NEW Phase 103**: Unit tests for KPI delta (relative-percent, percentage-point, null-on-zero-previous)
+- `apps/api/src/__tests__/sidak-dashboard-trends.test.ts` — **NEW Phase 103**: Regression test verifying compliance sparkline uses rate, not count
+- `apps/web/src/components/sidak/KpiCard.tsx` — **Phase 103**: Refactored to accept `KpiDeltaViewModel` prop; removed `invertDelta`; two-line delta badge with comparison label
+- `apps/web/src/routes/sidak/dashboard.tsx` — **Phase 103**: Replaced inline `calcDelta` with `buildKpiDelta`; per-metric deltaUnit/lowerIsBetter config
+- `apps/api/src/services/sidak/dashboard-trends.ts` — **Phase 103**: Compliance sparkline emits `complianceRate` (percentage) instead of count; typed as `DashboardSparklinePoint[]`
+- `packages/types/src/sidak.ts` — **Phase 103**: Added `DashboardSparklinePoint` type; updated `sparklines` type in `DashboardData`
+- `apps/web/src/__tests__/sidak-dashboard-parity.test.tsx` — **Phase 103**: Updated KpiCard mock for `delta` object; added delta text assertions
+- `docs/SIDAK_LOGIC_AND_SCORING.md` — **Phase 103**: Added Delta KPI Dashboard section
 
 ## Routes Reference (apps/web)
 
