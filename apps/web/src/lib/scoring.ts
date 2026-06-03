@@ -68,6 +68,16 @@ export const DEFAULT_SERVICE_WEIGHTS: Record<ServiceType, ServiceWeight> = {
   },
 };
 
+export const SERVICE_LABELS: Record<ServiceType, string> = {
+  call: "Call",
+  chat: "Chat",
+  email: "Email",
+  cso: "CSO",
+  pencatatan: "Pencatatan",
+  bko: "BKO",
+  slik: "SLIK",
+};
+
 function scoreSession(
   indicators: QAIndicator[],
   temuan: { indicator_id: string; nilai: number }[],

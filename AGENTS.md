@@ -680,6 +680,12 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `packages/types/src/sidak.ts` — **Phase 103**: Added `DashboardSparklinePoint` type; updated `sparklines` type in `DashboardData`
 - `apps/web/src/__tests__/sidak-dashboard-parity.test.tsx` — **Phase 103**: Updated KpiCard mock for `delta` object; added delta text assertions
 - `docs/SIDAK_LOGIC_AND_SCORING.md` — **Phase 103**: Added Delta KPI Dashboard section
+- `apps/web/src/components/sidak/ParetoChart.tsx` — **Phase 105**: Exported custom `ParetoTooltip` with full parameter name, counts, cumulative %, category, and layanan label; hover cursor highlight; `minPointSize={4}` for short bars; normalized category color mapping; No Category legend item
+- `apps/web/src/routes/sidak/dashboard.tsx` — **Phase 105**: Removed premature name truncation in Pareto data mapping; passed `serviceLabel` to ParetoChart using shared `SERVICE_LABELS`
+- `apps/web/src/lib/scoring.ts` — **Phase 105**: Added `SERVICE_LABELS` constant mapping service types to display labels
+- `apps/web/src/__tests__/sidak-dashboard-parity.test.tsx` — **Phase 105**: Added ParetoChart mock capture + `passes full RCA parameter names to ParetoChart` test
+- `apps/web/src/__tests__/ParetoChart.test.tsx` — **NEW Phase 105**: Unit tests for ParetoTooltip rendering (critical/non-critical/none categories) and layanan label assertion
+- `docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md` — **NEW Phase 105**: Documentation for RCA BKO tooltip fix
 
 ## Routes Reference (apps/web)
 

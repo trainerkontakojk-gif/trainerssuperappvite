@@ -10,9 +10,55 @@ interface ParetoItem {
 
 interface Props {
   data: ParetoItem[];
+  serviceLabel?: string;
 }
 
-export default function ParetoChart({ data }: Props) {
+const CATEGORY_META: Record<string, { label: string; color: string }> = {
+  critical: { label: "Critical Parameter", color: "#f43f5e" },
+  non_critical: { label: "Non-Critical Parameter", color: "hsl(var(--primary))" },
+  none: { label: "No Category", color: "#64748b" },
+};
+
+function getCategoryMeta(category?: string) {
+  return CATEGORY_META[category ?? ""] ?? { label: "Parameter", color: "#64748b" };
+}
+
+export function ParetoTooltip({ active, payload, serviceLabel }: any) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null;
+
+  const item = payload[0]?.payload as ParetoItem | undefined;
+  if (!item) return null;
+
+  const category = getCategoryMeta(item.category);
+
+  return (
+    <div className="min-w-48 rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
+      <p className="mb-2 max-w-64 font-semibold leading-snug text-foreground">{item.fullName || item.name}</p>
+      <div className="space-y-1 text-muted-foreground">
+        {serviceLabel ? (
+          <div className="flex items-center justify-between gap-4">
+            <span>Layanan</span>
+            <span className="font-semibold text-foreground">{serviceLabel}</span>
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between gap-4">
+          <span>Jumlah Temuan</span>
+          <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span>Kumulatif</span>
+          <span className="font-semibold text-foreground tabular-nums">{item.cumulative}%</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span>Kategori</span>
+          <span className="font-semibold text-foreground">{category.label}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ParetoChart({ data, serviceLabel }: Props) {
   if (!data.length) return null;
 
   return (
@@ -36,27 +82,13 @@ export default function ParetoChart({ data }: Props) {
             <YAxis yAxisId="left" orientation="left" tick={{ fontSize: 11, fill: "currentColor" }} opacity={0.6} axisLine={false} tickLine={false} />
             <YAxis yAxisId="right" orientation="right" domain={[0, 100]} ticks={[0, 20, 40, 60, 80, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 11, fill: "currentColor" }} opacity={0.6} axisLine={false} tickLine={false} />
             <Tooltip
-              formatter={(value: any, name: any) => {
-                if (name === "cumulative") return [`${value}%`, "Kumulatif"];
-                return [value, "Jumlah"];
-              }}
-              labelFormatter={(label: any, payload: any) => {
-                const items = Array.isArray(payload) ? payload : [];
-                return items[0]?.payload?.fullName ?? label;
-              }}
-              contentStyle={{
-                borderRadius: 8,
-                border: "1px solid var(--border)",
-                backgroundColor: "var(--card)",
-                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--foreground)",
-              }}
+              cursor={{ fill: "currentColor", opacity: 0.04 }}
+              content={(props) => <ParetoTooltip {...props} serviceLabel={serviceLabel} />}
+              wrapperStyle={{ outline: "none" }}
             />
-            <Bar yAxisId="left" dataKey="count" radius={[8, 8, 0, 0]} maxBarSize={32}>
+            <Bar yAxisId="left" dataKey="count" radius={[8, 8, 0, 0]} maxBarSize={32} minPointSize={4}>
               {data.map((entry, i) => (
-                <Cell key={i} fill={entry.category === "critical" ? "#f43f5e" : "hsl(var(--primary))"} fillOpacity={0.8} />
+                <Cell key={i} fill={getCategoryMeta(entry.category).color} fillOpacity={0.85} />
               ))}
             </Bar>
             <Line yAxisId="right" dataKey="cumulative" stroke="#f59e0b" strokeWidth={2} dot={{ fill: "#f59e0b", r: 3, strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }} type="monotone" animationDuration={2000} />
@@ -72,6 +104,12 @@ export default function ParetoChart({ data }: Props) {
           <div className="w-3 h-3 rounded bg-primary opacity-80" />
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Non-Critical Parameter</span>
         </div>
+        {data.some((entry) => entry.category === "none") && (
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded bg-[#64748b] opacity-80" />
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">No Category</span>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <div className="w-6 h-0.5 bg-[#f59e0b]" />
           <div className="w-2 h-2 rounded-full bg-[#f59e0b] -ml-2" />

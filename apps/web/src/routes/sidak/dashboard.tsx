@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
+import { SERVICE_LABELS } from "../../lib/scoring";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ParetoChart from "../../components/sidak/ParetoChart";
 import FatalDonutChart from "../../components/sidak/FatalDonutChart";
@@ -163,7 +164,7 @@ export default function SidakDashboardPage() {
       .map((p: ParetoData, _i: number, arr: ParetoData[]) => {
         const total = arr.reduce((s: number, x: ParetoData) => s + x.count, 0);
         return {
-          name: p.name.length > 15 ? p.name.slice(0, 15) + "..." : p.name,
+          name: p.name,
           fullName: p.fullName || p.name,
           count: p.count,
           cumulative: total > 0 ? Math.round((p.cumulative / total) * 100) : 0,
@@ -397,7 +398,10 @@ export default function SidakDashboardPage() {
                     </div>
                   </div>
                   {sortedPareto.length > 0 ? (
-                    <ParetoChart data={sortedPareto} />
+                    <ParetoChart
+                      data={sortedPareto}
+                      serviceLabel={SERVICE_LABELS[selectedService as keyof typeof SERVICE_LABELS] || selectedService}
+                    />
                   ) : (
                     <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
                       <p className="text-sm text-muted-foreground font-medium">Data kategori temuan belum tersedia</p>

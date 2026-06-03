@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 const useApiMock = vi.hoisted(() => vi.fn());
+const paretoChartMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
@@ -45,7 +46,10 @@ vi.mock("../components/sidak/ParamTrendChart", () => ({
 }));
 
 vi.mock("../components/sidak/ParetoChart", () => ({
-  default: () => <div data-testid="pareto-chart" />,
+  default: (props: unknown) => {
+    paretoChartMock(props);
+    return <div data-testid="pareto-chart" />;
+  },
 }));
 
 vi.mock("../components/sidak/FatalDonutChart", () => ({
@@ -212,5 +216,38 @@ describe("SIDAK dashboard legacy parity", () => {
       screen.queryByText("Memuat data dashboard..."),
     ).not.toBeInTheDocument();
     expect(container.querySelector('[data-testid="sidak-dashboard-skeleton"]')).toBeInTheDocument();
+  });
+
+  it("passes full RCA parameter names to ParetoChart", async () => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...mockDashboardData,
+        paretoData: [
+          {
+            name: "Kesesuaian Data pada Kertas Kerja",
+            fullName: "Kesesuaian Data pada Kertas Kerja",
+            count: 32,
+            cumulative: 32,
+            category: "none",
+          },
+        ],
+      },
+      loading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<SidakDashboardPage />);
+
+    expect(paretoChartMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serviceLabel: "Call",
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            name: "Kesesuaian Data pada Kertas Kerja",
+            fullName: "Kesesuaian Data pada Kertas Kerja",
+          }),
+        ]),
+      }),
+    );
   });
 });
