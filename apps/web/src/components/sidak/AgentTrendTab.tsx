@@ -27,13 +27,15 @@ const TREND_COLORS = [
 export default function AgentTrendTab({ labels, datasets, loading }: Props) {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (!mounted) return <div className="h-[400px] bg-muted/10 animate-pulse rounded-2xl" />;
+  if (!mounted)
+    return <div className="h-[400px] bg-muted/10 animate-pulse rounded-2xl" />;
 
-  const trendRangeLabel = labels.length > 0
-    ? `${labels[0]} - ${labels[labels.length - 1]}`
-    : "";
+  const trendRangeLabel =
+    labels.length > 0 ? `${labels[0]} - ${labels[labels.length - 1]}` : "";
 
   if (loading) {
     return (
@@ -62,7 +64,8 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
 
   const paramDatasets = datasets.filter((ds) => !ds.isTotal);
   const totalDataset = datasets.find((ds) => ds.isTotal);
-  const isFiltered = activeFilter !== null;
+  const isFiltered = activeFilter !== null && activeFilter !== "TOTAL_ONLY";
+  const isTotalOnly = activeFilter === "TOTAL_ONLY";
 
   // Build color map based on ORIGINAL index in full datasets array
   const colorMap: Record<string, string> = {};
@@ -75,10 +78,16 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
   // Determine which datasets to pass to chart
   const chartDatasets = isFiltered
     ? datasets.filter((ds) => ds.isTotal || ds.label === activeFilter)
-    : datasets;
+    : isTotalOnly
+      ? datasets.filter((ds) => ds.isTotal)
+      : datasets;
 
   const hiddenKeys = isFiltered
-    ? new Set(paramDatasets.filter((ds) => ds.label !== activeFilter).map((ds) => ds.label))
+    ? new Set(
+        paramDatasets
+          .filter((ds) => ds.label !== activeFilter)
+          .map((ds) => ds.label),
+      )
     : new Set<string>();
 
   const showTotal = !isFiltered;
@@ -91,7 +100,9 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
             <TrendingUp className="w-3.5 h-3.5" />
             Tren Kinerja {trendRangeLabel ? `• ${trendRangeLabel}` : ""}
           </div>
-          <h3 className="text-2xl sm:text-3xl font-black tracking-tight">Pergerakan skor per periode audit</h3>
+          <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
+            Pergerakan skor per periode audit
+          </h3>
           <p className="text-[11px] text-muted-foreground font-medium mt-2">
             Pantau tren temuan agen pada setiap periode evaluasi di tahun aktif.
           </p>
@@ -109,6 +120,20 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
           }`}
         >
           Ringkasan
+        </button>
+        <button
+          onClick={() => setActiveFilter(activeFilter === "TOTAL_ONLY" ? null : "TOTAL_ONLY")}
+          className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
+            activeFilter === "TOTAL_ONLY"
+              ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
+              : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
+          }`}
+        >
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: activeFilter === "TOTAL_ONLY" ? "white" : "hsl(var(--primary))" }}
+          />
+          Total Temuan
         </button>
         {paramDatasets.map((ds) => {
           const isActive = activeFilter === ds.label;
@@ -154,7 +179,9 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
             Volume Periode
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black tracking-tight">{labels.length}</span>
+            <span className="text-3xl font-black tracking-tight">
+              {labels.length}
+            </span>
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
               Periode Aktif
             </span>
@@ -169,7 +196,8 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
               Insight Tren
             </p>
             <p className="text-sm font-medium text-foreground/70 leading-relaxed">
-              Gunakan pola naik-turun per parameter untuk menentukan fokus coaching pada periode berikutnya.
+              Gunakan pola naik-turun per parameter untuk menentukan fokus
+              coaching pada periode berikutnya.
             </p>
           </div>
         </div>
