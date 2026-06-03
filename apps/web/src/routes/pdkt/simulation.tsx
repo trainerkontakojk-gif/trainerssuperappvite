@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { MailboxSidebar } from "./components/MailboxSidebar";
 import { EmailDetailPane } from "./components/EmailDetailPane";
 import { ReplyComposer } from "./components/ReplyComposer";
@@ -96,6 +96,9 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
+  // Tab filter state
+  const [filter, setFilter] = useState<"all" | "open" | "replied">("open");
+
   // Timer for time_taken (per mailbox)
   const sessionStartTimeRef = useRef<Record<string, number>>({});
 
@@ -121,6 +124,12 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
     "/pdkt/consumer-types",
   );
+
+  const filteredByTab = useMemo(() => {
+    if (!mailboxItems) return [];
+    if (filter === "all") return mailboxItems;
+    return mailboxItems.filter((item) => item.status === filter);
+  }, [mailboxItems, filter]);
 
   const selectedItem = mailboxItems?.find((item) => item.id === selectedId);
 
@@ -170,11 +179,21 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
     fetchHistory();
   }, []);
 
+  // Auto-sync selection when filter tab changes or items change
   useEffect(() => {
-    if (!selectedId && mailboxItems && mailboxItems.length > 0) {
-      setSelectedId(mailboxItems[0].id);
+    if (mailboxItems && mailboxItems.length > 0) {
+      const currentFiltered = filter === "all" ? mailboxItems : mailboxItems.filter(item => item.status === filter);
+      if (currentFiltered.length > 0) {
+        if (!selectedId || !currentFiltered.some(item => item.id === selectedId)) {
+          setSelectedId(currentFiltered[0].id);
+        }
+      } else {
+        setSelectedId(null);
+      }
+    } else {
+      setSelectedId(null);
     }
-  }, [mailboxItems, selectedId]);
+  }, [mailboxItems, filter, selectedId]);
 
   // Start timer for open items when selected
   useEffect(() => {
@@ -337,6 +356,9 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       (item) => item.history_id === session.id,
     );
     if (matchingMailbox) {
+      if (matchingMailbox.status === "open" || matchingMailbox.status === "replied") {
+        setFilter(matchingMailbox.status);
+      }
       setSelectedId(matchingMailbox.id);
     } else if (session.config && session.emails && session.emails.length > 0) {
       const firstInbound = session.emails.find((e: any) => !e.isAgent);
@@ -385,6 +407,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       });
 
       (mailboxItems as PdktMailboxItem[] | undefined)?.push(syntheticItem);
+      setFilter("replied");
       setSelectedId(syntheticId);
     }
     setIsHistoryOpen(false);
@@ -434,6 +457,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
 
       await refetch();
       await fetchHistory(); // update history list as well
+      setFilter("open");
       setSelectedId(result.id);
       setIsNewModalOpen(false);
     } catch (err) {
@@ -474,6 +498,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       await refetch();
       await fetchHistory();
       setIsReplyOpen(false);
+      setFilter("replied");
       notifyAfter();
       notify.success("Balasan terkirim! Evaluasi AI sedang berjalan.");
     } catch (err: any) {
@@ -755,7 +780,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         <div className="flex-1 flex bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm relative">
       <MailboxSidebar
-        items={mailboxItems || []}
+        items={filteredByTab}
         selectedId={selectedId}
         onSelect={setSelectedId}
         onNew={() => setIsNewModalOpen(true)}
@@ -764,6 +789,8 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
           await fetchHistory();
           setIsHistoryOpen(true);
         }}
+        filter={filter}
+        onFilterChange={setFilter}
         selectedBulkIds={selectedBulkIds}
         onToggleBulkId={handleToggleBulkId}
         isBulkMode={isBulkMode}

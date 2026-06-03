@@ -9,7 +9,10 @@ const mockUserClients: any[] = [];
 function buildMockClient() {
   const m: any = {
     rpc: mockRpc,
-    from: vi.fn(() => m),
+    from: vi.fn((table: string) => {
+      m.lastTable = table;
+      return m;
+    }),
     select: vi.fn(() => m),
     eq: vi.fn(() => m),
     order: vi.fn(() => m),
@@ -252,6 +255,83 @@ describe("PDKT Reply Route E2E", () => {
         "00000000-0000-0000-0000-000000000001",
       );
     });
+
+    it("returns evaluation status for non-owned history if linked to a visible mailbox item", async () => {
+      await createAuthenticatedApp("trainer");
+
+      let lastTableUser = "";
+      let lastTableAdmin = "";
+
+      mockSingle.mockImplementation(function (this: any) {
+        if (this === mockSupabaseAdmin) {
+          lastTableAdmin = this.lastTable;
+          return {
+            data: {
+              evaluation_status: "completed",
+              evaluation: { score: 90, feedback: "Good fallback." },
+              evaluation_error: null,
+            },
+            error: null,
+          };
+        } else {
+          lastTableUser = this.lastTable;
+          if (this.lastTable === "pdkt_history") {
+            return { data: null, error: { message: "Permission denied", code: "42501" } };
+          }
+          return { data: null, error: null };
+        }
+      });
+
+      mockMaybeSingle.mockImplementation(function (this: any) {
+        lastTableUser = this.lastTable;
+        if (this.lastTable === "pdkt_mailbox_items") {
+          return { data: { id: "mailbox-1", history_id: "hist-non-owned" }, error: null };
+        }
+        return { data: null, error: null };
+      });
+
+      const res = await app.request(
+        "/api/v1/pdkt/history/eval/hist-non-owned",
+        { headers: { Authorization: "Bearer test-token" } }
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.evaluation_status).toBe("completed");
+      expect(json.data.evaluation.score).toBe(90);
+
+      expect(lastTableUser).toBe("pdkt_mailbox_items");
+      expect(lastTableAdmin).toBe("pdkt_history");
+    });
+
+    it("returns 404 for non-owned history if not linked to any visible mailbox item", async () => {
+      await createAuthenticatedApp("trainer");
+
+      mockSingle.mockImplementation(function (this: any) {
+        if (this === mockSupabaseAdmin) {
+          return { data: null, error: null };
+        } else {
+          return { data: null, error: { message: "Permission denied", code: "42501" } };
+        }
+      });
+
+      mockMaybeSingle.mockImplementation(function (this: any) {
+        if (this.lastTable === "pdkt_mailbox_items") {
+          return { data: null, error: null };
+        }
+        return { data: null, error: null };
+      });
+
+      const res = await app.request(
+        "/api/v1/pdkt/history/eval/hist-non-owned-missing",
+        { headers: { Authorization: "Bearer test-token" } }
+      );
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+    });
   });
 
   describe("POST /history/retry-eval", () => {
@@ -274,6 +354,62 @@ describe("PDKT Reply Route E2E", () => {
       const client = mockUserClients[mockUserClients.length - 1];
       expect(client.eq).toHaveBeenCalledTimes(1);
       expect(client.eq).toHaveBeenCalledWith("id", "hist-1");
+    });
+
+    it("starts retry evaluation for non-owned history if linked to a visible mailbox item", async () => {
+      await createAuthenticatedApp("trainer");
+
+      mockMaybeSingle.mockImplementation(function (this: any) {
+        if (this === mockSupabaseAdmin) {
+          return { data: { id: "hist-non-owned" }, error: null };
+        } else {
+          if (this.lastTable === "pdkt_history") {
+            return { data: null, error: { message: "Permission denied", code: "42501" } };
+          }
+          if (this.lastTable === "pdkt_mailbox_items") {
+            return { data: { id: "mailbox-1", history_id: "hist-non-owned" }, error: null };
+          }
+          return { data: null, error: null };
+        }
+      });
+
+      const res = await app.request("/api/v1/pdkt/history/retry-eval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ historyId: "hist-non-owned" }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+    });
+
+    it("returns 404 for retry evaluation of non-owned history if not linked to any visible mailbox item", async () => {
+      await createAuthenticatedApp("trainer");
+
+      mockMaybeSingle.mockImplementation(function (this: any) {
+        if (this === mockSupabaseAdmin) {
+          return { data: null, error: null };
+        } else {
+          if (this.lastTable === "pdkt_history") {
+            return { data: null, error: { message: "Permission denied", code: "42501" } };
+          }
+          if (this.lastTable === "pdkt_mailbox_items") {
+            return { data: null, error: null };
+          }
+          return { data: null, error: null };
+        }
+      });
+
+      const res = await app.request("/api/v1/pdkt/history/retry-eval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ historyId: "hist-non-owned-missing" }),
+      });
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.success).toBe(false);
     });
   });
 });

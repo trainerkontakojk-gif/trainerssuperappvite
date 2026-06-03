@@ -297,8 +297,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 104. **SIDAK ParetoChart Tooltip Fix (RCA BKO)** — Exported custom `ParetoTooltip` with full parameter name, counts, cumulative %, category, and layanan label; hover cursor highlight; `minPointSize={4}` for short bars; normalized category color mapping; No Category legend item. Added `SERVICE_LABELS` constant. 4 files modified, 2 test files. (DONE)
 105. **PDKT Shared Mailbox Ownership** — Changed PDKT mailbox from per-user fanout copies to a single shared canonical mailbox accessible by all authenticated users (admin, trainer, leader, agent). Added creator metadata display (`created_by_user` with full_name/role/is_current_user), role-based delete authorization (admin/trainer can delete any, others only their own), new RPC `soft_delete_pdkt_mailbox_item` with SECURITY DEFINER, backfill of `created_by_user_id` null values, updated `submit_pdkt_mailbox_batch`/`submit_pdkt_mailbox_reply` RPCs, 403-aware error passthrough in `jsonServerError`, human-friendly tooltip for disabled delete button, creator label in sidebar and detail pane. 1 terminal migration, 1 rollback, 14 files modified, 40+ API + web regression tests passing. (DONE)
 106. **PDKT Bulk Delete & Soft Delete RPC Fix** — Added bulk soft delete for PDKT mailbox items via `POST /pdkt/mailbox/batch-delete` endpoint; fixed `soft_delete_pdkt_mailbox_item` RPC to use `COALESCE(created_by_user_id, user_id)` for legacy data where creator is NULL. Bulk delete service uses per-item permission check via `canDeletePdktMailboxItem`, parallel `Promise.allSettled` execution, and detailed `BulkDeleteResult` summary. Frontend: bulk selection mode with checkboxes, disabled checkbox for non-deletable items with tooltip, batch delete confirmation dialog, partial success/failure toast. 1 terminal migration, 1 rollback, 10 files modified, 3 new test suites. (DONE)
+107. **PDKT Shared Mailbox Evaluation Access Sharing Fix** — Fixed AI evaluation polling and retry access blocks for non-owner users when mailbox items are shared. Implemented a two-tier verification check: first tries user client (respecting owner-only RLS on pdkt_history), then queries pdkt_mailbox_items to check if linked to a visible mailbox item, falling back to adminClient query. Removed user_id constraints from background worker processPdktEvaluation. Added 4 E2E route tests. (DONE)
 
-## Key Files Changed (Phase 58 — 106)
+## Key Files Changed (Phase 58 — 107)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -712,6 +713,12 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx` — **NEW Phase 106**: Frontend bulk delete UX tests (toggle, select, delete, partial failure)
 - `apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts` — **Phase 106**: Unit tests for `bulkSoftDeleteMailboxItems` (permission filter, RPC rejection)
 - `docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md` — **NEW Phase 106**: Documentation for PDKT bulk delete & soft delete fix
+- `apps/api/src/services/pdkt/evaluation-service.ts` — **Phase 107**: Removed `.eq("user_id", userId)` from 3 query locations in `processPdktEvaluation()` to allow shared mailbox access
+- `apps/api/src/routes/pdkt/history.ts` — **Phase 107**: Added two-tier fallback (userClient → pdkt_mailbox_items check → adminClient) for evaluation access
+- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 107**: Filter state lifted to parent, auto-sync selection, `filteredByTab` memo
+- `apps/web/src/routes/pdkt/components/MailboxSidebar.tsx` — **Phase 107**: Filter state controlled by parent (props `filter`/`onFilterChange`)
+- `apps/api/src/__tests__/pdkt-reply-route.test.ts` — **Phase 107**: 4 E2E tests for non-owned history evaluation access
+- `docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md` — **NEW Phase 107**: Documentation for evaluation sharing access fix
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

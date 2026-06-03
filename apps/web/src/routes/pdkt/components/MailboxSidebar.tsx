@@ -30,6 +30,9 @@ interface MailboxSidebarProps {
   onHistory?: () => void;
   onUsage?: () => void;
 
+  filter: "all" | "open" | "replied";
+  onFilterChange: (filter: "all" | "open" | "replied") => void;
+
   // Bulk selection props
   selectedBulkIds: Set<string>;
   onToggleBulkId: (id: string) => void;
@@ -46,6 +49,8 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   onSettings,
   onHistory,
   onUsage,
+  filter,
+  onFilterChange,
   selectedBulkIds,
   onToggleBulkId,
   isBulkMode,
@@ -53,16 +58,13 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   onBulkDelete,
 }) => {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "open" | "replied">("open");
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
       item.sender_name.toLowerCase().includes(search.toLowerCase()) ||
       item.subject.toLowerCase().includes(search.toLowerCase());
 
-    const matchesFilter = filter === "all" || item.status === filter;
-
-    return matchesSearch && matchesFilter;
+    return matchesSearch;
   });
 
   const formatTime = (dateStr: string) => {
@@ -183,7 +185,7 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setFilter(tab.id as any)}
+              onClick={() => onFilterChange(tab.id as any)}
               className={`flex-1 py-1.5 text-[9px] font-medium uppercase tracking-wide rounded-lg transition-all ${
                 filter === tab.id
                   ? "bg-white text-sky-600 shadow-sm"

@@ -148,7 +148,6 @@ export async function processPdktEvaluation(
     .from("pdkt_history")
     .select("*")
     .eq("id", historyId)
-    .eq("user_id", userId)
     .single();
 
   if (fetchError || !history) {
@@ -170,7 +169,6 @@ export async function processPdktEvaluation(
       evaluation_error: null,
     })
     .eq("id", historyId)
-    .eq("user_id", userId)
     .or(
       `evaluation_started_at.is.null,evaluation_started_at.lt.${staleThreshold}`,
     )
@@ -186,7 +184,6 @@ export async function processPdktEvaluation(
       .from("pdkt_history")
       .select("evaluation_status, evaluation")
       .eq("id", historyId)
-      .eq("user_id", userId)
       .maybeSingle();
 
     if (current?.evaluation_status === "completed") {

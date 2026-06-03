@@ -1935,7 +1935,7 @@
       "source_file": "packages/types/src/ketik.ts",
       "source_location": "L199",
       "id": "src_ketik_ketikreviewdetail",
-      "community": 118,
+      "community": 27,
       "norm_label": "ketikreviewdetail"
     },
     {
@@ -2043,7 +2043,7 @@
       "source_file": "packages/types/src/ketik.ts",
       "source_location": "L310",
       "id": "src_ketik_generatemessageschema",
-      "community": 118,
+      "community": 307,
       "norm_label": "generatemessageschema"
     },
     {
@@ -2106,7 +2106,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L1",
       "id": "packages_types_src_admin_ts",
-      "community": 5,
+      "community": 45,
       "norm_label": "admin.ts"
     },
     {
@@ -2124,7 +2124,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L13",
       "id": "src_admin_pendingleaderrequest",
-      "community": 5,
+      "community": 45,
       "norm_label": "pendingleaderrequest"
     },
     {
@@ -2133,7 +2133,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L22",
       "id": "src_admin_approvedleaderaccess",
-      "community": 5,
+      "community": 20,
       "norm_label": "approvedleaderaccess"
     },
     {
@@ -2142,7 +2142,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L32",
       "id": "src_admin_accessgrouprow",
-      "community": 5,
+      "community": 45,
       "norm_label": "accessgrouprow"
     },
     {
@@ -2160,7 +2160,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L51",
       "id": "src_admin_accessscopeagentoption",
-      "community": 5,
+      "community": 20,
       "norm_label": "accessscopeagentoption"
     },
     {
@@ -2178,7 +2178,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L64",
       "id": "src_admin_activitylog",
-      "community": 5,
+      "community": 20,
       "norm_label": "activitylog"
     },
     {
@@ -2187,7 +2187,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L74",
       "id": "src_admin_updateuserstatusschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "updateuserstatusschema"
     },
     {
@@ -2196,7 +2196,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L78",
       "id": "src_admin_updateuserroleschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "updateuserroleschema"
     },
     {
@@ -2205,7 +2205,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L82",
       "id": "src_admin_createaccessgroupschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "createaccessgroupschema"
     },
     {
@@ -2214,7 +2214,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L87",
       "id": "src_admin_updateaccessgroupschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "updateaccessgroupschema"
     },
     {
@@ -2223,7 +2223,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L93",
       "id": "src_admin_addaccessgroupitemschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "addaccessgroupitemschema"
     },
     {
@@ -2232,7 +2232,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L98",
       "id": "src_admin_approveleaderrequestschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "approveleaderrequestschema"
     },
     {
@@ -2241,7 +2241,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L102",
       "id": "src_admin_rejectleaderrequestschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "rejectleaderrequestschema"
     },
     {
@@ -2250,7 +2250,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L106",
       "id": "src_admin_revokeleaderrequestschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "revokeleaderrequestschema"
     },
     {
@@ -2259,7 +2259,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L110",
       "id": "src_admin_reassignleaderrequestgroupsschema",
-      "community": 5,
+      "community": 45,
       "norm_label": "reassignleaderrequestgroupsschema"
     },
     {
@@ -2268,7 +2268,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L114",
       "id": "src_admin_leaderaccessstatusitem",
-      "community": 5,
+      "community": 45,
       "norm_label": "leaderaccessstatusitem"
     },
     {
@@ -2277,7 +2277,7 @@
       "source_file": "packages/types/src/admin.ts",
       "source_location": "L120",
       "id": "src_admin_leaderaccessstatusmap",
-      "community": 5,
+      "community": 45,
       "norm_label": "leaderaccessstatusmap"
     },
     {
@@ -2331,7 +2331,7 @@
       "source_file": "packages/types/src/pdkt.ts",
       "source_location": "L27",
       "id": "src_pdkt_pdktconsumertype",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdktconsumertype"
     },
     {
@@ -2349,7 +2349,7 @@
       "source_file": "packages/types/src/pdkt.ts",
       "source_location": "L46",
       "id": "src_pdkt_pdktscenario",
-      "community": 14,
+      "community": 39,
       "norm_label": "pdktscenario"
     },
     {
@@ -2367,7 +2367,7 @@
       "source_file": "packages/types/src/pdkt.ts",
       "source_location": "L54",
       "id": "src_pdkt_pdktidentity",
-      "community": 22,
+      "community": 285,
       "norm_label": "pdktidentity"
     },
     {
@@ -2475,7 +2475,7 @@
       "source_file": "packages/types/src/pdkt.ts",
       "source_location": "L155",
       "id": "src_pdkt_pdktsessionhistory",
-      "community": 10,
+      "community": 300,
       "norm_label": "pdktsessionhistory"
     },
     {
@@ -2531,6 +2531,24 @@
       "id": "src_pdkt_pdktmailboxreply",
       "community": 300,
       "norm_label": "pdktmailboxreply"
+    },
+    {
+      "label": "pdktMailboxBulkDeleteSchema",
+      "file_type": "code",
+      "source_file": "packages/types/src/pdkt.ts",
+      "source_location": "L205",
+      "id": "src_pdkt_pdktmailboxbulkdeleteschema",
+      "community": 300,
+      "norm_label": "pdktmailboxbulkdeleteschema"
+    },
+    {
+      "label": "PdktMailboxBulkDelete",
+      "file_type": "code",
+      "source_file": "packages/types/src/pdkt.ts",
+      "source_location": "L208",
+      "id": "src_pdkt_pdktmailboxbulkdelete",
+      "community": 300,
+      "norm_label": "pdktmailboxbulkdelete"
     },
     {
       "label": "ai-models.ts",
@@ -2664,7 +2682,7 @@
       "source_file": "packages/types/src/telefun.ts",
       "source_location": "L34",
       "id": "src_telefun_voicequalityassessment",
-      "community": 310,
+      "community": 322,
       "norm_label": "voicequalityassessment"
     },
     {
@@ -2709,7 +2727,7 @@
       "source_file": "packages/types/src/telefun.ts",
       "source_location": "L104",
       "id": "src_telefun_telefuncoachingsummary",
-      "community": 322,
+      "community": 306,
       "norm_label": "telefuncoachingsummary"
     },
     {
@@ -2718,7 +2736,7 @@
       "source_file": "packages/types/src/telefun.ts",
       "source_location": "L112",
       "id": "src_telefun_telefunreplayannotation",
-      "community": 322,
+      "community": 306,
       "norm_label": "telefunreplayannotation"
     },
     {
@@ -2754,7 +2772,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L1",
       "id": "packages_types_src_sidak_ts",
-      "community": 23,
+      "community": 348,
       "norm_label": "sidak.ts"
     },
     {
@@ -2781,7 +2799,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L15",
       "id": "src_sidak_categoryschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "categoryschema"
     },
     {
@@ -2799,7 +2817,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L18",
       "id": "src_sidak_scoringmodeschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "scoringmodeschema"
     },
     {
@@ -2817,7 +2835,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L21",
       "id": "src_sidak_qaperiodschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "qaperiodschema"
     },
     {
@@ -2835,7 +2853,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L30",
       "id": "src_sidak_qaindicatorschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "qaindicatorschema"
     },
     {
@@ -2853,7 +2871,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L42",
       "id": "src_sidak_qatemuanschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "qatemuanschema"
     },
     {
@@ -2880,7 +2898,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L80",
       "id": "src_sidak_createtemuanbatch",
-      "community": 23,
+      "community": 348,
       "norm_label": "createtemuanbatch"
     },
     {
@@ -2889,7 +2907,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L82",
       "id": "src_sidak_serviceweightschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "serviceweightschema"
     },
     {
@@ -2907,7 +2925,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L90",
       "id": "src_sidak_ruleversionstatusschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "ruleversionstatusschema"
     },
     {
@@ -2916,7 +2934,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L95",
       "id": "src_sidak_ruleversionstatus",
-      "community": 23,
+      "community": 348,
       "norm_label": "ruleversionstatus"
     },
     {
@@ -2925,7 +2943,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L97",
       "id": "src_sidak_ruleversionschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "ruleversionschema"
     },
     {
@@ -2943,7 +2961,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L130",
       "id": "src_sidak_ruleindicatorschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "ruleindicatorschema"
     },
     {
@@ -2961,7 +2979,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L146",
       "id": "src_sidak_createruleversionschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "createruleversionschema"
     },
     {
@@ -2970,7 +2988,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L154",
       "id": "src_sidak_createruleversion",
-      "community": 23,
+      "community": 348,
       "norm_label": "createruleversion"
     },
     {
@@ -2979,7 +2997,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L156",
       "id": "src_sidak_scoredetail",
-      "community": 23,
+      "community": 348,
       "norm_label": "scoredetail"
     },
     {
@@ -2988,7 +3006,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L167",
       "id": "src_sidak_qascore",
-      "community": 23,
+      "community": 348,
       "norm_label": "qascore"
     },
     {
@@ -2997,7 +3015,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L177",
       "id": "src_sidak_dashboardsummary",
-      "community": 23,
+      "community": 348,
       "norm_label": "dashboardsummary"
     },
     {
@@ -3024,7 +3042,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L207",
       "id": "src_sidak_agentperiodsummary",
-      "community": 23,
+      "community": 88,
       "norm_label": "agentperiodsummary"
     },
     {
@@ -3060,7 +3078,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L247",
       "id": "src_sidak_dashboarddata",
-      "community": 23,
+      "community": 47,
       "norm_label": "dashboarddata"
     },
     {
@@ -3069,7 +3087,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L270",
       "id": "src_sidak_agentdetaildata",
-      "community": 301,
+      "community": 359,
       "norm_label": "agentdetaildata"
     },
     {
@@ -3078,7 +3096,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L304",
       "id": "src_sidak_resolvedsidakinputconfigschema",
-      "community": 23,
+      "community": 348,
       "norm_label": "resolvedsidakinputconfigschema"
     },
     {
@@ -3087,7 +3105,7 @@
       "source_file": "packages/types/src/sidak.ts",
       "source_location": "L328",
       "id": "src_sidak_resolvedsidakinputconfig",
-      "community": 314,
+      "community": 348,
       "norm_label": "resolvedsidakinputconfig"
     },
     {
@@ -4887,7 +4905,7 @@
       "source_file": "apps/web/src/router.tsx",
       "source_location": "L38",
       "id": "src_router_monitoringpage",
-      "community": 45,
+      "community": 11,
       "norm_label": "monitoringpage"
     },
     {
@@ -5670,7 +5688,7 @@
       "source_file": "apps/web/src/components/ModuleWorkspaceIntro.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_moduleworkspaceintro_tsx",
-      "community": 27,
+      "community": 105,
       "norm_label": "moduleworkspaceintro.tsx"
     },
     {
@@ -5679,7 +5697,7 @@
       "source_file": "apps/web/src/components/ModuleWorkspaceIntro.tsx",
       "source_location": "L4",
       "id": "apps_web_src_components_moduleworkspaceintro_tsx_components_moduleworkspaceintro_moduleworkspaceintroprops",
-      "community": 27,
+      "community": 105,
       "norm_label": "moduleworkspaceintroprops"
     },
     {
@@ -5688,7 +5706,7 @@
       "source_file": "apps/web/src/components/ModuleWorkspaceIntro.tsx",
       "source_location": "L14",
       "id": "apps_web_src_components_moduleworkspaceintro_tsx_components_moduleworkspaceintro_moduleworkspaceintro",
-      "community": 27,
+      "community": 105,
       "norm_label": "moduleworkspaceintro()"
     },
     {
@@ -6426,7 +6444,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_agentprofilebar_tsx",
-      "community": 336,
+      "community": 364,
       "norm_label": "agentprofilebar.tsx"
     },
     {
@@ -6435,7 +6453,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L3",
       "id": "sidak_agentprofilebar_props",
-      "community": 336,
+      "community": 364,
       "norm_label": "props"
     },
     {
@@ -6444,7 +6462,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L15",
       "id": "sidak_agentprofilebar_computetenure",
-      "community": 336,
+      "community": 364,
       "norm_label": "computetenure()"
     },
     {
@@ -6453,7 +6471,7 @@
       "source_file": "apps/web/src/components/sidak/AgentProfileBar.tsx",
       "source_location": "L28",
       "id": "sidak_agentprofilebar_agentprofilebar",
-      "community": 336,
+      "community": 364,
       "norm_label": "agentprofilebar()"
     },
     {
@@ -6606,7 +6624,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_topticketscard_tsx",
-      "community": 354,
+      "community": 336,
       "norm_label": "topticketscard.tsx"
     },
     {
@@ -6615,7 +6633,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L3",
       "id": "sidak_topticketscard_ticketitem",
-      "community": 354,
+      "community": 336,
       "norm_label": "ticketitem"
     },
     {
@@ -6624,7 +6642,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L11",
       "id": "sidak_topticketscard_props",
-      "community": 354,
+      "community": 336,
       "norm_label": "props"
     },
     {
@@ -6633,7 +6651,7 @@
       "source_file": "apps/web/src/components/sidak/TopTicketsCard.tsx",
       "source_location": "L15",
       "id": "sidak_topticketscard_topticketscard",
-      "community": 354,
+      "community": 336,
       "norm_label": "topticketscard()"
     },
     {
@@ -7083,7 +7101,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputImportPanel.tsx",
       "source_location": "L1",
       "id": "apps_web_src_components_sidak_sidakinputimportpanel_tsx",
-      "community": 8,
+      "community": 115,
       "norm_label": "sidakinputimportpanel.tsx"
     },
     {
@@ -7092,7 +7110,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputImportPanel.tsx",
       "source_location": "L4",
       "id": "sidak_sidakinputimportpanel_parsedimportrow",
-      "community": 8,
+      "community": 115,
       "norm_label": "parsedimportrow"
     },
     {
@@ -7101,7 +7119,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputImportPanel.tsx",
       "source_location": "L15",
       "id": "sidak_sidakinputimportpanel_props",
-      "community": 8,
+      "community": 115,
       "norm_label": "props"
     },
     {
@@ -7110,7 +7128,7 @@
       "source_file": "apps/web/src/components/sidak/SidakInputImportPanel.tsx",
       "source_location": "L31",
       "id": "sidak_sidakinputimportpanel_sidakinputimportpanel",
-      "community": 8,
+      "community": 115,
       "norm_label": "sidakinputimportpanel()"
     },
     {
@@ -7308,7 +7326,7 @@
       "source_file": "apps/web/src/__tests__/useCrudForm.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_usecrudform_test_tsx",
-      "community": 39,
+      "community": 365,
       "norm_label": "usecrudform.test.tsx"
     },
     {
@@ -7317,7 +7335,7 @@
       "source_file": "apps/web/src/__tests__/useCrudForm.test.tsx",
       "source_location": "L5",
       "id": "tests_usecrudform_test_scenarioitem",
-      "community": 39,
+      "community": 365,
       "norm_label": "scenarioitem"
     },
     {
@@ -7326,7 +7344,7 @@
       "source_file": "apps/web/src/__tests__/useCrudForm.test.tsx",
       "source_location": "L13",
       "id": "tests_usecrudform_test_defaultvalues",
-      "community": 39,
+      "community": 365,
       "norm_label": "defaultvalues"
     },
     {
@@ -7335,7 +7353,7 @@
       "source_file": "apps/web/src/__tests__/useCrudForm.test.tsx",
       "source_location": "L20",
       "id": "tests_usecrudform_test_renderscenarioform",
-      "community": 39,
+      "community": 365,
       "norm_label": "renderscenarioform()"
     },
     {
@@ -7389,7 +7407,7 @@
       "source_file": "apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_input_legacy_refresh_test_tsx",
-      "community": 8,
+      "community": 96,
       "norm_label": "sidak-input-legacy-refresh.test.tsx"
     },
     {
@@ -7398,7 +7416,7 @@
       "source_file": "apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx",
       "source_location": "L59",
       "id": "tests_sidak_input_legacy_refresh_test_makeind",
-      "community": 8,
+      "community": 96,
       "norm_label": "makeind()"
     },
     {
@@ -7407,7 +7425,7 @@
       "source_file": "apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx",
       "source_location": "L63",
       "id": "tests_sidak_input_legacy_refresh_test_makeweight",
-      "community": 8,
+      "community": 96,
       "norm_label": "makeweight()"
     },
     {
@@ -7436,6 +7454,24 @@
       "id": "apps_web_src_tests_usage_modal_breakdown_test_tsx",
       "community": 105,
       "norm_label": "usage-modal-breakdown.test.tsx"
+    },
+    {
+      "label": "pdkt-mailbox-bulk.test.tsx",
+      "file_type": "code",
+      "source_file": "apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx",
+      "source_location": "L1",
+      "id": "apps_web_src_tests_pdkt_mailbox_bulk_test_tsx",
+      "community": 73,
+      "norm_label": "pdkt-mailbox-bulk.test.tsx"
+    },
+    {
+      "label": "mockNotify",
+      "file_type": "code",
+      "source_file": "apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx",
+      "source_location": "L12",
+      "id": "tests_pdkt_mailbox_bulk_test_mocknotify",
+      "community": 73,
+      "norm_label": "mocknotify"
     },
     {
       "label": "telefun-recording-path.test.ts",
@@ -7623,7 +7659,7 @@
       "source_file": "apps/web/src/__tests__/pdkt-settings-modal.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_pdkt_settings_modal_test_tsx",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdkt-settings-modal.test.tsx"
     },
     {
@@ -7785,7 +7821,7 @@
       "source_file": "apps/web/src/__tests__/sidak-settings-parity.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_sidak_settings_parity_test_tsx",
-      "community": 301,
+      "community": 87,
       "norm_label": "sidak-settings-parity.test.tsx"
     },
     {
@@ -7794,7 +7830,7 @@
       "source_file": "apps/web/src/__tests__/sidak-settings-parity.test.tsx",
       "source_location": "L4",
       "id": "tests_sidak_settings_parity_test_useapimock",
-      "community": 301,
+      "community": 87,
       "norm_label": "useapimock"
     },
     {
@@ -7803,7 +7839,7 @@
       "source_file": "apps/web/src/__tests__/sidak-settings-parity.test.tsx",
       "source_location": "L5",
       "id": "tests_sidak_settings_parity_test_getapimock",
-      "community": 301,
+      "community": 87,
       "norm_label": "getapimock"
     },
     {
@@ -7812,7 +7848,7 @@
       "source_file": "apps/web/src/__tests__/sidak-settings-parity.test.tsx",
       "source_location": "L26",
       "id": "tests_sidak_settings_parity_test_mockperiods",
-      "community": 301,
+      "community": 87,
       "norm_label": "mockperiods"
     },
     {
@@ -7821,7 +7857,7 @@
       "source_file": "apps/web/src/__tests__/sidak-settings-parity.test.tsx",
       "source_location": "L31",
       "id": "tests_sidak_settings_parity_test_mockversions",
-      "community": 301,
+      "community": 87,
       "norm_label": "mockversions"
     },
     {
@@ -7830,7 +7866,7 @@
       "source_file": "apps/web/src/__tests__/sidak-settings-parity.test.tsx",
       "source_location": "L58",
       "id": "tests_sidak_settings_parity_test_mockruleindicators",
-      "community": 301,
+      "community": 87,
       "norm_label": "mockruleindicators"
     },
     {
@@ -8091,7 +8127,7 @@
       "source_file": "apps/web/src/__tests__/useApi.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_useapi_test_ts",
-      "community": 301,
+      "community": 321,
       "norm_label": "useapi.test.ts"
     },
     {
@@ -8100,7 +8136,7 @@
       "source_file": "apps/web/src/__tests__/useApi.test.ts",
       "source_location": "L5",
       "id": "tests_useapi_test_mocklocalstorage",
-      "community": 301,
+      "community": 321,
       "norm_label": "mocklocalstorage()"
     },
     {
@@ -8226,7 +8262,7 @@
       "source_file": "apps/web/src/__tests__/telefun-session-finalizer.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_telefun_session_finalizer_test_ts",
-      "community": 301,
+      "community": 89,
       "norm_label": "telefun-session-finalizer.test.ts"
     },
     {
@@ -8379,7 +8415,7 @@
       "source_file": "apps/web/src/__tests__/telefun-voice-assessment-utils.test.ts",
       "source_location": "L1",
       "id": "apps_web_src_tests_telefun_voice_assessment_utils_test_ts",
-      "community": 310,
+      "community": 354,
       "norm_label": "telefun-voice-assessment-utils.test.ts"
     },
     {
@@ -8388,7 +8424,7 @@
       "source_file": "apps/web/src/__tests__/telefun-voice-assessment-utils.test.ts",
       "source_location": "L8",
       "id": "tests_telefun_voice_assessment_utils_test_valid",
-      "community": 310,
+      "community": 354,
       "norm_label": "valid"
     },
     {
@@ -8541,7 +8577,7 @@
       "source_file": "apps/web/src/__tests__/useAgentDetail.test.tsx",
       "source_location": "L1",
       "id": "apps_web_src_tests_useagentdetail_test_tsx",
-      "community": 34,
+      "community": 359,
       "norm_label": "useagentdetail.test.tsx"
     },
     {
@@ -8550,7 +8586,7 @@
       "source_file": "apps/web/src/__tests__/useAgentDetail.test.tsx",
       "source_location": "L6",
       "id": "tests_useagentdetail_test_useapimock",
-      "community": 34,
+      "community": 359,
       "norm_label": "useapimock"
     },
     {
@@ -8559,7 +8595,7 @@
       "source_file": "apps/web/src/__tests__/useAgentDetail.test.tsx",
       "source_location": "L15",
       "id": "tests_useagentdetail_test_buildagentdetaildata",
-      "community": 34,
+      "community": 359,
       "norm_label": "buildagentdetaildata()"
     },
     {
@@ -8613,7 +8649,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L1",
       "id": "apps_web_src_hooks_useagentdetail_ts",
-      "community": 301,
+      "community": 359,
       "norm_label": "useagentdetail.ts"
     },
     {
@@ -8622,7 +8658,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L8",
       "id": "hooks_useagentdetail_ticketscore",
-      "community": 301,
+      "community": 359,
       "norm_label": "ticketscore"
     },
     {
@@ -8631,7 +8667,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L17",
       "id": "hooks_useagentdetail_coachinginsight",
-      "community": 301,
+      "community": 359,
       "norm_label": "coachinginsight"
     },
     {
@@ -8640,7 +8676,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L24",
       "id": "hooks_useagentdetail_temuandisplayitem",
-      "community": 301,
+      "community": 359,
       "norm_label": "temuandisplayitem"
     },
     {
@@ -8649,7 +8685,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L36",
       "id": "hooks_useagentdetail_editformstate",
-      "community": 301,
+      "community": 359,
       "norm_label": "editformstate"
     },
     {
@@ -8658,7 +8694,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L42",
       "id": "hooks_useagentdetail_months_full",
-      "community": 301,
+      "community": 359,
       "norm_label": "months_full"
     },
     {
@@ -8667,7 +8703,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L44",
       "id": "hooks_useagentdetail_computetenure",
-      "community": 301,
+      "community": 359,
       "norm_label": "computetenure()"
     },
     {
@@ -8676,7 +8712,7 @@
       "source_file": "apps/web/src/hooks/useAgentDetail.ts",
       "source_location": "L55",
       "id": "hooks_useagentdetail_useagentdetail",
-      "community": 301,
+      "community": 359,
       "norm_label": "useagentdetail()"
     },
     {
@@ -8766,7 +8802,7 @@
       "source_file": "apps/web/src/hooks/useCrudForm.ts",
       "source_location": "L12",
       "id": "hooks_usecrudform_usecrudform",
-      "community": 39,
+      "community": 3,
       "norm_label": "usecrudform()"
     },
     {
@@ -8811,7 +8847,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L1",
       "id": "apps_web_src_hooks_useapi_ts",
-      "community": 301,
+      "community": 321,
       "norm_label": "useapi.ts"
     },
     {
@@ -8820,7 +8856,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L5",
       "id": "hooks_useapi_fetchapi",
-      "community": 301,
+      "community": 321,
       "norm_label": "fetchapi()"
     },
     {
@@ -8838,7 +8874,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L64",
       "id": "hooks_useapi_postapi",
-      "community": 301,
+      "community": 321,
       "norm_label": "postapi()"
     },
     {
@@ -8856,7 +8892,7 @@
       "source_file": "apps/web/src/hooks/useApi.ts",
       "source_location": "L72",
       "id": "hooks_useapi_patchapi",
-      "community": 301,
+      "community": 321,
       "norm_label": "patchapi()"
     },
     {
@@ -9117,7 +9153,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L1",
       "id": "apps_web_src_lib_voiceassessmentutils_ts",
-      "community": 310,
+      "community": 354,
       "norm_label": "voiceassessmentutils.ts"
     },
     {
@@ -9126,7 +9162,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L9",
       "id": "lib_voiceassessmentutils_clamp",
-      "community": 310,
+      "community": 354,
       "norm_label": "clamp()"
     },
     {
@@ -9135,7 +9171,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L13",
       "id": "lib_voiceassessmentutils_isrecord",
-      "community": 310,
+      "community": 354,
       "norm_label": "isrecord()"
     },
     {
@@ -9144,7 +9180,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L17",
       "id": "lib_voiceassessmentutils_validateaspectscore",
-      "community": 310,
+      "community": 354,
       "norm_label": "validateaspectscore()"
     },
     {
@@ -9153,7 +9189,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L34",
       "id": "lib_voiceassessmentutils_validateassessment",
-      "community": 310,
+      "community": 354,
       "norm_label": "validateassessment()"
     },
     {
@@ -9162,7 +9198,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L99",
       "id": "lib_voiceassessmentutils_telefunscoreresponse",
-      "community": 310,
+      "community": 322,
       "norm_label": "telefunscoreresponse"
     },
     {
@@ -9171,7 +9207,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L105",
       "id": "lib_voiceassessmentutils_normalizetelefunscoreresponse",
-      "community": 310,
+      "community": 354,
       "norm_label": "normalizetelefunscoreresponse()"
     },
     {
@@ -9180,7 +9216,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L127",
       "id": "lib_voiceassessmentutils_getcommunicationprofilefromassessment",
-      "community": 310,
+      "community": 354,
       "norm_label": "getcommunicationprofilefromassessment()"
     },
     {
@@ -9189,7 +9225,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L282",
       "id": "lib_voiceassessmentutils_buildspeakingratevalue",
-      "community": 310,
+      "community": 354,
       "norm_label": "buildspeakingratevalue()"
     },
     {
@@ -9198,7 +9234,7 @@
       "source_file": "apps/web/src/lib/voiceAssessmentUtils.ts",
       "source_location": "L298",
       "id": "lib_voiceassessmentutils_buildfillersvalue",
-      "community": 310,
+      "community": 354,
       "norm_label": "buildfillersvalue()"
     },
     {
@@ -9261,7 +9297,7 @@
       "source_file": "apps/web/src/lib/toast.ts",
       "source_location": "L1",
       "id": "apps_web_src_lib_toast_ts",
-      "community": 14,
+      "community": 301,
       "norm_label": "toast.ts"
     },
     {
@@ -9270,7 +9306,7 @@
       "source_file": "apps/web/src/lib/toast.ts",
       "source_location": "L3",
       "id": "lib_toast_notify",
-      "community": 14,
+      "community": 301,
       "norm_label": "notify"
     },
     {
@@ -9801,7 +9837,7 @@
       "source_file": "apps/web/src/lib/scoring.ts",
       "source_location": "L133",
       "id": "lib_scoring_nilai_badge_colors",
-      "community": 8,
+      "community": 115,
       "norm_label": "nilai_badge_colors"
     },
     {
@@ -10026,7 +10062,7 @@
       "source_file": "apps/web/src/routes/account.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_account_tsx",
-      "community": 34,
+      "community": 30,
       "norm_label": "account.tsx"
     },
     {
@@ -10449,7 +10485,7 @@
       "source_file": "apps/web/src/routes/telefun/index.tsx",
       "source_location": "L42",
       "id": "telefun_index_telefunlanding",
-      "community": 105,
+      "community": 301,
       "norm_label": "telefunlanding()"
     },
     {
@@ -10458,7 +10494,7 @@
       "source_file": "apps/web/src/routes/telefun/replay.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_replay_tsx",
-      "community": 322,
+      "community": 301,
       "norm_label": "replay.tsx"
     },
     {
@@ -10476,7 +10512,7 @@
       "source_file": "apps/web/src/routes/telefun/sessionFinalizer.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_sessionfinalizer_ts",
-      "community": 301,
+      "community": 89,
       "norm_label": "sessionfinalizer.ts"
     },
     {
@@ -10485,7 +10521,7 @@
       "source_file": "apps/web/src/routes/telefun/sessionFinalizer.ts",
       "source_location": "L7",
       "id": "telefun_sessionfinalizer_finalizerdependencies",
-      "community": 301,
+      "community": 89,
       "norm_label": "finalizerdependencies"
     },
     {
@@ -10494,7 +10530,7 @@
       "source_file": "apps/web/src/routes/telefun/sessionFinalizer.ts",
       "source_location": "L15",
       "id": "telefun_sessionfinalizer_defaultdependencies",
-      "community": 301,
+      "community": 89,
       "norm_label": "defaultdependencies"
     },
     {
@@ -10503,7 +10539,7 @@
       "source_file": "apps/web/src/routes/telefun/sessionFinalizer.ts",
       "source_location": "L41",
       "id": "telefun_sessionfinalizer_finalizetelefunsession",
-      "community": 301,
+      "community": 89,
       "norm_label": "finalizetelefunsession()"
     },
     {
@@ -10728,7 +10764,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceAssessmentSection.tsx",
       "source_location": "L22",
       "id": "components_voiceassessmentsection_voiceassessmentsectionprops",
-      "community": 310,
+      "community": 322,
       "norm_label": "voiceassessmentsectionprops"
     },
     {
@@ -10917,7 +10953,7 @@
       "source_file": "apps/web/src/routes/telefun/components/HistoryModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_components_historymodal_tsx",
-      "community": 322,
+      "community": 301,
       "norm_label": "historymodal.tsx"
     },
     {
@@ -10926,7 +10962,7 @@
       "source_file": "apps/web/src/routes/telefun/components/HistoryModal.tsx",
       "source_location": "L17",
       "id": "apps_web_src_routes_telefun_components_historymodal_tsx_components_historymodal_historymodalprops",
-      "community": 322,
+      "community": 301,
       "norm_label": "historymodalprops"
     },
     {
@@ -10935,7 +10971,7 @@
       "source_file": "apps/web/src/routes/telefun/components/HistoryModal.tsx",
       "source_location": "L26",
       "id": "components_historymodal_formatdate",
-      "community": 322,
+      "community": 301,
       "norm_label": "formatdate()"
     },
     {
@@ -10944,7 +10980,7 @@
       "source_file": "apps/web/src/routes/telefun/components/HistoryModal.tsx",
       "source_location": "L34",
       "id": "components_historymodal_formatduration",
-      "community": 322,
+      "community": 301,
       "norm_label": "formatduration()"
     },
     {
@@ -10953,7 +10989,7 @@
       "source_file": "apps/web/src/routes/telefun/components/HistoryModal.tsx",
       "source_location": "L40",
       "id": "components_historymodal_exporttocsv",
-      "community": 322,
+      "community": 301,
       "norm_label": "exporttocsv()"
     },
     {
@@ -10962,7 +10998,7 @@
       "source_file": "apps/web/src/routes/telefun/components/HistoryModal.tsx",
       "source_location": "L76",
       "id": "apps_web_src_routes_telefun_components_historymodal_tsx_components_historymodal_historymodal",
-      "community": 322,
+      "community": 301,
       "norm_label": "historymodal()"
     },
     {
@@ -11007,7 +11043,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_components_replayannotator_tsx",
-      "community": 21,
+      "community": 356,
       "norm_label": "replayannotator.tsx"
     },
     {
@@ -11016,7 +11052,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L17",
       "id": "components_replayannotator_replayannotationcategory",
-      "community": 21,
+      "community": 356,
       "norm_label": "replayannotationcategory"
     },
     {
@@ -11025,7 +11061,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L23",
       "id": "components_replayannotator_annotationmoment",
-      "community": 21,
+      "community": 356,
       "norm_label": "annotationmoment"
     },
     {
@@ -11034,7 +11070,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L30",
       "id": "components_replayannotator_replayannotationitem",
-      "community": 21,
+      "community": 356,
       "norm_label": "replayannotationitem"
     },
     {
@@ -11043,7 +11079,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L40",
       "id": "components_replayannotator_coachingrecommendationitem",
-      "community": 21,
+      "community": 356,
       "norm_label": "coachingrecommendationitem"
     },
     {
@@ -11052,7 +11088,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L45",
       "id": "components_replayannotator_replayannotatorprops",
-      "community": 21,
+      "community": 356,
       "norm_label": "replayannotatorprops"
     },
     {
@@ -11061,7 +11097,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L61",
       "id": "components_replayannotator_category_labels",
-      "community": 21,
+      "community": 356,
       "norm_label": "category_labels"
     },
     {
@@ -11070,7 +11106,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L68",
       "id": "components_replayannotator_category_styles",
-      "community": 21,
+      "community": 356,
       "norm_label": "category_styles"
     },
     {
@@ -11079,7 +11115,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L94",
       "id": "components_replayannotator_moment_labels",
-      "community": 21,
+      "community": 356,
       "norm_label": "moment_labels"
     },
     {
@@ -11088,7 +11124,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L104",
       "id": "components_replayannotator_formattimestamp",
-      "community": 21,
+      "community": 356,
       "norm_label": "formattimestamp()"
     },
     {
@@ -11097,7 +11133,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L111",
       "id": "components_replayannotator_recommendationlist",
-      "community": 21,
+      "community": 356,
       "norm_label": "recommendationlist()"
     },
     {
@@ -11106,7 +11142,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L163",
       "id": "components_replayannotator_annotationcard",
-      "community": 21,
+      "community": 356,
       "norm_label": "annotationcard()"
     },
     {
@@ -11115,7 +11151,7 @@
       "source_file": "apps/web/src/routes/telefun/components/ReplayAnnotator.tsx",
       "source_location": "L226",
       "id": "components_replayannotator_replayannotator",
-      "community": 21,
+      "community": 356,
       "norm_label": "replayannotator()"
     },
     {
@@ -11124,7 +11160,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_telefun_components_voiceevaluationdashboard_tsx",
-      "community": 322,
+      "community": 357,
       "norm_label": "voiceevaluationdashboard.tsx"
     },
     {
@@ -11133,7 +11169,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L15",
       "id": "components_voiceevaluationdashboard_voicedashboardprops",
-      "community": 322,
+      "community": 357,
       "norm_label": "voicedashboardprops"
     },
     {
@@ -11142,7 +11178,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L24",
       "id": "components_voiceevaluationdashboard_colorlevel",
-      "community": 322,
+      "community": 357,
       "norm_label": "colorlevel"
     },
     {
@@ -11151,7 +11187,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L26",
       "id": "components_voiceevaluationdashboard_getspeechclaritycolor",
-      "community": 322,
+      "community": 357,
       "norm_label": "getspeechclaritycolor()"
     },
     {
@@ -11160,7 +11196,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L32",
       "id": "components_voiceevaluationdashboard_getspeakingspeedcolor",
-      "community": 322,
+      "community": 357,
       "norm_label": "getspeakingspeedcolor()"
     },
     {
@@ -11169,7 +11205,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L38",
       "id": "components_voiceevaluationdashboard_getspeakingdominancecolor",
-      "community": 322,
+      "community": 357,
       "norm_label": "getspeakingdominancecolor()"
     },
     {
@@ -11178,7 +11214,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L44",
       "id": "components_voiceevaluationdashboard_getintonationcolor",
-      "community": 322,
+      "community": 357,
       "norm_label": "getintonationcolor()"
     },
     {
@@ -11187,7 +11223,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L50",
       "id": "components_voiceevaluationdashboard_colormap",
-      "community": 322,
+      "community": 357,
       "norm_label": "colormap"
     },
     {
@@ -11196,7 +11232,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L74",
       "id": "components_voiceevaluationdashboard_metricgauge",
-      "community": 322,
+      "community": 357,
       "norm_label": "metricgauge()"
     },
     {
@@ -11205,7 +11241,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L137",
       "id": "components_voiceevaluationdashboard_loadingskeleton",
-      "community": 322,
+      "community": 357,
       "norm_label": "loadingskeleton()"
     },
     {
@@ -11214,7 +11250,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L161",
       "id": "components_voiceevaluationdashboard_errorstate",
-      "community": 322,
+      "community": 357,
       "norm_label": "errorstate()"
     },
     {
@@ -11223,7 +11259,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L192",
       "id": "components_voiceevaluationdashboard_emptystate",
-      "community": 322,
+      "community": 357,
       "norm_label": "emptystate()"
     },
     {
@@ -11232,7 +11268,7 @@
       "source_file": "apps/web/src/routes/telefun/components/VoiceEvaluationDashboard.tsx",
       "source_location": "L213",
       "id": "components_voiceevaluationdashboard_voiceevaluationdashboard",
-      "community": 322,
+      "community": 357,
       "norm_label": "voiceevaluationdashboard()"
     },
     {
@@ -12204,7 +12240,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L76",
       "id": "realisticmode_realisticmodeorchestrator_orchestratoraction",
-      "community": 67,
+      "community": 14,
       "norm_label": "orchestratoraction"
     },
     {
@@ -12213,7 +12249,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L98",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator",
-      "community": 67,
+      "community": 14,
       "norm_label": "realisticmodeorchestrator"
     },
     {
@@ -12231,7 +12267,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L165",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_isenabled",
-      "community": 67,
+      "community": 14,
       "norm_label": ".isenabled()"
     },
     {
@@ -12240,7 +12276,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L168",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_emotionalintensity",
-      "community": 67,
+      "community": 14,
       "norm_label": ".emotionalintensity()"
     },
     {
@@ -12258,7 +12294,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L174",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_suspendengines",
-      "community": 67,
+      "community": 14,
       "norm_label": ".suspendengines()"
     },
     {
@@ -12267,7 +12303,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L177",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_suppressmicaudio",
-      "community": 67,
+      "community": 14,
       "norm_label": ".suppressmicaudio()"
     },
     {
@@ -12276,7 +12312,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L180",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_suppressgeminiaudio",
-      "community": 67,
+      "community": 14,
       "norm_label": ".suppressgeminiaudio()"
     },
     {
@@ -12294,7 +12330,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L241",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_recordconsentrequest",
-      "community": 67,
+      "community": 14,
       "norm_label": ".recordconsentrequest()"
     },
     {
@@ -12303,7 +12339,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L251",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_recordconsumerresponse",
-      "community": 67,
+      "community": 14,
       "norm_label": ".recordconsumerresponse()"
     },
     {
@@ -12312,7 +12348,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L261",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_iscurrentholdrude",
-      "community": 67,
+      "community": 14,
       "norm_label": ".iscurrentholdrude()"
     },
     {
@@ -12321,7 +12357,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L272",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_evaluatebackchannel",
-      "community": 67,
+      "community": 14,
       "norm_label": ".evaluatebackchannel()"
     },
     {
@@ -12330,7 +12366,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L314",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_evaluatedisruption",
-      "community": 67,
+      "community": 14,
       "norm_label": ".evaluatedisruption()"
     },
     {
@@ -12339,7 +12375,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L362",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_evaluateshortresponse",
-      "community": 67,
+      "community": 14,
       "norm_label": ".evaluateshortresponse()"
     },
     {
@@ -12375,7 +12411,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L482",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_onagentstartspeaking",
-      "community": 67,
+      "community": 14,
       "norm_label": ".onagentstartspeaking()"
     },
     {
@@ -12384,7 +12420,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L490",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_onagentstopspeaking",
-      "community": 67,
+      "community": 14,
       "norm_label": ".onagentstopspeaking()"
     },
     {
@@ -12393,7 +12429,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L494",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_onconsumerresponse",
-      "community": 67,
+      "community": 14,
       "norm_label": ".onconsumerresponse()"
     },
     {
@@ -12402,7 +12438,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L504",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_onmodelturncomplete",
-      "community": 67,
+      "community": 14,
       "norm_label": ".onmodelturncomplete()"
     },
     {
@@ -12411,7 +12447,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L523",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_updateconversationphase",
-      "community": 67,
+      "community": 14,
       "norm_label": ".updateconversationphase()"
     },
     {
@@ -12420,7 +12456,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L541",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_getmetrics",
-      "community": 67,
+      "community": 14,
       "norm_label": ".getmetrics()"
     },
     {
@@ -12429,7 +12465,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/RealisticModeOrchestrator.ts",
       "source_location": "L552",
       "id": "realisticmode_realisticmodeorchestrator_realisticmodeorchestrator_getpersonaconfig",
-      "community": 67,
+      "community": 14,
       "norm_label": ".getpersonaconfig()"
     },
     {
@@ -12681,7 +12717,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/types.ts",
       "source_location": "L75",
       "id": "realisticmode_types_annotationcategory",
-      "community": 21,
+      "community": 356,
       "norm_label": "annotationcategory"
     },
     {
@@ -12690,7 +12726,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/types.ts",
       "source_location": "L80",
       "id": "realisticmode_types_annotationmoment",
-      "community": 51,
+      "community": 21,
       "norm_label": "annotationmoment"
     },
     {
@@ -12744,7 +12780,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/types.ts",
       "source_location": "L113",
       "id": "realisticmode_types_voicedashboardmetrics",
-      "community": 322,
+      "community": 357,
       "norm_label": "voicedashboardmetrics"
     },
     {
@@ -12915,7 +12951,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/types.ts",
       "source_location": "L259",
       "id": "realisticmode_types_classificationinput",
-      "community": 67,
+      "community": 14,
       "norm_label": "classificationinput"
     },
     {
@@ -13455,7 +13491,7 @@
       "source_file": "apps/web/src/routes/telefun/services/realisticMode/turnTakingEngine.ts",
       "source_location": "L20",
       "id": "realisticmode_turntakingengine_turntakinginput",
-      "community": 46,
+      "community": 292,
       "norm_label": "turntakinginput"
     },
     {
@@ -13572,7 +13608,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-approval.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_dashboard_access_approval_tsx",
-      "community": 301,
+      "community": 321,
       "norm_label": "access-approval.tsx"
     },
     {
@@ -13581,7 +13617,7 @@
       "source_file": "apps/web/src/routes/dashboard/access-approval.tsx",
       "source_location": "L21",
       "id": "dashboard_access_approval_accessgroup",
-      "community": 301,
+      "community": 321,
       "norm_label": "accessgroup"
     },
     {
@@ -14616,7 +14652,7 @@
       "source_file": "apps/web/src/routes/profiler/components/slides/SlideCanvas.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_profiler_components_slides_slidecanvas_tsx",
-      "community": 59,
+      "community": 342,
       "norm_label": "slidecanvas.tsx"
     },
     {
@@ -14625,7 +14661,7 @@
       "source_file": "apps/web/src/routes/profiler/components/slides/SlideCanvas.tsx",
       "source_location": "L4",
       "id": "slides_slidecanvas_slidemode",
-      "community": 59,
+      "community": 342,
       "norm_label": "slidemode"
     },
     {
@@ -14634,7 +14670,7 @@
       "source_file": "apps/web/src/routes/profiler/components/slides/SlideCanvas.tsx",
       "source_location": "L6",
       "id": "slides_slidecanvas_slidecanvasref",
-      "community": 59,
+      "community": 342,
       "norm_label": "slidecanvasref"
     },
     {
@@ -14643,7 +14679,7 @@
       "source_file": "apps/web/src/routes/profiler/components/slides/SlideCanvas.tsx",
       "source_location": "L11",
       "id": "slides_slidecanvas_slidecanvasprops",
-      "community": 59,
+      "community": 342,
       "norm_label": "slidecanvasprops"
     },
     {
@@ -14652,7 +14688,7 @@
       "source_file": "apps/web/src/routes/profiler/components/slides/SlideCanvas.tsx",
       "source_location": "L22",
       "id": "slides_slidecanvas_slidecanvas",
-      "community": 59,
+      "community": 342,
       "norm_label": "slidecanvas"
     },
     {
@@ -14805,7 +14841,7 @@
       "source_file": "apps/web/src/routes/profiler/components/table/EditPesertaModal.tsx",
       "source_location": "L52",
       "id": "table_editpesertamodal_editpesertamodalprops",
-      "community": 342,
+      "community": 25,
       "norm_label": "editpesertamodalprops"
     },
     {
@@ -14994,7 +15030,7 @@
       "source_file": "apps/web/src/routes/pdkt/index.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_index_tsx",
-      "community": 14,
+      "community": 105,
       "norm_label": "index.tsx"
     },
     {
@@ -15021,7 +15057,7 @@
       "source_file": "apps/web/src/routes/pdkt/simulation.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_simulation_tsx",
-      "community": 14,
+      "community": 73,
       "norm_label": "simulation.tsx"
     },
     {
@@ -15030,7 +15066,7 @@
       "source_file": "apps/web/src/routes/pdkt/simulation.tsx",
       "source_location": "L25",
       "id": "pdkt_simulation_defaultconsumertypes",
-      "community": 14,
+      "community": 73,
       "norm_label": "defaultconsumertypes"
     },
     {
@@ -15039,7 +15075,7 @@
       "source_file": "apps/web/src/routes/pdkt/simulation.tsx",
       "source_location": "L70",
       "id": "pdkt_simulation_pdktsimulationprops",
-      "community": 14,
+      "community": 73,
       "norm_label": "pdktsimulationprops"
     },
     {
@@ -15066,7 +15102,7 @@
       "source_file": "apps/web/src/routes/pdkt/pdktSettings.ts",
       "source_location": "L10",
       "id": "pdkt_pdktsettings_pdktappsettings",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdktappsettings"
     },
     {
@@ -15244,7 +15280,7 @@
       "label": "formatCreatorLabel()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/MailboxSidebar.tsx",
-      "source_location": "L15",
+      "source_location": "L16",
       "id": "components_mailboxsidebar_formatcreatorlabel",
       "community": 73,
       "norm_label": "formatcreatorlabel()"
@@ -15253,7 +15289,7 @@
       "label": "MailboxSidebarProps",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/MailboxSidebar.tsx",
-      "source_location": "L23",
+      "source_location": "L24",
       "id": "components_mailboxsidebar_mailboxsidebarprops",
       "community": 73,
       "norm_label": "mailboxsidebarprops"
@@ -15262,7 +15298,7 @@
       "label": "MailboxSidebar()",
       "file_type": "code",
       "source_file": "apps/web/src/routes/pdkt/components/MailboxSidebar.tsx",
-      "source_location": "L33",
+      "source_location": "L44",
       "id": "components_mailboxsidebar_mailboxsidebar",
       "community": 73,
       "norm_label": "mailboxsidebar()"
@@ -15273,7 +15309,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/HistoryModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_historymodal_tsx",
-      "community": 14,
+      "community": 301,
       "norm_label": "historymodal.tsx"
     },
     {
@@ -15282,7 +15318,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/HistoryModal.tsx",
       "source_location": "L21",
       "id": "components_historymodal_sessionhistory",
-      "community": 14,
+      "community": 73,
       "norm_label": "sessionhistory"
     },
     {
@@ -15291,7 +15327,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/HistoryModal.tsx",
       "source_location": "L36",
       "id": "apps_web_src_routes_pdkt_components_historymodal_tsx_components_historymodal_historymodalprops",
-      "community": 14,
+      "community": 301,
       "norm_label": "historymodalprops"
     },
     {
@@ -15300,7 +15336,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/HistoryModal.tsx",
       "source_location": "L45",
       "id": "apps_web_src_routes_pdkt_components_historymodal_tsx_components_historymodal_historymodal",
-      "community": 14,
+      "community": 301,
       "norm_label": "historymodal()"
     },
     {
@@ -15336,7 +15372,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_replycomposer_tsx",
-      "community": 348,
+      "community": 73,
       "norm_label": "replycomposer.tsx"
     },
     {
@@ -15345,7 +15381,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
       "source_location": "L4",
       "id": "components_replycomposer_replycomposerprops",
-      "community": 348,
+      "community": 73,
       "norm_label": "replycomposerprops"
     },
     {
@@ -15354,7 +15390,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/ReplyComposer.tsx",
       "source_location": "L12",
       "id": "components_replycomposer_replycomposer",
-      "community": 348,
+      "community": 73,
       "norm_label": "replycomposer()"
     },
     {
@@ -15363,7 +15399,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/CreateEmailModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_createemailmodal_tsx",
-      "community": 14,
+      "community": 39,
       "norm_label": "createemailmodal.tsx"
     },
     {
@@ -15372,7 +15408,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/CreateEmailModal.tsx",
       "source_location": "L5",
       "id": "components_createemailmodal_createemailmodalprops",
-      "community": 14,
+      "community": 39,
       "norm_label": "createemailmodalprops"
     },
     {
@@ -15381,7 +15417,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/CreateEmailModal.tsx",
       "source_location": "L13",
       "id": "components_createemailmodal_createemailmodal",
-      "community": 14,
+      "community": 39,
       "norm_label": "createemailmodal()"
     },
     {
@@ -15390,7 +15426,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/EmailComposer.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_emailcomposer_tsx",
-      "community": 348,
+      "community": 73,
       "norm_label": "emailcomposer.tsx"
     },
     {
@@ -15399,7 +15435,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/EmailComposer.tsx",
       "source_location": "L4",
       "id": "components_emailcomposer_emailcomposerprops",
-      "community": 348,
+      "community": 73,
       "norm_label": "emailcomposerprops"
     },
     {
@@ -15408,7 +15444,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/EmailComposer.tsx",
       "source_location": "L13",
       "id": "components_emailcomposer_emailcomposer",
-      "community": 348,
+      "community": 73,
       "norm_label": "emailcomposer()"
     },
     {
@@ -15417,7 +15453,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/SettingsModal.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_settingsmodal_tsx",
-      "community": 14,
+      "community": 285,
       "norm_label": "settingsmodal.tsx"
     },
     {
@@ -15426,7 +15462,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/SettingsModal.tsx",
       "source_location": "L22",
       "id": "apps_web_src_routes_pdkt_components_settingsmodal_tsx_components_settingsmodal_settingsmodalprops",
-      "community": 14,
+      "community": 285,
       "norm_label": "settingsmodalprops"
     },
     {
@@ -15435,7 +15471,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/SettingsModal.tsx",
       "source_location": "L31",
       "id": "apps_web_src_routes_pdkt_components_settingsmodal_tsx_components_settingsmodal_settingsmodal",
-      "community": 14,
+      "community": 285,
       "norm_label": "settingsmodal()"
     },
     {
@@ -15453,7 +15489,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktScenariosTab.tsx",
       "source_location": "L16",
       "id": "settings_pdktscenariostab_pdktscenariostabprops",
-      "community": 14,
+      "community": 39,
       "norm_label": "pdktscenariostabprops"
     },
     {
@@ -15507,7 +15543,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_settings_pdktconsumerstab_tsx",
-      "community": 39,
+      "community": 285,
       "norm_label": "pdktconsumerstab.tsx"
     },
     {
@@ -15516,7 +15552,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
       "source_location": "L14",
       "id": "settings_pdktconsumerstab_pdktconsumerstabprops",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdktconsumerstabprops"
     },
     {
@@ -15525,7 +15561,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/PdktConsumersTab.tsx",
       "source_location": "L22",
       "id": "settings_pdktconsumerstab_pdktconsumerstab",
-      "community": 39,
+      "community": 285,
       "norm_label": "pdktconsumerstab()"
     },
     {
@@ -15534,7 +15570,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/pdktDraftNormalizers.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_settings_pdktdraftnormalizers_ts",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdktdraftnormalizers.ts"
     },
     {
@@ -15543,7 +15579,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/pdktDraftNormalizers.ts",
       "source_location": "L3",
       "id": "settings_pdktdraftnormalizers_normalizepdktscenariodraft",
-      "community": 14,
+      "community": 285,
       "norm_label": "normalizepdktscenariodraft()"
     },
     {
@@ -15552,7 +15588,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/pdktDraftNormalizers.ts",
       "source_location": "L19",
       "id": "settings_pdktdraftnormalizers_normalizepdktconsumerdraft",
-      "community": 14,
+      "community": 285,
       "norm_label": "normalizepdktconsumerdraft()"
     },
     {
@@ -15561,7 +15597,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_settings_usepdktsettingsdraft_ts",
-      "community": 14,
+      "community": 285,
       "norm_label": "usepdktsettingsdraft.ts"
     },
     {
@@ -15570,7 +15606,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
       "source_location": "L16",
       "id": "settings_usepdktsettingsdraft_usepdktsettingsdraftprops",
-      "community": 14,
+      "community": 285,
       "norm_label": "usepdktsettingsdraftprops"
     },
     {
@@ -15579,7 +15615,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
       "source_location": "L25",
       "id": "settings_usepdktsettingsdraft_pdktsystemdraft",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdktsystemdraft"
     },
     {
@@ -15597,7 +15633,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/usePdktSettingsDraft.ts",
       "source_location": "L53",
       "id": "settings_usepdktsettingsdraft_usepdktsettingsdraft",
-      "community": 14,
+      "community": 285,
       "norm_label": "usepdktsettingsdraft()"
     },
     {
@@ -15705,7 +15741,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/SettingsPrimitives.tsx",
       "source_location": "L85",
       "id": "settings_settingsprimitives_settingscardoption",
-      "community": 39,
+      "community": 285,
       "norm_label": "settingscardoption()"
     },
     {
@@ -15795,7 +15831,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/scenarios/ScenarioList.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_pdkt_components_settings_scenarios_scenariolist_tsx",
-      "community": 14,
+      "community": 39,
       "norm_label": "scenariolist.tsx"
     },
     {
@@ -15804,7 +15840,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/scenarios/ScenarioList.tsx",
       "source_location": "L6",
       "id": "scenarios_scenariolist_scenariolistprops",
-      "community": 14,
+      "community": 39,
       "norm_label": "scenariolistprops"
     },
     {
@@ -15813,7 +15849,7 @@
       "source_file": "apps/web/src/routes/pdkt/components/settings/scenarios/ScenarioList.tsx",
       "source_location": "L23",
       "id": "scenarios_scenariolist_scenariolist",
-      "community": 14,
+      "community": 39,
       "norm_label": "scenariolist()"
     },
     {
@@ -15849,7 +15885,7 @@
       "source_file": "apps/web/src/routes/monitoring/index.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_index_tsx",
-      "community": 45,
+      "community": 11,
       "norm_label": "index.tsx"
     },
     {
@@ -15858,7 +15894,7 @@
       "source_file": "apps/web/src/routes/monitoring/MonitoringPage.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_monitoringpage_tsx",
-      "community": 45,
+      "community": 11,
       "norm_label": "monitoringpage.tsx"
     },
     {
@@ -15867,7 +15903,7 @@
       "source_file": "apps/web/src/routes/monitoring/MonitoringPage.tsx",
       "source_location": "L17",
       "id": "monitoring_monitoringpage_monitoringpage",
-      "community": 45,
+      "community": 11,
       "norm_label": "monitoringpage()"
     },
     {
@@ -15903,7 +15939,7 @@
       "source_file": "apps/web/src/routes/monitoring/utils/formatting.tsx",
       "source_location": "L52",
       "id": "utils_formatting_formatidr",
-      "community": 45,
+      "community": 11,
       "norm_label": "formatidr()"
     },
     {
@@ -15957,7 +15993,7 @@
       "source_file": "apps/web/src/routes/monitoring/utils/formatting.tsx",
       "source_location": "L114",
       "id": "utils_formatting_getscoregrade",
-      "community": 11,
+      "community": 354,
       "norm_label": "getscoregrade()"
     },
     {
@@ -15966,7 +16002,7 @@
       "source_file": "apps/web/src/routes/monitoring/utils/formatting.tsx",
       "source_location": "L148",
       "id": "utils_formatting_maperror",
-      "community": 45,
+      "community": 11,
       "norm_label": "maperror()"
     },
     {
@@ -16074,7 +16110,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingRow.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_pricingrow_tsx",
-      "community": 45,
+      "community": 11,
       "norm_label": "pricingrow.tsx"
     },
     {
@@ -16083,7 +16119,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingRow.tsx",
       "source_location": "L4",
       "id": "components_pricingrow_pricingrow",
-      "community": 45,
+      "community": 11,
       "norm_label": "pricingrow()"
     },
     {
@@ -16092,7 +16128,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_telefunreviewpanel_tsx",
-      "community": 310,
+      "community": 354,
       "norm_label": "telefunreviewpanel.tsx"
     },
     {
@@ -16101,7 +16137,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx",
       "source_location": "L37",
       "id": "components_telefunreviewpanel_telefunreviewdata",
-      "community": 310,
+      "community": 354,
       "norm_label": "telefunreviewdata"
     },
     {
@@ -16110,7 +16146,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx",
       "source_location": "L51",
       "id": "components_telefunreviewpanel_metriccard",
-      "community": 310,
+      "community": 354,
       "norm_label": "metriccard()"
     },
     {
@@ -16119,7 +16155,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx",
       "source_location": "L88",
       "id": "components_telefunreviewpanel_telefunreviewpanel",
-      "community": 310,
+      "community": 354,
       "norm_label": "telefunreviewpanel()"
     },
     {
@@ -16128,7 +16164,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/constants.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_constants_ts",
-      "community": 45,
+      "community": 11,
       "norm_label": "constants.ts"
     },
     {
@@ -16137,7 +16173,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/constants.ts",
       "source_location": "L1",
       "id": "components_constants_module_options",
-      "community": 45,
+      "community": 11,
       "norm_label": "module_options"
     },
     {
@@ -16146,7 +16182,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_pricingtab_tsx",
-      "community": 45,
+      "community": 11,
       "norm_label": "pricingtab.tsx"
     },
     {
@@ -16155,7 +16191,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L7",
       "id": "components_pricingtab_pricingentry",
-      "community": 45,
+      "community": 11,
       "norm_label": "pricingentry"
     },
     {
@@ -16164,7 +16200,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L15",
       "id": "components_pricingtab_pricingtabprops",
-      "community": 45,
+      "community": 11,
       "norm_label": "pricingtabprops"
     },
     {
@@ -16173,7 +16209,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/PricingTab.tsx",
       "source_location": "L22",
       "id": "components_pricingtab_pricingtab",
-      "community": 45,
+      "community": 11,
       "norm_label": "pricingtab()"
     },
     {
@@ -16200,7 +16236,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L1",
       "id": "apps_web_src_routes_monitoring_components_usagetab_tsx",
-      "community": 45,
+      "community": 11,
       "norm_label": "usagetab.tsx"
     },
     {
@@ -16209,7 +16245,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L10",
       "id": "components_usagetab_usageaggregation",
-      "community": 45,
+      "community": 11,
       "norm_label": "usageaggregation"
     },
     {
@@ -16218,7 +16254,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L35",
       "id": "components_usagetab_usagetabprops",
-      "community": 45,
+      "community": 11,
       "norm_label": "usagetabprops"
     },
     {
@@ -16227,7 +16263,7 @@
       "source_file": "apps/web/src/routes/monitoring/components/UsageTab.tsx",
       "source_location": "L46",
       "id": "components_usagetab_usagetab",
-      "community": 45,
+      "community": 11,
       "norm_label": "usagetab()"
     },
     {
@@ -17046,7 +17082,7 @@
       "source_file": "apps/web/src/routes/sidak/settings/components/EditIndicatorModal.tsx",
       "source_location": "L16",
       "id": "components_editindicatormodal_editindicatormodal",
-      "community": 117,
+      "community": 87,
       "norm_label": "editindicatormodal()"
     },
     {
@@ -17307,7 +17343,7 @@
       "source_file": "apps/web/src/routes/ketik/index.tsx",
       "source_location": "L42",
       "id": "ketik_index_ketiklanding",
-      "community": 34,
+      "community": 105,
       "norm_label": "ketiklanding()"
     },
     {
@@ -17388,7 +17424,7 @@
       "source_file": "apps/web/src/routes/ketik/ketikApi.ts",
       "source_location": "L1",
       "id": "apps_web_src_routes_ketik_ketikapi_ts",
-      "community": 3,
+      "community": 27,
       "norm_label": "ketikapi.ts"
     },
     {
@@ -17397,7 +17433,7 @@
       "source_file": "apps/web/src/routes/ketik/ketikApi.ts",
       "source_location": "L12",
       "id": "ketik_ketikapi_apifetch",
-      "community": 3,
+      "community": 27,
       "norm_label": "apifetch()"
     },
     {
@@ -18531,7 +18567,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L1",
       "id": "apps_api_src_middleware_ratelimit_ts",
-      "community": 10,
+      "community": 307,
       "norm_label": "ratelimit.ts"
     },
     {
@@ -18540,7 +18576,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L3",
       "id": "middleware_ratelimit_ratelimitentry",
-      "community": 10,
+      "community": 307,
       "norm_label": "ratelimitentry"
     },
     {
@@ -18549,7 +18585,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L8",
       "id": "middleware_ratelimit_globalstore",
-      "community": 10,
+      "community": 307,
       "norm_label": "globalstore"
     },
     {
@@ -18558,7 +18594,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L9",
       "id": "middleware_ratelimit_aistore",
-      "community": 10,
+      "community": 307,
       "norm_label": "aistore"
     },
     {
@@ -18567,7 +18603,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L15",
       "id": "middleware_ratelimit_getkey",
-      "community": 10,
+      "community": 307,
       "norm_label": "getkey()"
     },
     {
@@ -18576,7 +18612,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L25",
       "id": "middleware_ratelimit_ratelimitmiddleware",
-      "community": 10,
+      "community": 307,
       "norm_label": "ratelimitmiddleware()"
     },
     {
@@ -18585,7 +18621,7 @@
       "source_file": "apps/api/src/middleware/rateLimit.ts",
       "source_location": "L64",
       "id": "middleware_ratelimit_airatelimitmiddleware",
-      "community": 10,
+      "community": 307,
       "norm_label": "airatelimitmiddleware()"
     },
     {
@@ -18684,8 +18720,89 @@
       "source_file": "apps/api/src/__tests__/pdkt-image-generation.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_pdkt_image_generation_test_ts",
-      "community": 35,
+      "community": 22,
       "norm_label": "pdkt-image-generation.test.ts"
+    },
+    {
+      "label": "pdkt-mailbox-bulk-delete-route.test.ts",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L1",
+      "id": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "community": 362,
+      "norm_label": "pdkt-mailbox-bulk-delete-route.test.ts"
+    },
+    {
+      "label": "mockRpc",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L4",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_mockrpc",
+      "community": 362,
+      "norm_label": "mockrpc"
+    },
+    {
+      "label": "mockSingle",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L5",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_mocksingle",
+      "community": 362,
+      "norm_label": "mocksingle"
+    },
+    {
+      "label": "mockMaybeSingle",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L6",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_mockmaybesingle",
+      "community": 362,
+      "norm_label": "mockmaybesingle"
+    },
+    {
+      "label": "mockMailboxItems",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L7",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_mockmailboxitems",
+      "community": 362,
+      "norm_label": "mockmailboxitems"
+    },
+    {
+      "label": "buildMockClient()",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L9",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_buildmockclient",
+      "community": 362,
+      "norm_label": "buildmockclient()"
+    },
+    {
+      "label": "mockSupabaseAdmin",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L27",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_mocksupabaseadmin",
+      "community": 362,
+      "norm_label": "mocksupabaseadmin"
+    },
+    {
+      "label": "mockUserClient",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L28",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_mockuserclient",
+      "community": 362,
+      "norm_label": "mockuserclient"
+    },
+    {
+      "label": "createAuthenticatedApp()",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L60",
+      "id": "tests_pdkt_mailbox_bulk_delete_route_test_createauthenticatedapp",
+      "community": 362,
+      "norm_label": "createauthenticatedapp()"
     },
     {
       "label": "telefun-communication-profile.test.ts",
@@ -18693,7 +18810,7 @@
       "source_file": "apps/api/src/__tests__/telefun-communication-profile.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_telefun_communication_profile_test_ts",
-      "community": 310,
+      "community": 355,
       "norm_label": "telefun-communication-profile.test.ts"
     },
     {
@@ -18702,7 +18819,7 @@
       "source_file": "apps/api/src/__tests__/telefun-communication-profile.test.ts",
       "source_location": "L11",
       "id": "tests_telefun_communication_profile_test_makelegacyassessment",
-      "community": 310,
+      "community": 355,
       "norm_label": "makelegacyassessment()"
     },
     {
@@ -18891,7 +19008,7 @@
       "source_file": "apps/api/src/__tests__/sidak-decomposition-structural.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_sidak_decomposition_structural_test_ts",
-      "community": 88,
+      "community": 74,
       "norm_label": "sidak-decomposition-structural.test.ts"
     },
     {
@@ -18911,6 +19028,15 @@
       "id": "apps_api_src_tests_pdkt_mailbox_permissions_test_ts",
       "community": 35,
       "norm_label": "pdkt-mailbox-permissions.test.ts"
+    },
+    {
+      "label": "{ mockProfilesQuery, mockSupabaseAdmin }",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts",
+      "source_location": "L4",
+      "id": "tests_pdkt_mailbox_permissions_test_mockprofilesquery_mocksupabaseadmin",
+      "community": 35,
+      "norm_label": "{ mockprofilesquery, mocksupabaseadmin }"
     },
     {
       "label": "ai-usage-enhanced.test.ts",
@@ -19084,10 +19210,19 @@
       "norm_label": "mockmaybesingle"
     },
     {
+      "label": "mockUserClients",
+      "file_type": "code",
+      "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
+      "source_location": "L7",
+      "id": "tests_pdkt_reply_route_test_mockuserclients",
+      "community": 333,
+      "norm_label": "mockuserclients"
+    },
+    {
       "label": "buildMockClient()",
       "file_type": "code",
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
-      "source_location": "L8",
+      "source_location": "L9",
       "id": "tests_pdkt_reply_route_test_buildmockclient",
       "community": 333,
       "norm_label": "buildmockclient()"
@@ -19096,7 +19231,7 @@
       "label": "mockSupabaseAdmin",
       "file_type": "code",
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
-      "source_location": "L27",
+      "source_location": "L32",
       "id": "tests_pdkt_reply_route_test_mocksupabaseadmin",
       "community": 333,
       "norm_label": "mocksupabaseadmin"
@@ -19105,7 +19240,7 @@
       "label": "createAuthenticatedApp()",
       "file_type": "code",
       "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
-      "source_location": "L67",
+      "source_location": "L76",
       "id": "tests_pdkt_reply_route_test_createauthenticatedapp",
       "community": 333,
       "norm_label": "createauthenticatedapp()"
@@ -19233,7 +19368,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_pdkt_mailbox_batch_route_test_ts",
-      "community": 333,
+      "community": 363,
       "norm_label": "pdkt-mailbox-batch-route.test.ts"
     },
     {
@@ -19242,7 +19377,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L4",
       "id": "tests_pdkt_mailbox_batch_route_test_mockrpc",
-      "community": 333,
+      "community": 363,
       "norm_label": "mockrpc"
     },
     {
@@ -19251,7 +19386,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L5",
       "id": "tests_pdkt_mailbox_batch_route_test_mocksingle",
-      "community": 333,
+      "community": 363,
       "norm_label": "mocksingle"
     },
     {
@@ -19260,7 +19395,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L6",
       "id": "tests_pdkt_mailbox_batch_route_test_mockmaybesingle",
-      "community": 333,
+      "community": 363,
       "norm_label": "mockmaybesingle"
     },
     {
@@ -19269,7 +19404,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L8",
       "id": "tests_pdkt_mailbox_batch_route_test_buildmockclient",
-      "community": 333,
+      "community": 363,
       "norm_label": "buildmockclient()"
     },
     {
@@ -19278,7 +19413,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L25",
       "id": "tests_pdkt_mailbox_batch_route_test_mocksupabaseadmin",
-      "community": 333,
+      "community": 363,
       "norm_label": "mocksupabaseadmin"
     },
     {
@@ -19287,7 +19422,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-batch-route.test.ts",
       "source_location": "L57",
       "id": "tests_pdkt_mailbox_batch_route_test_createauthenticatedapp",
-      "community": 333,
+      "community": 363,
       "norm_label": "createauthenticatedapp()"
     },
     {
@@ -19818,7 +19953,7 @@
       "source_file": "apps/api/src/__tests__/ai-usage-summary-breakdown.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_ai_usage_summary_breakdown_test_ts",
-      "community": 38,
+      "community": 53,
       "norm_label": "ai-usage-summary-breakdown.test.ts"
     },
     {
@@ -19827,7 +19962,7 @@
       "source_file": "apps/api/src/__tests__/ai-usage-summary-breakdown.test.ts",
       "source_location": "L4",
       "id": "tests_ai_usage_summary_breakdown_test_mockfrom_mockcreateadminclient",
-      "community": 38,
+      "community": 53,
       "norm_label": "{ mockfrom, mockcreateadminclient }"
     },
     {
@@ -19836,7 +19971,7 @@
       "source_file": "apps/api/src/__tests__/ai-usage-summary-breakdown.test.ts",
       "source_location": "L22",
       "id": "tests_ai_usage_summary_breakdown_test_buildapp",
-      "community": 38,
+      "community": 53,
       "norm_label": "buildapp()"
     },
     {
@@ -19863,7 +19998,7 @@
       "source_file": "apps/api/src/__tests__/sidak-versioning-parity.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_sidak_versioning_parity_test_ts",
-      "community": 314,
+      "community": 81,
       "norm_label": "sidak-versioning-parity.test.ts"
     },
     {
@@ -19872,7 +20007,7 @@
       "source_file": "apps/api/src/__tests__/sidak-versioning-parity.test.ts",
       "source_location": "L3",
       "id": "tests_sidak_versioning_parity_test_buildquery",
-      "community": 314,
+      "community": 81,
       "norm_label": "buildquery()"
     },
     {
@@ -19881,7 +20016,7 @@
       "source_file": "apps/api/src/__tests__/sidak-versioning-parity.test.ts",
       "source_location": "L18",
       "id": "tests_sidak_versioning_parity_test_pendingresolve",
-      "community": 314,
+      "community": 81,
       "norm_label": "pendingresolve()"
     },
     {
@@ -19989,7 +20124,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-template-resolver.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_pdkt_template_resolver_test_ts",
-      "community": 22,
+      "community": 39,
       "norm_label": "pdkt-template-resolver.test.ts"
     },
     {
@@ -19998,7 +20133,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-template-resolver.test.ts",
       "source_location": "L9",
       "id": "tests_pdkt_template_resolver_test_identity",
-      "community": 22,
+      "community": 39,
       "norm_label": "identity"
     },
     {
@@ -20007,7 +20142,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-template-resolver.test.ts",
       "source_location": "L16",
       "id": "tests_pdkt_template_resolver_test_asuransiscenario",
-      "community": 22,
+      "community": 39,
       "norm_label": "asuransiscenario"
     },
     {
@@ -20016,7 +20151,7 @@
       "source_file": "apps/api/src/__tests__/pdkt-template-resolver.test.ts",
       "source_location": "L25",
       "id": "tests_pdkt_template_resolver_test_pinjolscenario",
-      "community": 22,
+      "community": 39,
       "norm_label": "pinjolscenario"
     },
     {
@@ -20151,7 +20286,7 @@
       "source_file": "apps/api/src/__tests__/sidak-ranking-route.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_sidak_ranking_route_test_ts",
-      "community": 9,
+      "community": 40,
       "norm_label": "sidak-ranking-route.test.ts"
     },
     {
@@ -20160,7 +20295,7 @@
       "source_file": "apps/api/src/__tests__/sidak-ranking-route.test.ts",
       "source_location": "L5",
       "id": "tests_sidak_ranking_route_test_buildquery",
-      "community": 9,
+      "community": 40,
       "norm_label": "buildquery()"
     },
     {
@@ -20169,7 +20304,7 @@
       "source_file": "apps/api/src/__tests__/sidak-ranking-route.test.ts",
       "source_location": "L63",
       "id": "tests_sidak_ranking_route_test_app",
-      "community": 9,
+      "community": 40,
       "norm_label": "app"
     },
     {
@@ -20187,7 +20322,7 @@
       "source_file": "apps/api/src/__tests__/ketik-service.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_ketik_service_test_ts",
-      "community": 318,
+      "community": 13,
       "norm_label": "ketik-service.test.ts"
     },
     {
@@ -20196,7 +20331,7 @@
       "source_file": "apps/api/src/__tests__/ketik-service.test.ts",
       "source_location": "L3",
       "id": "tests_ketik_service_test_mockfrom",
-      "community": 318,
+      "community": 13,
       "norm_label": "mockfrom"
     },
     {
@@ -20205,7 +20340,7 @@
       "source_file": "apps/api/src/__tests__/ketik-service.test.ts",
       "source_location": "L202",
       "id": "tests_ketik_service_test_get",
-      "community": 318,
+      "community": 13,
       "norm_label": "get()"
     },
     {
@@ -20313,7 +20448,7 @@
       "source_file": "apps/api/src/__tests__/pdkt.test.ts",
       "source_location": "L1",
       "id": "apps_api_src_tests_pdkt_test_ts",
-      "community": 35,
+      "community": 22,
       "norm_label": "pdkt.test.ts"
     },
     {
@@ -20718,7 +20853,7 @@
       "source_file": "apps/api/src/lib/timezone.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_timezone_ts",
-      "community": 38,
+      "community": 53,
       "norm_label": "timezone.ts"
     },
     {
@@ -20727,7 +20862,7 @@
       "source_file": "apps/api/src/lib/timezone.ts",
       "source_location": "L1",
       "id": "lib_timezone_getcurrentwibmonth",
-      "community": 38,
+      "community": 53,
       "norm_label": "getcurrentwibmonth()"
     },
     {
@@ -20736,7 +20871,7 @@
       "source_file": "apps/api/src/lib/timezone.ts",
       "source_location": "L10",
       "id": "lib_timezone_getwibmonthbounds",
-      "community": 38,
+      "community": 53,
       "norm_label": "getwibmonthbounds()"
     },
     {
@@ -20790,7 +20925,7 @@
       "source_file": "apps/api/src/lib/math-utils.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_math_utils_ts",
-      "community": 88,
+      "community": 74,
       "norm_label": "math-utils.ts"
     },
     {
@@ -20799,7 +20934,7 @@
       "source_file": "apps/api/src/lib/math-utils.ts",
       "source_location": "L5",
       "id": "lib_math_utils_roundto",
-      "community": 88,
+      "community": 74,
       "norm_label": "roundto()"
     },
     {
@@ -20880,7 +21015,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_telefun_communication_profile_ts",
-      "community": 310,
+      "community": 355,
       "norm_label": "telefun-communication-profile.ts"
     },
     {
@@ -20889,7 +21024,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L8",
       "id": "lib_telefun_communication_profile_clamp",
-      "community": 310,
+      "community": 355,
       "norm_label": "clamp()"
     },
     {
@@ -20898,7 +21033,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L12",
       "id": "lib_telefun_communication_profile_benchmark_defaults",
-      "community": 310,
+      "community": 355,
       "norm_label": "benchmark_defaults"
     },
     {
@@ -20907,7 +21042,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L59",
       "id": "lib_telefun_communication_profile_evaluatemetricstatus",
-      "community": 310,
+      "community": 355,
       "norm_label": "evaluatemetricstatus()"
     },
     {
@@ -20916,7 +21051,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L104",
       "id": "lib_telefun_communication_profile_generateexplanation",
-      "community": 310,
+      "community": 355,
       "norm_label": "generateexplanation()"
     },
     {
@@ -20925,7 +21060,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L149",
       "id": "lib_telefun_communication_profile_generateimprovementtip",
-      "community": 310,
+      "community": 355,
       "norm_label": "generateimprovementtip()"
     },
     {
@@ -20934,7 +21069,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L171",
       "id": "lib_telefun_communication_profile_buildspeakingratevalue",
-      "community": 310,
+      "community": 355,
       "norm_label": "buildspeakingratevalue()"
     },
     {
@@ -20943,7 +21078,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L187",
       "id": "lib_telefun_communication_profile_buildfillersvalue",
-      "community": 310,
+      "community": 355,
       "norm_label": "buildfillersvalue()"
     },
     {
@@ -20952,7 +21087,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L200",
       "id": "lib_telefun_communication_profile_buildtonevalue",
-      "community": 310,
+      "community": 355,
       "norm_label": "buildtonevalue()"
     },
     {
@@ -20961,7 +21096,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L204",
       "id": "lib_telefun_communication_profile_buildcommunicationprofilefromassessment",
-      "community": 310,
+      "community": 355,
       "norm_label": "buildcommunicationprofilefromassessment()"
     },
     {
@@ -20970,7 +21105,7 @@
       "source_file": "apps/api/src/lib/telefun-communication-profile.ts",
       "source_location": "L282",
       "id": "lib_telefun_communication_profile_enrichassessmentwithcommunicationprofile",
-      "community": 310,
+      "community": 355,
       "norm_label": "enrichassessmentwithcommunicationprofile()"
     },
     {
@@ -21006,7 +21141,7 @@
       "source_file": "apps/api/src/lib/ai-models.ts",
       "source_location": "L29",
       "id": "lib_ai_models_normalizemodelid",
-      "community": 31,
+      "community": 0,
       "norm_label": "normalizemodelid()"
     },
     {
@@ -21015,7 +21150,7 @@
       "source_file": "apps/api/src/lib/ai-models.ts",
       "source_location": "L34",
       "id": "lib_ai_models_getproviderfrommodelid",
-      "community": 31,
+      "community": 0,
       "norm_label": "getproviderfrommodelid()"
     },
     {
@@ -21042,7 +21177,7 @@
       "source_file": "apps/api/src/lib/ai-models.ts",
       "source_location": "L73",
       "id": "lib_ai_models_supportsimagegeneration",
-      "community": 35,
+      "community": 0,
       "norm_label": "supportsimagegeneration()"
     },
     {
@@ -21051,7 +21186,7 @@
       "source_file": "apps/api/src/lib/ai-models.ts",
       "source_location": "L79",
       "id": "lib_ai_models_getimagegenerationmode",
-      "community": 35,
+      "community": 0,
       "norm_label": "getimagegenerationmode()"
     },
     {
@@ -21105,7 +21240,7 @@
       "source_file": "apps/api/src/lib/report-html-builder.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_report_html_builder_ts",
-      "community": 40,
+      "community": 60,
       "norm_label": "report-html-builder.ts"
     },
     {
@@ -21114,7 +21249,7 @@
       "source_file": "apps/api/src/lib/report-html-builder.ts",
       "source_location": "L1",
       "id": "lib_report_html_builder_buildhtmlreport",
-      "community": 40,
+      "community": 60,
       "norm_label": "buildhtmlreport()"
     },
     {
@@ -21312,7 +21447,7 @@
       "source_file": "apps/api/src/lib/scoring.ts",
       "source_location": "L9",
       "id": "lib_scoring_valid_service_types",
-      "community": 88,
+      "community": 23,
       "norm_label": "valid_service_types"
     },
     {
@@ -21321,7 +21456,7 @@
       "source_file": "apps/api/src/lib/scoring.ts",
       "source_location": "L19",
       "id": "lib_scoring_isservicetype",
-      "community": 88,
+      "community": 23,
       "norm_label": "isservicetype()"
     },
     {
@@ -21573,7 +21708,7 @@
       "source_file": "apps/api/src/lib/supabase.ts",
       "source_location": "L1",
       "id": "apps_api_src_lib_supabase_ts",
-      "community": 314,
+      "community": 81,
       "norm_label": "supabase.ts"
     },
     {
@@ -21582,7 +21717,7 @@
       "source_file": "apps/api/src/lib/supabase.ts",
       "source_location": "L4",
       "id": "lib_supabase_supabaseadmin",
-      "community": 314,
+      "community": 81,
       "norm_label": "supabaseadmin"
     },
     {
@@ -21825,7 +21960,7 @@
       "source_file": "apps/api/src/routes/admin.ts",
       "source_location": "L1",
       "id": "apps_api_src_routes_admin_ts",
-      "community": 5,
+      "community": 45,
       "norm_label": "admin.ts"
     },
     {
@@ -21834,7 +21969,7 @@
       "source_file": "apps/api/src/routes/admin.ts",
       "source_location": "L19",
       "id": "routes_admin_variables",
-      "community": 5,
+      "community": 45,
       "norm_label": "variables"
     },
     {
@@ -21888,7 +22023,7 @@
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L1",
       "id": "apps_api_src_routes_ai_ts",
-      "community": 38,
+      "community": 53,
       "norm_label": "ai.ts"
     },
     {
@@ -21897,7 +22032,7 @@
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L23",
       "id": "routes_ai_variables",
-      "community": 38,
+      "community": 53,
       "norm_label": "variables"
     },
     {
@@ -21906,7 +22041,7 @@
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L25",
       "id": "routes_ai_ai",
-      "community": 38,
+      "community": 53,
       "norm_label": "ai"
     },
     {
@@ -21915,7 +22050,7 @@
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L33",
       "id": "routes_ai_generateschema",
-      "community": 38,
+      "community": 53,
       "norm_label": "generateschema"
     },
     {
@@ -21924,7 +22059,7 @@
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L622",
       "id": "routes_ai_pricingupsertschema",
-      "community": 38,
+      "community": 53,
       "norm_label": "pricingupsertschema"
     },
     {
@@ -21933,7 +22068,7 @@
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L676",
       "id": "routes_ai_billingupdateschema",
-      "community": 38,
+      "community": 53,
       "norm_label": "billingupdateschema"
     },
     {
@@ -21960,7 +22095,7 @@
       "source_file": "apps/api/src/routes/sidak.ts",
       "source_location": "L11",
       "id": "routes_sidak_sidak",
-      "community": 83,
+      "community": 40,
       "norm_label": "sidak"
     },
     {
@@ -22255,7 +22390,7 @@
       "label": "mailbox",
       "file_type": "code",
       "source_file": "apps/api/src/routes/pdkt/mailbox.ts",
-      "source_location": "L18",
+      "source_location": "L19",
       "id": "pdkt_mailbox_mailbox",
       "community": 10,
       "norm_label": "mailbox"
@@ -22302,7 +22437,7 @@
       "source_file": "apps/api/src/routes/sidak/reports.ts",
       "source_location": "L1",
       "id": "apps_api_src_routes_sidak_reports_ts",
-      "community": 40,
+      "community": 60,
       "norm_label": "reports.ts"
     },
     {
@@ -22311,7 +22446,7 @@
       "source_file": "apps/api/src/routes/sidak/reports.ts",
       "source_location": "L11",
       "id": "sidak_reports_variables",
-      "community": 40,
+      "community": 60,
       "norm_label": "variables"
     },
     {
@@ -22320,7 +22455,7 @@
       "source_file": "apps/api/src/routes/sidak/reports.ts",
       "source_location": "L13",
       "id": "sidak_reports_sidakreports",
-      "community": 40,
+      "community": 60,
       "norm_label": "sidakreports"
     },
     {
@@ -22473,7 +22608,7 @@
       "source_file": "apps/api/src/services/pdkt-template-resolver.ts",
       "source_location": "L16",
       "id": "services_pdkt_template_resolver_pdkttemplateresolutioninput",
-      "community": 22,
+      "community": 285,
       "norm_label": "pdkttemplateresolutioninput"
     },
     {
@@ -23659,16 +23794,43 @@
       "label": "MAILBOX_MANAGER_ROLES",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L8",
+      "source_location": "L9",
       "id": "pdkt_mailbox_service_mailbox_manager_roles",
       "community": 300,
       "norm_label": "mailbox_manager_roles"
     },
     {
+      "label": "BulkDeleteResult",
+      "file_type": "code",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L11",
+      "id": "pdkt_mailbox_service_bulkdeleteresult",
+      "community": 300,
+      "norm_label": "bulkdeleteresult"
+    },
+    {
+      "label": "BulkDeleteOutcome",
+      "file_type": "code",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L17",
+      "id": "pdkt_mailbox_service_bulkdeleteoutcome",
+      "community": 300,
+      "norm_label": "bulkdeleteoutcome"
+    },
+    {
+      "label": "getErrorMessage()",
+      "file_type": "code",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L21",
+      "id": "pdkt_mailbox_service_geterrormessage",
+      "community": 300,
+      "norm_label": "geterrormessage()"
+    },
+    {
       "label": "canDeletePdktMailboxItem()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L13",
+      "source_location": "L30",
       "id": "pdkt_mailbox_service_candeletepdktmailboxitem",
       "community": 300,
       "norm_label": "candeletepdktmailboxitem()"
@@ -23677,7 +23839,7 @@
       "label": "fetchMailboxItems()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L27",
+      "source_location": "L44",
       "id": "pdkt_mailbox_service_fetchmailboxitems",
       "community": 300,
       "norm_label": "fetchmailboxitems()"
@@ -23686,7 +23848,7 @@
       "label": "createMailboxItem()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L106",
+      "source_location": "L124",
       "id": "pdkt_mailbox_service_createmailboxitem",
       "community": 35,
       "norm_label": "createmailboxitem()"
@@ -23695,7 +23857,7 @@
       "label": "softDeleteMailboxItem()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L135",
+      "source_location": "L153",
       "id": "pdkt_mailbox_service_softdeletemailboxitem",
       "community": 300,
       "norm_label": "softdeletemailboxitem()"
@@ -23704,10 +23866,19 @@
       "label": "submitMailboxReply()",
       "file_type": "code",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L177",
+      "source_location": "L195",
       "id": "pdkt_mailbox_service_submitmailboxreply",
       "community": 300,
       "norm_label": "submitmailboxreply()"
+    },
+    {
+      "label": "bulkSoftDeleteMailboxItems()",
+      "file_type": "code",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L219",
+      "id": "pdkt_mailbox_service_bulksoftdeletemailboxitems",
+      "community": 300,
+      "norm_label": "bulksoftdeletemailboxitems()"
     },
     {
       "label": "catalog-service.ts",
@@ -23814,7 +23985,7 @@
       "source_file": "apps/api/src/services/pdkt/shared-utils.ts",
       "source_location": "L58",
       "id": "pdkt_shared_utils_normalizesubject",
-      "community": 22,
+      "community": 31,
       "norm_label": "normalizesubject()"
     },
     {
@@ -23823,7 +23994,7 @@
       "source_file": "apps/api/src/services/pdkt/image-generation.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_pdkt_image_generation_ts",
-      "community": 35,
+      "community": 0,
       "norm_label": "image-generation.ts"
     },
     {
@@ -23832,7 +24003,7 @@
       "source_file": "apps/api/src/services/pdkt/image-generation.ts",
       "source_location": "L19",
       "id": "pdkt_image_generation_pdktimagegenerationdiagnostics",
-      "community": 35,
+      "community": 0,
       "norm_label": "pdktimagegenerationdiagnostics"
     },
     {
@@ -23841,7 +24012,7 @@
       "source_file": "apps/api/src/services/pdkt/image-generation.ts",
       "source_location": "L27",
       "id": "pdkt_image_generation_pdktimagegenerationresult",
-      "community": 35,
+      "community": 0,
       "norm_label": "pdktimagegenerationresult"
     },
     {
@@ -23850,7 +24021,7 @@
       "source_file": "apps/api/src/services/pdkt/image-generation.ts",
       "source_location": "L38",
       "id": "pdkt_image_generation_generatepdktscenarioimages",
-      "community": 35,
+      "community": 0,
       "norm_label": "generatepdktscenarioimages()"
     },
     {
@@ -23859,7 +24030,7 @@
       "source_file": "apps/api/src/services/pdkt/image-generation.ts",
       "source_location": "L235",
       "id": "pdkt_image_generation_normalizeattachments",
-      "community": 35,
+      "community": 0,
       "norm_label": "normalizeattachments()"
     },
     {
@@ -23976,7 +24147,7 @@
       "source_file": "apps/api/src/services/sidak/dashboard-aggregation.ts",
       "source_location": "L25",
       "id": "sidak_dashboard_aggregation_getscorerows",
-      "community": 74,
+      "community": 9,
       "norm_label": "getscorerows()"
     },
     {
@@ -24498,7 +24669,7 @@
       "source_file": "apps/api/src/services/sidak/shared-constants.ts",
       "source_location": "L5",
       "id": "sidak_shared_constants_report_admin_roles",
-      "community": 53,
+      "community": 81,
       "norm_label": "report_admin_roles"
     },
     {
@@ -24507,7 +24678,7 @@
       "source_file": "apps/api/src/services/sidak/shared-constants.ts",
       "source_location": "L7",
       "id": "sidak_shared_constants_excluded_folders",
-      "community": 88,
+      "community": 81,
       "norm_label": "excluded_folders"
     },
     {
@@ -24561,7 +24732,7 @@
       "source_file": "apps/api/src/services/sidak/period-indicator.ts",
       "source_location": "L6",
       "id": "sidak_period_indicator_getperiods",
-      "community": 290,
+      "community": 88,
       "norm_label": "getperiods()"
     },
     {
@@ -24633,7 +24804,7 @@
       "source_file": "apps/api/src/services/sidak/ai-report-service.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_sidak_ai_report_service_ts",
-      "community": 0,
+      "community": 31,
       "norm_label": "ai-report-service.ts"
     },
     {
@@ -24642,7 +24813,7 @@
       "source_file": "apps/api/src/services/sidak/ai-report-service.ts",
       "source_location": "L8",
       "id": "sidak_ai_report_service_aireportschema",
-      "community": 0,
+      "community": 31,
       "norm_label": "aireportschema"
     },
     {
@@ -24651,7 +24822,7 @@
       "source_file": "apps/api/src/services/sidak/ai-report-service.ts",
       "source_location": "L18",
       "id": "sidak_ai_report_service_aireportparams",
-      "community": 0,
+      "community": 31,
       "norm_label": "aireportparams"
     },
     {
@@ -24660,7 +24831,7 @@
       "source_file": "apps/api/src/services/sidak/ai-report-service.ts",
       "source_location": "L20",
       "id": "sidak_ai_report_service_aireportresult",
-      "community": 0,
+      "community": 31,
       "norm_label": "aireportresult"
     },
     {
@@ -24669,7 +24840,7 @@
       "source_file": "apps/api/src/services/sidak/ai-report-service.ts",
       "source_location": "L30",
       "id": "sidak_ai_report_service_generateaireport",
-      "community": 0,
+      "community": 31,
       "norm_label": "generateaireport()"
     },
     {
@@ -24678,7 +24849,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_sidak_report_archives_ts",
-      "community": 53,
+      "community": 81,
       "norm_label": "report-archives.ts"
     },
     {
@@ -24687,7 +24858,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L6",
       "id": "sidak_report_archives_reportarchiveinput",
-      "community": 53,
+      "community": 81,
       "norm_label": "reportarchiveinput"
     },
     {
@@ -24696,7 +24867,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L16",
       "id": "sidak_report_archives_savereportarchive",
-      "community": 53,
+      "community": 81,
       "norm_label": "savereportarchive()"
     },
     {
@@ -24705,7 +24876,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L35",
       "id": "sidak_report_archives_getreportarchives",
-      "community": 53,
+      "community": 81,
       "norm_label": "getreportarchives()"
     },
     {
@@ -24714,7 +24885,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L50",
       "id": "sidak_report_archives_getreportarchivebyid",
-      "community": 53,
+      "community": 81,
       "norm_label": "getreportarchivebyid()"
     },
     {
@@ -24723,7 +24894,7 @@
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L68",
       "id": "sidak_report_archives_deletereportarchive",
-      "community": 53,
+      "community": 81,
       "norm_label": "deletereportarchive()"
     },
     {
@@ -24732,7 +24903,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_ketik_consumer_response_ts",
-      "community": 0,
+      "community": 360,
       "norm_label": "consumer-response.ts"
     },
     {
@@ -24741,7 +24912,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L11",
       "id": "ketik_consumer_response_default_scenarios",
-      "community": 0,
+      "community": 360,
       "norm_label": "default_scenarios"
     },
     {
@@ -24750,7 +24921,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L60",
       "id": "ketik_consumer_response_default_consumer_types",
-      "community": 0,
+      "community": 360,
       "norm_label": "default_consumer_types"
     },
     {
@@ -24759,7 +24930,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L100",
       "id": "ketik_consumer_response_getscenarios",
-      "community": 0,
+      "community": 360,
       "norm_label": "getscenarios()"
     },
     {
@@ -24768,7 +24939,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L104",
       "id": "ketik_consumer_response_getconsumertypes",
-      "community": 0,
+      "community": 360,
       "norm_label": "getconsumertypes()"
     },
     {
@@ -24777,7 +24948,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L108",
       "id": "ketik_consumer_response_sanitizeconsumertext",
-      "community": 0,
+      "community": 360,
       "norm_label": "sanitizeconsumertext()"
     },
     {
@@ -24786,7 +24957,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L137",
       "id": "ketik_consumer_response_formatdurationlabel",
-      "community": 0,
+      "community": 360,
       "norm_label": "formatdurationlabel()"
     },
     {
@@ -24795,7 +24966,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L146",
       "id": "ketik_consumer_response_sessiontimingcontext",
-      "community": 0,
+      "community": 360,
       "norm_label": "sessiontimingcontext"
     },
     {
@@ -24804,7 +24975,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L152",
       "id": "ketik_consumer_response_buildtimelimitinstruction",
-      "community": 0,
+      "community": 360,
       "norm_label": "buildtimelimitinstruction()"
     },
     {
@@ -24813,7 +24984,7 @@
       "source_file": "apps/api/src/services/ketik/consumer-response.ts",
       "source_location": "L213",
       "id": "ketik_consumer_response_generateconsumerresponse",
-      "community": 0,
+      "community": 360,
       "norm_label": "generateconsumerresponse()"
     },
     {
@@ -24867,7 +25038,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_ketik_settings_history_ts",
-      "community": 13,
+      "community": 27,
       "norm_label": "settings-history.ts"
     },
     {
@@ -24876,7 +25047,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L13",
       "id": "ketik_settings_history_coerceketikmodelid",
-      "community": 13,
+      "community": 27,
       "norm_label": "coerceketikmodelid()"
     },
     {
@@ -24885,7 +25056,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L18",
       "id": "ketik_settings_history_coerceduration",
-      "community": 13,
+      "community": 27,
       "norm_label": "coerceduration()"
     },
     {
@@ -24894,7 +25065,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L23",
       "id": "ketik_settings_history_parsesettings",
-      "community": 13,
+      "community": 27,
       "norm_label": "parsesettings()"
     },
     {
@@ -24903,7 +25074,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L68",
       "id": "ketik_settings_history_getsettings",
-      "community": 13,
+      "community": 27,
       "norm_label": "getsettings()"
     },
     {
@@ -24912,7 +25083,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L84",
       "id": "ketik_settings_history_savesettings",
-      "community": 13,
+      "community": 27,
       "norm_label": "savesettings()"
     },
     {
@@ -24921,7 +25092,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L115",
       "id": "ketik_settings_history_gethistory",
-      "community": 13,
+      "community": 27,
       "norm_label": "gethistory()"
     },
     {
@@ -24930,7 +25101,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L192",
       "id": "ketik_settings_history_persistsession",
-      "community": 13,
+      "community": 27,
       "norm_label": "persistsession()"
     },
     {
@@ -24939,7 +25110,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L259",
       "id": "ketik_settings_history_deletesession",
-      "community": 13,
+      "community": 27,
       "norm_label": "deletesession()"
     },
     {
@@ -24948,7 +25119,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L284",
       "id": "ketik_settings_history_clearhistory",
-      "community": 13,
+      "community": 27,
       "norm_label": "clearhistory()"
     },
     {
@@ -24957,7 +25128,7 @@
       "source_file": "apps/api/src/services/ketik/settings-history.ts",
       "source_location": "L305",
       "id": "ketik_settings_history_getreviewdetail",
-      "community": 13,
+      "community": 27,
       "norm_label": "getreviewdetail()"
     },
     {
@@ -25020,7 +25191,7 @@
       "source_file": "apps/api/src/services/ketik/shared-utils.ts",
       "source_location": "L1",
       "id": "apps_api_src_services_ketik_shared_utils_ts",
-      "community": 31,
+      "community": 7,
       "norm_label": "shared-utils.ts"
     },
     {
@@ -25047,7 +25218,7 @@
       "source_file": "apps/api/src/services/ketik/review-lifecycle.ts",
       "source_location": "L5",
       "id": "ketik_review_lifecycle_triggerketikaireview",
-      "community": 13,
+      "community": 31,
       "norm_label": "triggerketikaireview()"
     },
     {
@@ -25987,19 +26158,19 @@
       "norm_label": "phase progress"
     },
     {
-      "label": "Key Files Changed (Phase 58 \u2014 98)",
+      "label": "Key Files Changed (Phase 58 \u2014 107)",
       "file_type": "document",
       "source_file": "GEMINI.md",
-      "source_location": "L280",
-      "id": "trainerssuperappvite_gemini_key_files_changed_phase_58_98",
+      "source_location": "L290",
+      "id": "trainerssuperappvite_gemini_key_files_changed_phase_58_107",
       "community": 78,
-      "norm_label": "key files changed (phase 58 \u2014 98)"
+      "norm_label": "key files changed (phase 58 \u2014 107)"
     },
     {
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "GEMINI.md",
-      "source_location": "L357",
+      "source_location": "L367",
       "id": "trainerssuperappvite_gemini_relevant_files",
       "community": 78,
       "norm_label": "relevant files"
@@ -26008,7 +26179,7 @@
       "label": "Routes Reference (apps/web)",
       "file_type": "document",
       "source_file": "GEMINI.md",
-      "source_location": "L465",
+      "source_location": "L475",
       "id": "trainerssuperappvite_gemini_routes_reference_apps_web",
       "community": 78,
       "norm_label": "routes reference (apps/web)"
@@ -26017,7 +26188,7 @@
       "label": "API Endpoints Reference (apps/api)",
       "file_type": "document",
       "source_file": "GEMINI.md",
-      "source_location": "L508",
+      "source_location": "L518",
       "id": "trainerssuperappvite_gemini_api_endpoints_reference_apps_api",
       "community": 78,
       "norm_label": "api endpoints reference (apps/api)"
@@ -26239,37 +26410,28 @@
       "norm_label": "phase progress"
     },
     {
-      "label": "Key Files Changed (Phase 58 \u2014 100)",
+      "label": "Key Files Changed (Phase 58 \u2014 107)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L298",
-      "id": "trainerssuperappvite_agents_key_files_changed_phase_58_100",
+      "source_location": "L302",
+      "id": "trainerssuperappvite_agents_key_files_changed_phase_58_107",
       "community": 52,
-      "norm_label": "key files changed (phase 58 \u2014 100)"
+      "norm_label": "key files changed (phase 58 \u2014 107)"
     },
     {
       "label": "Relevant Files",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L428",
+      "source_location": "L432",
       "id": "trainerssuperappvite_agents_relevant_files",
       "community": 52,
       "norm_label": "relevant files"
     },
     {
-      "label": "Routes Reference (apps/web)",
-      "file_type": "document",
-      "source_file": "AGENTS.md",
-      "source_location": "L690",
-      "id": "trainerssuperappvite_agents_routes_reference_apps_web",
-      "community": 52,
-      "norm_label": "routes reference (apps/web)"
-    },
-    {
       "label": "API Endpoints Reference (apps/api)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L733",
+      "source_location": "L758",
       "id": "trainerssuperappvite_agents_api_endpoints_reference_apps_api",
       "community": 52,
       "norm_label": "api endpoints reference (apps/api)"
@@ -26278,7 +26440,7 @@
       "label": "graphify",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L745",
+      "source_location": "L770",
       "id": "trainerssuperappvite_agents_graphify",
       "community": 349,
       "norm_label": "graphify"
@@ -26287,7 +26449,7 @@
       "label": "WAJIB: Gunakan graphify secara otomatis",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L751",
+      "source_location": "L776",
       "id": "trainerssuperappvite_agents_wajib_gunakan_graphify_secara_otomatis",
       "community": 349,
       "norm_label": "wajib: gunakan graphify secara otomatis"
@@ -26296,7 +26458,7 @@
       "label": "Untuk Planning",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L755",
+      "source_location": "L780",
       "id": "trainerssuperappvite_agents_untuk_planning",
       "community": 349,
       "norm_label": "untuk planning"
@@ -26305,7 +26467,7 @@
       "label": "Untuk Eksekusi (Bug Fix / Fitur Baru)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L760",
+      "source_location": "L785",
       "id": "trainerssuperappvite_agents_untuk_eksekusi_bug_fix_fitur_baru",
       "community": 349,
       "norm_label": "untuk eksekusi (bug fix / fitur baru)"
@@ -26314,7 +26476,7 @@
       "label": "Untuk Subagent (Task tool)",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L766",
+      "source_location": "L791",
       "id": "trainerssuperappvite_agents_untuk_subagent_task_tool",
       "community": 349,
       "norm_label": "untuk subagent (task tool)"
@@ -26323,7 +26485,7 @@
       "label": "Aturan Penting",
       "file_type": "document",
       "source_file": "AGENTS.md",
-      "source_location": "L770",
+      "source_location": "L795",
       "id": "trainerssuperappvite_agents_aturan_penting",
       "community": 349,
       "norm_label": "aturan penting"
@@ -29578,6 +29740,123 @@
       "norm_label": "pnpm-lock.yaml"
     },
     {
+      "label": "phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L1",
+      "id": "docs_rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_md",
+      "community": 358,
+      "norm_label": "phase-106-pdkt-bulk-delete-soft-delete-fix.md"
+    },
+    {
+      "label": "Rebuild Log: Phase 106 - PDKT Bulk Delete & Soft Delete RPC Fix",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L1",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "community": 358,
+      "norm_label": "rebuild log: phase 106 - pdkt bulk delete & soft delete rpc fix"
+    },
+    {
+      "label": "Deskripsi Fitur",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L3",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_deskripsi_fitur",
+      "community": 358,
+      "norm_label": "deskripsi fitur"
+    },
+    {
+      "label": "Backward Compatibility Fix: Soft Delete RPC",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L8",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_backward_compatibility_fix_soft_delete_rpc",
+      "community": 358,
+      "norm_label": "backward compatibility fix: soft delete rpc"
+    },
+    {
+      "label": "Bulk Delete Feature",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L20",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_bulk_delete_feature",
+      "community": 358,
+      "norm_label": "bulk delete feature"
+    },
+    {
+      "label": "Backend (`apps/api`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L22",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_backend_apps_api",
+      "community": 358,
+      "norm_label": "backend (`apps/api`)"
+    },
+    {
+      "label": "Frontend (`apps/web`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L27",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_frontend_apps_web",
+      "community": 358,
+      "norm_label": "frontend (`apps/web`)"
+    },
+    {
+      "label": "Types (`packages/types`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L31",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_types_packages_types",
+      "community": 358,
+      "norm_label": "types (`packages/types`)"
+    },
+    {
+      "label": "Verifikasi & Pengujian",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L36",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_verifikasi_pengujian",
+      "community": 358,
+      "norm_label": "verifikasi & pengujian"
+    },
+    {
+      "label": "API Tests (`pdkt-mailbox-bulk-delete-route.test.ts`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L38",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_api_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "community": 358,
+      "norm_label": "api tests (`pdkt-mailbox-bulk-delete-route.test.ts`)"
+    },
+    {
+      "label": "Service Unit Tests (`pdkt-mailbox-permissions.test.ts`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L42",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_service_unit_tests_pdkt_mailbox_permissions_test_ts",
+      "community": 358,
+      "norm_label": "service unit tests (`pdkt-mailbox-permissions.test.ts`)"
+    },
+    {
+      "label": "Frontend Tests (`pdkt-mailbox-bulk.test.tsx`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L46",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_frontend_tests_pdkt_mailbox_bulk_test_tsx",
+      "community": 358,
+      "norm_label": "frontend tests (`pdkt-mailbox-bulk.test.tsx`)"
+    },
+    {
+      "label": "Rollback Plan",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L53",
+      "id": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rollback_plan",
+      "community": 358,
+      "norm_label": "rollback plan"
+    },
+    {
       "label": "phase-43-telefun-schema-chart-fix.md",
       "file_type": "document",
       "source_file": "docs/rebuild-logs/phase-43-telefun-schema-chart-fix.md",
@@ -30620,6 +30899,96 @@
       "id": "rebuild_logs_phase_58a_sidak_input_build_fix_verification",
       "community": 251,
       "norm_label": "verification"
+    },
+    {
+      "label": "phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L1",
+      "id": "docs_rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_md",
+      "community": 361,
+      "norm_label": "phase-107-pdkt-evaluation-sharing-access-fix.md"
+    },
+    {
+      "label": "Rebuild Log: Phase 107 - PDKT Evaluation Sharing & Access Control Fix",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L1",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "community": 361,
+      "norm_label": "rebuild log: phase 107 - pdkt evaluation sharing & access control fix"
+    },
+    {
+      "label": "Deskripsi Fitur",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L3",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_deskripsi_fitur",
+      "community": 361,
+      "norm_label": "deskripsi fitur"
+    },
+    {
+      "label": "Masalah Utama",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L8",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_masalah_utama",
+      "community": 361,
+      "norm_label": "masalah utama"
+    },
+    {
+      "label": "Solusi Implementasi",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L15",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_solusi_implementasi",
+      "community": 361,
+      "norm_label": "solusi implementasi"
+    },
+    {
+      "label": "1. Backend Route Guard (`apps/api`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L17",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_1_backend_route_guard_apps_api",
+      "community": 361,
+      "norm_label": "1. backend route guard (`apps/api`)"
+    },
+    {
+      "label": "2. Service Claiming & Retry (`apps/api`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L25",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_2_service_claiming_retry_apps_api",
+      "community": 361,
+      "norm_label": "2. service claiming & retry (`apps/api`)"
+    },
+    {
+      "label": "Verifikasi & Pengujian",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L31",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_verifikasi_pengujian",
+      "community": 361,
+      "norm_label": "verifikasi & pengujian"
+    },
+    {
+      "label": "API E2E Tests (`pdkt-reply-route.test.ts`)",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L33",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_api_e2e_tests_pdkt_reply_route_test_ts",
+      "community": 361,
+      "norm_label": "api e2e tests (`pdkt-reply-route.test.ts`)"
+    },
+    {
+      "label": "Rollback Plan",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L46",
+      "id": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rollback_plan",
+      "community": 361,
+      "norm_label": "rollback plan"
     },
     {
       "label": "phase-30-sidak-input-baseline-fix.md",
@@ -36688,6 +37057,15 @@
       "norm_label": "api unit & contract tests (`apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts`)"
     },
     {
+      "label": "Rollback Plan",
+      "file_type": "document",
+      "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
+      "source_location": "L60",
+      "id": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rollback_plan",
+      "community": 293,
+      "norm_label": "rollback plan"
+    },
+    {
       "label": "README.md",
       "file_type": "document",
       "source_file": "supabase/rollbacks/README.md",
@@ -36718,7 +37096,7 @@
       "label": "Usage",
       "file_type": "document",
       "source_file": "supabase/rollbacks/README.md",
-      "source_location": "L26",
+      "source_location": "L28",
       "id": "rollbacks_readme_usage",
       "community": 274,
       "norm_label": "usage"
@@ -36727,7 +37105,7 @@
       "label": "Important Notes",
       "file_type": "document",
       "source_file": "supabase/rollbacks/README.md",
-      "source_location": "L53",
+      "source_location": "L56",
       "id": "rollbacks_readme_important_notes",
       "community": 274,
       "norm_label": "important notes"
@@ -36760,11 +37138,38 @@
       "norm_label": "normalizephotoframe"
     },
     {
+      "label": "Key Files Changed (Phase 58 \u2014 98)",
+      "file_type": "document",
+      "source_file": "GEMINI.md",
+      "source_location": "L280",
+      "community": 78,
+      "norm_label": "key files changed (phase 58 \u2014 98)",
+      "id": "trainerssuperappvite_gemini_key_files_changed_phase_58_98"
+    },
+    {
+      "label": "Key Files Changed (Phase 58 \u2014 100)",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L298",
+      "community": 52,
+      "norm_label": "key files changed (phase 58 \u2014 100)",
+      "id": "trainerssuperappvite_agents_key_files_changed_phase_58_100"
+    },
+    {
+      "label": "Routes Reference (apps/web)",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L690",
+      "community": 52,
+      "norm_label": "routes reference (apps/web)",
+      "id": "trainerssuperappvite_agents_routes_reference_apps_web"
+    },
+    {
       "label": "SERVICE_LABELS",
       "file_type": "code",
       "source_file": "apps/api/src/lib/scoring.ts",
       "source_location": "L73",
-      "community": 23,
+      "community": 47,
       "norm_label": "service_labels",
       "id": "lib_scoring_service_labels"
     },
@@ -36800,7 +37205,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L18",
-      "community": 38,
+      "community": 53,
       "norm_label": "simulation_actions",
       "id": "routes_ai_simulation_actions"
     },
@@ -36809,7 +37214,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L28",
-      "community": 38,
+      "community": 53,
       "norm_label": "review_actions",
       "id": "routes_ai_review_actions"
     },
@@ -36818,7 +37223,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L125",
-      "community": 38,
+      "community": 53,
       "norm_label": "usagecategory",
       "id": "routes_ai_usagecategory"
     },
@@ -36827,7 +37232,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L127",
-      "community": 38,
+      "community": 53,
       "norm_label": "usagebreakdownitem",
       "id": "routes_ai_usagebreakdownitem"
     },
@@ -36836,7 +37241,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L136",
-      "community": 38,
+      "community": 53,
       "norm_label": "usagebreakdown",
       "id": "routes_ai_usagebreakdown"
     },
@@ -36845,7 +37250,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L142",
-      "community": 38,
+      "community": 53,
       "norm_label": "emptyusagebreakdownitem()",
       "id": "routes_ai_emptyusagebreakdownitem"
     },
@@ -36854,7 +37259,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/routes/ai.ts",
       "source_location": "L153",
-      "community": 38,
+      "community": 53,
       "norm_label": "resolveusagecategory()",
       "id": "routes_ai_resolveusagecategory"
     },
@@ -37880,7 +38285,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L249",
-      "community": 9,
+      "community": 47,
       "norm_label": "paretodata",
       "id": "src_index_paretodata"
     },
@@ -37889,7 +38294,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L257",
-      "community": 74,
+      "community": 9,
       "norm_label": "dashboarddata",
       "id": "src_index_dashboarddata"
     },
@@ -37979,7 +38384,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L477",
-      "community": 3,
+      "community": 13,
       "norm_label": "default_ketik_settings",
       "id": "src_index_default_ketik_settings"
     },
@@ -37997,7 +38402,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L510",
-      "community": 13,
+      "community": 27,
       "norm_label": "ketikreviewdetail",
       "id": "src_index_ketikreviewdetail"
     },
@@ -38078,7 +38483,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L595",
-      "community": 285,
+      "community": 35,
       "norm_label": "resolvedconsumernamementionpattern",
       "id": "src_index_resolvedconsumernamementionpattern"
     },
@@ -38096,7 +38501,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L609",
-      "community": 14,
+      "community": 285,
       "norm_label": "pdktconsumertype",
       "id": "src_index_pdktconsumertype"
     },
@@ -38114,7 +38519,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L628",
-      "community": 14,
+      "community": 39,
       "norm_label": "pdktscenario",
       "id": "src_index_pdktscenario"
     },
@@ -38150,7 +38555,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L649",
-      "community": 35,
+      "community": 22,
       "norm_label": "pdktsessionconfig",
       "id": "src_index_pdktsessionconfig"
     },
@@ -38204,7 +38609,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L706",
-      "community": 310,
+      "community": 354,
       "norm_label": "voiceaspectscore",
       "id": "src_index_voiceaspectscore"
     },
@@ -38213,7 +38618,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L712",
-      "community": 310,
+      "community": 322,
       "norm_label": "voicequalityassessment",
       "id": "src_index_voicequalityassessment"
     },
@@ -38222,7 +38627,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L725",
-      "community": 310,
+      "community": 354,
       "norm_label": "communicationmetricmode",
       "id": "src_index_communicationmetricmode"
     },
@@ -38240,7 +38645,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L745",
-      "community": 310,
+      "community": 355,
       "norm_label": "telefuncommunicationprofile",
       "id": "src_index_telefuncommunicationprofile"
     },
@@ -38348,7 +38753,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L877",
-      "community": 5,
+      "community": 307,
       "norm_label": "generatemessageschema",
       "id": "src_index_generatemessageschema"
     },
@@ -38528,7 +38933,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1084",
-      "community": 5,
+      "community": 45,
       "norm_label": "updateuserstatusschema",
       "id": "src_index_updateuserstatusschema"
     },
@@ -38537,7 +38942,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1088",
-      "community": 5,
+      "community": 45,
       "norm_label": "updateuserroleschema",
       "id": "src_index_updateuserroleschema"
     },
@@ -38546,7 +38951,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1092",
-      "community": 5,
+      "community": 20,
       "norm_label": "createaccessgroupschema",
       "id": "src_index_createaccessgroupschema"
     },
@@ -38555,7 +38960,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1097",
-      "community": 5,
+      "community": 45,
       "norm_label": "updateaccessgroupschema",
       "id": "src_index_updateaccessgroupschema"
     },
@@ -38564,7 +38969,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1103",
-      "community": 5,
+      "community": 45,
       "norm_label": "addaccessgroupitemschema",
       "id": "src_index_addaccessgroupitemschema"
     },
@@ -38573,7 +38978,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1108",
-      "community": 5,
+      "community": 20,
       "norm_label": "approveleaderrequestschema",
       "id": "src_index_approveleaderrequestschema"
     },
@@ -38582,7 +38987,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1112",
-      "community": 5,
+      "community": 20,
       "norm_label": "rejectleaderrequestschema",
       "id": "src_index_rejectleaderrequestschema"
     },
@@ -38591,7 +38996,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1116",
-      "community": 5,
+      "community": 20,
       "norm_label": "revokeleaderrequestschema",
       "id": "src_index_revokeleaderrequestschema"
     },
@@ -38600,7 +39005,7 @@
       "file_type": "code",
       "source_file": "packages/types/src/index.ts",
       "source_location": "L1120",
-      "community": 5,
+      "community": 20,
       "norm_label": "reassignleaderrequestgroupsschema",
       "id": "src_index_reassignleaderrequestgroupsschema"
     },
@@ -39608,7 +40013,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak/report-archives.ts",
       "source_location": "L4",
-      "community": 53,
+      "community": 81,
       "norm_label": "adminroles",
       "id": "sidak_report_archives_adminroles"
     },
@@ -39662,7 +40067,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L113",
-      "community": 74,
+      "community": 9,
       "norm_label": "getfoldernamesbyids()",
       "id": "services_sidak_service_getfoldernamesbyids"
     },
@@ -39671,7 +40076,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L123",
-      "community": 74,
+      "community": 9,
       "norm_label": "getfoldersbyids()",
       "id": "services_sidak_service_getfoldersbyids"
     },
@@ -39680,7 +40085,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L134",
-      "community": 74,
+      "community": 9,
       "norm_label": "emptydashboardresponse()",
       "id": "services_sidak_service_emptydashboardresponse"
     },
@@ -39932,7 +40337,7 @@
       "file_type": "code",
       "source_file": "apps/api/src/services/sidak-service.ts",
       "source_location": "L1303",
-      "community": 74,
+      "community": 9,
       "norm_label": "getdashboarddata()",
       "id": "services_sidak_service_getdashboarddata"
     },
@@ -46789,11 +47194,31 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "packages/types/src/pdkt.ts",
-      "source_location": "L144",
+      "source_location": "L208",
       "weight": 1.0,
       "source": "packages_types_src_pdkt_ts",
-      "target": "src_pdkt_pdktmailboxcreator",
+      "target": "src_pdkt_pdktmailboxbulkdelete",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/types/src/pdkt.ts",
+      "source_location": "L205",
+      "weight": 1.0,
+      "source": "packages_types_src_pdkt_ts",
+      "target": "src_pdkt_pdktmailboxbulkdeleteschema",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "packages/types/src/pdkt.ts",
+      "source_location": "L144",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "packages_types_src_pdkt_ts",
+      "target": "src_pdkt_pdktmailboxcreator"
     },
     {
       "relation": "contains",
@@ -46811,9 +47236,9 @@
       "source_file": "packages/types/src/pdkt.ts",
       "source_location": "L151",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "packages_types_src_pdkt_ts",
-      "target": "src_pdkt_pdktmailboxpermissions",
-      "confidence_score": 1.0
+      "target": "src_pdkt_pdktmailboxpermissions"
     },
     {
       "relation": "contains",
@@ -48202,6 +48627,17 @@
       "confidence_score": 1.0,
       "source": "apps_api_src_services_pdkt_mailbox_service_ts",
       "target": "src_pdkt_pdktmailboxreply"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/routes/pdkt/mailbox.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "apps_api_src_routes_pdkt_mailbox_ts",
+      "target": "src_pdkt_pdktmailboxbulkdeleteschema",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -62519,9 +62955,9 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_components_sidak_paretochart_tsx",
-      "target": "sidak_paretochart_category_meta",
-      "confidence_score": 1.0
+      "target": "sidak_paretochart_category_meta"
     },
     {
       "relation": "contains",
@@ -62529,9 +62965,9 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L22",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_components_sidak_paretochart_tsx",
-      "target": "sidak_paretochart_getcategorymeta",
-      "confidence_score": 1.0
+      "target": "sidak_paretochart_getcategorymeta"
     },
     {
       "relation": "contains",
@@ -62559,9 +62995,9 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L26",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_components_sidak_paretochart_tsx",
-      "target": "sidak_paretochart_paretotooltip",
-      "confidence_score": 1.0
+      "target": "sidak_paretochart_paretotooltip"
     },
     {
       "relation": "contains",
@@ -62591,9 +63027,9 @@
       "source_file": "apps/web/src/__tests__/ParetoChart.test.tsx",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_tests_paretochart_test_tsx",
-      "target": "apps_web_src_components_sidak_paretochart_tsx",
-      "confidence_score": 1.0
+      "target": "apps_web_src_components_sidak_paretochart_tsx"
     },
     {
       "relation": "calls",
@@ -62602,9 +63038,9 @@
       "source_file": "apps/web/src/components/sidak/ParetoChart.tsx",
       "source_location": "L32",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "sidak_paretochart_paretotooltip",
-      "target": "sidak_paretochart_getcategorymeta",
-      "confidence_score": 1.0
+      "target": "sidak_paretochart_getcategorymeta"
     },
     {
       "relation": "imports",
@@ -62613,9 +63049,9 @@
       "source_file": "apps/web/src/__tests__/ParetoChart.test.tsx",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_tests_paretochart_test_tsx",
-      "target": "sidak_paretochart_paretotooltip",
-      "confidence_score": 1.0
+      "target": "sidak_paretochart_paretotooltip"
     },
     {
       "relation": "contains",
@@ -62995,6 +63431,38 @@
       "confidence_score": 1.0,
       "source": "apps_web_src_tests_usage_modal_breakdown_test_tsx",
       "target": "lib_usage_snapshot_emptyusagebreakdown"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_pdkt_mailbox_bulk_test_tsx",
+      "target": "apps_web_src_hooks_useapi_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_pdkt_mailbox_bulk_test_tsx",
+      "target": "apps_web_src_routes_pdkt_simulation_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "apps_web_src_tests_pdkt_mailbox_bulk_test_tsx",
+      "target": "tests_pdkt_mailbox_bulk_test_mocknotify",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -64053,9 +64521,9 @@
       "source_file": "apps/web/src/__tests__/sidak-dashboard-parity.test.tsx",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_tests_sidak_dashboard_parity_test_tsx",
-      "target": "tests_sidak_dashboard_parity_test_paretochartmock",
-      "confidence_score": 1.0
+      "target": "tests_sidak_dashboard_parity_test_paretochartmock"
     },
     {
       "relation": "contains",
@@ -72726,9 +73194,9 @@
       "source_file": "apps/web/src/lib/scoring.ts",
       "source_location": "L71",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_lib_scoring_ts",
-      "target": "apps_web_src_lib_scoring_ts_lib_scoring_service_labels",
-      "confidence_score": 1.0
+      "target": "apps_web_src_lib_scoring_ts_lib_scoring_service_labels"
     },
     {
       "relation": "contains",
@@ -72811,9 +73279,9 @@
       "source_file": "apps/web/src/routes/sidak/dashboard.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_dashboard_tsx",
-      "target": "apps_web_src_lib_scoring_ts",
-      "confidence_score": 1.0
+      "target": "apps_web_src_lib_scoring_ts"
     },
     {
       "relation": "imports_from",
@@ -88447,9 +88915,9 @@
       "source_file": "apps/web/src/routes/pdkt/components/MailboxSidebar.tsx",
       "source_location": "L15",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_pdkt_components_mailboxsidebar_tsx",
-      "target": "components_mailboxsidebar_formatcreatorlabel",
-      "confidence_score": 1.0
+      "target": "components_mailboxsidebar_formatcreatorlabel"
     },
     {
       "relation": "contains",
@@ -92493,9 +92961,9 @@
       "source_file": "apps/web/src/routes/sidak/dashboard.tsx",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_web_src_routes_sidak_dashboard_tsx",
-      "target": "lib_scoring_service_labels",
-      "confidence_score": 1.0
+      "target": "lib_scoring_service_labels"
     },
     {
       "relation": "contains",
@@ -98536,6 +99004,97 @@
       "target": "src_index_pdktsessionconfig"
     },
     {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_buildmockclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_createauthenticatedapp",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_mockmailboxitems",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_mockmaybesingle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_mockrpc",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_mocksingle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_mocksupabaseadmin",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "target": "tests_pdkt_mailbox_bulk_delete_route_test_mockuserclient",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts",
+      "source_location": "L61",
+      "weight": 1.0,
+      "source": "tests_pdkt_mailbox_bulk_delete_route_test_createauthenticatedapp",
+      "target": "apps_api_src_routes_pdkt_ts",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -98968,8 +99527,18 @@
       "source_file": "apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts",
       "source_location": "L2",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_api_src_tests_pdkt_mailbox_permissions_test_ts",
-      "target": "apps_api_src_services_pdkt_service_ts",
+      "target": "apps_api_src_services_pdkt_service_ts"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_mailbox_permissions_test_ts",
+      "target": "tests_pdkt_mailbox_permissions_test_mockprofilesquery_mocksupabaseadmin",
       "confidence_score": 1.0
     },
     {
@@ -99295,6 +99864,16 @@
       "confidence_score": 1.0,
       "source": "apps_api_src_tests_pdkt_reply_route_test_ts",
       "target": "tests_pdkt_reply_route_test_mocksupabaseadmin"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/__tests__/pdkt-reply-route.test.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_tests_pdkt_reply_route_test_ts",
+      "target": "tests_pdkt_reply_route_test_mockuserclients",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -105405,9 +105984,9 @@
       "source_file": "apps/api/src/lib/scoring.ts",
       "source_location": "L73",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "apps_api_src_lib_scoring_ts",
-      "target": "apps_api_src_lib_scoring_ts_lib_scoring_service_labels",
-      "confidence_score": 1.0
+      "target": "apps_api_src_lib_scoring_ts_lib_scoring_service_labels"
     },
     {
       "relation": "contains",
@@ -106613,6 +107192,17 @@
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_services_pdkt_mailbox_service_ts",
+      "target": "apps_api_src_lib_supabase_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
       "source_file": "apps/api/src/services/pdkt-service.ts",
       "source_location": "L14",
       "weight": 1.0,
@@ -106861,6 +107451,17 @@
       "confidence_score": 1.0,
       "source": "apps_api_src_services_leader_access_service_ts",
       "target": "lib_supabase_supabaseadmin"
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "apps_api_src_services_pdkt_mailbox_service_ts",
+      "target": "lib_supabase_supabaseadmin",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports",
@@ -116350,11 +116951,41 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L13",
+      "source_location": "L17",
       "weight": 1.0,
       "source": "apps_api_src_services_pdkt_mailbox_service_ts",
-      "target": "pdkt_mailbox_service_candeletepdktmailboxitem",
+      "target": "pdkt_mailbox_service_bulkdeleteoutcome",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "apps_api_src_services_pdkt_mailbox_service_ts",
+      "target": "pdkt_mailbox_service_bulkdeleteresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L219",
+      "weight": 1.0,
+      "source": "apps_api_src_services_pdkt_mailbox_service_ts",
+      "target": "pdkt_mailbox_service_bulksoftdeletemailboxitems",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L13",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "apps_api_src_services_pdkt_mailbox_service_ts",
+      "target": "pdkt_mailbox_service_candeletepdktmailboxitem"
     },
     {
       "relation": "contains",
@@ -116380,11 +117011,21 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
-      "source_location": "L8",
+      "source_location": "L21",
       "weight": 1.0,
       "source": "apps_api_src_services_pdkt_mailbox_service_ts",
-      "target": "pdkt_mailbox_service_mailbox_manager_roles",
+      "target": "pdkt_mailbox_service_geterrormessage",
       "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
+      "source_location": "L8",
+      "weight": 1.0,
+      "confidence_score": 1.0,
+      "source": "apps_api_src_services_pdkt_mailbox_service_ts",
+      "target": "pdkt_mailbox_service_mailbox_manager_roles"
     },
     {
       "relation": "contains",
@@ -116446,9 +117087,9 @@
       "source_file": "apps/api/src/services/pdkt/mailbox-service.ts",
       "source_location": "L155",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "pdkt_mailbox_service_softdeletemailboxitem",
-      "target": "pdkt_mailbox_service_candeletepdktmailboxitem",
-      "confidence_score": 1.0
+      "target": "pdkt_mailbox_service_candeletepdktmailboxitem"
     },
     {
       "relation": "contains",
@@ -120759,6 +121400,16 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "GEMINI.md",
+      "source_location": "L290",
+      "weight": 1.0,
+      "source": "trainerssuperappvite_gemini_gemini_md_trainers_superapp_rebuild",
+      "target": "trainerssuperappvite_gemini_key_files_changed_phase_58_107",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "GEMINI.md",
       "source_location": "L244",
       "weight": 1.0,
       "confidence_score": 1.0,
@@ -121084,6 +121735,16 @@
       "confidence_score": 1.0,
       "source": "trainerssuperappvite_agents_agents_md_trainers_superapp_rebuild",
       "target": "trainerssuperappvite_agents_key_files_changed_phase_58_100"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
+      "source_location": "L302",
+      "weight": 1.0,
+      "source": "trainerssuperappvite_agents_agents_md_trainers_superapp_rebuild",
+      "target": "trainerssuperappvite_agents_key_files_changed_phase_58_107",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -124751,9 +125412,9 @@
       "source_file": "docs/rebuild-logs/phase-104-turbo-upgrade.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_rebuild_logs_phase_104_turbo_upgrade_md",
-      "target": "rebuild_logs_phase_104_turbo_upgrade_phase_104_turborepo_v2_9_14_v2_9_16",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_104_turbo_upgrade_phase_104_turborepo_v2_9_14_v2_9_16"
     },
     {
       "relation": "contains",
@@ -124761,9 +125422,9 @@
       "source_file": "docs/rebuild-logs/phase-104-turbo-upgrade.md",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_104_turbo_upgrade_phase_104_turborepo_v2_9_14_v2_9_16",
-      "target": "rebuild_logs_phase_104_turbo_upgrade_changes",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_104_turbo_upgrade_changes"
     },
     {
       "relation": "contains",
@@ -124771,9 +125432,9 @@
       "source_file": "docs/rebuild-logs/phase-104-turbo-upgrade.md",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_104_turbo_upgrade_phase_104_turborepo_v2_9_14_v2_9_16",
-      "target": "rebuild_logs_phase_104_turbo_upgrade_summary",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_104_turbo_upgrade_summary"
     },
     {
       "relation": "contains",
@@ -124781,9 +125442,9 @@
       "source_file": "docs/rebuild-logs/phase-104-turbo-upgrade.md",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_104_turbo_upgrade_changes",
-      "target": "rebuild_logs_phase_104_turbo_upgrade_package_json",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_104_turbo_upgrade_package_json"
     },
     {
       "relation": "contains",
@@ -124791,9 +125452,9 @@
       "source_file": "docs/rebuild-logs/phase-104-turbo-upgrade.md",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_104_turbo_upgrade_changes",
-      "target": "rebuild_logs_phase_104_turbo_upgrade_packagemanager",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_104_turbo_upgrade_packagemanager"
     },
     {
       "relation": "contains",
@@ -124801,8 +125462,128 @@
       "source_file": "docs/rebuild-logs/phase-104-turbo-upgrade.md",
       "source_location": "L14",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_104_turbo_upgrade_changes",
-      "target": "rebuild_logs_phase_104_turbo_upgrade_pnpm_lock_yaml",
+      "target": "rebuild_logs_phase_104_turbo_upgrade_pnpm_lock_yaml"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_md",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_backward_compatibility_fix_soft_delete_rpc",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_bulk_delete_feature",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_deskripsi_fitur",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rollback_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_rebuild_log_phase_106_pdkt_bulk_delete_soft_delete_rpc_fix",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_verifikasi_pengujian",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_bulk_delete_feature",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_backend_apps_api",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_bulk_delete_feature",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_frontend_apps_web",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_bulk_delete_feature",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_types_packages_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_verifikasi_pengujian",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_api_tests_pdkt_mailbox_bulk_delete_route_test_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_verifikasi_pengujian",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_frontend_tests_pdkt_mailbox_bulk_test_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md",
+      "source_location": "L42",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_verifikasi_pengujian",
+      "target": "rebuild_logs_phase_106_pdkt_bulk_delete_soft_delete_fix_service_unit_tests_pdkt_mailbox_permissions_test_ts",
       "confidence_score": 1.0
     },
     {
@@ -125834,6 +126615,96 @@
       "confidence_score": 1.0,
       "source": "rebuild_logs_phase_58a_sidak_input_build_fix_phase_58a_sidak_input_railway_build_fix_arrowleft_import",
       "target": "rebuild_logs_phase_58a_sidak_input_build_fix_verification"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "docs_rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_md",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_deskripsi_fitur",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_masalah_utama",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rollback_plan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_solusi_implementasi",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_rebuild_log_phase_107_pdkt_evaluation_sharing_access_control_fix",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_verifikasi_pengujian",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_solusi_implementasi",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_1_backend_route_guard_apps_api",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_solusi_implementasi",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_2_service_claiming_retry_apps_api",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-107-pdkt-evaluation-sharing-access-fix.md",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_verifikasi_pengujian",
+      "target": "rebuild_logs_phase_107_pdkt_evaluation_sharing_access_fix_api_e2e_tests_pdkt_reply_route_test_ts",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -130461,9 +131332,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_md",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_phase_105_sidak_rca_bko_tooltip_fix",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_phase_105_sidak_rca_bko_tooltip_fix"
     },
     {
       "relation": "contains",
@@ -130471,9 +131342,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L6",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_phase_105_sidak_rca_bko_tooltip_fix",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_changes",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_changes"
     },
     {
       "relation": "contains",
@@ -130481,9 +131352,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_phase_105_sidak_rca_bko_tooltip_fix",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_summary",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_summary"
     },
     {
       "relation": "contains",
@@ -130491,9 +131362,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_changes",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_components_sidak_paretochart_tsx",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_components_sidak_paretochart_tsx"
     },
     {
       "relation": "contains",
@@ -130501,9 +131372,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_changes",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_routes_sidak_dashboard_tsx",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_routes_sidak_dashboard_tsx"
     },
     {
       "relation": "contains",
@@ -130511,9 +131382,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L20",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_changes",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_tests_paretochart_test_tsx",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_tests_paretochart_test_tsx"
     },
     {
       "relation": "contains",
@@ -130521,9 +131392,9 @@
       "source_file": "docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md",
       "source_location": "L24",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_changes",
-      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_tests_sidak_dashboard_parity_test_tsx",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_sidak_rca_bko_tooltip_fix_apps_web_src_tests_sidak_dashboard_parity_test_tsx"
     },
     {
       "relation": "contains",
@@ -131761,9 +132632,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "docs_rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_md",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy"
     },
     {
       "relation": "contains",
@@ -131771,9 +132642,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_aturan_kepemilikan_akses_pdkt_shared_mailbox",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_aturan_kepemilikan_akses_pdkt_shared_mailbox"
     },
     {
       "relation": "contains",
@@ -131781,8 +132652,18 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L3",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_deskripsi_fitur",
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_deskripsi_fitur"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
+      "source_location": "L60",
+      "weight": 1.0,
+      "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy",
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rollback_plan",
       "confidence_score": 1.0
     },
     {
@@ -131791,9 +132672,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_technical_design_implementasi",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_technical_design_implementasi"
     },
     {
       "relation": "contains",
@@ -131801,9 +132682,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L50",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_rebuild_log_phase_105_pdkt_shared_mailbox_ownership_policy",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_verifikasi_pengujian",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_verifikasi_pengujian"
     },
     {
       "relation": "contains",
@@ -131811,9 +132692,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L23",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_technical_design_implementasi",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_1_database_migrations_supabase_migrations_20260603090000_pdkt_shared_mailbox_policy_sql",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_1_database_migrations_supabase_migrations_20260603090000_pdkt_shared_mailbox_policy_sql"
     },
     {
       "relation": "contains",
@@ -131821,9 +132702,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L30",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_technical_design_implementasi",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_2_backend_routes_services_apps_api",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_2_backend_routes_services_apps_api"
     },
     {
       "relation": "contains",
@@ -131831,9 +132712,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L41",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_technical_design_implementasi",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_3_frontend_ui_apps_web",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_3_frontend_ui_apps_web"
     },
     {
       "relation": "contains",
@@ -131841,9 +132722,9 @@
       "source_file": "docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md",
       "source_location": "L52",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_verifikasi_pengujian",
-      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_api_unit_contract_tests_apps_api_src_tests_pdkt_mailbox_permissions_test_ts",
-      "confidence_score": 1.0
+      "target": "rebuild_logs_phase_105_pdkt_shared_mailbox_ownership_api_unit_contract_tests_apps_api_src_tests_pdkt_mailbox_permissions_test_ts"
     },
     {
       "relation": "contains",
@@ -134831,5 +135712,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "c0877d4519f75cc5cc4f4e59d0d031dab8c0970b"
+  "built_at_commit": "50a74f031923e60da553036e8041276c4aa2a88c"
 }

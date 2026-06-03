@@ -45,11 +45,36 @@ history.get(
     const userClient = getUserClient(c);
 
     try {
-      const { data, error } = await userClient
+      // First, try querying via userClient (respects RLS, works if they own the row)
+      let { data, error } = await userClient
         .from("pdkt_history")
         .select("evaluation_status, evaluation, evaluation_error")
         .eq("id", id)
         .single();
+
+      // Fallback: check if the history item is associated with a mailbox item
+      // that the user has access to (pdkt_mailbox_items select policy is select_all)
+      if (error || !data) {
+        const { data: mailboxItem } = await userClient
+          .from("pdkt_mailbox_items")
+          .select("id")
+          .eq("history_id", id)
+          .maybeSingle();
+
+        if (mailboxItem) {
+          const adminClient = createAdminClient();
+          const { data: adminData, error: adminError } = await adminClient
+            .from("pdkt_history")
+            .select("evaluation_status, evaluation, evaluation_error")
+            .eq("id", id)
+            .single();
+
+          if (!adminError && adminData) {
+            data = adminData;
+            error = null;
+          }
+        }
+      }
 
       if (error || !data) {
         return c.json(
@@ -93,11 +118,35 @@ history.post(
 
       // Verify the row is visible to the current user client. Shared history
       // visibility is delegated to Supabase RLS instead of owner-only filtering.
-      const { data, error } = await userClient
+      let { data, error } = await userClient
         .from("pdkt_history")
         .select("id")
         .eq("id", historyId)
         .maybeSingle();
+
+      // Fallback: check if the history item is associated with a mailbox item
+      // that the user has access to (pdkt_mailbox_items select policy is select_all)
+      if (error || !data) {
+        const { data: mailboxItem } = await userClient
+          .from("pdkt_mailbox_items")
+          .select("id")
+          .eq("history_id", historyId)
+          .maybeSingle();
+
+        if (mailboxItem) {
+          const adminClient = createAdminClient();
+          const { data: adminData, error: adminError } = await adminClient
+            .from("pdkt_history")
+            .select("id")
+            .eq("id", historyId)
+            .maybeSingle();
+
+          if (!adminError && adminData) {
+            data = adminData;
+            error = null;
+          }
+        }
+      }
 
       if (error || !data) {
         return c.json(
