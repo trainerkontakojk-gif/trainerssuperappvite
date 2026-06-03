@@ -14,7 +14,7 @@ import type {
   EmailMessage,
 } from "@trainers/types";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
+import { Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
 import { notify } from "../../lib/toast";
 import {
   type PdktAppSettings,
@@ -551,7 +551,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       if (selectedId && selectedBulkIds.has(selectedId)) {
         setSelectedId(null);
       }
-    } catch (err) {
+    } catch (_err) {
       notify.error("Gagal menghapus email.");
     }
   };
@@ -562,15 +562,116 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       await deleteApi(`/pdkt/mailbox/${id}`);
       await refetch();
       if (selectedId === id) setSelectedId(null);
-    } catch (err) {
+    } catch (_err) {
       notify.error("Gagal menghapus email.");
     }
   };
 
   if (loading && !mailboxItems) {
     return (
-      <div className="flex h-[calc(100vh-10rem)] items-center justify-center">
-        <Loader2 className="w-8 h-8 text-sky-600 animate-spin" />
+      <div className="flex flex-col h-screen w-full bg-slate-50 relative">
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shrink-0 z-10 shadow-sm">
+          <div className="flex items-center gap-3">
+            {onBack ? (
+              <button
+                onClick={onBack}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center"
+                title="Kembali ke Laman Utama"
+              >
+                <ArrowLeft className="w-5 h-5 text-slate-600" />
+              </button>
+            ) : (
+              <Link
+                to="/pdkt"
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center"
+                title="Kembali ke Laman Utama"
+              >
+                <ArrowLeft className="w-5 h-5 text-slate-600" />
+              </Link>
+            )}
+            <h1 className="font-semibold text-slate-800 text-lg">
+              Simulasi PDKT
+            </h1>
+          </div>
+        </div>
+
+        {/* Main Content Area Skeleton */}
+        <div className="flex flex-1 overflow-hidden p-4 gap-4">
+          <div className="flex-1 flex bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm relative">
+
+            {/* Sidebar Skeleton (w-80) */}
+            <div className="w-full md:w-80 border-r border-gray-200 flex flex-col h-full bg-white shrink-0 animate-pulse">
+              {/* Header skeleton */}
+              <div className="p-4 border-b border-gray-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="h-4 bg-slate-200 rounded w-24"></div>
+                  <div className="flex gap-2">
+                    <div className="w-7 h-7 bg-slate-200 rounded-lg"></div>
+                    <div className="w-7 h-7 bg-slate-200 rounded-lg"></div>
+                    <div className="w-7 h-7 bg-slate-200 rounded-lg"></div>
+                  </div>
+                </div>
+                <div className="h-8 bg-slate-100 rounded-xl w-full"></div>
+                <div className="h-6 bg-slate-100 rounded-xl w-full"></div>
+              </div>
+
+              {/* Items list skeleton */}
+              <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex gap-3 items-start">
+                    <div className="w-10 h-10 bg-slate-200 rounded-full shrink-0"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex justify-between">
+                        <div className="h-3 bg-slate-200 rounded w-20"></div>
+                        <div className="h-2 bg-slate-200 rounded w-10"></div>
+                      </div>
+                      <div className="h-3 bg-slate-200 rounded w-36"></div>
+                      <div className="h-2 bg-slate-100 rounded w-24"></div>
+                      <div className="h-2.5 bg-slate-200 rounded w-16 mt-1"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Main Detail Pane Skeleton */}
+            <div className="flex-1 flex flex-col min-w-0 bg-white animate-pulse">
+              {/* Detail Header skeleton */}
+              <div className="p-6 border-b border-gray-200 flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-slate-200 rounded-full"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-32"></div>
+                    <div className="h-3 bg-slate-100 rounded w-48"></div>
+                  </div>
+                </div>
+                <div className="h-8 bg-slate-100 rounded-xl w-24"></div>
+              </div>
+
+              {/* Detail Body skeleton */}
+              <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                <div className="space-y-3">
+                  <div className="h-4 bg-slate-200 rounded w-1/3"></div>
+                  <div className="h-3 bg-slate-100 rounded w-full"></div>
+                  <div className="h-3 bg-slate-100 rounded w-full"></div>
+                  <div className="h-3 bg-slate-100 rounded w-4/5"></div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="h-4 bg-slate-200 rounded w-1/4"></div>
+                  <div className="h-3 bg-slate-100 rounded w-full"></div>
+                  <div className="h-3 bg-slate-100 rounded w-5/6"></div>
+                </div>
+
+                <div className="pt-6 border-t border-gray-100 flex justify-end">
+                  <div className="h-10 bg-slate-200 rounded-xl w-32"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
     );
   }

@@ -45,7 +45,8 @@ describe("PDKT Service", () => {
       neq: vi.fn().mockReturnThis(),
       or: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({ data: [], error: null }),
-      order: vi.fn().mockResolvedValue({ data: [{ id: "1" }], error: null }),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue({ data: [{ id: "1" }], error: null }),
     };
     const items = await pdktService.fetchMailboxItems(
       mockSupabase as unknown as Parameters<typeof pdktService.fetchMailboxItems>[0],
@@ -53,6 +54,7 @@ describe("PDKT Service", () => {
     );
     expect(items).toHaveLength(1);
     expect(mockSupabase.from).toHaveBeenCalledWith("pdkt_mailbox_items");
+    expect(mockSupabase.limit).toHaveBeenCalledWith(100);
   });
 
   it("should create mailbox item via RPC", async () => {

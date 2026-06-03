@@ -55,7 +55,8 @@ export async function fetchMailboxItems(
     .select("*")
     .neq("status", "deleted")
     .or("is_shared_copy.eq.false,is_shared_copy.is.null")
-    .order("last_activity_at", { ascending: false });
+    .order("last_activity_at", { ascending: false })
+    .limit(100);
 
   if (error) {
     throw new Error(error.message || "Gagal mengambil data mailbox.");

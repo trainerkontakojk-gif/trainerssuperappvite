@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act } from "react";
 import {
   RouterProvider,
   createRouter,
@@ -112,13 +113,16 @@ describe("PDKT Mailbox UX", () => {
     expect(refetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not show error state while loading", () => {
+  it("does not show error state while loading", async () => {
     (useApiModule.useApi as any).mockReturnValue({
       data: null,
       loading: true,
       error: null,
       refetch: vi.fn(),
     });
+    (useApiModule.getApi as any).mockImplementation(
+      () => new Promise(() => {}),
+    );
 
     const rootRoute = createRootRoute();
     const indexRoute = createRoute({
@@ -128,10 +132,14 @@ describe("PDKT Mailbox UX", () => {
     });
     const routeTree = rootRoute.addChildren([indexRoute]);
     const router = createRouter({ routeTree });
-    render(<RouterProvider router={router} />);
+    await act(async () => {
+      render(<RouterProvider router={router} />);
+    });
 
     expect(screen.queryByText("Gagal Memuat Email")).toBeNull();
-    expect(document.querySelector(".animate-spin")).toBeDefined();
+    expect(await screen.findByText("Simulasi PDKT")).toBeDefined();
+    expect(document.querySelector(".animate-pulse")).toBeDefined();
+    expect(document.querySelector(".animate-spin")).toBeNull();
   });
 });
 

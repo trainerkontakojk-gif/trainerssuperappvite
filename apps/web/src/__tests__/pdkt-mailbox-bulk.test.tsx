@@ -119,7 +119,7 @@ describe("PDKT Mailbox Bulk Delete UX", () => {
     fireEvent.click(await screen.findByTitle("Pilih Banyak"));
 
     const checkboxes = screen.getAllByRole("checkbox");
-    
+
     // Select both checkboxes
     fireEvent.click(checkboxes[0]);
     fireEvent.click(checkboxes[1]);

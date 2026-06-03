@@ -122,7 +122,8 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
         select: vi.fn().mockReturnThis(),
         neq: vi.fn().mockReturnThis(),
         or: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: mockMailboxItems, error: null }),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: mockMailboxItems, error: null }),
       };
 
       const result = await pdktService.fetchMailboxItems(
@@ -135,6 +136,7 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
       expect(mockSupabase.or).toHaveBeenCalledWith(
         "is_shared_copy.eq.false,is_shared_copy.is.null",
       );
+      expect(mockSupabase.limit).toHaveBeenCalledWith(100);
       expect(mockSupabaseAdmin.from).toHaveBeenCalledWith("profiles");
       expect(mockProfilesQuery.select).toHaveBeenCalledWith("id, full_name, role");
       expect(mockProfilesQuery.in).toHaveBeenCalledWith("id", [

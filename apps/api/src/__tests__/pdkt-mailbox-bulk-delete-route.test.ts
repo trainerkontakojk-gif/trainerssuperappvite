@@ -116,6 +116,48 @@ describe("PDKT Mailbox Bulk Delete Route E2E", () => {
     expect(mockRpc).toHaveBeenCalledTimes(2);
   });
 
+  it("returns a partial summary when an agent includes forbidden items", async () => {
+    await createAuthenticatedApp("agent");
+
+    mockMailboxItems = [
+      {
+        id: "00000000-0000-0000-0000-000000000001",
+        user_id: "test-user-id",
+        created_by_user_id: "test-user-id",
+      },
+      {
+        id: "00000000-0000-0000-0000-000000000002",
+        user_id: "other-user-id",
+        created_by_user_id: "other-user-id",
+      },
+    ];
+
+    const ids = [
+      "00000000-0000-0000-0000-000000000001",
+      "00000000-0000-0000-0000-000000000002",
+    ];
+
+    const res = await app.request("/api/v1/pdkt/mailbox/batch-delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test-token",
+      },
+      body: JSON.stringify({ ids }),
+    });
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data.successCount).toBe(1);
+    expect(json.data.failureCount).toBe(1);
+    expect(json.data.errors[0]).toContain("tidak diizinkan");
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith("soft_delete_pdkt_mailbox_item", {
+      p_mailbox_id: "00000000-0000-0000-0000-000000000001",
+    });
+  });
+
   it("returns validation error for invalid UUIDs", async () => {
     await createAuthenticatedApp("trainer");
 

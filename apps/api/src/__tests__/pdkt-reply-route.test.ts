@@ -4,6 +4,7 @@ import { Hono } from "hono";
 const mockRpc = vi.fn();
 const mockSingle = vi.fn();
 const mockMaybeSingle = vi.fn();
+const mockUserClients: any[] = [];
 
 function buildMockClient() {
   const m: any = {
@@ -11,7 +12,8 @@ function buildMockClient() {
     from: vi.fn(() => m),
     select: vi.fn(() => m),
     eq: vi.fn(() => m),
-    order: vi.fn(() => ({ data: [], error: null })),
+    order: vi.fn(() => m),
+    limit: vi.fn(() => ({ data: [], error: null })),
     in: vi.fn(() => ({ data: [], error: null })),
     single: mockSingle,
     insert: vi.fn(() => m),
@@ -28,7 +30,11 @@ const mockSupabaseAdmin = buildMockClient();
 
 vi.mock("../lib/supabase", () => ({
   createAdminClient: () => mockSupabaseAdmin,
-  createUserClient: (_token: string) => buildMockClient(),
+  createUserClient: (_token: string) => {
+    const client = buildMockClient();
+    mockUserClients.push(client);
+    return client;
+  },
   supabaseAdmin: mockSupabaseAdmin,
 }));
 
@@ -85,6 +91,7 @@ beforeEach(() => {
   mockSingle.mockResolvedValue({ data: null, error: null });
   mockMaybeSingle.mockResolvedValue({ data: null, error: null });
   mockRpc.mockResolvedValue({ data: "history-123", error: null });
+  mockUserClients.length = 0;
 });
 
 afterEach(() => {
@@ -238,6 +245,12 @@ describe("PDKT Reply Route E2E", () => {
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(json.data.evaluation_status).toBe("completed");
+      const client = mockUserClients[mockUserClients.length - 1];
+      expect(client.eq).toHaveBeenCalledTimes(1);
+      expect(client.eq).toHaveBeenCalledWith(
+        "id",
+        "00000000-0000-0000-0000-000000000001",
+      );
     });
   });
 
@@ -258,6 +271,9 @@ describe("PDKT Reply Route E2E", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
+      const client = mockUserClients[mockUserClients.length - 1];
+      expect(client.eq).toHaveBeenCalledTimes(1);
+      expect(client.eq).toHaveBeenCalledWith("id", "hist-1");
     });
   });
 });

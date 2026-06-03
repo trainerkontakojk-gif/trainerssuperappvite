@@ -42,7 +42,6 @@ history.get(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const id = c.req.param("id");
-    const user = c.get("user");
     const userClient = getUserClient(c);
 
     try {
@@ -50,7 +49,6 @@ history.get(
         .from("pdkt_history")
         .select("evaluation_status, evaluation, evaluation_error")
         .eq("id", id)
-        .eq("user_id", user.id)
         .single();
 
       if (error || !data) {
@@ -93,12 +91,12 @@ history.post(
       const user = c.get("user");
       const userClient = getUserClient(c);
 
-      // Verify ownership
+      // Verify the row is visible to the current user client. Shared history
+      // visibility is delegated to Supabase RLS instead of owner-only filtering.
       const { data, error } = await userClient
         .from("pdkt_history")
         .select("id")
         .eq("id", historyId)
-        .eq("user_id", user.id)
         .maybeSingle();
 
       if (error || !data) {
