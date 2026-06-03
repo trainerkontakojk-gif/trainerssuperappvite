@@ -8,5 +8,8 @@ Upgraded Turborepo from 2.9.14 to 2.9.16 via `pnpm add -D -w turbo@latest`.
 ### package.json
 - `"turbo": "^2.0.0"` → `"turbo": "^2.9.16"`
 
+### packageManager
+- `"pnpm@11.5.0"` → `"pnpm@11.5.1"`
+
 ### pnpm-lock.yaml
 - Updated lockfile entry from `turbo@2.9.14` → `turbo@2.9.16`
