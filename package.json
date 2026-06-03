@@ -30,7 +30,7 @@
     "pg": "^8.21.0",
     "prettier": "^3.0.0",
     "tsx": "^4.0.0",
-    "turbo": "^2.0.0",
+    "turbo": "^2.9.16",
     "typescript-eslint": "^8.59.4"
   },
   "packageManager": "pnpm@11.5.0"

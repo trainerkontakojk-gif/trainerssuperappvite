@@ -25,12 +25,14 @@ interface Props {
   onDownloadTemplate: () => void;
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onImportSave: () => void;
+  disabled?: boolean;
 }
 
 export default function SidakInputImportPanel({
   show, onClose, importTab, onSetImportTab,
   importRows, importFile, generatingTemplate, parsing, importing,
   onDownloadTemplate, onFileUpload, onImportSave,
+  disabled = false,
 }: Props) {
   const validRows = importRows.filter((r) => !r.error);
   const invalidRows = importRows.filter((r) => r.error);
@@ -80,7 +82,7 @@ export default function SidakInputImportPanel({
             </div>
             <button
               onClick={onDownloadTemplate}
-              disabled={generatingTemplate}
+              disabled={generatingTemplate || disabled}
               className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
             >
               {generatingTemplate ? (
@@ -90,15 +92,24 @@ export default function SidakInputImportPanel({
               )}
               {generatingTemplate ? "Menyiapkan..." : "Download Template"}
             </button>
+            {disabled && (
+              <p className="text-center text-xs font-medium text-amber-600 mt-2">
+                Belum ada parameter untuk layanan dan periode ini. Tidak dapat mengunduh template.
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
             <label
-              className={`flex flex-col items-center justify-center gap-4 py-12 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
-                importFile ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/30"
+              className={`flex flex-col items-center justify-center gap-4 py-12 border-2 border-dashed rounded-2xl transition-all ${
+                disabled
+                  ? "border-border bg-foreground/5 opacity-50 cursor-not-allowed"
+                  : importFile
+                  ? "border-primary/40 bg-primary/5 cursor-pointer"
+                  : "border-border hover:border-primary/30 cursor-pointer"
               }`}
             >
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileUpload} />
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileUpload} disabled={disabled} />
               {parsing ? (
                 <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
               ) : importFile ? (
@@ -119,6 +130,11 @@ export default function SidakInputImportPanel({
                 </>
               )}
             </label>
+            {disabled && (
+              <p className="text-center text-xs font-medium text-amber-600 mt-2">
+                Belum ada parameter untuk layanan dan periode ini. Tidak dapat melakukan import.
+              </p>
+            )}
 
             {importRows.length > 0 && (
               <div className="space-y-4">

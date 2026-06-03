@@ -300,3 +300,30 @@ export interface AgentDetailData {
     bergabung_date: string | null;
   };
 }
+
+export const resolvedSidakInputConfigSchema = z.object({
+  indicators: z.array(
+    z.object({
+      id: z.string().uuid(),
+      service_type: serviceTypeSchema,
+      name: z.string(),
+      category: categorySchema,
+      bobot: z.number(),
+      has_na: z.boolean(),
+      threshold: z.number().nullable().optional(),
+      ruleIndicatorId: z.string().uuid().nullable().optional(),
+      legacyIndicatorId: z.string().uuid().nullable().optional(),
+    }),
+  ),
+  weight: z.object({
+    service_type: serviceTypeSchema,
+    critical_weight: z.number(),
+    non_critical_weight: z.number(),
+    scoring_mode: scoringModeSchema,
+  }),
+  ruleVersionId: z.string().uuid().nullable(),
+  hasDraftVersion: z.boolean(),
+});
+
+export type ResolvedSidakInputConfig = z.infer<typeof resolvedSidakInputConfigSchema>;
+

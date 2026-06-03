@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useApi, getApi } from "../../hooks/useApi";
 import { useAuthStore } from "../../store/authStore";
-import type { QAIndicator, QAPeriod, QATemuan, ServiceWeight, RuleVersion, AgentDirectoryResponse } from "@trainers/types";
+import type { QAIndicator, QAPeriod, QATemuan, ServiceWeight, RuleVersion, AgentDirectoryResponse, ResolvedSidakInputConfig } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, FolderOpen, User as UserIcon, CalendarDays, Plus,
@@ -21,7 +21,6 @@ import {
 import { useTemuanEdit } from "./hooks/useTemuanEdit";
 import { useTemuanForm, newEntry } from "./hooks/useTemuanForm";
 import { useTemuanImport } from "./hooks/useTemuanImport";
-import { useSidakInputRuleModel, type SidakRuleIndicatorRow } from "./hooks/useSidakInputRuleModel";
 
 const MONTHS = [
   "Januari", "Februari", "Maret", "April",
@@ -67,27 +66,54 @@ export default function SidakInputPage() {
 
   const { data: folders } = useApi<{ id: string; name: string }[]>("/sidak/folders");
   const { data: periods } = useApi<QAPeriod[]>("/sidak/periods");
-  const { data: indicators, refetch } = useApi<QAIndicator[]>(
-    selectedService ? `/sidak/indicators?service_type=${selectedService}` : null,
-  );
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [temuan, setTemuan] = useState<QATemuan[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Rule version snapshot for input
-  const [_activeRuleVersionId, setActiveRuleVersionId] = useState<string | null>(null);
+  // Resolved Config State
+  const [resolvedIndicators, setResolvedIndicators] = useState<QAIndicator[]>([]);
+  const [ruleVersionId, setRuleVersionId] = useState<string | null>(null);
   const [hasDraftVersion, setHasDraftVersion] = useState(false);
-  const [ruleIndicatorsRaw, setRuleIndicatorsRaw] = useState<SidakRuleIndicatorRow[]>([]);
-  const [_loadingRuleIndicators, setLoadingRuleIndicators] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(false);
 
-  // Rule indicators derivation via hook
-  const { activeIndicators, unlinkedIndicatorIds } = useSidakInputRuleModel({
-    ruleIndicatorsRaw,
-    globalIndicators: indicators ?? [],
-    selectedService,
-  });
+  const activeIndicators = resolvedIndicators;
+
+  const unlinkedIndicatorIds = useMemo(() => {
+    const set = new Set<string>();
+    resolvedIndicators.forEach((i: any) => {
+      if (i.ruleIndicatorId && !i.legacyIndicatorId) {
+        set.add(i.ruleIndicatorId);
+      }
+    });
+    return set;
+  }, [resolvedIndicators]);
+
+  const loadResolvedConfig = useCallback(async (service: QAIndicator["service_type"], periodId?: string) => {
+    setLoadingConfig(true);
+    setResolvedIndicators([]);
+    setActiveWeight(null);
+    setRuleVersionId(null);
+    setHasDraftVersion(false);
+    try {
+      const suffix = periodId ? `&period_id=${periodId}` : "";
+      const res = await getApi<ResolvedSidakInputConfig>(
+        `/sidak/resolved-input-config?service_type=${service}${suffix}`,
+      );
+      if (res) {
+        setResolvedIndicators(res.indicators || []);
+        setActiveWeight(res.weight || null);
+        setRuleVersionId(res.ruleVersionId || null);
+        setHasDraftVersion(res.hasDraftVersion || false);
+      }
+    } catch (err) {
+      console.error("Gagal memuat konfigurasi input SIDAK:", err);
+      setErrorMsg("Gagal memuat parameter");
+    } finally {
+      setLoadingConfig(false);
+    }
+  }, []);
 
   // Initialize Hooks
   const editHook = useTemuanEdit({
@@ -123,52 +149,6 @@ export default function SidakInputPage() {
 
   const { setEntries } = formHook;
 
-  const fetchRuleVersionIndicators = useCallback(async (svc: string) => {
-    setLoadingRuleIndicators(true);
-    setActiveRuleVersionId(null);
-    setHasDraftVersion(false);
-    setRuleIndicatorsRaw([]);
-    try {
-      const versions = await getApi<RuleVersion[]>(`/sidak/rule-versions?service_type=${svc}`);
-      const published = versions?.find((v) => v.status === "published");
-      const draft = versions?.find((v) => v.status === "draft");
-      if (draft) setHasDraftVersion(true);
-      if (published) {
-        setActiveRuleVersionId(published.id);
-        const allIndicators: QAIndicator[] = indicators ?? [];
-        const rawInds = await getApi<any[]>(`/sidak/rule-versions/${published.id}/indicators`);
-        if (rawInds && rawInds.length > 0) {
-          const mapping = rawInds.map((ri: any) => {
-            const legacyIndicator = ri.legacy_indicator_id
-              ? allIndicators.find((gi) => gi.id === ri.legacy_indicator_id)
-              : allIndicators.find((gi) => gi.name === ri.name);
-            return {
-              ruleIndicatorId: ri.id,
-              name: ri.name,
-              category: ri.category,
-              bobot: ri.bobot,
-              has_na: ri.has_na,
-              legacyIndicatorId: legacyIndicator?.id ?? ri.legacy_indicator_id,
-              threshold: ri.threshold,
-              sort_order: ri.sort_order,
-            };
-          });
-          setRuleIndicatorsRaw(mapping);
-        }
-      }
-    } catch {
-      // fallback to global indicators
-    } finally {
-      setLoadingRuleIndicators(false);
-    }
-  }, [indicators]);
-
-  useEffect(() => {
-    if (selectedService) {
-      fetchRuleVersionIndicators(selectedService);
-    }
-  }, [selectedService, fetchRuleVersionIndicators]);
-
   const indicatorLookup = useMemo(() => {
     const map = new Map<string, QAIndicator>();
     activeIndicators.forEach((i) => map.set(i.id, i));
@@ -191,10 +171,9 @@ export default function SidakInputPage() {
     setErrorMsg(null);
 
     try {
-      const agentService = resolveServiceTypeFromTeam(agent.tim);
-      setSelectedService(agentService as QAIndicator["service_type"]);
-      await refetch();
-      setActiveWeight(null);
+      const agentService = resolveServiceTypeFromTeam(agent.tim) as QAIndicator["service_type"];
+      setSelectedService(agentService);
+      await loadResolvedConfig(agentService);
       setStep("period");
     } catch {
       setErrorMsg("Gagal memuat data");
@@ -211,16 +190,12 @@ export default function SidakInputPage() {
 
     try {
       const svc = selectedService;
-      const [weightsRes, result] = await Promise.all([
-        getApi<{ data?: ServiceWeight[] }>("/sidak/service-weights"),
+      const [_, result] = await Promise.all([
+        loadResolvedConfig(svc, period.id),
         getApi<{ items: QATemuan[]; total: number }>(
           `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${period.id}&service_type=${svc}&limit=200`,
         ),
       ]);
-      if (weightsRes?.data) {
-        const found = weightsRes.data.find((w: ServiceWeight) => w.service_type === svc);
-        if (found) setActiveWeight(found);
-      }
       setTemuan(result.items ?? []);
       setStep("list");
     } catch {
@@ -234,16 +209,12 @@ export default function SidakInputPage() {
     setSelectedService(newService);
     setLoading(true);
     setErrorMsg(null);
+    setTemuan([]);
+    setEntries([newEntry()]);
+    importHook.setImportRows([]);
+    importHook.setImportFile(null);
     try {
-      const [weightsRes] = await Promise.all([
-        getApi<{ data?: ServiceWeight[] }>("/sidak/service-weights"),
-        refetch(),
-      ]);
-      if (weightsRes?.data) {
-        const found = weightsRes.data.find((w: ServiceWeight) => w.service_type === newService);
-        if (found) setActiveWeight(found);
-      }
-      setEntries([newEntry()]);
+      await loadResolvedConfig(newService, selectedPeriod?.id);
       if (selectedAgent && selectedPeriod) {
         const result = await getApi<{ items: QATemuan[]; total: number }>(
           `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${newService}&limit=200`,
@@ -255,7 +226,7 @@ export default function SidakInputPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedAgent, selectedPeriod, refetch, setEntries]);
+  }, [selectedAgent, selectedPeriod, loadResolvedConfig, setEntries, importHook]);
 
   const handleFolderClick = async (folder: string) => {
     setSelectedFolder(folder);
@@ -302,16 +273,15 @@ export default function SidakInputPage() {
       setAgents(folderAgents);
       setSelectedFolder(folder);
       setSelectedAgent(found);
-      const agentService = resolveServiceTypeFromTeam(found.tim);
-      setSelectedService(agentService as QAIndicator["service_type"]);
-      await refetch();
-      setActiveWeight(null);
+      const agentService = resolveServiceTypeFromTeam(found.tim) as QAIndicator["service_type"];
+      setSelectedService(agentService);
+      await loadResolvedConfig(agentService);
       setStep("period");
       window.history.replaceState({}, "", window.location.pathname);
     } catch {
       setErrorMsg("Gagal memuat data. Silakan pilih manual.");
     }
-  }, [refetch]);
+  }, [loadResolvedConfig]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -737,6 +707,17 @@ export default function SidakInputPage() {
                 </motion.div>
               )}
 
+              {selectedPeriod && !loadingConfig && !ruleVersionId && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm flex items-center gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  Belum ada parameter yang berlaku untuk {SERVICE_LABELS[selectedService]} pada periode ini. Cek Settings QA untuk mempublish parameter yang sesuai.
+                </motion.div>
+              )}
+
               {/* Info bar */}
               <div className="p-3 rounded-xl bg-card/50 border border-border text-sm text-muted-foreground flex items-center gap-3">
                 <span>Total temuan: <strong className="text-foreground">{temuan.length}</strong></span>
@@ -793,6 +774,7 @@ export default function SidakInputPage() {
                       onDownloadTemplate={importHook.handleDownloadTemplate}
                       onFileUpload={importHook.handleFileUpload}
                       onImportSave={importHook.handleImportSave}
+                      disabled={activeIndicators.length === 0}
                     />
                   </motion.div>
                 )}

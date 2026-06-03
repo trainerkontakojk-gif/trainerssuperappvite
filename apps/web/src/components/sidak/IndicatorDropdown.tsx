@@ -13,6 +13,7 @@ interface Props {
   indicators: Indicator[];
   scoringMode?: string;
   onChange: (id: string) => void;
+  disabled?: boolean;
 }
 
 export default function IndicatorDropdown({
@@ -20,6 +21,7 @@ export default function IndicatorDropdown({
   indicators,
   scoringMode = "weighted",
   onChange,
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -48,12 +50,13 @@ export default function IndicatorDropdown({
       <button
         ref={btnRef}
         type="button"
+        disabled={disabled}
         onClick={() => setOpen(!open)}
         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm text-left transition-all ${
           open
             ? "border-primary ring-2 ring-primary/20"
             : "border-border"
-        } bg-card text-foreground`}
+        } bg-card text-foreground ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <span className={selected ? "text-foreground" : "text-muted-foreground"}>
           {selected

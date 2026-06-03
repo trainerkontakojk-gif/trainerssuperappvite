@@ -158,3 +158,11 @@ Hasilnya tetap masuk audited population, tetap tampil di ranking, tetapi tidak m
 - Jika data temuan real dan phantom bercampur dalam sesi yang sama, hitungan skor dan defect harus mengikuti row real saja.
 - Gunakan `docs/SIDAK_SCORING_GUARDRAILS.md` untuk perubahan yang menyentuh scoring atau agregasi SIDAK.
 - **Tampilan UI**: Halaman input (`/sidak/input`) memakai grid responsif untuk pilihan folder, agen, periode, dan daftar temuan. Di mobile grid kembali menjadi satu kolom agar tetap mudah dibaca; di layar lebih lebar trainer bisa melihat lebih banyak pilihan atau sesi dalam satu viewport.
+
+## BKO Parameter and Weights Resolver
+
+Halaman Input Temuan (`/sidak/input`) menggunakan backend resolver khusus (`GET /resolved-input-config`) untuk memuat konfigurasi parameter aktif dan bobot per `(service_type, period_id)`. Hal ini menjamin parity dengan legacy:
+1. **Layanan BKO**: Parameter diselesaikan berdasarkan rule version yang aktif pada periode target. Jika tidak ada versi yang aktif, dropdown parameter akan dinonaktifkan secara eksplisit dan menampilkan peringatan.
+2. **Flat List**: Mode scoring BKO adalah `no_category`. Parameter ditampilkan dalam satu daftar datar (tanpa pemisahan kategori Critical/Non-Critical).
+3. **Pembersihan State**: Perpindahan layanan di halaman input secara otomatis membersihkan input manual yang sedang berjalan serta data preview Excel untuk mencegah kebocoran parameter antar layanan.
+

@@ -85,8 +85,14 @@ export default function SidakInputManualForm({
                     value={entry.indicator_id}
                     indicators={activeIndicators}
                     scoringMode={scoringMode}
+                    disabled={activeIndicators.length === 0}
                     onChange={(id) => onUpdateEntry(entry.uid, { indicator_id: id })}
                   />
+                  {activeIndicators.length === 0 && (
+                    <p className="mt-2 text-xs font-medium text-amber-600">
+                      Belum ada parameter untuk layanan dan periode ini.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-bold text-muted-foreground mb-2 block uppercase tracking-wider">

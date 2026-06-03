@@ -4,6 +4,7 @@ import { User } from "@supabase/supabase-js";
 import { requireRole } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { logActivity } from "../../services/activity-log-service";
+import { serviceTypeSchema } from "@trainers/types";
 
 type Variables = { user: User; profile: any };
 
@@ -78,6 +79,62 @@ sidakCore.delete("/periods/:id", requireRole("admin", "trainer"), async (c) => {
     );
   }
 });
+
+// ── Resolved Input Config ──────────────────────────────
+sidakCore.get(
+  "/resolved-input-config",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const serviceType = c.req.query("service_type");
+    const periodId = c.req.query("period_id");
+
+    const parsedService = serviceTypeSchema.safeParse(serviceType);
+    if (!parsedService.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Tipe layanan tidak valid",
+          },
+        },
+        400,
+      );
+    }
+
+    if (periodId && !z.string().uuid().safeParse(periodId).success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Period ID tidak valid",
+          },
+        },
+        400,
+      );
+    }
+
+    try {
+      const config = await sidakService.getResolvedInputConfig(
+        parsedService.data,
+        periodId || undefined,
+      );
+      return c.json({ success: true, data: config });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "INTERNAL_ERROR",
+            message: e.message,
+          },
+        },
+        500,
+      );
+    }
+  },
+);
 
 // ── Indicators ─────────────────────────────────────────
 sidakCore.get(
