@@ -81,11 +81,15 @@ export function jsonAiError(c: Context, message: string) {
  * Standard 500 response for generic database/server errors.
  */
 export function jsonServerError(c: Context, err: unknown) {
+  const status =
+    err && typeof err === "object" && "status" in err && typeof (err as any).status === "number"
+      ? (err as any).status
+      : 500;
   return c.json(
     {
       success: false,
-      error: { code: "DATABASE_ERROR", message: pdktErrorMessage(err) },
+      error: { code: status === 403 ? "FORBIDDEN" : "DATABASE_ERROR", message: pdktErrorMessage(err) },
     },
-    500,
+    status as any,
   );
 }

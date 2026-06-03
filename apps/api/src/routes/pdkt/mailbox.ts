@@ -22,10 +22,14 @@ mailbox.get(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
+    const profile = c.get("profile");
     const userClient = getUserClient(c);
 
     try {
-      const data = await pdktService.fetchMailboxItems(userClient, user.id);
+      const data = await pdktService.fetchMailboxItems(userClient, {
+        id: user.id,
+        role: profile.role,
+      });
       return c.json({ success: true, data });
     } catch (error: unknown) {
       return jsonServerError(c, error);
@@ -69,10 +73,14 @@ mailbox.delete(
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
+    const profile = c.get("profile");
     const userClient = getUserClient(c);
 
     try {
-      await pdktService.softDeleteMailboxItem(userClient, id, user.id);
+      await pdktService.softDeleteMailboxItem(userClient, id, {
+        id: user.id,
+        role: profile.role,
+      });
       return c.json({ success: true, message: "Mailbox item deleted." });
     } catch (error: unknown) {
       return jsonServerError(c, error);

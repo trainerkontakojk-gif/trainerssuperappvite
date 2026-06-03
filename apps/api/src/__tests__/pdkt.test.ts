@@ -31,6 +31,7 @@ vi.mock("../lib/supabase", () => ({
     from: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockResolvedValue({ data: [], error: null }),
     single: vi.fn().mockResolvedValue({ data: {}, error: null }),
   },
 }));
@@ -42,6 +43,8 @@ describe("PDKT Service", () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       neq: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({ data: [], error: null }),
       order: vi.fn().mockResolvedValue({ data: [{ id: "1" }], error: null }),
     };
     const items = await pdktService.fetchMailboxItems(
@@ -213,6 +216,22 @@ describe("PDKT mailbox SQL contract", () => {
       ),
       "utf8",
     );
+  const sharedMailboxMigrationSql = () =>
+    readFileSync(
+      join(
+        process.cwd(),
+        "../../supabase/migrations/20260603090000_pdkt_shared_mailbox_policy.sql",
+      ),
+      "utf8",
+    );
+  const sharedMailboxRollbackSql = () =>
+    readFileSync(
+      join(
+        process.cwd(),
+        "../../supabase/rollbacks/rollback_20260603090000_pdkt_shared_mailbox_policy.sql",
+      ),
+      "utf8",
+    );
 
   it("revokes public and anon execute access for mailbox batch RPC", () => {
     expect(sql()).toContain(
@@ -228,5 +247,21 @@ describe("PDKT mailbox SQL contract", () => {
 
   it("uses the approved profile status expected by the legacy fanout RPC", () => {
     expect(sql()).toContain("p.status = 'approved'");
+  });
+
+  it("returns the inserted canonical mailbox id from the shared mailbox migration", () => {
+    const migration = sharedMailboxMigrationSql();
+    expect(migration).toContain("v_source_item_id UUID");
+    expect(migration).toContain("RETURNING id INTO v_source_item_id");
+    expect(migration).toContain("RETURN v_source_item_id");
+  });
+
+  it("documents a DB rollback for the shared mailbox migration", () => {
+    const rollback = sharedMailboxRollbackSql();
+    expect(rollback).toContain('DROP POLICY IF EXISTS "pdkt_mailbox_select_all"');
+    expect(rollback).toContain('CREATE POLICY "pdkt_mailbox_select_own"');
+    expect(rollback).toContain("AND user_id = v_creator_id");
+    expect(rollback).toContain("AND user_id = v_user_id");
+    expect(rollback).toContain("DROP FUNCTION IF EXISTS public.soft_delete_pdkt_mailbox_item(UUID)");
   });
 });

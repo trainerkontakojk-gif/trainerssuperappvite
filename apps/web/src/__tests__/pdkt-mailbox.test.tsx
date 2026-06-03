@@ -246,4 +246,51 @@ describe("EmailDetailPane Component", () => {
     expect(screen.getByText("missed SLA detail")).toBeDefined();
     expect(screen.getByText('"Good reply but watch grammar."')).toBeDefined();
   });
+
+  it("renders creator info in EmailDetailPane", () => {
+    const itemWithCreator = {
+      ...mockItem,
+      created_by_user: {
+        id: "u-1",
+        full_name: "Siti Aminah",
+        role: "Trainer",
+        is_current_user: false,
+      },
+    };
+    render(
+      <EmailDetailPane
+        item={itemWithCreator}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+    expect(screen.getByText("Dibuat oleh Siti Aminah · Trainer")).toBeDefined();
+  });
+
+  it("disables delete button in EmailDetailPane when permissions.can_delete is false", () => {
+    const itemRestricted = {
+      ...mockItem,
+      permissions: {
+        can_delete: false,
+      },
+    };
+    render(
+      <EmailDetailPane
+        item={itemRestricted}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+    const deleteBtn = screen.getByTitle("Hanya pembuat email, admin, atau trainer yang bisa menghapus");
+    expect(deleteBtn).toBeDefined();
+    expect((deleteBtn as HTMLButtonElement).disabled).toBe(true);
+  });
 });

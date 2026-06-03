@@ -76,6 +76,14 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
     return name.substring(0, 2).toUpperCase();
   };
 
+  const formatCreatorLabel = (item: PdktMailboxItem) => {
+    const creator = item.created_by_user;
+    if (!creator) return "Dibuat oleh user lama";
+    if (creator.is_current_user) return "Dibuat oleh Anda";
+    const role = creator.role ? ` · ${creator.role}` : "";
+    return `Dibuat oleh ${creator.full_name}${role}`;
+  };
+
   // Safe check for emails_thread
   const thread = Array.isArray(item.emails_thread) ? item.emails_thread : [];
   const historyEmails = thread.slice(1);
@@ -142,8 +150,17 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
           )}
           <button
             onClick={onDelete}
-            className="p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all"
-            title="Hapus"
+            disabled={item.permissions?.can_delete === false}
+            className={`p-2 rounded-xl transition-all ${
+              item.permissions?.can_delete === false
+                ? "text-gray-200 cursor-not-allowed"
+                : "text-gray-400 hover:bg-red-50 hover:text-red-600"
+            }`}
+            title={
+              item.permissions?.can_delete === false
+                ? "Hanya pembuat email, admin, atau trainer yang bisa menghapus"
+                : "Hapus"
+            }
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -172,6 +189,9 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                 </div>
                 <div className="text-xs text-gray-500 truncate">
                   {item.sender_email}
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1">
+                  {formatCreatorLabel(item)}
                 </div>
               </div>
               <div className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">

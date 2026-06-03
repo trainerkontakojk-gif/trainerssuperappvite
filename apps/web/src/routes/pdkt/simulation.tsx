@@ -311,16 +311,6 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
     try {
       await deleteApi(`/pdkt/history/${historyId}`);
       setHistory((prev) => prev.filter((h) => h.id !== historyId));
-
-      // Also soft-delete matching mailbox item
-      const matchingMailbox = mailboxItems?.find(
-        (item) => item.history_id === historyId,
-      );
-      if (matchingMailbox) {
-        await deleteApi(`/pdkt/mailbox/${matchingMailbox.id}`);
-        await refetch();
-        if (selectedId === matchingMailbox.id) setSelectedId(null);
-      }
     } catch (err) {
       console.error("[PDKT] Failed to delete session:", err);
       notify.error("Gagal menghapus riwayat sesi.");
@@ -332,15 +322,6 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
     try {
       await deleteApi("/pdkt/history");
       setHistory([]);
-
-      // Clear mailbox too
-      if (mailboxItems) {
-        for (const item of mailboxItems) {
-          await deleteApi(`/pdkt/mailbox/${item.id}`);
-        }
-      }
-      await refetch();
-      setSelectedId(null);
     } catch (err) {
       notify.error("Gagal membersihkan riwayat.");
     }
@@ -384,6 +365,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
         history_id: session.id,
         last_activity_at: ts,
         time_taken: session.timeTaken ?? null,
+        permissions: { can_delete: false },
       };
 
       setEvaluations((prev) => {

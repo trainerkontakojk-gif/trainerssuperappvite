@@ -294,8 +294,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 101. **SIDAK Input Selection Grid & Card Refactor** — Extracted shared `SidakSelectionCard`, `SidakSelectionGrid`, and `TemuanGroupGrid` components from inline code in `input.tsx`. Changed folder/agent/period selection from single-column vertical list to responsive multi-column grid (1→3 cols). Changed card layout from horizontal to vertical (`flex-col min-h-32 p-5`). Changed temuan list from `space-y-3` to responsive grid (1→3 cols). Exported `TemuanItem`/`TemuanGroup`/`TemuanGroupCardProps` interfaces. Updated all tests. 0 logic changes. (DONE)
 102. **SIDAK Parameter Period Isolation** — Period-aware rule version resolution with `resolveEffectiveRuleVersionForPeriod()`. Period-scoped superseding: publish hanya menggantikan versi published di periode target yang sama. Dashboard & summary menggunakan snapshot bobot/indikator per `(service_type, period_id)`. New `DELETE /rule-versions/:id` endpoint untuk hapus draft. Rule versions sorted newest-first di backend. Frontend: dynamic confirm dialog copy, sorted period dropdown, clarified publish warning. Tests updated with table-aware mock pattern. (DONE)
 103. **SIDAK Dashboard KPI Delta & Compliance Sparkline Fix** — New `buildKpiDelta()` utility with direction/magnitude/tone, two unit modes (relative-percent for counts, percentage-point for percentages). KpiCard refactored to accept `KpiDeltaViewModel` instead of raw `delta`+`invertDelta`. Compliance sparkline now uses `complianceRate` (percentage) instead of raw count. New `DashboardSparklinePoint` type with `count`/`totalAudited`. 3 new test files. (DONE)
+104. **SIDAK ParetoChart Tooltip Fix (RCA BKO)** — Exported custom `ParetoTooltip` with full parameter name, counts, cumulative %, category, and layanan label; hover cursor highlight; `minPointSize={4}` for short bars; normalized category color mapping; No Category legend item. Added `SERVICE_LABELS` constant. 4 files modified, 2 test files. (DONE)
+105. **PDKT Shared Mailbox Ownership** — Changed PDKT mailbox from per-user fanout copies to a single shared canonical mailbox accessible by all authenticated users (admin, trainer, leader, agent). Added creator metadata display (`created_by_user` with full_name/role/is_current_user), role-based delete authorization (admin/trainer can delete any, others only their own), new RPC `soft_delete_pdkt_mailbox_item` with SECURITY DEFINER, backfill of `created_by_user_id` null values, updated `submit_pdkt_mailbox_batch`/`submit_pdkt_mailbox_reply` RPCs, 403-aware error passthrough in `jsonServerError`, human-friendly tooltip for disabled delete button, creator label in sidebar and detail pane. 1 terminal migration, 1 rollback, 14 files modified, 40+ API + web regression tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 100)
+## Key Files Changed (Phase 58 — 105)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -686,8 +688,19 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/sidak-dashboard-parity.test.tsx` — **Phase 105**: Added ParetoChart mock capture + `passes full RCA parameter names to ParetoChart` test
 - `apps/web/src/__tests__/ParetoChart.test.tsx` — **NEW Phase 105**: Unit tests for ParetoTooltip rendering (critical/non-critical/none categories) and layanan label assertion
 - `docs/rebuild-logs/phase-105-sidak-rca-bko-tooltip-fix.md` — **NEW Phase 105**: Documentation for RCA BKO tooltip fix
-
-## Routes Reference (apps/web)
+- `apps/api/src/services/pdkt/mailbox-service.ts` — **Phase 105**: Added `canDeletePdktMailboxItem()`, `fetchMailboxItems` returns canonical rows with `created_by_user` metadata + `permissions.can_delete`, `softDeleteMailboxItem` validates permission before calling RPC
+- `apps/api/src/routes/pdkt/mailbox.ts` — **Phase 105**: Passes user `id` + `role` to service methods for permission-aware fetching and deletion
+- `apps/api/src/routes/pdkt/route-utils.ts` — **Phase 105**: `jsonServerError` passes through custom status codes (403) with `FORBIDDEN` error code
+- `apps/web/src/routes/pdkt/components/EmailDetailPane.tsx` — **Phase 105**: `formatCreatorLabel` display, delete button disabled + tooltip when `can_delete === false`
+- `apps/web/src/routes/pdkt/components/MailboxSidebar.tsx` — **Phase 105**: Creator label (e.g. "Dibuat oleh Siti Aminah · Trainer") under snippet
+- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 105**: Removed cascading mailbox delete on session/clear-all; added `permissions: { can_delete: false }` to local evaluation items
+- `packages/types/src/pdkt.ts` — **Phase 105**: Added `PdktMailboxCreator` and `PdktMailboxPermissions` interfaces, `created_by_user` and `permissions` fields on `PdktMailboxItem`
+- `supabase/migrations/20260603090000_pdkt_shared_mailbox_policy.sql` — **NEW Phase 105**: Shared mailbox migration (RLS update, RPC rewrite, soft-delete RPC)
+- `supabase/rollbacks/rollback_20260603090000_pdkt_shared_mailbox_policy.sql` — **NEW Phase 105**: Rollback restoring owner-only policy + fanout RPCs
+- `apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts` — **NEW Phase 105**: Permission matrix tests for `canDeletePdktMailboxItem`, shared fetch, and 403 delete enforcement
+- `apps/web/src/__tests__/pdkt-mailbox.test.tsx` — **Phase 105**: Updated for `created_by_user` creator label and disabled delete assertions
+- `apps/api/src/__tests__/pdkt.test.ts` — **Phase 105**: Added shared mailbox migration + rollback SQL contract tests
+- `docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md` — **NEW Phase 105**: Documentation for PDKT shared mailbox ownership
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

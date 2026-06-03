@@ -4,20 +4,41 @@ import {
   PdktMailboxBatch,
   PdktMailboxReply,
 } from "@trainers/types";
+import { supabaseAdmin } from "../../lib/supabase";
+
+const MAILBOX_MANAGER_ROLES = new Set(["admin", "trainer"]);
 
 /**
- * Fetch all active mailbox items for a specific user.
- * Aligned with Vite schema: uses status !== 'deleted' and last_activity_at ordering.
+ * Checks if an actor can delete a mailbox item.
+ */
+export function canDeletePdktMailboxItem(
+  actor: { id: string; role?: string | null },
+  item: { created_by_user_id?: string | null; user_id?: string | null },
+): boolean {
+  const role = (actor.role || "").toLowerCase().trim();
+  const creatorId = item.created_by_user_id || item.user_id;
+  return MAILBOX_MANAGER_ROLES.has(role) || creatorId === actor.id;
+}
+
+/**
+ * Fetch all active shared canonical mailbox items.
+ * Aligned with shared mailbox policy: returns canonical rows (is_shared_copy=false/null),
+ * status !== 'deleted', and appends creator profile metadata and delete permission.
  */
 export async function fetchMailboxItems(
   supabaseClient: SupabaseClient,
-  userId: string,
+  actorOrId: string | { id: string; role: string },
 ): Promise<PdktMailboxItem[]> {
+  const actor =
+    typeof actorOrId === "string"
+      ? { id: actorOrId, role: "agent" }
+      : actorOrId;
+
   const { data, error } = await supabaseClient
     .from("pdkt_mailbox_items")
     .select("*")
-    .eq("user_id", userId)
     .neq("status", "deleted")
+    .or("is_shared_copy.eq.false,is_shared_copy.is.null")
     .order("last_activity_at", { ascending: false });
 
   if (error) {
@@ -25,14 +46,58 @@ export async function fetchMailboxItems(
   }
 
   if (!data || data.length === 0) {
-    console.warn(
-      "[PDKT] Empty mailbox for user:",
-      userId,
-      "- verify RLS policies, user_id mismatch, or data existence",
-    );
+    return [];
   }
 
-  return data as PdktMailboxItem[];
+  // Batch query to resolve creator profile details (name and role)
+  const creatorIds = Array.from(
+    new Set(
+      data
+        .map((item: any) => item.created_by_user_id || item.user_id)
+        .filter(Boolean),
+    ),
+  ) as string[];
+
+  const profilesMap = new Map<
+    string,
+    { id: string; full_name: string; role: string }
+  >();
+
+  if (creatorIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, role")
+      .in("id", creatorIds);
+
+    if (!profilesError && profiles) {
+      for (const p of profiles) {
+        profilesMap.set(p.id, p);
+      }
+    }
+  }
+
+  // Map canonical items with creator summary and permissions
+  return data.map((item: any) => {
+    const creatorId = item.created_by_user_id || item.user_id;
+    const profile = profilesMap.get(creatorId);
+
+    const created_by_user = {
+      id: creatorId || null,
+      full_name: profile ? profile.full_name : "User Lama",
+      role: profile ? profile.role : null,
+      is_current_user: creatorId === actor.id,
+    };
+
+    const permissions = {
+      can_delete: canDeletePdktMailboxItem(actor, item),
+    };
+
+    return {
+      ...item,
+      created_by_user,
+      permissions,
+    } as PdktMailboxItem;
+  });
 }
 
 /**
@@ -66,20 +131,43 @@ export async function createMailboxItem(
 
 /**
  * Soft delete a mailbox item by updating status to 'deleted'.
+ * Controlled via RPC + policy check in service layer.
  */
 export async function softDeleteMailboxItem(
   supabaseClient: SupabaseClient,
   id: string,
-  userId: string,
+  actorOrId: string | { id: string; role: string },
 ): Promise<void> {
-  const { error } = await supabaseClient
-    .from("pdkt_mailbox_items")
-    .update({ status: "deleted", deleted_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", userId);
+  const actor =
+    typeof actorOrId === "string"
+      ? { id: actorOrId, role: "agent" }
+      : actorOrId;
 
-  if (error) {
-    throw new Error(error.message || "Gagal menghapus item mailbox.");
+  const { data: item, error: fetchError } = await supabaseClient
+    .from("pdkt_mailbox_items")
+    .select("user_id, created_by_user_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchError || !item) {
+    throw new Error("Item mailbox tidak ditemukan.");
+  }
+
+  if (!canDeletePdktMailboxItem(actor, item)) {
+    const err = new Error("Anda hanya dapat menghapus email yang Anda buat sendiri.");
+    (err as any).status = 403;
+    throw err;
+  }
+
+  const { error: deleteError } = await supabaseClient.rpc(
+    "soft_delete_pdkt_mailbox_item",
+    {
+      p_mailbox_id: id,
+    },
+  );
+
+  if (deleteError) {
+    throw new Error(deleteError.message || "Gagal menghapus item mailbox.");
   }
 }
 

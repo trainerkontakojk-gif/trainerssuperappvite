@@ -137,6 +137,19 @@ export interface PdktMailboxItem {
   is_shared_copy?: boolean;
   shared_at?: string | null;
   source_mailbox_item_id?: string | null;
+  created_by_user?: PdktMailboxCreator | null;
+  permissions?: PdktMailboxPermissions;
+}
+
+export interface PdktMailboxCreator {
+  id: string | null;
+  full_name: string;
+  role: string | null;
+  is_current_user: boolean;
+}
+
+export interface PdktMailboxPermissions {
+  can_delete: boolean;
 }
 
 export interface PdktSessionHistory {

@@ -12,6 +12,14 @@ import {
 } from "lucide-react";
 import type { PdktMailboxItem } from "@trainers/types";
 
+function formatCreatorLabel(item: PdktMailboxItem) {
+  const creator = item.created_by_user;
+  if (!creator) return "Dibuat oleh user lama";
+  if (creator.is_current_user) return "Dibuat oleh Anda";
+  const role = creator.role ? ` · ${creator.role}` : "";
+  return `Dibuat oleh ${creator.full_name}${role}`;
+}
+
 interface MailboxSidebarProps {
   items: PdktMailboxItem[];
   selectedId: string | null;
@@ -207,6 +215,10 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
 
                   <div className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed opacity-70">
                     {item.snippet}
+                  </div>
+
+                  <div className="text-[9px] text-gray-400 mt-1 leading-normal">
+                    {formatCreatorLabel(item)}
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">

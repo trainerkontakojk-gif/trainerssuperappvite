@@ -12,11 +12,13 @@ function buildMockClient() {
     select: vi.fn(() => m),
     eq: vi.fn(() => m),
     order: vi.fn(() => ({ data: [], error: null })),
+    in: vi.fn(() => ({ data: [], error: null })),
     single: mockSingle,
     insert: vi.fn(() => m),
     delete: vi.fn(() => m),
     update: vi.fn(() => m),
     neq: vi.fn(() => m),
+    or: vi.fn(() => m),
     maybeSingle: mockMaybeSingle,
   };
   return m;
