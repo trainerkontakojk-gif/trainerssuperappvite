@@ -75,7 +75,9 @@ export default function SidakDashboardPage() {
   const [selectedFolder, setSelectedFolder] = useState("ALL");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [startMonth, setStartMonth] = useState<number | null>(1);
-  const [endMonth, setEndMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [endMonth, setEndMonth] = useState<number | null>(
+    new Date().getMonth() + 1,
+  );
   const [hiddenParams, setHiddenParams] = useState<Set<string> | null>(null);
 
   const queryParams = useMemo(() => {
@@ -102,7 +104,10 @@ export default function SidakDashboardPage() {
   // Normalize invalid selections
   useEffect(() => {
     if (loading || !data) return;
-    if (availableServices.length > 0 && !(availableServices as string[]).includes(selectedService)) {
+    if (
+      availableServices.length > 0 &&
+      !(availableServices as string[]).includes(selectedService)
+    ) {
       setSelectedService(availableServices[0]);
     }
   }, [availableServices, selectedService, loading, data]);
@@ -131,6 +136,8 @@ export default function SidakDashboardPage() {
   }, [paramTrendDatasets]);
 
   const activeHiddenParams = hiddenParams ?? defaultHiddenParams;
+
+  const isAllShown = activeHiddenParams.size === 0;
 
   const hasVisibleParam =
     data?.paramTrend?.datasets?.some(
@@ -192,7 +199,8 @@ export default function SidakDashboardPage() {
     });
   };
 
-  const complianceLabel = startMonth !== endMonth ? "Rata-rata Kepatuhan" : "Tingkat Kepatuhan";
+  const complianceLabel =
+    startMonth !== endMonth ? "Rata-rata Kepatuhan" : "Tingkat Kepatuhan";
 
   const KPI_CARDS = [
     {
@@ -240,7 +248,6 @@ export default function SidakDashboardPage() {
   return (
     <div className="bg-background min-h-full overflow-x-hidden">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 w-full space-y-6">
-
         {/* Filter Bar */}
         <DashboardFilters
           selectedService={selectedService}
@@ -251,7 +258,10 @@ export default function SidakDashboardPage() {
           onYearChange={setSelectedYear}
           startMonth={startMonth}
           endMonth={endMonth}
-          onMonthRangeChange={(s, e) => { setStartMonth(s); setEndMonth(e); }}
+          onMonthRangeChange={(s, e) => {
+            setStartMonth(s);
+            setEndMonth(e);
+          }}
           folders={folders}
           availableYears={availableYears}
           leaderLockedService={leaderLockedService}
@@ -268,8 +278,13 @@ export default function SidakDashboardPage() {
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
             <h2 className="text-lg font-bold mb-2">Gagal memuat data</h2>
-            <p className="text-muted-foreground text-sm max-w-sm text-center px-6">Terjadi kesalahan. Silakan coba lagi.</p>
-            <button onClick={() => refetch()} className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2">
+            <p className="text-muted-foreground text-sm max-w-sm text-center px-6">
+              Terjadi kesalahan. Silakan coba lagi.
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2"
+            >
               <RefreshCw className="w-4 h-4" /> Coba Lagi
             </button>
           </div>
@@ -282,8 +297,13 @@ export default function SidakDashboardPage() {
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
             <h2 className="text-lg font-bold mb-2">Data Tidak Ditemukan</h2>
-            <p className="text-muted-foreground text-sm max-w-sm text-center px-6">Tidak ada rekaman QA untuk filter yang Anda pilih.</p>
-            <button onClick={handleReset} className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2">
+            <p className="text-muted-foreground text-sm max-w-sm text-center px-6">
+              Tidak ada rekaman QA untuk filter yang Anda pilih.
+            </p>
+            <button
+              onClick={handleReset}
+              className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2"
+            >
               <RefreshCw className="w-4 h-4" /> Reset Filter
             </button>
           </div>
@@ -291,12 +311,13 @@ export default function SidakDashboardPage() {
 
         {data && hasSummary && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-
             {/* Loading overlay during re-fetch */}
             {loading && data && (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                <span className="ml-2 text-sm text-muted-foreground">Memperbarui data...</span>
+                <span className="ml-2 text-sm text-muted-foreground">
+                  Memperbarui data...
+                </span>
               </div>
             )}
 
@@ -328,49 +349,73 @@ export default function SidakDashboardPage() {
                         <LineChart className="w-5 h-5 text-primary" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold">Tren Kualitas & Parameter</h2>
-                        <p className="text-sm text-muted-foreground">Fluktuasi temuan berdasarkan parameter QA</p>
+                        <h2 className="text-lg font-bold">
+                          Tren Kualitas & Parameter
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                          Fluktuasi temuan berdasarkan parameter QA
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-xl border border-border/50">
                       <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Mode Awal: Total Temuan</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                        Mode Awal: Total Temuan
+                      </span>
                     </div>
                   </div>
 
-                  {(!data.paramTrend || !data.paramTrend.labels?.length) ? (
+                  {!data.paramTrend || !data.paramTrend.labels?.length ? (
                     <div className="h-[400px] flex flex-col items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                      <p className="text-sm text-muted-foreground font-medium">Data tren tidak tersedia untuk filter ini</p>
+                      <p className="text-sm text-muted-foreground font-medium">
+                        Data tren tidak tersedia untuk filter ini
+                      </p>
                     </div>
                   ) : (
                     <>
                       <div className="flex flex-wrap items-center gap-1.5 pb-2">
-                        <span className="text-xs font-bold text-muted-foreground mr-2 uppercase tracking-tighter">Parameter:</span>
-                        {data.paramTrend.datasets.filter((ds) => !ds.isTotal).map((ds) => {
-                          const isHidden = activeHiddenParams.has(ds.label);
-                          return (
-                            <button
-                              key={ds.label}
-                              onClick={() => {
-                                setHiddenParams((prev) => {
-                                  const next = new Set(prev ?? defaultHiddenParams);
-                                  if (next.has(ds.label)) next.delete(ds.label);
-                                  else next.add(ds.label);
-                                  return next;
-                                });
-                              }}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all ${isHidden ? "bg-transparent border-transparent text-muted-foreground hover:bg-muted" : "border-border shadow-sm scale-105 z-10"}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : ""}`} />
-                              <span className="max-w-[120px] truncate">{ds.label}</span>
-                            </button>
-                          );
-                        })}
+                        <span className="text-xs font-bold text-muted-foreground mr-2 uppercase tracking-tighter">
+                          Parameter:
+                        </span>
+                        {data.paramTrend.datasets
+                          .filter((ds) => !ds.isTotal)
+                          .map((ds) => {
+                            const isHidden = activeHiddenParams.has(ds.label);
+                            return (
+                              <button
+                                key={ds.label}
+                                onClick={() => {
+                                  setHiddenParams((prev) => {
+                                    const next = new Set(
+                                      prev ?? defaultHiddenParams,
+                                    );
+                                    if (next.has(ds.label))
+                                      next.delete(ds.label);
+                                    else next.add(ds.label);
+                                    return next;
+                                  });
+                                }}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all ${isHidden ? "bg-transparent border-transparent text-muted-foreground hover:bg-muted" : "border-border shadow-sm scale-105 z-10"}`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : ""}`}
+                                />
+                                <span className="max-w-[120px] truncate">
+                                  {ds.label}
+                                </span>
+                              </button>
+                            );
+                          })}
                         <button
-                          onClick={() => setHiddenParams(new Set())}
+                          onClick={() =>
+                            setHiddenParams(isAllShown ? null : new Set())
+                          }
                           className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest ml-auto"
                         >
-                          Tampilkan Semua <ArrowRight className="w-3 h-3" />
+                          {isAllShown ? "Sembunyikan Semua" : "Tampilkan Semua"}{" "}
+                          <ArrowRight
+                            className={`w-3 h-3 transition-transform duration-200 ${isAllShown ? "rotate-90" : ""}`}
+                          />
                         </button>
                       </div>
                       <div className="h-[360px] w-full mt-2">
@@ -394,17 +439,26 @@ export default function SidakDashboardPage() {
                     </div>
                     <div>
                       <h2 className="text-lg font-bold">Root Cause Analysis</h2>
-                      <p className="text-sm text-muted-foreground">Prinsip Pareto: 80% temuan biasanya berasal dari 20% kategori utama</p>
+                      <p className="text-sm text-muted-foreground">
+                        Prinsip Pareto: 80% temuan biasanya berasal dari 20%
+                        kategori utama
+                      </p>
                     </div>
                   </div>
                   {sortedPareto.length > 0 ? (
                     <ParetoChart
                       data={sortedPareto}
-                      serviceLabel={SERVICE_LABELS[selectedService as keyof typeof SERVICE_LABELS] || selectedService}
+                      serviceLabel={
+                        SERVICE_LABELS[
+                          selectedService as keyof typeof SERVICE_LABELS
+                        ] || selectedService
+                      }
                     />
                   ) : (
                     <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                      <p className="text-sm text-muted-foreground font-medium">Data kategori temuan belum tersedia</p>
+                      <p className="text-sm text-muted-foreground font-medium">
+                        Data kategori temuan belum tersedia
+                      </p>
                     </div>
                   )}
                 </div>
@@ -428,18 +482,28 @@ export default function SidakDashboardPage() {
                       <PieChart className="w-5 h-5 text-indigo-500" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold">Komposisi Severity</h3>
-                      <p className="text-xs text-muted-foreground">Parameter Kritikal vs Non-Kritikal</p>
+                      <h3 className="text-base font-bold">
+                        Komposisi Severity
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Parameter Kritikal vs Non-Kritikal
+                      </p>
                     </div>
                   </div>
                   {data.donutData && data.donutData.total > 0 ? (
-                    <FatalDonutChart critical={data.donutData.critical} nonCritical={data.donutData.nonCritical} total={data.donutData.total} />
+                    <FatalDonutChart
+                      critical={data.donutData.critical}
+                      nonCritical={data.donutData.nonCritical}
+                      total={data.donutData.total}
+                    />
                   ) : (
                     <div className="h-64 flex flex-col items-center justify-center text-center p-6 grayscale opacity-60">
                       <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
                         <PieChart className="w-6 h-6 text-muted-foreground/40" />
                       </div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Belum Ada Data</p>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                        Belum Ada Data
+                      </p>
                     </div>
                   )}
                 </div>
@@ -456,7 +520,9 @@ export default function SidakDashboardPage() {
                     </div>
                   ) : (
                     <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                      <p className="text-sm text-muted-foreground font-medium">Data temuan per layanan belum tersedia</p>
+                      <p className="text-sm text-muted-foreground font-medium">
+                        Data temuan per layanan belum tersedia
+                      </p>
                     </div>
                   )}
                 </div>
