@@ -201,3 +201,8 @@ export const pdktMailboxReplySchema = z.object({
   timeTaken: z.number().int().positive(),
 });
 export type PdktMailboxReply = z.infer<typeof pdktMailboxReplySchema>;
+
+export const pdktMailboxBulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()),
+});
+export type PdktMailboxBulkDelete = z.infer<typeof pdktMailboxBulkDeleteSchema>;

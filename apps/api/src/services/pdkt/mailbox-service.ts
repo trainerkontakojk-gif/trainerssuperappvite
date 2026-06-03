@@ -8,6 +8,22 @@ import { supabaseAdmin } from "../../lib/supabase";
 
 const MAILBOX_MANAGER_ROLES = new Set(["admin", "trainer"]);
 
+type BulkDeleteResult = {
+  successCount: number;
+  failureCount: number;
+  errors: string[];
+};
+
+type BulkDeleteOutcome =
+  | { status: "success" }
+  | { status: "failure"; error: string };
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Unknown error";
+}
+
 /**
  * Checks if an actor can delete a mailbox item.
  */
@@ -193,4 +209,94 @@ export async function submitMailboxReply(
   }
 
   return historyId;
+}
+
+/**
+ * Bulk soft delete mailbox items by updating status to 'deleted'.
+ * Controlled via RPC + policy check in service layer.
+ */
+export async function bulkSoftDeleteMailboxItems(
+  supabaseClient: SupabaseClient,
+  ids: string[],
+  actorOrId: string | { id: string; role: string },
+): Promise<BulkDeleteResult> {
+  const actor =
+    typeof actorOrId === "string"
+      ? { id: actorOrId, role: "agent" }
+      : actorOrId;
+
+  if (ids.length === 0) {
+    return { successCount: 0, failureCount: 0, errors: [] };
+  }
+
+  const { data: items, error: fetchError } = await supabaseClient
+    .from("pdkt_mailbox_items")
+    .select("id, user_id, created_by_user_id")
+    .in("id", ids);
+
+  if (fetchError || !items) {
+    throw new Error("Gagal mengambil data email untuk dihapus.");
+  }
+
+  const itemById = new Map(items.map((item) => [item.id, item]));
+
+  const operations = ids.map(async (id): Promise<BulkDeleteOutcome> => {
+    const item = itemById.get(id);
+    if (!item) {
+      return {
+        status: "failure",
+        error: `Email dengan ID ${id} tidak ditemukan.`,
+      };
+    }
+
+    if (!canDeletePdktMailboxItem(actor, item)) {
+      return {
+        status: "failure",
+        error: `Email dengan ID ${item.id} tidak diizinkan untuk dihapus oleh Anda.`,
+      };
+    }
+
+    try {
+      const { error: deleteError } = await supabaseClient.rpc(
+        "soft_delete_pdkt_mailbox_item",
+        {
+          p_mailbox_id: item.id,
+        },
+      );
+
+      if (deleteError) {
+        return {
+          status: "failure",
+          error: `Gagal menghapus email ${item.id}: ${deleteError.message}`,
+        };
+      }
+
+      return { status: "success" };
+    } catch (error: unknown) {
+      return {
+        status: "failure",
+        error: `Gagal menghapus email ${item.id}: ${getErrorMessage(error)}`,
+      };
+    }
+  });
+
+  const settled = await Promise.allSettled(operations);
+  const outcomes = settled.map((result, index): BulkDeleteOutcome => {
+    if (result.status === "fulfilled") return result.value;
+
+    return {
+      status: "failure",
+      error: `Gagal menghapus email ${ids[index]}: ${getErrorMessage(result.reason)}`,
+    };
+  });
+
+  const errors = outcomes
+    .filter((outcome): outcome is Extract<BulkDeleteOutcome, { status: "failure" }> => outcome.status === "failure")
+    .map((outcome) => outcome.error);
+
+  return {
+    successCount: outcomes.length - errors.length,
+    failureCount: errors.length,
+    errors,
+  };
 }

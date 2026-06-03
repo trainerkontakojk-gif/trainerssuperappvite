@@ -4,6 +4,7 @@ import {
   pdktMailboxBatchSchema,
   pdktMailboxReplySchema,
   evaluateSchema,
+  pdktMailboxBulkDeleteSchema,
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
 import { requireRole } from "../../middleware/role";
@@ -82,6 +83,32 @@ mailbox.delete(
         role: profile.role,
       });
       return c.json({ success: true, message: "Mailbox item deleted." });
+    } catch (error: unknown) {
+      return jsonServerError(c, error);
+    }
+  },
+);
+
+mailbox.post(
+  "/batch-delete",
+  requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
+  zValidator("json", pdktMailboxBulkDeleteSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const userClient = getUserClient(c);
+
+    try {
+      const result = await pdktService.bulkSoftDeleteMailboxItems(
+        userClient,
+        body.ids,
+        {
+          id: user.id,
+          role: profile.role,
+        },
+      );
+      return c.json({ success: true, data: result });
     } catch (error: unknown) {
       return jsonServerError(c, error);
     }

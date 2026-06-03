@@ -219,4 +219,68 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
       expect(mockSupabase.rpc).not.toHaveBeenCalled();
     });
   });
+
+  describe("bulkSoftDeleteMailboxItems service", () => {
+    it("successfully deletes allowed items and skips/logs others", async () => {
+      const mockItems = [
+        { id: "m-1", user_id: "agent-1", created_by_user_id: "agent-1" },
+        { id: "m-2", user_id: "agent-2", created_by_user_id: "agent-2" },
+      ];
+
+      const mockSupabase = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ data: mockItems, error: null }),
+        rpc: vi.fn().mockResolvedValue({ error: null }),
+      };
+
+      const result = await pdktService.bulkSoftDeleteMailboxItems(
+        mockSupabase as any,
+        ["m-1", "m-2", "m-missing"],
+        { id: "agent-1", role: "agent" },
+      );
+
+      expect(result.successCount).toBe(1); // m-1 only
+      expect(result.failureCount).toBe(2); // m-2 (forbidden) and m-missing (missing)
+      expect(result.errors).toHaveLength(2);
+      expect(result.errors[0]).toContain("tidak diizinkan untuk dihapus");
+      expect(result.errors[1]).toContain("tidak ditemukan");
+      expect(mockSupabase.rpc).toHaveBeenCalledTimes(1);
+      expect(mockSupabase.rpc).toHaveBeenCalledWith("soft_delete_pdkt_mailbox_item", {
+        p_mailbox_id: "m-1",
+      });
+    });
+
+    it("returns deterministic best-effort summary when an RPC rejects", async () => {
+      const mockItems = [
+        { id: "m-1", user_id: "agent-1", created_by_user_id: "agent-1" },
+        { id: "m-2", user_id: "agent-1", created_by_user_id: "agent-1" },
+      ];
+
+      const mockSupabase = {
+        from: vi.fn().mockReturnThis(),
+        select: vi.fn().mockReturnThis(),
+        in: vi.fn().mockResolvedValue({ data: mockItems, error: null }),
+        rpc: vi.fn()
+          .mockRejectedValueOnce(new Error("network dropped"))
+          .mockResolvedValueOnce({ error: null }),
+      };
+
+      const result = await pdktService.bulkSoftDeleteMailboxItems(
+        mockSupabase as any,
+        ["m-1", "m-missing", "m-2"],
+        { id: "agent-1", role: "agent" },
+      );
+
+      expect(result).toEqual({
+        successCount: 1,
+        failureCount: 2,
+        errors: [
+          "Gagal menghapus email m-1: network dropped",
+          "Email dengan ID m-missing tidak ditemukan.",
+        ],
+      });
+      expect(mockSupabase.rpc).toHaveBeenCalledTimes(2);
+    });
+  });
 });

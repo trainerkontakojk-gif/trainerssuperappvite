@@ -296,8 +296,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 103. **SIDAK Dashboard KPI Delta & Compliance Sparkline Fix** — New `buildKpiDelta()` utility with direction/magnitude/tone, two unit modes (relative-percent for counts, percentage-point for percentages). KpiCard refactored to accept `KpiDeltaViewModel` instead of raw `delta`+`invertDelta`. Compliance sparkline now uses `complianceRate` (percentage) instead of raw count. New `DashboardSparklinePoint` type with `count`/`totalAudited`. 3 new test files. (DONE)
 104. **SIDAK ParetoChart Tooltip Fix (RCA BKO)** — Exported custom `ParetoTooltip` with full parameter name, counts, cumulative %, category, and layanan label; hover cursor highlight; `minPointSize={4}` for short bars; normalized category color mapping; No Category legend item. Added `SERVICE_LABELS` constant. 4 files modified, 2 test files. (DONE)
 105. **PDKT Shared Mailbox Ownership** — Changed PDKT mailbox from per-user fanout copies to a single shared canonical mailbox accessible by all authenticated users (admin, trainer, leader, agent). Added creator metadata display (`created_by_user` with full_name/role/is_current_user), role-based delete authorization (admin/trainer can delete any, others only their own), new RPC `soft_delete_pdkt_mailbox_item` with SECURITY DEFINER, backfill of `created_by_user_id` null values, updated `submit_pdkt_mailbox_batch`/`submit_pdkt_mailbox_reply` RPCs, 403-aware error passthrough in `jsonServerError`, human-friendly tooltip for disabled delete button, creator label in sidebar and detail pane. 1 terminal migration, 1 rollback, 14 files modified, 40+ API + web regression tests passing. (DONE)
+106. **PDKT Bulk Delete & Soft Delete RPC Fix** — Added bulk soft delete for PDKT mailbox items via `POST /pdkt/mailbox/batch-delete` endpoint; fixed `soft_delete_pdkt_mailbox_item` RPC to use `COALESCE(created_by_user_id, user_id)` for legacy data where creator is NULL. Bulk delete service uses per-item permission check via `canDeletePdktMailboxItem`, parallel `Promise.allSettled` execution, and detailed `BulkDeleteResult` summary. Frontend: bulk selection mode with checkboxes, disabled checkbox for non-deletable items with tooltip, batch delete confirmation dialog, partial success/failure toast. 1 terminal migration, 1 rollback, 10 files modified, 3 new test suites. (DONE)
 
-## Key Files Changed (Phase 58 — 105)
+## Key Files Changed (Phase 58 — 106)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -701,6 +702,16 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/pdkt-mailbox.test.tsx` — **Phase 105**: Updated for `created_by_user` creator label and disabled delete assertions
 - `apps/api/src/__tests__/pdkt.test.ts` — **Phase 105**: Added shared mailbox migration + rollback SQL contract tests
 - `docs/rebuild-logs/phase-105-pdkt-shared-mailbox-ownership.md` — **NEW Phase 105**: Documentation for PDKT shared mailbox ownership
+- `apps/api/src/services/pdkt/mailbox-service.ts` — **Phase 106**: Added `bulkSoftDeleteMailboxItems()` with per-item `canDeletePdktMailboxItem` check, `Promise.allSettled` execution, and `BulkDeleteResult` summary
+- `apps/api/src/routes/pdkt/mailbox.ts` — **Phase 106**: Added `POST /mailbox/batch-delete` endpoint with Zod `pdktMailboxBulkDeleteSchema` validation
+- `packages/types/src/pdkt.ts` — **Phase 106**: Added `pdktMailboxBulkDeleteSchema` and `PdktMailboxBulkDelete` type
+- `apps/web/src/routes/pdkt/components/MailboxSidebar.tsx` — **Phase 106**: Bulk selection mode with checkboxes, disabled state for non-deletable items, batch delete button
+- `apps/web/src/routes/pdkt/simulation.tsx` — **Phase 106**: Bulk delete handlers, confirmation dialog, partial success/failure toast
+- `supabase/migrations/20260603100000_pdkt_fix_soft_delete_rpc.sql` — **NEW Phase 106**: Fix `soft_delete_pdkt_mailbox_item` RPC with `COALESCE` for legacy NULL `created_by_user_id`
+- `apps/api/src/__tests__/pdkt-mailbox-bulk-delete-route.test.ts` — **NEW Phase 106**: Route E2E test for bulk delete (success + validation)
+- `apps/web/src/__tests__/pdkt-mailbox-bulk.test.tsx` — **NEW Phase 106**: Frontend bulk delete UX tests (toggle, select, delete, partial failure)
+- `apps/api/src/__tests__/pdkt-mailbox-permissions.test.ts` — **Phase 106**: Unit tests for `bulkSoftDeleteMailboxItems` (permission filter, RPC rejection)
+- `docs/rebuild-logs/phase-106-pdkt-bulk-delete-soft-delete-fix.md` — **NEW Phase 106**: Documentation for PDKT bulk delete & soft delete fix
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

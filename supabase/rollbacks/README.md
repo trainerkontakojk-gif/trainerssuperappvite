@@ -7,22 +7,23 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #   | Rollback Script                                          | Dependency                                                          |
 | --- | -------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1   | `rollback_20260603090000_pdkt_shared_mailbox_policy.sql` | Restores pre-shared PDKT mailbox policy/RPC behavior                |
-| 2   | `rollback_20260520054101_add_is_deleted_to_profiles.sql` | Independently reversible                                            |
-| 3   | `rollback_013_refresh_mv_function.sql`                   | Independently reversible                                            |
-| 4   | `rollback_012_ai_usage_status_error.sql`                 | Independently reversible                                            |
-| 5   | `rollback_011_materialized_view_dashboard.sql`           | Requires prior rollback of [013]                                    |
-| 6   | `rollback_010_activity_logs_index.sql`                   | Independently reversible                                            |
-| 7   | `rollback_009_storage_rls_policies.sql`                  | Independently reversible                                            |
-| 8   | `rollback_008_profile_admin_policies.sql`                | Independently reversible                                            |
-| 9   | `rollback_007_report_archives.sql`                       | Independently reversible                                            |
-| 10  | `rollback_006_create_user_settings.sql`                  | Independently reversible                                            |
-| 11  | `rollback_005_carbon_copy_parity.sql`                    | Independently reversible                                            |
-| 12  | `rollback_004_admin_core.sql`                            | Independently reversible                                            |
-| 13  | `rollback_003_telefun_core.sql`                          | Requires prior rollback of [005]                                    |
-| 14  | `rollback_002_ketik_pdkt_core.sql`                       | Requires prior rollback of [003, 005]                               |
-| 15  | `rollback_001_sidak_core.sql`                            | Requires prior rollback of [011]                                    |
-| 16  | `rollback_000_profiles_core.sql`                         | Requires prior rollback of [001, 002, 003, 004, 005, 006, 007, 008] |
+| 1   | `rollback_20260603100000` (covered by `rollback_20260603090000`) | Fixes `soft_delete_pdkt_mailbox_item` with `COALESCE` for legacy NULL handling. Reverting #2 also reverts this. |
+| 2   | `rollback_20260603090000_pdkt_shared_mailbox_policy.sql` | Restores pre-shared PDKT mailbox policy/RPC behavior                |
+| 3   | `rollback_20260520054101_add_is_deleted_to_profiles.sql` | Independently reversible                                            |
+| 4   | `rollback_013_refresh_mv_function.sql`                   | Independently reversible                                            |
+| 5   | `rollback_012_ai_usage_status_error.sql`                 | Independently reversible                                            |
+| 6   | `rollback_011_materialized_view_dashboard.sql`           | Requires prior rollback of [013]                                    |
+| 7   | `rollback_010_activity_logs_index.sql`                   | Independently reversible                                            |
+| 8   | `rollback_009_storage_rls_policies.sql`                  | Independently reversible                                            |
+| 9   | `rollback_008_profile_admin_policies.sql`                | Independently reversible                                            |
+| 10  | `rollback_007_report_archives.sql`                       | Independently reversible                                            |
+| 11  | `rollback_006_create_user_settings.sql`                  | Independently reversible                                            |
+| 12  | `rollback_005_carbon_copy_parity.sql`                    | Independently reversible                                            |
+| 13  | `rollback_004_admin_core.sql`                            | Independently reversible                                            |
+| 14  | `rollback_003_telefun_core.sql`                          | Requires prior rollback of [005]                                    |
+| 15  | `rollback_002_ketik_pdkt_core.sql`                       | Requires prior rollback of [003, 005]                               |
+| 16  | `rollback_001_sidak_core.sql`                            | Requires prior rollback of [011]                                    |
+| 17  | `rollback_000_profiles_core.sql`                         | Requires prior rollback of [001, 002, 003, 004, 005, 006, 007, 008] |
 
 ## Usage
 

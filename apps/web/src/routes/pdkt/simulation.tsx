@@ -80,6 +80,10 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   const [isStartingNew, setIsStartingNew] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
 
+  // Bulk selection states
+  const [selectedBulkIds, setSelectedBulkIds] = useState<Set<string>>(new Set());
+  const [isBulkMode, setIsBulkMode] = useState(false);
+
   // Modals visibility
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -503,6 +507,55 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
     }
   };
 
+  const handleToggleBulkId = (id: string) => {
+    setSelectedBulkIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleBulkMode = () => {
+    setIsBulkMode((prev) => !prev);
+    setSelectedBulkIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedBulkIds.size === 0) return;
+    if (!confirm(`Hapus ${selectedBulkIds.size} email terpilih?`)) return;
+
+    try {
+      const ids = Array.from(selectedBulkIds);
+      const result = await postApi<{
+        successCount: number;
+        failureCount: number;
+        errors: string[];
+      }>("/pdkt/mailbox/batch-delete", { ids });
+
+      if (result.failureCount > 0) {
+        notify.warning(
+          `${result.successCount} email berhasil dihapus, ${result.failureCount} gagal.`,
+          result.errors[0],
+        );
+      } else {
+        notify.success(`${result.successCount} email berhasil dihapus.`);
+      }
+
+      setSelectedBulkIds(new Set());
+      setIsBulkMode(false);
+      await refetch();
+      if (selectedId && selectedBulkIds.has(selectedId)) {
+        setSelectedId(null);
+      }
+    } catch (err) {
+      notify.error("Gagal menghapus email.");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus email ini?")) return;
     try {
@@ -610,6 +663,11 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
           await fetchHistory();
           setIsHistoryOpen(true);
         }}
+        selectedBulkIds={selectedBulkIds}
+        onToggleBulkId={handleToggleBulkId}
+        isBulkMode={isBulkMode}
+        onToggleBulkMode={handleToggleBulkMode}
+        onBulkDelete={handleBulkDelete}
       />
 
       <div className="flex-1 flex flex-col min-w-0 relative">

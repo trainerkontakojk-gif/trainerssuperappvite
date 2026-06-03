@@ -9,6 +9,7 @@ import {
   Settings,
   History,
   BarChart3,
+  CheckSquare,
 } from "lucide-react";
 import type { PdktMailboxItem } from "@trainers/types";
 
@@ -28,6 +29,13 @@ interface MailboxSidebarProps {
   onSettings?: () => void;
   onHistory?: () => void;
   onUsage?: () => void;
+
+  // Bulk selection props
+  selectedBulkIds: Set<string>;
+  onToggleBulkId: (id: string) => void;
+  isBulkMode: boolean;
+  onToggleBulkMode: () => void;
+  onBulkDelete: () => void;
 }
 
 export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
@@ -38,6 +46,11 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   onSettings,
   onHistory,
   onUsage,
+  selectedBulkIds,
+  onToggleBulkId,
+  isBulkMode,
+  onToggleBulkMode,
+  onBulkDelete,
 }) => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "open" | "replied">("open");
@@ -84,40 +97,69 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
             Mailbox
           </h2>
           <div className="flex items-center gap-1">
-            {onSettings && (
-              <button
-                onClick={onSettings}
-                className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
-                title="Pengaturan"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
+            {isBulkMode ? (
+              <div className="flex items-center gap-1">
+                {selectedBulkIds.size > 0 && (
+                  <button
+                    onClick={onBulkDelete}
+                    className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center transition-all animate-pulse"
+                    title={`Hapus ${selectedBulkIds.size} email terpilih`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={onToggleBulkMode}
+                  className="px-2 py-1 text-[10px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all"
+                >
+                  Batal
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={onToggleBulkMode}
+                  className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                  title="Pilih Banyak"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                </button>
+                {onSettings && (
+                  <button
+                    onClick={onSettings}
+                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                    title="Pengaturan"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {onHistory && (
+                  <button
+                    onClick={onHistory}
+                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                    title="Riwayat"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                {onUsage && (
+                  <button
+                    onClick={onUsage}
+                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                    title="Usage Bulan Ini"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={onNew}
+                  className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center transition-all hover:bg-sky-700 active:scale-95 ml-1"
+                  title="Buat Simulasi"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </>
             )}
-            {onHistory && (
-              <button
-                onClick={onHistory}
-                className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
-                title="Riwayat"
-              >
-                <History className="w-3.5 h-3.5" />
-              </button>
-            )}
-            {onUsage && (
-              <button
-                onClick={onUsage}
-                className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
-                title="Usage Bulan Ini"
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              onClick={onNew}
-              className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center transition-all hover:bg-sky-700 active:scale-95 ml-1"
-              title="Buat Simulasi"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
 
@@ -175,68 +217,102 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {filteredItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => onSelect(item.id)}
-                className={`w-full text-left p-4 transition-all relative flex gap-3 ${
-                  selectedId === item.id
-                    ? "bg-sky-50/50 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-sky-600"
-                    : "hover:bg-gray-50"
-                }`}
-              >
-                <div
-                  className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    selectedId === item.id
-                      ? "bg-sky-600 text-white shadow-md"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {getInitials(item.sender_name)}
-                </div>
+            {filteredItems.map((item) => {
+              const isSelected = selectedBulkIds.has(item.id);
+              const canDelete = item.permissions?.can_delete !== false;
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span
-                      className={`text-xs truncate ${item.status === "open" ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    if (isBulkMode) {
+                      if (canDelete) {
+                        onToggleBulkId(item.id);
+                      }
+                    } else {
+                      onSelect(item.id);
+                    }
+                  }}
+                  className={`w-full text-left p-4 transition-all relative flex gap-3 cursor-pointer ${
+                    isBulkMode
+                      ? isSelected
+                        ? "bg-sky-50/40"
+                        : "hover:bg-gray-50"
+                      : selectedId === item.id
+                      ? "bg-sky-50/50 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-sky-600"
+                      : "hover:bg-gray-50"
+                  } ${isBulkMode && !canDelete ? "opacity-50" : ""}`}
+                  style={{ cursor: isBulkMode && !canDelete ? "not-allowed" : "pointer" }}
+                >
+                  {isBulkMode && (
+                    <div
+                      className="shrink-0 flex items-center pr-1"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {item.sender_name}
-                    </span>
-                    <span className="text-[9px] text-gray-500 whitespace-nowrap">
-                      {formatTime(item.last_activity_at)}
-                    </span>
-                  </div>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={!canDelete}
+                        onChange={() => onToggleBulkId(item.id)}
+                        className="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500 cursor-pointer disabled:cursor-not-allowed"
+                        title={!canDelete ? "Anda tidak memiliki izin menghapus email ini" : ""}
+                      />
+                    </div>
+                  )}
 
                   <div
-                    className={`text-[11px] truncate mb-0.5 ${item.status === "open" ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}
+                    className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      !isBulkMode && selectedId === item.id
+                        ? "bg-sky-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
                   >
-                    {item.subject || "(Tanpa Subjek)"}
+                    {getInitials(item.sender_name)}
                   </div>
 
-                  <div className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed opacity-70">
-                    {item.snippet}
-                  </div>
-
-                  <div className="text-[9px] text-gray-400 mt-1 leading-normal">
-                    {formatCreatorLabel(item)}
-                  </div>
-
-                  <div className="mt-2 flex items-center gap-2">
-                    {item.status === "open" ? (
-                      <span className="inline-flex items-center gap-1 font-medium text-[9px] text-sky-600">
-                        <span className="w-1.5 h-1.5 rounded-full bg-sky-600" />{" "}
-                        Menunggu Balasan
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span
+                        className={`text-xs truncate ${item.status === "open" ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}
+                      >
+                        {item.sender_name}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 font-medium text-[9px] text-emerald-500">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{" "}
-                        Terbalas
+                      <span className="text-[9px] text-gray-500 whitespace-nowrap">
+                        {formatTime(item.last_activity_at)}
                       </span>
-                    )}
+                    </div>
+
+                    <div
+                      className={`text-[11px] truncate mb-0.5 ${item.status === "open" ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}
+                    >
+                      {item.subject || "(Tanpa Subjek)"}
+                    </div>
+
+                    <div className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed opacity-70">
+                      {item.snippet}
+                    </div>
+
+                    <div className="text-[9px] text-gray-400 mt-1 leading-normal">
+                      {formatCreatorLabel(item)}
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2">
+                      {item.status === "open" ? (
+                        <span className="inline-flex items-center gap-1 font-medium text-[9px] text-sky-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-600" />{" "}
+                          Menunggu Balasan
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 font-medium text-[9px] text-emerald-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{" "}
+                          Terbalas
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
