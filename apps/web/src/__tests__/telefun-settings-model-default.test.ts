@@ -7,6 +7,7 @@ import {
   MALE_VOICES,
   FEMALE_VOICES,
 } from "../routes/telefun/telefunSettings";
+import { GEMINI_LIVE_VOICES_BY_GENDER } from "../routes/telefun/telefunVoiceRegistry";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -84,6 +85,51 @@ describe("resolveFinalIdentity gender-first", () => {
     expect(identity.phone).not.toBe("");
     expect(identity.city).not.toBe("");
     expect(MALE_VOICES.includes(identity.voiceName as any)).toBe(true);
+  });
+});
+
+describe("resolveFinalIdentity invalid voice normalization", () => {
+  it("[CHAR] normalizes legacy Ursa male voice to a provider-valid male voice", () => {
+    const identity = resolveFinalIdentity({
+      displayName: "Rudi",
+      gender: "male",
+      phoneNumber: "0811",
+      city: "Jakarta",
+      signatureName: "",
+      voiceName: "Ursa",
+    });
+
+    expect(identity.gender).toBe("male");
+    expect(identity.voiceName).not.toBe("Ursa");
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(identity.voiceName as any);
+  });
+
+  it("[CHAR] normalizes legacy Dipper male voice to a provider-valid male voice", () => {
+    const identity = resolveFinalIdentity({
+      displayName: "Budi",
+      gender: "male",
+      phoneNumber: "0812",
+      city: "Bandung",
+      signatureName: "",
+      voiceName: "Dipper",
+    });
+
+    expect(identity.voiceName).not.toBe("Dipper");
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(identity.voiceName as any);
+  });
+
+  it("[CHAR] normalizes legacy female invalid voice (Capella) to a provider-valid female voice", () => {
+    const identity = resolveFinalIdentity({
+      displayName: "Sari",
+      gender: "female",
+      phoneNumber: "0813",
+      city: "Jakarta",
+      signatureName: "",
+      voiceName: "Capella",
+    });
+
+    expect(identity.voiceName).not.toBe("Capella");
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).toContain(identity.voiceName as any);
   });
 });
 

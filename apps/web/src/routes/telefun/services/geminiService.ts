@@ -19,6 +19,7 @@ import {
   getConsumerTypeHint,
   getTimeCueInstruction,
 } from "./promptBuilder";
+import { resolveGeminiLiveVoice } from "../telefunVoiceRegistry";
 
 interface WebkitAudioContextWindow extends Window {
   webkitAudioContext?: typeof AudioContext;
@@ -48,6 +49,12 @@ export class LiveSession {
   private isSetupComplete: boolean = false;
   private hasSentFirstUserAudio: boolean = false;
   private hasReceivedFirstModelAudio: boolean = false;
+
+  // Volume Throttling
+  private lastVolumeEmitMs: number = 0;
+  private lastVolumeBucket: number = -1;
+  private readonly MIN_VOLUME_EMIT_MS = 200;
+  private readonly MAX_VOLUME_SAMPLES = 1000;
 
   // Long Speech Interruption
   private longSpeechStartMs: number | null = null;
@@ -294,8 +301,15 @@ export class LiveSession {
         sum += inputData[i] * inputData[i];
       const rms = Math.sqrt(sum / inputData.length);
       const vol = Math.min(100, Math.floor(rms * 200));
-      this.onVolumeChange(vol);
-      this.volumeSamples.push(vol);
+      const volBucket = Math.floor(vol / 10);
+      if (volBucket !== this.lastVolumeBucket || now - this.lastVolumeEmitMs >= this.MIN_VOLUME_EMIT_MS) {
+        this.onVolumeChange(vol);
+        this.lastVolumeEmitMs = now;
+        this.lastVolumeBucket = volBucket;
+      }
+      if (this.volumeSamples.length < this.MAX_VOLUME_SAMPLES) {
+        this.volumeSamples.push(vol);
+      }
 
       const isSilent = vol <= 10;
 
@@ -424,6 +438,11 @@ export class LiveSession {
       signatureName: this.config.identitySettings?.signatureName || "",
     };
 
+    const setupVoiceName = resolveGeminiLiveVoice({
+      requestedVoice: resolvedIdentity.voiceName,
+      gender: resolvedIdentity.gender,
+    });
+
     const systemInstructionText = buildTelefunLiveSystemInstruction({
       identity: resolvedIdentity,
       scenario: this.config.activeScenario ?? this.config.scenarios[0],
@@ -434,7 +453,7 @@ export class LiveSession {
 
     const setup = buildTelefunLiveSetupMessage({
       telefunModelId: this.config.telefunModelId || "gemini-3.1-flash-live-preview",
-      voiceName: this.config.voiceName,
+      voiceName: setupVoiceName,
       systemInstruction: systemInstructionText,
     });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { VoiceRadarChart, buildVoiceRadarData } from "../routes/telefun/components/VoiceRadarChart";
+import VoiceRadarChartInner from "../routes/telefun/components/VoiceRadarChartInner";
 import { CommunicationProfileZoomModal } from "../routes/telefun/components/CommunicationProfileZoomModal";
 import type { TelefunCommunicationProfile } from "@trainers/types";
 
@@ -94,15 +95,14 @@ describe("buildVoiceRadarData", () => {
 describe("VoiceRadarChart", () => {
   it("renders chart when profile has metrics", () => {
     const { container } = render(
-      <VoiceRadarChart profile={mockProfile} compact />,
+      <VoiceRadarChartInner profile={mockProfile} compact />,
     );
-    const responsiveContainer = container.querySelector(".recharts-responsive-container");
-    expect(responsiveContainer).toBeTruthy();
+    expect(container.querySelector(".recharts-responsive-container")).toBeTruthy();
   });
 
   it("shows empty message when metrics array is empty", () => {
     const emptyProfile = { ...mockProfile, metrics: [] };
-    render(<VoiceRadarChart profile={emptyProfile} compact />);
+    render(<VoiceRadarChartInner profile={emptyProfile} compact />);
     expect(
       screen.getByText("Data profil komunikasi belum tersedia."),
     ).toBeTruthy();
@@ -110,12 +110,12 @@ describe("VoiceRadarChart", () => {
 
   it("renders in compact and expanded modes", () => {
     const { container: containerCompact } = render(
-      <VoiceRadarChart profile={mockProfile} compact />,
+      <VoiceRadarChartInner profile={mockProfile} compact />,
     );
     expect(containerCompact.querySelector(".recharts-responsive-container")).toBeTruthy();
 
     const { container: containerExpanded } = render(
-      <VoiceRadarChart profile={mockProfile} compact={false} />,
+      <VoiceRadarChartInner profile={mockProfile} compact={false} />,
     );
     expect(containerExpanded.querySelector(".recharts-responsive-container")).toBeTruthy();
   });

@@ -1,3 +1,5 @@
+import { GEMINI_LIVE_VOICES_BY_GENDER, isGeminiLiveVoiceName, resolveGeminiLiveVoice } from "./telefunVoiceRegistry";
+
 export enum ConsumerDifficulty {
   Easy = "Easy",
   Medium = "Medium",
@@ -114,35 +116,18 @@ export const VOICE_MODELS: TelefunVoiceModel[] = [
   }
 ];
 
-export const MALE_VOICES = [
-  "Fenrir",
-  "Charon",
-  "Dipper",
-  "Puck",
-  "Ursa",
-] as const;
-export const FEMALE_VOICES = [
-  "Kore",
-  "Aoede",
-  "Capella",
-  "Lyra",
-  "Vega",
-] as const;
+export const MALE_VOICES = GEMINI_LIVE_VOICES_BY_GENDER.male;
+export const FEMALE_VOICES = GEMINI_LIVE_VOICES_BY_GENDER.female;
 
 export function pickRandomVoiceForGender(gender: "male" | "female"): string {
-  const pool = gender === "male" ? MALE_VOICES : FEMALE_VOICES;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return resolveGeminiLiveVoice({ gender, random: Math.random });
 }
 
 export function resolveVoiceForGender(
   requestedVoice: string | undefined,
   gender: "male" | "female",
 ): string {
-  const pool = gender === "male" ? MALE_VOICES : FEMALE_VOICES;
-  if (requestedVoice && (pool as readonly string[]).includes(requestedVoice)) {
-    return requestedVoice;
-  }
-  return pickRandomVoiceForGender(gender);
+  return resolveGeminiLiveVoice({ requestedVoice, gender, random: Math.random });
 }
 
 export interface DefaultProfile {
@@ -187,14 +172,14 @@ export const DEFAULT_IDENTITY_POOL: DefaultProfile[] = [
     phone: "0816-7890-1234",
     city: "Semarang",
     gender: "male",
-    voiceName: "Dipper",
+    voiceName: "Charon",
   },
   {
     name: "Rina Marlina",
     phone: "0817-8901-2345",
     city: "Yogyakarta",
     gender: "female",
-    voiceName: "Capella",
+    voiceName: "Kore",
   },
   {
     name: "Andi Pratama",
@@ -208,21 +193,21 @@ export const DEFAULT_IDENTITY_POOL: DefaultProfile[] = [
     phone: "0819-0123-4567",
     city: "Palembang",
     gender: "female",
-    voiceName: "Lyra",
+    voiceName: "Aoede",
   },
   {
     name: "Rudi Hermawan",
     phone: "0821-1234-5678",
     city: "Tangerang",
     gender: "male",
-    voiceName: "Ursa",
+    voiceName: "Puck",
   },
   {
     name: "Mega Ayuningtyas",
     phone: "0822-2345-6789",
     city: "Bekasi",
     gender: "female",
-    voiceName: "Vega",
+    voiceName: "Leda",
   },
   {
     name: "Dian Permana",
@@ -402,13 +387,14 @@ export function parseTelefunSettings(
           : "Fenrir") as string,
       };
     } else {
+      const rawVoice = (identityRaw.voiceName as string) || "";
       identitySettings = {
         displayName: (identityRaw.displayName as string) || "",
         gender: coerceTelefunGender(identityRaw.gender),
         phoneNumber: (identityRaw.phoneNumber as string) || "",
         city: (identityRaw.city as string) || "",
         signatureName: (identityRaw.signatureName as string) || "",
-        voiceName: (identityRaw.voiceName as string) || "",
+        voiceName: isGeminiLiveVoiceName(rawVoice) ? rawVoice : "",
       };
     }
   } else {
@@ -444,18 +430,13 @@ export function parseTelefunSettings(
 }
 
 export const VOICE_OPTIONS = [
-  { id: "Kore", name: "Kore" },
   { id: "Puck", name: "Puck" },
   { id: "Charon", name: "Charon" },
-  { id: "Aoede", name: "Aoede" },
   { id: "Fenrir", name: "Fenrir" },
-  { id: "Leda", name: "Leda" },
   { id: "Orus", name: "Orus" },
-  { id: "Dipper", name: "Dipper" },
-  { id: "Ursa", name: "Ursa" },
-  { id: "Capella", name: "Capella" },
-  { id: "Lyra", name: "Lyra" },
-  { id: "Vega", name: "Vega" },
+  { id: "Kore", name: "Kore" },
+  { id: "Leda", name: "Leda" },
+  { id: "Aoede", name: "Aoede" },
 ];
 
 export const CONSUMER_GENDERS = [

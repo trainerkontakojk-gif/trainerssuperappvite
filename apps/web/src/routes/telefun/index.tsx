@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Phone, Settings, History, Play, BarChart3 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { TelefunAppSettings } from "./telefunSettings";
@@ -10,9 +10,8 @@ import {
 import { SettingsModal } from "./components/SettingsModal";
 import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
-import { ReviewModal } from "./components/ReviewModal";
 import { UsageModal } from "../../components/UsageModal";
-import { getApi, postApi, putApi } from "../../hooks/useApi";
+import { postApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
@@ -31,6 +30,19 @@ import {
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
 
+const ReviewModal = lazy(() =>
+  import("./components/ReviewModal").then((m) => ({ default: m.ReviewModal })),
+);
+
+function TelefunReviewModalFallback() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="rounded-xl border border-border/60 bg-background px-5 py-4 text-sm font-semibold text-muted-foreground shadow-xl">
+        Memuat review...
+      </div>
+    </div>
+  );
+}
 
 
 function getToken(): string | null {
@@ -107,6 +119,7 @@ export default function TelefunLanding() {
         if (cancelled) return;
 
         const dbRecords = rows.map(mapTelefunSessionRow);
+        const dbRecordIds = new Set(dbRecords.map((r) => r.id));
 
         let localRecords: CallRecord[] = [];
         const savedHistory = localStorage.getItem("telefun_history");
@@ -120,9 +133,7 @@ export default function TelefunLanding() {
 
         const merged = [
           ...dbRecords,
-          ...localRecords.filter(
-            (lr) => !new Set(dbRecords.map((r) => r.id)).has(lr.id),
-          ),
+          ...localRecords.filter((lr) => !dbRecordIds.has(lr.id)),
         ].sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
         );
@@ -142,7 +153,7 @@ export default function TelefunLanding() {
     return () => {
       cancelled = true;
     };
-  }, [view]);
+  }, []);
 
   const handleSaveSettings = async (newSettings: TelefunAppSettings) => {
     try {
@@ -200,14 +211,11 @@ export default function TelefunLanding() {
     setSessionDelta(null);
     sessionBaselineRef.current = null;
 
-    try {
-      const data = await fetchUsageSummary("telefun");
+    fetchUsageSummary("telefun").then((data) => {
       if (data && runId === sessionRunIdRef.current) {
         sessionBaselineRef.current = data;
       }
-    } catch {
-      // best-effort
-    }
+    }).catch(() => {});
 
     try {
       const res = await postApi<any>("/telefun/sessions", {
@@ -453,12 +461,14 @@ export default function TelefunLanding() {
         onReviewSession={handleReviewSession}
       />
 
-      <ReviewModal
-        isOpen={isReviewOpen}
-        onClose={() => setIsReviewOpen(false)}
-        record={reviewRecord}
-        onAssessmentComplete={handleAssessmentComplete}
-      />
+      <Suspense fallback={isReviewOpen ? <TelefunReviewModalFallback /> : null}>
+        <ReviewModal
+          isOpen={isReviewOpen}
+          onClose={() => setIsReviewOpen(false)}
+          record={reviewRecord}
+          onAssessmentComplete={handleAssessmentComplete}
+        />
+      </Suspense>
 
       <UsageModal
         isOpen={isUsageOpen}
