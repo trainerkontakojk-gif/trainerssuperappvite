@@ -103,4 +103,80 @@ describe("Telefun Session Finalizer", () => {
     expect(result.record.voiceAssessment).toEqual(mockAssessment);
     expect(result.record.score).toBe(90);
   });
+
+  it("marks upload and scoring failures when recordings exist but user id is unavailable", async () => {
+    const result = await finalizeTelefunSession({
+      sessionId: "session-no-user",
+      fullBlob: new Blob(["full"]),
+      agentBlob: new Blob(["agent"]),
+      duration: 20,
+      metrics: {
+        speechSegments: [],
+        totalSpeakingMs: 0,
+        totalSilenceMs: 0,
+        deadAirCount: 0,
+        interruptionCount: 0,
+        volumeSamples: [],
+        volumeConsistency: 0,
+        inputTranscriptionChunks: [],
+        sessionDurationMs: 20000,
+      },
+      localUrl: "blob:local",
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => undefined),
+        uploadRecording: vi.fn(async () => {
+          throw new Error("upload should not run without user id");
+        }),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => ({ score: 0, feedback: "" })),
+      },
+    });
+
+    expect(result.uploadFailed).toBe(true);
+    expect(result.scoringFailed).toBe(true);
+    expect(result.saveFailed).toBe(false);
+    expect(result.record.recordingPath).toBeUndefined();
+    expect(result.record.agentRecordingPath).toBeUndefined();
+  });
+
+  it("keeps saveFailed in the public return contract when base patch fails", async () => {
+    const result = await finalizeTelefunSession({
+      sessionId: "session-save-fails",
+      fullBlob: null,
+      agentBlob: null,
+      duration: 10,
+      metrics: {
+        speechSegments: [],
+        totalSpeakingMs: 0,
+        totalSilenceMs: 0,
+        deadAirCount: 0,
+        interruptionCount: 0,
+        volumeSamples: [],
+        volumeConsistency: 0,
+        inputTranscriptionChunks: [],
+        sessionDurationMs: 10000,
+      },
+      localUrl: null,
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => undefined),
+        patchSession: vi.fn(async () => {
+          throw new Error("patch failed");
+        }),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => ({ score: 0, feedback: "" })),
+      },
+    });
+
+    expect(result.saveFailed).toBe(true);
+    expect(result.uploadFailed).toBe(false);
+    expect(result.scoringFailed).toBe(true);
+  });
 });

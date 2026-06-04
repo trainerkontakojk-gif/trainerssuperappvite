@@ -38,6 +38,30 @@ const defaultDependencies: FinalizerDependencies = {
   },
 };
 
+interface FinalizerStatus {
+  uploadFailed: boolean;
+  saveFailed: boolean;
+  scoringFailed: boolean;
+}
+
+const createFinalizerStatus = (): FinalizerStatus => ({
+  uploadFailed: false,
+  saveFailed: false,
+  scoringFailed: false,
+});
+
+const markUploadFailed = (status: FinalizerStatus) => {
+  status.uploadFailed = true;
+};
+
+const markSaveFailed = (status: FinalizerStatus) => {
+  status.saveFailed = true;
+};
+
+const markScoringFailed = (status: FinalizerStatus) => {
+  status.scoringFailed = true;
+};
+
 export async function finalizeTelefunSession(params: {
   sessionId: string;
   fullBlob: Blob | null;
@@ -51,9 +75,7 @@ export async function finalizeTelefunSession(params: {
   dependencies?: Partial<FinalizerDependencies>;
 }): Promise<{ record: CallRecord; scoringFailed: boolean; saveFailed: boolean; uploadFailed: boolean }> {
   const deps = { ...defaultDependencies, ...params.dependencies };
-  let scoringFailed = false;
-  let saveFailed = false;
-  let uploadFailed = false;
+  const status = createFinalizerStatus();
 
   let userId: string | undefined;
   try {
@@ -71,11 +93,11 @@ export async function finalizeTelefunSession(params: {
         const path = buildTelefunRecordingPath({ userId, sessionId: params.sessionId, type: "full_call" });
         recordingPath = await deps.uploadRecording({ path, blob: params.fullBlob, type: "full_call" });
         if (!recordingPath) {
-          uploadFailed = true;
+          markUploadFailed(status);
         }
       } catch (err) {
         console.error("Full recording upload failed:", err);
-        uploadFailed = true;
+        markUploadFailed(status);
       }
     }
     if (params.agentBlob) {
@@ -83,16 +105,16 @@ export async function finalizeTelefunSession(params: {
         const path = buildTelefunRecordingPath({ userId, sessionId: params.sessionId, type: "agent_only" });
         agentRecordingPath = await deps.uploadRecording({ path, blob: params.agentBlob, type: "agent_only" });
         if (!agentRecordingPath) {
-          uploadFailed = true;
+          markUploadFailed(status);
         }
       } catch (err) {
         console.error("Agent recording upload failed:", err);
-        uploadFailed = true;
+        markUploadFailed(status);
       }
     }
   } else {
     if (params.fullBlob || params.agentBlob) {
-      uploadFailed = true;
+      markUploadFailed(status);
     }
   }
 
@@ -105,7 +127,7 @@ export async function finalizeTelefunSession(params: {
     });
   } catch (err) {
     console.error("Base session patch failed:", err);
-    saveFailed = true;
+    markSaveFailed(status);
   }
 
   // 5. Call finalize-recording if either path exists
@@ -135,14 +157,14 @@ export async function finalizeTelefunSession(params: {
       }
     } catch (err) {
       console.error("Scoring failed:", err);
-      scoringFailed = true;
+      markScoringFailed(status);
     }
   } else {
-    scoringFailed = true;
+    markScoringFailed(status);
   }
 
   // 7. Patch score and feedback if scoring succeeds
-  if (!scoringFailed && (score > 0 || feedback)) {
+  if (!status.scoringFailed && (score > 0 || feedback)) {
     try {
       await deps.patchSession(params.sessionId, {
         score,
@@ -175,8 +197,8 @@ export async function finalizeTelefunSession(params: {
 
   return {
     record,
-    scoringFailed,
-    saveFailed,
-    uploadFailed,
+    scoringFailed: status.scoringFailed,
+    saveFailed: status.saveFailed,
+    uploadFailed: status.uploadFailed,
   };
 }
