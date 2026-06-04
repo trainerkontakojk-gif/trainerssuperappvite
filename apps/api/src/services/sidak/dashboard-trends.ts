@@ -145,8 +145,8 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
       })),
     };
 
-    return { paramTrend: { labels, datasets }, sparklines };
+    return { paramTrend: { labels, datasets }, sparklines, periodMetrics };
   }
 
-  return { paramTrend: { labels: [], datasets: [] }, sparklines: {} as Record<string, DashboardSparklinePoint[]> };
+  return { paramTrend: { labels: [], datasets: [] }, sparklines: {} as Record<string, DashboardSparklinePoint[]>, periodMetrics: [] };
 }

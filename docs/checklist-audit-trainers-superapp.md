@@ -411,7 +411,7 @@ Contoh catatan:
 - [x] Aggregate tidak bocor lintas service/role.
   - Catatan: Agent-only, leader-specific, dan admin/trainer/qa scoping diterapkan di semua endpoint read SIDAK.
 - [x] Query besar memakai summary/cache jika diperlukan.
-  - Catatan: Summary tables (`qa_dashboard_period_summary` + `qa_dashboard_agent_period_summary`) diaktifkan via write-through pada batch upload + refresh endpoint. Dashboard membaca cache dengan fallback ke raw query. Lihat `refreshDashboardSummary()` di sidak-service.ts.
+  - Catatan: Summary tables (`qa_dashboard_period_summary` + `qa_dashboard_agent_period_summary`) tetap diaktifkan via write-through pada batch upload + refresh endpoint untuk kompatibilitas/backfill, tetapi summary endpoint dashboard utama dihitung real-time dari `qa_temuan` via scoring engine aplikasi.
 
 ## 2.6 Upload Batch QA `P0`
 
@@ -680,8 +680,8 @@ Contoh catatan:
 - [x] Index `ai_usage_logs.user_id`, `ai_usage_logs.module`, `ai_usage_logs.created_at`, dan `ai_usage_logs.model_id` tersedia.
 - [x] Index `report_archives.user_id`, `report_archives.created_at`, dan `report_archives.report_type` tersedia.
 - [x] Index `activity_logs.created_at` sudah ada (Migration 010).
-- [x] Summary cache table `qa_dashboard_period_summary` dan `qa_dashboard_agent_period_summary` dipakai.
-- [x] Materialized view `mv_qa_period_summary` sudah dipakai, dengan fallback chain ke cache table → raw computed.
+- [x] Summary cache table `qa_dashboard_period_summary` dan `qa_dashboard_agent_period_summary` dipertahankan untuk refresh/backfill dan kompatibilitas database.
+- [x] Materialized view `mv_qa_period_summary` sudah dibuat dan direfresh, sementara dashboard utama selalu menghitung dari temuan mentah secara real-time via scoring engine.
 
 ## 4.5 Migration `P0`
 

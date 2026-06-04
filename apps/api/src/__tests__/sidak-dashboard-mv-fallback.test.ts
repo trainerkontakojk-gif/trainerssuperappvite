@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as fc from "fast-check";
 import {
   mockBuildQuery,
   mockPeriods,
@@ -10,21 +9,24 @@ import {
 
 // ─── Mock Setup ────────────────────────────────────────────────────────────────
 
-let mvState: "returns-data" | "returns-null" | "throws-error" = "returns-data";
+let allowSummaryQueries = false;
 let mvData: Record<string, any> | null = null;
+let mockTemuanRows: any[] = [];
 
 vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
     from: vi.fn((tableName: string) => {
-      if (tableName === "mv_qa_period_summary") {
-        if (mvState === "throws-error") {
-          return mockBuildQuery(tableName, () => {
-            throw new Error('relation "mv_qa_period_summary" does not exist');
-          });
-        }
-        return mockBuildQuery(tableName, () => ({ data: mvData, error: null }));
+      const forbiddenSummaryTables = new Set([
+        "mv_qa_period_summary",
+        "qa_dashboard_period_summary",
+      ]);
+      if (forbiddenSummaryTables.has(tableName) && !allowSummaryQueries) {
+        throw new Error(`${tableName} must not be queried by getDashboardData summary`);
       }
 
+      if (tableName === "mv_qa_period_summary") {
+        return mockBuildQuery(tableName, () => ({ data: mvData, error: null }));
+      }
       if (tableName === "qa_periods") {
         return mockBuildQuery(tableName, () => ({
           data: mockPeriods,
@@ -56,7 +58,7 @@ vi.mock("../lib/supabase", () => ({
         return mockBuildQuery(tableName, () => ({ data: null, error: null }));
       }
       if (tableName === "qa_temuan") {
-        return mockBuildQuery(tableName, () => ({ data: [], error: null }));
+        return mockBuildQuery(tableName, () => ({ data: mockTemuanRows, error: null }));
       }
 
       return mockBuildQuery(tableName, () => ({ data: [], error: null }));
@@ -65,168 +67,75 @@ vi.mock("../lib/supabase", () => ({
   createAdminClient: vi.fn(),
 }));
 
+import { supabaseAdmin } from "../lib/supabase";
 import * as sidakService from "../services/sidak-service";
 
 describe("Dashboard Materialized View Fallback", () => {
   beforeEach(() => {
-    mvState = "returns-data";
+    allowSummaryQueries = false;
     mvData = null;
-  });
-
-  const mvStateArb = fc.oneof(
-    fc.constant("returns-data" as const),
-    fc.constant("returns-null" as const),
-    fc.constant("throws-error" as const),
-  );
-
-  const mvRowArb = fc.record({
-    total_agents: fc.integer({ min: 0, max: 1000 }),
-    total_defects: fc.integer({ min: 0, max: 5000 }),
-    avg_defects_per_audit: fc.float({ min: 0, max: 100, noNaN: true }),
-    zero_error_rate: fc.float({ min: 0, max: 1, noNaN: true }),
-    avg_agent_score: fc.float({ min: 0, max: 100, noNaN: true }),
-    compliance_rate: fc.float({ min: 0, max: 1, noNaN: true }),
-    compliance_count: fc.integer({ min: 0, max: 1000 }),
-  });
-
-  const serviceTypeArb = fc.oneof(
-    fc.constant("call"),
-    fc.constant("email"),
-    fc.constant("chat"),
-  );
-
-  const periodIdArb = fc.uuid();
-
-  it("should always return valid dashboard data regardless of MV state (Property 1)", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        mvStateArb,
-        mvRowArb,
-        serviceTypeArb,
-        periodIdArb,
-        async (state, mvRowData, serviceType, periodId) => {
-          mvState = state;
-
-          if (state === "returns-data") {
-            mvData = {
-              ...mvRowData,
-              period_id: periodId,
-              service_type: serviceType,
-            };
-          } else {
-            mvData = null;
-          }
-
-          const result = await sidakService.getDashboardData({
-            period_ids: [periodId],
-            service_type: serviceType,
-          });
-
-          expect(result).toBeDefined();
-          expect(result.summary).toBeDefined();
-
-          const summary = result.summary!;
-          expect(typeof summary.totalDefects).toBe("number");
-          expect(typeof summary.avgDefectsPerAudit).toBe("number");
-          expect(typeof summary.zeroErrorRate).toBe("number");
-          expect(typeof summary.avgAgentScore).toBe("number");
-          expect(typeof summary.complianceRate).toBe("number");
-          expect(typeof summary.complianceCount).toBe("number");
-          expect(typeof summary.totalAgents).toBe("number");
-
-          expect(Number.isNaN(summary.totalDefects)).toBe(false);
-          expect(Number.isNaN(summary.avgDefectsPerAudit)).toBe(false);
-          expect(Number.isNaN(summary.zeroErrorRate)).toBe(false);
-          expect(Number.isNaN(summary.avgAgentScore)).toBe(false);
-          expect(Number.isNaN(summary.complianceRate)).toBe(false);
-          expect(Number.isNaN(summary.complianceCount)).toBe(false);
-          expect(Number.isNaN(summary.totalAgents)).toBe(false);
-
-          expect(summary.totalDefects).toBeGreaterThanOrEqual(0);
-          expect(summary.totalAgents).toBeGreaterThanOrEqual(0);
-          expect(summary.complianceCount).toBeGreaterThanOrEqual(0);
+    mockTemuanRows = [
+      {
+        period_id: "period-1",
+        peserta_id: "agent-1",
+        service_type: "call",
+        tahun: 2025,
+        no_tiket: "ticket-1",
+        indicator_id: "ind-1",
+        nilai: 2,
+        ketidaksesuaian: "Greeting tidak lengkap",
+        sebaiknya: null,
+        is_phantom_padding: false,
+        profiler_peserta: {
+          id: "agent-1",
+          nama: "Agent One",
+          batch_name: "Folder A",
+          tim: "Team A",
+          jabatan: "Agent",
         },
-      ),
-      { numRuns: 100 },
-    );
+      },
+    ];
+    vi.clearAllMocks();
   });
 
-  it("should use MV data when MV returns valid rows", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        mvRowArb,
-        serviceTypeArb,
-        periodIdArb,
-        async (mvRowData, serviceType, periodId) => {
-          mvState = "returns-data";
-          mvData = {
-            ...mvRowData,
-            period_id: periodId,
-            service_type: serviceType,
-          };
+  it("should calculate summary solely using app scoring engine and not query MV or cache tables", async () => {
+    const result = await sidakService.getDashboardData({
+      period_ids: ["period-1"],
+      service_type: "call",
+    });
 
-          const result = await sidakService.getDashboardData({
-            period_ids: [periodId],
-            service_type: serviceType,
-          });
+    expect(result).toBeDefined();
+    expect(result.summary).toBeDefined();
+    expect(result.summary).toMatchObject({
+      totalDefects: 1,
+      totalAgents: 1,
+    });
 
-          const summary = result.summary!;
-          expect(summary.totalDefects).toBe(Number(mvRowData.total_defects));
-          expect(summary.totalAgents).toBe(Number(mvRowData.total_agents));
-          expect(summary.complianceCount).toBe(
-            Number(mvRowData.compliance_count),
-          );
-        },
-      ),
-      { numRuns: 100 },
-    );
+    // Verify the tables are never queried
+    expect(supabaseAdmin.from).not.toHaveBeenCalledWith("mv_qa_period_summary");
+    expect(supabaseAdmin.from).not.toHaveBeenCalledWith("qa_dashboard_period_summary");
   });
 
-  it("should never propagate MV errors to caller", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        serviceTypeArb,
-        periodIdArb,
-        async (serviceType, periodId) => {
-          mvState = "throws-error";
-          mvData = null;
+  it("should ignore poison/impossible MV data if queries are allowed", async () => {
+    // Even if a future change accidentally leaves table mocks available, poisoned values must not win.
+    allowSummaryQueries = true;
+    mvData = {
+      total_agents: 999,
+      total_defects: 999,
+      avg_defects_per_audit: 999,
+      zero_error_rate: 0.99,
+      avg_agent_score: 1,
+      compliance_rate: 0.01,
+      compliance_count: 999,
+    };
 
-          const result = await sidakService.getDashboardData({
-            period_ids: [periodId],
-            service_type: serviceType,
-          });
+    const result = await sidakService.getDashboardData({
+      period_ids: ["period-1"],
+      service_type: "call",
+    });
 
-          expect(result).toBeDefined();
-          expect(result.summary).toBeDefined();
-          expect(typeof result.summary!.totalDefects).toBe("number");
-          expect(typeof result.summary!.totalAgents).toBe("number");
-        },
-      ),
-      { numRuns: 100 },
-    );
-  });
-
-  it("should fall back gracefully when MV returns null/no rows", async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        serviceTypeArb,
-        periodIdArb,
-        async (serviceType, periodId) => {
-          mvState = "returns-null";
-          mvData = null;
-
-          const result = await sidakService.getDashboardData({
-            period_ids: [periodId],
-            service_type: serviceType,
-          });
-
-          expect(result).toBeDefined();
-          expect(result.summary).toBeDefined();
-          expect(typeof result.summary!.totalDefects).toBe("number");
-          expect(typeof result.summary!.totalAgents).toBe("number");
-        },
-      ),
-      { numRuns: 100 },
-    );
+    expect(result.summary?.totalAgents).not.toBe(999);
+    expect(result.summary?.totalDefects).not.toBe(999);
+    expect(result.summary?.avgAgentScore).not.toBe(1);
   });
 });

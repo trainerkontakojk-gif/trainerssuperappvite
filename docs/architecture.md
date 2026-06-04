@@ -121,7 +121,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - Monitoring lintas akun dan usage billing menggunakan server-side access via admin client, bukan direct browser read terhadap tabel sensitif.
 - History simulasi KETIK/PDKT menggunakan tabel modul masing-masing sebagai sumber utama.
 - Module settings (KETIK, PDKT, Telefun) disimpan namespaced di `user_settings.settings.<module>` agar tidak saling timpa. Setiap modul wajib membaca existing settings sebelum menulis.
-- **SIDAK Dashboard Performance**: Materialized view (`mv_qa_period_summary`) menyediakan ringkasan KPI dengan fallback chain: MV → `qa_dashboard_period_summary` cache → raw computed values. MV direfresh async via `refreshMaterializedView()` setelah `createTemuanBatch()`.
+- **SIDAK Dashboard Performance**: Endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi. Materialized view (`mv_qa_period_summary`) dan tabel cache/summary (`qa_dashboard_period_summary`) dipelihara terpisah untuk kompatibilitas database, workflows backfill, dan offline analytics, namun tidak digunakan pada read-path dashboard utama.
 - **Soft-delete Exclusion**: Semua query SIDAK (dashboard, agents, data reports) otomatis mengecualikan peserta yang terhubung ke profile soft-deleted/inactive, dengan opsi `show_archived=true` untuk override.
 
 ## AI Integration Pattern

@@ -300,6 +300,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 107. **PDKT Shared Mailbox Evaluation Access Sharing Fix** — Fixed AI evaluation polling and retry access blocks for non-owner users when mailbox items are shared. Implemented a two-tier verification check: first tries user client (respecting owner-only RLS on pdkt_history), then queries pdkt_mailbox_items to check if linked to a visible mailbox item, falling back to adminClient query. Removed user_id constraints from background worker processPdktEvaluation. Added 4 E2E route tests. (DONE)
 108. **SIDAK Dashboard Trend Toggle & Total Temuan Filter** — Added "Tampilkan Semua"/"Sembunyikan Semua" toggle for parameter trend chart with rotation animation; "Total Temuan" filter button on Agent Trend Tab isolates only total trend line with active pill styling. 2 files modified. (DONE)
 109. **SIDAK Agent Score Caching & Score Card UI Overhaul** — Agent detail now queries `qa_dashboard_agent_period_summary` MV for cached per-period scores with real-time fallback using `resolveEffectiveRuleVersionForPeriod`. SidakInputScoreCard complete UI overhaul: SVG radial progress ring, glassmorphism, live pulse badge, ShieldAlert/ShieldCheck icons. 3 files modified. (DONE)
+110. **SIDAK Dashboard Summary Consistency Fix** — Dashboard summary KPI cards (`totalDefects`, `avgAgentScore`, `complianceRate`) now computed real-time from `qa_temuan` via app scoring engine, replacing chain MV/cache lookups. Ensures consistency with trend chart data. Multi-period summaries aggregate weighted averages from `periodMetrics`. Compliance description differentiates single vs multi-month. Documentation synced across 4 docs files. 10 files modified. (DONE)
 
 ## Key Files Changed (Phase 58 — 107)
 
@@ -727,7 +728,16 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/services/sidak/agent-directory.ts` — **Phase 109**: Agent detail now queries `qa_dashboard_agent_period_summary` MV for cached per-(period_id,service_type) scores; fallback to real-time via `resolveEffectiveRuleVersionForPeriod` with error-safe DEFAULT_SERVICE_WEIGHTS fallback
 - `apps/web/src/components/sidak/SidakInputScoreCard.tsx` — **Phase 109**: UI overhaul — SVG radial progress ring, glassmorphism (`backdrop-blur-md`), "Skor Kualitas (Live)" rename, live pulse badge, ShieldAlert/ShieldCheck icons, improved info footnote
 - `apps/web/src/__tests__/sidak-input-parity.test.tsx` — **Phase 109**: Updated test assertions for new score card UI (SVG circle, text-2xl, new class names)
-- `docs/rebuild-logs/phase-109-sidak-agent-score-caching-scorecard-ui.md` — **NEW Phase 109**: Documentation for agent score caching & score card UI overhaul
+- `apps/api/src/services/sidak/dashboard-data.ts` — **Phase 110**: Dashboard summary now computed real-time from `qa_temuan` via app scoring engine, replacing MV/cache chain; multi-period summaries aggregate from `periodMetrics` with weighted averages
+- `apps/api/src/services/sidak/dashboard-trends.ts` — **Phase 110**: Returns `periodMetrics` array alongside `paramTrend` and `sparklines` for downstream summary aggregation
+- `apps/web/src/routes/sidak/dashboard.tsx` — **Phase 110**: Compliance description differentiates single vs multi-month (`"X agen..."` vs `"X agen... (rata-rata per bulan)"`)
+- `apps/api/src/__tests__/sidak-dashboard-mv-fallback.test.ts` — **Phase 110**: Refactored to error if summary/cache tables are queried (enforcing MV-free dashboard summary path)
+- `apps/api/src/__tests__/sidak-dashboard-range-summary.test.ts` — **NEW Phase 110**: Multi-period summary aggregation test from `periodMetrics`
+- `docs/SIDAK_LOGIC_AND_SCORING.md` — **Phase 110**: Added note about real-time computation vs MV/cache
+- `docs/architecture.md` — **Phase 110**: Updated SIDAK Dashboard Performance section
+- `docs/checklist-audit-trainers-superapp.md` — **Phase 110**: Updated 2 audit entries
+- `docs/database.md` — **Phase 110**: Updated MV description
+- `docs/rebuild-logs/phase-110-sidak-dashboard-summary-consistency.md` — **NEW Phase 110**: Documentation for dashboard summary consistency fix
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

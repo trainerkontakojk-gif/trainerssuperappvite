@@ -131,7 +131,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 
 ### 7. Monitoring AI Usage & Billing
 
-- **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard SIDAK per periode. Diprioritaskan dari pada `qa_dashboard_period_summary` dengan fallback chain: MV → cache → computed.
+- **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard SIDAK per periode. Dipelihara secara terpisah; endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi.
 - **`ai_usage_logs`**: Log 1 baris per AI call (sukses maupun gagal/timeout). Menyimpan `request_id`, `user_id`, `provider`, `model_id`, `module`, `action`, token, harga, kurs, estimasi biaya, `status` (success/failed/timeout), dan `error_message`.
 - **`ai_pricing_settings`**: Harga token input/output per model kanonik.
 - **`ai_billing_settings`**: Riwayat nilai kurs global USD ke IDR.

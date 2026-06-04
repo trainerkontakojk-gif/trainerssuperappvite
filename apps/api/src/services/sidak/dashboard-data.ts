@@ -259,70 +259,87 @@ export async function getDashboardData(params: {
     if (finalAgentScore >= complianceThreshold) complianceCount++;
   }
 
+  const trends = buildDashboardTrends({
+    periods,
+    rows: rows as DashboardTemuanRow[],
+    indicators,
+    weightMap,
+    year: params.year ?? new Date().getFullYear(),
+    startMonth: params.startMonth,
+    endMonth: params.endMonth,
+    isCountableFinding,
+    calculateScore: (scoreRows, serviceType, periodId) => {
+      const comboKey = `${serviceType}:${periodId}`;
+      const weight =
+        ruleWeightMap[comboKey] ??
+        weightMap[serviceType] ??
+        DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
+        DEFAULT_SERVICE_WEIGHTS.call;
+      const agentIndicators =
+        ruleIndicatorsMap[comboKey] ??
+        indicators.filter((i) => i.service_type === serviceType);
+      return calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight).finalScore;
+    },
+  });
+
   const totalAgents = auditedAgents.length;
 
-  let summary: DashboardSummary = {
-    totalDefects: totalFindings,
-    avgDefectsPerAudit: roundTo(
-      totalAgents > 0 ? totalFindings / totalAgents : 0,
-      2,
-    ),
-    zeroErrorRate: roundTo(
-      totalAgents > 0 ? (zeroErrorCount / totalAgents) * 100 : 0,
-      2,
-    ),
-    avgAgentScore: roundTo(totalAgents > 0 ? totalScore / totalAgents : 0, 2),
-    complianceRate: roundTo(
-      totalAgents > 0 ? (complianceCount / totalAgents) * 100 : 0,
-      2,
-    ),
-    complianceCount,
-    totalAgents,
-  };
-
+  let summary: DashboardSummary;
   if (
     params.period_ids?.length === 1 &&
     params.service_type &&
     params.service_type !== "all"
   ) {
-    try {
-      const { data: mvRow } = await supabaseAdmin
-        .from("mv_qa_period_summary")
-        .select("*")
-        .eq("period_id", params.period_ids[0])
-        .eq("service_type", params.service_type)
-        .maybeSingle();
-      if (mvRow) {
-        summary = {
-          totalDefects: Number(mvRow.total_defects),
-          avgDefectsPerAudit: Number(mvRow.avg_defects_per_audit),
-          zeroErrorRate: Number(mvRow.zero_error_rate) * 100,
-          avgAgentScore: Number(mvRow.avg_agent_score),
-          complianceRate: Number(mvRow.compliance_rate) * 100,
-          complianceCount: Number(mvRow.compliance_count),
-          totalAgents: Number(mvRow.total_agents),
-        };
-      } else {
-        const { data: cachedPeriod } = await supabaseAdmin
-          .from("qa_dashboard_period_summary")
-          .select("*")
-          .eq("period_id", params.period_ids[0])
-          .eq("service_type", params.service_type)
-          .maybeSingle();
-        if (cachedPeriod) {
-          summary = {
-            totalDefects: cachedPeriod.total_defects,
-            avgDefectsPerAudit: Number(cachedPeriod.avg_defects_per_audit),
-            zeroErrorRate: Number(cachedPeriod.zero_error_rate),
-            avgAgentScore: Number(cachedPeriod.avg_agent_score),
-            complianceRate: Number(cachedPeriod.compliance_rate),
-            complianceCount: cachedPeriod.compliance_count,
-            totalAgents: cachedPeriod.total_agents,
-          };
-        }
-      }
-    } catch {
-      // MV unavailable — fall back to raw computed values above
+    summary = {
+      totalDefects: totalFindings,
+      avgDefectsPerAudit: roundTo(
+        totalAgents > 0 ? totalFindings / totalAgents : 0,
+        2,
+      ),
+      zeroErrorRate: roundTo(
+        totalAgents > 0 ? (zeroErrorCount / totalAgents) * 100 : 0,
+        2,
+      ),
+      avgAgentScore: roundTo(totalAgents > 0 ? totalScore / totalAgents : 0, 2),
+      complianceRate: roundTo(
+        totalAgents > 0 ? (complianceCount / totalAgents) * 100 : 0,
+        2,
+      ),
+      complianceCount,
+      totalAgents,
+    };
+    // Keep dashboard summary on the app scoring engine; SQL MV/cache formulas are not scoring-equivalent.
+  } else {
+    if (trends.periodMetrics && trends.periodMetrics.length > 0) {
+      const metrics = trends.periodMetrics;
+      const totalDefects = metrics.reduce((acc, m) => acc + m.total, 0);
+      const totalAudited = metrics.reduce((acc, m) => acc + m.totalAudited, 0);
+      const totalCompliant = metrics.reduce((acc, m) => acc + m.compliance, 0);
+      const avgAgentScoreSum = metrics.reduce((acc, m) => acc + m.avgAgentScore * m.totalAudited, 0);
+      const totalZeroError = metrics.reduce((acc, m) => {
+        const zCount = Math.round((m.zero / 100) * m.totalAudited);
+        return acc + zCount;
+      }, 0);
+
+      summary = {
+        totalDefects,
+        avgDefectsPerAudit: totalAgents > 0 ? roundTo(totalDefects / totalAgents, 2) : 0,
+        zeroErrorRate: totalAudited > 0 ? roundTo((totalZeroError / totalAudited) * 100, 2) : 0,
+        avgAgentScore: totalAudited > 0 ? roundTo(avgAgentScoreSum / totalAudited, 2) : 0,
+        complianceRate: totalAudited > 0 ? roundTo((totalCompliant / totalAudited) * 100, 2) : 0,
+        complianceCount: metrics.length > 0 ? roundTo(totalCompliant / metrics.length, 1) : 0,
+        totalAgents,
+      };
+    } else {
+      summary = {
+        totalDefects: 0,
+        avgDefectsPerAudit: 0,
+        zeroErrorRate: 0,
+        avgAgentScore: 0,
+        complianceRate: 0,
+        complianceCount: 0,
+        totalAgents: 0,
+      };
     }
   }
 
@@ -410,28 +427,7 @@ export async function getDashboardData(params: {
       nonCritical: nonCriticalCount,
       total: criticalCount + nonCriticalCount,
     },
-    ...buildDashboardTrends({
-      periods,
-      rows: rows as DashboardTemuanRow[],
-      indicators,
-      weightMap,
-      year: params.year ?? new Date().getFullYear(),
-      startMonth: params.startMonth,
-      endMonth: params.endMonth,
-      isCountableFinding,
-      calculateScore: (scoreRows, serviceType, periodId) => {
-        const comboKey = `${serviceType}:${periodId}`;
-        const weight =
-          ruleWeightMap[comboKey] ??
-          weightMap[serviceType] ??
-          DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
-          DEFAULT_SERVICE_WEIGHTS.call;
-        const agentIndicators =
-          ruleIndicatorsMap[comboKey] ??
-          indicators.filter((i) => i.service_type === serviceType);
-        return calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight).finalScore;
-      },
-    }),
+    ...trends,
     availableYears,
     currentYear,
     availableServices,

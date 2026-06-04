@@ -100,6 +100,9 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 | `avgAgentScore`      | `sum(finalAgentScore) / totalAgents`             |
 | `complianceRate`     | `(agent dengan score >= 95 / totalAgents) * 100` |
 
+> [!NOTE]
+> Dashboard SIDAK menghitung summary endpoint dari row `qa_temuan` secara real-time memakai scoring engine aplikasi. Materialized view/cache summary tidak menjadi sumber kebenaran untuk response dashboard karena formula SQL/cache dapat tertinggal dari rule-version, grouping sesi, dan `isCountableFinding()`.
+
 ## Delta KPI Dashboard
 
 Persentase kenaikan/penurunan (delta) di KPI Dashboard dihitung berdasarkan dua titik terakhir dari data tren (sparkline). Unit delta disesuaikan dengan jenis metrik:

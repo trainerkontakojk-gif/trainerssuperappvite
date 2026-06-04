@@ -239,7 +239,10 @@ export default function SidakDashboardPage() {
       value: `${(summary?.complianceRate ?? 0).toFixed(1)}%`,
       icon: Sparkles,
       color: "emerald" as const,
-      desc: `${summary?.complianceCount ?? 0} agen dengan skor ≥ 95`,
+      desc:
+        startMonth !== endMonth
+          ? `${Math.round(summary?.complianceCount ?? 0)} agen dengan skor ≥ 95 (rata-rata per bulan)`
+          : `${summary?.complianceCount ?? 0} agen dengan skor ≥ 95`,
       deltaUnit: "percentage-point" as const,
       lowerIsBetter: false,
     },
