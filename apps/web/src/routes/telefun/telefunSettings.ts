@@ -240,6 +240,18 @@ export const DEFAULT_IDENTITY_POOL: DefaultProfile[] = [
   },
 ];
 
+function pickIdentityProfileForGender(gender: "male" | "female"): DefaultProfile {
+  const pool = DEFAULT_IDENTITY_POOL.filter((profile) => profile.gender === gender);
+  return pool[Math.floor(Math.random() * pool.length)] ?? DEFAULT_IDENTITY_POOL[0];
+}
+
+function resolveGender(g?: "male" | "female" | "random"): "male" | "female" {
+  if (g === "random" || !g) {
+    return Math.random() > 0.5 ? "male" : "female";
+  }
+  return g;
+}
+
 export function resolveFinalIdentity(
   identitySettings: TelefunIdentitySettings,
 ): TelefunIdentity {
@@ -247,62 +259,35 @@ export function resolveFinalIdentity(
   const hasPhone = identitySettings.phoneNumber.trim().length > 0;
   const hasCity = identitySettings.city.trim().length > 0;
 
-  const allEmpty = !hasName && !hasPhone && !hasCity;
-  const allFilled = hasName && hasPhone && hasCity;
+  // When gender is "random", pick a random profile first, then use its gender
+  const finalGender = identitySettings.gender === "random"
+    ? pickIdentityProfileForGender(Math.random() > 0.5 ? "male" : "female").gender
+    : resolveGender(identitySettings.gender);
 
-  const resolveGender = (g?: "male" | "female" | "random") => {
-    if (g === "random" || !g) return Math.random() > 0.5 ? "male" : "female";
-    return g;
-  };
+  const fallbackProfile = pickIdentityProfileForGender(finalGender);
 
-  if (allEmpty) {
-    const profile =
-      DEFAULT_IDENTITY_POOL[
-        Math.floor(Math.random() * DEFAULT_IDENTITY_POOL.length)
-      ];
-    return {
-      name: profile.name,
-      phone: profile.phone,
-      city: profile.city,
-      gender: profile.gender,
-      voiceName: profile.voiceName,
-      signatureName: identitySettings.signatureName,
-    };
-  }
+  const resolvedVoice = resolveVoiceForGender(
+    identitySettings.voiceName || undefined,
+    finalGender,
+  );
 
-  if (allFilled) {
-    const resolvedGender = resolveGender(identitySettings.gender);
+  if (hasName && hasPhone && hasCity) {
     return {
       name: identitySettings.displayName,
       phone: identitySettings.phoneNumber,
       city: identitySettings.city,
-      gender: resolvedGender,
-      voiceName: resolveVoiceForGender(
-        identitySettings.voiceName || undefined,
-        resolvedGender,
-      ),
+      gender: finalGender,
+      voiceName: resolvedVoice,
       signatureName: identitySettings.signatureName,
     };
   }
 
-  const profile =
-    DEFAULT_IDENTITY_POOL[
-      Math.floor(Math.random() * DEFAULT_IDENTITY_POOL.length)
-    ];
-  const resolvedGender = hasName
-    ? resolveGender(identitySettings.gender)
-    : profile.gender;
   return {
-    name: hasName ? identitySettings.displayName : profile.name,
-    phone: hasPhone ? identitySettings.phoneNumber : profile.phone,
-    city: hasCity ? identitySettings.city : profile.city,
-    gender: resolvedGender,
-    voiceName: hasName
-      ? resolveVoiceForGender(
-          identitySettings.voiceName || undefined,
-          resolvedGender,
-        )
-      : profile.voiceName,
+    name: hasName ? identitySettings.displayName : fallbackProfile.name,
+    phone: hasPhone ? identitySettings.phoneNumber : fallbackProfile.phone,
+    city: hasCity ? identitySettings.city : fallbackProfile.city,
+    gender: finalGender,
+    voiceName: resolvedVoice,
     signatureName: identitySettings.signatureName,
   };
 }

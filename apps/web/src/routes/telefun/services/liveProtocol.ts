@@ -99,6 +99,14 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+export function float32ToPcm16Buffer(inputData: Float32Array): ArrayBuffer {
+  const pcm16 = new Int16Array(inputData.length);
+  for (let i = 0; i < inputData.length; i += 1) {
+    pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
+  }
+  return pcm16.buffer;
+}
+
 export function buildRealtimeAudioMessage(buffer: ArrayBuffer) {
   return {
     realtimeInput: {

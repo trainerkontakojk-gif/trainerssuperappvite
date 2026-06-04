@@ -304,8 +304,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 111. **Telefun Finalizer Status Refactor** — Replaced 3 mutable failure flags (`scoringFailed`, `saveFailed`, `uploadFailed`) scattered across `sessionFinalizer.ts` with a typed `FinalizerStatus` object and explicit marking helpers (`createFinalizerStatus()`, `markUploadFailed()`, `markSaveFailed()`, `markScoringFailed()`). Behavior-preserving refactor — public return contract unchanged. 2 characterization tests added. 1 file modified. (DONE)
 112. **Type Safety & Maintainability Refactor** — Three independent type safety improvements: (1) KETIK ChatInterface — extracted `KetikMessageBubble`, `KetikImageLightbox`, `getKetikScenarioImages` into dedicated files; `ChatInterface.tsx` reduced 277→16 lines. (2) SIDAK dashboard types — added 9 typed converter functions in `dashboard-types.ts`, replaced all `(agent as any).xxx` mutations with `withDashboardAgentMetrics()`, added `DashboardAgentWithMetrics` type, added `no_tiket`/`created_at` fields to `DashboardTemuanRow`. (3) Telefun realistic mode — added `RealisticModeMetrics` interface, typed AudioContext fallback, removed `(metrics as any)` casts via `SessionMetricsExtended.realisticModeMetrics`. 3 new boundary test files. Zero logic change. (DONE)
 113. **Profiler Slides Label Fix** — Renamed slide mode labels for clarity: "Original" → "Landscape" (title: "Versi Landscape"), "Opsi 2" → "Portrait" (title: "Portrait A4"). Updated `ParticipantSlide.tsx` subtitle from "Opsi 2 · Portrait A4" to "Portrait A4". 2 files modified. (DONE)
+114. **Telefun Live Audio, Orchestrator, Radar, dan Identity Fix** — Fixed 5 Telefun bugs: (1) Gender-first identity resolver (`resolveFinalIdentity()` gender-first, `pickIdentityProfileForGender()` helper, Kore voice auto-normalize), (2) Orchestrator removal from live path (prompt-only realistic mode + SILENT HANDLING section), (3) Audio encoding hardening (`float32ToPcm16Buffer()` helper, base64 roundtrip validation), (4) Canonical communication profile builder (`packages/types/src/telefun-communication-profile.ts` shared source-of-truth), (5) Radar chart explicit dataKey (`userValue`/`targetValue`), ResizeObserver dimension guard. 14 files modified, 1 new shared helper file, 199 tests passing (164 web + 30 API + 5 proxy). (DONE)
 
-## Key Files Changed (Phase 58 — 113)
+## Key Files Changed (Phase 58 — 114)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -437,6 +438,21 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/profiler/components/slides/SlideModeControls.tsx` — **Phase 113**: Renamed "Original" → "Landscape" ("Versi Landscape"), "Opsi 2" → "Portrait" ("Portrait A4")
 - `apps/web/src/routes/profiler/components/slides/ParticipantSlide.tsx` — **Phase 113**: Changed subtitle from "Opsi 2 · Portrait A4" to "Portrait A4"
 - `docs/rebuild-logs/phase-113-profiler-slides-label-fix.md` — **NEW Phase 113**: Documentation for profiler slides label fix
+- `packages/types/src/telefun-communication-profile.ts` — **NEW Phase 114**: Canonical shared communication profile builder (benchmark defaults, status evaluation, value builders)
+- `packages/types/src/index.ts` — **Phase 114**: Added export for `telefun-communication-profile`
+- `apps/web/src/routes/telefun/telefunSettings.ts` — **Phase 114**: Gender-first identity resolver (`pickIdentityProfileForGender()`, Kore→male voice auto-normalize)
+- `apps/web/src/routes/telefun/services/geminiService.ts` — **Phase 114**: Orchestrator removed from live path, simplified `SessionMetrics`, extracted PCM conversion
+- `apps/web/src/routes/telefun/services/liveProtocol.ts` — **Phase 114**: Added `float32ToPcm16Buffer()` helper for audio encoding
+- `apps/web/src/routes/telefun/services/promptBuilder.ts` — **Phase 114**: Added SILENT HANDLING section with non-aggressive rules for realistic mode
+- `apps/web/src/routes/telefun/components/VoiceRadarChart.tsx` — **Phase 114**: Explicit `userValue`/`targetValue` data keys, `buildVoiceRadarData()` helper, `ResizeObserver` dimension guard
+- `apps/web/src/lib/voiceAssessmentUtils.ts` — **Phase 114**: Delegates `getCommunicationProfileFromAssessment()` to shared helper, removed duplicate benchmark defaults
+- `apps/api/src/lib/telefun-communication-profile.ts` — **Phase 114**: Re-export from shared `@trainers/types` helper (294→5 lines)
+- `apps/web/src/__tests__/telefun-settings-model-default.test.ts` — **Phase 114**: Added 4 identity gender-first characterization tests
+- `apps/web/src/__tests__/telefun-prompt-builder.test.ts` — **Phase 114**: Added 2 silent handling prompt tests
+- `apps/web/src/__tests__/telefun-live-protocol.test.ts` — **Phase 114**: Added 3 audio encoding tests (PCM16, clamping, base64 roundtrip)
+- `apps/telefun/src/server-protocol.test.ts` — **Phase 114**: Added realtimeInput.audio forwardable message test
+- `apps/web/src/__tests__/telefun-communication-profile.test.tsx` — **Phase 114**: Added 2 `buildVoiceRadarData` helper tests
+- `docs/rebuild-logs/phase-114-telefun-live-audio-radar-identity-fix.md` — **NEW Phase 114**: Documentation for Telefun live audio, orchestrator, radar, dan identity fix
 
 ## Relevant Files
 

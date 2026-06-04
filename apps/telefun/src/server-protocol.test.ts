@@ -23,6 +23,17 @@ describe("telefun proxy protocol", () => {
     expect(hasGeminiSetupComplete({ serverContent: {} })).toBe(false);
   });
 
+  it("accepts realtimeInput with user audio payload", () => {
+    expect(isGeminiForwardableMessage({
+      realtimeInput: {
+        audio: {
+          mimeType: "audio/pcm;rate=16000",
+          data: "AAAA",
+        },
+      },
+    })).toBe(true);
+  });
+
   it("keeps current forwardable message contract", () => {
     expect(isGeminiForwardableMessage({ setup: {} })).toBe(true);
     expect(isGeminiForwardableMessage({ realtimeInput: { audioStreamEnd: true } })).toBe(true);

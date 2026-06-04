@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { VoiceRadarChart } from "../routes/telefun/components/VoiceRadarChart";
+import { VoiceRadarChart, buildVoiceRadarData } from "../routes/telefun/components/VoiceRadarChart";
 import { CommunicationProfileZoomModal } from "../routes/telefun/components/CommunicationProfileZoomModal";
 import type { TelefunCommunicationProfile } from "@trainers/types";
 
@@ -63,6 +63,33 @@ const mockProfile: TelefunCommunicationProfile = {
   strengths: ["Artikulasi jelas", "Fillers minim"],
   improvementPriorities: ["Intonasi perlu lebih hangat"],
 };
+
+describe("buildVoiceRadarData", () => {
+  it("maps metrics to VoiceRadarDatum with userValue and targetValue", () => {
+    const data = buildVoiceRadarData(mockProfile);
+    expect(data).toHaveLength(5);
+
+    const sr = data.find((d) => d.key === "speakingRate");
+    expect(sr).toBeDefined();
+    expect(sr!.subject).toBe("speakingRate");
+    expect(sr!.userValue).toBe(75);
+    expect(sr!.targetValue).toBe(70);
+    expect(sr!.fullMark).toBe(100);
+
+    const fillers = data.find((d) => d.key === "fillers");
+    expect(fillers).toBeDefined();
+    expect(fillers!.userValue).toBe(15);
+    expect(fillers!.targetValue).toBe(20);
+  });
+
+  it("produces non-zero userValue and targetValue for all metrics", () => {
+    const data = buildVoiceRadarData(mockProfile);
+    for (const datum of data) {
+      expect(datum.userValue).toBeGreaterThan(0);
+      expect(datum.targetValue).toBeGreaterThan(0);
+    }
+  });
+});
 
 describe("VoiceRadarChart", () => {
   it("renders chart when profile has metrics", () => {

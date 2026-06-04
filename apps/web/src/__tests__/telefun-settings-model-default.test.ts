@@ -1,10 +1,91 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_TELEFUN_SETTINGS,
   parseTelefunSettings,
   ConsumerDifficulty,
   resolveFinalIdentity,
+  MALE_VOICES,
+  FEMALE_VOICES,
 } from "../routes/telefun/telefunSettings";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("resolveFinalIdentity gender-first", () => {
+  it("[CHAR] gender male + all empty → gender male, name from male pool, male voice", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99); // would pick female if random across pool
+
+    const identity = resolveFinalIdentity({
+      displayName: "",
+      gender: "male",
+      phoneNumber: "",
+      city: "",
+      signatureName: "",
+      voiceName: "",
+    });
+
+    expect(identity.gender).toBe("male");
+    expect(MALE_VOICES.includes(identity.voiceName as any)).toBe(true);
+    // name should be from a male profile, e.g. "Agus Setiawan", "Budi Hartono", etc.
+    const maleNames = ["Agus Setiawan", "Budi Hartono", "Hendra Wijaya", "Andi Pratama", "Rudi Hermawan", "Dian Permana"];
+    expect(maleNames).toContain(identity.name);
+  });
+
+  it("[CHAR] gender female + all empty → gender female, name from female pool, female voice", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.01); // would pick male if random across pool
+
+    const identity = resolveFinalIdentity({
+      displayName: "",
+      gender: "female",
+      phoneNumber: "",
+      city: "",
+      signatureName: "",
+      voiceName: "",
+    });
+
+    expect(identity.gender).toBe("female");
+    expect(FEMALE_VOICES.includes(identity.voiceName as any)).toBe(true);
+    const femaleNames = ["Siti Rahayu", "Dewi Lestari", "Rina Marlina", "Fitri Handayani", "Mega Ayuningtyas", "Lina Kusuma"];
+    expect(femaleNames).toContain(identity.name);
+  });
+
+  it("[CHAR] gender male + voiceName Kore (female) → normalizes to male voice", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+    const identity = resolveFinalIdentity({
+      displayName: "Budi",
+      gender: "male",
+      phoneNumber: "0811",
+      city: "Jakarta",
+      signatureName: "",
+      voiceName: "Kore", // female voice — should be rejected
+    });
+
+    expect(identity.gender).toBe("male");
+    expect(MALE_VOICES.includes(identity.voiceName as any)).toBe(true);
+    expect(identity.voiceName).not.toBe("Kore");
+  });
+
+  it("[CHAR] gender male + partial fill (missing phone/city) falls back with male identity", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+
+    const identity = resolveFinalIdentity({
+      displayName: "Budi",
+      gender: "male",
+      phoneNumber: "",
+      city: "",
+      signatureName: "",
+      voiceName: "",
+    });
+
+    expect(identity.gender).toBe("male");
+    expect(identity.name).toBe("Budi");
+    expect(identity.phone).not.toBe("");
+    expect(identity.city).not.toBe("");
+    expect(MALE_VOICES.includes(identity.voiceName as any)).toBe(true);
+  });
+});
 
 describe("resolveFinalIdentity fallback", () => {
   it("uses default pool when all identity fields are empty", () => {

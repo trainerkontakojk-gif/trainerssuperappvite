@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Radar,
   RadarChart,
@@ -9,6 +9,16 @@ import {
   Legend,
 } from "recharts";
 import type { CommunicationMetric, TelefunCommunicationProfile } from "@trainers/types";
+
+interface VoiceRadarDatum {
+  key: CommunicationMetric["key"];
+  subject: string;
+  label: string;
+  userValue: number;
+  targetValue: number;
+  fullMark: 100;
+  evaluationMode: CommunicationMetric["evaluationMode"];
+}
 
 interface VoiceRadarChartProps {
   profile: TelefunCommunicationProfile;
@@ -26,15 +36,51 @@ const AXIS_META: Record<
   tone: { label: "Tone", directionHint: "semakin tinggi" },
 };
 
+export function buildVoiceRadarData(
+  profile: TelefunCommunicationProfile,
+): VoiceRadarDatum[] {
+  return profile.metrics.map((metric) => ({
+    key: metric.key,
+    subject: metric.key,
+    label: AXIS_META[metric.key]?.label ?? metric.label,
+    userValue: metric.value,
+    targetValue: metric.benchmarkValue,
+    fullMark: 100,
+    evaluationMode: metric.evaluationMode,
+  }));
+}
+
 export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = ({
   profile,
   compact = false,
 }) => {
-  const [mounted, setMounted] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
-    return () => setMounted(false);
+    const el = wrapperRef.current;
+    if (!el) return;
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          const h = entry.contentRect.height;
+          if (w > 0 && h > 0) {
+            setMeasuredWidth(w);
+          }
+        }
+      });
+      ro.observe(el);
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) {
+        setMeasuredWidth(w);
+      }
+      return () => ro.disconnect();
+    } else {
+      // Fallback for jsdom/non-browser: set measured width from clientWidth
+      setMeasuredWidth(el.clientWidth || 1);
+    }
   }, []);
 
   if (!profile.metrics || profile.metrics.length === 0) {
@@ -47,15 +93,7 @@ export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = ({
     );
   }
 
-  const chartData = profile.metrics.map((m) => ({
-    subject: AXIS_META[m.key]?.label ?? m.label,
-    [m.label]: m.value,
-    benchmark: m.benchmarkValue,
-    fullMark: 100,
-    key: m.key,
-    evaluationMode: m.evaluationMode,
-    directionHint: AXIS_META[m.key]?.directionHint ?? "",
-  }));
+  const chartData = buildVoiceRadarData(profile);
 
   const renderLegend = (props: any) => {
     const { payload } = props;
@@ -80,82 +118,81 @@ export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = ({
   const outerRadius = compact ? "70%" : "75%";
   const tickFontSize = compact ? 10 : 12;
 
-  if (!mounted) {
-    return (
-      <div
-        className={`min-h-0 min-w-0 w-full`}
-        style={{ height }}
-      />
-    );
-  }
-
   return (
-    <div className="w-full min-w-0 min-h-0" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%" minHeight={0}>
-        <RadarChart
-          cx="50%"
-          cy="50%"
-          outerRadius={outerRadius}
-          data={chartData}
-        >
-          <PolarGrid stroke="#94a3b8" strokeOpacity={0.2} />
-          <PolarAngleAxis
-            dataKey="subject"
-            tick={({ payload, x, y, cx, cy, ...rest }: any) => {
-              const metric = profile.metrics.find(
-                (m) => m.label === payload.value,
-              );
-              const isLowerBetter =
-                metric?.evaluationMode === "lower_better";
-              return (
-                <text
-                  x={x}
-                  y={y}
-                  textAnchor={
-                    x > cx ? "start" : x < cx ? "end" : "middle"
-                  }
-                  fill="#64748b"
-                  fontSize={tickFontSize}
-                  fontWeight={700}
+    <div
+      ref={wrapperRef}
+      className="relative w-full min-w-0 overflow-hidden"
+      style={{ height, minHeight: height }}
+    >
+      {measuredWidth > 0 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart
+            cx="50%"
+            cy="50%"
+            outerRadius={outerRadius}
+            data={chartData}
+          >
+            <PolarGrid stroke="#94a3b8" strokeOpacity={0.2} />
+            <PolarAngleAxis
+              dataKey="subject"
+              tick={({ payload, x, y, cx, cy }: any) => {
+                const metric = chartData.find(
+                  (d) => d.key === payload.value,
+                );
+                const isLowerBetter =
+                  metric?.evaluationMode === "lower_better";
+                return (
+                  <text
+                    x={x}
+                    y={y}
+                    textAnchor={
+                      x > cx ? "start" : x < cx ? "end" : "middle"
+                    }
+                    fill="#64748b"
+                    fontSize={tickFontSize}
+                    fontWeight={700}
                   dy={y > cy ? 10 : -4}
                 >
-                  {payload.value}
-                  {isLowerBetter && (
-                    <tspan fill="#f59e0b" fontSize={tickFontSize - 2}>
-                      {" "}(<tspan fill="#f59e0b" fontSize={tickFontSize - 2}>&darr;</tspan>)
-                    </tspan>
-                  )}
-                </text>
-              );
-            }}
-          />
-          <PolarRadiusAxis
-            angle={30}
-            domain={[0, 100]}
-            tick={{ fill: "#94a3b8", fontSize: 9 }}
-            axisLine={false}
-            tickCount={5}
-          />
-          <Radar
-            name="Target QA"
-            dataKey="benchmark"
-            stroke="#10b981"
-            fill="#10b981"
-            fillOpacity={0.1}
-            strokeWidth={2}
-            strokeDasharray="4 4"
-          />
-          <Radar
-            name="Hasil Anda"
-            dataKey={(d) => d[d.subject] || 0}
-            stroke="#3b82f6"
-            fill="#3b82f6"
-            fillOpacity={0.2}
-            strokeWidth={2}
-          />
-          <Legend content={renderLegend} />
-        </RadarChart>
-      </ResponsiveContainer>
+                  {metric?.label ?? payload.value}
+                    {isLowerBetter && (
+                      <tspan fill="#f59e0b" fontSize={tickFontSize - 2}>
+                        {" "}(<tspan fill="#f59e0b" fontSize={tickFontSize - 2}>&darr;</tspan>)
+                      </tspan>
+                    )}
+                  </text>
+                );
+              }}
+            />
+            <PolarRadiusAxis
+              angle={30}
+              domain={[0, 100]}
+              tick={{ fill: "#94a3b8", fontSize: 9 }}
+              axisLine={false}
+              tickCount={5}
+            />
+            <Radar
+              name="Target QA"
+              dataKey="targetValue"
+              stroke="#10b981"
+              fill="#10b981"
+              fillOpacity={0.1}
+              strokeWidth={2}
+              strokeDasharray="4 4"
+            />
+            <Radar
+              name="Hasil Anda"
+              dataKey="userValue"
+              stroke="#3b82f6"
+              fill="#3b82f6"
+              fillOpacity={0.2}
+              strokeWidth={2}
+            />
+            <Legend content={renderLegend} />
+          </RadarChart>
+        </ResponsiveContainer>
+      ) : (
+        <div style={{ height }} />
+      )}
     </div>
   );
 };

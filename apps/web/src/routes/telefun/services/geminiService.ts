@@ -1,12 +1,7 @@
 import type { TelefunAppSettings } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
-import type { SessionMetricsExtended } from "./realisticMode/types";
 import {
-  RealisticModeOrchestrator,
-} from "./realisticMode/RealisticModeOrchestrator";
-import {
-  resolveTelefunRealisticModeConfig,
   updateInterruptionGuard,
   InterruptionGuardState,
 } from "./guards";
@@ -15,6 +10,7 @@ import {
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
   buildRealtimeAudioMessage,
+  float32ToPcm16Buffer,
   shouldSendRealtimeAudio,
   extractGeminiInlineAudioChunks,
 } from "./liveProtocol";
@@ -75,8 +71,6 @@ export class LiveSession {
   private readonly STALLED_RESPONSE_START_MS = 12000;
   private readonly STALLED_RESPONSE_MID_MS = 15000;
 
-  // Realistic Mode
-  private orchestrator: RealisticModeOrchestrator | null = null;
   private interruptionGuardState: InterruptionGuardState = {
     aiSpeakingStartedAt: null,
     nonSilentStartedAt: null,
@@ -107,12 +101,7 @@ export class LiveSession {
   private interruptionCount: number = 0;
   private deadAirCount: number = 0;
 
-  constructor(private config: TelefunAppSettings) {
-    if (config.realisticModeEnabled) {
-      const orchestratorConfig = resolveTelefunRealisticModeConfig(config);
-      this.orchestrator = new RealisticModeOrchestrator(orchestratorConfig);
-    }
-  }
+  constructor(private config: TelefunAppSettings) {}
 
   public async connect() {
     try {
@@ -241,39 +230,16 @@ export class LiveSession {
       this.lastModelActivityMs = Date.now();
       this.setIsAiSpeaking(true);
       this.setSessionState("ai_speaking");
-      if (this.orchestrator) this.orchestrator.onConsumerResponse(Date.now());
     }
     if (msg.serverContent?.turnComplete) {
       this.setIsAiSpeaking(false);
       this.setSessionState("idle");
-      if (this.orchestrator) {
-        const action = this.orchestrator.onModelTurnComplete();
-        this.handleOrchestratorAction(action);
-      }
     }
     if (msg.type === "silence") {
       this.deadAirCount++;
     }
     if (msg.serverContent?.interrupted) {
       this.emitTimelineEvent("interrupted_received");
-    }
-  }
-
-  private handleOrchestratorAction(action: any) {
-    if (action.type === "inject_prompt") {
-      this.sendPrompt(action.text);
-      this.emitTimelineEvent("realistic_mode_prompt", {
-        text: action.text,
-        source: action.source,
-      });
-    } else if (action.type === "session_recovery") {
-      this.emitTimelineEvent("realistic_mode_session_recovery");
-      // Potentially reconnect or reset
-    } else if (action.type === "end_session") {
-      this.disconnect();
-      this.emitTimelineEvent("realistic_mode_end_session", {
-        source: action.source,
-      });
     }
   }
 
@@ -339,11 +305,10 @@ export class LiveSession {
 
       const isSilent = vol <= 10;
 
-      // Dead Air Detection (only when NOT held, NOT muted, and NOT in realistic mode)
-      // Realistic mode: prolongued silence handler in orchestrator manages this
-      if (!this.isHeld && !this.isMuted && !this.orchestrator) {
+      // Dead Air Detection (prompt-only, throttled)
+      if (!this.isHeld && !this.isMuted) {
         if (isSilent) {
-          this.deadAirSilenceMs += 4096 / (16000 / 1000); // ms per frame
+          this.deadAirSilenceMs += 4096 / (16000 / 1000);
           const nowMs = Date.now();
           if (
             this.deadAirSilenceMs >= this.DEAD_AIR_THRESHOLD_MS &&
@@ -360,8 +325,8 @@ export class LiveSession {
         this.deadAirSilenceMs = 0;
       }
 
-      // Long Speech Detection (only when NOT held and NOT muted, non-realistic mode fallback)
-      if (!this.isHeld && !this.isMuted && !this.orchestrator) {
+      // Long Speech Detection
+      if (!this.isHeld && !this.isMuted) {
         if (!isSilent) {
           if (!this.longSpeechStartMs) {
             this.longSpeechStartMs = now;
@@ -398,43 +363,11 @@ export class LiveSession {
         }
       }
 
-      // Realistic Mode Orchestration
-      if (this.orchestrator && !this.isHeld && !this.isMuted) {
-        const ttResult = this.orchestrator.evaluateAudioFrame({
-          now,
-          isSilent,
-          rms,
-          sessionState: this.sessionState,
-        });
-
-        if (ttResult.action === "end_of_turn") {
-          this.emitTimelineEvent("local_user_turn_end_detected");
-        }
-
-        const fallbackAction = this.orchestrator.evaluateFallbackResponse({
-          now,
-          sessionState: this.sessionState,
-        });
-        this.handleOrchestratorAction(fallbackAction);
-
-        const silenceAction = this.orchestrator.evaluateProlongedSilence({
-          now,
-          agentSpeaking: !isSilent,
-          agentAudioDurationMs: this.currentSpeechSegment
-            ? now - this.currentSpeechSegment.startMs
-            : 0,
-          sessionState: this.sessionState,
-          uiHoldActive: this.isHeld,
-        });
-        this.handleOrchestratorAction(silenceAction);
-      }
-
       // Speech Segments
       if (!isSilent) {
         if (!this.currentSpeechSegment) {
           this.currentSpeechSegment = { startMs: now };
           this.setSessionState("user_speaking");
-          if (this.orchestrator) this.orchestrator.onAgentStartSpeaking(now);
         }
       } else if (this.currentSpeechSegment) {
         const endMs = now;
@@ -449,7 +382,6 @@ export class LiveSession {
         }
         this.currentSpeechSegment = null;
         this.setSessionState("ai_thinking");
-        if (this.orchestrator) this.orchestrator.onAgentStopSpeaking(now);
       }
 
       const canSend = shouldSendRealtimeAudio({
@@ -461,11 +393,7 @@ export class LiveSession {
 
       if (!canSend) return;
 
-      const pcm16 = new Int16Array(inputData.length);
-      for (let i = 0; i < inputData.length; i++) {
-        pcm16[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
-      }
-      this.ws!.send(JSON.stringify(buildRealtimeAudioMessage(pcm16.buffer)));
+      this.ws!.send(JSON.stringify(buildRealtimeAudioMessage(float32ToPcm16Buffer(inputData))));
       if (!this.hasSentFirstUserAudio) {
         this.hasSentFirstUserAudio = true;
         this.emitTimelineEvent("first_user_audio_chunk_sent");
@@ -639,15 +567,6 @@ export class LiveSession {
   public setHold(held: boolean) {
     this.isHeld = held;
     this.emitTimelineEvent("hold_state_changed", { held });
-    if (this.orchestrator) {
-      const action = this.orchestrator.evaluateHoldStateInput({
-        now: Date.now(),
-        uiButtonPressed: held,
-        uiButtonReleased: !held,
-        uiTimerExpired: false,
-      });
-      this.handleOrchestratorAction(action);
-    }
   }
 
   private setIsAiSpeaking(speaking: boolean) {
@@ -712,7 +631,7 @@ export class LiveSession {
         : null;
     const url = fullBlob ? URL.createObjectURL(fullBlob) : null;
 
-    const metrics: SessionMetricsExtended = {
+    const metrics: SessionMetrics = {
       speechSegments: this.speechSegments,
       totalSpeakingMs: this.totalSpeakingMs,
       totalSilenceMs: Math.max(
@@ -725,19 +644,7 @@ export class LiveSession {
       volumeConsistency: this.calculateVolumeConsistency(),
       inputTranscriptionChunks: [],
       sessionDurationMs: Date.now() - this.sessionStartTime,
-      turnTakingEvents: [],
-      fallbackCount: 0,
-      fallbackRecoveryCount: 0,
-      backchannelCount: 0,
-      personaIntensityHistory: [],
-      disruptionOutcomes: [],
-      speakingDominanceRatio: 0,
-      estimatedWpm: 0,
     };
-
-    if (this.orchestrator) {
-      metrics.realisticModeMetrics = this.orchestrator.getMetrics();
-    }
 
     this.onRecordingComplete(url, fullBlob, agentBlob, metrics);
   }
@@ -782,7 +689,4 @@ export class LiveSession {
     });
   }
 
-  public getOrchestrator() {
-    return this.orchestrator;
-  }
 }

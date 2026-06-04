@@ -7,3 +7,4 @@ export * from "./ai";
 export * from "./profiler";
 export * from "./admin";
 export * from "./ai-models";
+export * from "./telefun-communication-profile";

@@ -33,6 +33,15 @@ export function buildTelefunLiveSystemInstruction(params: {
     ? "SUARA: LAKI-LAKI (Bapak-bapak). Gunakan suara berat."
     : "SUARA: PEREMPUAN (Ibu-ibu). Gunakan suara wanita.";
 
+  const silentInstruction = responsePacingMode === "realistic"
+    ? `\nSILENT HANDLING (REALISTIS):
+1. Jika agen diam sebentar (<10 detik), tunggu dengan sabar. Jangan panik atau mengulang panggilan.
+2. Jika agen diam lebih lama (10-15 detik), panggil agen secara natural satu kali (misal: "Halo? Masih ada?").
+3. Jangan mengulang panggilan berkali-kali. Satu kali cukup.
+4. Jangan mengakhiri sesi hanya karena agen diam atau memberikan jawaban singkat.
+5. Jika agen hanya merespons dengan "iya", "baik", "oke", "hmm", "lanjut" — lanjutkan eksposisi masalahmu.`
+    : "";
+
   const timeLimitInstruction = maxCallDuration > 0
     ? `\nBATAS WAKTU: Simulasi ini dibatasi maksimal ${maxCallDuration} menit. Jika kamu merasa percakapan sudah mendekati batas waktu ini, kamu HARUS segera mengakhiri telepon (misalnya: "Ya sudah terima kasih, saya tutup", "Saya ada urusan lain", atau "Pulsa saya habis") MESKIPUN SKRIP BELUM SELESAI. Prioritaskan menutup telepon jika waktu habis.`
     : "";
@@ -59,7 +68,7 @@ Isi skrip:
 ${scenario.script}`
     : "";
 
-  return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).
+  return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).${silentInstruction}
 
 IDENTITAS ANDA (WAJIB KONSISTEN):
 - NAMA: ${identity.name} (${identity.gender === "male" ? "Pria" : "Wanita"})

@@ -4,6 +4,7 @@ import {
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
   buildRealtimeAudioMessage,
+  float32ToPcm16Buffer,
   extractGeminiInlineAudioChunks,
   parsePcmSampleRate,
   shouldSendRealtimeAudio,
@@ -57,6 +58,40 @@ describe("telefun live protocol", () => {
     expect(message.realtimeInput.audio.mimeType).toBe("audio/pcm;rate=16000");
     expect(typeof message.realtimeInput.audio.data).toBe("string");
     expect(message.realtimeInput.audio.data.length).toBeGreaterThan(0);
+  });
+
+  it("float32ToPcm16Buffer converts Float32 audio to PCM16 ArrayBuffer", () => {
+    const input = new Float32Array([0.5, -0.5, 0.0, 1.0, -1.0]);
+    const buffer = float32ToPcm16Buffer(input);
+    const pcm16 = new Int16Array(buffer);
+
+    expect(pcm16.length).toBe(5);
+    expect(pcm16[0]).toBe(16383); // Math.trunc(0.5 * 32767)
+    expect(pcm16[1]).toBe(-16383); // Math.trunc(-0.5 * 32767)
+    expect(pcm16[2]).toBe(0); // 0.0
+    expect(pcm16[3]).toBe(32767); // 1.0 * 32767
+    expect(pcm16[4]).toBe(-32767); // -1.0 * 32767
+  });
+
+  it("float32ToPcm16Buffer clamps values outside [-1, 1]", () => {
+    const input = new Float32Array([2.0, -2.0]);
+    const buffer = float32ToPcm16Buffer(input);
+    const pcm16 = new Int16Array(buffer);
+
+    expect(pcm16[0]).toBe(32767); // clamped to 1.0 * 32767
+    expect(pcm16[1]).toBe(-32767); // clamped to -1.0 * 32767
+  });
+
+  it("buildRealtimeAudioMessage with float32 input produces valid base64 that can be decoded", () => {
+    const input = new Float32Array([0.25, -0.25]);
+    const buffer = float32ToPcm16Buffer(input);
+    const message = buildRealtimeAudioMessage(buffer);
+
+    const base64 = message.realtimeInput.audio.data;
+    const decoded = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const view = new DataView(decoded.buffer);
+    expect(view.getInt16(0, true)).toBe(8191); // Math.trunc(0.25 * 32767)
+    expect(view.getInt16(2, true)).toBe(-8191); // Math.trunc(-0.25 * 32767)
   });
 
   it("does not use selectedModel as live voice model", () => {

@@ -157,6 +157,31 @@ describe("buildTelefunLiveSystemInstruction", () => {
     expect(prompt).toContain("JANGAN menyalin skrip secara verbatim");
   });
 
+  it("realistic mode includes SILENT HANDLING section with non-aggressive rules", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: { name: "X", gender: "male", phone: "0", city: "X", voiceName: "Fenrir", signatureName: "" },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "realistic",
+      maxCallDuration: 0,
+    });
+    expect(prompt).toContain("SILENT HANDLING");
+    expect(prompt).toContain("tunggu dengan sabar");
+    expect(prompt).toContain("Jangan mengulang panggilan berkali-kali");
+    expect(prompt).toContain("Jangan mengakhiri sesi hanya karena agen diam");
+  });
+
+  it("training_fast mode does not include SILENT HANDLING section", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: { name: "X", gender: "male", phone: "0", city: "X", voiceName: "Fenrir", signatureName: "" },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "training_fast",
+      maxCallDuration: 0,
+    });
+    expect(prompt).not.toContain("SILENT HANDLING");
+  });
+
   it("no script produces no script section", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: { name: "X", gender: "male", phone: "0", city: "X", voiceName: "Fenrir", signatureName: "" },
