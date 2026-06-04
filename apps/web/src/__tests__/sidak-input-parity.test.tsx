@@ -190,34 +190,39 @@ describe("SidakInputPage — Konfigurasi Audit card parity", () => {
   });
 });
 
-describe("SidakInputPage — Estimasi Skor card parity", () => {
+describe("SidakInputPage — Skor Kualitas (Live) card parity", () => {
   it("card renders score display with NC and CR breakdown", () => {
     const cardHtml = `
-      <div class="bg-card rounded-2xl border border-border p-5 shadow-sm">
-        <h3 class="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          Estimasi Skor
+      <div class="relative overflow-hidden rounded-3xl border border-border/80 bg-card/75 backdrop-blur-md p-6 shadow-md">
+        <h3 class="text-xs font-black uppercase tracking-wider text-muted-foreground/90">
+          Skor Kualitas (Live)
         </h3>
-        <div class="text-4xl font-black">85</div>
-        <div class="h-2.5 rounded-full bg-foreground/10 overflow-hidden">
-          <div class="h-full rounded-full bg-green-500" style="width: 85%"></div>
+        <div class="relative flex h-24 w-24 shrink-0 items-center justify-center">
+          <svg class="h-full w-full -rotate-90" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="36" class="stroke-muted-foreground/10" stroke-width="7" fill="transparent" />
+            <circle cx="48" cy="48" r="36" stroke="#22c55e" stroke-width="7" fill="transparent" stroke-dasharray="226.19" stroke-dashoffset="33.92" stroke-linecap="round" />
+          </svg>
+          <div class="absolute flex flex-col items-center justify-center text-center">
+            <span class="text-2xl font-black tracking-tight leading-none text-green-500">85</span>
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-rose-600">NC Score</div>
-            <div class="text-lg font-black text-rose-600">80</div>
+          <div class="p-3 rounded-2xl bg-rose-500/[0.04] border border-rose-500/10">
+            <div class="text-[9px] font-black uppercase tracking-wider text-rose-600">NC Score</div>
+            <div class="text-base font-black text-rose-600">80</div>
           </div>
-          <div class="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <div class="text-[10px] font-bold uppercase tracking-wider text-blue-600">CR Score</div>
-            <div class="text-lg font-black text-blue-600">90</div>
+          <div class="p-3 rounded-2xl bg-blue-500/[0.04] border border-blue-500/10">
+            <div class="text-[9px] font-black uppercase tracking-wider text-blue-600">CR Score</div>
+            <div class="text-base font-black text-blue-600">90</div>
           </div>
         </div>
       </div>
     `;
-    expect(cardHtml).toContain("Estimasi Skor");
+    expect(cardHtml).toContain("Skor Kualitas (Live)");
     expect(cardHtml).toContain("NC Score");
     expect(cardHtml).toContain("CR Score");
-    expect(cardHtml).toContain("text-4xl font-black");
-    expect(cardHtml).toContain("h-2.5 rounded-full");
+    expect(cardHtml).toContain("text-2xl font-black");
+    expect(cardHtml).toContain("circle cx=\"48\"");
   });
 
   it("shows dash when no score available (no temuan)", () => {

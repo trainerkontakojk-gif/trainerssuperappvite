@@ -10,6 +10,7 @@ import {
   isServiceType,
   resolveServiceTypeFromTeam,
 } from "../../lib/scoring";
+import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import type {
   AgentDetailData,
   AgentDirectoryEntry,
@@ -286,12 +287,12 @@ export async function getAgentDetail(
 
   const { data: temuan } = await temuanQuery.order("created_at", { ascending: false });
 
-  const rows = temuan ?? [];
-  const weight = serviceType
-    ? (DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
-      DEFAULT_SERVICE_WEIGHTS["call"])
-    : DEFAULT_SERVICE_WEIGHTS["call"];
+  const { data: dbSummaries } = await supabaseAdmin
+    .from("qa_dashboard_agent_period_summary")
+    .select("*")
+    .eq("agent_id", agentId);
 
+  const rows = temuan ?? [];
   const rawWeights = weightsResult?.data ?? [];
   const resolvedWeights: Record<string, ServiceWeight> = { ...DEFAULT_SERVICE_WEIGHTS };
   for (const w of rawWeights) {
@@ -314,25 +315,81 @@ export async function getAgentDetail(
         (serviceType ? r.service_type === serviceType : true),
     );
     if (periodRows.length === 0) continue;
-    const scoreRowsForCalc = getScoreRows(periodRows as DashboardTemuanRow[]);
-    const score = calculateQAScoreFromTemuan(
-      indicators,
-      scoreRowsForCalc as any,
-      weight,
+
+    const activeSvc = (serviceType || periodRows[0]?.service_type || "call") as ServiceType;
+
+    const dbSummary = dbSummaries?.find(
+      (s) => s.period_id === period.id && s.service_type === activeSvc
     );
+
+    let finalScore: number;
+    let nonCriticalScore: number;
+    let criticalScore: number;
+    let sessionCount: number;
+
+    if (dbSummary) {
+      finalScore = Number(dbSummary.final_score);
+      nonCriticalScore = Number(dbSummary.non_critical_score);
+      criticalScore = Number(dbSummary.critical_score);
+      sessionCount = Number(dbSummary.session_count);
+    } else {
+      let activeWeight = resolvedWeights[activeSvc] || DEFAULT_SERVICE_WEIGHTS[activeSvc];
+      let periodIndicators = indicators.filter((i) => i.service_type === activeSvc);
+
+      try {
+        const activeVersion = await resolveEffectiveRuleVersionForPeriod(activeSvc, period.id);
+        if (activeVersion) {
+          activeWeight = {
+            service_type: activeSvc,
+            critical_weight: Number(activeVersion.critical_weight),
+            non_critical_weight: Number(activeVersion.non_critical_weight),
+            scoring_mode: activeVersion.scoring_mode,
+          };
+          const { data: snapshotInds } = await supabaseAdmin
+            .from("qa_service_rule_indicators")
+            .select("*")
+            .eq("rule_version_id", activeVersion.id);
+          if (snapshotInds && snapshotInds.length > 0) {
+            periodIndicators = snapshotInds.map((ri: any) => ({
+              id: ri.legacy_indicator_id || ri.id,
+              service_type: activeSvc,
+              name: ri.name,
+              category: ri.category || "none",
+              bobot: Number(ri.bobot),
+              has_na: ri.has_na ?? false,
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("Gagal memuat aturan dinamis untuk period:", period.id, err);
+      }
+
+      const scoreRowsForCalc = getScoreRows(periodRows as DashboardTemuanRow[]);
+      const score = calculateQAScoreFromTemuan(
+        periodIndicators,
+        scoreRowsForCalc as any,
+        activeWeight,
+      );
+      finalScore = score.finalScore;
+      nonCriticalScore = score.nonCriticalScore;
+      criticalScore = score.criticalScore;
+      sessionCount = score.sessionCount;
+    }
+
     const findingsCount = periodRows.filter((r) =>
       isCountableFinding(r),
     ).length;
+
     summaries.push({
       id: period.id,
       month: period.month,
       year: period.year,
       label: `${String(period.month).padStart(2, "0")}/${period.year}`,
-      serviceType: (serviceType as ServiceType) ?? (periodRows[0]?.service_type as ServiceType) ?? "call",
-      finalScore: roundTo(score.finalScore, 2),
-      nonCriticalScore: roundTo(score.nonCriticalScore, 2),
-      criticalScore: roundTo(score.criticalScore, 2),
-      sessionCount: score.sessionCount,
+      serviceType: activeSvc,
+      finalScore: roundTo(finalScore, 2),
+      nonCriticalScore: roundTo(nonCriticalScore, 2),
+      criticalScore: roundTo(criticalScore, 2),
+      sessionCount: sessionCount,
       findingsCount,
     });
   }
