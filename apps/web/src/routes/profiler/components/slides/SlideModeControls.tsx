@@ -33,9 +33,9 @@ export const SlideModeControls: React.FC<SlideModeControlsProps> = ({
               ? "bg-background text-primary shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
-          title="Versi Original"
+          title="Versi Landscape"
         >
-          Original
+          Landscape
         </button>
         <button
           onClick={() => setSlideMode("portraitA4")}
@@ -44,9 +44,9 @@ export const SlideModeControls: React.FC<SlideModeControlsProps> = ({
               ? "bg-background text-primary shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
-          title="Opsi 2 (Portrait A4)"
+          title="Portrait A4"
         >
-          Opsi 2
+          Portrait
         </button>
       </div>
 

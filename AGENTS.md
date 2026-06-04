@@ -303,8 +303,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 110. **SIDAK Dashboard Summary Consistency Fix** — Dashboard summary KPI cards (`totalDefects`, `avgAgentScore`, `complianceRate`) now computed real-time from `qa_temuan` via app scoring engine, replacing chain MV/cache lookups. Ensures consistency with trend chart data. Multi-period summaries aggregate weighted averages from `periodMetrics`. Compliance description differentiates single vs multi-month. Documentation synced across 4 docs files. 10 files modified. (DONE)
 111. **Telefun Finalizer Status Refactor** — Replaced 3 mutable failure flags (`scoringFailed`, `saveFailed`, `uploadFailed`) scattered across `sessionFinalizer.ts` with a typed `FinalizerStatus` object and explicit marking helpers (`createFinalizerStatus()`, `markUploadFailed()`, `markSaveFailed()`, `markScoringFailed()`). Behavior-preserving refactor — public return contract unchanged. 2 characterization tests added. 1 file modified. (DONE)
 112. **Type Safety & Maintainability Refactor** — Three independent type safety improvements: (1) KETIK ChatInterface — extracted `KetikMessageBubble`, `KetikImageLightbox`, `getKetikScenarioImages` into dedicated files; `ChatInterface.tsx` reduced 277→16 lines. (2) SIDAK dashboard types — added 9 typed converter functions in `dashboard-types.ts`, replaced all `(agent as any).xxx` mutations with `withDashboardAgentMetrics()`, added `DashboardAgentWithMetrics` type, added `no_tiket`/`created_at` fields to `DashboardTemuanRow`. (3) Telefun realistic mode — added `RealisticModeMetrics` interface, typed AudioContext fallback, removed `(metrics as any)` casts via `SessionMetricsExtended.realisticModeMetrics`. 3 new boundary test files. Zero logic change. (DONE)
+113. **Profiler Slides Label Fix** — Renamed slide mode labels for clarity: "Original" → "Landscape" (title: "Versi Landscape"), "Opsi 2" → "Portrait" (title: "Portrait A4"). Updated `ParticipantSlide.tsx` subtitle from "Opsi 2 · Portrait A4" to "Portrait A4". 2 files modified. (DONE)
 
-## Key Files Changed (Phase 58 — 112)
+## Key Files Changed (Phase 58 — 113)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -433,6 +434,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/pdkt/components/settings/PdktSystemTab.tsx` — **Phase 94**: Consistent left-border header, compact writing-style and model selection cards
 - `docs/rebuild-logs/phase-93-pdkt-consumer-name-realistic-mode.md` — **NEW Phase 93**: Documentation for consumer name and realistic mode hardening
 - `docs/rebuild-logs/phase-94-pdkt-settings-visual-polish.md` — **NEW Phase 94**: Documentation for PDKT settings visual polish
+- `apps/web/src/routes/profiler/components/slides/SlideModeControls.tsx` — **Phase 113**: Renamed "Original" → "Landscape" ("Versi Landscape"), "Opsi 2" → "Portrait" ("Portrait A4")
+- `apps/web/src/routes/profiler/components/slides/ParticipantSlide.tsx` — **Phase 113**: Changed subtitle from "Opsi 2 · Portrait A4" to "Portrait A4"
+- `docs/rebuild-logs/phase-113-profiler-slides-label-fix.md` — **NEW Phase 113**: Documentation for profiler slides label fix
 
 ## Relevant Files
 

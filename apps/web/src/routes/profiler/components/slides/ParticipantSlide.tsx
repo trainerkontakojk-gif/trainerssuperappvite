@@ -103,7 +103,7 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
                   className="text-[10px] font-bold uppercase tracking-[0.24em]"
                   style={{ color: theme.accent }}
                 >
-                  Opsi 2 · Portrait A4
+                  Portrait A4
                 </p>
                 <h3 className="text-foreground mt-2 text-3xl font-black leading-tight tracking-tight">
                   {p.nama}
