@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Upload, Loader2, Check } from 'lucide-react';
+import { X, Trash2, Upload, Loader2, Check, User, Briefcase, Lock, FileText } from 'lucide-react';
 import type { ProfilerPeserta } from '@trainers/types';
 import { labelJabatan } from '@trainers/types';
 import { profilerApi } from '../../../../lib/profilerService';
@@ -16,37 +16,15 @@ import {
 } from '../../../../lib/photo-frame';
 
 const inputClass =
-  "w-full min-w-0 min-h-11 px-4 py-2.5 rounded-xl border border-border/40 bg-background text-sm leading-5 text-foreground placeholder-foreground/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background";
+  "w-full min-w-0 min-h-11 px-4 py-2.5 rounded-xl border border-border/40 bg-background text-sm leading-5 text-foreground placeholder-foreground/20 transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
 const labelClass =
   "block text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground mb-1.5 select-none";
-
-// ── Helper components for EditPesertaModal ───────────────────────────
-const SectionTitle = ({
-  children,
-  accent = true,
-}: {
-  children: React.ReactNode;
-  accent?: boolean;
-}) => (
-  <div className="flex items-center gap-3 mb-4">
-    {accent && <div className="w-1 h-5 bg-primary/40 rounded-full" />}
-    <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.12em]">
-      {children}
-    </h3>
-  </div>
-);
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="min-w-0 flex flex-col gap-1.5">
     <label className={labelClass}>{label}</label>
     {children}
   </div>
-);
-
-const SectionCard = ({ children }: { children: React.ReactNode }) => (
-  <section className="rounded-[1.75rem] border border-border/30 bg-background/35 p-5 sm:p-6 space-y-5 shadow-sm">
-    {children}
-  </section>
 );
 
 interface EditPesertaModalProps {
@@ -75,6 +53,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
   const [fotoPreview, setFotoPreview] = useState<string>(peserta.foto_url || '');
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [photoFrame, setPhotoFrameState] = useState<PhotoFrame>(DEFAULT_PHOTO_FRAME);
+  const [activeTab, setActiveTab] = useState<'profil' | 'kontak' | 'personal' | 'catatan'>('profil');
   const frameSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingFrameRef = useRef<PhotoFrame | null>(null);
 
@@ -190,6 +169,13 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
     notify.success('Peserta berhasil dihapus');
   };
 
+  const tabs = [
+    { id: 'profil' as const, label: 'Profil & Foto', icon: User },
+    { id: 'kontak' as const, label: 'Kontak & Karir', icon: Briefcase },
+    { id: 'personal' as const, label: 'Pribadi & Sensitif', icon: Lock },
+    { id: 'catatan' as const, label: 'Catatan & Memo', icon: FileText },
+  ];
+
   return (
     <AnimatePresence>
       <div
@@ -204,8 +190,8 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
           initial={{ opacity: 0, scale: 0.98, y: 30 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.98, y: 30 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-card w-full sm:max-w-3xl sm:rounded-[2.5rem] rounded-t-[2.5rem] border border-border/40 overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] flex flex-col max-h-[92vh]"
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-card w-full sm:max-w-4xl sm:rounded-[2rem] rounded-t-[2rem] border border-border/40 overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.25)] flex flex-col max-h-[92vh]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 sm:px-8 py-5 border-b border-border/40 shrink-0 bg-background/50 backdrop-blur-sm">
@@ -243,310 +229,359 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
             </div>
           </div>
 
-          <div className="overflow-y-auto flex-1 px-6 sm:px-8 py-8 pb-28 space-y-10 custom-scrollbar">
-            {/* Visual Section */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-6 bg-primary rounded-full" />
-                <h3 className="text-sm font-black text-foreground uppercase tracking-[0.2em]">
-                  Visual & Frame
-                </h3>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                <div className="relative group shrink-0">
-                  <div className="relative w-40 h-40 md:w-48 md:h-48 rounded-[2.5rem] bg-muted/20 border-2 border-dashed border-border/60 overflow-hidden flex items-center justify-center transition-all group-hover:border-primary/40 group-hover:shadow-2xl group-hover:shadow-primary/5">
-                    {uploadingFoto ? (
-                      <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                    ) : fotoPreview ? (
-                      <div className="relative w-full h-full">
-                         <img
-                          src={fotoPreview}
-                          alt="Preview"
-                          className="object-cover w-full h-full"
-                          style={getPhotoImageStyle(photoFrame)}
-                        />
-                      </div>
-                    ) : (
-                      <Upload className="w-8 h-8 text-muted-foreground/30" />
-                    )}
-
-                    {!isReadOnly && (
-                      <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs font-bold flex items-center gap-2">
-                          <Upload className="w-4 h-4" /> Ganti Foto
-                        </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFoto}
-                          className="sr-only"
-                          disabled={uploadingFoto}
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-6 w-full translate-y-2">
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <div className="flex items-center justify-between mb-3 px-1">
-                        <label className={labelClass + ' !mb-0'}>Posisi Horizontal</label>
-                        <span className="text-[10px] font-mono text-muted-foreground">
-                          {Math.round(photoFrame.x)}%
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={1}
-                        disabled={isReadOnly}
-                        className="w-full accent-primary disabled:opacity-40 disabled:cursor-not-allowed"
-                        value={Math.round(photoFrame.x)}
-                        onChange={(e) => updateFrame({ x: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-3 px-1">
-                        <label className={labelClass + ' !mb-0'}>Posisi Vertikal</label>
-                        <span className="text-[10px] font-mono text-muted-foreground">
-                          {Math.round(photoFrame.y)}%
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={1}
-                        disabled={isReadOnly}
-                        className="w-full accent-primary disabled:opacity-40 disabled:cursor-not-allowed"
-                        value={Math.round(photoFrame.y)}
-                        onChange={(e) => updateFrame({ y: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-3 px-1">
-                        <label className={labelClass + ' !mb-0'}>Skala Zoom</label>
-                        <span className="text-[10px] font-mono text-muted-foreground">
-                          {photoFrame.zoom.toFixed(2)}x
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => updateFrame({ zoom: photoFrame.zoom - 0.1 })}
-                          className="w-10 h-10 rounded-xl border border-border/40 bg-background hover:bg-muted text-lg font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="range"
-                          min={1}
-                          max={3}
-                          step={0.05}
-                          disabled={isReadOnly}
-                          className="flex-1 accent-primary disabled:opacity-40 disabled:cursor-not-allowed"
-                          value={photoFrame.zoom}
-                          onChange={(e) => updateFrame({ zoom: Number(e.target.value) })}
-                        />
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => updateFrame({ zoom: photoFrame.zoom + 0.1 })}
-                          className="w-10 h-10 rounded-xl border border-border/40 bg-background hover:bg-muted text-lg font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {/* Segmented Tab Controls */}
+          <div className="px-6 sm:px-8 py-3.5 border-b border-border/40 bg-muted/10 shrink-0 overflow-x-auto custom-scrollbar">
+            <div className="flex bg-muted/40 p-1 rounded-2xl gap-1.5 w-full min-w-[550px]">
+              {tabs.map((t) => {
+                const Icon = t.icon;
+                const isActive = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setActiveTab(t.id)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 text-xs font-bold rounded-xl transition-all cursor-pointer select-none focus:outline-none ${
+                      isActive
+                        ? "bg-background text-primary shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-border/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? "text-primary" : "text-muted-foreground/75"}`} />
+                    <span>{t.label}</span>
+                    {t.id === 'personal' && <span className="text-[10px] text-muted-foreground/60">🔒</span>}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Form Fields Grouped */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-6 gap-y-6 xl:items-start">
-              {/* Left column: Identitas, Data Sensitif, Catatan */}
-              <div className="flex flex-col gap-5 self-start">
-                <SectionCard>
-                  <SectionTitle>Identitas Utama</SectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <Field label="Nama Lengkap *">
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={form.nama || ''}
-                          onChange={(e) => set('nama', e.target.value)}
-                          autoFocus
-                        />
-                      </Field>
+          {/* Scrollable Container with Animating Tabs */}
+          <div className="overflow-y-auto flex-1 px-6 sm:px-8 py-6 pb-28 custom-scrollbar">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-6"
+              >
+                {activeTab === 'profil' && (
+                  <div className="space-y-6">
+                    {/* Visual Photo Editor Box */}
+                    <div className="flex flex-col md:flex-row gap-6 p-5 rounded-[1.75rem] border border-border/30 bg-muted/5 shadow-sm items-center md:items-start">
+                      <div className="relative group shrink-0">
+                        <div className="relative w-40 h-40 rounded-[2rem] bg-muted/20 border-2 border-dashed border-border/60 overflow-hidden flex items-center justify-center transition-all group-hover:border-primary/40 group-hover:shadow-lg">
+                          {uploadingFoto ? (
+                            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                          ) : fotoPreview ? (
+                            <div className="relative w-full h-full">
+                              <img
+                                src={fotoPreview}
+                                alt="Preview"
+                                className="object-cover w-full h-full"
+                                style={getPhotoImageStyle(photoFrame)}
+                              />
+                            </div>
+                          ) : (
+                            <Upload className="w-8 h-8 text-muted-foreground/30" />
+                          )}
+
+                          {!isReadOnly && (
+                            <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                              <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs font-bold flex items-center gap-2">
+                                <Upload className="w-4 h-4" /> Ganti Foto
+                              </div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFoto}
+                                className="sr-only"
+                                disabled={uploadingFoto}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 w-full space-y-4">
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border/30 pb-2">
+                          Bingkai & Posisi Foto
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5 px-1">
+                              <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Posisi X</label>
+                              <span className="text-[9px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">
+                                {Math.round(photoFrame.x)}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={1}
+                              disabled={isReadOnly}
+                              className="w-full accent-primary disabled:opacity-40"
+                              value={Math.round(photoFrame.x)}
+                              onChange={(e) => updateFrame({ x: Number(e.target.value) })}
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5 px-1">
+                              <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Posisi Y</label>
+                              <span className="text-[9px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">
+                                {Math.round(photoFrame.y)}%
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={1}
+                              disabled={isReadOnly}
+                              className="w-full accent-primary disabled:opacity-40"
+                              value={Math.round(photoFrame.y)}
+                              onChange={(e) => updateFrame({ y: Number(e.target.value) })}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5 px-1">
+                            <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Skala Zoom</label>
+                            <span className="text-[9px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">
+                              {photoFrame.zoom.toFixed(2)}x
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => updateFrame({ zoom: photoFrame.zoom - 0.1 })}
+                              className="w-9 h-9 rounded-xl border border-border/40 bg-background hover:bg-muted text-sm font-bold flex items-center justify-center disabled:opacity-40"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="range"
+                              min={1}
+                              max={3}
+                              step={0.05}
+                              disabled={isReadOnly}
+                              className="flex-1 accent-primary disabled:opacity-40"
+                              value={photoFrame.zoom}
+                              onChange={(e) => updateFrame({ zoom: Number(e.target.value) })}
+                            />
+                            <button
+                              type="button"
+                              disabled={isReadOnly}
+                              onClick={() => updateFrame({ zoom: photoFrame.zoom + 0.1 })}
+                              className="w-9 h-9 rounded-xl border border-border/40 bg-background hover:bg-muted text-sm font-bold flex items-center justify-center disabled:opacity-40"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="md:col-span-2">
-                      <Field label="Tim Terdaftar">
-                        <select
-                          className={inputClass}
-                          value={form.tim || ''}
-                          onChange={(e) => set('tim', e.target.value)}
-                        >
-                          {timList.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Field label="Level Jabatan">
-                        <select
-                          className={inputClass}
-                          value={form.jabatan || ''}
-                          onChange={(e) => set('jabatan', e.target.value)}
-                        >
-                          {Object.entries(labelJabatan).map(([k, v]) => (
-                            <option key={k} value={k}>
-                              {v}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-                    <div>
-                      <Field label="NIK OJK">
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={form.nik_ojk || ''}
-                          onChange={(e) => set('nik_ojk', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <div>
-                      <Field label="Bergabung di 157">
-                        <input
-                          type="date"
-                          className={inputClass}
-                          value={form.bergabung_date || ''}
-                          onChange={(e) => set('bergabung_date', e.target.value)}
-                        />
-                      </Field>
+
+                    {/* Identitas Utama Fields */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 rounded-[1.75rem] border border-border/20 bg-card">
+                      <div className="md:col-span-2">
+                        <Field label="Nama Lengkap *">
+                          <input
+                            type="text"
+                            className={inputClass}
+                            value={form.nama || ''}
+                            onChange={(e) => set('nama', e.target.value)}
+                            disabled={isReadOnly}
+                            autoFocus
+                          />
+                        </Field>
+                      </div>
+                      <div>
+                        <Field label="Tim Terdaftar">
+                          <select
+                            className={inputClass}
+                            value={form.tim || ''}
+                            onChange={(e) => set('tim', e.target.value)}
+                            disabled={isReadOnly}
+                          >
+                            {timList.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </div>
+                      <div>
+                        <Field label="Level Jabatan">
+                          <select
+                            className={inputClass}
+                            value={form.jabatan || ''}
+                            onChange={(e) => set('jabatan', e.target.value)}
+                            disabled={isReadOnly}
+                          >
+                            {Object.entries(labelJabatan).map(([k, v]) => (
+                              <option key={k} value={k}>
+                                {v}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </div>
+                      <div>
+                        <Field label="NIK OJK">
+                          <input
+                            type="text"
+                            className={inputClass}
+                            value={form.nik_ojk || ''}
+                            onChange={(e) => set('nik_ojk', e.target.value)}
+                            disabled={isReadOnly}
+                          />
+                        </Field>
+                      </div>
+                      <div>
+                        <Field label="Bergabung di 157">
+                          <input
+                            type="date"
+                            className={inputClass}
+                            value={form.bergabung_date || ''}
+                            onChange={(e) => set('bergabung_date', e.target.value)}
+                            disabled={isReadOnly}
+                          />
+                        </Field>
+                      </div>
                     </div>
                   </div>
-                </SectionCard>
+                )}
 
-                <SectionCard>
-                  <SectionTitle>Data Sensitif</SectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeTab === 'kontak' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 rounded-[1.75rem] border border-border/20 bg-card">
                     <div className="md:col-span-2">
-                      <Field label="No. KTP">
+                      <Field label="Email Official">
                         <input
-                          type="text"
-                          maxLength={16}
+                          type="email"
                           className={inputClass}
-                          value={form.no_ktp || ''}
-                          onChange={(e) => set('no_ktp', e.target.value)}
+                          value={form.email_ojk || ''}
+                          onChange={(e) => set('email_ojk', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
                     <div>
-                      <Field label="No. NPWP">
+                      <Field label="WhatsApp Aktif">
                         <input
                           type="text"
                           className={inputClass}
-                          value={form.no_npwp || ''}
-                          onChange={(e) => set('no_npwp', e.target.value)}
+                          value={form.no_telepon || ''}
+                          onChange={(e) => set('no_telepon', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
                     <div>
-                      <Field label="Nomor Rekening">
+                      <Field label="No. Telepon Darurat">
                         <input
                           type="text"
                           className={inputClass}
-                          value={form.nomor_rekening || ''}
-                          onChange={(e) => set('nomor_rekening', e.target.value)}
+                          value={form.no_telepon_darurat || ''}
+                          onChange={(e) => set('no_telepon_darurat', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
-                    <div className="md:col-span-2">
-                      <Field label="Nama Bank">
+                    <div>
+                      <Field label="Nama Kontak Darurat">
                         <input
                           type="text"
                           className={inputClass}
-                          value={form.nama_bank || ''}
-                          onChange={(e) => set('nama_bank', e.target.value)}
+                          value={form.nama_kontak_darurat || ''}
+                          onChange={(e) => set('nama_kontak_darurat', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
-                    <div className="md:col-span-2">
-                      <Field label="Alamat Tinggal">
-                        <textarea
-                          rows={4}
-                          placeholder="Masukkan alamat lengkap..."
-                          className={inputClass + ' resize-none leading-relaxed'}
-                          value={form.alamat_tinggal || ''}
-                          onChange={(e) => set('alamat_tinggal', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Field label="Status Tempat Tinggal">
+                    <div>
+                      <Field label="Hubungan Kontak Darurat">
                         <select
                           className={inputClass}
-                          value={form.status_tempat_tinggal || ''}
-                          onChange={(e) => set('status_tempat_tinggal', e.target.value as any)}
+                          value={form.hubungan_kontak_darurat || ''}
+                          onChange={(e) => set('hubungan_kontak_darurat', e.target.value as any)}
+                          disabled={isReadOnly}
                         >
                           <option value="">Pilih</option>
-                          <option value="Milik Sendiri">Milik Sendiri</option>
-                          <option value="Milik Orang Tua">Milik Orang Tua</option>
-                          <option value="Kost/Sewa">Kost/Sewa</option>
-                          <option value="Lainnya">Lainnya</option>
+                          <option value="Orang Tua">Orang Tua</option>
+                          <option value="Saudara">Saudara</option>
+                          <option value="Pasangan">Pasangan</option>
+                          <option value="Teman">Teman</option>
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="md:col-span-2 border-t border-border/30 my-2 pt-4">
+                      <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pendidikan & Karir</h4>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Field label="Lembaga Pendidikan">
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={form.nama_lembaga || ''}
+                          onChange={(e) => set('nama_lembaga', e.target.value)}
+                          disabled={isReadOnly}
+                        />
+                      </Field>
+                    </div>
+                    <div>
+                      <Field label="Jurusan">
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={form.jurusan || ''}
+                          onChange={(e) => set('jurusan', e.target.value)}
+                          disabled={isReadOnly}
+                        />
+                      </Field>
+                    </div>
+                    <div>
+                      <Field label="Perusahaan Sebelumnya">
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={form.previous_company || ''}
+                          onChange={(e) => set('previous_company', e.target.value)}
+                          disabled={isReadOnly}
+                        />
+                      </Field>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Field label="Pengalaman Contact Center">
+                        <select
+                          className={inputClass}
+                          value={form.pengalaman_cc || ''}
+                          onChange={(e) => set('pengalaman_cc', e.target.value as any)}
+                          disabled={isReadOnly}
+                        >
+                          <option value="">Pilih</option>
+                          <option value="Pernah">Pernah</option>
+                          <option value="Tidak Pernah">Tidak Pernah</option>
                         </select>
                       </Field>
                     </div>
                   </div>
-                </SectionCard>
+                )}
 
-                <SectionCard>
-                  <SectionTitle>Catatan & Keterangan</SectionTitle>
-                  <div className="grid grid-cols-1 gap-4">
-                    <Field label="Catatan Tambahan">
-                      <textarea
-                        rows={3}
-                        placeholder="Prestasi, bakat, hobi, atau hal unik lainnya..."
-                        className={inputClass + ' resize-none'}
-                        value={form.catatan_tambahan || ''}
-                        onChange={(e) => set('catatan_tambahan', e.target.value)}
-                      />
-                    </Field>
-                    <Field label="Keterangan">
-                      <textarea
-                        rows={2}
-                        placeholder="Catatan umum lainnya..."
-                        className={inputClass + ' resize-none'}
-                        value={form.keterangan || ''}
-                        onChange={(e) => set('keterangan', e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                </SectionCard>
-              </div>
-
-              {/* Right column: Personal, Kontak, Latar Belakang */}
-              <div className="flex flex-col gap-5 self-start">
-                <SectionCard>
-                  <SectionTitle>Informasi Personal</SectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {activeTab === 'personal' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6 rounded-[1.75rem] border border-border/20 bg-card">
                     <div>
                       <Field label="Gender">
                         <select
                           className={inputClass}
                           value={form.jenis_kelamin || ''}
                           onChange={(e) => set('jenis_kelamin', e.target.value as any)}
+                          disabled={isReadOnly}
                         >
                           <option value="">Pilih</option>
                           <option value="Laki-laki">Laki-laki</option>
@@ -560,34 +595,35 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
                           className={inputClass}
                           value={form.agama || ''}
                           onChange={(e) => set('agama', e.target.value as any)}
+                          disabled={isReadOnly}
                         >
                           <option value="">Pilih</option>
-                          {['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'].map(
-                            (a) => (
-                              <option key={a} value={a}>
-                                {a}
-                              </option>
-                            )
-                          )}
+                          {['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'].map((a) => (
+                            <option key={a} value={a}>
+                              {a}
+                            </option>
+                          ))}
                         </select>
                       </Field>
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
                       <Field label="Tanggal Lahir">
                         <input
                           type="date"
                           className={inputClass}
                           value={form.tgl_lahir || ''}
                           onChange={(e) => set('tgl_lahir', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
                       <Field label="Status Perkawinan">
                         <select
                           className={inputClass}
                           value={form.status_perkawinan || ''}
                           onChange={(e) => set('status_perkawinan', e.target.value as any)}
+                          disabled={isReadOnly}
                         >
                           <option value="">Pilih</option>
                           <option value="Belum Menikah">Belum Menikah</option>
@@ -602,6 +638,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
                           className={inputClass}
                           value={form.pendidikan || ''}
                           onChange={(e) => set('pendidikan', e.target.value as any)}
+                          disabled={isReadOnly}
                         >
                           <option value="">Pilih</option>
                           {['SMA', 'D3', 'S1', 'S2', 'S3'].map((p) => (
@@ -612,120 +649,112 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
                         </select>
                       </Field>
                     </div>
-                  </div>
-                </SectionCard>
-
-                <SectionCard>
-                  <SectionTitle>Kontak & Keamanan</SectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2 border-t border-border/30 my-2 pt-4 flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground/60" />
+                      <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Informasi Sensitif (Terlindungi)</h4>
+                    </div>
                     <div className="md:col-span-2">
-                      <Field label="Email Official">
+                      <Field label="No. KTP">
                         <input
-                          type="email"
+                          type="text"
+                          maxLength={16}
                           className={inputClass}
-                          value={form.email_ojk || ''}
-                          onChange={(e) => set('email_ojk', e.target.value)}
+                          value={form.no_ktp || ''}
+                          onChange={(e) => set('no_ktp', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
                     <div>
-                      <Field label="WhatsApp Aktif">
+                      <Field label="No. NPWP">
                         <input
                           type="text"
                           className={inputClass}
-                          value={form.no_telepon || ''}
-                          onChange={(e) => set('no_telepon', e.target.value)}
+                          value={form.no_npwp || ''}
+                          onChange={(e) => set('no_npwp', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
                     <div>
-                      <Field label="No. Telepon Darurat">
+                      <Field label="Nomor Rekening">
                         <input
                           type="text"
                           className={inputClass}
-                          value={form.no_telepon_darurat || ''}
-                          onChange={(e) => set('no_telepon_darurat', e.target.value)}
+                          value={form.nomor_rekening || ''}
+                          onChange={(e) => set('nomor_rekening', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
                     <div>
-                      <Field label="Nama Kontak Darurat">
+                      <Field label="Nama Bank">
                         <input
                           type="text"
                           className={inputClass}
-                          value={form.nama_kontak_darurat || ''}
-                          onChange={(e) => set('nama_kontak_darurat', e.target.value)}
+                          value={form.nama_bank || ''}
+                          onChange={(e) => set('nama_bank', e.target.value)}
+                          disabled={isReadOnly}
                         />
                       </Field>
                     </div>
                     <div>
-                      <Field label="Hubungan Kontak Darurat">
+                      <Field label="Status Tempat Tinggal">
                         <select
                           className={inputClass}
-                          value={form.hubungan_kontak_darurat || ''}
-                          onChange={(e) => set('hubungan_kontak_darurat', e.target.value as any)}
+                          value={form.status_tempat_tinggal || ''}
+                          onChange={(e) => set('status_tempat_tinggal', e.target.value as any)}
+                          disabled={isReadOnly}
                         >
                           <option value="">Pilih</option>
-                          <option value="Orang Tua">Orang Tua</option>
-                          <option value="Saudara">Saudara</option>
-                          <option value="Pasangan">Pasangan</option>
-                          <option value="Teman">Teman</option>
+                          <option value="Milik Sendiri">Milik Sendiri</option>
+                          <option value="Milik Orang Tua">Milik Orang Tua</option>
+                          <option value="Kost/Sewa">Kost/Sewa</option>
+                          <option value="Lainnya">Lainnya</option>
                         </select>
                       </Field>
                     </div>
+                    <div className="md:col-span-2">
+                      <Field label="Alamat Tinggal">
+                        <textarea
+                          rows={3}
+                          placeholder="Masukkan alamat lengkap..."
+                          className={inputClass + ' resize-none leading-relaxed'}
+                          value={form.alamat_tinggal || ''}
+                          onChange={(e) => set('alamat_tinggal', e.target.value)}
+                          disabled={isReadOnly}
+                        />
+                      </Field>
+                    </div>
                   </div>
-                </SectionCard>
+                )}
 
-                <SectionCard>
-                  <SectionTitle>Latar Belakang</SectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <Field label="Lembaga Pendidikan">
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={form.nama_lembaga || ''}
-                          onChange={(e) => set('nama_lembaga', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Field label="Jurusan">
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={form.jurusan || ''}
-                          onChange={(e) => set('jurusan', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Field label="Previous Company">
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={form.previous_company || ''}
-                          onChange={(e) => set('previous_company', e.target.value)}
-                        />
-                      </Field>
-                    </div>
-                    <div className="md:col-span-2">
-                      <Field label="Pengalaman Contact Center">
-                        <select
-                          className={inputClass}
-                          value={form.pengalaman_cc || ''}
-                          onChange={(e) => set('pengalaman_cc', e.target.value as any)}
-                        >
-                          <option value="">Pilih</option>
-                          <option value="Pernah">Pernah</option>
-                          <option value="Tidak Pernah">Tidak Pernah</option>
-                        </select>
-                      </Field>
-                    </div>
+                {activeTab === 'catatan' && (
+                  <div className="grid grid-cols-1 gap-5 p-6 rounded-[1.75rem] border border-border/20 bg-card">
+                    <Field label="Catatan Tambahan">
+                      <textarea
+                        rows={4}
+                        placeholder="Prestasi, bakat, hobi, atau hal unik lainnya..."
+                        className={inputClass + ' resize-none'}
+                        value={form.catatan_tambahan || ''}
+                        onChange={(e) => set('catatan_tambahan', e.target.value)}
+                        disabled={isReadOnly}
+                      />
+                    </Field>
+                    <Field label="Keterangan Admin">
+                      <textarea
+                        rows={3}
+                        placeholder="Catatan umum atau administratif lainnya..."
+                        className={inputClass + ' resize-none'}
+                        value={form.keterangan || ''}
+                        onChange={(e) => set('keterangan', e.target.value)}
+                        disabled={isReadOnly}
+                      />
+                    </Field>
                   </div>
-                </SectionCard>
-              </div>
-            </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* Footer Actions */}
@@ -734,7 +763,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 h-14 bg-primary hover:opacity-90 disabled:opacity-30 text-primary-foreground rounded-2xl text-base font-black tracking-tight shadow-xl shadow-primary/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3 order-1 sm:order-2"
+                className="flex-1 h-14 bg-primary hover:opacity-90 disabled:opacity-30 text-primary-foreground rounded-2xl text-base font-black tracking-tight shadow-xl shadow-primary/20 transition-all active:scale-[0.98] flex items-center justify-center gap-3 order-1 sm:order-2 cursor-pointer"
               >
                 {saving ? (
                   <>
@@ -749,7 +778,7 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
             )}
             <button
               onClick={onClose}
-              className="flex-1 h-14 bg-background hover:bg-muted text-foreground rounded-2xl text-base font-bold transition-all active:scale-[0.98] border border-border/40 order-2 sm:order-1"
+              className="flex-1 h-14 bg-background hover:bg-muted text-foreground rounded-2xl text-base font-bold transition-all active:scale-[0.98] border border-border/40 order-2 sm:order-1 cursor-pointer"
             >
               Batal
             </button>
@@ -759,3 +788,4 @@ export const EditPesertaModal: React.FC<EditPesertaModalProps> = ({
     </AnimatePresence>
   );
 };
+
