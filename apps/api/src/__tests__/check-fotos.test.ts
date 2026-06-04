@@ -31,7 +31,7 @@ describe("checkFotoUrl", () => {
 
     expect(result).toEqual({ status: "valid" });
     expect(mockFetch).toHaveBeenCalledWith(
-      `${SUPABASE_URL}/storage/v1/object/public/foto-avatar/avatar-123.jpg`,
+      `${SUPABASE_URL}/storage/v1/object/public/profiler-foto/avatar-123.jpg`,
       expect.objectContaining({ method: "HEAD" }),
     );
   });
@@ -115,7 +115,7 @@ describe("checkFotoUrl", () => {
     await checkFotoUrl(SUPABASE_URL, "path/to/avatar.webp");
 
     expect(mockFetch).toHaveBeenCalledWith(
-      `${SUPABASE_URL}/storage/v1/object/public/foto-avatar/path/to/avatar.webp`,
+      `${SUPABASE_URL}/storage/v1/object/public/profiler-foto/path/to/avatar.webp`,
       expect.objectContaining({
         method: "HEAD",
         signal: expect.any(AbortSignal),

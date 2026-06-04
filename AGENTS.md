@@ -309,8 +309,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 115. **KETIK [NO_RESPONSE] Tag Leak Fix** — Tag internal `[NO_RESPONSE]` yang bocor ke UI chat KETIK di-strip dengan defense-in-depth: (1) Backend `sanitizeConsumerText()` stripping regex + collapse double spaces, (2) Frontend guard di `ChatInterface.tsx` dengan pattern `NO_RESPONSE_PATTERN_GLOBAL` dari `message-utils.ts`, (3) `sanitizeConsumerText()` di-export untuk testing langsung. 9 backend + 6 frontend regression tests, 581 API + ~469 web tests passing. 6 files modified/added. (DONE)
 
 116. **Telefun Disable Silence & Dead-Air Detectors** — Mematikan `SilenceDetector` server-side Telefun (5 detik) dan client `Dead Air Detector` (7 detik + cooldown 12 detik), termasuk hapus auto prompt `[INSTRUKSI SISTEM - DEAD AIR]`. Silent instruction di `promptBuilder.ts` diperpanjang 3x (<10→<30, 10-15→30-45 detik). Gemini VAD tidak disentuh. 8 files modified/added, 30 regression tests (7 + 23) passing. (DONE)
+117. **KTP Manual Input Storage Bucket Fix** — Memperbaiki kegagalan CRUD KTP saat role `trainer` menambahkan peserta manual dengan foto. Root cause: mismatch kontrak storage bucket antara frontend (`profiler-assets`), backend (`foto-avatar`), dan docs (`profiler-foto`). Fix: canonical helper frontend (`profilerPhotoStorage.ts`) dan backend (`profiler-photo-storage.ts`) dengan bucket `profiler-foto`, terminal migration storage policy, route contract test untuk trainer create. 6 new files, 4 modified files, 40 tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 116)
+## Key Files Changed (Phase 58 — 117)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -791,6 +792,17 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/telefun-dead-air-disabled.test.ts` — **NEW Phase 116**: Static guard client dead-air
 - `apps/web/src/__tests__/telefun-prompt-builder.test.ts` — **Phase 116**: Test assertions untuk timing silent instruction baru
 - `docs/rebuild-logs/phase-116-telefun-disable-silence-and-dead-air-detectors.md` — **NEW Phase 116**: Rebuild log
+- `apps/web/src/lib/profilerPhotoStorage.ts` — **NEW Phase 117**: Canonical frontend storage helper (`profiler-foto` bucket, unique path generation, upload + public URL)
+- `apps/api/src/services/profiler-photo-storage.ts` — **NEW Phase 117**: Canonical backend storage helper (`extractProfilerPhotoPath`, `checkProfilerPhotoUrl` with HEAD-based validation)
+- `supabase/migrations/20260604100000_restore_profiler_foto_bucket.sql` — **NEW Phase 117**: Terminal migration — `profiler-foto` bucket (public, 5 MB, image MIME types) + RLS policies
+- `apps/web/src/__tests__/profiler-photo-storage.test.ts` — **NEW Phase 117**: 2 frontend unit tests (upload path, extension normalization)
+- `apps/api/src/__tests__/profiler-photo-storage.test.ts` — **NEW Phase 117**: 3 backend unit tests (path extraction, HEAD check, 404)
+- `apps/api/src/__tests__/profiler-route-create.test.ts` — **NEW Phase 117**: 3 route contract tests (trainer OK, leader rejected, qa rejected)
+- `apps/web/src/lib/profilerService.ts` — **Phase 117**: `uploadFoto` delegates to `profilerPhotoStorage.uploadProfilerPhoto` (replaces inline `profiler-assets` upload)
+- `apps/api/src/services/profiler-service.ts` — **Phase 117**: Removed inline `checkFotoUrl()` using `foto-avatar`, uses `checkProfilerPhotoUrl()`
+- `scripts/data-integrity/foto-checker.ts` — **Phase 117**: `foto-avatar` → `profiler-foto`
+- `apps/api/src/__tests__/check-fotos.test.ts` — **Phase 117**: `foto-avatar` → `profiler-foto`
+- `docs/rebuild-logs/phase-117-ktp-storage-bucket-fix.md` — **NEW Phase 117**: Rebuild log
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

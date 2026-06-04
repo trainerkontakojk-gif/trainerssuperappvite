@@ -15,7 +15,7 @@ export async function checkFotoUrl(
   supabaseUrl: string,
   fotoUrl: string,
 ): Promise<{ status: "valid" | "broken" | "unverified"; reason?: string }> {
-  const storageUrl = `${supabaseUrl}/storage/v1/object/public/foto-avatar/${fotoUrl}`;
+  const storageUrl = `${supabaseUrl}/storage/v1/object/public/profiler-foto/${fotoUrl}`;
 
   try {
     const controller = new AbortController();

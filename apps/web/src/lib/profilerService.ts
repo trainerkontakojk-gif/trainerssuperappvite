@@ -1,5 +1,5 @@
 import { postApi, putApi, deleteApi, getApi } from "../hooks/useApi";
-import { supabase } from "./supabase";
+import { uploadProfilerPhoto } from "./profilerPhotoStorage";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -90,21 +90,5 @@ export const profilerApi = {
   deleteTeam: (id: string) => deleteApi(`${BASE}/teams/${id}`),
 
   // File Upload
-  uploadFoto: async (file: File, pesertaId: string): Promise<string> => {
-    const fileExt = file.name.split(".").pop();
-    const filePath = `${pesertaId}.${fileExt}`;
-    const { data, error } = await supabase.storage
-      .from("profiler-assets")
-      .upload(filePath, file, { upsert: true });
-
-    if (error) {
-      throw error;
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from("profiler-assets")
-      .getPublicUrl(filePath);
-
-    return publicUrlData.publicUrl;
-  },
+  uploadFoto: uploadProfilerPhoto,
 };

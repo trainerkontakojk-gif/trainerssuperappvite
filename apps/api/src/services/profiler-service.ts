@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../lib/supabase";
 import { getLeaderScopeSnapshot } from "./leader-access-service";
+import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
 import type {
   ProfilerYear,
   ProfilerFolder,
@@ -352,44 +353,6 @@ export async function getPesertaByBatch(
   return data ?? [];
 }
 
-async function checkFotoUrl(
-  fotoUrl: string | null | undefined,
-): Promise<boolean> {
-  if (!fotoUrl) return true;
-  const supabaseUrl =
-    process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  if (!supabaseUrl) return true;
-
-  let filename = fotoUrl;
-  if (fotoUrl.startsWith("http")) {
-    const parts = fotoUrl.split("/foto-avatar/");
-    if (parts.length > 1) {
-      filename = parts[1];
-    } else {
-      filename = fotoUrl.substring(fotoUrl.lastIndexOf("/") + 1);
-    }
-  }
-
-  const url = `${supabaseUrl}/storage/v1/object/public/foto-avatar/${filename}`;
-
-  try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(url, {
-      method: "HEAD",
-      signal: controller.signal,
-    });
-    clearTimeout(id);
-
-    if (response.status === 404) {
-      return false;
-    }
-    return true;
-  } catch (_err) {
-    return true;
-  }
-}
-
 function cleanEmptyStrings(obj: any) {
   const cleaned: any = {};
   for (const [key, val] of Object.entries(obj)) {
@@ -401,7 +364,7 @@ function cleanEmptyStrings(obj: any) {
 export async function createPeserta(
   peserta: Partial<ProfilerPeserta>,
 ): Promise<ProfilerPeserta> {
-  const isFotoValid = await checkFotoUrl(peserta.foto_url);
+  const isFotoValid = await checkProfilerPhotoUrl(peserta.foto_url);
   if (!isFotoValid) {
     throw new Error("Avatar tidak ditemukan di storage");
   }
@@ -481,7 +444,7 @@ export async function updatePeserta(
   updates: Partial<ProfilerPeserta>,
 ): Promise<ProfilerPeserta> {
   if (updates && "foto_url" in updates) {
-    const isFotoValid = await checkFotoUrl(updates.foto_url);
+    const isFotoValid = await checkProfilerPhotoUrl(updates.foto_url);
     if (!isFotoValid) {
       throw new Error("Avatar tidak ditemukan di storage");
     }
