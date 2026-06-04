@@ -10,7 +10,7 @@ import {
   type LiveUsageSnapshot,
 } from "./usage.js";
 import { createSession, updateSession, getOwnedSessionId } from "./db.js";
-import { SilenceDetector, UtteranceBuffer } from "./silence.js";
+import { UtteranceBuffer } from "./silence.js";
 import { TurnManager } from "./turn-taking.js";
 import {
   isGeminiForwardableMessage,
@@ -90,7 +90,6 @@ wss.on("connection", async (ws, req) => {
   let geminiSetupComplete = false;
   const postSetupQueue: string[] = [];
 
-  const silence = new SilenceDetector(5000);
   const utteranceBuffer = new UtteranceBuffer(500, 1000);
   const turnManager = new TurnManager();
 
@@ -227,24 +226,8 @@ wss.on("connection", async (ws, req) => {
     });
   };
 
-  // Silence handler: send gentle prompt to user
-  silence.onSilence(() => {
-    console.log("[Telefun] Silence detected > 5s");
-    try {
-      ws.send(
-        JSON.stringify({
-          type: "silence",
-          message: "Saya masih mendengarkan. Silakan lanjutkan.",
-        }),
-      );
-    } catch {
-      /* ignore */
-    }
-  });
-
   // Message handler: validate and forward structured JSON to Gemini Live
   ws.on("message", (data) => {
-    silence.ping();
     if (typeof data !== "string" && !Buffer.isBuffer(data)) {
       console.warn("[Telefun] Unsupported binary message type");
       return;
@@ -291,7 +274,6 @@ wss.on("connection", async (ws, req) => {
   });
 
   ws.on("close", async () => {
-    silence.stop();
     utteranceBuffer.flushNow();
     if (
       geminiWs &&
@@ -305,7 +287,6 @@ wss.on("connection", async (ws, req) => {
   });
 
   ws.on("error", async () => {
-    silence.stop();
     utteranceBuffer.clear();
     if (
       geminiWs &&
@@ -378,9 +359,6 @@ wss.on("connection", async (ws, req) => {
       console.error("[Telefun] Failed to create session:", err);
     }
   }
-
-  // Start silence detection after auth
-  silence.start();
 
   // Connect to Gemini Live API
   setupGeminiWs();

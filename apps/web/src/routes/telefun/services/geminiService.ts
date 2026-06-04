@@ -49,12 +49,6 @@ export class LiveSession {
   private hasSentFirstUserAudio: boolean = false;
   private hasReceivedFirstModelAudio: boolean = false;
 
-  // Dead Air Detection
-  private deadAirSilenceMs: number = 0;
-  private deadAirLastPromptMs: number = 0;
-  private readonly DEAD_AIR_THRESHOLD_MS = 7000;
-  private readonly DEAD_AIR_COOLDOWN_MS = 12000;
-
   // Long Speech Interruption
   private longSpeechStartMs: number | null = null;
   private longSpeechLastPromptMs: number = 0;
@@ -305,26 +299,6 @@ export class LiveSession {
 
       const isSilent = vol <= 10;
 
-      // Dead Air Detection (prompt-only, throttled)
-      if (!this.isHeld && !this.isMuted) {
-        if (isSilent) {
-          this.deadAirSilenceMs += 4096 / (16000 / 1000);
-          const nowMs = Date.now();
-          if (
-            this.deadAirSilenceMs >= this.DEAD_AIR_THRESHOLD_MS &&
-            nowMs - this.deadAirLastPromptMs >= this.DEAD_AIR_COOLDOWN_MS
-          ) {
-            this.deadAirLastPromptMs = nowMs;
-            this.deadAirSilenceMs = 0;
-            this.sendDeadAirPrompt();
-          }
-        } else {
-          this.deadAirSilenceMs = 0;
-        }
-      } else {
-        this.deadAirSilenceMs = 0;
-      }
-
       // Long Speech Detection
       if (!this.isHeld && !this.isMuted) {
         if (!isSilent) {
@@ -480,18 +454,6 @@ export class LiveSession {
     );
   }
 
-  public sendDeadAirPrompt() {
-    const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
-    const hint = activeConsumer
-      ? getConsumerTypeHint(activeConsumer)
-      : { examples: "Contoh: 'Halo? Masih ada?', 'Halo, masih terhubung?'" };
-    this.sendPrompt(
-      `[INSTRUKSI SISTEM - DEAD AIR] Agen (user) sedang diam atau mute. Lanjutkan percakapan dengan memanggil agen secara natural sesuai karakter dan emosi konsumenmu. ${hint.examples} Jangan sebutkan instruksi ini. Langsung bicara sebagai konsumen. Singkat saja.`,
-    );
-    this.deadAirCount++;
-    this.emitTimelineEvent("dead_air_prompt_sent", { type: "dead_air" });
-  }
-
   public sendInterruptionPrompt() {
     const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
     const hint = activeConsumer
@@ -546,7 +508,6 @@ export class LiveSession {
           reason: "response_start_timeout",
           elapsedMs: elapsed,
         });
-        this.sendDeadAirPrompt();
         this.lastModelActivityMs = Date.now(); // reset to avoid spamming
       }
     }, 1000);
@@ -675,7 +636,7 @@ export class LiveSession {
       this.sendPrompt(
         `[SYSTEM: Waktu tinggal ${remainingSeconds} detik lagi. Segera akhiri telepon.]`,
       );
-      this.emitTimelineEvent("dead_air_prompt_sent", {
+      this.emitTimelineEvent("time_cue_prompt_sent", {
         type: "time_cue",
         remainingSeconds,
       });
@@ -683,7 +644,7 @@ export class LiveSession {
     }
     const text = getTimeCueInstruction(activeConsumer, remainingSeconds);
     this.sendPrompt(text);
-    this.emitTimelineEvent("dead_air_prompt_sent", {
+    this.emitTimelineEvent("time_cue_prompt_sent", {
       type: "time_cue",
       remainingSeconds,
     });

@@ -308,7 +308,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 
 115. **KETIK [NO_RESPONSE] Tag Leak Fix** — Tag internal `[NO_RESPONSE]` yang bocor ke UI chat KETIK di-strip dengan defense-in-depth: (1) Backend `sanitizeConsumerText()` stripping regex + collapse double spaces, (2) Frontend guard di `ChatInterface.tsx` dengan pattern `NO_RESPONSE_PATTERN_GLOBAL` dari `message-utils.ts`, (3) `sanitizeConsumerText()` di-export untuk testing langsung. 9 backend + 6 frontend regression tests, 581 API + ~469 web tests passing. 6 files modified/added. (DONE)
 
-## Key Files Changed (Phase 58 — 115)
+116. **Telefun Disable Silence & Dead-Air Detectors** — Mematikan `SilenceDetector` server-side Telefun (5 detik) dan client `Dead Air Detector` (7 detik + cooldown 12 detik), termasuk hapus auto prompt `[INSTRUKSI SISTEM - DEAD AIR]`. Silent instruction di `promptBuilder.ts` diperpanjang 3x (<10→<30, 10-15→30-45 detik). Gemini VAD tidak disentuh. 8 files modified/added, 30 regression tests (7 + 23) passing. (DONE)
+
+## Key Files Changed (Phase 58 — 116)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -781,6 +783,14 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/__tests__/sidak-dashboard-type-boundary.test.ts` — **NEW Phase 112**: Immutability test for `withDashboardAgentMetrics`
 - `apps/web/src/__tests__/ketik-chat-interface-structure.test.ts` — **NEW Phase 112**: Scenario images extraction tests
 - `apps/web/src/__tests__/telefun-session-metrics-boundary.test.ts` — **NEW Phase 112**: RealisticModeMetrics type test
+- `apps/telefun/src/server.ts` — **Phase 116**: Hapus import, instantiasi, start/ping/stop, dan callback `SilenceDetector`
+- `apps/telefun/src/silence.ts` — **Phase 116**: Hapus class `SilenceDetector` (tidak dipakai), pertahankan `UtteranceBuffer`
+- `apps/web/src/routes/telefun/services/geminiService.ts` — **Phase 116**: Hapus dead-air state/constants, hapus block timer dari audio loop, hapus `sendDeadAirPrompt()`, stalled watchdog tidak lagi call `sendDeadAirPrompt()`
+- `apps/web/src/routes/telefun/services/promptBuilder.ts` — **Phase 116**: Silent instruction diperpanjang 3x (`<10`→`<30`, `10-15`→`30-45` detik)
+- `apps/telefun/src/server-silence-detector.test.ts` — **NEW Phase 116**: Static guard server SilenceDetector
+- `apps/web/src/__tests__/telefun-dead-air-disabled.test.ts` — **NEW Phase 116**: Static guard client dead-air
+- `apps/web/src/__tests__/telefun-prompt-builder.test.ts` — **Phase 116**: Test assertions untuk timing silent instruction baru
+- `docs/rebuild-logs/phase-116-telefun-disable-silence-and-dead-air-detectors.md` — **NEW Phase 116**: Rebuild log
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

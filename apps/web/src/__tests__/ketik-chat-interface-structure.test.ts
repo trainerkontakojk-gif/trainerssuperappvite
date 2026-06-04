@@ -13,7 +13,7 @@ describe("KETIK NO_RESPONSE_PATTERN_GLOBAL", () => {
   });
 
   it("strips [NO_RESPONSE] in middle of text", () => {
-    expect("oke [NO_RESPONSE] lanjut".replace(NO_RESPONSE_PATTERN_GLOBAL, "").trim()).toBe("oke lanjut");
+    expect("oke [NO_RESPONSE] lanjut".replace(NO_RESPONSE_PATTERN_GLOBAL, "")).toBe("oke  lanjut");
   });
 
   it("returns empty when only [NO_RESPONSE]", () => {

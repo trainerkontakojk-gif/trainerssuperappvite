@@ -59,6 +59,7 @@ export type TelefunTimelineEventName =
   | "playback_start"
   | "playback_end"
   | "dead_air_prompt_sent"
+  | "time_cue_prompt_sent"
   | "interruption_prompt_sent"
   | "stalled_response_detected"
   | "stalled_response_watchdog"

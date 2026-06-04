@@ -35,8 +35,8 @@ export function buildTelefunLiveSystemInstruction(params: {
 
   const silentInstruction = responsePacingMode === "realistic"
     ? `\nSILENT HANDLING (REALISTIS):
-1. Jika agen diam sebentar (<10 detik), tunggu dengan sabar. Jangan panik atau mengulang panggilan.
-2. Jika agen diam lebih lama (10-15 detik), panggil agen secara natural satu kali (misal: "Halo? Masih ada?").
+1. Jika agen diam sebentar (<30 detik), tunggu dengan sabar. Jangan panik atau mengulang panggilan.
+2. Jika agen diam lebih lama (30-45 detik), panggil agen secara natural satu kali (misal: "Halo? Masih ada?").
 3. Jangan mengulang panggilan berkali-kali. Satu kali cukup.
 4. Jangan mengakhiri sesi hanya karena agen diam atau memberikan jawaban singkat.
 5. Jika agen hanya merespons dengan "iya", "baik", "oke", "hmm", "lanjut" — lanjutkan eksposisi masalahmu.`

@@ -169,6 +169,10 @@ describe("buildTelefunLiveSystemInstruction", () => {
     expect(prompt).toContain("tunggu dengan sabar");
     expect(prompt).toContain("Jangan mengulang panggilan berkali-kali");
     expect(prompt).toContain("Jangan mengakhiri sesi hanya karena agen diam");
+    expect(prompt).toContain("(<30 detik)");
+    expect(prompt).toContain("(30-45 detik)");
+    expect(prompt).not.toContain("(<10 detik)");
+    expect(prompt).not.toContain("(10-15 detik)");
   });
 
   it("training_fast mode does not include SILENT HANDLING section", () => {
