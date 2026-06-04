@@ -4,6 +4,7 @@ export const IMAGE_TAG_PATTERN = /\[SEND_IMAGE\s*:\s*\d+\]/i;
 export const IMAGE_TAG_PATTERN_GLOBAL = /\[SEND_IMAGE\s*:\s*\d+\]/gi;
 export const SYSTEM_TAG_PATTERN = /\[(sistem|system)\]/i;
 export const SYSTEM_TAG_PATTERN_GLOBAL = /\[(sistem|system)\]/gi;
+export const NO_RESPONSE_PATTERN_GLOBAL = /\[NO_RESPONSE\]/gi;
 
 export const STRICT_INSTRUCTIONAL_CUES = [
   "silakan",

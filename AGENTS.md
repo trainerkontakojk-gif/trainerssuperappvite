@@ -306,7 +306,9 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 113. **Profiler Slides Label Fix** — Renamed slide mode labels for clarity: "Original" → "Landscape" (title: "Versi Landscape"), "Opsi 2" → "Portrait" (title: "Portrait A4"). Updated `ParticipantSlide.tsx` subtitle from "Opsi 2 · Portrait A4" to "Portrait A4". 2 files modified. (DONE)
 114. **Telefun Live Audio, Orchestrator, Radar, dan Identity Fix** — Fixed 5 Telefun bugs: (1) Gender-first identity resolver (`resolveFinalIdentity()` gender-first, `pickIdentityProfileForGender()` helper, Kore voice auto-normalize), (2) Orchestrator removal from live path (prompt-only realistic mode + SILENT HANDLING section), (3) Audio encoding hardening (`float32ToPcm16Buffer()` helper, base64 roundtrip validation), (4) Canonical communication profile builder (`packages/types/src/telefun-communication-profile.ts` shared source-of-truth), (5) Radar chart explicit dataKey (`userValue`/`targetValue`), ResizeObserver dimension guard. 14 files modified, 1 new shared helper file, 199 tests passing (164 web + 30 API + 5 proxy). (DONE)
 
-## Key Files Changed (Phase 58 — 114)
+115. **KETIK [NO_RESPONSE] Tag Leak Fix** — Tag internal `[NO_RESPONSE]` yang bocor ke UI chat KETIK di-strip dengan defense-in-depth: (1) Backend `sanitizeConsumerText()` stripping regex + collapse double spaces, (2) Frontend guard di `ChatInterface.tsx` dengan pattern `NO_RESPONSE_PATTERN_GLOBAL` dari `message-utils.ts`, (3) `sanitizeConsumerText()` di-export untuk testing langsung. 9 backend + 6 frontend regression tests, 581 API + ~469 web tests passing. 6 files modified/added. (DONE)
+
+## Key Files Changed (Phase 58 — 115)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -453,6 +455,12 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/telefun/src/server-protocol.test.ts` — **Phase 114**: Added realtimeInput.audio forwardable message test
 - `apps/web/src/__tests__/telefun-communication-profile.test.tsx` — **Phase 114**: Added 2 `buildVoiceRadarData` helper tests
 - `docs/rebuild-logs/phase-114-telefun-live-audio-radar-identity-fix.md` — **NEW Phase 114**: Documentation for Telefun live audio, orchestrator, radar, dan identity fix
+- `apps/api/src/services/ketik/consumer-response.ts` — **Phase 115**: Added `[NO_RESPONSE]` stripping in `sanitizeConsumerText()`, exported function for testing
+- `apps/web/src/routes/ketik/lib/message-utils.ts` — **Phase 115**: Added `NO_RESPONSE_PATTERN_GLOBAL` constant
+- `apps/web/src/routes/ketik/components/ChatInterface.tsx` — **Phase 115**: Frontend guard strips `[NO_RESPONSE]` from responseText before display check
+- `apps/api/src/__tests__/ketik-consumer-response.test.ts` — **NEW Phase 115**: 9 unit tests for sanitizeConsumerText [NO_RESPONSE] stripping
+- `apps/web/src/__tests__/ketik-chat-interface-structure.test.ts` — **Phase 115**: Added 6 pattern tests for NO_RESPONSE_PATTERN_GLOBAL
+- `docs/rebuild-logs/phase-115-ketik-no-response-tag-fix.md` — **NEW Phase 115**: Documentation for KETIK NO_RESPONSE tag leak fix
 
 ## Relevant Files
 

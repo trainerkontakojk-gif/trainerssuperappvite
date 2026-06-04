@@ -21,6 +21,7 @@ import {
   IMAGE_TAG_PATTERN_GLOBAL,
   allowSolutionAcknowledgement,
   normalizeGeneratedParts,
+  NO_RESPONSE_PATTERN_GLOBAL,
   normalizeMessagesForDisplay,
 } from "../lib/message-utils";
 import {
@@ -346,8 +347,8 @@ export function ChatInterface({
         return;
       }
 
-      const responseText = result.text;
-      if (responseText !== "[NO_RESPONSE]") {
+      const responseText = result.text.replace(NO_RESPONSE_PATTERN_GLOBAL, "").trim();
+      if (responseText) {
         const rawParts = responseText
           .split("[BREAK]")
           .map((p) => p.trim())

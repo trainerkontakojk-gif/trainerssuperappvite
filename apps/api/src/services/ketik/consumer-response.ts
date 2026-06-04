@@ -105,7 +105,7 @@ export function getConsumerTypes(): KetikConsumerType[] {
   return DEFAULT_CONSUMER_TYPES;
 }
 
-function sanitizeConsumerText(rawText: string): string {
+export function sanitizeConsumerText(rawText: string): string {
   if (!rawText) return rawText;
   let text = rawText
     .trim()
@@ -115,7 +115,10 @@ function sanitizeConsumerText(rawText: string): string {
       "",
     )
     .replace(/\(pesan chat sebelumnya\)/gi, "")
-    .replace(/\[pesan( chat)? sebelumnya\]/gi, "");
+    .replace(/\[pesan( chat)? sebelumnya\]/gi, "")
+    .replace(/\[NO_RESPONSE\]/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 
   if (/(^|\n)\s*(Agen|Agent|CS|Customer Service)\s*:/i.test(text)) {
     const consumerLines = text
