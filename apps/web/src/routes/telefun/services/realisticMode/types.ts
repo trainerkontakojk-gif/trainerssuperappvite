@@ -133,6 +133,15 @@ export interface PersonaConfig {
 // Extended Session Metrics (realistic mode)
 // ---------------------------------------------------------------------------
 
+export interface RealisticModeMetrics {
+  turnTakingEvents: TurnTakingEvent[];
+  fallbackCount: number;
+  fallbackRecoveryCount: number;
+  backchannelCount: number;
+  personaIntensityHistory: PersonaIntensitySnapshot[];
+  disruptionOutcomes: DisruptionInstance[];
+}
+
 export interface SessionMetricsExtended extends SessionMetrics {
   turnTakingEvents: TurnTakingEvent[];
   fallbackCount: number;
@@ -142,6 +151,7 @@ export interface SessionMetricsExtended extends SessionMetrics {
   disruptionOutcomes: DisruptionInstance[];
   speakingDominanceRatio: number;
   estimatedWpm: number;
+  realisticModeMetrics?: RealisticModeMetrics;
 }
 
 // ---------------------------------------------------------------------------

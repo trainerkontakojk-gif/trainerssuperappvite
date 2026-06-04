@@ -1,11 +1,25 @@
 import { supabaseAdmin } from "../../lib/supabase";
-import type { DashboardTemuanRow } from "./dashboard-types";
+import type {
+  DashboardAgentWithMetrics,
+  DashboardTemuanRow,
+} from "./dashboard-types";
+import {
+  getDashboardServiceLabel,
+  toDashboardFolderRows,
+  toDashboardRuleIndicators,
+  toDashboardScoreRows,
+  toDashboardServiceSet,
+  toDashboardTemuanRows,
+  toDashboardWeightMap,
+  toParetoCategory,
+  withDashboardAgentMetrics,
+} from "./dashboard-types";
 import { groupTemuanByAgent, getScoreRows } from "./dashboard-aggregation";
 import { buildDashboardTrends } from "./dashboard-trends";
 import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
-  SERVICE_LABELS,
+  isServiceType,
   VALID_SERVICE_TYPES,
 } from "../../lib/scoring";
 import type {
@@ -14,6 +28,8 @@ import type {
   DashboardSummary,
   TopAgentData,
   ParetoData,
+  QAIndicator,
+  ServiceWeight,
 } from "@trainers/types";
 import {
   isCountableFinding,
@@ -118,15 +134,9 @@ export async function getDashboardData(params: {
     query,
     distinctQuery,
   ]);
-  const rows = allTemuan ?? [];
+  const rows = toDashboardTemuanRows(allTemuan);
 
-  const weightMap = (weights?.data ?? []).reduce(
-    (acc: Record<string, any>, w: any) => {
-      acc[w.service_type] = w;
-      return acc;
-    },
-    {},
-  );
+  const weightMap = toDashboardWeightMap(weights?.data);
 
   // 1. Find all unique combinations of (service_type, period_id) in rows
   const uniqueCombos = new Set<string>();
@@ -137,8 +147,8 @@ export async function getDashboardData(params: {
   }
 
   // 2. Resolve effective rule versions for each combo concurrently
-  const ruleWeightMap: Record<string, any> = {};
-  const ruleIndicatorsMap: Record<string, any[]> = {};
+  const ruleWeightMap: Record<string, ServiceWeight> = {};
+  const ruleIndicatorsMap: Record<string, QAIndicator[]> = {};
 
   await Promise.all(
     Array.from(uniqueCombos).map(async (combo) => {
@@ -146,6 +156,7 @@ export async function getDashboardData(params: {
       const rule = await resolveEffectiveRuleVersionForPeriod(svc, pid);
       if (rule) {
         ruleWeightMap[combo] = {
+          service_type: isServiceType(svc) ? svc : "call",
           critical_weight: rule.critical_weight,
           non_critical_weight: rule.non_critical_weight,
           scoring_mode: rule.scoring_mode,
@@ -156,19 +167,14 @@ export async function getDashboardData(params: {
           .select("*")
           .eq("rule_version_id", rule.id);
         if (snapshotInds && snapshotInds.length > 0) {
-          ruleIndicatorsMap[combo] = snapshotInds.map((ri: any) => ({
-            id: ri.legacy_indicator_id || ri.id,
-            name: ri.name,
-            category: ri.category,
-            bobot: Number(ri.bobot),
-            has_na: ri.has_na,
-          }));
+          ruleIndicatorsMap[combo] = toDashboardRuleIndicators(snapshotInds);
         }
       }
     })
   );
 
-  const auditedAgents = groupTemuanByAgent(rows as DashboardTemuanRow[]);
+  const auditedAgents = groupTemuanByAgent(rows);
+  const auditedAgentsWithMetrics: DashboardAgentWithMetrics[] = [];
   let totalFindings = 0;
   let totalScore = 0;
   let zeroErrorCount = 0;
@@ -178,7 +184,7 @@ export async function getDashboardData(params: {
   const serviceDefects: Record<string, number> = {};
   const paretoMap = new Map<
     string,
-    { name: string; count: number; cat: string }
+    { name: string; count: number; cat: ParetoData["category"] }
   >();
   let criticalCount = 0;
   let nonCriticalCount = 0;
@@ -211,8 +217,8 @@ export async function getDashboardData(params: {
         ruleIndicatorsMap[comboKey] ??
         indicators.filter((i) => i.service_type === svc);
 
-      const scoreRows = getScoreRows(periodRows);
-      const score = calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight);
+      const scoreRows = toDashboardScoreRows(getScoreRows(periodRows));
+      const score = calculateQAScoreFromTemuan(agentIndicators, scoreRows, weight);
 
       agentScoreSum += score.finalScore;
       agentPeriodsCount++;
@@ -239,7 +245,7 @@ export async function getDashboardData(params: {
           paretoMap.set(key, {
             name: key,
             count: (paretoMap.get(key)?.count ?? 0) + 1,
-            cat: ind.category,
+            cat: toParetoCategory(ind.category),
           });
           if (ind.category === "critical") criticalCount++;
           else if (ind.category === "non_critical") nonCriticalCount++;
@@ -248,9 +254,14 @@ export async function getDashboardData(params: {
     }
 
     const finalAgentScore = agentPeriodsCount > 0 ? agentScoreSum / agentPeriodsCount : 100;
-    (agent as any).finalAgentScore = finalAgentScore;
-    (agent as any).agentFindings = agentFindings;
-    (agent as any).hasCritical = hasCritical;
+
+    auditedAgentsWithMetrics.push(
+      withDashboardAgentMetrics(agent, {
+        finalAgentScore,
+        agentFindings,
+        hasCritical,
+      }),
+    );
 
     totalFindings += agentFindings;
     totalScore += finalAgentScore;
@@ -261,7 +272,7 @@ export async function getDashboardData(params: {
 
   const trends = buildDashboardTrends({
     periods,
-    rows: rows as DashboardTemuanRow[],
+    rows,
     indicators,
     weightMap,
     year: params.year ?? new Date().getFullYear(),
@@ -278,7 +289,7 @@ export async function getDashboardData(params: {
       const agentIndicators =
         ruleIndicatorsMap[comboKey] ??
         indicators.filter((i) => i.service_type === serviceType);
-      return calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight).finalScore;
+      return calculateQAScoreFromTemuan(agentIndicators, toDashboardScoreRows(scoreRows), weight).finalScore;
     },
   });
 
@@ -344,19 +355,17 @@ export async function getDashboardData(params: {
   }
 
   const limit = params.limit !== undefined ? params.limit : 20;
-  const topAgentsAll: TopAgentData[] = auditedAgents
-    .map((agent: any) => {
-      return {
-        agentId: agent.id,
-        nama: agent.nama,
-        batch: agent.batch_name,
-        tim: agent.tim,
-        jabatan: agent.jabatan,
-        defects: agent.agentFindings,
-        score: roundTo(agent.finalAgentScore, 2),
-        hasCritical: agent.hasCritical,
-      };
-    })
+  const topAgentsAll: TopAgentData[] = auditedAgentsWithMetrics
+    .map((agent) => ({
+      agentId: agent.id,
+      nama: agent.nama,
+      batch: agent.batch_name,
+      tim: agent.tim,
+      jabatan: agent.jabatan,
+      defects: agent.agentFindings,
+      score: roundTo(agent.finalAgentScore, 2),
+      hasCritical: agent.hasCritical,
+    }))
     .sort((a, b) => b.defects - a.defects || a.nama.localeCompare(b.nama));
 
   const topAgents = limit > 0 ? topAgentsAll.slice(0, limit) : topAgentsAll;
@@ -367,7 +376,7 @@ export async function getDashboardData(params: {
       fullName: val.name,
       count: val.count,
       cumulative: 0,
-      category: val.cat as any,
+      category: val.cat,
     }))
     .sort((a, b) => b.count - a.count);
 
@@ -386,19 +395,19 @@ export async function getDashboardData(params: {
       .from("profiler_folders")
       .select("id, name")
       .order("name");
-    folderIds = (allFolders ?? []).map((f: any) => ({ id: f.id, name: f.name }));
+    folderIds = toDashboardFolderRows(allFolders);
   }
 
   const availableYears = [
-    ...new Set(rows.map((r) => r.tahun).filter(Boolean)),
-  ].sort((a, b) => b - a) as number[];
+    ...new Set(
+      rows
+        .map((r) => r.tahun)
+        .filter((year): year is number => typeof year === "number"),
+    ),
+  ].sort((a, b) => b - a);
   const currentYear = params.year ?? new Date().getFullYear();
 
-  const distinctSvcs = new Set(
-    (distinctServiceRows ?? [])
-      .map((r: any) => r.service_type)
-      .filter((s: any) => typeof s === "string" && s.length > 0),
-  );
+  const distinctSvcs = toDashboardServiceSet(distinctServiceRows);
   const availableServices = allowedSvcs
     ? allowedSvcs.filter((svc) => distinctSvcs.has(svc))
     : VALID_SERVICE_TYPES.filter((svc) => distinctSvcs.has(svc));
@@ -408,7 +417,7 @@ export async function getDashboardData(params: {
     folders: folderIds,
     summary,
     serviceData: Object.entries(serviceDefects).map(([svc, total]) => ({
-      name: (SERVICE_LABELS as any)[svc] ?? svc,
+      name: getDashboardServiceLabel(svc),
       serviceType: svc,
       total,
       severity:

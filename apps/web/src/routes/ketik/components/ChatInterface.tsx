@@ -4,8 +4,6 @@ import {
   Send,
   Phone,
   X,
-  Check,
-  CheckCheck,
   ArrowLeft,
   Download,
   Sparkles,
@@ -34,6 +32,12 @@ import {
   TRAINING_FAST_RANGES,
   type SessionPhase,
 } from "../lib/pacing";
+import {
+  KetikMessageBubble,
+  renderKetikMessageContent,
+} from "./chat/KetikMessageBubble";
+import { KetikImageLightbox } from "./chat/KetikImageLightbox";
+import { getKetikScenarioImages } from "./chat/ketikScenarioImages";
 
 interface ChatInterfaceProps {
   config: KetikSessionConfig;
@@ -47,13 +51,6 @@ interface ChatInterfaceProps {
   templates?: KetikQuickTemplate[];
   signatureName?: string;
 }
-
-const TickIcon = ({ status }: { status?: string }) => {
-  if (!status) return null;
-  const color = status === "read" ? "text-primary" : "text-muted-foreground";
-  if (status === "sent") return <Check className={`w-3.5 h-3.5 ${color}`} />;
-  return <CheckCheck className={`w-3.5 h-3.5 ${color}`} />;
-};
 
 const MAINTENANCE_TEMPLATE =
   "Demikian informasi yang dapat kami sampaikan. Apakah informasinya sudah cukup jelas? Ada hal lain yang dapat kami bantu?";
@@ -522,43 +519,6 @@ export function ChatInterface({
     textareaRef.current?.focus();
   };
 
-  const renderMessageContent = (text: string) => {
-    const scenarioImages = (scenario as any).images || [];
-    const parts = text.split(/(\[SEND_IMAGE\s*:\s*\d+\])/gi);
-
-    return parts.map((part, index) => {
-      const match = part.match(/\[SEND_IMAGE\s*:\s*(\d+)\]/i);
-      if (match) {
-        const imgIndex = parseInt(match[1]);
-        const imgSrc = scenarioImages[imgIndex];
-
-        if (imgSrc) {
-          return (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="my-2"
-            >
-              <img
-                src={imgSrc}
-                alt={`Attachment ${imgIndex}`}
-                className="rounded-2xl max-h-64 w-full object-cover border border-gray-200 dark:border-white/10 cursor-pointer hover:opacity-90 transition-all"
-                onClick={() => setSelectedImage(imgSrc)}
-              />
-            </motion.div>
-          );
-        }
-        return (
-          <span key={index} className="text-sm italic text-muted-foreground">
-            Lampiran gambar
-          </span>
-        );
-      }
-      return <span key={index}>{part}</span>;
-    });
-  };
-
   return (
     <div
       data-module="ketik"
@@ -726,7 +686,11 @@ export function ChatInterface({
                     ) : null}
                     {msgHasImageTag ? (
                       <div className="w-full max-w-sm">
-                        {renderMessageContent(msg.text)}
+                        {renderKetikMessageContent(
+                          msg.text,
+                          getKetikScenarioImages(scenario),
+                          setSelectedImage,
+                        )}
                       </div>
                     ) : null}
                   </div>
@@ -734,41 +698,13 @@ export function ChatInterface({
               );
             }
 
-            const isAgent = msg.sender === "agent";
-
             return (
-              <motion.div
+              <KetikMessageBubble
                 key={msg.id}
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                className={`flex w-full ${isAgent ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[80%] px-6 py-4 relative text-[15px] leading-relaxed shadow-sm
-                    ${
-                      isAgent
-                        ? "bg-module-ketik text-white rounded-[2rem] rounded-tr-none shadow-module-ketik/20"
-                        : "module-clean-panel text-foreground rounded-[2rem] rounded-tl-none"
-                    }`}
-                >
-                  <div className="font-medium whitespace-pre-wrap break-words">
-                    {renderMessageContent(msg.text)}
-                  </div>
-                  <div
-                    className={`text-[9px] font-black uppercase tracking-widest flex items-center justify-end gap-2 mt-2 ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
-                  >
-                    <span>
-                      {msg.timestamp
-                        ? new Date(msg.timestamp).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : ""}
-                    </span>
-                    {isAgent && <TickIcon status={msg.status} />}
-                  </div>
-                </div>
-              </motion.div>
+                message={msg}
+                scenarioImages={getKetikScenarioImages(scenario)}
+                onImageClick={setSelectedImage}
+              />
             );
           })}
         </AnimatePresence>
@@ -921,30 +857,10 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Image Lightbox */}
-      <AnimatePresence>
-        {selectedImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-6 cursor-pointer"
-            onClick={() => setSelectedImage(null)}
-          >
-            <motion.img
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              src={selectedImage}
-              alt="Full preview"
-              className="max-w-full max-h-full rounded-xl shadow-2xl"
-            />
-            <button className="absolute top-6 right-6 bg-gray-800/80 text-white p-2 rounded-full">
-              <X className="w-6 h-6" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <KetikImageLightbox
+        src={selectedImage}
+        onClose={() => setSelectedImage(null)}
+      />
     </div>
   );
 }

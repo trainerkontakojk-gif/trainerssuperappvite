@@ -301,8 +301,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 108. **SIDAK Dashboard Trend Toggle & Total Temuan Filter** — Added "Tampilkan Semua"/"Sembunyikan Semua" toggle for parameter trend chart with rotation animation; "Total Temuan" filter button on Agent Trend Tab isolates only total trend line with active pill styling. 2 files modified. (DONE)
 109. **SIDAK Agent Score Caching & Score Card UI Overhaul** — Agent detail now queries `qa_dashboard_agent_period_summary` MV for cached per-period scores with real-time fallback using `resolveEffectiveRuleVersionForPeriod`. SidakInputScoreCard complete UI overhaul: SVG radial progress ring, glassmorphism, live pulse badge, ShieldAlert/ShieldCheck icons. 3 files modified. (DONE)
 110. **SIDAK Dashboard Summary Consistency Fix** — Dashboard summary KPI cards (`totalDefects`, `avgAgentScore`, `complianceRate`) now computed real-time from `qa_temuan` via app scoring engine, replacing chain MV/cache lookups. Ensures consistency with trend chart data. Multi-period summaries aggregate weighted averages from `periodMetrics`. Compliance description differentiates single vs multi-month. Documentation synced across 4 docs files. 10 files modified. (DONE)
+111. **Telefun Finalizer Status Refactor** — Replaced 3 mutable failure flags (`scoringFailed`, `saveFailed`, `uploadFailed`) scattered across `sessionFinalizer.ts` with a typed `FinalizerStatus` object and explicit marking helpers (`createFinalizerStatus()`, `markUploadFailed()`, `markSaveFailed()`, `markScoringFailed()`). Behavior-preserving refactor — public return contract unchanged. 2 characterization tests added. 1 file modified. (DONE)
+112. **Type Safety & Maintainability Refactor** — Three independent type safety improvements: (1) KETIK ChatInterface — extracted `KetikMessageBubble`, `KetikImageLightbox`, `getKetikScenarioImages` into dedicated files; `ChatInterface.tsx` reduced 277→16 lines. (2) SIDAK dashboard types — added 9 typed converter functions in `dashboard-types.ts`, replaced all `(agent as any).xxx` mutations with `withDashboardAgentMetrics()`, added `DashboardAgentWithMetrics` type, added `no_tiket`/`created_at` fields to `DashboardTemuanRow`. (3) Telefun realistic mode — added `RealisticModeMetrics` interface, typed AudioContext fallback, removed `(metrics as any)` casts via `SessionMetricsExtended.realisticModeMetrics`. 3 new boundary test files. Zero logic change. (DONE)
 
-## Key Files Changed (Phase 58 — 107)
+## Key Files Changed (Phase 58 — 112)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
 - `apps/web/src/routes/profiler/export.tsx` — **Phase 90**: Reduced 1,490→28 lines, delegates to ProfilerExportToolbar/ProfilerExportGrid + useProfilerExport hook
@@ -738,6 +740,19 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `docs/checklist-audit-trainers-superapp.md` — **Phase 110**: Updated 2 audit entries
 - `docs/database.md` — **Phase 110**: Updated MV description
 - `docs/rebuild-logs/phase-110-sidak-dashboard-summary-consistency.md` — **NEW Phase 110**: Documentation for dashboard summary consistency fix
+- `apps/web/src/routes/telefun/sessionFinalizer.ts` — **Phase 111**: Added `FinalizerStatus` type + helpers; replaced 3 mutable `let` booleans with `const status = createFinalizerStatus()` + `mark*` calls; preserved return contract
+- `apps/web/src/__tests__/telefun-session-finalizer.test.ts` — **Phase 111**: Added 2 characterization tests: missing-user-ID path (upload+scoring failure) and base-save-failure path
+- `apps/web/src/routes/ketik/components/ChatInterface.tsx` — **Phase 112**: Reduced 277→16 lines, extracted `KetikMessageBubble`/`KetikImageLightbox`/`getKetikScenarioImages` into `chat/` directory
+- `apps/web/src/routes/ketik/components/chat/KetikMessageBubble.tsx` — **NEW Phase 112**: `TickIcon` + `renderKetikMessageContent` + message bubble component
+- `apps/web/src/routes/ketik/components/chat/KetikImageLightbox.tsx` — **NEW Phase 112**: Image lightbox with AnimatePresence
+- `apps/web/src/routes/ketik/components/chat/ketikScenarioImages.ts` — **NEW Phase 112**: Scenario images helper
+- `apps/api/src/services/sidak/dashboard-types.ts` — **Phase 112**: Added 9 typed converter functions + `DashboardAgentWithMetrics` type + `no_tiket`/`created_at` on `DashboardTemuanRow`
+- `apps/api/src/services/sidak/dashboard-data.ts` — **Phase 112**: Replaced all `(agent as any).xxx` mutations with `withDashboardAgentMetrics()`, removed inline type-casts
+- `apps/web/src/routes/telefun/services/realisticMode/types.ts` — **Phase 112**: Added `RealisticModeMetrics` interface
+- `apps/web/src/routes/telefun/services/geminiService.ts` — **Phase 112**: Typed AudioContext fallback via `WebkitAudioContextWindow`, typed `realisticModeMetrics` field
+- `apps/api/src/__tests__/sidak-dashboard-type-boundary.test.ts` — **NEW Phase 112**: Immutability test for `withDashboardAgentMetrics`
+- `apps/web/src/__tests__/ketik-chat-interface-structure.test.ts` — **NEW Phase 112**: Scenario images extraction tests
+- `apps/web/src/__tests__/telefun-session-metrics-boundary.test.ts` — **NEW Phase 112**: RealisticModeMetrics type test
 
 | #   | Route                        | Page Type    | Notes                                                    |
 | --- | ---------------------------- | ------------ | -------------------------------------------------------- |

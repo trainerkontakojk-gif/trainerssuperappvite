@@ -1,6 +1,7 @@
 import type { TelefunAppSettings } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
+import type { SessionMetricsExtended } from "./realisticMode/types";
 import {
   RealisticModeOrchestrator,
 } from "./realisticMode/RealisticModeOrchestrator";
@@ -22,6 +23,10 @@ import {
   getConsumerTypeHint,
   getTimeCueInstruction,
 } from "./promptBuilder";
+
+interface WebkitAudioContextWindow extends Window {
+  webkitAudioContext?: typeof AudioContext;
+}
 
 export class LiveSession {
   private ws: WebSocket | null = null;
@@ -126,9 +131,13 @@ export class LiveSession {
       });
 
       // 2. Setup Audio Context
-      this.audioContext = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )({ sampleRate: 16000 });
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as WebkitAudioContextWindow).webkitAudioContext;
+      if (!AudioContextCtor) {
+        throw new Error("Browser tidak mendukung AudioContext.");
+      }
+      this.audioContext = new AudioContextCtor({ sampleRate: 16000 });
 
       // 3. Setup Recording
       this.setupRecorders();
@@ -703,7 +712,7 @@ export class LiveSession {
         : null;
     const url = fullBlob ? URL.createObjectURL(fullBlob) : null;
 
-    const metrics: SessionMetrics = {
+    const metrics: SessionMetricsExtended = {
       speechSegments: this.speechSegments,
       totalSpeakingMs: this.totalSpeakingMs,
       totalSilenceMs: Math.max(
@@ -716,11 +725,18 @@ export class LiveSession {
       volumeConsistency: this.calculateVolumeConsistency(),
       inputTranscriptionChunks: [],
       sessionDurationMs: Date.now() - this.sessionStartTime,
+      turnTakingEvents: [],
+      fallbackCount: 0,
+      fallbackRecoveryCount: 0,
+      backchannelCount: 0,
+      personaIntensityHistory: [],
+      disruptionOutcomes: [],
+      speakingDominanceRatio: 0,
+      estimatedWpm: 0,
     };
 
     if (this.orchestrator) {
-      const rmMetrics = this.orchestrator.getMetrics();
-      (metrics as any).realisticModeMetrics = rmMetrics;
+      metrics.realisticModeMetrics = this.orchestrator.getMetrics();
     }
 
     this.onRecordingComplete(url, fullBlob, agentBlob, metrics);
