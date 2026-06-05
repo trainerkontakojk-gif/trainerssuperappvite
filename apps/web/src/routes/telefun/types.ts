@@ -69,7 +69,11 @@ export type TelefunTimelineEventName =
   | "realistic_mode_prompt"
   | "realistic_mode_session_recovery"
   | "realistic_mode_end_session"
-  | "hold_state_changed";
+  | "hold_state_changed"
+  | "audio_worklet_enabled"
+  | "audio_worklet_fallback"
+  | "session_reconnecting"
+  | "session_resumed";
 
 export interface TelefunTimelineEvent {
   event: TelefunTimelineEventName;

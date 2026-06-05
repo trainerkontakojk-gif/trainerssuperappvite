@@ -70,27 +70,6 @@ export function updateTelefunLongSpeechState(
   return { state, shouldInterrupt: false };
 }
 
-export function getTelefunTimeCueThreshold({
-  totalSeconds,
-  elapsedSeconds,
-  cue30Sent,
-  cue20Sent,
-}: {
-  totalSeconds: number;
-  elapsedSeconds: number;
-  cue30Sent: boolean;
-  cue20Sent: boolean;
-}): "30s" | "20s" | null {
-  if (totalSeconds <= 0) return null;
-
-  const remaining = totalSeconds - elapsedSeconds;
-  if (totalSeconds > 50 && remaining <= 30 && remaining > 20 && !cue30Sent)
-    return "30s";
-  if (totalSeconds > 20 && remaining <= 20 && remaining > 0 && !cue20Sent)
-    return "20s";
-  return null;
-}
-
 // ── Interruption Guards ─────────────────────────────────────
 
 export type InterruptionClassification =

@@ -9,6 +9,7 @@ import {
   parsePcmSampleRate,
   shouldSendRealtimeAudio,
   shouldReportTelefunCloseError,
+  processInputAudioFrame,
 } from "../routes/telefun/services/liveProtocol";
 import { resolveFinalIdentity } from "../routes/telefun/telefunSettings";
 import {
@@ -143,6 +144,19 @@ describe("telefun live protocol", () => {
     expect(view.getInt16(2, true)).toBe(-8191); // Math.trunc(-0.25 * 32767)
   });
 
+  it("enables Gemini Live session resumption and context compression", () => {
+    const message = buildTelefunLiveSetupMessage({
+      telefunModelId: "gemini-3.1-flash-live-preview",
+      voiceName: "Aoede",
+      systemInstruction: "ROLEPLAY TEST",
+    });
+
+    expect(message.setup.sessionResumption).toEqual({});
+    expect(message.setup.contextWindowCompression).toEqual({
+      slidingWindow: {},
+    });
+  });
+
   it("does not use selectedModel as live voice model", () => {
     const message = buildTelefunLiveSetupMessage({
       telefunModelId: "gemini-2.0-flash-exp",
@@ -256,5 +270,14 @@ describe("telefun live protocol", () => {
         held: false,
       }),
     ).toBe(true);
+  });
+
+  it("processes audio input frames into volume and pcm16 data", () => {
+    const result = processInputAudioFrame(new Float32Array([0, 0.5, -0.5, 1]));
+
+    expect(result.volume).toBeGreaterThan(0);
+    expect(result.volumeBucket).toBeGreaterThanOrEqual(0);
+    expect(result.isSilent).toBe(false);
+    expect(new Int16Array(result.pcm16Buffer)).toHaveLength(4);
   });
 });

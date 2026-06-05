@@ -11,7 +11,10 @@ import {
 import type { SessionMetrics } from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
 import { LiveSession } from "../services/geminiService";
-import { getTelefunTimeCueThreshold } from "../services/timingGuards";
+import {
+  getTelefunTimeCueThreshold,
+  type TelefunTimeCue,
+} from "../services/timingGuards";
 import {
   MicrophoneActivityWaveform,
   type MicrophoneWaveformTone,
@@ -59,8 +62,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const [holdTimer, setHoldTimer] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const timeCue30Sent = useRef(false);
-  const timeCue20Sent = useRef(false);
+  const sentTimeCues = useRef<Set<TelefunTimeCue>>(new Set());
 
   const sessionRef = useRef<LiveSession | null>(null);
   const mountedRef = useRef(true);
@@ -215,8 +217,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     mountedRef.current = true;
 
     const startCallSequence = async () => {
-      timeCue30Sent.current = false;
-      timeCue20Sent.current = false;
+      sentTimeCues.current = new Set();
 
       if (isActive) {
         console.log("[Telefun] Starting ringtone sequence");
@@ -399,15 +400,10 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       const cue = getTelefunTimeCueThreshold({
         totalSeconds,
         elapsedSeconds: callDuration,
-        cue30Sent: timeCue30Sent.current,
-        cue20Sent: timeCue20Sent.current,
+        sentCues: sentTimeCues.current,
       });
-      if (cue === "30s") {
-        timeCue30Sent.current = true;
-        sessionRef.current?.sendTimeCue(remaining);
-      }
-      if (cue === "20s") {
-        timeCue20Sent.current = true;
+      if (cue) {
+        sentTimeCues.current.add(cue);
         sessionRef.current?.sendTimeCue(remaining);
       }
     }

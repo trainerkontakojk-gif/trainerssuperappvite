@@ -7,9 +7,9 @@ import {
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
   buildRealtimeAudioMessage,
-  float32ToPcm16Buffer,
   shouldSendRealtimeAudio,
   extractGeminiInlineAudioChunks,
+  processInputAudioFrame,
   TELEFUN_CLIENT_CLOSE_CODE,
   TELEFUN_CLIENT_CLOSE_REASON,
   shouldReportTelefunCloseError,
@@ -31,6 +31,7 @@ export class LiveSession {
   private stream: MediaStream | null = null;
   private inputSource: MediaStreamAudioSourceNode | null = null;
   private processor: ScriptProcessorNode | null = null;
+  private workletNode: AudioWorkletNode | null = null;
   private analyser: AnalyserNode | null = null;
 
   private mediaRecorder: MediaRecorder | null = null;
@@ -69,8 +70,8 @@ export class LiveSession {
   // Stalled Response Watchdog
   private stalledWatchdogTimer: ReturnType<typeof setInterval> | null = null;
   private lastModelActivityMs: number = 0;
-  private readonly STALLED_RESPONSE_START_MS = 12000;
-  private readonly STALLED_RESPONSE_MID_MS = 15000;
+  private readonly STALLED_RESPONSE_START_MS = 20000;
+  private readonly STALLED_RESPONSE_MID_MS = 25000;
 
   private interruptionGuardState: InterruptionGuardState = {
     aiSpeakingStartedAt: null,
@@ -137,7 +138,7 @@ export class LiveSession {
       this.setupRecorders();
 
       // 4. Setup Input Processing
-      this.setupInputProcessing();
+      await this.setupInputProcessing();
 
       // 5. Connect WebSocket
       const token =
@@ -265,6 +266,22 @@ export class LiveSession {
     if (msg.serverContent?.interrupted) {
       this.emitTimelineEvent("interrupted_received");
     }
+
+    if (msg.type === "session_reconnecting") {
+      this.lastModelActivityMs = Date.now();
+      this.onStatusChange("Menyambung ulang...");
+      this.emitTimelineEvent("session_reconnecting", {
+        reason: msg.reason,
+        code: msg.code,
+        timeLeftSeconds: msg.timeLeftSeconds,
+      });
+    }
+
+    if (msg.type === "session_resumed") {
+      this.lastModelActivityMs = Date.now();
+      this.onStatusChange("Tersambung");
+      this.emitTimelineEvent("session_resumed");
+    }
   }
 
   private setupRecorders() {
@@ -301,7 +318,7 @@ export class LiveSession {
     this.agentMediaRecorder.start(1000);
   }
 
-  private setupInputProcessing() {
+  private async setupInputProcessing() {
     if (!this.audioContext || !this.stream || !this.recordingDestination)
       return;
 
@@ -309,116 +326,145 @@ export class LiveSession {
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 256;
 
-    this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
-
     this.inputSource.connect(this.analyser);
-    this.inputSource.connect(this.processor);
     this.inputSource.connect(this.recordingDestination);
 
-    this.processor.onaudioprocess = (e) => {
-      const now = Date.now();
-      const inputData = e.inputBuffer.getChannelData(0);
-
-      let sum = 0;
-      for (let i = 0; i < inputData.length; i++)
-        sum += inputData[i] * inputData[i];
-      const rms = Math.sqrt(sum / inputData.length);
-      const vol = Math.min(100, Math.floor(rms * 200));
-      const volBucket = Math.floor(vol / 10);
-      if (
-        volBucket !== this.lastVolumeBucket ||
-        now - this.lastVolumeEmitMs >= this.MIN_VOLUME_EMIT_MS
-      ) {
-        this.onVolumeChange(vol);
-        this.lastVolumeEmitMs = now;
-        this.lastVolumeBucket = volBucket;
-      }
-      if (this.volumeSamples.length < this.MAX_VOLUME_SAMPLES) {
-        this.volumeSamples.push(vol);
-      }
-
-      const isSilent = vol <= 10;
-
-      // Long Speech Detection
-      if (!this.isHeld && !this.isMuted) {
-        if (!isSilent) {
-          if (!this.longSpeechStartMs) {
-            this.longSpeechStartMs = now;
-          }
-          const speechDuration = now - this.longSpeechStartMs;
-          if (
-            speechDuration >= this.LONG_SPEECH_THRESHOLD_MS &&
-            now - this.longSpeechLastPromptMs >= this.LONG_SPEECH_COOLDOWN_MS
-          ) {
-            this.longSpeechLastPromptMs = now;
-            this.sendInterruptionPrompt();
-          }
-        } else {
-          this.longSpeechStartMs = null;
-        }
-      }
-
-      // Interruption Guard
-      if (this.isAiSpeaking) {
-        const guardResult = updateInterruptionGuard(
-          this.interruptionGuardState,
-          {
-            now,
-            isAiSpeaking: true,
-            isSilent,
-            rms,
-          },
+    if (this.audioContext.audioWorklet) {
+      try {
+        await this.audioContext.audioWorklet.addModule(
+          "/audio-input-processor.js",
         );
-        this.interruptionGuardState = guardResult.state;
-        if (guardResult.shouldInterrupt) {
-          this.interruptionCount++;
-          this.cancelAiPlayback();
-          this.emitTimelineEvent("interruption_prompt_sent");
-        }
+        this.workletNode = new AudioWorkletNode(
+          this.audioContext,
+          "telefun-audio-input-processor",
+        );
+        this.workletNode.port.onmessage = (event) => {
+          this.handleInputAudioFrame(event.data as Float32Array);
+        };
+        this.inputSource.connect(this.workletNode);
+        this.workletNode.connect(this.audioContext.destination);
+        this.emitTimelineEvent("audio_worklet_enabled");
+        return;
+      } catch (error) {
+        this.emitTimelineEvent("audio_worklet_fallback", {
+          reason: error instanceof Error ? error.message : "unknown",
+        });
       }
+    }
 
-      // Speech Segments
-      if (!isSilent) {
-        if (!this.currentSpeechSegment) {
-          this.currentSpeechSegment = { startMs: now };
-          this.setSessionState("user_speaking");
-        }
-      } else if (this.currentSpeechSegment) {
-        const endMs = now;
-        const durationMs = endMs - this.currentSpeechSegment.startMs;
-        if (durationMs > 200) {
-          this.speechSegments.push({
-            startMs: this.currentSpeechSegment.startMs,
-            endMs,
-            durationMs,
-          });
-          this.totalSpeakingMs += durationMs;
-        }
-        this.currentSpeechSegment = null;
-        this.setSessionState("ai_thinking");
-      }
+    this.setupInputProcessingFallback();
+  }
 
-      const canSend = shouldSendRealtimeAudio({
-        wsReady: !!(this.ws && this.ws.readyState === WebSocket.OPEN),
-        setupComplete: this.isSetupComplete,
-        muted: this.isMuted,
-        held: this.isHeld,
-      });
+  private setupInputProcessingFallback() {
+    if (!this.audioContext || !this.inputSource) return;
 
-      if (!canSend) return;
-
-      this.ws!.send(
-        JSON.stringify(
-          buildRealtimeAudioMessage(float32ToPcm16Buffer(inputData)),
-        ),
-      );
-      if (!this.hasSentFirstUserAudio) {
-        this.hasSentFirstUserAudio = true;
-        this.emitTimelineEvent("first_user_audio_chunk_sent");
-      }
+    this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+    this.processor.onaudioprocess = (event) => {
+      this.handleInputAudioFrame(event.inputBuffer.getChannelData(0));
     };
-
+    this.inputSource.connect(this.processor);
     this.processor.connect(this.audioContext.destination);
+  }
+
+  private handleInputAudioFrame(inputData: Float32Array) {
+    const now = Date.now();
+    const frame = processInputAudioFrame(inputData);
+
+    if (
+      frame.volumeBucket !== this.lastVolumeBucket ||
+      now - this.lastVolumeEmitMs >= this.MIN_VOLUME_EMIT_MS
+    ) {
+      this.onVolumeChange(frame.volume);
+      this.lastVolumeEmitMs = now;
+      this.lastVolumeBucket = frame.volumeBucket;
+    }
+    if (this.volumeSamples.length < this.MAX_VOLUME_SAMPLES) {
+      this.volumeSamples.push(frame.volume);
+    }
+
+    this.handleSpeechAndInterruptionState(now, frame.isSilent, inputData);
+
+    const canSend = shouldSendRealtimeAudio({
+      wsReady: !!(this.ws && this.ws.readyState === WebSocket.OPEN),
+      setupComplete: this.isSetupComplete,
+      muted: this.isMuted,
+      held: this.isHeld,
+    });
+
+    if (!canSend) return;
+
+    this.ws!.send(JSON.stringify(buildRealtimeAudioMessage(frame.pcm16Buffer)));
+    if (!this.hasSentFirstUserAudio) {
+      this.hasSentFirstUserAudio = true;
+      this.emitTimelineEvent("first_user_audio_chunk_sent");
+    }
+  }
+
+  private handleSpeechAndInterruptionState(
+    now: number,
+    isSilent: boolean,
+    inputData: Float32Array,
+  ) {
+    const rms = Math.sqrt(
+      inputData.reduce((sum, value) => sum + value * value, 0) /
+        inputData.length,
+    );
+
+    // Long Speech Detection
+    if (!this.isHeld && !this.isMuted) {
+      if (!isSilent) {
+        if (!this.longSpeechStartMs) {
+          this.longSpeechStartMs = now;
+        }
+        const speechDuration = now - this.longSpeechStartMs;
+        if (
+          speechDuration >= this.LONG_SPEECH_THRESHOLD_MS &&
+          now - this.longSpeechLastPromptMs >= this.LONG_SPEECH_COOLDOWN_MS
+        ) {
+          this.longSpeechLastPromptMs = now;
+          this.sendInterruptionPrompt();
+        }
+      } else {
+        this.longSpeechStartMs = null;
+      }
+    }
+
+    // Interruption Guard
+    if (this.isAiSpeaking) {
+      const guardResult = updateInterruptionGuard(this.interruptionGuardState, {
+        now,
+        isAiSpeaking: true,
+        isSilent,
+        rms,
+      });
+      this.interruptionGuardState = guardResult.state;
+      if (guardResult.shouldInterrupt) {
+        this.interruptionCount++;
+        this.cancelAiPlayback();
+        this.emitTimelineEvent("interruption_prompt_sent");
+      }
+    }
+
+    // Speech Segments
+    if (!isSilent) {
+      if (!this.currentSpeechSegment) {
+        this.currentSpeechSegment = { startMs: now };
+        this.setSessionState("user_speaking");
+      }
+    } else if (this.currentSpeechSegment) {
+      const endMs = now;
+      const durationMs = endMs - this.currentSpeechSegment.startMs;
+      if (durationMs > 200) {
+        this.speechSegments.push({
+          startMs: this.currentSpeechSegment.startMs,
+          endMs,
+          durationMs,
+        });
+        this.totalSpeakingMs += durationMs;
+      }
+      this.currentSpeechSegment = null;
+      this.setSessionState("ai_thinking");
+    }
   }
 
   private playPcm(data: Uint8Array, sampleRate = 24000) {
@@ -558,10 +604,11 @@ export class LiveSession {
           reason: "mid_response_timeout",
           elapsedMs: elapsed,
         });
-        this.onError(
-          new Error("Respons AI terhenti. Panggilan akan diakhiri."),
+        this.lastLocalError = new Error(
+          "Respons AI terhenti. Panggilan akan diakhiri.",
         );
-        this.disconnect();
+        this.onError(this.lastLocalError);
+        this.disconnect("timeout");
       } else if (
         this.sessionState !== "ai_speaking" &&
         elapsed > this.STALLED_RESPONSE_START_MS
@@ -696,6 +743,10 @@ export class LiveSession {
   }
 
   private cleanupAudio() {
+    if (this.workletNode) {
+      this.workletNode.port.onmessage = null;
+      this.workletNode.disconnect();
+    }
     if (this.processor) this.processor.disconnect();
     if (this.analyser) this.analyser.disconnect();
     if (this.inputSource) this.inputSource.disconnect();

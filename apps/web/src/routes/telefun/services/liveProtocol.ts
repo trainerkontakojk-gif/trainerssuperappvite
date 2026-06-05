@@ -123,6 +123,10 @@ export function buildTelefunLiveSetupMessage(params: {
         turnCoverage: "TURN_INCLUDES_ONLY_ACTIVITY",
       },
       inputAudioTranscription: {},
+      sessionResumption: {},
+      contextWindowCompression: {
+        slidingWindow: {},
+      },
     },
   };
 }
@@ -203,6 +207,26 @@ export function extractGeminiInlineAudioChunks(message: unknown): Array<{
       };
     })
     .filter(Boolean) as Array<{ data: Uint8Array; sampleRate: number }>;
+}
+
+export function processInputAudioFrame(inputData: Float32Array): {
+  volume: number;
+  volumeBucket: number;
+  isSilent: boolean;
+  pcm16Buffer: ArrayBuffer;
+} {
+  let sum = 0;
+  for (let i = 0; i < inputData.length; i += 1) {
+    sum += inputData[i] * inputData[i];
+  }
+  const rms = Math.sqrt(sum / inputData.length);
+  const volume = Math.min(100, Math.floor(rms * 200));
+  return {
+    volume,
+    volumeBucket: Math.floor(volume / 10),
+    isSilent: volume <= 10,
+    pcm16Buffer: float32ToPcm16Buffer(inputData),
+  };
 }
 
 export function shouldSendRealtimeAudio(params: {

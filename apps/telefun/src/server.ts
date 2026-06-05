@@ -16,6 +16,9 @@ import {
   isGeminiForwardableMessage,
   isGeminiSetupMessage,
   hasGeminiSetupComplete,
+  getGeminiGoAwayTimeLeftSeconds,
+  getSessionResumptionHandle,
+  isCurrentGeminiSocket,
 } from "./server-protocol.js";
 import { buildSafeCloseMetadata } from "./server-close.js";
 
@@ -90,6 +93,19 @@ wss.on("connection", async (ws, req) => {
   let reconnectAttempts = 0;
   let geminiSetupComplete = false;
   const postSetupQueue: string[] = [];
+  let cachedSetupMessage: string | null = null;
+  let latestSessionHandle: string | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let clientClosed = false;
+
+  const keepaliveTimer = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping();
+    }
+    if (geminiWs?.readyState === WebSocket.OPEN) {
+      geminiWs.ping();
+    }
+  }, 30_000);
 
   const utteranceBuffer = new UtteranceBuffer(500, 1000);
   const turnManager = new TurnManager();
@@ -119,31 +135,78 @@ wss.on("connection", async (ws, req) => {
     }
   };
 
-  const setupGeminiWs = () => {
-    geminiWs = connectGemini();
+  const buildReconnectSetupMessage = () => {
+    if (!cachedSetupMessage) return null;
+    const setupMsg = JSON.parse(cachedSetupMessage);
+    if (latestSessionHandle) {
+      setupMsg.setup = {
+        ...setupMsg.setup,
+        sessionResumption: {
+          ...(setupMsg.setup?.sessionResumption ?? {}),
+          handle: latestSessionHandle,
+        },
+      };
+    }
+    return JSON.stringify(setupMsg);
+  };
 
-    geminiWs.on("open", () => {
+  const scheduleReconnect = (delay: number) => {
+    if (clientClosed || reconnectTimer) return;
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+    reconnectAttempts += 1;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (ws.readyState !== WebSocket.OPEN || clientClosed) return;
+      geminiSetupComplete = false;
+      const previousSocket = geminiWs;
+      geminiWs = null;
+      isGeminiOpen = false;
+      if (
+        previousSocket &&
+        (previousSocket.readyState === WebSocket.OPEN ||
+          previousSocket.readyState === WebSocket.CONNECTING)
+      ) {
+        previousSocket.close(1000, "Reconnecting Gemini session");
+      }
+      setupGeminiWs();
+    }, delay);
+  };
+
+  const setupGeminiWs = () => {
+    const socket = connectGemini();
+    geminiWs = socket;
+
+    socket.on("open", () => {
+      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
       isGeminiOpen = true;
-      reconnectAttempts = 0;
       console.log("[Telefun] Gemini Live connected");
+
+      if (reconnectAttempts > 0) {
+        const reconnectSetup = buildReconnectSetupMessage();
+        if (reconnectSetup) {
+          socket.send(reconnectSetup);
+        }
+      }
+
       while (pendingMessages.length > 0) {
         const msg = pendingMessages.shift();
         if (msg) {
           try {
             const parsed = JSON.parse(msg);
             if (isGeminiSetupMessage(parsed) || geminiSetupComplete) {
-              geminiWs!.send(msg);
+              socket.send(msg);
             } else {
               postSetupQueue.push(msg);
             }
           } catch {
-            geminiWs!.send(msg);
+            socket.send(msg);
           }
         }
       }
     });
 
-    geminiWs.on("message", (data) => {
+    socket.on("message", (data) => {
+      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
       const raw = data.toString();
 
       if (raw.includes('"usageMetadata"')) {
@@ -161,7 +224,12 @@ wss.on("connection", async (ws, req) => {
         const parsed = JSON.parse(raw);
         if (hasGeminiSetupComplete(parsed)) {
           console.log("[Telefun] Gemini Setup Complete received, opening gate");
+          const resumed = reconnectAttempts > 0;
           geminiSetupComplete = true;
+          reconnectAttempts = 0;
+          if (resumed && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "session_resumed" }));
+          }
           while (postSetupQueue.length > 0) {
             const msg = postSetupQueue.shift();
             if (msg) sendToGemini(msg);
@@ -182,6 +250,29 @@ wss.on("connection", async (ws, req) => {
         if (parsed.serverContent?.turnComplete) {
           turnManager.endAiSpeaking();
         }
+
+        const nextHandle = getSessionResumptionHandle(parsed);
+        if (nextHandle) {
+          latestSessionHandle = nextHandle;
+          console.log("[Telefun] Session resumption handle updated");
+        }
+
+        const goAwaySeconds = getGeminiGoAwayTimeLeftSeconds(parsed);
+        if (goAwaySeconds !== null) {
+          console.log(`[Telefun] GoAway received: ${goAwaySeconds}s remaining`);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(
+              JSON.stringify({
+                type: "session_reconnecting",
+                reason: "goAway",
+                timeLeftSeconds: goAwaySeconds,
+              }),
+            );
+          }
+          if (goAwaySeconds > 5 && !reconnectTimer) {
+            scheduleReconnect(250);
+          }
+        }
       } catch {
         /* skip */
       }
@@ -189,31 +280,38 @@ wss.on("connection", async (ws, req) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(raw);
     });
 
-    geminiWs.on("error", () => {
-      void saveAndCloseSession("failed").then(() => flushUsage());
-      if (ws.readyState === WebSocket.OPEN) ws.close(1011, "Gemini API Error");
+    socket.on("error", (error) => {
+      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
+      console.error("[Telefun] Gemini WebSocket error:", error);
     });
 
-    geminiWs.on("close", (code, reason) => {
+    socket.on("close", (code, reason) => {
+      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
       console.log(
         `[Telefun] Gemini closed: ${code} (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
       );
       isGeminiOpen = false;
       geminiSetupComplete = false;
-      postSetupQueue.length = 0;
 
-      // Attempt reconnect on non-clean close
-      if (code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 8000);
+      if (
+        !clientClosed &&
+        code !== 1000 &&
+        reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+      ) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 8000);
         console.log(
-          `[Telefun] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`,
+          `[Telefun] Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})`,
         );
-        setTimeout(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            setupGeminiWs();
-          }
-        }, delay);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "session_reconnecting",
+              reason: "gemini_close",
+              code,
+            }),
+          );
+        }
+        scheduleReconnect(delay);
         return;
       }
 
@@ -250,6 +348,10 @@ wss.on("connection", async (ws, req) => {
       activeModelId = (parsed as any).setup.model.replace(/^models\//, "");
     }
 
+    if (isGeminiSetupMessage(parsed)) {
+      cachedSetupMessage = JSON.stringify(parsed);
+    }
+
     // Extract user text for transcript
     if ((parsed as any).clientContent?.turns) {
       for (const turn of (parsed as any).clientContent.turns) {
@@ -276,26 +378,38 @@ wss.on("connection", async (ws, req) => {
     console.log(
       `[Telefun] Client closed: ${code} ${reason.toString() || "(no reason)"}`,
     );
+    clientClosed = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    clearInterval(keepaliveTimer);
     utteranceBuffer.flushNow();
     if (
       geminiWs &&
       (geminiWs.readyState === WebSocket.OPEN ||
         geminiWs.readyState === WebSocket.CONNECTING)
     ) {
-      geminiWs.close();
+      geminiWs.close(1000, "Client disconnected");
     }
     await saveAndCloseSession("completed");
     setTimeout(() => void flushUsage(), 2000);
   });
 
   ws.on("error", async () => {
+    clientClosed = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    clearInterval(keepaliveTimer);
     utteranceBuffer.clear();
     if (
       geminiWs &&
       (geminiWs.readyState === WebSocket.OPEN ||
         geminiWs.readyState === WebSocket.CONNECTING)
     ) {
-      geminiWs.close();
+      geminiWs.close(1011, "Client WebSocket error");
     }
     await saveAndCloseSession("failed");
     setTimeout(() => void flushUsage(), 2000);
