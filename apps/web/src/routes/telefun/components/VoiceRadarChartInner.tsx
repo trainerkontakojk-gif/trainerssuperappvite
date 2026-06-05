@@ -84,79 +84,82 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
   const tickFontSize = compact ? 10 : 12;
 
   return (
-    <div
-      ref={wrapperRef}
-      className="relative w-full min-w-0 overflow-hidden"
-      style={{ height, minHeight: height }}
-    >
-      {measuredWidth > 0 ? (
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart
-            cx="50%"
-            cy="50%"
-            outerRadius={outerRadius}
-            data={chartData}
-          >
-            <PolarGrid stroke="#94a3b8" strokeOpacity={0.2} />
-            <PolarAngleAxis
-              dataKey="subject"
-              tick={({ payload, x, y, cx, cy }: any) => {
-                const metric = chartData.find(
-                  (d) => d.key === payload.value,
-                );
-                const isLowerBetter =
-                  metric?.evaluationMode === "lower_better";
-                return (
-                  <text
-                    x={x}
-                    y={y}
-                    textAnchor={
-                      x > cx ? "start" : x < cx ? "end" : "middle"
-                    }
-                    fill="#64748b"
-                    fontSize={tickFontSize}
-                    fontWeight={700}
-                    dy={y > cy ? 10 : -4}
-                  >
-                    {metric?.label ?? payload.value}
-                    {isLowerBetter && (
-                      <tspan fill="#f59e0b" fontSize={tickFontSize - 2}>
-                        {" "}(<tspan fill="#f59e0b" fontSize={tickFontSize - 2}>&darr;</tspan>)
-                      </tspan>
-                    )}
-                  </text>
-                );
-              }}
-            />
-            <PolarRadiusAxis
-              angle={30}
-              domain={[0, 100]}
-              tick={{ fill: "#94a3b8", fontSize: 9 }}
-              axisLine={false}
-              tickCount={5}
-            />
-            <Radar
-              name="Target QA"
-              dataKey="targetValue"
-              stroke="#10b981"
-              fill="#10b981"
-              fillOpacity={0.1}
-              strokeWidth={2}
-              strokeDasharray="4 4"
-            />
-            <Radar
-              name="Hasil Anda"
-              dataKey="userValue"
-              stroke="#3b82f6"
-              fill="#3b82f6"
-              fillOpacity={0.2}
-              strokeWidth={2}
-            />
-            <Legend content={renderLegend} />
-          </RadarChart>
-        </ResponsiveContainer>
-      ) : (
-        <div style={{ height }} />
+    <div className="flex flex-col items-center w-full">
+      <div
+        ref={wrapperRef}
+        className="relative w-full min-w-0 overflow-hidden"
+        style={{ height, minHeight: height }}
+      >
+        {measuredWidth > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart
+              cx="50%"
+              cy="50%"
+              outerRadius={outerRadius}
+              data={chartData}
+            >
+              <PolarGrid stroke="#94a3b8" strokeOpacity={0.2} />
+              <PolarAngleAxis
+                dataKey="subject"
+                tick={({ payload, x, y, cx, cy }: any) => {
+                  const metric = chartData.find((d) => d.key === payload.value);
+                  return (
+                    <text
+                      x={x}
+                      y={y}
+                      textAnchor={x > cx ? "start" : x < cx ? "end" : "middle"}
+                      fill="#64748b"
+                      fontSize={tickFontSize}
+                      fontWeight={700}
+                      dy={y > cy ? 10 : -4}
+                    >
+                      {metric?.label ?? payload.value}
+                    </text>
+                  );
+                }}
+              />
+              <PolarRadiusAxis
+                angle={30}
+                domain={[0, 100]}
+                tick={{ fill: "#94a3b8", fontSize: 9 }}
+                axisLine={false}
+                tickCount={5}
+              />
+              <Radar
+                name="Target QA"
+                dataKey="targetValue"
+                stroke="#10b981"
+                fill="#10b981"
+                fillOpacity={0.08}
+                strokeWidth={2}
+                strokeDasharray="4 4"
+              />
+              <Radar
+                name="Hasil Anda"
+                dataKey="userValue"
+                stroke="#2563eb"
+                fill="#2563eb"
+                fillOpacity={0.22}
+                strokeWidth={2}
+              />
+              <Legend content={renderLegend} />
+            </RadarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div style={{ height }} />
+        )}
+      </div>
+      {!compact && (
+        <div className="mt-4 px-4 py-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1 w-full text-center">
+          <p className="font-semibold text-slate-700 dark:text-slate-300">
+            Diagram ini menunjukkan seberapa dekat hasil Anda dengan target QA
+            pada tiap aspek komunikasi.
+          </p>
+          <p>
+            Untuk Fillers, target yang baik memang rendah karena semakin sedikit
+            kata pengisi semakin baik.
+          </p>
+        </div>
       )}
     </div>
   );

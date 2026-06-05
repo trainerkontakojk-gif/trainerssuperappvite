@@ -174,6 +174,10 @@ describe("buildCommunicationProfileFromAssessment", () => {
     expect(profile!.metrics[0]).toHaveProperty("evaluationMode");
     expect(profile!.metrics[0]).toHaveProperty("status");
     expect(profile!.metrics[0]).toHaveProperty("explanation");
+    expect(profile!.metrics[0]).toHaveProperty("score");
+    expect(profile!.metrics[0]).toHaveProperty("verdict");
+    expect(profile!.metrics[0]).toHaveProperty("feedback");
+    expect(profile!.metrics[0]).toHaveProperty("targetDirection");
   });
 
   it("uses wordsPerMinute for speakingRate value (not score * 10)", () => {
@@ -187,7 +191,7 @@ describe("buildCommunicationProfileFromAssessment", () => {
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     const sr = profile!.metrics.find((m) => m.key === "speakingRate");
-    expect(sr!.value).toBe(85);
+    expect(sr!.value).toBe(70);
   });
 
   it("falls back speakingRate to score * 10 when wordsPerMinute missing", () => {
@@ -216,7 +220,7 @@ describe("buildCommunicationProfileFromAssessment", () => {
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     const fl = profile!.metrics.find((m) => m.key === "fillers");
-    expect(fl!.value).toBe(25);
+    expect(fl!.value).toBe(20);
     expect(fl!.evaluationMode).toBe("lower_better");
     expect(fl!.status).toBe("good");
   });
@@ -233,13 +237,18 @@ describe("buildCommunicationProfileFromAssessment", () => {
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     const fl = profile!.metrics.find((m) => m.key === "fillers");
-    expect(fl!.value).toBe(85);
+    expect(fl!.value).toBe(90);
     expect(fl!.status).toBe("poor");
   });
 
   it("maps emotionalTone to tone key", () => {
     const assessment = makeLegacyAssessment({
-      emotionalTone: { score: 8, dominant: "tenang", verdict: "Baik", feedback: "" },
+      emotionalTone: {
+        score: 8,
+        dominant: "tenang",
+        verdict: "Baik",
+        feedback: "",
+      },
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     const tone = profile!.metrics.find((m) => m.key === "tone");
@@ -250,14 +259,25 @@ describe("buildCommunicationProfileFromAssessment", () => {
     const assessment = makeLegacyAssessment({
       speakingRate: {
         score: 7,
-        wordsPerMinute: 120,
+        wordsPerMinute: 140,
         verdict: "Baik",
         feedback: "",
       },
-      intonation: { score: 9, verdict: "Baik", feedback: "" },
+      intonation: { score: 8, verdict: "Baik", feedback: "" },
       articulation: { score: 9, verdict: "Baik", feedback: "" },
-      fillerWords: { score: 9, count: 1, examples: [], verdict: "Baik", feedback: "" },
-      emotionalTone: { score: 9, dominant: "tenang", verdict: "Baik", feedback: "" },
+      fillerWords: {
+        score: 9,
+        count: 1,
+        examples: [],
+        verdict: "Baik",
+        feedback: "",
+      },
+      emotionalTone: {
+        score: 8,
+        dominant: "tenang",
+        verdict: "Baik",
+        feedback: "",
+      },
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     expect(profile!.overallSummary).toContain("sangat baik");
@@ -268,6 +288,62 @@ describe("buildCommunicationProfileFromAssessment", () => {
     const profile = buildCommunicationProfileFromAssessment(assessment);
     expect(profile!.strengths.length).toBeGreaterThan(0);
     expect(profile!.improvementPriorities).toBeDefined();
+  });
+
+  it("normalizes speaking rate WPM into displayScore without using WPM as score", () => {
+    const profile = buildCommunicationProfileFromAssessment(
+      makeLegacyAssessment({
+        speakingRate: {
+          score: 4,
+          wordsPerMinute: 118,
+          verdict: "Cukup",
+          feedback: "Tempo agak lambat.",
+        },
+      }),
+    );
+    const sr = profile!.metrics.find((m) => m.key === "speakingRate")!;
+    expect(sr.rawValue).toBe(118);
+    expect(sr.displayScore).toBeGreaterThanOrEqual(0);
+    expect(sr.displayScore).toBeLessThanOrEqual(100);
+    expect(sr.displayScore).not.toBe(118);
+    expect(sr.targetScore).toBe(70);
+  });
+
+  it("normalizes filler count as low target display value instead of raw count score", () => {
+    const profile = buildCommunicationProfileFromAssessment(
+      makeLegacyAssessment({
+        fillerWords: {
+          score: 9,
+          count: 3,
+          examples: ["eh"],
+          verdict: "Baik",
+          feedback: "Minim filler.",
+        },
+      }),
+    );
+    const fillers = profile!.metrics.find((m) => m.key === "fillers")!;
+    expect(fillers.rawValue).toBe(3);
+    expect(fillers.displayScore).toBe(20);
+    expect(fillers.targetScore).toBe(20);
+    expect(fillers.status).toBe("good");
+  });
+
+  it("carries original quality score, verdict, and feedback into the display metric", () => {
+    const profile = buildCommunicationProfileFromAssessment(
+      makeLegacyAssessment({
+        speakingRate: {
+          score: 6,
+          wordsPerMinute: 118,
+          verdict: "Cukup",
+          feedback: "Tempo agak lambat, tambahkan jeda.",
+        },
+      }),
+    );
+    const sr = profile!.metrics.find((m) => m.key === "speakingRate")!;
+    expect(sr.score).toBe(6);
+    expect(sr.verdict).toBe("Cukup");
+    expect(sr.feedback).toBe("Tempo agak lambat, tambahkan jeda.");
+    expect(sr.targetDirection).toBe("match_target");
   });
 });
 
@@ -281,7 +357,98 @@ describe("enrichAssessmentWithCommunicationProfile", () => {
     expect(enriched.communicationProfile!.metrics).toHaveLength(5);
   });
 
-  it("keeps existing communicationProfile if present", () => {
+  it("keeps existing communicationProfile if present and valid", () => {
+    const existing = {
+      metrics: [
+        {
+          key: "speakingRate",
+          label: "Speaking Rate",
+          value: 70,
+          benchmarkValue: 70,
+          score: 7,
+          displayScore: 70,
+          targetScore: 70,
+          targetDirection: "match_target",
+          evaluationMode: "optimal_range",
+          verdict: "Baik",
+          status: "good",
+          feedback: "Tempo stabil.",
+          explanation: "Custom",
+        },
+        {
+          key: "intonation",
+          label: "Intonation",
+          value: 80,
+          benchmarkValue: 80,
+          score: 8,
+          displayScore: 80,
+          targetScore: 80,
+          targetDirection: "higher_quality",
+          evaluationMode: "higher_better",
+          verdict: "Baik",
+          status: "good",
+          feedback: "Intonasi baik.",
+          explanation: "Custom",
+        },
+        {
+          key: "articulation",
+          label: "Articulation",
+          value: 90,
+          benchmarkValue: 90,
+          score: 9,
+          displayScore: 90,
+          targetScore: 90,
+          targetDirection: "higher_quality",
+          evaluationMode: "higher_better",
+          verdict: "Sangat baik",
+          status: "good",
+          feedback: "Artikulasi jelas.",
+          explanation: "Custom",
+        },
+        {
+          key: "fillers",
+          label: "Fillers",
+          value: 20,
+          benchmarkValue: 20,
+          score: 8,
+          displayScore: 20,
+          targetScore: 20,
+          targetDirection: "lower_raw_is_better",
+          evaluationMode: "lower_better",
+          verdict: "Baik",
+          status: "good",
+          feedback: "Minim filler.",
+          explanation: "Custom",
+        },
+        {
+          key: "tone",
+          label: "Tone",
+          value: 85,
+          benchmarkValue: 85,
+          score: 7,
+          displayScore: 85,
+          targetScore: 85,
+          targetDirection: "higher_quality",
+          evaluationMode: "higher_better",
+          verdict: "Cukup",
+          status: "good",
+          feedback: "Empati cukup.",
+          explanation: "Custom",
+        },
+      ],
+      overallSummary: "Custom",
+      strengths: [],
+      improvementPriorities: [],
+    };
+    const assessment = {
+      ...makeLegacyAssessment(),
+      communicationProfile: existing as any,
+    };
+    const enriched = enrichAssessmentWithCommunicationProfile(assessment);
+    expect(enriched.communicationProfile).toBe(existing);
+  });
+
+  it("rebuilds existing communicationProfile if stale or invalid", () => {
     const existing = {
       metrics: [],
       overallSummary: "Custom",
@@ -290,10 +457,74 @@ describe("enrichAssessmentWithCommunicationProfile", () => {
     };
     const assessment = {
       ...makeLegacyAssessment(),
-      communicationProfile: existing,
+      communicationProfile: existing as any,
     };
     const enriched = enrichAssessmentWithCommunicationProfile(assessment);
-    expect(enriched.communicationProfile).toBe(existing);
+    expect(enriched.communicationProfile).not.toBe(existing);
+    expect(enriched.communicationProfile!.metrics).toHaveLength(5);
+    expect(
+      enriched.communicationProfile!.metrics[0].displayScore,
+    ).toBeDefined();
+  });
+
+  it("rebuilds stale communicationProfile instead of trusting an old ambiguous profile", () => {
+    const assessment = makeLegacyAssessment({
+      communicationProfile: {
+        metrics: [
+          {
+            key: "speakingRate",
+            label: "Speaking Rate",
+            value: 118,
+            benchmarkValue: 100,
+            evaluationMode: "higher_better",
+            status: "good",
+            explanation: "old",
+          },
+        ],
+        overallSummary: "old",
+        strengths: [],
+        improvementPriorities: [],
+      } as any,
+    });
+    const enriched = enrichAssessmentWithCommunicationProfile(assessment);
+    const sr = enriched.communicationProfile!.metrics.find(
+      (m) => m.key === "speakingRate",
+    )!;
+    expect(sr.displayScore).not.toBe(118);
+    expect(sr.targetScore).toBe(70);
+  });
+
+  it("rebuilds cache with wrong deterministic target even if display fields exist", () => {
+    const assessment = makeLegacyAssessment({
+      communicationProfile: {
+        metrics: [
+          {
+            key: "speakingRate",
+            label: "Speaking Rate",
+            value: 70,
+            benchmarkValue: 100,
+            score: 7,
+            displayScore: 70,
+            targetScore: 100,
+            targetDirection: "match_target",
+            evaluationMode: "optimal_range",
+            verdict: "Baik",
+            status: "good",
+            feedback: "Old target",
+            explanation: "old",
+          },
+        ],
+        overallSummary: "old",
+        strengths: [],
+        improvementPriorities: [],
+      } as any,
+    });
+    const enriched = enrichAssessmentWithCommunicationProfile(assessment);
+    const sr = enriched.communicationProfile!.metrics.find(
+      (m) => m.key === "speakingRate",
+    )!;
+    expect(sr.targetScore).toBe(70);
+    expect(sr.feedback).toBe("Tempo stabil.");
   });
 
   it("does not mutate original assessment", () => {

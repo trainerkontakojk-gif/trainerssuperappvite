@@ -8,9 +8,13 @@ import {
   extractGeminiInlineAudioChunks,
   parsePcmSampleRate,
   shouldSendRealtimeAudio,
+  shouldReportTelefunCloseError,
 } from "../routes/telefun/services/liveProtocol";
 import { resolveFinalIdentity } from "../routes/telefun/telefunSettings";
-import { resolveGeminiLiveVoice, GEMINI_LIVE_VOICES_BY_GENDER } from "../routes/telefun/telefunVoiceRegistry";
+import {
+  resolveGeminiLiveVoice,
+  GEMINI_LIVE_VOICES_BY_GENDER,
+} from "../routes/telefun/telefunVoiceRegistry";
 
 describe("telefun live protocol", () => {
   it("normalizes http(s) URLs to ws(s) URLs", () => {
@@ -20,9 +24,9 @@ describe("telefun live protocol", () => {
     expect(normalizeTelefunWebSocketUrl("http://localhost:3002")).toBe(
       "ws://localhost:3002/",
     );
-    expect(normalizeTelefunWebSocketUrl("wss://telefun.up.railway.app/ws")).toBe(
-      "wss://telefun.up.railway.app/ws",
-    );
+    expect(
+      normalizeTelefunWebSocketUrl("wss://telefun.up.railway.app/ws"),
+    ).toBe("wss://telefun.up.railway.app/ws");
   });
 
   it("maps known close codes to Indonesian messages", () => {
@@ -40,6 +44,47 @@ describe("telefun live protocol", () => {
     );
   });
 
+  it("maps normal client close without surfacing a WebSocket error", () => {
+    const mapped = mapTelefunCloseEvent({
+      code: 1000,
+      reason: "Client ended Telefun session",
+    });
+
+    expect(mapped.severity).toBe("normal");
+    expect(mapped.message).toContain("selesai");
+  });
+
+  it("maps browser 1005 to a diagnostic network message", () => {
+    const mapped = mapTelefunCloseEvent({ code: 1005, reason: "" });
+
+    expect(mapped.severity).toBe("network");
+    expect(mapped.message).toContain("tanpa status");
+    expect(mapped.message).toContain("1005");
+  });
+
+  it("does not report close errors for intentional or normal close events", () => {
+    expect(
+      shouldReportTelefunCloseError({
+        intentionalClose: true,
+        severity: "network",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldReportTelefunCloseError({
+        intentionalClose: false,
+        severity: "normal",
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldReportTelefunCloseError({
+        intentionalClose: false,
+        severity: "network",
+      }),
+    ).toBe(true);
+  });
+
   it("builds Gemini Live setup with telefunModelId and realtime input config", () => {
     const message = buildTelefunLiveSetupMessage({
       telefunModelId: "gemini-2.0-flash-exp",
@@ -49,7 +94,9 @@ describe("telefun live protocol", () => {
 
     expect(message.setup.model).toBe("models/gemini-2.0-flash-exp");
     expect(message.setup.systemInstruction.parts[0].text).toBe("ROLEPLAY TEST");
-    expect(message.setup.realtimeInputConfig.automaticActivityDetection.disabled).toBe(false);
+    expect(
+      message.setup.realtimeInputConfig.automaticActivityDetection.disabled,
+    ).toBe(false);
     expect(message.setup.inputAudioTranscription).toEqual({});
   });
 
@@ -112,7 +159,9 @@ describe("telefun live protocol", () => {
     const chunks = extractGeminiInlineAudioChunks({
       serverContent: {
         modelTurn: {
-          parts: [{ inlineData: { mimeType: "audio/pcm;rate=24000", data: b64 } }],
+          parts: [
+            { inlineData: { mimeType: "audio/pcm;rate=24000", data: b64 } },
+          ],
         },
       },
     });
@@ -148,9 +197,13 @@ describe("telefun live protocol", () => {
       systemInstruction: "test",
     });
 
-    expect(message.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).not.toBe("Ursa");
+    expect(
+      message.setup.generationConfig.speechConfig.voiceConfig
+        .prebuiltVoiceConfig.voiceName,
+    ).not.toBe("Ursa");
     expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(
-      message.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+      message.setup.generationConfig.speechConfig.voiceConfig
+        .prebuiltVoiceConfig.voiceName,
     );
   });
 
@@ -175,9 +228,13 @@ describe("telefun live protocol", () => {
       systemInstruction: "test",
     });
 
-    expect(message.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName).not.toBe("Dipper");
+    expect(
+      message.setup.generationConfig.speechConfig.voiceConfig
+        .prebuiltVoiceConfig.voiceName,
+    ).not.toBe("Dipper");
     expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(
-      message.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+      message.setup.generationConfig.speechConfig.voiceConfig
+        .prebuiltVoiceConfig.voiceName,
     );
   });
 

@@ -1,4 +1,6 @@
-export function normalizeTelefunWebSocketUrl(rawUrl: string | undefined): string {
+export function normalizeTelefunWebSocketUrl(
+  rawUrl: string | undefined,
+): string {
   if (!rawUrl?.trim()) {
     throw new Error("VITE_TELEFUN_WS_URL belum dikonfigurasi.");
   }
@@ -11,40 +13,68 @@ export function normalizeTelefunWebSocketUrl(rawUrl: string | undefined): string
     }
     return url.toString();
   } catch {
-    throw new Error("VITE_TELEFUN_WS_URL harus berupa URL WebSocket yang valid.");
+    throw new Error(
+      "VITE_TELEFUN_WS_URL harus berupa URL WebSocket yang valid.",
+    );
   }
 }
+
+export const TELEFUN_CLIENT_CLOSE_CODE = 1000;
+export const TELEFUN_CLIENT_CLOSE_REASON = "Client ended Telefun session";
 
 export function mapTelefunCloseEvent(event: {
   code: number;
   reason?: string;
-}): { code: number; message: string; severity: "auth" | "config" | "network" | "upstream" | "unknown" } {
+}): {
+  code: number;
+  message: string;
+  severity: "normal" | "auth" | "config" | "network" | "upstream" | "unknown";
+} {
+  if (event.code === 1000) {
+    return {
+      code: event.code,
+      severity: "normal",
+      message: "Panggilan Telefun selesai.",
+    };
+  }
+  if (event.code === 1005) {
+    return {
+      code: event.code,
+      severity: "network",
+      message:
+        "Koneksi WebSocket ditutup tanpa status dari server (1005). Cek service Telefun, Railway proxy, dan koneksi ke Gemini.",
+    };
+  }
   if (event.code === 4001) {
     return {
       code: event.code,
       severity: "auth",
-      message: "Koneksi WebSocket ditolak: sesi login tidak valid. Silakan login ulang.",
+      message:
+        "Koneksi WebSocket ditolak: sesi login tidak valid. Silakan login ulang.",
     };
   }
   if (event.code === 4003) {
     return {
       code: event.code,
       severity: "config",
-      message: "Koneksi WebSocket ditolak: origin Web belum diizinkan di Telefun Railway.",
+      message:
+        "Koneksi WebSocket ditolak: origin Web belum diizinkan di Telefun Railway.",
     };
   }
   if (event.code === 1006) {
     return {
       code: event.code,
       severity: "network",
-      message: "Koneksi WebSocket terputus mendadak (1006). Pastikan service Telefun Railway aktif dan URL WebSocket benar.",
+      message:
+        "Koneksi WebSocket terputus mendadak (1006). Pastikan service Telefun Railway aktif dan URL WebSocket benar.",
     };
   }
   if (event.code === 1011) {
     return {
       code: event.code,
       severity: "upstream",
-      message: "Koneksi WebSocket gagal: server Telefun tidak bisa terhubung ke Gemini.",
+      message:
+        "Koneksi WebSocket gagal: server Telefun tidak bisa terhubung ke Gemini.",
     };
   }
   return {
@@ -54,6 +84,13 @@ export function mapTelefunCloseEvent(event: {
       ? `Koneksi WebSocket ditutup: ${event.reason}`
       : `Koneksi WebSocket ditutup dengan kode ${event.code}.`,
   };
+}
+
+export function shouldReportTelefunCloseError(params: {
+  intentionalClose: boolean;
+  severity: ReturnType<typeof mapTelefunCloseEvent>["severity"];
+}): boolean {
+  return !params.intentionalClose && params.severity !== "normal";
 }
 
 export function buildTelefunLiveSetupMessage(params: {
@@ -126,7 +163,10 @@ export function buildAudioStreamEndMessage() {
   };
 }
 
-export function parsePcmSampleRate(mimeType: string | undefined, fallback = 24000): number {
+export function parsePcmSampleRate(
+  mimeType: string | undefined,
+  fallback = 24000,
+): number {
   const match = mimeType?.match(/rate=(\d+)/i);
   const parsed = match ? Number(match[1]) : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -171,6 +211,7 @@ export function shouldSendRealtimeAudio(params: {
   muted: boolean;
   held: boolean;
 }): boolean {
-  return params.wsReady && params.setupComplete && !params.muted && !params.held;
+  return (
+    params.wsReady && params.setupComplete && !params.muted && !params.held
+  );
 }
-

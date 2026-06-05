@@ -250,9 +250,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         session.onError = (e) => {
           if (isActive)
             setError(
-              e instanceof Error
-                ? e.message
-                : "Terjadi kesalahan koneksi.",
+              e instanceof Error ? e.message : "Terjadi kesalahan koneksi.",
             );
         };
         session.onAiSpeaking = (speaking) => {
@@ -291,9 +289,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         console.error("[Telefun] Failed to initialize session:", err);
         if (isActive)
           setError(
-            err instanceof Error
-              ? err.message
-              : "Gagal memulai panggilan.",
+            err instanceof Error ? err.message : "Gagal memulai panggilan.",
           );
       }
     };
@@ -305,7 +301,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       isActive = false;
       mountedRef.current = false;
       stopHoldMusic();
-      sessionRef.current?.disconnect();
+      sessionRef.current?.disconnect("cleanup");
       if (
         uiAudioContextRef.current &&
         uiAudioContextRef.current.state !== "closed"
@@ -382,7 +378,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           /* cleanup */
         }
       }
-      sessionRef.current?.disconnect();
+      sessionRef.current?.disconnect(reason === "timeout" ? "timeout" : "user");
       onEndSessionRef.current(reason);
     },
     [stopHoldMusic],

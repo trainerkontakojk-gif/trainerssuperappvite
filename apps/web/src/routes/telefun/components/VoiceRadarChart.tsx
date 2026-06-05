@@ -1,5 +1,8 @@
 import React, { Suspense } from "react";
-import type { CommunicationMetric, TelefunCommunicationProfile } from "@trainers/types";
+import type {
+  CommunicationMetric,
+  TelefunCommunicationProfile,
+} from "@trainers/types";
 
 interface VoiceRadarDatum {
   key: CommunicationMetric["key"];
@@ -33,15 +36,20 @@ export function buildVoiceRadarData(
   return profile.metrics.map((metric) => ({
     key: metric.key,
     subject: metric.key,
-    label: AXIS_META[metric.key]?.label ?? metric.label,
-    userValue: metric.value,
-    targetValue: metric.benchmarkValue,
+    label:
+      metric.key === "fillers"
+        ? "Fillers (↓)"
+        : (AXIS_META[metric.key]?.label ?? metric.label),
+    userValue: metric.displayScore ?? metric.value,
+    targetValue: metric.targetScore ?? metric.benchmarkValue,
     fullMark: 100,
     evaluationMode: metric.evaluationMode,
   }));
 }
 
-const LazyVoiceRadarChartInner = React.lazy(() => import("./VoiceRadarChartInner"));
+const LazyVoiceRadarChartInner = React.lazy(
+  () => import("./VoiceRadarChartInner"),
+);
 
 const ChartFallback: React.FC<{ compact?: boolean }> = ({ compact }) => (
   <div
@@ -54,7 +62,10 @@ const ChartFallback: React.FC<{ compact?: boolean }> = ({ compact }) => (
 export const VoiceRadarChart: React.FC<VoiceRadarChartProps> = (props) => {
   return (
     <Suspense fallback={<ChartFallback compact={props.compact} />}>
-      <LazyVoiceRadarChartInner profile={props.profile} compact={props.compact} />
+      <LazyVoiceRadarChartInner
+        profile={props.profile}
+        compact={props.compact}
+      />
     </Suspense>
   );
 };

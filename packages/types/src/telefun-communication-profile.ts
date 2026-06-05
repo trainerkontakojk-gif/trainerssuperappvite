@@ -31,7 +31,7 @@ export const BENCHMARK_DEFAULTS: Record<
     label: "Speaking Rate",
   },
   intonation: {
-    benchmarkValue: 85,
+    benchmarkValue: 80,
     evaluationMode: "higher_better",
     goodMin: 75,
     label: "Intonation",
@@ -49,12 +49,57 @@ export const BENCHMARK_DEFAULTS: Record<
     label: "Fillers",
   },
   tone: {
-    benchmarkValue: 88,
+    benchmarkValue: 85,
     evaluationMode: "higher_better",
     goodMin: 75,
     label: "Tone",
   },
 };
+
+export const TELEFUN_QA_TARGETS = {
+  speakingRate: { targetScore: 70, idealWpmMin: 130, idealWpmMax: 150 },
+  intonation: { targetScore: 80 },
+  articulation: { targetScore: 90 },
+  fillers: { targetScore: 20, goodCountMax: 3 },
+  tone: { targetScore: 85 },
+} as const;
+
+export function normalizeSpeakingRateScore(
+  wpm: number | null | undefined,
+): number | null {
+  if (typeof wpm !== "number" || !Number.isFinite(wpm) || wpm <= 0) return null;
+  if (wpm >= 130 && wpm <= 150) return 70;
+  const idealCenter = 140;
+  const distance = Math.abs(wpm - idealCenter);
+  if (distance <= 25)
+    return Math.max(50, 70 - Math.round((distance - 10) * 1.2));
+  if (distance <= 50)
+    return Math.max(30, 50 - Math.round((distance - 25) * 0.8));
+  return Math.max(10, 30 - Math.round((distance - 50) * 0.25));
+}
+
+export function normalizeFillerDisplayScore(
+  count: number | null | undefined,
+): number | null {
+  if (typeof count !== "number" || !Number.isFinite(count) || count < 0)
+    return null;
+  if (count <= 1) return 10;
+  if (count <= 3) return 20;
+  if (count <= 5) return 35;
+  if (count <= 8) return 55;
+  if (count <= 12) return 75;
+  return 90;
+}
+
+export function getMetricStatus(
+  displayScore: number,
+  targetScore: number,
+): "good" | "needs_improvement" | "poor" {
+  const distance = Math.abs(displayScore - targetScore);
+  if (distance <= 10) return "good";
+  if (distance <= 25) return "needs_improvement";
+  return "poor";
+}
 
 export function evaluateMetricStatus(
   value: number,
@@ -80,7 +125,10 @@ export function evaluateMetricStatus(
       return "poor";
 
     case "optimal_range":
-      if (benchmark.idealMin !== undefined && benchmark.idealMax !== undefined) {
+      if (
+        benchmark.idealMin !== undefined &&
+        benchmark.idealMax !== undefined
+      ) {
         if (c >= benchmark.idealMin && c <= benchmark.idealMax) return "good";
       }
       if (benchmark.goodMin !== undefined && benchmark.goodMax !== undefined) {
@@ -97,51 +145,46 @@ export function evaluateMetricStatus(
 export function generateExplanation(
   key: CommunicationMetric["key"],
   value: number,
-  mode: CommunicationMetricMode,
-  benchmark: {
+  modeOrStatus: CommunicationMetricMode | "good" | "needs_improvement" | "poor",
+  benchmark?: {
     idealMin?: number;
     idealMax?: number;
     goodMin?: number;
     goodMax?: number;
   },
 ): string {
-  const def = BENCHMARK_DEFAULTS[key];
-
-  switch (mode) {
-    case "higher_better":
-      if (value >= (benchmark.goodMin ?? 75))
-        return `${def.label} Anda sudah sangat baik.`;
-      if (value >= 50)
-        return `${def.label} Anda cukup baik, namun masih dapat ditingkatkan.`;
-      return `${def.label} Anda perlu perbaikan signifikan.`;
-
-    case "lower_better":
-      if (value <= (benchmark.goodMax ?? 30))
-        return `${def.label} Anda sangat minim, pertahankan.`;
-      if (value <= 50)
-        return `${def.label} Anda cukup terkendali, namun bisa dikurangi lagi.`;
-      return `${def.label} Anda cukup tinggi, perlu dikurangi secara sadar.`;
-
-    case "optimal_range":
-      if (
-        benchmark.idealMin !== undefined &&
-        benchmark.idealMax !== undefined &&
-        value >= benchmark.idealMin &&
-        value <= benchmark.idealMax
-      )
-        return `${def.label} Anda berada di rentang ideal.`;
-      if (
-        benchmark.goodMin !== undefined &&
-        benchmark.goodMax !== undefined &&
-        value >= benchmark.goodMin &&
-        value <= benchmark.goodMax
-      )
-        return `${def.label} Anda mendekati rentang ideal.`;
-      return `${def.label} Anda di luar rentang ideal, perlu penyesuaian.`;
-
-    default:
-      return `Nilai ${def.label} adalah ${value}/100.`;
+  let status: "good" | "needs_improvement" | "poor";
+  if (
+    modeOrStatus === "good" ||
+    modeOrStatus === "needs_improvement" ||
+    modeOrStatus === "poor"
+  ) {
+    status = modeOrStatus;
+  } else {
+    status = evaluateMetricStatus(value, modeOrStatus, benchmark || {});
   }
+
+  const def = BENCHMARK_DEFAULTS[key];
+  if (status === "good") {
+    if (key === "fillers")
+      return `${def.label} Anda sangat minim, pertahankan.`;
+    if (key === "speakingRate")
+      return `${def.label} Anda berada di rentang ideal.`;
+    return `${def.label} Anda sudah sangat baik.`;
+  }
+  if (status === "needs_improvement") {
+    if (key === "fillers")
+      return `${def.label} Anda cukup terkendali, namun bisa dikurangi lagi.`;
+    if (key === "speakingRate")
+      return `${def.label} Anda mendekati rentang ideal.`;
+    return `${def.label} Anda cukup baik, namun masih dapat ditingkatkan.`;
+  }
+
+  if (key === "fillers")
+    return `${def.label} Anda cukup tinggi, perlu dikurangi secara sadar.`;
+  if (key === "speakingRate")
+    return `${def.label} Anda di luar rentang ideal, perlu penyesuaian.`;
+  return `${def.label} Anda perlu perbaikan signifikan.`;
 }
 
 export function generateImprovementTip(
@@ -159,54 +202,45 @@ export function generateImprovementTip(
       "Latih pengucapan kata-kata sulit. Buka mulut lebih lebar saat bicara.",
     fillers:
       "Ganti 'eh', 'anu', 'gitu' dengan jeda senyap. Sadari kebiasaan Anda.",
-    tone:
-      "Tunjukkan empati lewat nada suara. Sesuaikan emosi dengan konteks percakapan.",
+    tone: "Tunjukkan empati lewat nada suara. Sesuaikan emosi dengan konteks percakapan.",
   };
 
   return tips[key];
 }
 
-function buildSpeakingRateValue(assessment: VoiceQualityAssessment): number {
-  if (
-    typeof assessment.speakingRate?.wordsPerMinute === "number" &&
-    assessment.speakingRate.wordsPerMinute > 0
-  ) {
-    const wpm = assessment.speakingRate.wordsPerMinute;
-    if (wpm >= 130 && wpm <= 150) return 85;
-    if (wpm >= 120 && wpm <= 160) return 70;
-    if (wpm >= 100 && wpm <= 180) return 55;
-    return Math.max(20, Math.min(100, Math.round((wpm / 200) * 100)));
+function getAspectScore(
+  assessment: VoiceQualityAssessment,
+  key: CommunicationMetric["key"],
+): {
+  score: number;
+  verdict: string;
+  feedback: string;
+} {
+  const fallback = {
+    score: 0,
+    verdict: "Belum tersedia",
+    feedback: "Feedback belum tersedia.",
+  };
+  switch (key) {
+    case "speakingRate":
+      return assessment.speakingRate ?? fallback;
+    case "intonation":
+      return assessment.intonation ?? fallback;
+    case "articulation":
+      return assessment.articulation ?? fallback;
+    case "fillers":
+      return assessment.fillerWords ?? fallback;
+    case "tone":
+      return assessment.emotionalTone ?? fallback;
   }
-  return clamp(
-    Math.round((assessment.speakingRate?.score ?? 5) * 10),
-    0,
-    100,
-  );
 }
 
-function buildFillersValue(assessment: VoiceQualityAssessment): number {
-  if (typeof assessment.fillerWords?.count === "number") {
-    const count = assessment.fillerWords.count;
-    if (count <= 2) return 10;
-    if (count <= 5) return 25;
-    if (count <= 8) return 45;
-    if (count <= 12) return 65;
-    if (count <= 20) return 85;
-    return 100;
-  }
-  return clamp(
-    Math.round((assessment.fillerWords?.score ?? 5) * 10),
-    0,
-    100,
-  );
-}
-
-function buildToneValue(assessment: VoiceQualityAssessment): number {
-  return clamp(
-    Math.round((assessment.emotionalTone?.score ?? 5) * 10),
-    0,
-    100,
-  );
+function getTargetDirection(
+  key: CommunicationMetric["key"],
+): CommunicationMetric["targetDirection"] {
+  if (key === "fillers") return "lower_raw_is_better";
+  if (key === "speakingRate") return "match_target";
+  return "higher_quality";
 }
 
 export function buildCommunicationProfileFromAssessment(
@@ -214,52 +248,84 @@ export function buildCommunicationProfileFromAssessment(
 ): TelefunCommunicationProfile | null {
   if (!assessment) return null;
 
-  const rawValues: Partial<Record<CommunicationMetric["key"], number>> = {
-    speakingRate: buildSpeakingRateValue(assessment),
-    intonation: clamp(
-      Math.round((assessment.intonation?.score ?? 5) * 10),
-      0,
-      100,
-    ),
-    articulation: clamp(
-      Math.round((assessment.articulation?.score ?? 5) * 10),
-      0,
-      100,
-    ),
-    fillers: buildFillersValue(assessment),
-    tone: buildToneValue(assessment),
-  };
-
   const metrics: CommunicationMetric[] = (
     Object.keys(BENCHMARK_DEFAULTS) as CommunicationMetric["key"][]
   ).map((key) => {
     const def = BENCHMARK_DEFAULTS[key];
-    const value = clamp(rawValues[key] ?? 50, 0, 100);
-    const status = evaluateMetricStatus(value, def.evaluationMode, {
-      goodMin: def.goodMin,
-      goodMax: def.goodMax,
-      idealMin: def.idealMin,
-      idealMax: def.idealMax,
-    });
-    const explanation = generateExplanation(key, value, def.evaluationMode, {
-      idealMin: def.idealMin,
-      idealMax: def.idealMax,
-      goodMin: def.goodMin,
-      goodMax: def.goodMax,
-    });
+    const targetScore = def.benchmarkValue;
+    const aspect = getAspectScore(assessment, key);
+
+    let displayScore = 50;
+    let rawValue: number | string | undefined = undefined;
+    let rawUnit: CommunicationMetric["rawUnit"] = undefined;
+
+    if (key === "speakingRate") {
+      rawValue = assessment.speakingRate?.wordsPerMinute;
+      rawUnit = "WPM";
+      const normScore = normalizeSpeakingRateScore(rawValue);
+      if (normScore !== null) {
+        displayScore = normScore;
+      } else {
+        displayScore = clamp(
+          Math.round((assessment.speakingRate?.score ?? 5) * 10),
+          0,
+          100,
+        );
+      }
+    } else if (key === "fillers") {
+      rawValue = assessment.fillerWords?.count;
+      rawUnit = "filler_words";
+      const normScore = normalizeFillerDisplayScore(rawValue);
+      if (normScore !== null) {
+        displayScore = normScore;
+      } else {
+        displayScore = clamp(
+          Math.round((assessment.fillerWords?.score ?? 5) * 10),
+          0,
+          100,
+        );
+      }
+    } else if (key === "intonation") {
+      displayScore = clamp(
+        Math.round((assessment.intonation?.score ?? 5) * 10),
+        0,
+        100,
+      );
+    } else if (key === "articulation") {
+      displayScore = clamp(
+        Math.round((assessment.articulation?.score ?? 5) * 10),
+        0,
+        100,
+      );
+    } else if (key === "tone") {
+      rawValue = assessment.emotionalTone?.dominant;
+      rawUnit = "dominant_tone";
+      displayScore = clamp(
+        Math.round((assessment.emotionalTone?.score ?? 5) * 10),
+        0,
+        100,
+      );
+    }
+
+    const status = getMetricStatus(displayScore, targetScore);
+    const explanation = generateExplanation(key, displayScore, status);
     const improvementTip = generateImprovementTip(key, status);
 
     return {
       key,
       label: def.label,
-      value,
-      benchmarkValue: def.benchmarkValue,
+      value: displayScore,
+      benchmarkValue: targetScore,
+      score: clamp(aspect.score ?? 0, 0, 10),
+      displayScore,
+      targetScore,
+      targetDirection: getTargetDirection(key),
+      rawValue,
+      rawUnit,
       evaluationMode: def.evaluationMode,
-      idealMin: def.idealMin,
-      idealMax: def.idealMax,
-      goodMin: def.goodMin,
-      goodMax: def.goodMax,
+      verdict: aspect.verdict,
       status,
+      feedback: aspect.feedback,
       explanation,
       ...(improvementTip ? { improvementTip } : {}),
     };
@@ -293,7 +359,9 @@ export function buildCommunicationProfileFromAssessment(
     strengths:
       strengths.length > 0
         ? strengths
-        : ["Belum ada kekuatan yang menonjol. Fokus pada perbaikan terlebih dahulu."],
+        : [
+            "Belum ada kekuatan yang menonjol. Fokus pada perbaikan terlebih dahulu.",
+          ],
     improvementPriorities,
   };
 }
@@ -301,7 +369,27 @@ export function buildCommunicationProfileFromAssessment(
 export function enrichAssessmentWithCommunicationProfile(
   assessment: VoiceQualityAssessment,
 ): VoiceQualityAssessment {
-  if (assessment.communicationProfile) return assessment;
-  const profile = buildCommunicationProfileFromAssessment(assessment);
-  return { ...assessment, communicationProfile: profile };
+  const profile = assessment.communicationProfile;
+  const isValid =
+    profile &&
+    Array.isArray(profile.metrics) &&
+    profile.metrics.length === 5 &&
+    profile.metrics.every(
+      (m) =>
+        BENCHMARK_DEFAULTS[m.key]?.benchmarkValue === m.targetScore &&
+        typeof m.score === "number" &&
+        Number.isFinite(m.score) &&
+        typeof m.displayScore === "number" &&
+        Number.isFinite(m.displayScore) &&
+        typeof m.targetScore === "number" &&
+        Number.isFinite(m.targetScore) &&
+        typeof m.targetDirection === "string" &&
+        typeof m.verdict === "string" &&
+        typeof m.feedback === "string",
+    );
+
+  if (isValid) return assessment;
+
+  const newProfile = buildCommunicationProfileFromAssessment(assessment);
+  return { ...assessment, communicationProfile: newProfile };
 }

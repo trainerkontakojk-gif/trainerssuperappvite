@@ -44,22 +44,55 @@ export interface VoiceQualityAssessment {
   communicationProfile?: TelefunCommunicationProfile | null;
 }
 
+export type TelefunVoiceMetricKey =
+  | "speakingRate"
+  | "intonation"
+  | "articulation"
+  | "fillers"
+  | "tone";
+
+export type TelefunMetricStatus = "good" | "needs_improvement" | "poor";
+
+export interface TelefunMetricDisplay {
+  key: TelefunVoiceMetricKey;
+  label: string;
+  score: number; // quality score 0-10, legacy-compatible
+  displayScore: number; // normalized radar/card value 0-100
+  rawValue?: number | string;
+  rawUnit?: "WPM" | "filler_words" | "dominant_tone";
+  targetScore: number; // QA target plotted on radar 0-100
+  targetDirection: "match_target" | "higher_quality" | "lower_raw_is_better";
+  verdict: string;
+  status: TelefunMetricStatus;
+  feedback: string;
+  explanation: string;
+  improvementTip?: string;
+}
+
 export type CommunicationMetricMode =
   | "higher_better"
   | "lower_better"
   | "optimal_range";
 
 export interface CommunicationMetric {
-  key: "speakingRate" | "intonation" | "articulation" | "fillers" | "tone";
+  key: TelefunVoiceMetricKey;
   label: string;
-  value: number;
-  benchmarkValue: number;
+  value: number; // alias legacy untuk displayScore
+  benchmarkValue: number; // alias legacy untuk targetScore
+  score: number; // quality score 0-10, legacy-compatible
+  displayScore: number;
+  targetScore: number;
+  targetDirection: "match_target" | "higher_quality" | "lower_raw_is_better";
+  rawValue?: number | string;
+  rawUnit?: "WPM" | "filler_words" | "dominant_tone";
   evaluationMode: CommunicationMetricMode;
   idealMin?: number;
   idealMax?: number;
   goodMin?: number;
   goodMax?: number;
-  status: "good" | "needs_improvement" | "poor";
+  verdict: string;
+  status: TelefunMetricStatus;
+  feedback: string;
   explanation: string;
   improvementTip?: string;
 }

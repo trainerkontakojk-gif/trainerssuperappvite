@@ -7,18 +7,33 @@ import {
 
 const valid = {
   overallScore: 8,
-  speakingRate: { score: 7, verdict: "Good", feedback: "Nice pace", wordsPerMinute: 130 },
+  speakingRate: {
+    score: 7,
+    verdict: "Good",
+    feedback: "Nice pace",
+    wordsPerMinute: 130,
+  },
   intonation: { score: 8, verdict: "Good", feedback: "Nice tone" },
   articulation: { score: 9, verdict: "Great", feedback: "Clear speech" },
-  fillerWords: { score: 6, verdict: "Fine", feedback: "Some fillers", count: 5, examples: ["uh", "um"] },
-  emotionalTone: { score: 7, verdict: "Good", feedback: "Empathetic", dominant: "calm" },
+  fillerWords: {
+    score: 6,
+    verdict: "Fine",
+    feedback: "Some fillers",
+    count: 5,
+    examples: ["uh", "um"],
+  },
+  emotionalTone: {
+    score: 7,
+    verdict: "Good",
+    feedback: "Empathetic",
+    dominant: "calm",
+  },
   transcript: "Hello world",
   highlights: ["Great start"],
   strengths: ["Clear voice"],
 };
 
 describe("validateAssessment", () => {
-
   it("returns null for non-object", () => {
     expect(validateAssessment(null)).toBeNull();
     expect(validateAssessment("string")).toBeNull();
@@ -26,7 +41,9 @@ describe("validateAssessment", () => {
   });
 
   it("returns null when overallScore is missing", () => {
-    expect(validateAssessment({ ...valid, overallScore: undefined })).toBeNull();
+    expect(
+      validateAssessment({ ...valid, overallScore: undefined }),
+    ).toBeNull();
   });
 
   it("clamps overallScore to 0-10", () => {
@@ -49,7 +66,12 @@ describe("validateAssessment", () => {
   it("handles missing aspect fields gracefully with safe defaults", () => {
     const result = validateAssessment({
       overallScore: 5,
-      speakingRate: { score: 5, verdict: "Ok", feedback: "Fine", wordsPerMinute: 100 },
+      speakingRate: {
+        score: 5,
+        verdict: "Ok",
+        feedback: "Fine",
+        wordsPerMinute: 100,
+      },
       intonation: {},
       articulation: {},
       fillerWords: {},
@@ -115,7 +137,12 @@ describe("validateAssessment", () => {
   it("clamps aspect scores to 0-10", () => {
     const result = validateAssessment({
       ...valid,
-      speakingRate: { score: 15, verdict: "Too fast", feedback: "Slow down", wordsPerMinute: 200 },
+      speakingRate: {
+        score: 15,
+        verdict: "Too fast",
+        feedback: "Slow down",
+        wordsPerMinute: 200,
+      },
     });
     expect(result!.speakingRate.score).toBe(10);
   });
@@ -147,11 +174,27 @@ describe("normalizeTelefunScoreResponse", () => {
       feedback: "Bagus",
       assessment: {
         overallScore: 8,
-        speakingRate: { score: 7, wordsPerMinute: 130, verdict: "Good", feedback: "Nice" },
+        speakingRate: {
+          score: 7,
+          wordsPerMinute: 130,
+          verdict: "Good",
+          feedback: "Nice",
+        },
         intonation: { score: 8, verdict: "Good", feedback: "Nice" },
         articulation: { score: 9, verdict: "Great", feedback: "Clear" },
-        fillerWords: { score: 7, count: 2, examples: ["uh"], verdict: "Good", feedback: "Minimal" },
-        emotionalTone: { score: 7, dominant: "calm", verdict: "Good", feedback: "Calm" },
+        fillerWords: {
+          score: 7,
+          count: 2,
+          examples: ["uh"],
+          verdict: "Good",
+          feedback: "Minimal",
+        },
+        emotionalTone: {
+          score: 7,
+          dominant: "calm",
+          verdict: "Good",
+          feedback: "Calm",
+        },
         transcript: "Hello",
         highlights: [],
         strengths: [],
@@ -168,11 +211,27 @@ describe("normalizeTelefunScoreResponse", () => {
   it("handles assessment directly when no envelope (defensive)", () => {
     const direct = {
       overallScore: 7,
-      speakingRate: { score: 6, wordsPerMinute: 120, verdict: "Ok", feedback: "Fine" },
+      speakingRate: {
+        score: 6,
+        wordsPerMinute: 120,
+        verdict: "Ok",
+        feedback: "Fine",
+      },
       intonation: { score: 7, verdict: "Ok", feedback: "Fine" },
       articulation: { score: 8, verdict: "Good", feedback: "Clear" },
-      fillerWords: { score: 5, count: 4, examples: [], verdict: "Ok", feedback: "Some" },
-      emotionalTone: { score: 6, dominant: "neutral", verdict: "Ok", feedback: "Neutral" },
+      fillerWords: {
+        score: 5,
+        count: 4,
+        examples: [],
+        verdict: "Ok",
+        feedback: "Some",
+      },
+      emotionalTone: {
+        score: 6,
+        dominant: "neutral",
+        verdict: "Ok",
+        feedback: "Neutral",
+      },
       transcript: "Hi",
       highlights: [],
       strengths: [],
@@ -191,18 +250,142 @@ describe("normalizeTelefunScoreResponse", () => {
 });
 
 describe("getCommunicationProfileFromAssessment", () => {
-  it("returns existing communicationProfile if present", () => {
+  it("keeps existing communicationProfile if present and valid", () => {
     const existing = {
-      metrics: [],
-      overallSummary: "Ada",
+      metrics: [
+        {
+          key: "speakingRate",
+          label: "Speaking Rate",
+          value: 70,
+          benchmarkValue: 70,
+          score: 7,
+          displayScore: 70,
+          targetScore: 70,
+          targetDirection: "match_target",
+          evaluationMode: "optimal_range",
+          verdict: "Good",
+          status: "good",
+          feedback: "Nice pace",
+          explanation: "Custom",
+        },
+        {
+          key: "intonation",
+          label: "Intonation",
+          value: 80,
+          benchmarkValue: 80,
+          score: 8,
+          displayScore: 80,
+          targetScore: 80,
+          targetDirection: "higher_quality",
+          evaluationMode: "higher_better",
+          verdict: "Good",
+          status: "good",
+          feedback: "Nice tone",
+          explanation: "Custom",
+        },
+        {
+          key: "articulation",
+          label: "Articulation",
+          value: 90,
+          benchmarkValue: 90,
+          score: 9,
+          displayScore: 90,
+          targetScore: 90,
+          targetDirection: "higher_quality",
+          evaluationMode: "higher_better",
+          verdict: "Great",
+          status: "good",
+          feedback: "Clear speech",
+          explanation: "Custom",
+        },
+        {
+          key: "fillers",
+          label: "Fillers",
+          value: 20,
+          benchmarkValue: 20,
+          score: 6,
+          displayScore: 20,
+          targetScore: 20,
+          targetDirection: "lower_raw_is_better",
+          evaluationMode: "lower_better",
+          verdict: "Fine",
+          status: "good",
+          feedback: "Some fillers",
+          explanation: "Custom",
+        },
+        {
+          key: "tone",
+          label: "Tone",
+          value: 85,
+          benchmarkValue: 85,
+          score: 7,
+          displayScore: 85,
+          targetScore: 85,
+          targetDirection: "higher_quality",
+          evaluationMode: "higher_better",
+          verdict: "Good",
+          status: "good",
+          feedback: "Empathetic",
+          explanation: "Custom",
+        },
+      ],
+      overallSummary: "Custom",
       strengths: [],
       improvementPriorities: [],
     };
     const result = getCommunicationProfileFromAssessment({
       ...valid,
-      communicationProfile: existing,
+      communicationProfile: existing as any,
     });
     expect(result).toBe(existing);
+  });
+
+  it("rebuilds existing communicationProfile if stale or invalid", () => {
+    const existing = {
+      metrics: [],
+      overallSummary: "Custom",
+      strengths: [],
+      improvementPriorities: [],
+    };
+    const result = getCommunicationProfileFromAssessment({
+      ...valid,
+      communicationProfile: existing as any,
+    });
+    expect(result).not.toBe(existing);
+    expect(result!.metrics).toHaveLength(5);
+    expect(result!.metrics[0].displayScore).toBeDefined();
+  });
+
+  it("rebuilds stale profile where WPM was stored as radar score", () => {
+    const result = validateAssessment({
+      ...valid,
+      speakingRate: {
+        score: 7,
+        wordsPerMinute: 118,
+        verdict: "Cukup",
+        feedback: "Tempo cukup.",
+      },
+      communicationProfile: {
+        metrics: [
+          {
+            key: "speakingRate",
+            label: "Speaking Rate",
+            value: 118,
+            benchmarkValue: 100,
+            evaluationMode: "higher_better",
+            status: "good",
+            explanation: "old",
+          },
+        ],
+        overallSummary: "old",
+        strengths: [],
+        improvementPriorities: [],
+      } as any,
+    });
+    const profile = getCommunicationProfileFromAssessment(result);
+    const sr = profile!.metrics.find((m) => m.key === "speakingRate")!;
+    expect(sr.displayScore).not.toBe(118);
+    expect(sr.targetScore).toBe(70);
   });
 
   it("builds fallback profile from legacy assessment", () => {

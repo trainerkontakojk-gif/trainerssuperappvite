@@ -1,5 +1,8 @@
 import React, { useState } from "react";
-import type { VoiceQualityAssessment, TelefunCommunicationProfile } from "@trainers/types";
+import type {
+  VoiceQualityAssessment,
+  TelefunCommunicationProfile,
+} from "@trainers/types";
 import {
   CheckCircle2,
   Loader2,
@@ -14,9 +17,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { validateAssessment, normalizeTelefunScoreResponse, getCommunicationProfileFromAssessment } from "../../../lib/voiceAssessmentUtils";
+import {
+  validateAssessment,
+  normalizeTelefunScoreResponse,
+  getCommunicationProfileFromAssessment,
+} from "../../../lib/voiceAssessmentUtils";
 import { VoiceRadarChart } from "./VoiceRadarChart";
 import { CommunicationProfileZoomModal } from "./CommunicationProfileZoomModal";
+import { VoiceMetricCards } from "./VoiceMetricCards";
 import { postApi } from "../../../hooks/useApi";
 
 interface VoiceAssessmentSectionProps {
@@ -28,7 +36,8 @@ interface VoiceAssessmentSectionProps {
 
 const STATUS_COLORS: Record<string, string> = {
   good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  needs_improvement: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  needs_improvement:
+    "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
   poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
 };
 
@@ -51,17 +60,15 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
 
-  const communicationProfile = getCommunicationProfileFromAssessment(assessment);
+  const communicationProfile =
+    getCommunicationProfileFromAssessment(assessment);
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setError(null);
 
     try {
-      const data = await postApi<any>(
-        `/telefun/score/${sessionId}`,
-        {},
-      );
+      const data = await postApi<any>(`/telefun/score/${sessionId}`, {});
       const normalized = normalizeTelefunScoreResponse(data);
       const validAssessment = normalized.assessment
         ? validateAssessment(normalized.assessment)
@@ -243,16 +250,14 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
             </h3>
             {communicationProfile.improvementPriorities.length > 0 ? (
               <ul className="space-y-1.5">
-                {communicationProfile.improvementPriorities.map(
-                  (item, i) => (
-                    <li key={i} className="flex gap-2 text-xs">
-                      <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-                      <span className="text-slate-700 dark:text-white/75">
-                        {item}
-                      </span>
-                    </li>
-                  ),
-                )}
+                {communicationProfile.improvementPriorities.map((item, i) => (
+                  <li key={i} className="flex gap-2 text-xs">
+                    <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    <span className="text-slate-700 dark:text-white/75">
+                      {item}
+                    </span>
+                  </li>
+                ))}
               </ul>
             ) : (
               <p className="text-xs text-slate-400 dark:text-white/40">
@@ -264,36 +269,9 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
       )}
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <MetricCard
-          label="Kecepatan"
-          score={assessment.speakingRate.score}
-          subValue={`${assessment.speakingRate.wordsPerMinute} WPM`}
-          feedback={assessment.speakingRate.verdict}
-        />
-        <MetricCard
-          label="Intonasi"
-          score={assessment.intonation.score}
-          feedback={assessment.intonation.verdict}
-        />
-        <MetricCard
-          label="Artikulasi"
-          score={assessment.articulation.score}
-          feedback={assessment.articulation.verdict}
-        />
-        <MetricCard
-          label="Filler Words"
-          score={assessment.fillerWords.score}
-          subValue={`${assessment.fillerWords.count} kata`}
-          feedback={assessment.fillerWords.verdict}
-        />
-        <MetricCard
-          label="Emosi"
-          score={assessment.emotionalTone.score}
-          subValue={assessment.emotionalTone.dominant}
-          feedback={assessment.emotionalTone.verdict}
-        />
-      </div>
+      {communicationProfile && (
+        <VoiceMetricCards profile={communicationProfile} />
+      )}
 
       {/* Transcript */}
       <div className="rounded-2xl border border-slate-950/10 bg-white p-6 dark:border-white/10 dark:bg-slate-900">
@@ -315,30 +293,3 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
     </motion.div>
   );
 };
-
-const MetricCard = ({
-  label,
-  score,
-  subValue,
-  feedback,
-}: {
-  label: string;
-  score: number;
-  subValue?: string;
-  feedback: string;
-}) => (
-  <div className="rounded-xl border border-slate-950/5 bg-slate-950/5 p-4 transition-colors hover:bg-slate-950/[0.07] dark:border-white/5 dark:bg-white/5 dark:hover:bg-white/[0.08]">
-    <div className="mb-1 flex items-center justify-between">
-      <span className="text-xs font-bold text-slate-500 dark:text-white/40">
-        {label}
-      </span>
-      <span className="text-xs font-black text-emerald-500">{score}/10</span>
-    </div>
-    {subValue && (
-      <div className="mb-1 text-lg font-black tracking-tight">{subValue}</div>
-    )}
-    <p className="text-xs leading-relaxed text-slate-500 dark:text-white/55">
-      {feedback}
-    </p>
-  </div>
-);

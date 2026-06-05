@@ -33,6 +33,7 @@ import {
 } from "../../../lib/voiceAssessmentUtils";
 import { VoiceRadarChart } from "../../telefun/components/VoiceRadarChart";
 import { CommunicationProfileZoomModal } from "../../telefun/components/CommunicationProfileZoomModal";
+import { VoiceMetricCards } from "../../telefun/components/VoiceMetricCards";
 
 interface TelefunReviewData {
   module: string;
@@ -48,43 +49,6 @@ interface TelefunReviewData {
   coaching_focus: string[] | null;
 }
 
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-  sublabel,
-  score,
-  verdict,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  sublabel: string;
-  score: number;
-  verdict: string;
-}) {
-  const grade = getScoreGrade(score);
-  return (
-    <div className={`${grade.bg} ${grade.border} border p-4 rounded-2xl flex flex-col items-center text-center gap-2`}>
-      <div className={`w-10 h-10 ${grade.bg} ${grade.color} rounded-xl flex items-center justify-center mb-1`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </div>
-      <div className={`text-2xl font-black ${grade.color}`}>
-        {value}
-      </div>
-      <div className="text-[10px] text-foreground/60 font-medium">
-        {sublabel}
-      </div>
-      <div className={`text-[9px] font-bold ${grade.color} uppercase tracking-wider`}>
-        {verdict}
-      </div>
-    </div>
-  );
-}
-
 export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   const [data, setData] = useState<TelefunReviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +58,9 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   const [zoomOpen, setZoomOpen] = useState(false);
 
   const va = useMemo(() => {
-    return data?.voice_assessment ? validateAssessment(data.voice_assessment) : null;
+    return data?.voice_assessment
+      ? validateAssessment(data.voice_assessment)
+      : null;
   }, [data]);
 
   const communicationProfile = useMemo(() => {
@@ -165,15 +131,39 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
 
   // Score grade helper (0-10 scale for Telefun)
   const getTelefunGrade = (score: number) => {
-    if (score >= 8) return { label: "Sangat Baik", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" };
-    if (score >= 6) return { label: "Baik", color: "text-sky-600", bg: "bg-sky-50", border: "border-sky-200" };
-    if (score >= 4) return { label: "Cukup", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" };
-    return { label: "Perlu Coaching", color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-200" };
+    if (score >= 8)
+      return {
+        label: "Sangat Baik",
+        color: "text-emerald-600",
+        bg: "bg-emerald-50",
+        border: "border-emerald-200",
+      };
+    if (score >= 6)
+      return {
+        label: "Baik",
+        color: "text-sky-600",
+        bg: "bg-sky-50",
+        border: "border-sky-200",
+      };
+    if (score >= 4)
+      return {
+        label: "Cukup",
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+        border: "border-amber-200",
+      };
+    return {
+      label: "Perlu Coaching",
+      color: "text-rose-600",
+      bg: "bg-rose-50",
+      border: "border-rose-200",
+    };
   };
 
   const STATUS_COLORS: Record<string, string> = {
     good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    needs_improvement: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    needs_improvement:
+      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
     poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
   };
 
@@ -272,7 +262,9 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 <div className="text-3xl font-black text-module-telefun">
                   {data.score}
                 </div>
-                <div className={`text-[11px] font-bold ${getTelefunGrade(data.score!).color} mt-0.5`}>
+                <div
+                  className={`text-[11px] font-bold ${getTelefunGrade(data.score!).color} mt-0.5`}
+                >
                   {getTelefunGrade(data.score!).label}
                 </div>
               </div>
@@ -283,7 +275,8 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                   Durasi
                 </div>
                 <div className="text-lg font-black">
-                  {Math.floor(data.duration_seconds / 60)}m {data.duration_seconds % 60}d
+                  {Math.floor(data.duration_seconds / 60)}m{" "}
+                  {data.duration_seconds % 60}d
                 </div>
               </div>
             )}
@@ -401,72 +394,9 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 Metrik Suara
               </h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <MetricCard
-                icon={Gauge}
-                label="Kecepatan"
-                value={`${va.speakingRate.wordsPerMinute} WPM`}
-                sublabel="Words Per Minute"
-                score={va.speakingRate.score}
-                verdict={va.speakingRate.verdict}
-              />
-              <MetricCard
-                icon={Volume2}
-                label="Intonasi"
-                value={`${va.intonation.score}/10`}
-                sublabel="Naik turun nada"
-                score={va.intonation.score * 10}
-                verdict={va.intonation.verdict}
-              />
-              <MetricCard
-                icon={Mic}
-                label="Artikulasi"
-                value={`${va.articulation.score}/10`}
-                sublabel="Kejelasan bicara"
-                score={va.articulation.score * 10}
-                verdict={va.articulation.verdict}
-              />
-              <MetricCard
-                icon={Ban}
-                label="Filler Words"
-                value={`${va.fillerWords.count}`}
-                sublabel="Kata pengisi"
-                score={va.fillerWords.score}
-                verdict={va.fillerWords.verdict}
-              />
-              <MetricCard
-                icon={Smile}
-                label="Emosi"
-                value={va.emotionalTone.dominant}
-                sublabel="Nada emosional"
-                score={va.emotionalTone.score * 10}
-                verdict={va.emotionalTone.verdict}
-              />
-            </div>
-
-            {/* Metric Feedback Accordion */}
-            <details className="group cursor-pointer">
-              <summary className="flex items-center gap-2 text-xs text-muted-foreground/80 hover:text-foreground/90 transition-colors list-none select-none">
-                <Info className="w-3.5 h-3.5" />
-                <span className="font-semibold">Detail Feedback per Metrik</span>
-              </summary>
-              <div className="mt-3 space-y-2">
-                {[
-                  { label: "Kecepatan Bicara", feedback: va.speakingRate.feedback },
-                  { label: "Intonasi", feedback: va.intonation.feedback },
-                  { label: "Artikulasi", feedback: va.articulation.feedback },
-                  { label: "Filler Words", feedback: va.fillerWords.feedback },
-                  { label: "Emosi", feedback: va.emotionalTone.feedback },
-                ].map((item) => (
-                  <div key={item.label} className="p-3 rounded-xl bg-foreground/[0.02] border border-border/50">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-                      {item.label}
-                    </div>
-                    <p className="text-xs text-foreground/70 leading-relaxed">{item.feedback}</p>
-                  </div>
-                ))}
-              </div>
-            </details>
+            {communicationProfile && (
+              <VoiceMetricCards profile={communicationProfile} />
+            )}
           </div>
 
           {/* Filler Words Examples */}
@@ -544,7 +474,11 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 onClick={() => setShowTranscript(!showTranscript)}
                 className="flex items-center gap-2 text-xs font-black text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors cursor-pointer"
               >
-                {showTranscript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                {showTranscript ? (
+                  <ChevronUp size={14} />
+                ) : (
+                  <ChevronDown size={14} />
+                )}
                 Transcript Percakapan
               </button>
               {showTranscript && (
@@ -570,7 +504,8 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
             Penilaian suara AI belum tersedia
           </p>
           <p className="text-[10px] text-muted-foreground/60 mt-1">
-            Metrik suara (kecepatan, intonasi, artikulasi, dll.) akan muncul setelah AI selesai menganalisis rekaman.
+            Metrik suara (kecepatan, intonasi, artikulasi, dll.) akan muncul
+            setelah AI selesai menganalisis rekaman.
           </p>
         </div>
       )}

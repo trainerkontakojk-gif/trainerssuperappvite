@@ -3,7 +3,10 @@ import type {
   VoiceAspectScore,
   TelefunCommunicationProfile,
 } from "@trainers/types";
-import { buildCommunicationProfileFromAssessment } from "@trainers/types";
+import {
+  buildCommunicationProfileFromAssessment,
+  enrichAssessmentWithCommunicationProfile,
+} from "@trainers/types";
 
 function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
@@ -110,7 +113,8 @@ export function normalizeTelefunScoreResponse(
 
   const assessment = isRecord(data.assessment)
     ? data.assessment
-    : isRecord(data) && typeof (data as Record<string, unknown>).overallScore === "number"
+    : isRecord(data) &&
+        typeof (data as Record<string, unknown>).overallScore === "number"
       ? data
       : null;
 
@@ -122,11 +126,10 @@ export function normalizeTelefunScoreResponse(
       : null,
   };
 }
-
 export function getCommunicationProfileFromAssessment(
   assessment: VoiceQualityAssessment | null | undefined,
 ): TelefunCommunicationProfile | null {
   if (!assessment) return null;
-  if (assessment.communicationProfile) return assessment.communicationProfile;
-  return buildCommunicationProfileFromAssessment(assessment);
+  const enriched = enrichAssessmentWithCommunicationProfile(assessment);
+  return enriched.communicationProfile || null;
 }

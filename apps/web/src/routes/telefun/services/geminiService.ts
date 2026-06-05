@@ -1,10 +1,7 @@
 import type { TelefunAppSettings } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
-import {
-  updateInterruptionGuard,
-  InterruptionGuardState,
-} from "./guards";
+import { updateInterruptionGuard, InterruptionGuardState } from "./guards";
 import {
   normalizeTelefunWebSocketUrl,
   mapTelefunCloseEvent,
@@ -13,6 +10,9 @@ import {
   float32ToPcm16Buffer,
   shouldSendRealtimeAudio,
   extractGeminiInlineAudioChunks,
+  TELEFUN_CLIENT_CLOSE_CODE,
+  TELEFUN_CLIENT_CLOSE_REASON,
+  shouldReportTelefunCloseError,
 } from "./liveProtocol";
 import {
   buildTelefunLiveSystemInstruction,
@@ -77,6 +77,10 @@ export class LiveSession {
     nonSilentStartedAt: null,
     cooldownUntil: 0,
   };
+
+  private intentionalClose = false;
+  private hasStoppedRecording = false;
+  private lastLocalError: Error | null = null;
 
   // Callbacks
   public onStatusChange: (status: string) => void = () => {};
@@ -144,9 +148,13 @@ export class LiveSession {
         throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
       }
       if (this.config.telefunTransport === "openai-audio") {
-        throw new Error("OpenAI Audio transport belum diimplementasi. Gunakan Gemini Live.");
+        throw new Error(
+          "OpenAI Audio transport belum diimplementasi. Gunakan Gemini Live.",
+        );
       }
-      const wsBase = normalizeTelefunWebSocketUrl(import.meta.env.VITE_TELEFUN_WS_URL);
+      const wsBase = normalizeTelefunWebSocketUrl(
+        import.meta.env.VITE_TELEFUN_WS_URL,
+      );
       const wsUrl = new URL(wsBase);
       wsUrl.pathname = wsUrl.pathname.endsWith("/ws") ? wsUrl.pathname : "/ws";
       wsUrl.searchParams.set("token", token);
@@ -191,10 +199,25 @@ export class LiveSession {
       this.ws.onclose = (event) => {
         const mapped = mapTelefunCloseEvent(event);
         this.setSessionState("ended");
-        this.onStatusChange("Terputus");
-        this.onError(new Error(mapped.message));
-        this.stopRecording();
-        this.emitTimelineEvent("ws_close", { code: event.code, reason: event.reason });
+        this.onStatusChange(
+          mapped.severity === "normal" ? "Selesai" : "Terputus",
+        );
+
+        if (
+          shouldReportTelefunCloseError({
+            intentionalClose: this.intentionalClose,
+            severity: mapped.severity,
+          })
+        ) {
+          this.onError(this.lastLocalError ?? new Error(mapped.message));
+        }
+
+        this.stopRecordingOnce();
+        this.emitTimelineEvent("ws_close", {
+          code: event.code,
+          reason: event.reason,
+          severity: mapped.severity,
+        });
       };
     } catch (err) {
       this.onError(err as Error);
@@ -302,7 +325,10 @@ export class LiveSession {
       const rms = Math.sqrt(sum / inputData.length);
       const vol = Math.min(100, Math.floor(rms * 200));
       const volBucket = Math.floor(vol / 10);
-      if (volBucket !== this.lastVolumeBucket || now - this.lastVolumeEmitMs >= this.MIN_VOLUME_EMIT_MS) {
+      if (
+        volBucket !== this.lastVolumeBucket ||
+        now - this.lastVolumeEmitMs >= this.MIN_VOLUME_EMIT_MS
+      ) {
         this.onVolumeChange(vol);
         this.lastVolumeEmitMs = now;
         this.lastVolumeBucket = volBucket;
@@ -381,7 +407,11 @@ export class LiveSession {
 
       if (!canSend) return;
 
-      this.ws!.send(JSON.stringify(buildRealtimeAudioMessage(float32ToPcm16Buffer(inputData))));
+      this.ws!.send(
+        JSON.stringify(
+          buildRealtimeAudioMessage(float32ToPcm16Buffer(inputData)),
+        ),
+      );
       if (!this.hasSentFirstUserAudio) {
         this.hasSentFirstUserAudio = true;
         this.emitTimelineEvent("first_user_audio_chunk_sent");
@@ -400,7 +430,11 @@ export class LiveSession {
       float32[i] = view.getInt16(i * 2, true) / 32768.0;
     }
 
-    const buffer = this.audioContext.createBuffer(1, float32.length, sampleRate);
+    const buffer = this.audioContext.createBuffer(
+      1,
+      float32.length,
+      sampleRate,
+    );
     buffer.getChannelData(0).set(float32);
 
     const source = this.audioContext.createBufferSource();
@@ -431,7 +465,10 @@ export class LiveSession {
 
     const resolvedIdentity = this.config.resolvedIdentity || {
       name: this.config.consumerName,
-      gender: this.config.consumerGender === "male" ? "male" : "female" as "male" | "female",
+      gender:
+        this.config.consumerGender === "male"
+          ? "male"
+          : ("female" as "male" | "female"),
       phone: this.config.identitySettings?.phoneNumber || "08123456789",
       city: this.config.identitySettings?.city || "Jakarta",
       voiceName: this.config.voiceName,
@@ -446,13 +483,15 @@ export class LiveSession {
     const systemInstructionText = buildTelefunLiveSystemInstruction({
       identity: resolvedIdentity,
       scenario: this.config.activeScenario ?? this.config.scenarios[0],
-      consumerType: this.config.activeConsumerType ?? this.config.consumerTypes[0],
+      consumerType:
+        this.config.activeConsumerType ?? this.config.consumerTypes[0],
       responsePacingMode: this.config.responsePacingMode || "realistic",
       maxCallDuration: this.config.maxCallDuration || 0,
     });
 
     const setup = buildTelefunLiveSetupMessage({
-      telefunModelId: this.config.telefunModelId || "gemini-3.1-flash-live-preview",
+      telefunModelId:
+        this.config.telefunModelId || "gemini-3.1-flash-live-preview",
       voiceName: setupVoiceName,
       systemInstruction: systemInstructionText,
     });
@@ -474,7 +513,8 @@ export class LiveSession {
   }
 
   public sendInterruptionPrompt() {
-    const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const activeConsumer =
+      this.config.activeConsumerType ?? this.config.consumerTypes[0];
     const hint = activeConsumer
       ? getConsumerTypeHint(activeConsumer)
       : { tone: "Nada: netral/wajar. Katakan dengan sopan." };
@@ -489,8 +529,11 @@ export class LiveSession {
     this.clearSetupTimeout();
     this.setupTimeoutTimer = setTimeout(() => {
       if (!this.isSetupComplete) {
-        this.onError(new Error("Koneksi gagal — waktu setup habis. Coba lagi."));
-        this.disconnect();
+        this.lastLocalError = new Error(
+          "Koneksi gagal — waktu setup habis. Coba lagi.",
+        );
+        this.onError(this.lastLocalError);
+        this.disconnect("timeout");
       }
     }, this.CONNECT_SETUP_TIMEOUT_MS);
   }
@@ -575,13 +618,24 @@ export class LiveSession {
     });
   }
 
-  public disconnect() {
+  public disconnect(reason: "user" | "timeout" | "cleanup" = "user") {
+    this.intentionalClose = true;
     this.clearSetupTimeout();
     this.stopStalledWatchdog();
-    if (this.ws) this.ws.close();
-    this.stopRecording();
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.close(TELEFUN_CLIENT_CLOSE_CODE, TELEFUN_CLIENT_CLOSE_REASON);
+    }
+
+    this.stopRecordingOnce();
     this.cleanupAudio();
-    this.emitTimelineEvent("disconnect");
+    this.emitTimelineEvent("disconnect", { reason });
+  }
+
+  private stopRecordingOnce() {
+    if (this.hasStoppedRecording) return;
+    this.hasStoppedRecording = true;
+    this.stopRecording();
   }
 
   private stopRecording() {
@@ -650,7 +704,8 @@ export class LiveSession {
   }
 
   public sendTimeCue(remainingSeconds: number) {
-    const activeConsumer = this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const activeConsumer =
+      this.config.activeConsumerType ?? this.config.consumerTypes[0];
     if (!activeConsumer) {
       this.sendPrompt(
         `[SYSTEM: Waktu tinggal ${remainingSeconds} detik lagi. Segera akhiri telepon.]`,
@@ -668,5 +723,4 @@ export class LiveSession {
       remainingSeconds,
     });
   }
-
 }

@@ -62,53 +62,6 @@ const VOICE_ASSESSMENT_SCHEMA = {
     transcript: { type: "string" },
     highlights: { type: "array", items: { type: "string" } },
     strengths: { type: "array", items: { type: "string" } },
-    communicationProfile: {
-      type: "object",
-      properties: {
-        metrics: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              key: {
-                type: "string",
-                enum: ["speakingRate", "intonation", "articulation", "fillers", "tone"],
-              },
-              label: { type: "string" },
-              value: { type: "number" },
-              benchmarkValue: { type: "number" },
-              evaluationMode: {
-                type: "string",
-                enum: ["higher_better", "lower_better", "optimal_range"],
-              },
-              idealMin: { type: "number" },
-              idealMax: { type: "number" },
-              goodMin: { type: "number" },
-              goodMax: { type: "number" },
-              status: {
-                type: "string",
-                enum: ["good", "needs_improvement", "poor"],
-              },
-              explanation: { type: "string" },
-              improvementTip: { type: "string" },
-            },
-            required: [
-              "key",
-              "label",
-              "value",
-              "benchmarkValue",
-              "evaluationMode",
-              "status",
-              "explanation",
-            ],
-          },
-        },
-        overallSummary: { type: "string" },
-        strengths: { type: "array", items: { type: "string" } },
-        improvementPriorities: { type: "array", items: { type: "string" } },
-      },
-      required: ["metrics", "overallSummary", "strengths", "improvementPriorities"],
-    },
   },
   required: [
     "overallScore",
@@ -191,8 +144,10 @@ export async function analyzeVoiceQuality(
     ATURAN WAJIB:
     1. SEMUA teks, ulasan (verdict), umpan balik (feedback), poin penting, dan kelebihan WAJIB MENGGUNAKAN BAHASA INDONESIA. Jangan gunakan bahasa Inggris.
     2. Sifat ulasan harus KRITIS dengan rasio 50% kritik konstruktif dan 50% apresiasi. Beritahu agen secara tegas apa saja yang masih kurang dan bagaimana cara memperbaikinya.
-    3. Semua field nilai (overallScore dan setiap skor aspek) HARUS berada di kisaran 0-10.
-    4. Nilai 0 berarti sangat buruk, 10 berarti sangat luar biasa. Jangan ragu untuk memberi skor sedang/rendah jika memang banyak ruang untuk perbaikan.
+    3. Semua field score aspek HARUS berada di kisaran 0-10 dan merepresentasikan kualitas, bukan raw metric.
+    4. wordsPerMinute HARUS berisi angka WPM mentah saja (kisaran normal 100-180). Jangan jadikan WPM sebagai score.
+    5. fillerWords.count HARUS berisi jumlah kata pengisi mentah saja (misal: 0, 3, 15). Jangan jadikan count sebagai score.
+    6. Jangan mengarang target radar. Target QA dihitung sistem.
   `;
 
   const response = await generateGeminiContent({
@@ -216,7 +171,9 @@ export async function analyzeVoiceQuality(
 
   if (response.success && response.text) {
     try {
-      const parsed = parseJsonFromModelText(response.text) as VoiceQualityAssessment;
+      const parsed = parseJsonFromModelText(
+        response.text,
+      ) as VoiceQualityAssessment;
       const assessment = enrichAssessmentWithCommunicationProfile(parsed);
 
       // Save to DB

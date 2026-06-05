@@ -17,6 +17,7 @@ import {
   isGeminiSetupMessage,
   hasGeminiSetupComplete,
 } from "./server-protocol.js";
+import { buildSafeCloseMetadata } from "./server-close.js";
 
 process.on("uncaughtException", (err) =>
   console.error("[Telefun] Uncaught:", err),
@@ -217,12 +218,10 @@ wss.on("connection", async (ws, req) => {
       }
 
       void flushUsage();
-      const safeCode =
-        (code >= 3000 && code <= 4999) || (code >= 1000 && code <= 1013)
-          ? code
-          : 1011;
-      if (ws.readyState === WebSocket.OPEN)
-        ws.close(safeCode, reason.toString().slice(0, 123));
+      const closeMeta = buildSafeCloseMetadata(code, reason);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(closeMeta.code, closeMeta.reason);
+      }
     });
   };
 
@@ -273,7 +272,10 @@ wss.on("connection", async (ws, req) => {
     }
   });
 
-  ws.on("close", async () => {
+  ws.on("close", async (code, reason) => {
+    console.log(
+      `[Telefun] Client closed: ${code} ${reason.toString() || "(no reason)"}`,
+    );
     utteranceBuffer.flushNow();
     if (
       geminiWs &&

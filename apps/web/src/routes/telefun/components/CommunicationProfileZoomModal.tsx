@@ -1,7 +1,10 @@
 import React, { useEffect, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Maximize2, TrendingUp, TrendingDown, Gauge } from "lucide-react";
-import type { TelefunCommunicationProfile, CommunicationMetric } from "@trainers/types";
+import type {
+  TelefunCommunicationProfile,
+  CommunicationMetric,
+} from "@trainers/types";
 import { VoiceRadarChart } from "./VoiceRadarChart";
 
 interface CommunicationProfileZoomModalProps {
@@ -18,14 +21,13 @@ const MODE_ICONS: Record<string, React.ReactNode> = {
 
 const STATUS_COLORS: Record<string, string> = {
   good: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  needs_improvement:
-    "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  needs_improvement: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   poor: "bg-red-500/10 text-red-500 border-red-500/20",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   good: "Baik",
-  needs_improvement: "Perlu Perbaikan",
+  needs_improvement: "Cukup",
   poor: "Kurang",
 };
 
@@ -111,7 +113,7 @@ export const CommunicationProfileZoomModal: React.FC<
                     </span>
                   </div>
                   <div className="text-2xl font-black text-foreground mb-1">
-                    {metric.value}
+                    {metric.displayScore ?? metric.value}
                     <span className="text-xs font-normal text-muted-foreground">
                       /100
                     </span>
@@ -153,17 +155,17 @@ export const CommunicationProfileZoomModal: React.FC<
                 <div className="flex items-start gap-2">
                   <Gauge className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                   <span>
-                    <strong className="text-foreground">
-                      Speaking Rate:
-                    </strong>{" "}
-                    ideal di rentang 60-80. Terlalu cepat atau terlalu lambat kurang baik.
+                    <strong className="text-foreground">Speaking Rate:</strong>{" "}
+                    ideal di rentang 60-80. Terlalu cepat atau terlalu lambat
+                    kurang baik.
                   </span>
                 </div>
                 <div className="flex items-start gap-2">
                   <TrendingDown className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <span>
-                    <strong className="text-foreground">Fillers:</strong>{" "}
-                    semakin rendah skor, semakin baik (sedikit kata pengisi).
+                    <strong className="text-foreground">Fillers:</strong> target
+                    QA memang rendah. Semakin dekat hasil Anda ke target rendah
+                    ini, semakin baik.
                   </span>
                 </div>
               </div>
