@@ -120,7 +120,16 @@ export async function analyzeVoiceQuality(
   const parsedCached = parseVoiceQualityAssessment(row.voice_assessment);
   if (parsedCached) {
     let assessment = parsedCached;
-    if (!parsedCached.holdManagement) {
+    
+    // Check if we need to apply a newly computed hold assessment
+    // Since parsedCached always has a default holdManagement, check if the raw row had it,
+    // or simply always trust the freshly computed holdAssessment if it has actual data.
+    const rawHasHold = 
+      row.voice_assessment && 
+      typeof row.voice_assessment === "object" && 
+      "holdManagement" in row.voice_assessment;
+      
+    if (!rawHasHold && holdAssessment.status !== "not_used") {
       assessment = {
         ...parsedCached,
         holdManagement: holdAssessment,

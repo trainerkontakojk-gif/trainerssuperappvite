@@ -98,6 +98,17 @@ export type TelefunCommunicationProfile = z.infer<
   typeof telefunCommunicationProfileSchema
 >;
 
+export const NOT_USED_HOLD_ASSESSMENT: TelefunHoldAssessment = {
+  status: "not_used",
+  score: null,
+  verdict: "N/A",
+  feedback: "User tidak menggunakan hold pada sesi ini.",
+  holdCount: 0,
+  totalDurationMs: 0,
+  longestDurationMs: 0,
+  exceededCount: 0,
+};
+
 export const voiceQualityAssessmentInputSchema = z.object({
   overallScore: scoreSchema,
   speakingRate: voiceAspectScoreSchema.extend({
@@ -115,8 +126,10 @@ export const voiceQualityAssessmentInputSchema = z.object({
   transcript: z.string().default(""),
   highlights: boundedStringArraySchema(5).default([]),
   strengths: boundedStringArraySchema(5).default([]),
-  holdManagement: telefunHoldAssessmentSchema.optional(),
-  communicationProfile: telefunCommunicationProfileSchema.nullable().optional(),
+  holdManagement: telefunHoldAssessmentSchema
+    .catch(NOT_USED_HOLD_ASSESSMENT)
+    .default(NOT_USED_HOLD_ASSESSMENT),
+  communicationProfile: z.unknown().optional(),
 });
 
 export const telefunScoreEnvelopeSchema = z.object({
