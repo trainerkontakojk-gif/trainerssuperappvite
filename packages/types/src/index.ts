@@ -3,7 +3,7 @@ export * from "./sidak";
 export * from "./ketik";
 export * from "./pdkt";
 export * from "./telefun";
-export * from "./ai";
+export * from "./telefun-assessment";
 export * from "./profiler";
 export * from "./admin";
 export * from "./ai-models";

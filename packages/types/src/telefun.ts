@@ -33,17 +33,6 @@ export interface TelefunHoldMetrics {
   intervals: TelefunHoldInterval[];
 }
 
-export interface TelefunHoldAssessment {
-  status: "not_used" | "within_limit" | "exceeded";
-  score: number | null;
-  verdict: "N/A" | "Baik" | "Kurang";
-  feedback: string;
-  holdCount: number;
-  totalDurationMs: number;
-  longestDurationMs: number;
-  exceededCount: number;
-}
-
 export interface SessionMetrics {
   speechSegments: SpeechSegment[];
   totalSpeakingMs: number;
@@ -57,85 +46,17 @@ export interface SessionMetrics {
   hold?: TelefunHoldMetrics;
 }
 
-export interface VoiceAspectScore {
-  score: number;
-  verdict: string;
-  feedback: string;
-}
-
-export interface VoiceQualityAssessment {
-  overallScore: number;
-  speakingRate: VoiceAspectScore & { wordsPerMinute: number };
-  intonation: VoiceAspectScore;
-  articulation: VoiceAspectScore;
-  fillerWords: VoiceAspectScore & { count: number; examples: string[] };
-  emotionalTone: VoiceAspectScore & { dominant: string };
-  transcript: string;
-  highlights: string[];
-  strengths: string[];
-  communicationProfile?: TelefunCommunicationProfile | null;
-  holdManagement?: TelefunHoldAssessment;
-}
-
-export type TelefunVoiceMetricKey =
-  | "speakingRate"
-  | "intonation"
-  | "articulation"
-  | "fillers"
-  | "tone";
-
-export type TelefunMetricStatus = "good" | "needs_improvement" | "poor";
-
-export interface TelefunMetricDisplay {
-  key: TelefunVoiceMetricKey;
-  label: string;
-  score: number; // quality score 0-10, legacy-compatible
-  displayScore: number; // normalized radar/card value 0-100
-  rawValue?: number | string;
-  rawUnit?: "WPM" | "filler_words" | "dominant_tone";
-  targetScore: number; // QA target plotted on radar 0-100
-  targetDirection: "match_target" | "higher_quality" | "lower_raw_is_better";
-  verdict: string;
-  status: TelefunMetricStatus;
-  feedback: string;
-  explanation: string;
-  improvementTip?: string;
-}
-
-export type CommunicationMetricMode =
-  | "higher_better"
-  | "lower_better"
-  | "optimal_range";
-
-export interface CommunicationMetric {
-  key: TelefunVoiceMetricKey;
-  label: string;
-  value: number; // alias legacy untuk displayScore
-  benchmarkValue: number; // alias legacy untuk targetScore
-  score: number; // quality score 0-10, legacy-compatible
-  displayScore: number;
-  targetScore: number;
-  targetDirection: "match_target" | "higher_quality" | "lower_raw_is_better";
-  rawValue?: number | string;
-  rawUnit?: "WPM" | "filler_words" | "dominant_tone";
-  evaluationMode: CommunicationMetricMode;
-  idealMin?: number;
-  idealMax?: number;
-  goodMin?: number;
-  goodMax?: number;
-  verdict: string;
-  status: TelefunMetricStatus;
-  feedback: string;
-  explanation: string;
-  improvementTip?: string;
-}
-
-export interface TelefunCommunicationProfile {
-  metrics: CommunicationMetric[];
-  overallSummary: string;
-  strengths: string[];
-  improvementPriorities: string[];
-}
+export type {
+  VoiceAspectScore,
+  TelefunHoldAssessment,
+  TelefunScoreResult,
+  VoiceQualityAssessment,
+  TelefunVoiceMetricKey,
+  TelefunMetricStatus,
+  CommunicationMetricMode,
+  CommunicationMetric,
+  TelefunCommunicationProfile,
+} from "./telefun-assessment";
 
 export interface TelefunHistory {
   id: string;
