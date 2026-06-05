@@ -12,6 +12,11 @@ import type { SessionMetrics } from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
 import { LiveSession } from "../services/geminiService";
 import { getTelefunTimeCueThreshold } from "../services/timingGuards";
+import {
+  MicrophoneActivityWaveform,
+  type MicrophoneWaveformTone,
+} from "./MicrophoneActivityWaveform";
+import { useMicrophoneActivity } from "./useMicrophoneActivity";
 
 interface PhoneInterfaceProps {
   config: TelefunAppSettings;
@@ -436,7 +441,20 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     };
   };
 
-  const volStatus = getVolumeStatus(agentVolume);
+  const micActivity = useMicrophoneActivity({
+    active: connectionState === "Tersambung" && !isOnHold,
+    muted: isMuted,
+  });
+  const displayVolume = isMuted ? 0 : Math.max(agentVolume, micActivity.level);
+  const volStatus = getVolumeStatus(displayVolume);
+  const volumeTone: MicrophoneWaveformTone =
+    isMuted || displayVolume < 10
+      ? "silent"
+      : displayVolume < 35
+        ? "normal"
+        : displayVolume < 65
+          ? "warning"
+          : "danger";
   const initials = getInitials(config.consumerName);
   const displayName = config.resolvedIdentity?.name || config.consumerName;
   const displayPhone = config.resolvedIdentity?.phone || "08123456789";
@@ -561,7 +579,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                 <div className="mb-1 flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-white/45">
                   <span>Indikator Input Suara Anda</span>
                   <span
-                    className={volStatus.color.replace("bg-", "text-").replace("/50", "")}
+                    className={volStatus.color
+                      .replace("bg-", "text-")
+                      .replace("/50", "")}
                   >
                     {isMuted ? "Mic Mute" : volStatus.label}
                   </span>
@@ -576,6 +596,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                     }}
                   />
                 </div>
+                <MicrophoneActivityWaveform
+                  active={micActivity.isListening && !isMuted}
+                  bars={isMuted ? [] : micActivity.bars}
+                  tone={volumeTone}
+                />
               </div>
             )}
 
