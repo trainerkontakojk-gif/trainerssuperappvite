@@ -147,17 +147,20 @@ Project ini memiliki knowledge graph di `graphify-out/` dengan god nodes, commun
 Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — baik oleh agent utama maupun oleh subagent lewat Task tool. Ini berlaku untuk semua skenario:
 
 #### Untuk Planning
+
 - SEBELUM membuat plan, WAJIB query graphify untuk memahami konteks fitur/modul yang akan diubah.
 - Gunakan `graphify query "arsitektur modul X"` atau `graphify explain "KonsepY"` untuk dapatkan gambaran sebelum menyusun tasklist.
 - Untuk plan yang menyentuh banyak file/modul, query `graphify path "ModuleA" "ModuleB"` untuk lihat relasi.
 
 #### Untuk Eksekusi (Bug Fix / Fitur Baru)
+
 - SEBELUM mengubah kode, WAJIB query graphify untuk tahu dependensi dan file terkait.
 - Gunakan `graphify query "file apa yang terkait dengan fitur X"` untuk identifikasi file yang perlu diubah.
 - Jika ragu dengan dampak perubahan, query graphify dulu untuk cek cross-file relationships.
 - SETELAH selesai mengubah kode, WAJIB jalankan `graphify update .` untuk menjaga graph tetap sinkron.
 
 #### Untuk Subagent (Task tool)
+
 - Saat mengirim task ke subagent via Task tool, SERTAKAN instruksi: "Gunakan graphify dulu untuk referensi codebase sebelum memulai."
 - Subagent harus query graphify via `graphify query "<pertanyaan>"` sebelum menulis kode.
 
@@ -286,8 +289,9 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 105. **PDKT Shared Mailbox Ownership** — Changed PDKT mailbox from per-user fanout copies to a single shared canonical mailbox accessible by all authenticated users (admin, trainer, leader, agent). Added creator metadata display (`created_by_user` with full_name/role/is_current_user), role-based delete authorization (admin/trainer can delete any, others only their own), new RPC `soft_delete_pdkt_mailbox_item` with SECURITY DEFINER, backfill of `created_by_user_id` null values, updated `submit_pdkt_mailbox_batch`/`submit_pdkt_mailbox_reply` RPCs, 403-aware error passthrough in `jsonServerError`, human-friendly tooltip for disabled delete button, creator label in sidebar and detail pane. 1 terminal migration, 1 rollback, 14 files modified, 40+ API + web regression tests passing. (DONE)
 106. **PDKT Bulk Delete & Soft Delete RPC Fix** — Added bulk soft delete for PDKT mailbox items via `POST /pdkt/mailbox/batch-delete` endpoint; fixed `soft_delete_pdkt_mailbox_item` RPC to use `COALESCE(created_by_user_id, user_id)` for legacy data where creator is NULL. Bulk delete service uses per-item permission check via `canDeletePdktMailboxItem`, parallel `Promise.allSettled` execution, and detailed `BulkDeleteResult` summary. Frontend: bulk selection mode with checkboxes, disabled checkbox for non-deletable items with tooltip, batch delete confirmation dialog, partial success/failure toast. 1 terminal migration, 1 rollback, 10 files modified, 3 new test suites. (DONE)
 107. **PDKT Shared Mailbox Evaluation Access Sharing Fix** — Fixed AI evaluation polling and retry access blocks for non-owner users when mailbox items are shared. Implemented a two-tier verification check: first tries user client (respecting owner-only RLS on pdkt_history), then queries pdkt_mailbox_items to check if linked to a visible mailbox item, falling back to adminClient query. Removed user_id constraints from background worker processPdktEvaluation. Added 4 E2E route tests. (DONE)
+108. **Telefun AI Assessment Radar Consistency** — Pemisahan dan normalisasi kualitas skor (0-10), displayScore (0-100), raw value, dan target QA (Speaking Rate 70, Intonation 80, Articulation 90, Fillers 20, Tone 85) untuk data assessment AI Telefun. Memperkenalkan reusable component `VoiceMetricCards.tsx`, memperbarui `VoiceRadarChart.tsx` dan `CommunicationProfileZoomModal.tsx` dengan visual copy target-distance. Rebuild profil stale/invalid secara otomatis di backend (`enrichAssessmentWithCommunicationProfile`) dan frontend (`getCommunicationProfileFromAssessment`). 8 files modified, 41 API + 44 web regression tests passing. (DONE)
 
-## Key Files Changed (Phase 58 — 107)
+## Key Files Changed (Phase 58 — 108)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface.
 - `apps/api/src/services/sidak-service.ts` — **Phase 65**: Added optional `limit` parameter to `getDashboardData` to support custom slicing limits or bypass slicing (limit <= 0) to allow full agent listing; **Phase 74**: Populated `periodMonth` in `getAgentDirectorySummary` from the latest period associated with the agent's findings.
@@ -481,55 +485,55 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 
 ## Routes Reference (apps/web)
 
-| #   | Route                        | Page Type    | Notes                                                    |
-| --- | ---------------------------- | ------------ | -------------------------------------------------------- |
-| 1   | `/`                          | Landing      | Hero, stats, modules showcase, benefits                  |
-| 2   | `/dashboard`                 | Overview     | Recharts charts, KPI cards, module grid                  |
-| 3   | `/sidak`                     | Landing      | 6 card links                                             |
-| 4   | `/sidak/dashboard`           | QA Dashboard | 4 metric cards, bar charts, top agents                   |
-| 5   | `/sidak/input`               | Form         | Multi-step audit input + Excel                           |
-| 6   | `/sidak/ranking`             | Table        | Agent ranking sorted by defects                          |
-| 7   | `/sidak/settings`            | CRUD         | Service weights configuration                            |
-| 8   | `/sidak/periods`             | Manager      | Create/view audit periods                                |
-| 9   | `/sidak/agents`              | Directory    | Searchable agent list                                    |
+| #   | Route                        | Page Type    | Notes                                                                               |
+| --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |
+| 1   | `/`                          | Landing      | Hero, stats, modules showcase, benefits                                             |
+| 2   | `/dashboard`                 | Overview     | Recharts charts, KPI cards, module grid                                             |
+| 3   | `/sidak`                     | Landing      | 6 card links                                                                        |
+| 4   | `/sidak/dashboard`           | QA Dashboard | 4 metric cards, bar charts, top agents                                              |
+| 5   | `/sidak/input`               | Form         | Multi-step audit input + Excel                                                      |
+| 6   | `/sidak/ranking`             | Table        | Agent ranking sorted by defects                                                     |
+| 7   | `/sidak/settings`            | CRUD         | Service weights configuration                                                       |
+| 8   | `/sidak/periods`             | Manager      | Create/view audit periods                                                           |
+| 9   | `/sidak/agents`              | Directory    | Searchable agent list                                                               |
 | 10  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service, score badges in temuan history |
-| 11  | `/ketik`                     | Landing      | Chat simulation intro                                    |
-| 12  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                      |
-| 13  | `/ketik/history`             | Placeholder  | Session history                                          |
-| 14  | `/pdkt`                      | Landing      | Email simulation intro                                   |
-| 15  | `/pdkt/simulation`           | Email UI     | Scenario + inbound email + evaluate                      |
-| 16  | `/pdkt/history`              | Placeholder  | Session history                                          |
-| 17  | `/telefun`                   | Voice UI     | WebSocket-based call simulation                          |
-| 18  | `/monitoring`                | Dashboard    | AI usage + pricing management                            |
-| 19  | `/account`                   | Settings     | Edit name + change password                              |
-| 20  | `/profiler`                  | Landing      | Year/folder sidebar + action tiles                       |
-| 21  | `/profiler/table`            | Table        | Search/filter/edit participant data                      |
-| 22  | `/profiler/slides`           | Slides       | Slide view per participant                               |
-| 23  | `/profiler/analytics`        | Charts       | Recharts analytics (4 charts)                            |
-| 24  | `/profiler/export`           | Export       | Excel/CSV export                                         |
-| 25  | `/profiler/add`              | Form         | Manual participant input                                 |
-| 26  | `/profiler/import`           | Import       | Excel template + upload + results                        |
-| 27  | `/profiler/teams`            | CRUD         | Custom team management                                   |
-| 28  | `/sidak/reports`             | Landing      | Data vs AI report selection                              |
-| 29  | `/sidak/reports-data`        | Table        | Filter form + temuan table + Excel export                |
-| 30  | `/sidak/reports-ai`          | Form         | AI-powered report generation                             |
-| 31  | `/waiting-approval`          | Auth         | Status polling page                                      |
-| 32  | `/reset-password`            | Auth         | Password recovery form                                   |
-| 33  | `/dashboard/users`           | Table        | User status/role management, password reset, soft delete |
-| 34  | `/dashboard/access-groups`   | Builder      | Dynamic access data rule scopes builder for leaders      |
-| 35  | `/dashboard/access-approval` | Action       | Assign access groups and approve leader requests         |
-| 36  | `/dashboard/activities`      | Table        | System-wide audit logs with CSV export                   |
-| 37  | `/unauthorized`              | Error        | 403 role-denied page                                     |
-| 38  | 404                          | Catch-all    | Custom not-found page                                    |
+| 11  | `/ketik`                     | Landing      | Chat simulation intro                                                               |
+| 12  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                                                 |
+| 13  | `/ketik/history`             | Placeholder  | Session history                                                                     |
+| 14  | `/pdkt`                      | Landing      | Email simulation intro                                                              |
+| 15  | `/pdkt/simulation`           | Email UI     | Scenario + inbound email + evaluate                                                 |
+| 16  | `/pdkt/history`              | Placeholder  | Session history                                                                     |
+| 17  | `/telefun`                   | Voice UI     | WebSocket-based call simulation                                                     |
+| 18  | `/monitoring`                | Dashboard    | AI usage + pricing management                                                       |
+| 19  | `/account`                   | Settings     | Edit name + change password                                                         |
+| 20  | `/profiler`                  | Landing      | Year/folder sidebar + action tiles                                                  |
+| 21  | `/profiler/table`            | Table        | Search/filter/edit participant data                                                 |
+| 22  | `/profiler/slides`           | Slides       | Slide view per participant                                                          |
+| 23  | `/profiler/analytics`        | Charts       | Recharts analytics (4 charts)                                                       |
+| 24  | `/profiler/export`           | Export       | Excel/CSV export                                                                    |
+| 25  | `/profiler/add`              | Form         | Manual participant input                                                            |
+| 26  | `/profiler/import`           | Import       | Excel template + upload + results                                                   |
+| 27  | `/profiler/teams`            | CRUD         | Custom team management                                                              |
+| 28  | `/sidak/reports`             | Landing      | Data vs AI report selection                                                         |
+| 29  | `/sidak/reports-data`        | Table        | Filter form + temuan table + Excel export                                           |
+| 30  | `/sidak/reports-ai`          | Form         | AI-powered report generation                                                        |
+| 31  | `/waiting-approval`          | Auth         | Status polling page                                                                 |
+| 32  | `/reset-password`            | Auth         | Password recovery form                                                              |
+| 33  | `/dashboard/users`           | Table        | User status/role management, password reset, soft delete                            |
+| 34  | `/dashboard/access-groups`   | Builder      | Dynamic access data rule scopes builder for leaders                                 |
+| 35  | `/dashboard/access-approval` | Action       | Assign access groups and approve leader requests                                    |
+| 36  | `/dashboard/activities`      | Table        | System-wide audit logs with CSV export                                              |
+| 37  | `/unauthorized`              | Error        | 403 role-denied page                                                                |
+| 38  | 404                          | Catch-all    | Custom not-found page                                                               |
 
 ## API Endpoints Reference (apps/api)
 
-| Prefix             | Endpoints    | Service                         |
-| ------------------ | ------------ | ------------------------------- |
-| `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports) |
-| `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history) |
+| Prefix             | Endpoints    | Service                                                                                                                                                                                                                     |
+| ------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/v1/sidak`    | 16 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports)                                                                                                                                           |
+| `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history)                                                                                                   |
 | `/api/v1/pdkt`     | 16 endpoints | `routes/pdkt/` — 6 sub-modules (index, simulation, mailbox, history, settings, route-utils) + `services/pdkt/` — 7 service modules (catalog, session, evaluation, mailbox, shared-utils, image-generation, mailbox-session) |
-| `/api/v1/ai`       | 7 endpoints  | —                               |
-| `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`           |
-| `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`              |
-| `/api/v1/telefun`  | 5 endpoints  | `routes/telefun/` — 4 sub-modules (sessions, recordings, settings, annotations) |
+| `/api/v1/ai`       | 7 endpoints  | —                                                                                                                                                                                                                           |
+| `/api/v1/profiler` | 18 endpoints | `profiler-service.ts`                                                                                                                                                                                                       |
+| `/api/v1/admin`    | 8 endpoints  | `admin-service.ts`                                                                                                                                                                                                          |
+| `/api/v1/telefun`  | 5 endpoints  | `routes/telefun/` — 4 sub-modules (sessions, recordings, settings, annotations)                                                                                                                                             |
