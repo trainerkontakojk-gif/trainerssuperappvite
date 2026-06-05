@@ -66,11 +66,9 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
     setError(null);
 
     try {
-      const data = await postApi<any>(`/telefun/score/${sessionId}`, {});
+      const data = await postApi<unknown>(`/telefun/score/${sessionId}`, {});
       const normalized = normalizeTelefunScoreResponse(data);
-      const validAssessment = normalized.assessment
-        ? validateAssessment(normalized.assessment)
-        : null;
+      const validAssessment = normalized.assessment;
 
       if (validAssessment) {
         setAssessment(validAssessment);

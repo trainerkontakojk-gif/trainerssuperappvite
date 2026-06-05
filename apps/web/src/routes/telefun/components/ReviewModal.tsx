@@ -396,7 +396,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                         </div>
                         <p className="text-sm font-bold text-foreground">
                           {record.score != null
-                            ? `${record.score}/${record.score <= 10 ? "10" : "100"}`
+                            ? `${record.score}/10`
                             : "—"}
                         </p>
                       </div>

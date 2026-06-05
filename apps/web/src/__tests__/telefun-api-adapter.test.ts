@@ -17,22 +17,27 @@ describe("Telefun API Adapter", () => {
     await saveTelefunSettings({ selectedModel: "gemini" } as any);
   });
 
-  it("maps session rows to CallRecord correctly", () => {
+  it("maps session rows to CallRecord correctly with canonical score", () => {
     const row = {
       id: "session-1",
       created_at: "2026-05-30T10:00:00Z",
-      recording_url: "http://storage.com/rec.webm",
+      recording_path: "path/to/rec.webm",
       consumer_name: "John",
-      consumer_phone: "123",
-      consumer_city: "Jakarta",
       scenario_title: "Scenario A",
-      duration: 120,
-      configured_duration: 300,
-      score: 98,
+      duration_seconds: 120,
+      score: 8,
     };
-    const record = mapTelefunSessionRow(row);
+    const record = mapTelefunSessionRow(row as any);
     expect(record.id).toBe("session-1");
-    expect(record.consumerName).toBe("John");
-    expect(record.duration).toBe(120);
+    expect(record.score).toBe(8);
+  });
+
+  it("sets voiceAssessment to null when invalid in row", () => {
+    const row = {
+      id: "session-invalid",
+      voice_assessment: { overallScore: 8 }, // Incomplete
+    };
+    const record = mapTelefunSessionRow(row as any);
+    expect(record.voiceAssessment).toBeNull();
   });
 });

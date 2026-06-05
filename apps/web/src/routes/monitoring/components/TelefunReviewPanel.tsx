@@ -42,7 +42,7 @@ interface TelefunReviewData {
   recording_path: string | null;
   scenario_title: string | null;
   duration_seconds: number | null;
-  voice_assessment: VoiceQualityAssessment | null;
+  voice_assessment: unknown;
   ai_summary: string | null;
   strengths: string[] | null;
   weaknesses: string[] | null;

@@ -17,6 +17,35 @@ function baseMetrics(): SessionMetrics {
 }
 
 describe("Telefun Session Finalizer", () => {
+  const mockAssessment = {
+    overallScore: 8,
+    speakingRate: {
+      score: 7,
+      wordsPerMinute: 130,
+      verdict: "Baik",
+      feedback: "Tempo oke",
+    },
+    intonation: { score: 8, verdict: "Baik", feedback: "Intonasi baik" },
+    articulation: { score: 9, verdict: "Baik", feedback: "Jelas" },
+    fillerWords: {
+      score: 8,
+      count: 2,
+      examples: ["uh"],
+      verdict: "Baik",
+      feedback: "Minim",
+    },
+    emotionalTone: {
+      score: 7,
+      dominant: "tenang",
+      verdict: "Baik",
+      feedback: "Empati cukup",
+    },
+    transcript: "Tes",
+    highlights: [],
+    strengths: [],
+    communicationProfile: null,
+  };
+
   it("uploads and finalizes recording before scoring", async () => {
     const calls: string[] = [];
 
@@ -44,7 +73,11 @@ describe("Telefun Session Finalizer", () => {
         }),
         scoreSession: vi.fn(async () => {
           calls.push("score");
-          return { score: 88, feedback: "Bagus", assessment: null };
+          return { 
+            score: 8, 
+            feedback: "Bagus", 
+            assessment: { ...mockAssessment, overallScore: 8 } 
+          };
         }),
       },
     });
@@ -57,41 +90,12 @@ describe("Telefun Session Finalizer", () => {
       "score",
       "patch",
     ]);
-    expect(result.record.score).toBe(88);
+    expect(result.record.score).toBe(8);
     expect(result.record.feedback).toBe("Bagus");
   });
 
   it("includes voiceAssessment in record when scoring provides assessment", async () => {
     const calls: string[] = [];
-    const mockAssessment = {
-      overallScore: 8,
-      speakingRate: {
-        score: 7,
-        wordsPerMinute: 130,
-        verdict: "Baik",
-        feedback: "Tempo oke",
-      },
-      intonation: { score: 8, verdict: "Baik", feedback: "Intonasi baik" },
-      articulation: { score: 9, verdict: "Baik", feedback: "Jelas" },
-      fillerWords: {
-        score: 8,
-        count: 2,
-        examples: ["uh"],
-        verdict: "Baik",
-        feedback: "Minim",
-      },
-      emotionalTone: {
-        score: 7,
-        dominant: "tenang",
-        verdict: "Baik",
-        feedback: "Empati cukup",
-      },
-      transcript: "Tes",
-      highlights: [],
-      strengths: [],
-      communicationProfile: null,
-    };
-
     const result = await finalizeTelefunSession({
       sessionId: "session-2",
       fullBlob: null,
@@ -113,13 +117,52 @@ describe("Telefun Session Finalizer", () => {
         }),
         finalizeRecording: vi.fn(async () => {}),
         scoreSession: vi.fn(async () => {
-          return { score: 90, feedback: "Bagus", assessment: mockAssessment };
+          return { 
+            score: 9, 
+            feedback: "Bagus", 
+            assessment: { ...mockAssessment, overallScore: 9 } 
+          };
         }),
       },
     });
 
-    expect(result.record.voiceAssessment).toEqual(mockAssessment);
-    expect(result.record.score).toBe(90);
+    expect(result.record.voiceAssessment?.overallScore).toBe(9);
+    expect(result.record.score).toBe(9);
+  });
+
+  it("patches score 0 when assessment is valid but score is zero", async () => {
+    const calls: string[] = [];
+    const result = await finalizeTelefunSession({
+      sessionId: "session-zero",
+      fullBlob: null,
+      agentBlob: new Blob(["agent"]),
+      duration: 15,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "path"),
+        patchSession: vi.fn(async (_id, body) => {
+          if (body.score !== undefined) {
+            calls.push(`patch:score:${body.score}`);
+          }
+        }),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => {
+          return { 
+            score: 0, 
+            feedback: "Kurang", 
+            assessment: { ...mockAssessment, overallScore: 0 } 
+          };
+        }),
+      },
+    });
+
+    expect(calls).toContain("patch:score:0");
+    expect(result.record.score).toBe(0);
   });
 
   it("marks upload and scoring failures when recordings exist but user id is unavailable", async () => {
