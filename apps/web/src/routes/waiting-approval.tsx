@@ -4,6 +4,10 @@ import { Clock, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { normalizeProfileStatus } from "../lib/profile";
 import { clearAuthLocalState } from "../lib/authLocalState";
+import {
+  shouldPollWaitingApproval,
+  WAITING_APPROVAL_POLL_INTERVAL_MS,
+} from "./waitingApprovalPolling";
 
 type WaitingApprovalProfile = {
   status?: string | null;
@@ -88,9 +92,22 @@ export default function WaitingApprovalPage() {
       }
     };
 
-    checkStatus();
-    const interval = setInterval(checkStatus, 60000);
-    return () => clearInterval(interval);
+    const checkVisibleStatus = () => {
+      if (shouldPollWaitingApproval(document)) {
+        void checkStatus();
+      }
+    };
+
+    void checkStatus();
+    const interval = setInterval(
+      checkVisibleStatus,
+      WAITING_APPROVAL_POLL_INTERVAL_MS,
+    );
+    document.addEventListener("visibilitychange", checkVisibleStatus);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", checkVisibleStatus);
+    };
   }, [navigate]);
 
   return (
