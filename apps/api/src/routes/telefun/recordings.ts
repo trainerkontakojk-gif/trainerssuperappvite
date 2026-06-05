@@ -29,9 +29,8 @@ export function isTelefunRecordingPathOwnedBySession(params: {
 }
 
 export function buildTelefunFeedbackSummary(
-  assessment: VoiceQualityAssessment | null | undefined,
+  assessment: VoiceQualityAssessment,
 ): string {
-  if (!assessment) return "";
   const voiceParts = [
     assessment.speakingRate?.feedback,
     assessment.intonation?.feedback,
@@ -185,13 +184,14 @@ telefunRecordings.get("/recording/:id", async (c) => {
       data: { url: data.signedUrl },
       url: data.signedUrl,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Storage error.";
     return c.json(
       {
         success: false,
         error: {
           code: "STORAGE_ERROR",
-          message: error?.message || "Storage error.",
+          message,
         },
       },
       500,
@@ -230,13 +230,15 @@ telefunRecordings.post("/score/:id", async (c) => {
         assessment,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Internal server error.";
     return c.json(
       {
         success: false,
         error: {
           code: "SERVER_ERROR",
-          message: error?.message || "Internal server error.",
+          message,
         },
       },
       500,

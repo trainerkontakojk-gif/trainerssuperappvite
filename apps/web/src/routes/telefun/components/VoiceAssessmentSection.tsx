@@ -16,7 +16,7 @@ import {
 import { motion } from "framer-motion";
 import {
   validateAssessment,
-  normalizeTelefunScoreResponse,
+  parseTelefunScoreResult,
   getCommunicationProfileFromAssessment,
 } from "../../../lib/voiceAssessmentUtils";
 import { VoiceRadarChart } from "./VoiceRadarChart";
@@ -67,12 +67,11 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
 
     try {
       const data = await postApi<unknown>(`/telefun/score/${sessionId}`, {});
-      const normalized = normalizeTelefunScoreResponse(data);
-      const validAssessment = normalized.assessment;
+      const result = parseTelefunScoreResult(data);
 
-      if (validAssessment) {
-        setAssessment(validAssessment);
-        onAssessmentUpdate?.(validAssessment);
+      if (result) {
+        setAssessment(result.assessment);
+        onAssessmentUpdate?.(result.assessment);
       } else {
         setError("Format penilaian tidak valid");
       }

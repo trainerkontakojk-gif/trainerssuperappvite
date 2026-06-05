@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { TelefunCommunicationProfile } from "./telefun";
 import { enrichAssessmentWithCommunicationProfile } from "./telefun-communication-profile";
 
 const finiteNumber = z.number().finite();
@@ -87,9 +86,10 @@ export const communicationMetricSchema = z.object({
   explanation: z.string(),
   improvementTip: z.string().optional(),
 });
+export type CommunicationMetric = z.infer<typeof communicationMetricSchema>;
 
 export const telefunCommunicationProfileSchema = z.object({
-  metrics: z.array(communicationMetricSchema),
+  metrics: z.array(communicationMetricSchema).length(5),
   overallSummary: z.string(),
   strengths: z.array(z.string()),
   improvementPriorities: z.array(z.string()),
@@ -128,7 +128,7 @@ export const voiceQualityAssessmentInputSchema = z.object({
   strengths: boundedStringArraySchema(5).default([]),
   holdManagement: telefunHoldAssessmentSchema
     .catch(NOT_USED_HOLD_ASSESSMENT)
-    .default(NOT_USED_HOLD_ASSESSMENT),
+    .optional(),
   communicationProfile: z.unknown().optional(),
 });
 
@@ -140,12 +140,20 @@ export const telefunScoreEnvelopeSchema = z.object({
 
 export type VoiceAspectScore = z.infer<typeof voiceAspectScoreSchema>;
 export type TelefunHoldAssessment = z.infer<typeof telefunHoldAssessmentSchema>;
-export type VoiceQualityAssessment = z.output<
+type ParsedVoiceQualityAssessment = z.output<
   typeof voiceQualityAssessmentInputSchema
 >;
-export type TelefunScoreResult = {
-  score: number;
-  feedback: string;
+export type VoiceQualityAssessment = Omit<
+  ParsedVoiceQualityAssessment,
+  "holdManagement" | "communicationProfile"
+> & {
+  holdManagement?: TelefunHoldAssessment;
+  communicationProfile?: TelefunCommunicationProfile | null;
+};
+export type TelefunScoreResult = Omit<
+  z.output<typeof telefunScoreEnvelopeSchema>,
+  "assessment"
+> & {
   assessment: VoiceQualityAssessment;
 };
 
@@ -155,9 +163,16 @@ export function parseVoiceQualityAssessment(
   const parsed = voiceQualityAssessmentInputSchema.safeParse(input);
   if (!parsed.success) return null;
 
-  return enrichAssessmentWithCommunicationProfile(
-    parsed.data as VoiceQualityAssessment,
+  const profile = telefunCommunicationProfileSchema.safeParse(
+    parsed.data.communicationProfile,
   );
+  const assessment: VoiceQualityAssessment = {
+    ...parsed.data,
+    holdManagement: parsed.data.holdManagement ?? NOT_USED_HOLD_ASSESSMENT,
+    communicationProfile: profile.success ? profile.data : null,
+  };
+
+  return enrichAssessmentWithCommunicationProfile(assessment);
 }
 
 export function parseTelefunScoreResult(

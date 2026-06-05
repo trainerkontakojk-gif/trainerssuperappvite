@@ -1,9 +1,6 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
-import { 
-  parseVoiceQualityAssessment,
-  enrichAssessmentWithCommunicationProfile,
-} from "@trainers/types";
+import { parseVoiceQualityAssessment } from "@trainers/types";
 import type { VoiceQualityAssessment } from "@trainers/types";
 import { parseJsonFromModelText } from "./ai-json";
 import {
@@ -120,31 +117,47 @@ export async function analyzeVoiceQuality(
   const parsedCached = parseVoiceQualityAssessment(row.voice_assessment);
   if (parsedCached) {
     let assessment = parsedCached;
-    
-    // Check if we need to apply a newly computed hold assessment
-    // Since parsedCached always has a default holdManagement, check if the raw row had it,
-    // or simply always trust the freshly computed holdAssessment if it has actual data.
-    const rawHasHold = 
-      row.voice_assessment && 
-      typeof row.voice_assessment === "object" && 
+
+    const rawHasHold =
+      row.voice_assessment &&
+      typeof row.voice_assessment === "object" &&
+      !Array.isArray(row.voice_assessment) &&
       "holdManagement" in row.voice_assessment;
-      
-    if (!rawHasHold && holdAssessment.status !== "not_used") {
-      assessment = {
+
+    if (!rawHasHold) {
+      const synchronizedAssessment = parseVoiceQualityAssessment({
         ...parsedCached,
         holdManagement: holdAssessment,
         overallScore: applyHoldAssessmentToOverallScore(
           parsedCached.overallScore,
           holdAssessment,
         ),
-      };
-      await adminClient
+      });
+      if (!synchronizedAssessment) {
+        return {
+          success: false,
+          error: "Format hasil analisis tidak valid.",
+        };
+      }
+      assessment = synchronizedAssessment;
+
+      const { error: updateError } = await adminClient
         .from("telefun_history")
         .update({
           voice_assessment: assessment,
           score: assessment.overallScore,
         })
         .eq("id", sessionId);
+      if (updateError) {
+        console.error(
+          "[Telefun] Failed to synchronize cached assessment:",
+          updateError,
+        );
+        return {
+          success: false,
+          error: "Gagal menyimpan hasil penilaian suara.",
+        };
+      }
     }
     return {
       success: true,
@@ -223,23 +236,33 @@ export async function analyzeVoiceQuality(
         throw new Error("Invalid assessment shape from AI");
       }
 
-      // Append deterministic hold assessment (AI cannot overwrite)
-      parsed.holdManagement = holdAssessment;
-      parsed.overallScore = applyHoldAssessmentToOverallScore(
-        parsed.overallScore,
-        holdAssessment,
-      );
-      
-      const assessment = parsed;
+      const assessment = parseVoiceQualityAssessment({
+        ...parsed,
+        holdManagement: holdAssessment,
+        overallScore: applyHoldAssessmentToOverallScore(
+          parsed.overallScore,
+          holdAssessment,
+        ),
+      });
+      if (!assessment) {
+        throw new Error("Invalid assessment after hold normalization");
+      }
 
       // Save to DB
-      await adminClient
+      const { error: updateError } = await adminClient
         .from("telefun_history")
         .update({
           voice_assessment: assessment,
           score: assessment.overallScore,
         })
         .eq("id", sessionId);
+      if (updateError) {
+        console.error("[Telefun] Failed to save assessment:", updateError);
+        return {
+          success: false,
+          error: "Gagal menyimpan hasil penilaian suara.",
+        };
+      }
 
       return { success: true, assessment };
     } catch (err) {

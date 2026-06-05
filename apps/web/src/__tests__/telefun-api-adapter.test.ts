@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { getTelefunSettings, saveTelefunSettings, mapTelefunSessionRow } from "../routes/telefun/telefunApi";
+import {
+  getTelefunSettings,
+  saveTelefunSettings,
+  mapTelefunSessionRow,
+} from "../routes/telefun/telefunApi";
+import type { TelefunSessionRow } from "../routes/telefun/telefunApi";
 
 vi.mock("../hooks/useApi", () => ({
   getApi: vi.fn().mockResolvedValue({ success: true, selectedModel: "gemini" }),
@@ -18,7 +23,7 @@ describe("Telefun API Adapter", () => {
   });
 
   it("maps session rows to CallRecord correctly with canonical score", () => {
-    const row = {
+    const row: TelefunSessionRow = {
       id: "session-1",
       created_at: "2026-05-30T10:00:00Z",
       recording_path: "path/to/rec.webm",
@@ -27,17 +32,37 @@ describe("Telefun API Adapter", () => {
       duration_seconds: 120,
       score: 8,
     };
-    const record = mapTelefunSessionRow(row as any);
+    const record = mapTelefunSessionRow(row);
     expect(record.id).toBe("session-1");
     expect(record.score).toBe(8);
   });
 
   it("sets voiceAssessment to null when invalid in row", () => {
-    const row = {
+    const row: TelefunSessionRow = {
       id: "session-invalid",
       voice_assessment: { overallScore: 8 }, // Incomplete
     };
-    const record = mapTelefunSessionRow(row as any);
+    const record = mapTelefunSessionRow(row);
     expect(record.voiceAssessment).toBeNull();
+  });
+
+  it("preserves score zero instead of falling back to dashboard score", () => {
+    const row: TelefunSessionRow = {
+      id: "session-zero",
+      score: 0,
+      voice_dashboard_metrics: { score: 8 },
+    };
+
+    expect(mapTelefunSessionRow(row).score).toBe(0);
+  });
+
+  it("uses dashboard score only when the canonical row score is absent", () => {
+    const row: TelefunSessionRow = {
+      id: "session-dashboard",
+      score: null,
+      voice_dashboard_metrics: { score: 7 },
+    };
+
+    expect(mapTelefunSessionRow(row).score).toBe(7);
   });
 });

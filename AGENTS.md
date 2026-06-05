@@ -314,6 +314,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 183. **KTP Manual Input Storage Bucket Fix** — Memperbaiki kegagalan CRUD KTP saat role `trainer` menambahkan peserta manual dengan foto. Root cause: mismatch kontrak storage bucket antara frontend (`profiler-assets`), backend (`foto-avatar`), dan docs (`profiler-foto`). Fix: canonical helper frontend (`profilerPhotoStorage.ts`) dan backend (`profiler-photo-storage.ts`) dengan bucket `profiler-foto`, terminal migration storage policy, route contract test untuk trainer create. 6 new files, 4 modified files, 40 tests passing. (DONE)
 184. **Telefun AI Assessment Radar Consistency** — Pemisahan dan normalisasi kualitas skor (0-10), displayScore (0-100), raw value, dan target QA (Speaking Rate 70, Intonation 80, Articulation 90, Fillers 20, Tone 85) untuk data assessment AI Telefun. Memperkenalkan reusable component `VoiceMetricCards.tsx`, memperbarui `VoiceRadarChart.tsx` dan `CommunicationProfileZoomModal.tsx` dengan visual copy target-distance. Rebuild profil stale/invalid secara otomatis di backend (`enrichAssessmentWithCommunicationProfile`) dan frontend (`getCommunicationProfileFromAssessment`). 8 files modified, 41 API + 44 web regression tests passing. (DONE)
 185. **Monitoring History Delete Atomicity** — Refactored monitoring history delete from manual multi-table orchestration in `routes/ai.ts` into a transactional PostgreSQL RPC `delete_monitoring_history` with SECURITY DEFINER. New typed service `monitoring-history-delete-service.ts` with domain error mapping (NOT_FOUND/DELETE_FAILED). Route validation with Zod enum+UUID schemas and human-friendly error responses. Terminal migration `20260605100000_atomic_monitoring_history_delete.sql`. 3 test files covering migration contract, service unit tests, and route integration tests. 29 tests passing across 5 test files, 626 API tests passing overall. (DONE)
+186. **Telefun Metrics Trust Boundary** — Memusatkan validasi assessment dan score Telefun di `@trainers/types`. Schema dan parser kanonik untuk assessment, hold, communication profile, dan score result. Menolak payload inti tidak lengkap dan angka non-finite. Menetapkan score Telefun `0..10`, mempertahankan nilai `0`. Memvalidasi cache dan output Gemini sebelum digunakan atau disimpan. Persistence assessment fail-closed ketika update Supabase gagal. Menghapus compatibility normalizer frontend yang mengubah payload invalid jadi skor nol. Mengetik dependency finalizer dan transport row tanpa `any`. 17 files modified, 639 API + 623 web tests passing. (DONE)
 
 ## Key Files Changed (Phase 58 — 118)
 
@@ -820,6 +821,19 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `supabase/migrations/20260605100000_atomic_monitoring_history_delete.sql` — **NEW Phase 185**: Terminal migration creating `delete_monitoring_history` RPC with SECURITY DEFINER, auth guard, module dispatch, and privilege restrictions.
 - `docs/rebuild-logs/phase-thermo-monitoring-delete-atomicity.md` — **NEW Phase 185**: Documentation for monitoring history delete atomicity.
 - `docs/MONITORING_TOKEN_USAGE_BILLING.md` — **Phase 185**: Added "Penghapusan Riwayat (Atomic Delete)" section; updated Access Matrix.
+
+- `packages/types/src/telefun-assessment.ts` — **Phase 186**: Canonical schemas dengan hold `.optional()`, `VoiceQualityAssessment`/`TelefunScoreResult` dengan Omit, `parseVoiceQualityAssessment()` memvalidasi communicationProfile via schema, menghilangkan blind cast
+- `packages/types/src/telefun-communication-profile.ts` — **Phase 186**: `enrichAssessmentWithCommunicationProfile()` validasi metric key exact match via `hasCanonicalMetricSet`, mengganti `length===5`
+- `packages/types/src/telefun.ts` — **Phase 186**: Replaced manual named type re-exports dengan `export * from "./telefun-assessment"`
+- `packages/types/src/index.ts` — **Phase 186**: Removed duplicate `TelefunCommunicationProfile` re-export (from telefun.ts wildcard)
+- `apps/api/src/lib/telefun-analysis.ts` — **Phase 186**: `analyzeVoiceQuality` revalidates assessment via `parseVoiceQualityAssessment` setelah hold normalization; fail-closed pada DB update failure
+- `apps/web/src/routes/telefun/telefunApi.ts` — **Phase 186**: Removed blind score/assessment casts, menggunakan typed parsers
+- `apps/web/src/routes/telefun/sessionFinalizer.ts` — **Phase 186**: Removed `any` types dari transport row, typed dengan `TelefunHistory`
+- `apps/web/src/lib/voiceAssessmentUtils.ts` — **Phase 186**: Removed compatibility normalizer yang mengubah payload invalid menjadi object skor nol
+- `apps/web/src/routes/telefun/components/VoiceAssessmentSection.tsx` — **Phase 186**: Removed score normalizer import, menggunakan raw assessment
+- `apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx` — **Phase 186**: Removed score normalizer import
+- `docs/TELEFUN_ASSESSMENT_CONTRACT.md` — **NEW Phase 186**: Kontrak penilaian Telefun — trust boundary, skala nilai, parser kanonik, hold management, persistence
+- `docs/rebuild-logs/phase-thermo-telefun-metrics-trust-boundary.md` — **NEW Phase 186**: Rebuild log untuk Telefun Metrics Trust Boundary
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |

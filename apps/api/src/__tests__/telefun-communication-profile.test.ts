@@ -527,6 +527,31 @@ describe("enrichAssessmentWithCommunicationProfile", () => {
     expect(sr.feedback).toBe("Tempo stabil.");
   });
 
+  it("rebuilds a profile when canonical metric keys are duplicated", () => {
+    const assessment = makeLegacyAssessment();
+    const existing = buildCommunicationProfileFromAssessment(assessment);
+    expect(existing).not.toBeNull();
+
+    const duplicatedMetric = existing!.metrics[0];
+    const enriched = enrichAssessmentWithCommunicationProfile({
+      ...assessment,
+      communicationProfile: {
+        ...existing!,
+        metrics: Array.from({ length: 5 }, () => duplicatedMetric),
+      },
+    });
+
+    expect(
+      enriched.communicationProfile?.metrics.map((metric) => metric.key),
+    ).toEqual([
+      "speakingRate",
+      "intonation",
+      "articulation",
+      "fillers",
+      "tone",
+    ]);
+  });
+
   it("does not mutate original assessment", () => {
     const assessment = makeLegacyAssessment();
     const enriched = enrichAssessmentWithCommunicationProfile(assessment);

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   validateAssessment,
-  normalizeTelefunScoreResponse,
   getCommunicationProfileFromAssessment,
+  parseTelefunScoreResult,
 } from "../lib/voiceAssessmentUtils";
 import type { TelefunHoldAssessment } from "@trainers/types";
 
@@ -59,15 +59,21 @@ describe("validateAssessment", () => {
   });
 
   it("rejects invalid numeric values", () => {
-    expect(validateAssessment({ ...valid, overallScore: Number.NaN })).toBeNull();
-    expect(validateAssessment({ 
-      ...valid, 
-      speakingRate: { ...valid.speakingRate, wordsPerMinute: -1 } 
-    })).toBeNull();
-    expect(validateAssessment({ 
-      ...valid, 
-      fillerWords: { ...valid.fillerWords, count: 1.5 } 
-    })).toBeNull();
+    expect(
+      validateAssessment({ ...valid, overallScore: Number.NaN }),
+    ).toBeNull();
+    expect(
+      validateAssessment({
+        ...valid,
+        speakingRate: { ...valid.speakingRate, wordsPerMinute: -1 },
+      }),
+    ).toBeNull();
+    expect(
+      validateAssessment({
+        ...valid,
+        fillerWords: { ...valid.fillerWords, count: 1.5 },
+      }),
+    ).toBeNull();
   });
 
   it("clamps overallScore to 0-10", () => {
@@ -89,7 +95,7 @@ describe("validateAssessment", () => {
       highlights: ["Good", 123, "Bad", null, "OK", "Extra"],
     });
     expect(result!.highlights).toEqual(["Good", "Bad", "OK", "Extra"]);
-    
+
     const resultLong = validateAssessment({
       ...valid,
       highlights: ["1", "2", "3", "4", "5", "6", "7"],
@@ -98,7 +104,7 @@ describe("validateAssessment", () => {
   });
 });
 
-describe("normalizeTelefunScoreResponse", () => {
+describe("parseTelefunScoreResult", () => {
   it("unwraps { score, feedback, assessment } envelope", () => {
     const envelope = {
       score: 8,
@@ -106,36 +112,30 @@ describe("normalizeTelefunScoreResponse", () => {
       assessment: { ...valid, overallScore: 8 },
     };
 
-    const result = normalizeTelefunScoreResponse(envelope);
-    expect(result.score).toBe(8);
-    expect(result.feedback).toBe("Bagus");
-    expect(result.assessment).not.toBeNull();
-    expect(result.assessment!.overallScore).toBe(8);
+    const result = parseTelefunScoreResult(envelope);
+    expect(result?.score).toBe(8);
+    expect(result?.feedback).toBe("Bagus");
+    expect(result?.assessment.overallScore).toBe(8);
   });
 
   it("rejects invalid scale or mismatch", () => {
-    // Current normalizeTelefunScoreResponse might be permissive, 
-    // but the new one must be strict.
     const invalidScale = {
       score: 85, // Scale 100
       feedback: "Bagus",
       assessment: { ...valid, overallScore: 8 },
     };
-    expect(normalizeTelefunScoreResponse(invalidScale).assessment).toBeNull();
+    expect(parseTelefunScoreResult(invalidScale)).toBeNull();
 
     const mismatch = {
       score: 8,
       feedback: "Bagus",
       assessment: { ...valid, overallScore: 7 },
     };
-    expect(normalizeTelefunScoreResponse(mismatch).assessment).toBeNull();
+    expect(parseTelefunScoreResult(mismatch)).toBeNull();
   });
 
-  it("returns safe error object for invalid input", () => {
-    const result = normalizeTelefunScoreResponse(null);
-    expect(result.score).toBe(0);
-    expect(result.feedback).toBe("");
-    expect(result.assessment).toBeNull();
+  it("returns null for invalid input", () => {
+    expect(parseTelefunScoreResult(null)).toBeNull();
   });
 });
 

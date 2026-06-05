@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { getApi } from "../../../hooks/useApi";
 import { getScoreGrade } from "../utils/formatting";
-import type { VoiceQualityAssessment } from "@trainers/types";
 import {
   validateAssessment,
   getCommunicationProfileFromAssessment,

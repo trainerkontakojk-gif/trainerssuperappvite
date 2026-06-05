@@ -3,8 +3,20 @@ import { postApi, patchApi } from "../../hooks/useApi";
 import { buildTelefunRecordingPath } from "./recordingPath";
 import type { CallRecord } from "./types";
 import type { TelefunAppSettings } from "./telefunSettings";
-import type { SessionMetrics, TelefunScoreResult, VoiceQualityAssessment } from "@trainers/types";
+import type {
+  SessionMetrics,
+  TelefunScoreResult,
+  VoiceQualityAssessment,
+} from "@trainers/types";
 import { parseTelefunScoreResult } from "@trainers/types";
+
+interface TelefunSessionPatch {
+  status?: "completed";
+  duration_seconds?: number;
+  session_metrics?: SessionMetrics;
+  score?: number;
+  feedback?: string;
+}
 
 export interface FinalizerDependencies {
   getUserId: () => Promise<string | undefined>;
@@ -13,15 +25,13 @@ export interface FinalizerDependencies {
     blob: Blob;
     type: "full_call" | "agent_only";
   }) => Promise<string | undefined>;
-  patchSession: (sessionId: string, body: any) => Promise<void>;
+  patchSession: (sessionId: string, body: TelefunSessionPatch) => Promise<void>;
   finalizeRecording: (params: {
     sessionId: string;
     recordingPath?: string;
     agentRecordingPath?: string;
   }) => Promise<void>;
-  scoreSession: (
-    sessionId: string,
-  ) => Promise<TelefunScoreResult | null>;
+  scoreSession: (sessionId: string) => Promise<TelefunScoreResult>;
 }
 
 const defaultDependencies: FinalizerDependencies = {
@@ -46,7 +56,11 @@ const defaultDependencies: FinalizerDependencies = {
   },
   scoreSession: async (sessionId) => {
     const response = await postApi<unknown>(`/telefun/score/${sessionId}`, {});
-    return parseTelefunScoreResult(response);
+    const result = parseTelefunScoreResult(response);
+    if (!result) {
+      throw new Error("Format hasil penilaian Telefun tidak valid.");
+    }
+    return result;
   },
 };
 
@@ -177,19 +191,15 @@ export async function finalizeTelefunSession(params: {
   }
 
   // 6. Call scoreSession only after agent recording path is persisted in DB
-  let score = 0;
+  let score: number | undefined;
   let feedback = "";
-  let voiceAssessment: VoiceQualityAssessment | undefined = undefined;
+  let voiceAssessment: VoiceQualityAssessment | undefined;
   if (agentRecordingPath) {
     try {
       const scoring = await deps.scoreSession(params.sessionId);
-      if (scoring) {
-        score = scoring.score;
-        feedback = scoring.feedback;
-        voiceAssessment = scoring.assessment;
-      } else {
-        markScoringFailed(status);
-      }
+      score = scoring.score;
+      feedback = scoring.feedback;
+      voiceAssessment = scoring.assessment;
     } catch (err) {
       console.error("Scoring failed:", err);
       markScoringFailed(status);
@@ -199,7 +209,7 @@ export async function finalizeTelefunSession(params: {
   }
 
   // 7. Patch score and feedback if scoring succeeds
-  if (!status.scoringFailed && voiceAssessment) {
+  if (!status.scoringFailed && score !== undefined) {
     try {
       await deps.patchSession(params.sessionId, {
         score,
@@ -220,7 +230,7 @@ export async function finalizeTelefunSession(params: {
     duration: params.duration,
     recordingPath,
     agentRecordingPath,
-    score,
+    score: score ?? 0,
     feedback,
     voiceAssessment,
     sessionMetrics: params.metrics,

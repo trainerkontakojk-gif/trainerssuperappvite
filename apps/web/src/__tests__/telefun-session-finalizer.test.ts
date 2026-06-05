@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { finalizeTelefunSession } from "../routes/telefun/sessionFinalizer";
-import type { SessionMetrics } from "@trainers/types";
+import type {
+  SessionMetrics,
+  TelefunScoreResult,
+  VoiceQualityAssessment,
+} from "@trainers/types";
 
 function baseMetrics(): SessionMetrics {
   return {
@@ -17,7 +21,7 @@ function baseMetrics(): SessionMetrics {
 }
 
 describe("Telefun Session Finalizer", () => {
-  const mockAssessment = {
+  const mockAssessment: VoiceQualityAssessment = {
     overallScore: 8,
     speakingRate: {
       score: 7,
@@ -73,10 +77,10 @@ describe("Telefun Session Finalizer", () => {
         }),
         scoreSession: vi.fn(async () => {
           calls.push("score");
-          return { 
-            score: 8, 
-            feedback: "Bagus", 
-            assessment: { ...mockAssessment, overallScore: 8 } 
+          return {
+            score: 8,
+            feedback: "Bagus",
+            assessment: { ...mockAssessment, overallScore: 8 },
           };
         }),
       },
@@ -117,10 +121,10 @@ describe("Telefun Session Finalizer", () => {
         }),
         finalizeRecording: vi.fn(async () => {}),
         scoreSession: vi.fn(async () => {
-          return { 
-            score: 9, 
-            feedback: "Bagus", 
-            assessment: { ...mockAssessment, overallScore: 9 } 
+          return {
+            score: 9,
+            feedback: "Bagus",
+            assessment: { ...mockAssessment, overallScore: 9 },
           };
         }),
       },
@@ -152,16 +156,43 @@ describe("Telefun Session Finalizer", () => {
         }),
         finalizeRecording: vi.fn(async () => {}),
         scoreSession: vi.fn(async () => {
-          return { 
-            score: 0, 
-            feedback: "Kurang", 
-            assessment: { ...mockAssessment, overallScore: 0 } 
+          return {
+            score: 0,
+            feedback: "Kurang",
+            assessment: { ...mockAssessment, overallScore: 0 },
           };
         }),
       },
     });
 
     expect(calls).toContain("patch:score:0");
+    expect(result.record.score).toBe(0);
+  });
+
+  it("marks scoringFailed when the score boundary rejects a response", async () => {
+    const result = await finalizeTelefunSession({
+      sessionId: "session-invalid-score",
+      fullBlob: null,
+      agentBlob: new Blob(["agent"]),
+      duration: 15,
+      metrics: baseMetrics(),
+      localUrl: null,
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "path"),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async (): Promise<TelefunScoreResult> => {
+          throw new Error("Format hasil penilaian Telefun tidak valid.");
+        }),
+      },
+    });
+
+    expect(result.scoringFailed).toBe(true);
+    expect(result.record.voiceAssessment).toBeUndefined();
     expect(result.record.score).toBe(0);
   });
 
@@ -183,7 +214,9 @@ describe("Telefun Session Finalizer", () => {
         }),
         patchSession: vi.fn(async () => {}),
         finalizeRecording: vi.fn(async () => {}),
-        scoreSession: vi.fn(async () => ({ score: 0, feedback: "" })),
+        scoreSession: vi.fn(async (): Promise<TelefunScoreResult> => {
+          throw new Error("score should not run");
+        }),
       },
     });
 
@@ -212,7 +245,9 @@ describe("Telefun Session Finalizer", () => {
           throw new Error("patch failed");
         }),
         finalizeRecording: vi.fn(async () => {}),
-        scoreSession: vi.fn(async () => ({ score: 0, feedback: "" })),
+        scoreSession: vi.fn(async (): Promise<TelefunScoreResult> => {
+          throw new Error("score should not run");
+        }),
       },
     });
 
@@ -240,7 +275,7 @@ describe("Telefun Session Finalizer", () => {
           calls.push(`upload:${type}`);
           return `path`;
         }),
-        patchSession: vi.fn(async (_id: string, body: any) => {
+        patchSession: vi.fn(async (_id, body) => {
           if (body.session_metrics) calls.push("patch:metrics");
           else calls.push("patch:score");
         }),
@@ -249,7 +284,11 @@ describe("Telefun Session Finalizer", () => {
         }),
         scoreSession: vi.fn(async () => {
           calls.push("score");
-          return { score: 85, feedback: "Baik" };
+          return {
+            score: 8,
+            feedback: "Baik",
+            assessment: mockAssessment,
+          };
         }),
       },
     });
@@ -262,7 +301,10 @@ describe("Telefun Session Finalizer", () => {
   });
 
   it("retains hold metrics in patch even when scoring fails (no agent recording)", async () => {
-    const capturedBodies: any[] = [];
+    const capturedBodies: Array<{
+      session_metrics?: SessionMetrics;
+      score?: number;
+    }> = [];
 
     await finalizeTelefunSession({
       sessionId: "session-hold-retain",
@@ -296,18 +338,20 @@ describe("Telefun Session Finalizer", () => {
       dependencies: {
         getUserId: vi.fn(async () => "user-1"),
         uploadRecording: vi.fn(async () => undefined),
-        patchSession: vi.fn(async (_id: string, body: any) => {
+        patchSession: vi.fn(async (_id, body) => {
           capturedBodies.push(body);
         }),
         finalizeRecording: vi.fn(async () => {}),
-        scoreSession: vi.fn(async () => ({ score: 0, feedback: "" })),
+        scoreSession: vi.fn(async (): Promise<TelefunScoreResult> => {
+          throw new Error("score should not run");
+        }),
       },
     });
 
     expect(capturedBodies.length).toBeGreaterThanOrEqual(1);
-    const metricsPatch = capturedBodies.find((b: any) => b.session_metrics);
+    const metricsPatch = capturedBodies.find((body) => body.session_metrics);
     expect(metricsPatch).toBeDefined();
-    expect(metricsPatch.session_metrics.hold).toBeDefined();
-    expect(metricsPatch.session_metrics.hold.count).toBe(1);
+    expect(metricsPatch?.session_metrics?.hold).toBeDefined();
+    expect(metricsPatch?.session_metrics?.hold?.count).toBe(1);
   });
 });

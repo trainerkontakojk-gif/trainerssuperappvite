@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-// @ts-ignore - shared parser might not be exported yet
-import { 
-  parseVoiceQualityAssessment, 
-  parseTelefunScoreResult 
+import {
+  parseTelefunScoreResult,
+  parseVoiceQualityAssessment,
 } from "@trainers/types";
 
 const validAssessment = {
@@ -91,11 +90,13 @@ describe("parseTelefunScoreResult", () => {
   it("rejects invalid envelope", () => {
     expect(parseTelefunScoreResult(null)).toBeNull();
     expect(parseTelefunScoreResult(validAssessment)).toBeNull();
-    expect(parseTelefunScoreResult({
-      score: 88,
-      feedback: "invalid scale",
-      assessment: validAssessment,
-    })).toBeNull();
+    expect(
+      parseTelefunScoreResult({
+        score: 88,
+        feedback: "invalid scale",
+        assessment: validAssessment,
+      }),
+    ).toBeNull();
   });
 
   it("accepts valid result with score 0", () => {

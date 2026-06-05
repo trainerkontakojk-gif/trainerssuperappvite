@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue } from "./common";
+import type { VoiceQualityAssessment } from "./telefun-assessment";
 
 export interface SpeechSegment {
   startMs: number;
@@ -46,17 +47,7 @@ export interface SessionMetrics {
   hold?: TelefunHoldMetrics;
 }
 
-export type {
-  VoiceAspectScore,
-  TelefunHoldAssessment,
-  TelefunScoreResult,
-  VoiceQualityAssessment,
-  TelefunVoiceMetricKey,
-  TelefunMetricStatus,
-  CommunicationMetricMode,
-  CommunicationMetric,
-  TelefunCommunicationProfile,
-} from "./telefun-assessment";
+export * from "./telefun-assessment";
 
 export interface TelefunHistory {
   id: string;

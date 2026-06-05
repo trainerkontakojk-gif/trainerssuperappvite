@@ -370,10 +370,18 @@ export function enrichAssessmentWithCommunicationProfile(
   assessment: VoiceQualityAssessment,
 ): VoiceQualityAssessment {
   const profile = assessment.communicationProfile;
+  const expectedMetricKeys = Object.keys(
+    BENCHMARK_DEFAULTS,
+  ) as CommunicationMetric["key"][];
+  const profileMetricKeys = profile?.metrics.map((metric) => metric.key) ?? [];
+  const hasCanonicalMetricSet =
+    profileMetricKeys.length === expectedMetricKeys.length &&
+    new Set(profileMetricKeys).size === expectedMetricKeys.length &&
+    expectedMetricKeys.every((key) => profileMetricKeys.includes(key));
   const isValid =
     profile &&
     Array.isArray(profile.metrics) &&
-    profile.metrics.length === 5 &&
+    hasCanonicalMetricSet &&
     profile.metrics.every(
       (m) =>
         BENCHMARK_DEFAULTS[m.key]?.benchmarkValue === m.targetScore &&

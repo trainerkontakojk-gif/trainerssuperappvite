@@ -6,10 +6,12 @@ const mockState: {
   row: Record<string, any> | null;
   geminiResponse: any;
   updates: Array<Record<string, unknown>>;
+  updateError: Error | null;
 } = {
   row: null,
   geminiResponse: null,
   updates: [],
+  updateError: null,
 };
 
 vi.mock("../lib/supabase", () => ({
@@ -28,7 +30,7 @@ vi.mock("../lib/supabase", () => ({
       update: vi.fn((payload: Record<string, unknown>) => ({
         eq: vi.fn(() => {
           mockState.updates.push(payload);
-          return Promise.resolve({ error: null });
+          return Promise.resolve({ error: mockState.updateError });
         }),
       })),
     })),
@@ -103,6 +105,7 @@ describe("Telefun analysis with hold assessment", () => {
     mockState.row = { ...BASE_ROW };
     mockState.geminiResponse = null;
     mockState.updates = [];
+    mockState.updateError = null;
   });
 
   it("rejects invalid cached assessment and continues to analysis", async () => {
@@ -145,6 +148,19 @@ describe("Telefun analysis with hold assessment", () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe("Format hasil analisis tidak valid.");
     expect(mockState.updates).toHaveLength(0);
+  });
+
+  it("fails closed when a generated assessment cannot be persisted", async () => {
+    mockState.row = BASE_ROW;
+    mockState.geminiResponse = DEFAULT_AI_RESPONSE;
+    mockState.updateError = new Error("database unavailable");
+
+    const result = await analyzeVoiceQuality("s1", "u1");
+
+    expect(result).toEqual({
+      success: false,
+      error: "Gagal menyimpan hasil penilaian suara.",
+    });
   });
 
   it("returns N/A hold when no hold metrics exist", async () => {
@@ -219,5 +235,21 @@ describe("Telefun analysis with hold assessment", () => {
         }),
       }),
     );
+  });
+
+  it("fails closed when cached hold synchronization cannot be persisted", async () => {
+    const cached: VoiceQualityAssessment = JSON.parse(DEFAULT_AI_RESPONSE.text);
+    mockState.row = {
+      ...BASE_ROW,
+      voice_assessment: cached,
+    };
+    mockState.updateError = new Error("database unavailable");
+
+    const result = await analyzeVoiceQuality("s1", "u1");
+
+    expect(result).toEqual({
+      success: false,
+      error: "Gagal menyimpan hasil penilaian suara.",
+    });
   });
 });
