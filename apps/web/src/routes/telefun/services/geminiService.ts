@@ -3,6 +3,15 @@ import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
 import { updateInterruptionGuard, InterruptionGuardState } from "./guards";
 import {
+  createHoldTrackerState,
+  startHold,
+  endHold,
+  finalizeActiveHold,
+  getActiveHoldSnapshot,
+  summarizeHoldMetrics,
+  type HoldTrackerState,
+} from "./holdMetrics";
+import {
   normalizeTelefunWebSocketUrl,
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
@@ -106,6 +115,7 @@ export class LiveSession {
   private volumeSamples: number[] = [];
   private interruptionCount: number = 0;
   private deadAirCount: number = 0;
+  private holdTracker: HoldTrackerState = createHoldTrackerState();
 
   constructor(private config: TelefunAppSettings) {}
 
@@ -635,8 +645,15 @@ export class LiveSession {
   }
 
   public setHold(held: boolean) {
-    this.isHeld = held;
-    this.emitTimelineEvent("hold_state_changed", { held });
+    const relativeNow = Math.max(0, Date.now() - this.sessionStartTime);
+    this.holdTracker = held
+      ? startHold(this.holdTracker, relativeNow)
+      : endHold(this.holdTracker, relativeNow);
+    this.isHeld = this.holdTracker.active !== null;
+    this.emitTimelineEvent("hold_state_changed", {
+      held: this.isHeld,
+      ...getActiveHoldSnapshot(this.holdTracker, relativeNow),
+    });
   }
 
   private setIsAiSpeaking(speaking: boolean) {
@@ -701,18 +718,10 @@ export class LiveSession {
     }, 500);
   }
 
-  private emitRecording() {
-    const fullBlob =
-      this.recordedChunks.length > 0
-        ? new Blob(this.recordedChunks, { type: "audio/webm" })
-        : null;
-    const agentBlob =
-      this.agentRecordedChunks.length > 0
-        ? new Blob(this.agentRecordedChunks, { type: "audio/webm" })
-        : null;
-    const url = fullBlob ? URL.createObjectURL(fullBlob) : null;
-
-    const metrics: SessionMetrics = {
+  private buildSessionMetrics(): SessionMetrics {
+    const sessionEndMs = Math.max(0, Date.now() - this.sessionStartTime);
+    this.holdTracker = finalizeActiveHold(this.holdTracker, sessionEndMs);
+    return {
       speechSegments: this.speechSegments,
       totalSpeakingMs: this.totalSpeakingMs,
       totalSilenceMs: Math.max(
@@ -725,8 +734,22 @@ export class LiveSession {
       volumeConsistency: this.calculateVolumeConsistency(),
       inputTranscriptionChunks: [],
       sessionDurationMs: Date.now() - this.sessionStartTime,
+      hold: summarizeHoldMetrics(this.holdTracker),
     };
+  }
 
+  private emitRecording() {
+    const fullBlob =
+      this.recordedChunks.length > 0
+        ? new Blob(this.recordedChunks, { type: "audio/webm" })
+        : null;
+    const agentBlob =
+      this.agentRecordedChunks.length > 0
+        ? new Blob(this.agentRecordedChunks, { type: "audio/webm" })
+        : null;
+    const url = fullBlob ? URL.createObjectURL(fullBlob) : null;
+
+    const metrics = this.buildSessionMetrics();
     this.onRecordingComplete(url, fullBlob, agentBlob, metrics);
   }
 

@@ -2,11 +2,9 @@ import type {
   VoiceQualityAssessment,
   VoiceAspectScore,
   TelefunCommunicationProfile,
+  TelefunHoldAssessment,
 } from "@trainers/types";
-import {
-  buildCommunicationProfileFromAssessment,
-  enrichAssessmentWithCommunicationProfile,
-} from "@trainers/types";
+import { enrichAssessmentWithCommunicationProfile } from "@trainers/types";
 
 function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val));
@@ -14,6 +12,19 @@ function clamp(val: number, min: number, max: number): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function createNotUsedHoldAssessment(): TelefunHoldAssessment {
+  return {
+    status: "not_used",
+    score: null,
+    verdict: "N/A",
+    feedback: "User tidak menggunakan hold pada sesi ini.",
+    holdCount: 0,
+    totalDurationMs: 0,
+    longestDurationMs: 0,
+    exceededCount: 0,
+  };
 }
 
 function validateAspectScore(
@@ -30,6 +41,38 @@ function validateAspectScore(
       typeof safeData.feedback === "string"
         ? safeData.feedback
         : "No feedback provided.",
+  };
+}
+
+function validateHoldAssessment(data: unknown): TelefunHoldAssessment | null {
+  if (!isRecord(data)) return null;
+  const status = data.status as string;
+  if (!["not_used", "within_limit", "exceeded"].includes(status)) return null;
+
+  const score =
+    typeof data.score === "number" ? clamp(data.score, 0, 10) : null;
+  const verdict = data.verdict as string;
+  if (!["N/A", "Baik", "Kurang"].includes(verdict)) return null;
+
+  return {
+    status: status as TelefunHoldAssessment["status"],
+    score,
+    verdict: verdict as TelefunHoldAssessment["verdict"],
+    feedback: typeof data.feedback === "string" ? data.feedback : "",
+    holdCount:
+      typeof data.holdCount === "number" ? Math.max(0, data.holdCount) : 0,
+    totalDurationMs:
+      typeof data.totalDurationMs === "number"
+        ? Math.max(0, data.totalDurationMs)
+        : 0,
+    longestDurationMs:
+      typeof data.longestDurationMs === "number"
+        ? Math.max(0, data.longestDurationMs)
+        : 0,
+    exceededCount:
+      typeof data.exceededCount === "number"
+        ? Math.max(0, data.exceededCount)
+        : 0,
   };
 }
 
@@ -95,6 +138,9 @@ export function validateAssessment(
           .slice(0, 5)
       : [],
     communicationProfile,
+    holdManagement:
+      validateHoldAssessment(data.holdManagement) ??
+      createNotUsedHoldAssessment(),
   };
 }
 

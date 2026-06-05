@@ -1,5 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { finalizeTelefunSession } from "../routes/telefun/sessionFinalizer";
+import type { SessionMetrics } from "@trainers/types";
+
+function baseMetrics(): SessionMetrics {
+  return {
+    speechSegments: [],
+    totalSpeakingMs: 0,
+    totalSilenceMs: 0,
+    deadAirCount: 0,
+    interruptionCount: 0,
+    volumeSamples: [],
+    volumeConsistency: 0,
+    inputTranscriptionChunks: [],
+    sessionDurationMs: 12000,
+  };
+}
 
 describe("Telefun Session Finalizer", () => {
   it("uploads and finalizes recording before scoring", async () => {
@@ -10,17 +25,7 @@ describe("Telefun Session Finalizer", () => {
       fullBlob: new Blob(["full"]),
       agentBlob: new Blob(["agent"]),
       duration: 12,
-      metrics: {
-        speechSegments: [],
-        totalSpeakingMs: 0,
-        totalSilenceMs: 0,
-        deadAirCount: 0,
-        interruptionCount: 0,
-        volumeSamples: [],
-        volumeConsistency: 0,
-        inputTranscriptionChunks: [],
-        sessionDurationMs: 12000,
-      },
+      metrics: baseMetrics(),
       localUrl: "blob:local",
       sessionConfig: null,
       scenarioTitle: "Skenario",
@@ -44,7 +49,14 @@ describe("Telefun Session Finalizer", () => {
       },
     });
 
-    expect(calls).toEqual(["upload:full_call", "upload:agent_only", "patch", "finalize", "score", "patch"]);
+    expect(calls).toEqual([
+      "upload:full_call",
+      "upload:agent_only",
+      "patch",
+      "finalize",
+      "score",
+      "patch",
+    ]);
     expect(result.record.score).toBe(88);
     expect(result.record.feedback).toBe("Bagus");
   });
@@ -53,11 +65,27 @@ describe("Telefun Session Finalizer", () => {
     const calls: string[] = [];
     const mockAssessment = {
       overallScore: 8,
-      speakingRate: { score: 7, wordsPerMinute: 130, verdict: "Baik", feedback: "Tempo oke" },
+      speakingRate: {
+        score: 7,
+        wordsPerMinute: 130,
+        verdict: "Baik",
+        feedback: "Tempo oke",
+      },
       intonation: { score: 8, verdict: "Baik", feedback: "Intonasi baik" },
       articulation: { score: 9, verdict: "Baik", feedback: "Jelas" },
-      fillerWords: { score: 8, count: 2, examples: ["uh"], verdict: "Baik", feedback: "Minim" },
-      emotionalTone: { score: 7, dominant: "tenang", verdict: "Baik", feedback: "Empati cukup" },
+      fillerWords: {
+        score: 8,
+        count: 2,
+        examples: ["uh"],
+        verdict: "Baik",
+        feedback: "Minim",
+      },
+      emotionalTone: {
+        score: 7,
+        dominant: "tenang",
+        verdict: "Baik",
+        feedback: "Empati cukup",
+      },
       transcript: "Tes",
       highlights: [],
       strengths: [],
@@ -69,17 +97,7 @@ describe("Telefun Session Finalizer", () => {
       fullBlob: null,
       agentBlob: new Blob(["agent"]),
       duration: 15,
-      metrics: {
-        speechSegments: [],
-        totalSpeakingMs: 0,
-        totalSilenceMs: 0,
-        deadAirCount: 0,
-        interruptionCount: 0,
-        volumeSamples: [],
-        volumeConsistency: 0,
-        inputTranscriptionChunks: [],
-        sessionDurationMs: 15000,
-      },
+      metrics: { ...baseMetrics(), sessionDurationMs: 15000 },
       localUrl: "blob:local",
       sessionConfig: null,
       scenarioTitle: "Skenario",
@@ -110,17 +128,7 @@ describe("Telefun Session Finalizer", () => {
       fullBlob: new Blob(["full"]),
       agentBlob: new Blob(["agent"]),
       duration: 20,
-      metrics: {
-        speechSegments: [],
-        totalSpeakingMs: 0,
-        totalSilenceMs: 0,
-        deadAirCount: 0,
-        interruptionCount: 0,
-        volumeSamples: [],
-        volumeConsistency: 0,
-        inputTranscriptionChunks: [],
-        sessionDurationMs: 20000,
-      },
+      metrics: { ...baseMetrics(), sessionDurationMs: 20000 },
       localUrl: "blob:local",
       sessionConfig: null,
       scenarioTitle: "Skenario",
@@ -149,17 +157,7 @@ describe("Telefun Session Finalizer", () => {
       fullBlob: null,
       agentBlob: null,
       duration: 10,
-      metrics: {
-        speechSegments: [],
-        totalSpeakingMs: 0,
-        totalSilenceMs: 0,
-        deadAirCount: 0,
-        interruptionCount: 0,
-        volumeSamples: [],
-        volumeConsistency: 0,
-        inputTranscriptionChunks: [],
-        sessionDurationMs: 10000,
-      },
+      metrics: { ...baseMetrics(), sessionDurationMs: 10000 },
       localUrl: null,
       sessionConfig: null,
       scenarioTitle: "Skenario",
@@ -178,5 +176,95 @@ describe("Telefun Session Finalizer", () => {
     expect(result.saveFailed).toBe(true);
     expect(result.uploadFailed).toBe(false);
     expect(result.scoringFailed).toBe(true);
+  });
+
+  it("patches session metrics before scoring (ordering)", async () => {
+    const calls: string[] = [];
+
+    await finalizeTelefunSession({
+      sessionId: "session-order",
+      fullBlob: null,
+      agentBlob: new Blob(["agent"]),
+      duration: 12,
+      metrics: { ...baseMetrics(), sessionDurationMs: 12000 },
+      localUrl: null,
+      sessionConfig: null,
+      scenarioTitle: "Test",
+      consumerName: "Test",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async ({ type }) => {
+          calls.push(`upload:${type}`);
+          return `path`;
+        }),
+        patchSession: vi.fn(async (_id: string, body: any) => {
+          if (body.session_metrics) calls.push("patch:metrics");
+          else calls.push("patch:score");
+        }),
+        finalizeRecording: vi.fn(async () => {
+          calls.push("finalize");
+        }),
+        scoreSession: vi.fn(async () => {
+          calls.push("score");
+          return { score: 85, feedback: "Baik" };
+        }),
+      },
+    });
+
+    const patchMetricsIdx = calls.indexOf("patch:metrics");
+    const scoreIdx = calls.indexOf("score");
+    expect(patchMetricsIdx).toBeGreaterThan(-1);
+    expect(scoreIdx).toBeGreaterThan(-1);
+    expect(patchMetricsIdx).toBeLessThan(scoreIdx);
+  });
+
+  it("retains hold metrics in patch even when scoring fails (no agent recording)", async () => {
+    const capturedBodies: any[] = [];
+
+    await finalizeTelefunSession({
+      sessionId: "session-hold-retain",
+      fullBlob: null,
+      agentBlob: null,
+      duration: 10,
+      metrics: {
+        ...baseMetrics(),
+        sessionDurationMs: 10000,
+        hold: {
+          count: 1,
+          totalDurationMs: 61_000,
+          longestDurationMs: 61_000,
+          exceededCount: 1,
+          intervals: [
+            {
+              sequence: 1,
+              startedAtMs: 0,
+              endedAtMs: 61_000,
+              durationMs: 61_000,
+              limitMs: 60_000,
+              exceededByMs: 1_000,
+            },
+          ],
+        },
+      },
+      localUrl: null,
+      sessionConfig: null,
+      scenarioTitle: "Test",
+      consumerName: "Test",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => undefined),
+        patchSession: vi.fn(async (_id: string, body: any) => {
+          capturedBodies.push(body);
+        }),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => ({ score: 0, feedback: "" })),
+      },
+    });
+
+    expect(capturedBodies.length).toBeGreaterThanOrEqual(1);
+    const metricsPatch = capturedBodies.find((b: any) => b.session_metrics);
+    expect(metricsPatch).toBeDefined();
+    expect(metricsPatch.session_metrics.hold).toBeDefined();
+    expect(metricsPatch.session_metrics.hold.count).toBe(1);
   });
 });

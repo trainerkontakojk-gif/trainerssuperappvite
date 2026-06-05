@@ -4,6 +4,23 @@ import {
   normalizeTelefunScoreResponse,
   getCommunicationProfileFromAssessment,
 } from "../lib/voiceAssessmentUtils";
+import type { TelefunHoldAssessment } from "@trainers/types";
+
+function makeHoldAssessment(
+  overrides?: Partial<TelefunHoldAssessment>,
+): TelefunHoldAssessment {
+  return {
+    status: "not_used",
+    score: null,
+    verdict: "N/A",
+    feedback: "User tidak menggunakan hold pada sesi ini.",
+    holdCount: 0,
+    totalDurationMs: 0,
+    longestDurationMs: 0,
+    exceededCount: 0,
+    ...overrides,
+  };
+}
 
 const valid = {
   overallScore: 8,
@@ -411,5 +428,72 @@ describe("getCommunicationProfileFromAssessment", () => {
   it("returns null for null/undefined input", () => {
     expect(getCommunicationProfileFromAssessment(null)).toBeNull();
     expect(getCommunicationProfileFromAssessment(undefined)).toBeNull();
+  });
+});
+
+describe("validateAssessment with holdManagement", () => {
+  it("preserves valid holdManagement with N/A", () => {
+    const result = validateAssessment({
+      ...valid,
+      holdManagement: makeHoldAssessment(),
+    });
+    expect(result?.holdManagement?.verdict).toBe("N/A");
+    expect(result?.holdManagement?.score).toBeNull();
+  });
+
+  it("preserves valid holdManagement with Baik", () => {
+    const result = validateAssessment({
+      ...valid,
+      holdManagement: makeHoldAssessment({
+        status: "within_limit",
+        score: 10,
+        verdict: "Baik",
+      }),
+    });
+    expect(result?.holdManagement?.verdict).toBe("Baik");
+    expect(result?.holdManagement?.score).toBe(10);
+  });
+
+  it("normalizes invalid holdManagement status to N/A", () => {
+    const result = validateAssessment({
+      ...valid,
+      holdManagement: { status: "invalid", score: 5, verdict: "Unknown" },
+    });
+    expect(result?.holdManagement).toEqual({
+      status: "not_used",
+      score: null,
+      verdict: "N/A",
+      feedback: "User tidak menggunakan hold pada sesi ini.",
+      holdCount: 0,
+      totalDurationMs: 0,
+      longestDurationMs: 0,
+      exceededCount: 0,
+    });
+  });
+
+  it("clamps hold score to 0-10", () => {
+    const result = validateAssessment({
+      ...valid,
+      holdManagement: makeHoldAssessment({
+        status: "within_limit",
+        score: 15,
+        verdict: "Baik",
+      }),
+    });
+    expect(result?.holdManagement?.score).toBe(10);
+  });
+
+  it("normalizes missing holdManagement to N/A for historical assessments", () => {
+    const result = validateAssessment(valid);
+    expect(result?.holdManagement).toEqual({
+      status: "not_used",
+      score: null,
+      verdict: "N/A",
+      feedback: "User tidak menggunakan hold pada sesi ini.",
+      holdCount: 0,
+      totalDurationMs: 0,
+      longestDurationMs: 0,
+      exceededCount: 0,
+    });
   });
 });

@@ -83,7 +83,7 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
 - **Route**: `/telefun`
 - **Fitur Utama**:
   - **Live Voice Interface**: Panggilan dimulai dari ringtone, izin mikrofon, dan koneksi WebSocket.
-  - **Hold & Mute**: User bisa mute mikrofon dan menahan panggilan.
+  - **Hold & Mute**: User bisa mute mikrofon dan menahan panggilan. Hold memiliki batas layanan (pertama 1 menit, berikutnya 3 menit) yang tidak memutus panggilan. UI menampilkan countdown, peringatan 10 detik terakhir, dan overtime (+MM:SS) setelah batas. Durasi hold dihitung dari timestamp, bukan tick timer. Metrics hold tersimpan di `session_metrics.hold` (intervals, durasi, exceeded count). Penilaian Manajemen Hold: N/A (tidak digunakan), Baik (semua ≤ batas), atau Kurang (ada yang melebihi batas). AI tidak menilai hold — policy aplikasi menentukan hasil secara deterministik.
   - **Recording & History**: Rekaman browser disimpan ke local history dan `telefun_history`.
   - **Voice Assessment**: Analisis otomatis kualitas suara agen.
   - **Realistic Mode**: Mode realistik dengan hold consent, rude hold penalty, dan WPM analysis.

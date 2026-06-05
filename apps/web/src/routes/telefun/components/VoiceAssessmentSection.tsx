@@ -1,8 +1,5 @@
 import React, { useState } from "react";
-import type {
-  VoiceQualityAssessment,
-  TelefunCommunicationProfile,
-} from "@trainers/types";
+import type { VoiceQualityAssessment } from "@trainers/types";
 import {
   CheckCircle2,
   Loader2,
@@ -25,6 +22,7 @@ import {
 import { VoiceRadarChart } from "./VoiceRadarChart";
 import { CommunicationProfileZoomModal } from "./CommunicationProfileZoomModal";
 import { VoiceMetricCards } from "./VoiceMetricCards";
+import { HoldAssessmentCard } from "./HoldAssessmentCard";
 import { postApi } from "../../../hooks/useApi";
 
 interface VoiceAssessmentSectionProps {
@@ -272,6 +270,9 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
       {communicationProfile && (
         <VoiceMetricCards profile={communicationProfile} />
       )}
+
+      {/* Hold Assessment Card */}
+      <HoldAssessmentCard assessment={assessment?.holdManagement} />
 
       {/* Transcript */}
       <div className="rounded-2xl border border-slate-950/10 bg-white p-6 dark:border-white/10 dark:bg-slate-900">

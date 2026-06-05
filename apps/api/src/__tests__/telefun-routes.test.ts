@@ -146,11 +146,35 @@ describe("telefun API payload and security validators", () => {
   it("builds an Indonesian feedback summary from voice assessment sections", () => {
     const summary = buildTelefunFeedbackSummary({
       overallScore: 8,
-      speakingRate: { score: 8, wordsPerMinute: 145, verdict: "Baik", feedback: "Tempo stabil." },
-      intonation: { score: 7, verdict: "Cukup", feedback: "Intonasi perlu lebih hangat." },
-      articulation: { score: 8, verdict: "Baik", feedback: "Artikulasi jelas." },
-      fillerWords: { score: 9, count: 1, examples: ["eee"], verdict: "Baik", feedback: "Kata pengisi minim." },
-      emotionalTone: { score: 7, dominant: "tenang", verdict: "Cukup", feedback: "Empati perlu lebih eksplisit." },
+      speakingRate: {
+        score: 8,
+        wordsPerMinute: 145,
+        verdict: "Baik",
+        feedback: "Tempo stabil.",
+      },
+      intonation: {
+        score: 7,
+        verdict: "Cukup",
+        feedback: "Intonasi perlu lebih hangat.",
+      },
+      articulation: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "Artikulasi jelas.",
+      },
+      fillerWords: {
+        score: 9,
+        count: 1,
+        examples: ["eee"],
+        verdict: "Baik",
+        feedback: "Kata pengisi minim.",
+      },
+      emotionalTone: {
+        score: 7,
+        dominant: "tenang",
+        verdict: "Cukup",
+        feedback: "Empati perlu lebih eksplisit.",
+      },
       transcript: "",
       highlights: [],
       strengths: [],
@@ -164,11 +188,35 @@ describe("telefun API payload and security validators", () => {
   it("builds feedback summary with communicationProfile present (backward compatible)", () => {
     const summary = buildTelefunFeedbackSummary({
       overallScore: 8,
-      speakingRate: { score: 8, wordsPerMinute: 145, verdict: "Baik", feedback: "Tempo stabil." },
-      intonation: { score: 7, verdict: "Cukup", feedback: "Intonasi perlu lebih hangat." },
-      articulation: { score: 8, verdict: "Baik", feedback: "Artikulasi jelas." },
-      fillerWords: { score: 9, count: 1, examples: ["eee"], verdict: "Baik", feedback: "Kata pengisi minim." },
-      emotionalTone: { score: 7, dominant: "tenang", verdict: "Cukup", feedback: "Empati perlu lebih eksplisit." },
+      speakingRate: {
+        score: 8,
+        wordsPerMinute: 145,
+        verdict: "Baik",
+        feedback: "Tempo stabil.",
+      },
+      intonation: {
+        score: 7,
+        verdict: "Cukup",
+        feedback: "Intonasi perlu lebih hangat.",
+      },
+      articulation: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "Artikulasi jelas.",
+      },
+      fillerWords: {
+        score: 9,
+        count: 1,
+        examples: ["eee"],
+        verdict: "Baik",
+        feedback: "Kata pengisi minim.",
+      },
+      emotionalTone: {
+        score: 7,
+        dominant: "tenang",
+        verdict: "Cukup",
+        feedback: "Empati perlu lebih eksplisit.",
+      },
       transcript: "",
       highlights: [],
       strengths: [],
@@ -183,5 +231,55 @@ describe("telefun API payload and security validators", () => {
     expect(summary).toContain("Tempo stabil.");
     expect(summary).toContain("Intonasi perlu lebih hangat.");
     expect(summary).toContain("Artikulasi jelas.");
+  });
+
+  it("includes hold management feedback when hold was used", () => {
+    const summary = buildTelefunFeedbackSummary({
+      overallScore: 8,
+      speakingRate: {
+        score: 8,
+        wordsPerMinute: 145,
+        verdict: "Baik",
+        feedback: "Tempo stabil.",
+      },
+      intonation: {
+        score: 7,
+        verdict: "Cukup",
+        feedback: "Intonasi perlu lebih hangat.",
+      },
+      articulation: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "Artikulasi jelas.",
+      },
+      fillerWords: {
+        score: 9,
+        count: 1,
+        examples: [],
+        verdict: "Baik",
+        feedback: "Kata pengisi minim.",
+      },
+      emotionalTone: {
+        score: 7,
+        dominant: "tenang",
+        verdict: "Cukup",
+        feedback: "Empati baik.",
+      },
+      holdManagement: {
+        status: "exceeded",
+        score: 4,
+        verdict: "Kurang",
+        feedback: "Manajemen hold kurang.",
+        holdCount: 1,
+        totalDurationMs: 61_000,
+        longestDurationMs: 61_000,
+        exceededCount: 1,
+      },
+      transcript: "",
+      highlights: [],
+      strengths: [],
+    });
+
+    expect(summary).toContain("Manajemen hold kurang.");
   });
 });

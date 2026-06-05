@@ -3,6 +3,11 @@ import { generateGeminiContent } from "./gemini";
 import type { VoiceQualityAssessment } from "@trainers/types";
 import { enrichAssessmentWithCommunicationProfile } from "./telefun-communication-profile";
 import { parseJsonFromModelText } from "./ai-json";
+import {
+  normalizeTelefunHoldMetrics,
+  evaluateTelefunHoldAssessment,
+  applyHoldAssessmentToOverallScore,
+} from "./telefun-hold-assessment";
 
 export type { VoiceQualityAssessment };
 
@@ -86,11 +91,11 @@ export async function analyzeVoiceQuality(
 }> {
   const adminClient = createAdminClient();
 
-  // 1. Fetch paths
+  // 1. Fetch paths and session_metrics
   const { data: row, error: fetchError } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, scenario_title, agent_recording_path, voice_assessment",
+      "id, user_id, scenario_title, agent_recording_path, voice_assessment, session_metrics",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -98,12 +103,40 @@ export async function analyzeVoiceQuality(
   if (fetchError || !row) return { success: false, error: "Session not found" };
   if (row.user_id !== userId) return { success: false, error: "Unauthorized" };
 
+  // Compute hold assessment from session_metrics
+  const sessionMetrics =
+    row.session_metrics &&
+    typeof row.session_metrics === "object" &&
+    !Array.isArray(row.session_metrics)
+      ? (row.session_metrics as Record<string, unknown>)
+      : null;
+  const holdMetrics = normalizeTelefunHoldMetrics(sessionMetrics?.hold);
+  const holdAssessment = evaluateTelefunHoldAssessment(holdMetrics);
+
   // 2. Return cached if exists and valid
   if (row.voice_assessment && typeof row.voice_assessment === "object") {
     const cached = row.voice_assessment as VoiceQualityAssessment;
+    let assessment = cached;
+    if (!cached.holdManagement) {
+      assessment = {
+        ...cached,
+        holdManagement: holdAssessment,
+        overallScore: applyHoldAssessmentToOverallScore(
+          cached.overallScore,
+          holdAssessment,
+        ),
+      };
+      await adminClient
+        .from("telefun_history")
+        .update({
+          voice_assessment: assessment,
+          score: assessment.overallScore,
+        })
+        .eq("id", sessionId);
+    }
     return {
       success: true,
-      assessment: enrichAssessmentWithCommunicationProfile(cached),
+      assessment: enrichAssessmentWithCommunicationProfile(assessment),
     };
   }
 
@@ -174,6 +207,12 @@ export async function analyzeVoiceQuality(
       const parsed = parseJsonFromModelText(
         response.text,
       ) as VoiceQualityAssessment;
+      // Append deterministic hold assessment (AI cannot overwrite)
+      parsed.holdManagement = holdAssessment;
+      parsed.overallScore = applyHoldAssessmentToOverallScore(
+        parsed.overallScore,
+        holdAssessment,
+      );
       const assessment = enrichAssessmentWithCommunicationProfile(parsed);
 
       // Save to DB

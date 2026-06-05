@@ -193,7 +193,6 @@ export class RealisticModeOrchestrator {
     now: number;
     uiButtonPressed: boolean;
     uiButtonReleased: boolean;
-    uiTimerExpired: boolean;
   }): OrchestratorAction {
     if (!this.enabled) return { type: "none" };
 
@@ -203,7 +202,6 @@ export class RealisticModeOrchestrator {
       uiButtonReleased: input.uiButtonReleased,
       consentContext: this.consentContext,
       currentHoldActive: this.holdState.source !== "none",
-      uiTimerExpired: input.uiTimerExpired,
     });
 
     this.holdState = holdResult.state;
@@ -479,7 +477,7 @@ export class RealisticModeOrchestrator {
   // Session Lifecycle Hooks
   // ---------------------------------------------------------------------------
 
-  onAgentStartSpeaking(now: number): void {
+  onAgentStartSpeaking(_now: number): void {
     this.agentStoppedSpeakingAt = null;
     this.fallbackState = {
       ...this.fallbackState,

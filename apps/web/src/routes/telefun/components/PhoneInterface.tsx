@@ -9,6 +9,10 @@ import {
   UserRound,
 } from "lucide-react";
 import type { SessionMetrics } from "@trainers/types";
+import {
+  TELEFUN_FIRST_HOLD_LIMIT_MS,
+  TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS,
+} from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
 import { LiveSession } from "../services/geminiService";
 import {
@@ -20,6 +24,7 @@ import {
   type MicrophoneWaveformTone,
 } from "./MicrophoneActivityWaveform";
 import { useMicrophoneActivity } from "./useMicrophoneActivity";
+import { HoldStatusDisplay } from "./HoldStatusDisplay";
 
 interface PhoneInterfaceProps {
   config: TelefunAppSettings;
@@ -33,6 +38,12 @@ interface PhoneInterfaceProps {
     metrics: SessionMetrics,
   ) => void;
   onSessionCreated?: (sessionId: string) => void;
+}
+
+interface ActiveHoldUi {
+  sequence: number;
+  startedAtEpochMs: number;
+  limitMs: number;
 }
 
 function getInitials(name: string): string {
@@ -57,12 +68,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isRinging, setIsRinging] = useState(true);
   const [agentVolume, setAgentVolume] = useState(0);
-  const [isOnHold, setIsOnHold] = useState(false);
-  const [holdCount, setHoldCount] = useState(0);
-  const [holdTimer, setHoldTimer] = useState(0);
+  const [activeHold, setActiveHold] = useState<ActiveHoldUi | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const sentTimeCues = useRef<Set<TelefunTimeCue>>(new Set());
+  const holdSequenceRef = useRef(0);
 
   const sessionRef = useRef<LiveSession | null>(null);
   const mountedRef = useRef(true);
@@ -329,31 +339,28 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     };
   }, [isRinging, connectionState]);
 
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (isOnHold && holdTimer > 0) {
-      timer = setInterval(() => {
-        setHoldTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (isOnHold && holdTimer <= 0) {
-      // timer finished
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isOnHold, holdTimer]);
+  // Hold timer is now derived via useTelefunHoldClock in HoldStatusDisplay.
+  // No countdown decrement effect needed — duration is from timestamps.
+
+  const isOnHold = activeHold !== null;
 
   const toggleHold = () => {
-    if (isOnHold) {
-      setIsOnHold(false);
+    if (activeHold) {
+      setActiveHold(null);
       stopHoldMusic();
       sessionRef.current?.setHold(false);
     } else {
-      const isFirstHold = holdCount === 0;
-      const duration = isFirstHold ? 60 : 180;
-      setHoldTimer(duration);
-      setHoldCount((prev) => prev + 1);
-      setIsOnHold(true);
+      const sequence = holdSequenceRef.current + 1;
+      holdSequenceRef.current = sequence;
+      const limitMs =
+        sequence === 1
+          ? TELEFUN_FIRST_HOLD_LIMIT_MS
+          : TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS;
+      setActiveHold({
+        sequence,
+        startedAtEpochMs: Date.now(),
+        limitMs,
+      });
       sessionRef.current?.setHold(true);
       startHoldMusic();
     }
@@ -521,17 +528,14 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                 </>
               )}
 
-              {isOnHold && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center rounded-full border-4 border-amber-400 bg-black/65 backdrop-blur-sm">
-                  <div className="text-center">
-                    <Pause className="mx-auto h-7 w-7 fill-current text-amber-300" />
-                    <span className="mt-1 block text-xs font-bold text-amber-300">
-                      HOLD
-                    </span>
-                    <div className="mt-1 text-xl font-mono font-bold text-white">
-                      {formatTime(holdTimer)}
-                    </div>
-                  </div>
+              {activeHold && (
+                <div className="absolute inset-0 z-20">
+                  <HoldStatusDisplay
+                    active
+                    sequence={activeHold.sequence}
+                    startedAtEpochMs={activeHold.startedAtEpochMs}
+                    limitMs={activeHold.limitMs}
+                  />
                 </div>
               )}
 
@@ -607,17 +611,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               </p>
             </div>
 
-            {/* Hold Warnings */}
-            {isOnHold && holdTimer <= 10 && holdTimer > 0 && (
-              <p className="mt-2 font-bold text-red-400 animate-bounce">
-                Waktu hold hampir habis!
-              </p>
-            )}
-            {isOnHold && holdTimer <= 0 && (
-              <p className="mt-2 font-bold uppercase tracking-wider text-red-500 bg-red-900/50 px-4 py-1 rounded">
-                Batas Waktu Hold Habis
-              </p>
-            )}
+            {/* Hold warnings are handled by HoldStatusDisplay phase */}
           </div>
         </div>
       </div>
@@ -642,7 +636,8 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                 ? "border-amber-400 bg-amber-400 text-black hover:bg-amber-300"
                 : "border-slate-950/10 bg-slate-950/5 text-slate-900 hover:bg-slate-950/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             }`}
-            title={isOnHold ? "Resume Call" : "Put on Hold"}
+            title={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
+            aria-label={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
           >
             {isOnHold ? (
               <Play className="h-6 w-6 fill-current md:h-7 md:w-7" />
@@ -651,7 +646,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             )}
           </button>
           <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground hidden md:block">
-            Hold
+            {isOnHold ? "Kembali" : "Hold"}
           </span>
         </div>
 

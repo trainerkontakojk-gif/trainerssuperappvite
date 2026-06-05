@@ -12,7 +12,8 @@
  * - During active hold: mic audio suppressed, Gemini audio blocked,
  *   all engines suspended
  * - Hold music and Gemini audio are mutually exclusive
- * - UI timer expiry auto-releases hold (equivalent to manual resume)
+ * - Timer limits are assessment thresholds. Only explicit UI release or session
+ *   finalization deactivates hold.
  * - Hold release resets all engine timers and resumes normal processing
  */
 
@@ -23,16 +24,14 @@ import type {
   ConsentContext,
   RudeHoldReason,
 } from "./types";
+import {
+  TELEFUN_FIRST_HOLD_LIMIT_MS,
+  TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS,
+} from "@trainers/types";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-/** Timer duration for the first UI-initiated hold (ms). */
-const FIRST_HOLD_TIMER_MS = 60000;
-
-/** Timer duration for subsequent UI-initiated holds (ms). */
-const SUBSEQUENT_HOLD_TIMER_MS = 180000;
 
 /** Max age of a hold request (ms) for valid consent. */
 const CONSENT_REQUEST_TTL_MS = 15000;
@@ -111,11 +110,6 @@ export function evaluateHoldState(
   state: HoldState,
   input: HoldInput,
 ): HoldResult {
-  // --- UI timer expiry: auto-release hold ---
-  if (input.uiTimerExpired && state.source === "ui") {
-    return buildDeactivateResult(state);
-  }
-
   // --- UI button released: deactivate hold ---
   if (input.uiButtonReleased && state.source !== "none") {
     return buildDeactivateResult(state);
@@ -146,7 +140,9 @@ function buildActivateUiResult(state: HoldState, input: HoldInput): HoldResult {
   const newHoldCount =
     state.source === "none" ? state.holdCount + 1 : state.holdCount;
   const timerDuration =
-    newHoldCount === 1 ? FIRST_HOLD_TIMER_MS : SUBSEQUENT_HOLD_TIMER_MS;
+    newHoldCount === 1
+      ? TELEFUN_FIRST_HOLD_LIMIT_MS
+      : TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS;
 
   const { isRudeHold, rudeHoldReason } = validateHoldConsent(
     input.now,

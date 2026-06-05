@@ -13,6 +13,37 @@ export interface TelefunMessage {
   [key: string]: JsonValue | undefined;
 }
 
+export const TELEFUN_FIRST_HOLD_LIMIT_MS = 60_000;
+export const TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS = 180_000;
+
+export interface TelefunHoldInterval {
+  sequence: number;
+  startedAtMs: number;
+  endedAtMs: number;
+  durationMs: number;
+  limitMs: number;
+  exceededByMs: number;
+}
+
+export interface TelefunHoldMetrics {
+  count: number;
+  totalDurationMs: number;
+  longestDurationMs: number;
+  exceededCount: number;
+  intervals: TelefunHoldInterval[];
+}
+
+export interface TelefunHoldAssessment {
+  status: "not_used" | "within_limit" | "exceeded";
+  score: number | null;
+  verdict: "N/A" | "Baik" | "Kurang";
+  feedback: string;
+  holdCount: number;
+  totalDurationMs: number;
+  longestDurationMs: number;
+  exceededCount: number;
+}
+
 export interface SessionMetrics {
   speechSegments: SpeechSegment[];
   totalSpeakingMs: number;
@@ -23,6 +54,7 @@ export interface SessionMetrics {
   volumeConsistency: number;
   inputTranscriptionChunks: string[];
   sessionDurationMs: number;
+  hold?: TelefunHoldMetrics;
 }
 
 export interface VoiceAspectScore {
@@ -42,6 +74,7 @@ export interface VoiceQualityAssessment {
   highlights: string[];
   strengths: string[];
   communicationProfile?: TelefunCommunicationProfile | null;
+  holdManagement?: TelefunHoldAssessment;
 }
 
 export type TelefunVoiceMetricKey =

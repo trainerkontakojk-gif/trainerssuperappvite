@@ -3,13 +3,24 @@ import { postApi, patchApi } from "../../hooks/useApi";
 import { buildTelefunRecordingPath } from "./recordingPath";
 import type { CallRecord } from "./types";
 import type { TelefunAppSettings } from "./telefunSettings";
+import type { SessionMetrics } from "@trainers/types";
 
 export interface FinalizerDependencies {
   getUserId: () => Promise<string | undefined>;
-  uploadRecording: (params: { path: string; blob: Blob; type: "full_call" | "agent_only" }) => Promise<string | undefined>;
+  uploadRecording: (params: {
+    path: string;
+    blob: Blob;
+    type: "full_call" | "agent_only";
+  }) => Promise<string | undefined>;
   patchSession: (sessionId: string, body: any) => Promise<void>;
-  finalizeRecording: (params: { sessionId: string; recordingPath?: string; agentRecordingPath?: string }) => Promise<void>;
-  scoreSession: (sessionId: string) => Promise<{ score: number; feedback: string; assessment?: any }>;
+  finalizeRecording: (params: {
+    sessionId: string;
+    recordingPath?: string;
+    agentRecordingPath?: string;
+  }) => Promise<void>;
+  scoreSession: (
+    sessionId: string,
+  ) => Promise<{ score: number; feedback: string; assessment?: any }>;
 }
 
 const defaultDependencies: FinalizerDependencies = {
@@ -33,7 +44,11 @@ const defaultDependencies: FinalizerDependencies = {
     await postApi("/telefun/finalize-recording", params);
   },
   scoreSession: async (sessionId) => {
-    const response = await postApi<{ score: number; feedback: string; assessment?: any }>(`/telefun/score/${sessionId}`, {});
+    const response = await postApi<{
+      score: number;
+      feedback: string;
+      assessment?: any;
+    }>(`/telefun/score/${sessionId}`, {});
     return response || { score: 0, feedback: "" };
   },
 };
@@ -67,13 +82,18 @@ export async function finalizeTelefunSession(params: {
   fullBlob: Blob | null;
   agentBlob: Blob | null;
   duration: number;
-  metrics: any;
+  metrics: SessionMetrics;
   localUrl: string | null;
   sessionConfig: TelefunAppSettings | null;
   scenarioTitle: string;
   consumerName: string;
   dependencies?: Partial<FinalizerDependencies>;
-}): Promise<{ record: CallRecord; scoringFailed: boolean; saveFailed: boolean; uploadFailed: boolean }> {
+}): Promise<{
+  record: CallRecord;
+  scoringFailed: boolean;
+  saveFailed: boolean;
+  uploadFailed: boolean;
+}> {
   const deps = { ...defaultDependencies, ...params.dependencies };
   const status = createFinalizerStatus();
 
@@ -90,8 +110,16 @@ export async function finalizeTelefunSession(params: {
   if (userId) {
     if (params.fullBlob) {
       try {
-        const path = buildTelefunRecordingPath({ userId, sessionId: params.sessionId, type: "full_call" });
-        recordingPath = await deps.uploadRecording({ path, blob: params.fullBlob, type: "full_call" });
+        const path = buildTelefunRecordingPath({
+          userId,
+          sessionId: params.sessionId,
+          type: "full_call",
+        });
+        recordingPath = await deps.uploadRecording({
+          path,
+          blob: params.fullBlob,
+          type: "full_call",
+        });
         if (!recordingPath) {
           markUploadFailed(status);
         }
@@ -102,8 +130,16 @@ export async function finalizeTelefunSession(params: {
     }
     if (params.agentBlob) {
       try {
-        const path = buildTelefunRecordingPath({ userId, sessionId: params.sessionId, type: "agent_only" });
-        agentRecordingPath = await deps.uploadRecording({ path, blob: params.agentBlob, type: "agent_only" });
+        const path = buildTelefunRecordingPath({
+          userId,
+          sessionId: params.sessionId,
+          type: "agent_only",
+        });
+        agentRecordingPath = await deps.uploadRecording({
+          path,
+          blob: params.agentBlob,
+          type: "agent_only",
+        });
         if (!agentRecordingPath) {
           markUploadFailed(status);
         }
@@ -180,7 +216,8 @@ export async function finalizeTelefunSession(params: {
     date: new Date().toISOString(),
     url: params.localUrl || "",
     consumerName: params.sessionConfig?.consumerName || params.consumerName,
-    scenarioTitle: params.sessionConfig?.scenarioTitle || params.scenarioTitle || "Custom",
+    scenarioTitle:
+      params.sessionConfig?.scenarioTitle || params.scenarioTitle || "Custom",
     duration: params.duration,
     recordingPath,
     agentRecordingPath,
@@ -192,7 +229,9 @@ export async function finalizeTelefunSession(params: {
     responsePacingMode: params.sessionConfig?.responsePacingMode,
     telefunModelId: params.sessionConfig?.telefunModelId,
     telefunTransport: params.sessionConfig?.telefunTransport,
-    configuredDuration: params.sessionConfig?.maxCallDuration ? params.sessionConfig.maxCallDuration * 60 : undefined,
+    configuredDuration: params.sessionConfig?.maxCallDuration
+      ? params.sessionConfig.maxCallDuration * 60
+      : undefined,
   };
 
   return {

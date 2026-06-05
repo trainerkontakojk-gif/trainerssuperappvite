@@ -183,7 +183,6 @@ export interface HoldInput {
   uiButtonReleased: boolean;
   consentContext: ConsentContext;
   currentHoldActive: boolean;
-  uiTimerExpired: boolean;
 }
 
 export type HoldAction = "activate_ui_hold" | "deactivate_hold" | "none";

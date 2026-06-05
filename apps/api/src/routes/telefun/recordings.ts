@@ -29,14 +29,21 @@ export function isTelefunRecordingPathOwnedBySession(params: {
 
 export function buildTelefunFeedbackSummary(assessment: any): string {
   if (!assessment) return "";
-  const parts = [
+  const voiceParts = [
     assessment.speakingRate?.feedback,
     assessment.intonation?.feedback,
     assessment.articulation?.feedback,
     assessment.fillerWords?.feedback,
     assessment.emotionalTone?.feedback,
-  ].filter(Boolean);
-  return parts.slice(0, 3).join("\n\n");
+  ]
+    .filter(Boolean)
+    .slice(0, 3);
+  const holdFeedback =
+    assessment.holdManagement?.status &&
+    assessment.holdManagement.status !== "not_used"
+      ? assessment.holdManagement.feedback
+      : null;
+  return [...voiceParts, holdFeedback].filter(Boolean).join("\n\n");
 }
 
 telefunRecordings.post(
@@ -56,12 +63,15 @@ telefunRecordings.post(
       c.req.valid("json");
 
     try {
-      if (recordingPath && !isTelefunRecordingPathOwnedBySession({
-        path: recordingPath,
-        userId: user.id,
-        sessionId,
-        type: "full_call"
-      })) {
+      if (
+        recordingPath &&
+        !isTelefunRecordingPathOwnedBySession({
+          path: recordingPath,
+          userId: user.id,
+          sessionId,
+          type: "full_call",
+        })
+      ) {
         return c.json(
           {
             success: false,
@@ -70,12 +80,15 @@ telefunRecordings.post(
           400,
         );
       }
-      if (agentRecordingPath && !isTelefunRecordingPathOwnedBySession({
-        path: agentRecordingPath,
-        userId: user.id,
-        sessionId,
-        type: "agent_only"
-      })) {
+      if (
+        agentRecordingPath &&
+        !isTelefunRecordingPathOwnedBySession({
+          path: agentRecordingPath,
+          userId: user.id,
+          sessionId,
+          type: "agent_only",
+        })
+      ) {
         return c.json(
           {
             success: false,
@@ -164,7 +177,11 @@ telefunRecordings.get("/recording/:id", async (c) => {
       .createSignedUrl(path, 3600);
 
     if (error) throw error;
-    return c.json({ success: true, data: { url: data.signedUrl }, url: data.signedUrl });
+    return c.json({
+      success: true,
+      data: { url: data.signedUrl },
+      url: data.signedUrl,
+    });
   } catch (error: any) {
     return c.json(
       {
