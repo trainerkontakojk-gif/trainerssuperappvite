@@ -1,7 +1,10 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
+import { 
+  parseVoiceQualityAssessment,
+  enrichAssessmentWithCommunicationProfile,
+} from "@trainers/types";
 import type { VoiceQualityAssessment } from "@trainers/types";
-import { enrichAssessmentWithCommunicationProfile } from "./telefun-communication-profile";
 import { parseJsonFromModelText } from "./ai-json";
 import {
   normalizeTelefunHoldMetrics,
@@ -114,15 +117,15 @@ export async function analyzeVoiceQuality(
   const holdAssessment = evaluateTelefunHoldAssessment(holdMetrics);
 
   // 2. Return cached if exists and valid
-  if (row.voice_assessment && typeof row.voice_assessment === "object") {
-    const cached = row.voice_assessment as VoiceQualityAssessment;
-    let assessment = cached;
-    if (!cached.holdManagement) {
+  const parsedCached = parseVoiceQualityAssessment(row.voice_assessment);
+  if (parsedCached) {
+    let assessment = parsedCached;
+    if (!parsedCached.holdManagement) {
       assessment = {
-        ...cached,
+        ...parsedCached,
         holdManagement: holdAssessment,
         overallScore: applyHoldAssessmentToOverallScore(
-          cached.overallScore,
+          parsedCached.overallScore,
           holdAssessment,
         ),
       };
@@ -136,7 +139,7 @@ export async function analyzeVoiceQuality(
     }
     return {
       success: true,
-      assessment: enrichAssessmentWithCommunicationProfile(assessment),
+      assessment,
     };
   }
 
@@ -204,16 +207,21 @@ export async function analyzeVoiceQuality(
 
   if (response.success && response.text) {
     try {
-      const parsed = parseJsonFromModelText(
-        response.text,
-      ) as VoiceQualityAssessment;
+      const rawJson = parseJsonFromModelText(response.text);
+      const parsed = parseVoiceQualityAssessment(rawJson);
+
+      if (!parsed) {
+        throw new Error("Invalid assessment shape from AI");
+      }
+
       // Append deterministic hold assessment (AI cannot overwrite)
       parsed.holdManagement = holdAssessment;
       parsed.overallScore = applyHoldAssessmentToOverallScore(
         parsed.overallScore,
         holdAssessment,
       );
-      const assessment = enrichAssessmentWithCommunicationProfile(parsed);
+      
+      const assessment = parsed;
 
       // Save to DB
       await adminClient

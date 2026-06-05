@@ -105,6 +105,48 @@ describe("Telefun analysis with hold assessment", () => {
     mockState.updates = [];
   });
 
+  it("rejects invalid cached assessment and continues to analysis", async () => {
+    mockState.row = {
+      ...BASE_ROW,
+      voice_assessment: { overallScore: 8 }, // Incomplete shape
+    };
+    mockState.geminiResponse = DEFAULT_AI_RESPONSE;
+
+    const result = await analyzeVoiceQuality("s1", "u1");
+
+    expect(result.success).toBe(true);
+    const { generateGeminiContent } = await import("../lib/gemini");
+    expect(generateGeminiContent).toHaveBeenCalled();
+  });
+
+  it("returns error when cache is invalid and no audio exists", async () => {
+    mockState.row = {
+      ...BASE_ROW,
+      voice_assessment: { overallScore: 8 },
+      agent_recording_path: null,
+    };
+
+    const result = await analyzeVoiceQuality("s1", "u1");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("No agent audio available for assessment");
+  });
+
+  it("rejects invalid model output and does not update database", async () => {
+    mockState.row = BASE_ROW;
+    mockState.geminiResponse = {
+      success: true,
+      text: JSON.stringify({ overallScore: 8 }), // Incomplete shape
+    };
+    mockState.updates = [];
+
+    const result = await analyzeVoiceQuality("s1", "u1");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Format hasil analisis tidak valid.");
+    expect(mockState.updates).toHaveLength(0);
+  });
+
   it("returns N/A hold when no hold metrics exist", async () => {
     mockState.row = { ...BASE_ROW, session_metrics: {} };
     mockState.geminiResponse = { ...DEFAULT_AI_RESPONSE };

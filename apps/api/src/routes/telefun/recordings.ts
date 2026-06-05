@@ -7,6 +7,7 @@ import {
   analyzeVoiceQuality,
   generateCoachingSummary,
 } from "../../lib/telefun-analysis";
+import type { VoiceQualityAssessment } from "@trainers/types";
 
 type Variables = { user: User; profile: any };
 
@@ -27,7 +28,9 @@ export function isTelefunRecordingPathOwnedBySession(params: {
   );
 }
 
-export function buildTelefunFeedbackSummary(assessment: any): string {
+export function buildTelefunFeedbackSummary(
+  assessment: VoiceQualityAssessment | null | undefined,
+): string {
   if (!assessment) return "";
   const voiceParts = [
     assessment.speakingRate?.feedback,
@@ -202,11 +205,14 @@ telefunRecordings.post("/score/:id", async (c) => {
 
   try {
     const result = await analyzeVoiceQuality(id, user.id);
-    if (!result.success) {
+    if (!result.success || !result.assessment) {
       return c.json(
         {
           success: false,
-          error: { code: "ANALYSIS_ERROR", message: result.error },
+          error: {
+            code: "ANALYSIS_ERROR",
+            message: result.error || "Gagal melakukan analisis suara.",
+          },
         },
         500,
       );
@@ -219,9 +225,9 @@ telefunRecordings.post("/score/:id", async (c) => {
     return c.json({
       success: true,
       data: {
-        score: assessment?.overallScore ?? 0,
-        feedback: assessment ? buildTelefunFeedbackSummary(assessment) : "",
-        assessment: assessment,
+        score: assessment.overallScore,
+        feedback: buildTelefunFeedbackSummary(assessment),
+        assessment,
       },
     });
   } catch (error: any) {
