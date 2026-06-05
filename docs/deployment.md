@@ -8,24 +8,26 @@
                     │  (DB + Auth)      │
                     └────────┬─────────┘
                              │
-          ┌──────────────────┼──────────────────┐
-          │                  │                  │
-   ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
-   │  apps/web   │   │  apps/api   │   │ apps/telefun │
-   │  Vite SPA   │──▶│  Hono HTTP  │   │ WS Server    │
-   │  (Railway)  │   │  (Railway)  │   │ (Railway)    │
-   └─────────────┘   └─────────────┘   └─────────────┘
+           ┌──────────────────┼──────────────────┐
+           │                  │                  │
+    ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
+    │  apps/web   │   │  apps/api   │   │ apps/telefun │
+    │  Vite SPA   │──▶│  Hono HTTP  │   │ WS Server    │
+    │  (Railway/  │   │  (Railway)  │   │ (Railway)    │
+    │   Vercel)   │   │             │   │              │
+    └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
-Semua 3 service dideploy di Railway sebagai service terpisah dari monorepo yang sama.
+**Primary:** Web, API, dan Telefun dideploy di Railway sebagai service terpisah dari monorepo yang sama.
+**Alternative:** Web juga bisa dideploy di Vercel (static SPA) — lihat [Vercel Deployment](#vercel-deployment).
 
 ## Service Overview
 
-| Service        | Port      | Stack                   | Deploy Target |
-| -------------- | --------- | ----------------------- | ------------- |
-| `apps/web`     | `$PORT`   | Vite SPA → `serve dist` | Railway       |
-| `apps/api`     | `$PORT`   | Hono (Node.js HTTP)     | Railway       |
-| `apps/telefun` | `$PORT`   | WebSocket (persistent)  | Railway       |
+| Service        | Port      | Stack                   | Deploy Target (Primary) | Deploy Target (Alt) |
+| -------------- | --------- | ----------------------- | ----------------------- | ------------------- |
+| `apps/web`     | `$PORT`   | Vite SPA → `serve dist` | Railway                 | **Vercel**          |
+| `apps/api`     | `$PORT`   | Hono (Node.js HTTP)     | Railway                 | Railway             |
+| `apps/telefun` | `$PORT`   | WebSocket (persistent)  | Railway                 | Railway             |
 
 ## Prerequisites
 
@@ -263,7 +265,83 @@ Request dari browser menuju domain API tanpa prefix `/api/v1`. Pastikan `VITE_AP
 2. Cek `ALLOWED_ORIGINS` di Telefun service mencakup Web URL.
 3. Cek Telefun service status di Railway dashboard — harus Active.
 
+## Vercel Deployment
+
+Web (`apps/web`) dapat dideploy ke Vercel sebagai static SPA alternatif. API dan Telefun tetap di Railway.
+
+### Vercel Configuration
+
+File `vercel.json` di root repository:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm build:web",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "CI=true pnpm install"
+}
+```
+
+### Vercel Environment Variables
+
+**Hanya `VITE_*` vars yang dibutuhkan.** API-only vars (`GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, dll) jangan diset di Vercel — cukup di Railway.
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `VITE_SUPABASE_URL` | `https://<project>.supabase.co` | Sama dengan Railway |
+| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Sama dengan Railway |
+| `VITE_API_URL` | `https://<railway-api-url>.up.railway.app/api/v1` | **Harus menunjuk ke Railway API** |
+| `VITE_TELEFUN_WS_URL` | `wss://<railway-telefun-url>.up.railway.app` | **Harus menunjuk ke Railway Telefun** |
+| `VITE_APP_URL` | `https://<vercel-app>.vercel.app` | Untuk redirect OAuth/reset password |
+
+### Vercel Build Settings
+
+| Setting | Value |
+|---|---|
+| Framework Preset | Vite |
+| Root Directory | `./` |
+| Build Command | `pnpm build:web` (dari `vercel.json`) |
+| Output Directory | `apps/web/dist` (dari `vercel.json`) |
+| Node.js Version | 22.x |
+
+### CORS untuk Vercel
+
+Jika menggunakan Vercel untuk web, pastikan:
+
+- **Railway API:** `ALLOWED_ORIGINS` harus mencakup domain Vercel (`https://<app>.vercel.app`)
+- **Railway Telefun:** `ALLOWED_ORIGINS` harus mencakup domain Vercel
+
+### turbo.json Env Passthrough
+
+Untuk memastikan `VITE_*` vars tersedia saat build di Vercel, task `build` di `turbo.json` sudah mendeklarasikan `env`:
+
+```json
+{
+  "tasks": {
+    "build": {
+      "env": [
+        "VITE_SUPABASE_URL",
+        "VITE_SUPABASE_ANON_KEY",
+        "VITE_API_URL",
+        "VITE_TELEFUN_WS_URL",
+        "VITE_APP_URL"
+      ]
+    }
+  }
+}
+```
+
+Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai empty string tanpa error.
+
+### Catatan
+
+- `VITE_API_URL` di Vercel harus menunjuk ke Railway API, bukan Vercel.
+- Setiap ganti `VITE_*` di Vercel Dashboard, trigger redeploy (Vite inline saat build time).
+- Hapus API-only vars (`GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, dll) dari Vercel env — mereka tidak dipakai di frontend dan akan memicu warning turbo.
+
 ## Deployment Checklist
+
+### Railway (Primary)
 
 - [ ] Apply all Supabase migrations
 - [ ] Deploy 3 Railway service dari repo yang sama (Web, API, Telefun)
@@ -274,3 +352,12 @@ Request dari browser menuju domain API tanpa prefix `/api/v1`. Pastikan `VITE_AP
 - [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
 - [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
 - [ ] Set up monitoring / alerting
+
+### Vercel (Alternative Web)
+
+- [ ] Import repo ke Vercel, framework preset Vite
+- [ ] Set 5 `VITE_*` env vars di Vercel Dashboard (lihat tabel Vercel Environment Variables)
+- [ ] Pastikan API-only vars TIDAK diset di Vercel
+- [ ] Verifikasi `VITE_API_URL` menunjuk ke Railway API dengan suffix `/api/v1`
+- [ ] Deploy dan verifikasi halaman login berfungsi
+- [ ] Cek CORS: Railway API `ALLOWED_ORIGINS` mencakup domain Vercel
