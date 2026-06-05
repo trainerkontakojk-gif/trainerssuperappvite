@@ -313,6 +313,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 182. **Telefun Disable Silence & Dead-Air Detectors** — Mematikan `SilenceDetector` server-side Telefun (5 detik) dan client `Dead Air Detector` (7 detik + cooldown 12 detik), termasuk hapus auto prompt `[INSTRUKSI SISTEM - DEAD AIR]`. Silent instruction di `promptBuilder.ts` diperpanjang 3x (<10→<30, 10-15→30-45 detik). Gemini VAD tidak disentuh. 8 files modified/added, 30 regression tests (7 + 23) passing. (DONE)
 183. **KTP Manual Input Storage Bucket Fix** — Memperbaiki kegagalan CRUD KTP saat role `trainer` menambahkan peserta manual dengan foto. Root cause: mismatch kontrak storage bucket antara frontend (`profiler-assets`), backend (`foto-avatar`), dan docs (`profiler-foto`). Fix: canonical helper frontend (`profilerPhotoStorage.ts`) dan backend (`profiler-photo-storage.ts`) dengan bucket `profiler-foto`, terminal migration storage policy, route contract test untuk trainer create. 6 new files, 4 modified files, 40 tests passing. (DONE)
 184. **Telefun AI Assessment Radar Consistency** — Pemisahan dan normalisasi kualitas skor (0-10), displayScore (0-100), raw value, dan target QA (Speaking Rate 70, Intonation 80, Articulation 90, Fillers 20, Tone 85) untuk data assessment AI Telefun. Memperkenalkan reusable component `VoiceMetricCards.tsx`, memperbarui `VoiceRadarChart.tsx` dan `CommunicationProfileZoomModal.tsx` dengan visual copy target-distance. Rebuild profil stale/invalid secara otomatis di backend (`enrichAssessmentWithCommunicationProfile`) dan frontend (`getCommunicationProfileFromAssessment`). 8 files modified, 41 API + 44 web regression tests passing. (DONE)
+185. **Monitoring History Delete Atomicity** — Refactored monitoring history delete from manual multi-table orchestration in `routes/ai.ts` into a transactional PostgreSQL RPC `delete_monitoring_history` with SECURITY DEFINER. New typed service `monitoring-history-delete-service.ts` with domain error mapping (NOT_FOUND/DELETE_FAILED). Route validation with Zod enum+UUID schemas and human-friendly error responses. Terminal migration `20260605100000_atomic_monitoring_history_delete.sql`. 3 test files covering migration contract, service unit tests, and route integration tests. 29 tests passing across 5 test files, 626 API tests passing overall. (DONE)
 
 ## Key Files Changed (Phase 58 — 118)
 
@@ -471,7 +472,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 ## Relevant Files
 
 - `opencode.json` — project-level opencode config with context7 MCP
-- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index, **017 MV hardening**, **20260526090000 MV terminal re-hardening**)
+- `supabase/migrations/` — DB schemas (001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin Core, 009 Storage RLS, 010 Activity Logs Index, **017 MV hardening**, **20260526090000 MV terminal re-hardening**, **20260605100000 atomic monitoring history delete**)
 - `supabase/rollbacks/` — DB rollbacks (including **rollback_017**, **rollback_20260526090000**)
 - `apps/api/src/__tests__/mv-qa-period-summary-security.test.ts` — order-aware regression tests for MV security hardening (Phase 53+54)
 - `apps/api/src/__tests__/database-parity-post-sync.test.ts` — parity tests with MV terminal re-hardening validation
@@ -540,6 +541,10 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
 - `apps/api/src/__tests__/monitoring-history-enrichment.test.ts` — **Phase 70 update**: Mock data aligned to Vite schema columns
+- `apps/api/src/services/monitoring-history-delete-service.ts` — **Phase 185**: Typed service wrapper for atomic monitoring history delete via PostgreSQL RPC
+- `apps/api/src/__tests__/monitoring-history-delete-migration.test.ts` — **Phase 185**: Migration contract tests (RPC definition, security, FK cascades)
+- `apps/api/src/__tests__/monitoring-history-delete-service.test.ts` — **Phase 185**: Service unit tests (success, NOT_FOUND, DELETE_FAILED, malformed payload)
+- `apps/api/src/__tests__/monitoring-history-delete-route.test.ts` — **Phase 185**: Route integration tests (role guard, validation, error mapping)
 - `apps/api/src/services/sidak/` — **Phase 75**: SIDAK service decomposition into 13 sub-modules (shared-constants, access-scope, period-indicator, temuan-service, agent-directory, rule-versions, service-trends, dashboard-data, dashboard-aggregation, dashboard-trends, dashboard-types, report-data, report-archives)
 - `apps/api/src/services/sidak-ranking-service.ts` — **Phase 75**: Extracted ranking service from sidak-service.ts
 - `apps/api/src/lib/math-utils.ts` — **Phase 75**: Shared `roundTo()` extracted from dashboard-trends
@@ -806,6 +811,15 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `scripts/data-integrity/foto-checker.ts` — **Phase 117**: `foto-avatar` → `profiler-foto`
 - `apps/api/src/__tests__/check-fotos.test.ts` — **Phase 117**: `foto-avatar` → `profiler-foto`
 - `docs/rebuild-logs/phase-117-ktp-storage-bucket-fix.md` — **NEW Phase 117**: Rebuild log
+
+- `apps/api/src/routes/ai.ts` — **Phase 185**: Replaced ~35 lines of manual delete orchestration with single `deleteMonitoringHistory()` service call; added Zod validation for module+UUID; human-friendly error mapping with internal message redaction.
+- `apps/api/src/services/monitoring-history-delete-service.ts` — **NEW Phase 185**: Typed service wrapper for `delete_monitoring_history` RPC with domain error classes and defensive payload validation.
+- `apps/api/src/__tests__/monitoring-history-delete-migration.test.ts` — **NEW Phase 185**: 3 migration contract tests (file existence, security/structural contract, FK cascade verification).
+- `apps/api/src/__tests__/monitoring-history-delete-service.test.ts` — **NEW Phase 185**: 7 service unit tests (success, NOT_FOUND, DELETE_FAILED, malformed payload, unknown source, source-module mismatch).
+- `apps/api/src/__tests__/monitoring-history-delete-route.test.ts` — **NEW Phase 185**: 7 route integration tests (role guard, invalid module, invalid UUID, success, 404 mapping, 500 mapping, internal message redaction).
+- `supabase/migrations/20260605100000_atomic_monitoring_history_delete.sql` — **NEW Phase 185**: Terminal migration creating `delete_monitoring_history` RPC with SECURITY DEFINER, auth guard, module dispatch, and privilege restrictions.
+- `docs/rebuild-logs/phase-thermo-monitoring-delete-atomicity.md` — **NEW Phase 185**: Documentation for monitoring history delete atomicity.
+- `docs/MONITORING_TOKEN_USAGE_BILLING.md` — **Phase 185**: Added "Penghapusan Riwayat (Atomic Delete)" section; updated Access Matrix.
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |

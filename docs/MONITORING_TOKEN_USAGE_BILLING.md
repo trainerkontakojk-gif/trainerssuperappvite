@@ -119,22 +119,22 @@ Format: `{ user_id, user_name, action, module, type }`
 
 Cakupan per modul:
 
-| Modul   | Events Tercatat                                                                        |
-| ------- | -------------------------------------------------------------------------------------- |
-| SIDAK   | create/delete period, delete temuan, publish/supersede rule version, save/delete report archive, upload batch temuan |
-| KTP     | create/delete year, create/delete folder, create/update/delete peserta, move peserta, create/delete team |
-| USER_MGMT | update status/role, delete user, reset password, access approval mutations            |
+| Modul     | Events Tercatat                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------- |
+| SIDAK     | create/delete period, delete temuan, publish/supersede rule version, save/delete report archive, upload batch temuan |
+| KTP       | create/delete year, create/delete folder, create/update/delete peserta, move peserta, create/delete team             |
+| USER_MGMT | update status/role, delete user, reset password, access approval mutations                                           |
 
 ## Action Map per Modul
 
 Action `usageContext` yang saat ini aktif:
 
-| Modul         | Action                                                                          |
-| ------------- | ------------------------------------------------------------------------------- |
-| `ketik`       | `chat_response`, `session_timeout`, `generate_consumer_response`               |
+| Modul         | Action                                                                                                                                    |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `ketik`       | `chat_response`, `session_timeout`, `generate_consumer_response`                                                                          |
 | `pdkt`        | `init_email`, `generate_ai_images`, `generate_scenario_images`, `generate_template`, `evaluate_response`, `async_evaluate_agent_response` |
-| `telefun`     | `voice_live`, `voice_tts`, `chat_response`, `first_message`, `score_generation` |
-| `qa-analyzer` | `report_generation`                                                             |
+| `telefun`     | `voice_live`, `voice_tts`, `chat_response`, `first_message`, `score_generation`                                                           |
+| `qa-analyzer` | `report_generation`                                                                                                                       |
 
 Catatan:
 
@@ -173,9 +173,26 @@ Saat kurs baru disimpan:
 | ------------------------------------- | ----- | ------- | ------ | ----- |
 | Monitoring histori lintas akun        | Ya    | Ya      | Ya     | Tidak |
 | Monitoring usage lintas akun          | Ya    | Ya      | Ya     | Tidak |
+| Hapus riwayat simulasi (Atomic)       | Ya    | Ya      | Tidak  | Tidak |
 | Editor pricing model                  | Ya    | Ya      | Tidak  | Tidak |
 | Editor kurs USD/IDR                   | Ya    | Ya      | Tidak  | Tidak |
 | Quick-view `Usage Bulan Ini` di modul | Ya    | Ya      | Ya     | Ya    |
+
+### Penghapusan Riwayat (Atomic Delete)
+
+Penghapusan riwayat simulasi dari tab `Riwayat Simulasi` dilakukan secara **atomik** untuk menjamin integritas data.
+
+**Aturan Teknis:**
+
+- Operasi dilakukan melalui PostgreSQL RPC `delete_monitoring_history`.
+- Hanya dapat dijalankan oleh role `trainer` atau `admin` melalui `service_role` client di backend.
+- Penghapusan satu entri riwayat akan menghapus seluruh data terkait (cascade) dalam satu transaksi:
+  - **KETIK**: `ketik_history`, `ketik_session_reviews`, `ketik_typo_findings`, dan `ketik_review_jobs`.
+  - **PDKT**: `pdkt_history`.
+  - **Telefun**: `telefun_history`, `telefun_coaching_summary`, dan `telefun_replay_annotations`.
+- Mendukung penghapusan data legacy Telefun dari tabel `results` (menggunakan UUID yang sama).
+- Jika terjadi kegagalan pada salah satu tabel child, seluruh operasi akan dibatalkan (rollback).
+- Sistem memberikan respon jujur: HTTP 404 jika ID tidak ditemukan, dan HTTP 500 jika terjadi kegagalan database.
 
 Catatan:
 
@@ -200,15 +217,16 @@ Semua API call monitoring di frontend (`apps/web/src/routes/monitoring.tsx`) men
 
 Error dari backend dimap ke pesan human-friendly:
 
-| Backend Error | Pesan User |
-| --- | --- |
-| `Unauthorized` / `Invalid token` | Sesi Anda telah berakhir. Silakan login kembali. |
-| Pesan lain | Ditampilkan apa adanya |
-| Network error | Terjadi kesalahan koneksi. Periksa jaringan Anda. |
+| Backend Error                    | Pesan User                                        |
+| -------------------------------- | ------------------------------------------------- |
+| `Unauthorized` / `Invalid token` | Sesi Anda telah berakhir. Silakan login kembali.  |
+| Pesan lain                       | Ditampilkan apa adanya                            |
+| Network error                    | Terjadi kesalahan koneksi. Periksa jaringan Anda. |
 
 ### Toast Feedback
 
 Operasi save pricing dan billing memberikan feedback via sonner toast:
+
 - Sukses: "Harga berhasil disimpan." / "Kurs berhasil disimpan."
 - Gagal: "Gagal menyimpan harga." / "Gagal menyimpan kurs." + pesan error.
 

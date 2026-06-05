@@ -15,14 +15,18 @@ import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
 import { getMonitoringHistory } from "../services/monitoring-history-service";
 import { getAiUsageSummary } from "../services/ai-usage-summary-service";
-
 import {
-  isUsageActionInCategory,
-} from "../lib/ai-usage-categories";
+  deleteMonitoringHistory,
+  MonitoringHistoryDeleteError,
+} from "../services/monitoring-history-delete-service";
+
+import { isUsageActionInCategory } from "../lib/ai-usage-categories";
 
 type Variables = { user: User; profile: any };
 
 const ai = new Hono<{ Variables: Variables }>();
+const monitoringHistoryModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
+const monitoringHistoryIdSchema = z.string().uuid();
 
 ai.get("/models", (c) => {
   const module = c.req.query("module") as AiModelModule | undefined;
@@ -393,43 +397,61 @@ ai.delete(
   requireRole("admin", "trainer"),
   async (c) => {
     const { module, id } = c.req.param();
-    const admin = createAdminClient();
+
+    const parsedModule = monitoringHistoryModuleSchema.safeParse(module);
+    const parsedId = monitoringHistoryIdSchema.safeParse(id);
+
+    if (!parsedModule.success || !parsedId.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: !parsedModule.success
+              ? `Modul tidak dikenal: ${module}`
+              : "ID riwayat tidak valid.",
+          },
+        },
+        400,
+      );
+    }
 
     try {
-      if (module === "ketik") {
-        await admin.from("ketik_session_reviews").delete().eq("session_id", id);
-        await admin.from("ketik_typo_findings").delete().eq("session_id", id);
-        const { error } = await admin.from("ketik_history").delete().eq("id", id);
-        if (error) throw error;
-      } else if (module === "pdkt") {
-        const { error } = await admin.from("pdkt_history").delete().eq("id", id);
-        if (error) throw error;
-      } else if (module === "telefun") {
-        await admin.from("telefun_coaching_summaries").delete().eq("session_id", id);
-        await admin.from("telefun_replay_annotations").delete().eq("session_id", id);
-        await admin.from("telefun_history").delete().eq("id", id);
-        await admin.from("results").delete().eq("id", id);
-      } else {
+      await deleteMonitoringHistory(parsedModule.data, parsedId.data);
+      return c.json({ success: true, data: null });
+    } catch (error: unknown) {
+      if (error instanceof MonitoringHistoryDeleteError) {
+        if (error.code === "NOT_FOUND") {
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: "NOT_FOUND",
+                message: error.message,
+              },
+            },
+            404,
+          );
+        }
+
         return c.json(
           {
             success: false,
             error: {
-              code: "BAD_REQUEST",
-              message: `Modul tidak dikenal: ${module}`,
+              code: "DB_ERROR",
+              message: error.message,
             },
           },
-          400,
+          500,
         );
       }
 
-      return c.json({ success: true, data: null });
-    } catch (error: any) {
       return c.json(
         {
           success: false,
           error: {
             code: "DB_ERROR",
-            message: error?.message || "Gagal menghapus riwayat.",
+            message: "Gagal menghapus riwayat.",
           },
         },
         500,
