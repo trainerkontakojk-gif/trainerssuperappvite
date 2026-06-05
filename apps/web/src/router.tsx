@@ -38,6 +38,7 @@ const PdktSimulation = lazy(() => import("./routes/pdkt/simulation"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
 const AccountPage = lazy(() => import("./routes/account"));
+const AuthCallbackPage = lazy(() => import("./routes/auth-callback"));
 const NotFoundPage = lazy(() => import("./routes/not-found"));
 const UnauthorizedPage = lazy(() => import("./routes/unauthorized"));
 const WaitingApprovalPage = lazy(() => import("./routes/waiting-approval"));
@@ -389,6 +390,12 @@ const resetPasswordRoute = createRoute({
   beforeLoad: guardResetPassword(),
 });
 
+const authCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/auth/callback",
+  component: AuthCallbackPage,
+});
+
 const unauthorizedRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/unauthorized",
@@ -467,9 +474,10 @@ export function requireLeaderModuleApproval(
       }
 
       if (profile.role === "leader") {
-        const accessData = await fetchApi<
-          Record<string, { status: string }>
-        >("/me/access-status");
+        const accessData =
+          await fetchApi<Record<string, { status: string }>>(
+            "/me/access-status",
+          );
         const moduleStatus = accessData[module]?.status;
         if (moduleStatus !== "approved") {
           throw redirect({ to: landingPath });
@@ -568,6 +576,7 @@ const routeTree = rootRoute.addChildren([
   telefunReplayRoute,
   monitoringRoute,
   accountRoute,
+  authCallbackRoute,
   waitingApprovalRoute,
   resetPasswordRoute,
   unauthorizedRoute,

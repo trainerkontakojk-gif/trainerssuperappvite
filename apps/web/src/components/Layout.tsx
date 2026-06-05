@@ -26,7 +26,10 @@ import {
 } from "../lib/app-config";
 import { ThemeToggle } from "./ThemeToggle";
 import { useThemeMode } from "../hooks/useThemeMode";
-import { TelefunWarningProvider, useTelefunWarning } from "../context/TelefunWarningContext";
+import {
+  TelefunWarningProvider,
+  useTelefunWarning,
+} from "../context/TelefunWarningContext";
 import { MaintenanceModal } from "../routes/telefun/components/MaintenanceModal";
 
 const SIDAK_CHILDREN = [
@@ -154,12 +157,21 @@ export function DashboardLayoutContent() {
       openMaintenance();
     }
 
-    if (prevPathnameRef.current.startsWith("/telefun") && !pathname.startsWith("/telefun")) {
+    if (
+      prevPathnameRef.current.startsWith("/telefun") &&
+      !pathname.startsWith("/telefun")
+    ) {
       revokeTelefunAccess();
     }
 
     prevPathnameRef.current = pathname;
-  }, [pathname, hasTelefunAccess, openMaintenance, revokeTelefunAccess, profile]);
+  }, [
+    pathname,
+    hasTelefunAccess,
+    openMaintenance,
+    revokeTelefunAccess,
+    profile,
+  ]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
@@ -167,12 +179,13 @@ export function DashboardLayoutContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const effectiveIsCollapsed = isSidebarCollapsed && !isSidebarHovered;
-  const isPublicRoute = ["/", "/waiting-approval", "/reset-password"].includes(
-    pathname,
-  );
+  const isPublicRoute = [
+    "/",
+    "/auth/callback",
+    "/waiting-approval",
+    "/reset-password",
+  ].includes(pathname);
   const isStandaloneRoute = ["/pdkt/simulation"].includes(pathname);
-
-
 
   useEffect(() => {
     if (pathname.startsWith("/sidak")) {
@@ -504,7 +517,9 @@ export function DashboardLayoutContent() {
         )}
 
         {/* Scrollable Workspace Content */}
-        <section className={`flex-1 min-w-0 ${pathname === "/profiler" || pathname === "/profiler/" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
+        <section
+          className={`flex-1 min-w-0 ${pathname === "/profiler" || pathname === "/profiler/" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}
+        >
           {pathname.startsWith("/telefun") && !hasTelefunAccess ? (
             <div className="flex items-center justify-center h-full text-gray-400">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />

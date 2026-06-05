@@ -11,7 +11,10 @@ import {
 import { supabase } from "../lib/supabase";
 import { normalizeProfileStatus } from "../lib/profile";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
-import { clearAuthLocalState, clearLogoutGuestLock } from "../lib/authLocalState";
+import {
+  clearAuthLocalState,
+  clearLogoutGuestLock,
+} from "../lib/authLocalState";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -297,7 +300,7 @@ export default function AuthModal({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/api/auth/callback`,
+          redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/auth/callback`,
         },
       });
       if (error) {

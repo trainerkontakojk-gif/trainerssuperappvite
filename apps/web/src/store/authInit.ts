@@ -26,9 +26,14 @@ export async function initAuth() {
       clearAuthLocalState();
       useAuthStore.getState().setSession(null);
       useAuthStore.getState().setProfile(null);
-      
+
       // If we are signed out and currently on a non-public route, redirect to landing
-      const publicRoutes = ["/", "/waiting-approval", "/reset-password"];
+      const publicRoutes = [
+        "/",
+        "/auth/callback",
+        "/waiting-approval",
+        "/reset-password",
+      ];
       if (!publicRoutes.includes(window.location.pathname)) {
         window.location.href = "/";
       }
