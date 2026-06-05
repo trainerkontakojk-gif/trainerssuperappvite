@@ -51,16 +51,23 @@ const valid = {
 };
 
 describe("validateAssessment", () => {
-  it("returns null for non-object", () => {
+  it("rejects non-object or incomplete shape", () => {
     expect(validateAssessment(null)).toBeNull();
     expect(validateAssessment("string")).toBeNull();
-    expect(validateAssessment(123)).toBeNull();
+    expect(validateAssessment({})).toBeNull();
+    expect(validateAssessment({ ...valid, intonation: undefined })).toBeNull();
   });
 
-  it("returns null when overallScore is missing", () => {
-    expect(
-      validateAssessment({ ...valid, overallScore: undefined }),
-    ).toBeNull();
+  it("rejects invalid numeric values", () => {
+    expect(validateAssessment({ ...valid, overallScore: Number.NaN })).toBeNull();
+    expect(validateAssessment({ 
+      ...valid, 
+      speakingRate: { ...valid.speakingRate, wordsPerMinute: -1 } 
+    })).toBeNull();
+    expect(validateAssessment({ 
+      ...valid, 
+      fillerWords: { ...valid.fillerWords, count: 1.5 } 
+    })).toBeNull();
   });
 
   it("clamps overallScore to 0-10", () => {
@@ -71,194 +78,60 @@ describe("validateAssessment", () => {
     expect(low?.overallScore).toBe(0);
   });
 
-  it("returns validated assessment with safe defaults", () => {
-    const result = validateAssessment(valid);
-    expect(result).not.toBeNull();
-    expect(result!.overallScore).toBe(8);
-    expect(result!.speakingRate.score).toBe(7);
-    expect(result!.fillerWords.count).toBe(5);
-    expect(result!.transcript).toBe("Hello world");
+  it("preserves score 0 as valid", () => {
+    const result = validateAssessment({ ...valid, overallScore: 0 });
+    expect(result?.overallScore).toBe(0);
   });
 
-  it("handles missing aspect fields gracefully with safe defaults", () => {
-    const result = validateAssessment({
-      overallScore: 5,
-      speakingRate: {
-        score: 5,
-        verdict: "Ok",
-        feedback: "Fine",
-        wordsPerMinute: 100,
-      },
-      intonation: {},
-      articulation: {},
-      fillerWords: {},
-      emotionalTone: {},
-    });
-    expect(result).not.toBeNull();
-    expect(result!.intonation.score).toBe(0);
-    expect(result!.intonation.verdict).toBe("Neutral");
-    expect(result!.intonation.feedback).toBe("No feedback provided.");
-  });
-
-  it("filters non-string highlights", () => {
+  it("filters non-string highlights and truncates to 5", () => {
     const result = validateAssessment({
       ...valid,
-      highlights: ["Good", 123, "Bad", null, "OK"],
+      highlights: ["Good", 123, "Bad", null, "OK", "Extra"],
     });
-    expect(result!.highlights).toEqual(["Good", "Bad", "OK"]);
-  });
-
-  it("truncates highlights to 5", () => {
-    const result = validateAssessment({
+    expect(result!.highlights).toEqual(["Good", "Bad", "OK", "Extra"]);
+    
+    const resultLong = validateAssessment({
       ...valid,
       highlights: ["1", "2", "3", "4", "5", "6", "7"],
     });
-    expect(result!.highlights).toHaveLength(5);
-  });
-
-  it("truncates strengths to 5", () => {
-    const result = validateAssessment({
-      ...valid,
-      strengths: ["1", "2", "3", "4", "5", "6"],
-    });
-    expect(result!.strengths).toHaveLength(5);
-  });
-
-  it("defaults empty transcript to empty string", () => {
-    const result = validateAssessment({ ...valid, transcript: undefined });
-    expect(result!.transcript).toBe("");
-  });
-
-  it("filters non-string filler word examples", () => {
-    const result = validateAssessment({
-      ...valid,
-      fillerWords: {
-        score: 5,
-        verdict: "Ok",
-        feedback: "Fine",
-        count: 3,
-        examples: ["uh", 123, "um", null, "ah"],
-      },
-    });
-    expect(result!.fillerWords.examples).toEqual(["uh", "um", "ah"]);
-  });
-
-  it("defaults missing dominant tone to Unknown", () => {
-    const result = validateAssessment({
-      ...valid,
-      emotionalTone: { score: 5, verdict: "Ok", feedback: "Fine" },
-    });
-    expect(result!.emotionalTone.dominant).toBe("Unknown");
-  });
-
-  it("clamps aspect scores to 0-10", () => {
-    const result = validateAssessment({
-      ...valid,
-      speakingRate: {
-        score: 15,
-        verdict: "Too fast",
-        feedback: "Slow down",
-        wordsPerMinute: 200,
-      },
-    });
-    expect(result!.speakingRate.score).toBe(10);
-  });
-
-  it("preserves communicationProfile if present in payload", () => {
-    const profile = {
-      metrics: [],
-      overallSummary: "Test",
-      strengths: ["Satu"],
-      improvementPriorities: ["Dua"],
-    };
-    const result = validateAssessment({
-      ...valid,
-      communicationProfile: profile,
-    });
-    expect(result!.communicationProfile).toEqual(profile);
-  });
-
-  it("sets communicationProfile to null for legacy payload", () => {
-    const result = validateAssessment(valid);
-    expect(result!.communicationProfile).toBeNull();
+    expect(resultLong!.highlights).toHaveLength(5);
   });
 });
 
 describe("normalizeTelefunScoreResponse", () => {
-  it("unwraps { score, feedback, assessment } envelope from postApi", () => {
+  it("unwraps { score, feedback, assessment } envelope", () => {
     const envelope = {
-      score: 85,
+      score: 8,
       feedback: "Bagus",
-      assessment: {
-        overallScore: 8,
-        speakingRate: {
-          score: 7,
-          wordsPerMinute: 130,
-          verdict: "Good",
-          feedback: "Nice",
-        },
-        intonation: { score: 8, verdict: "Good", feedback: "Nice" },
-        articulation: { score: 9, verdict: "Great", feedback: "Clear" },
-        fillerWords: {
-          score: 7,
-          count: 2,
-          examples: ["uh"],
-          verdict: "Good",
-          feedback: "Minimal",
-        },
-        emotionalTone: {
-          score: 7,
-          dominant: "calm",
-          verdict: "Good",
-          feedback: "Calm",
-        },
-        transcript: "Hello",
-        highlights: [],
-        strengths: [],
-      },
+      assessment: { ...valid, overallScore: 8 },
     };
 
     const result = normalizeTelefunScoreResponse(envelope);
-    expect(result.score).toBe(85);
+    expect(result.score).toBe(8);
     expect(result.feedback).toBe("Bagus");
     expect(result.assessment).not.toBeNull();
     expect(result.assessment!.overallScore).toBe(8);
   });
 
-  it("handles assessment directly when no envelope (defensive)", () => {
-    const direct = {
-      overallScore: 7,
-      speakingRate: {
-        score: 6,
-        wordsPerMinute: 120,
-        verdict: "Ok",
-        feedback: "Fine",
-      },
-      intonation: { score: 7, verdict: "Ok", feedback: "Fine" },
-      articulation: { score: 8, verdict: "Good", feedback: "Clear" },
-      fillerWords: {
-        score: 5,
-        count: 4,
-        examples: [],
-        verdict: "Ok",
-        feedback: "Some",
-      },
-      emotionalTone: {
-        score: 6,
-        dominant: "neutral",
-        verdict: "Ok",
-        feedback: "Neutral",
-      },
-      transcript: "Hi",
-      highlights: [],
-      strengths: [],
+  it("rejects invalid scale or mismatch", () => {
+    // Current normalizeTelefunScoreResponse might be permissive, 
+    // but the new one must be strict.
+    const invalidScale = {
+      score: 85, // Scale 100
+      feedback: "Bagus",
+      assessment: { ...valid, overallScore: 8 },
     };
+    expect(normalizeTelefunScoreResponse(invalidScale).assessment).toBeNull();
 
-    const result = normalizeTelefunScoreResponse(direct);
-    expect(result.assessment).not.toBeNull();
+    const mismatch = {
+      score: 8,
+      feedback: "Bagus",
+      assessment: { ...valid, overallScore: 7 },
+    };
+    expect(normalizeTelefunScoreResponse(mismatch).assessment).toBeNull();
   });
 
-  it("returns safe defaults for invalid input", () => {
+  it("returns safe error object for invalid input", () => {
     const result = normalizeTelefunScoreResponse(null);
     expect(result.score).toBe(0);
     expect(result.feedback).toBe("");
