@@ -26,6 +26,20 @@
     },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "test:targeted": {
+      "cache": true
+    },
+    "test:core": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "test:fast": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "test:full": {
+      "dependsOn": ["^build"]
     }
   }
 }

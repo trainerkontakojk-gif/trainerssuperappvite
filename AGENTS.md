@@ -68,11 +68,78 @@ Project ini menggunakan **pnpm** dan **Turborepo**.
 - **Build:** `pnpm build`
 - **Lint:** `pnpm lint` (ESLint 9 flat config — `eslint.config.mjs` di root)
 - **Lint (single workspace):** `pnpm --filter @trainers/web lint`
-- **Test:** `pnpm test` (vitest — 300+ tests covering API services + frontend hooks/components)
+- **Test (targeted — development):** `pnpm test:targeted` (10-30s, test terkait perubahan via `vitest --changed`)
+- **Test (core — pre-push):** `pnpm test:core` (30-60s, kontrak kritis lintas modul)
+- **Test (fast — pre-merge):** `pnpm test:fast` (1-2min, seluruh unit test ringan)
+- **Test (full — CI/release):** `pnpm test` atau `pnpm test:full` (~5min, semua tests termasuk component rendering)
 - **Test (api only):** `pnpm --filter @trainers/api test`
 - **Test (web only):** `pnpm --filter @trainers/web test`
+- **Test (web fast):** `pnpm --filter @trainers/web test:fast`
 - **Format:** `pnpm format`
 - **Telefun standalone:** `pnpm --filter @trainers/telefun dev`
+
+### Test Tiering Strategy
+
+| Tier | Command | Duration | Coverage | Kapan |
+|------|---------|----------|----------|-------|
+| **Targeted** | `pnpm test:targeted` | 10-30s | Changed files only (vitest --changed) | Development, quick check |
+| **Core** | `pnpm test:core` | 30-60s | Kontrak kritis lintas modul | Pre-push |
+| **Fast** | `pnpm test:fast` | 1-2min | Seluruh unit test ringan (no .tsx) | Pre-merge |
+| **Full** | `pnpm test` atau `pnpm test:full` | ~5min | Semua tests (unit + component rendering + jsdom) | CI, release |
+
+**Core tests mencakup:**
+- Authentication, authorization, dan RLS
+- API route/service contract kritis
+- SIDAK scoring dan period/version resolution
+- Telefun session finalizer dan assessment boundary
+- KETIK/PDKT session lifecycle
+- Migration/security contract
+
+**Fast tests exclude:**
+- `.test.tsx` files (React component rendering)
+- React hook tests (`useApi`, `useQueryParams`, `authInit`, `auth-login-flow`)
+
+**Development workflow:**
+```bash
+# Quick check saat development
+pnpm test:targeted  # 10-30s
+
+# Sebelum commit
+pnpm test:core      # 30-60s
+
+# Sebelum push
+pnpm test:fast      # 1-2min
+
+# Sebelum merge/release
+pnpm test:full      # ~5min
+```
+
+### Risk-Based Testing Policy
+
+**Wajib test baru:**
+- Perubahan behavior atau business logic
+- Bug fix (tulis regression test)
+- Perubahan security/permission
+- Perubahan database schema/migration
+- Perubahan API contract
+
+**Tidak wajib test baru:**
+- Refactor tanpa perubahan behavior (jalankan test terkait)
+- UI kosmetik/styling
+- Dokumentasi
+- Konfigurasi sederhana
+
+**Pre-push checklist:**
+```bash
+pnpm lint
+pnpm build
+pnpm test:core  # 30-60s, targeted tests
+```
+
+**Pre-merge/CI:**
+```bash
+pnpm test  # ~5min, full suite
+```
 
 ## Verified Structure
 
@@ -151,7 +218,7 @@ Saat user meminta push ke GitHub (`git push` atau `git commit && git push`), **W
 0. **Gitignore Audit:** Jalankan `git status` — periksa apakah ada file tidak sengaja ter-track yang seharusnya di `.gitignore` (misal: `.env`, `*.log`, `dist/`, file editor config). Jika ada, update `.gitignore`, hapus dari staging/index, lalu commit fix terpisah.
 1. **Lint:** Jalankan `pnpm lint` — pastikan 0 error (warning diperbolehkan).
 2. **Build:** Jalankan `pnpm build` — pastikan 0 error. Build failure = Railway deploy failure.
-3. **Test:** Jalankan `pnpm test` — pastikan seluruh suite lulus (API + web). Jika ada test failure, perbaiki sebelum push.
+3. **Test:** Jalankan `pnpm test:core` — pastikan seluruh suite lulus (30-60s, kontrak kritis lintas modul). Untuk validasi penuh sebelum merge, jalankan `pnpm test` (~5min, termasuk component rendering). Jika ada test failure, perbaiki sebelum push.
 
 Jika ada langkah yang gagal, **HENTIKAN** proses push dan informasikan ke user beserta output error-nya. Jangan melanjutkan push sampai semua langkah hijau.
 
@@ -315,6 +382,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 184. **Telefun AI Assessment Radar Consistency** — Pemisahan dan normalisasi kualitas skor (0-10), displayScore (0-100), raw value, dan target QA (Speaking Rate 70, Intonation 80, Articulation 90, Fillers 20, Tone 85) untuk data assessment AI Telefun. Memperkenalkan reusable component `VoiceMetricCards.tsx`, memperbarui `VoiceRadarChart.tsx` dan `CommunicationProfileZoomModal.tsx` dengan visual copy target-distance. Rebuild profil stale/invalid secara otomatis di backend (`enrichAssessmentWithCommunicationProfile`) dan frontend (`getCommunicationProfileFromAssessment`). 8 files modified, 41 API + 44 web regression tests passing. (DONE)
 185. **Monitoring History Delete Atomicity** — Refactored monitoring history delete from manual multi-table orchestration in `routes/ai.ts` into a transactional PostgreSQL RPC `delete_monitoring_history` with SECURITY DEFINER. New typed service `monitoring-history-delete-service.ts` with domain error mapping (NOT_FOUND/DELETE_FAILED). Route validation with Zod enum+UUID schemas and human-friendly error responses. Terminal migration `20260605100000_atomic_monitoring_history_delete.sql`. 3 test files covering migration contract, service unit tests, and route integration tests. 29 tests passing across 5 test files, 626 API tests passing overall. (DONE)
 186. **Telefun Metrics Trust Boundary** — Memusatkan validasi assessment dan score Telefun di `@trainers/types`. Schema dan parser kanonik untuk assessment, hold, communication profile, dan score result. Menolak payload inti tidak lengkap dan angka non-finite. Menetapkan score Telefun `0..10`, mempertahankan nilai `0`. Memvalidasi cache dan output Gemini sebelum digunakan atau disimpan. Persistence assessment fail-closed ketika update Supabase gagal. Menghapus compatibility normalizer frontend yang mengubah payload invalid jadi skor nol. Mengetik dependency finalizer dan transport row tanpa `any`. 17 files modified, 639 API + 623 web tests passing. (DONE)
+187. **Test Suite Optimization & Tiering** — Removed 23 low-value tests (import verification, hardcoded CSS assertions, built-in API tests). Implemented 4-tier testing: `test:targeted` (10-30s, vitest --changed), `test:core` (30-60s, 175 critical contract tests), `test:fast` (1-2min, 983 unit tests), `test:full` (~5min, 1239 all tests). New `vitest.config.fast.ts` + `setup-fast.ts` for web. Pre-push workflow uses `test:core`. 10 files modified/added, 639 API + 600 web tests passing. (DONE)
 
 ## Key Files Changed (Phase 58 — 118)
 
@@ -834,6 +902,17 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/routes/monitoring/components/TelefunReviewPanel.tsx` — **Phase 186**: Removed score normalizer import
 - `docs/TELEFUN_ASSESSMENT_CONTRACT.md` — **NEW Phase 186**: Kontrak penilaian Telefun — trust boundary, skala nilai, parser kanonik, hold management, persistence
 - `docs/rebuild-logs/phase-thermo-telefun-metrics-trust-boundary.md` — **NEW Phase 186**: Rebuild log untuk Telefun Metrics Trust Boundary
+
+- `apps/web/vitest.config.fast.ts` — **NEW Phase 187**: Vitest config for fast test tier (node environment, excludes .tsx and React hook tests)
+- `apps/web/src/__tests__/setup-fast.ts` — **NEW Phase 187**: Minimal setup file without DOM globals for fast tests
+- `apps/web/src/__tests__/sidak-input-legacy-refresh.test.tsx` — **Phase 187**: Removed 6 low-value tests (import verification, component contract checks)
+- `apps/web/src/__tests__/sidak-input-parity.test.tsx` — **Phase 187**: Removed 17 hardcoded CSS/HTML string assertion tests, kept actual function tests
+- `apps/web/package.json` — **Phase 187**: Added `test:fast` script
+- `apps/api/package.json` — **Phase 187**: Added `test:fast` script
+- `apps/telefun/package.json` — **Phase 187**: Added `test:fast` script
+- `package.json` — **Phase 187**: Added `test:fast` root script
+- `turbo.json` — **Phase 187**: Added `test:fast` task
+- `docs/rebuild-logs/phase-thermo-test-suite-optimization.md` — **NEW Phase 187**: Rebuild log for test suite optimization & tiering
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |

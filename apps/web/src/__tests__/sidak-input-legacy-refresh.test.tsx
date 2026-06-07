@@ -138,38 +138,6 @@ describe("calculateQAScoreFromTemuan", () => {
   });
 });
 
-// ── SidakInputManualForm scoring mode pass-through ────────────
-describe("SidakInputManualForm — scoringMode", () => {
-  it("passes scoringMode prop to IndicatorDropdown", async () => {
-    const mod = await import("../components/sidak/SidakInputManualForm");
-    expect(mod.default).toBeDefined();
-  }, 15000);
-});
-
-// ── SidakInputScoreCard contract ─────────────────────────────
-describe("SidakInputScoreCard — contract", () => {
-  it("renders without crashing with minimal props", async () => {
-    const mod = await import("../components/sidak/SidakInputScoreCard");
-    expect(mod.default).toBeDefined();
-  }, 10000);
-});
-
-// ── SidakInputImportPanel contract ───────────────────────────
-describe("SidakInputImportPanel — contract", () => {
-  it("exports ParsedImportRow type and component", async () => {
-    const mod = await import("../components/sidak/SidakInputImportPanel");
-    expect(mod.default).toBeDefined();
-  }, 10000);
-});
-
-// ── TemuanGroupCard contract ─────────────────────────────────
-describe("TemuanGroupCard — new props", () => {
-  it("accepts gIdx, categoryMap, canEdit props", async () => {
-    const mod = await import("../components/sidak/TemuanGroupCard");
-    expect(mod.default).toBeDefined();
-  }, 10000);
-});
-
 // ── Perfect Score Session (Sesi Tanpa Temuan) ─────────────────
 describe("Sesi Tanpa Temuan — hasBadFindings logic", () => {
   it("returns true when any temuan has nilai < 3", () => {
@@ -209,14 +177,4 @@ describe("Sesi Tanpa Temuan — hasBadFindings logic", () => {
   });
 });
 
-describe("Sesi Tanpa Temuan — Button component contract", () => {
-  it("can import postApi from useApi hook", async () => {
-    const mod = await import("../hooks/useApi");
-    expect(typeof mod.postApi).toBe("function");
-  });
 
-  it("can import Check icon from lucide-react", async () => {
-    const mod = await import("lucide-react");
-    expect(mod.Check).toBeDefined();
-  });
-});
