@@ -350,7 +350,7 @@ describe("sidak-service", () => {
         if (callCount === 1)
           return {
             data: [
-              { id: "i1", name: "Test", category: "non_critical", bobot: 1 },
+              { id: "i1", name: "Test", service_type: "call", category: "non_critical", bobot: 1 },
             ],
             error: null,
           };

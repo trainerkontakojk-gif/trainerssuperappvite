@@ -106,6 +106,7 @@ Berbeda dengan dashboard yang menghitung populasi audit secara luas (termasuk cl
 ## Delta KPI Dashboard
 
 Persentase kenaikan/penurunan (delta) di KPI Dashboard dihitung berdasarkan dua titik terakhir dari data tren (sparkline). Unit delta disesuaikan dengan jenis metrik:
+
 1. **Metrik Count/Ratio** (`total-defects` dan `avg-defects`): Delta ditampilkan sebagai persentase relatif terhadap periode sebelumnya. Rumusnya: `((current - previous) / previous) * 100`.
 2. **Metrik Persen** (`avg-score` dan `compliance`): Delta ditampilkan sebagai perubahan poin persentase (poin) absolut agar operator tidak bingung. Rumusnya: `current - previous` (dengan nilai mutlak untuk magnitudo).
 3. **Kepatuhan (Compliance)**: Delta kepatuhan dihitung menggunakan `complianceRate` (persentase) alih-alih `complianceCount` (jumlah agen) agar konsisten dengan nilai utama KPI.
@@ -162,10 +163,16 @@ Hasilnya tetap masuk audited population, tetap tampil di ranking, tetapi tidak m
 - Gunakan `docs/SIDAK_SCORING_GUARDRAILS.md` untuk perubahan yang menyentuh scoring atau agregasi SIDAK.
 - **Tampilan UI**: Halaman input (`/sidak/input`) memakai grid responsif untuk pilihan folder, agen, periode, dan daftar temuan. Di mobile grid kembali menjadi satu kolom agar tetap mudah dibaca; di layar lebih lebar trainer bisa melihat lebih banyak pilihan atau sesi dalam satu viewport.
 
+## Agent Detail Score Source
+
+Skor bulanan halaman agent detail (`GET /sidak/agents/:id`) dihitung dari `qa_temuan` melalui scoring engine aplikasi dengan `PeriodScoringContext` yang spesifik per periode. Tabel `qa_dashboard_agent_period_summary` tidak digunakan sebagai sumber skor agent detail karena row history dapat berisi placeholder hasil migration refresh yang tidak setara dengan formula aplikasi.
+
+Lihat `apps/api/src/services/sidak/period-scoring-context.ts` untuk implementasi canonical rule/indicator/weight resolver.
+
 ## BKO Parameter and Weights Resolver
 
 Halaman Input Temuan (`/sidak/input`) menggunakan backend resolver khusus (`GET /resolved-input-config`) untuk memuat konfigurasi parameter aktif dan bobot per `(service_type, period_id)`. Hal ini menjamin parity dengan legacy:
+
 1. **Layanan BKO**: Parameter diselesaikan berdasarkan rule version yang aktif pada periode target. Jika tidak ada versi yang aktif, dropdown parameter akan dinonaktifkan secara eksplisit dan menampilkan peringatan.
 2. **Flat List**: Mode scoring BKO adalah `no_category`. Parameter ditampilkan dalam satu daftar datar (tanpa pemisahan kategori Critical/Non-Critical).
 3. **Pembersihan State**: Perpindahan layanan di halaman input secara otomatis membersihkan input manual yang sedang berjalan serta data preview Excel untuk mencegah kebocoran parameter antar layanan.
-

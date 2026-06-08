@@ -9,9 +9,11 @@ Two improvements: (1) Agent Detail page now queries `qa_dashboard_agent_period_s
 ### 1. Agent Detail Score Caching
 
 **Files:**
+
 - `apps/api/src/services/sidak/agent-directory.ts` — Added parallel query to `qa_dashboard_agent_period_summary` MV for cached `(period_id, service_type)` scores; if MV has data, use `final_score`/`non_critical_score`/`critical_score`/`session_count` directly (avoiding expensive real-time recalculation); else fallback to real-time calculation via `resolveEffectiveRuleVersionForPeriod` for period-specific rule weights/indicators, with error-safe fallback to `DEFAULT_SERVICE_WEIGHTS`
 
 **Behavior:**
+
 - Agent detail summaries now use DB-cached scores when available (faster, consistent with dashboard)
 - If MV row is missing (e.g., period not yet summarized), falls back to real-time calculation using the effective rule version for that specific period
 - Error handling: if `resolveEffectiveRuleVersionForPeriod` throws, gracefully uses `DEFAULT_SERVICE_WEIGHTS` and period's registered indicators
@@ -19,6 +21,7 @@ Two improvements: (1) Agent Detail page now queries `qa_dashboard_agent_period_s
 ### 2. SidakInputScoreCard UI Overhaul
 
 **Files:**
+
 - `apps/web/src/components/sidak/SidakInputScoreCard.tsx` — Complete visual overhaul:
   - Renamed from "Estimasi Skor" to "Skor Kualitas (Live)"
   - SVG radial progress ring (circumference/strokeDashoffset) replacing horizontal progress bar
@@ -45,3 +48,21 @@ Updated existing SidakInputPage test assertions. 0 new tests needed (existing te
 ## Regression Tests
 
 468 web + 479 API tests passing.
+
+---
+
+## Correction (2026-06-08): Invalid Cache-Read Assumption
+
+**Phase 109 memperkenalkan bug: skor cache `0` dari migration refresh dianggap authoritative oleh agent detail.**
+
+Root cause:
+
+- Migration `20260525000100` mengisi `qa_dashboard_agent_period_summary` dengan literal `0` untuk kolom skor.
+- Phase 109 membuat `getAgentDetail()` membaca tabel cache tersebut dan menggunakan nilainya tanpa validasi provenance.
+- Akibatnya, Januari-Maret 2026 menampilkan `0.0%` meskipun data temuan asli menunjukkan skor non-zero.
+
+**Perbaikan (Phase 188):**
+
+- `getAgentDetail()` tidak lagi membaca `qa_dashboard_agent_period_summary`.
+- Skor dihitung dari `qa_temuan` melalui canonical `PeriodScoringContext` (`apps/api/src/services/sidak/period-scoring-context.ts`).
+- Cache tetap dipertahankan untuk kompatibilitas backfill, tetapi tidak digunakan oleh read path aplikasi.

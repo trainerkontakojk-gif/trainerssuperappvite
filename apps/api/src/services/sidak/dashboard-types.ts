@@ -4,16 +4,14 @@ import type {
   ServiceType,
   ServiceWeight,
 } from "@trainers/types";
-import {
-  SERVICE_LABELS,
-  isServiceType,
-} from "../../lib/scoring";
+import { SERVICE_LABELS, isServiceType } from "../../lib/scoring";
 
 export type DashboardTemuanRow = {
   id?: string;
   peserta_id: string;
   period_id: string;
   indicator_id: string;
+  rule_indicator_id?: string | null;
   service_type?: ServiceType | string | null;
   tahun?: number | null;
   nilai?: number | null;
@@ -77,7 +75,8 @@ export type DashboardAgentMetrics = {
   hasCritical: boolean;
 };
 
-export type DashboardAgentWithMetrics = DashboardAgentGroup & DashboardAgentMetrics;
+export type DashboardAgentWithMetrics = DashboardAgentGroup &
+  DashboardAgentMetrics;
 
 export function withDashboardAgentMetrics(
   agent: DashboardAgentGroup,
@@ -86,31 +85,41 @@ export function withDashboardAgentMetrics(
   return { ...agent, ...metrics };
 }
 
-export function toDashboardScoreRows(rows: DashboardTemuanRow[]): DashboardScoreRow[] {
+export function toDashboardScoreRows(
+  rows: DashboardTemuanRow[],
+): DashboardScoreRow[] {
   return rows.flatMap((row) => {
     if (typeof row.nilai !== "number") return [];
-    return [{
+    return [
+      {
       indicator_id: row.indicator_id,
       nilai: row.nilai,
       no_tiket: row.no_tiket ?? null,
       created_at: row.created_at,
       period_id: row.period_id,
-    }];
+      },
+    ];
   });
 }
 
-export function toDashboardTemuanRows(rows: DashboardTemuanRow[] | null | undefined): DashboardTemuanRow[] {
+export function toDashboardTemuanRows(
+  rows: DashboardTemuanRow[] | null | undefined,
+): DashboardTemuanRow[] {
   return rows ?? [];
 }
 
-export function toDashboardWeightMap(rows: DashboardRawWeightRow[] | null | undefined): Record<string, ServiceWeight> {
+export function toDashboardWeightMap(
+  rows: DashboardRawWeightRow[] | null | undefined,
+): Record<string, ServiceWeight> {
   return (rows ?? []).reduce<Record<string, ServiceWeight>>((acc, row) => {
     acc[row.service_type] = row;
     return acc;
   }, {});
 }
 
-export function toDashboardRuleIndicators(rows: DashboardRuleIndicatorRow[] | null | undefined): QAIndicator[] {
+export function toDashboardRuleIndicators(
+  rows: DashboardRuleIndicatorRow[] | null | undefined,
+): QAIndicator[] {
   return (rows ?? []).map((row) => ({
     id: row.legacy_indicator_id || row.id,
     service_type: isServiceType(row.service_type) ? row.service_type : "call",
@@ -121,19 +130,28 @@ export function toDashboardRuleIndicators(rows: DashboardRuleIndicatorRow[] | nu
   }));
 }
 
-export function toDashboardFolderRows(rows: DashboardFolderRow[] | null | undefined): DashboardFolderRow[] {
+export function toDashboardFolderRows(
+  rows: DashboardFolderRow[] | null | undefined,
+): DashboardFolderRow[] {
   return rows ?? [];
 }
 
-export function toDashboardServiceSet(rows: DashboardServiceRow[] | null | undefined): Set<string> {
+export function toDashboardServiceSet(
+  rows: DashboardServiceRow[] | null | undefined,
+): Set<string> {
   return new Set(
     (rows ?? [])
       .map((row) => row.service_type)
-      .filter((serviceType): serviceType is string => typeof serviceType === "string" && serviceType.length > 0),
+      .filter(
+        (serviceType): serviceType is string =>
+          typeof serviceType === "string" && serviceType.length > 0,
+      ),
   );
 }
 
-export function toParetoCategory(category: string | null | undefined): ParetoData["category"] {
+export function toParetoCategory(
+  category: string | null | undefined,
+): ParetoData["category"] {
   return category === "critical" ? "critical" : "non_critical";
 }
 

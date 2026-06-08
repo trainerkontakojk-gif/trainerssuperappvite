@@ -2,15 +2,19 @@ import { supabaseAdmin } from "../../lib/supabase";
 import { roundTo } from "../../lib/math-utils";
 import { isCountableFinding } from "./shared-constants";
 import { getIndicators } from "./period-indicator";
-import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import { getScoreRows } from "./dashboard-aggregation";
 import {
   calculateQAScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
+  isServiceType,
 } from "../../lib/scoring";
-import type { QATemuan, ServiceType } from "@trainers/types";
+import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
+import {
+  loadPeriodScoringContext,
+  normalizePeriodScoringRows,
+} from "./period-scoring-context";
+import type { QATemuan, ServiceType, ServiceWeight } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
-
 
 export interface ValidationError {
   indicator_id: string;
@@ -90,7 +94,10 @@ export async function createPerfectScoreSession(
     throw new Error("Sesi tanpa temuan untuk periode ini sudah pernah dibuat.");
   }
 
-  const activeVersion = await resolveEffectiveRuleVersionForPeriod(service_type, period_id);
+  const activeVersion = await resolveEffectiveRuleVersionForPeriod(
+    service_type,
+    period_id,
+  );
   let indicators: { id: string; rule_indicator_id: string | null }[];
   let rule_version_id: string | null = null;
 
@@ -110,19 +117,25 @@ export async function createPerfectScoreSession(
         .from("qa_indicators")
         .select("id")
         .eq("service_type", service_type);
-      if (!inds || inds.length === 0) throw new Error("Tidak ada parameter untuk tim agent ini");
-      indicators = inds.map((i: any) => ({ id: i.id, rule_indicator_id: null }));
+      if (!inds || inds.length === 0)
+        throw new Error("Tidak ada parameter untuk tim agent ini");
+      indicators = inds.map((i: any) => ({
+        id: i.id,
+        rule_indicator_id: null,
+      }));
     }
   } else {
     const { data: inds } = await supabaseAdmin
       .from("qa_indicators")
       .select("id")
       .eq("service_type", service_type);
-    if (!inds || inds.length === 0) throw new Error("Tidak ada parameter untuk tim agent ini");
+    if (!inds || inds.length === 0)
+      throw new Error("Tidak ada parameter untuk tim agent ini");
     indicators = inds.map((i: any) => ({ id: i.id, rule_indicator_id: null }));
   }
 
-  if (indicators.length === 0) throw new Error("Tidak ada parameter untuk tim agent ini");
+  if (indicators.length === 0)
+    throw new Error("Tidak ada parameter untuk tim agent ini");
 
   const phantomBatchId = crypto.randomUUID();
   const PADDING_COUNT = 5;
@@ -149,7 +162,9 @@ export async function createPerfectScoreSession(
 
   if (error) {
     if (error.message.includes("foreign key")) {
-      throw new Error("Data tidak valid: pastikan agent, periode, dan indikator sudah benar");
+      throw new Error(
+        "Data tidak valid: pastikan agent, periode, dan indikator sudah benar",
+      );
     }
     throw new Error(`Gagal membuat sesi tanpa temuan: ${error.message}`);
   }
@@ -195,7 +210,10 @@ export async function validateTemuanBatch(items: {
   const existingKeys = new Set(
     (existing?.data ?? [])
       .filter((e: any) => e.no_tiket?.trim())
-      .map((e: any) => `${e.no_tiket.trim().toLowerCase()}::${e.indicator_id}::${e.service_type}`)
+      .map(
+        (e: any) =>
+          `${e.no_tiket.trim().toLowerCase()}::${e.indicator_id}::${e.service_type}`,
+      ),
   );
 
   let validLegacyIds: Set<string> | null = null;
@@ -267,7 +285,6 @@ export async function validateTemuanBatch(items: {
     },
     active_rule_version_id: activeVersion?.id ?? null,
   };
-
 }
 
 export async function createTemuanBatch(
@@ -307,7 +324,6 @@ export async function createTemuanBatch(
   }
 
   const ruleVersionId = validation.active_rule_version_id ?? null;
-
 
   const rows = validation.valid.map((item) => {
     const rawTicket = item.no_tiket ?? items.no_tiket ?? null;
@@ -386,7 +402,7 @@ export async function refreshDashboardSummary(
   ]);
 
   const weightMap = (weights?.data ?? []).reduce(
-    (acc: Record<string, any>, w: any) => {
+    (acc: Partial<Record<ServiceType, ServiceWeight>>, w: ServiceWeight) => {
       acc[w.service_type] = w;
       return acc;
     },
@@ -401,7 +417,15 @@ export async function refreshDashboardSummary(
   if (serviceType) query = query.eq("service_type", serviceType);
 
   const { data: allTemuan } = await query;
-  const rows = allTemuan ?? [];
+  type RefreshDashboardRow = DashboardTemuanRow & {
+    profiler_peserta?: {
+      nama?: string | null;
+      batch_name?: string | null;
+      tim?: string | null;
+      jabatan?: string | null;
+    } | null;
+  };
+  const rows = (allTemuan ?? []) as RefreshDashboardRow[];
 
   if (rows.length === 0) {
     return {
@@ -419,14 +443,14 @@ export async function refreshDashboardSummary(
       batch_name: string;
       tim: string;
       jabatan: string;
-      rows: any[];
+      rows: RefreshDashboardRow[];
     }
   >();
 
   for (const row of rows) {
     const pid = row.peserta_id;
     if (!agentMap.has(pid)) {
-      const p = row.profiler_peserta as any;
+      const p = row.profiler_peserta;
       agentMap.set(pid, {
         id: pid,
         nama: p?.nama ?? "Unknown",
@@ -459,65 +483,44 @@ export async function refreshDashboardSummary(
     findings_count: number;
   }[] = [];
 
-  const ruleWeightCache = new Map<string, any>();
-  const ruleIndicatorsCache = new Map<string, any[]>();
-
-  const getRuleWeight = async (svcType: string) => {
-    if (ruleWeightCache.has(svcType)) return ruleWeightCache.get(svcType);
-    const rule = await resolveEffectiveRuleVersionForPeriod(svcType, periodId);
-    let resolved = null;
-    if (rule) {
-      resolved = {
-        critical_weight: rule.critical_weight,
-        non_critical_weight: rule.non_critical_weight,
-        scoring_mode: rule.scoring_mode,
-      };
-    }
-    ruleWeightCache.set(svcType, resolved);
-    return resolved;
-  };
-
-  const getRuleIndicators = async (svcType: string) => {
-    if (ruleIndicatorsCache.has(svcType)) return ruleIndicatorsCache.get(svcType)!;
-    const rule = await resolveEffectiveRuleVersionForPeriod(svcType, periodId);
-    let resolvedInds: any[] = [];
-    if (rule) {
-      const { data: snapshotInds } = await supabaseAdmin
-        .from("qa_service_rule_indicators")
-        .select("*")
-        .eq("rule_version_id", rule.id);
-      if (snapshotInds && snapshotInds.length > 0) {
-        resolvedInds = snapshotInds.map((ri: any) => ({
-          id: ri.legacy_indicator_id || ri.id,
-          name: ri.name,
-          category: ri.category,
-          bobot: Number(ri.bobot),
-          has_na: ri.has_na,
-        }));
-      }
-    }
-    if (resolvedInds.length === 0) {
-      resolvedInds = indicators.filter((i) => i.service_type === svcType);
-    }
-    ruleIndicatorsCache.set(svcType, resolvedInds);
-    return resolvedInds;
-  };
+  const contextCache = new Map<
+    string,
+    Awaited<ReturnType<typeof loadPeriodScoringContext>>
+  >();
 
   for (const agent of auditedAgents) {
-    const agentSvc = agent.rows[0]?.service_type ?? svc;
-    const ruleWeight = await getRuleWeight(agentSvc);
-    const weight =
-      ruleWeight ??
+    const rawAgentService = agent.rows[0]?.service_type ?? svc;
+    if (!isServiceType(rawAgentService)) {
+      throw new Error(`Layanan SIDAK tidak valid: ${rawAgentService}`);
+    }
+    const agentSvc = rawAgentService;
+    const comboKey = `${agentSvc}:${periodId}`;
+
+    if (!contextCache.has(comboKey)) {
+      const fallbackWeight =
       weightMap[agentSvc] ??
-      DEFAULT_SERVICE_WEIGHTS[agentSvc as ServiceType] ??
+        DEFAULT_SERVICE_WEIGHTS[agentSvc] ??
       DEFAULT_SERVICE_WEIGHTS.call;
+      const ctx = await loadPeriodScoringContext(
+        agentSvc,
+        periodId,
+        indicators,
+        fallbackWeight,
+      );
+      contextCache.set(comboKey, ctx);
+    }
 
-    const agentIndicators = await getRuleIndicators(agentSvc);
-    const scoreRows = getScoreRows(agent.rows as DashboardTemuanRow[]);
-    const score = calculateQAScoreFromTemuan(agentIndicators, scoreRows as any, weight);
+    const ctx = contextCache.get(comboKey)!;
+    const weight = ctx.weight;
+    const scoreRows = getScoreRows(agent.rows);
+    const normalizedRows = normalizePeriodScoringRows(scoreRows, ctx);
+    const score = calculateQAScoreFromTemuan(
+      ctx.indicators,
+      normalizedRows,
+      weight,
+    );
 
-
-    const findingRows = agent.rows.filter((r: any) => isCountableFinding(r));
+    const findingRows = agent.rows.filter((r) => isCountableFinding(r));
     const agentFindings = findingRows.length;
     totalFindings += agentFindings;
     totalScore += score.finalScore;
@@ -563,9 +566,7 @@ export async function refreshDashboardSummary(
     .from("qa_dashboard_agent_period_summary")
     .insert(agentRows);
   if (saveAgentsErr)
-    throw new Error(
-      `Gagal menyimpan cache agent: ${saveAgentsErr.message}`,
-    );
+    throw new Error(`Gagal menyimpan cache agent: ${saveAgentsErr.message}`);
 
   const periodSummary = {
     period_id: periodId,

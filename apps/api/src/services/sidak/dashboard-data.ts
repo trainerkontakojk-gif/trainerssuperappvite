@@ -6,8 +6,6 @@ import type {
 import {
   getDashboardServiceLabel,
   toDashboardFolderRows,
-  toDashboardRuleIndicators,
-  toDashboardScoreRows,
   toDashboardServiceSet,
   toDashboardTemuanRows,
   toDashboardWeightMap,
@@ -28,18 +26,17 @@ import type {
   DashboardSummary,
   TopAgentData,
   ParetoData,
-  QAIndicator,
-  ServiceWeight,
 } from "@trainers/types";
-import {
-  isCountableFinding,
-  emptyDashboardResponse,
-} from "./shared-constants";
+import { isCountableFinding, emptyDashboardResponse } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
 import { getFolderNamesByIds, getFoldersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
-import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
+import {
+  loadPeriodScoringContext,
+  normalizePeriodScoringRows,
+  type PeriodScoringContext,
+} from "./period-scoring-context";
 
 export async function getDashboardData(params: {
   period_ids?: string[];
@@ -79,7 +76,10 @@ export async function getDashboardData(params: {
     .select("*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)");
 
   if (params.service_type && params.service_type !== "all") {
-    if (allowedSvcs && !allowedSvcs.includes(params.service_type as ServiceType)) {
+    if (
+      allowedSvcs &&
+      !allowedSvcs.includes(params.service_type as ServiceType)
+    ) {
       return emptyDashboardResponse(periods);
     }
     query = query.eq("service_type", params.service_type);
@@ -107,9 +107,7 @@ export async function getDashboardData(params: {
     query = query.not("peserta_id", "in", `(${excludedIds.join(",")})`);
   }
 
-  let distinctQuery = supabaseAdmin
-    .from("qa_temuan")
-    .select("service_type");
+  let distinctQuery = supabaseAdmin.from("qa_temuan").select("service_type");
 
   if (allowedSvcs) {
     distinctQuery = distinctQuery.in("service_type", allowedSvcs);
@@ -127,13 +125,15 @@ export async function getDashboardData(params: {
     distinctQuery = distinctQuery.in("peserta_id", params.agent_ids);
   }
   if (excludedIds.length > 0) {
-    distinctQuery = distinctQuery.not("peserta_id", "in", `(${excludedIds.join(",")})`);
+    distinctQuery = distinctQuery.not(
+      "peserta_id",
+      "in",
+      `(${excludedIds.join(",")})`,
+    );
   }
 
-  const [{ data: allTemuan }, { data: distinctServiceRows }] = await Promise.all([
-    query,
-    distinctQuery,
-  ]);
+  const [{ data: allTemuan }, { data: distinctServiceRows }] =
+    await Promise.all([query, distinctQuery]);
   const rows = toDashboardTemuanRows(allTemuan);
 
   const weightMap = toDashboardWeightMap(weights?.data);
@@ -146,32 +146,54 @@ export async function getDashboardData(params: {
     }
   }
 
-  // 2. Resolve effective rule versions for each combo concurrently
-  const ruleWeightMap: Record<string, ServiceWeight> = {};
-  const ruleIndicatorsMap: Record<string, QAIndicator[]> = {};
-
+  // 2. Resolve one canonical scoring context per (service_type, period_id).
+  const scoringContextMap = new Map<string, PeriodScoringContext>();
   await Promise.all(
     Array.from(uniqueCombos).map(async (combo) => {
-      const [svc, pid] = combo.split(":");
-      const rule = await resolveEffectiveRuleVersionForPeriod(svc, pid);
-      if (rule) {
-        ruleWeightMap[combo] = {
-          service_type: isServiceType(svc) ? svc : "call",
-          critical_weight: rule.critical_weight,
-          non_critical_weight: rule.non_critical_weight,
-          scoring_mode: rule.scoring_mode,
-        };
-        // Fetch indicators snapshot
-        const { data: snapshotInds } = await supabaseAdmin
-          .from("qa_service_rule_indicators")
-          .select("*")
-          .eq("rule_version_id", rule.id);
-        if (snapshotInds && snapshotInds.length > 0) {
-          ruleIndicatorsMap[combo] = toDashboardRuleIndicators(snapshotInds);
+      const separator = combo.lastIndexOf(":");
+      const rawService = combo.slice(0, separator);
+      const periodId = combo.slice(separator + 1);
+      if (!isServiceType(rawService)) {
+        throw new Error(`Layanan SIDAK tidak valid: ${rawService}`);
         }
-      }
-    })
+      const fallbackWeight =
+        weightMap[rawService] ?? DEFAULT_SERVICE_WEIGHTS[rawService];
+      const context = await loadPeriodScoringContext(
+        rawService,
+        periodId,
+        indicators,
+        fallbackWeight,
+      );
+      scoringContextMap.set(combo, context);
+    }),
   );
+
+  const getScoringContext = (
+    serviceType: string | null | undefined,
+    periodId: string,
+  ): PeriodScoringContext => {
+    if (!isServiceType(serviceType)) {
+      throw new Error(`Layanan SIDAK tidak valid: ${serviceType ?? ""}`);
+    }
+    const context = scoringContextMap.get(`${serviceType}:${periodId}`);
+    if (!context) {
+      throw new Error(
+        `Konteks scoring SIDAK tidak ditemukan: ${serviceType}:${periodId}`,
+      );
+      }
+    return context;
+  };
+
+  const findIndicatorForRow = (
+    row: DashboardTemuanRow,
+    context: PeriodScoringContext,
+  ) => {
+    const [normalized] = normalizePeriodScoringRows([row], context);
+    if (!normalized) return undefined;
+    return context.indicators.find(
+      (indicator) => indicator.id === normalized.indicator_id,
+  );
+  };
 
   const auditedAgents = groupTemuanByAgent(rows);
   const auditedAgentsWithMetrics: DashboardAgentWithMetrics[] = [];
@@ -206,19 +228,16 @@ export async function getDashboardData(params: {
 
     for (const [pid, periodRows] of rowsByPeriod) {
       const svc = periodRows[0]?.service_type ?? "call";
-      const comboKey = `${svc}:${pid}`;
-      const weight =
-        ruleWeightMap[comboKey] ??
-        weightMap[svc] ??
-        DEFAULT_SERVICE_WEIGHTS[svc as ServiceType] ??
-        DEFAULT_SERVICE_WEIGHTS["call"];
-
-      const agentIndicators =
-        ruleIndicatorsMap[comboKey] ??
-        indicators.filter((i) => i.service_type === svc);
-
-      const scoreRows = toDashboardScoreRows(getScoreRows(periodRows));
-      const score = calculateQAScoreFromTemuan(agentIndicators, scoreRows, weight);
+      const context = getScoringContext(svc, pid);
+      const scoreRows = normalizePeriodScoringRows(
+        getScoreRows(periodRows),
+        context,
+      );
+      const score = calculateQAScoreFromTemuan(
+        context.indicators,
+        scoreRows,
+        context.weight,
+      );
 
       agentScoreSum += score.finalScore;
       agentPeriodsCount++;
@@ -232,14 +251,19 @@ export async function getDashboardData(params: {
 
       const periodHasCritical = periodRows.some((r) => {
         if (r.is_phantom_padding === true) return false;
-        if (r.nilai === null || r.nilai === undefined || Number(r.nilai) !== 0) return false;
-        const ind = agentIndicators.find((i) => i.id === r.indicator_id) || indicators.find((i) => i.id === r.indicator_id);
+        if (r.nilai === null || r.nilai === undefined || Number(r.nilai) !== 0)
+          return false;
+        const ind =
+          findIndicatorForRow(r, context) ??
+          indicators.find((i) => i.id === r.indicator_id);
         return ind?.category === "critical";
       });
       if (periodHasCritical) hasCritical = true;
 
       for (const row of findingRows) {
-        const ind = agentIndicators.find((i) => i.id === row.indicator_id) || indicators.find((i) => i.id === row.indicator_id);
+        const ind =
+          findIndicatorForRow(row, context) ??
+          indicators.find((i) => i.id === row.indicator_id);
         if (ind) {
           const key = ind.name;
           paretoMap.set(key, {
@@ -253,7 +277,8 @@ export async function getDashboardData(params: {
       }
     }
 
-    const finalAgentScore = agentPeriodsCount > 0 ? agentScoreSum / agentPeriodsCount : 100;
+    const finalAgentScore =
+      agentPeriodsCount > 0 ? agentScoreSum / agentPeriodsCount : 100;
 
     auditedAgentsWithMetrics.push(
       withDashboardAgentMetrics(agent, {
@@ -280,16 +305,12 @@ export async function getDashboardData(params: {
     endMonth: params.endMonth,
     isCountableFinding,
     calculateScore: (scoreRows, serviceType, periodId) => {
-      const comboKey = `${serviceType}:${periodId}`;
-      const weight =
-        ruleWeightMap[comboKey] ??
-        weightMap[serviceType] ??
-        DEFAULT_SERVICE_WEIGHTS[serviceType as ServiceType] ??
-        DEFAULT_SERVICE_WEIGHTS.call;
-      const agentIndicators =
-        ruleIndicatorsMap[comboKey] ??
-        indicators.filter((i) => i.service_type === serviceType);
-      return calculateQAScoreFromTemuan(agentIndicators, toDashboardScoreRows(scoreRows), weight).finalScore;
+      const context = getScoringContext(serviceType, periodId);
+      return calculateQAScoreFromTemuan(
+        context.indicators,
+        normalizePeriodScoringRows(scoreRows, context),
+        context.weight,
+      ).finalScore;
     },
   });
 
@@ -326,7 +347,10 @@ export async function getDashboardData(params: {
       const totalDefects = metrics.reduce((acc, m) => acc + m.total, 0);
       const totalAudited = metrics.reduce((acc, m) => acc + m.totalAudited, 0);
       const totalCompliant = metrics.reduce((acc, m) => acc + m.compliance, 0);
-      const avgAgentScoreSum = metrics.reduce((acc, m) => acc + m.avgAgentScore * m.totalAudited, 0);
+      const avgAgentScoreSum = metrics.reduce(
+        (acc, m) => acc + m.avgAgentScore * m.totalAudited,
+        0,
+      );
       const totalZeroError = metrics.reduce((acc, m) => {
         const zCount = Math.round((m.zero / 100) * m.totalAudited);
         return acc + zCount;
@@ -334,11 +358,20 @@ export async function getDashboardData(params: {
 
       summary = {
         totalDefects,
-        avgDefectsPerAudit: totalAgents > 0 ? roundTo(totalDefects / totalAgents, 2) : 0,
-        zeroErrorRate: totalAudited > 0 ? roundTo((totalZeroError / totalAudited) * 100, 2) : 0,
-        avgAgentScore: totalAudited > 0 ? roundTo(avgAgentScoreSum / totalAudited, 2) : 0,
-        complianceRate: totalAudited > 0 ? roundTo((totalCompliant / totalAudited) * 100, 2) : 0,
-        complianceCount: metrics.length > 0 ? roundTo(totalCompliant / metrics.length, 1) : 0,
+        avgDefectsPerAudit:
+          totalAgents > 0 ? roundTo(totalDefects / totalAgents, 2) : 0,
+        zeroErrorRate:
+          totalAudited > 0
+            ? roundTo((totalZeroError / totalAudited) * 100, 2)
+            : 0,
+        avgAgentScore:
+          totalAudited > 0 ? roundTo(avgAgentScoreSum / totalAudited, 2) : 0,
+        complianceRate:
+          totalAudited > 0
+            ? roundTo((totalCompliant / totalAudited) * 100, 2)
+            : 0,
+        complianceCount:
+          metrics.length > 0 ? roundTo(totalCompliant / metrics.length, 1) : 0,
         totalAgents,
       };
     } else {

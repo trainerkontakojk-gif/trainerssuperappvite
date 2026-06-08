@@ -11,8 +11,7 @@ export * from "./sidak/report-data";
 export * from "./sidak/ai-report-service";
 export { roundTo } from "../lib/math-utils";
 export * from "./sidak/rule-version-resolver";
-
+export * from "./sidak/period-scoring-context";
 
 // Test compatibility: supabaseAdmin.from("mv_qa_period_summary")
 // Test compatibility: supabaseAdmin.rpc("refresh_mv_qa_period_summary")
-

@@ -63,7 +63,6 @@ erDiagram
 - `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql` — Add unique index on qa_temuan to prevent duplicate input at database level (peserta + period + service + trimmed lowercased no_tiket + indicator)
 - `20260527000001_add_simulation_duration_to_ketik_history.sql` — Add `simulation_duration INTEGER` column to `ketik_history` (fixes KETIK session save failure)
 
-
 ### 1. `public.profiles`
 
 Menyimpan data profil user yang terintegrasi dengan `auth.users`.
@@ -111,6 +110,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
   - **Final security posture**: `SELECT` and `EXECUTE` on `mv_qa_period_summary` and `refresh_mv_qa_period_summary()` are granted exclusively to `service_role`. Zero client-side grants after the terminal migration.
 - **`qa_dashboard_period_summary`**: Summary KPI per periode per service per folder untuk dashboard SIDAK (Vite cache, menggunakan `folder_id` bukan `folder_key`). Dihasilkan oleh `refresh_qa_dashboard_summary_for_period()`.
 - **`qa_dashboard_agent_period_summary`**: Skor dan metrik per agent per periode per service (Vite cache, menggunakan `agent_id`). Dihasilkan oleh `refresh_qa_dashboard_summary_for_period()`.
+  - **Peringatan**: Kolom skor (`final_score`, `non_critical_score`, `critical_score`) pada tabel ini bersifat **non-authoritative** untuk aplikasi read path. Migration refresh awal mengisi literal `0` sebagai placeholder, sehingga skor cache bisa tidak merepresentasikan nilai sebenarnya. Agent detail menghitung skor dari `qa_temuan` melalui scoring engine aplikasi (`PeriodScoringContext`), bukan dari tabel cache ini.
 - **`qa_periods`**: Definisi periode audit kualitas.
 - **`qa_temuan`**: Data utama audit (Agent, Tim, Temuan, Status).
 - **`qa_indicators`**: Daftar parameter penilaian audit.
@@ -204,6 +204,7 @@ Backup database via `pg_dump` hanya mencakup schema/data PostgreSQL dan metadata
 Jika Anda menambahkan kolom baru atau melakukan DDL di database namun aplikasi (atau PostgREST) merespons dengan pesan error terkait kolom hilang (misalnya `PGRST204` "Could not find the '...' column in the schema cache"), PostgREST cache mungkin menjadi usang (_stale_).
 
 Untuk memuat ulang schema cache PostgREST:
+
 1. Hubungkan ke database menggunakan `supabase db query --linked` (jika remote) atau tool SQL client apa pun.
 2. Jalankan perintah `NOTIFY pgrst, 'reload schema';`
 
