@@ -12,6 +12,7 @@ export interface ManagedUser {
 
 export interface PendingLeaderRequest {
   id: string;
+  leader_user_id: string;
   leader_name: string;
   leader_email: string;
   module: string;
@@ -21,6 +22,7 @@ export interface PendingLeaderRequest {
 
 export interface ApprovedLeaderAccess {
   id: string;
+  leader_user_id: string;
   leader_name: string;
   leader_email: string;
   module: string;

@@ -145,7 +145,8 @@ export async function resetUserPassword(
     type: "recovery",
     email,
   });
-  if (error) throw new Error(`Gagal generate link reset password: ${error.message}`);
+  if (error)
+    throw new Error(`Gagal generate link reset password: ${error.message}`);
 
   await logActivity({
     user_id: callerId,
@@ -334,6 +335,7 @@ export async function getPendingLeaderRequests(): Promise<
     .select(
       `
       id,
+      leader_user_id,
       module,
       status,
       created_at,
@@ -347,6 +349,7 @@ export async function getPendingLeaderRequests(): Promise<
 
   return (data || []).map((row: any) => ({
     id: row.id,
+    leader_user_id: row.leader_user_id,
     leader_name: row.profiles?.full_name ?? "Unknown",
     leader_email: row.profiles?.email ?? "",
     module: row.module,
@@ -363,6 +366,7 @@ export async function getApprovedLeaderRequests(): Promise<
     .select(
       `
       id,
+      leader_user_id,
       module,
       status,
       updated_at,
@@ -407,6 +411,7 @@ export async function getApprovedLeaderRequests(): Promise<
 
   return requests.map((row: any) => ({
     id: row.id,
+    leader_user_id: row.leader_user_id,
     leader_name: row.profiles?.full_name ?? "Unknown",
     leader_email: row.profiles?.email ?? "",
     module: row.module,
@@ -599,12 +604,12 @@ export async function reassignLeaderRequestGroups(
 
   if (insertError) {
     // Rollback: restore old links
-    await supabaseAdmin
-      .from("leader_access_request_groups")
-      .insert(oldGroupIds.map((gid: string) => ({
+    await supabaseAdmin.from("leader_access_request_groups").insert(
+      oldGroupIds.map((gid: string) => ({
         request_id: requestId,
         access_group_id: gid,
-      })));
+      })),
+    );
     throw new Error("Gagal menyimpan access group baru. Perubahan dibatalkan.");
   }
 
