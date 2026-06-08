@@ -26,6 +26,7 @@ describe("ParetoChart", () => {
             category: "none",
           },
         ]}
+        insight={null}
       />
     );
     expect(container.firstChild).toBeInTheDocument();

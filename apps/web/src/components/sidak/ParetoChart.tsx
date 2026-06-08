@@ -1,15 +1,10 @@
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-
-interface ParetoItem {
-  name: string;
-  fullName: string;
-  count: number;
-  cumulative: number;
-  category: string;
-}
+import type { ParetoChartItem, ParetoImprovementInsightModel } from "./pareto-view-model";
+import ParetoImprovementInsight from "./ParetoImprovementInsight";
 
 interface Props {
-  data: ParetoItem[];
+  data: ParetoChartItem[];
+  insight: ParetoImprovementInsightModel | null;
   serviceLabel?: string;
 }
 
@@ -26,7 +21,7 @@ function getCategoryMeta(category?: string) {
 export function ParetoTooltip({ active, payload, serviceLabel }: any) {
   if (!active || !Array.isArray(payload) || payload.length === 0) return null;
 
-  const item = payload[0]?.payload as ParetoItem | undefined;
+  const item = payload[0]?.payload as ParetoChartItem | undefined;
   if (!item) return null;
 
   const category = getCategoryMeta(item.category);
@@ -58,13 +53,13 @@ export function ParetoTooltip({ active, payload, serviceLabel }: any) {
   );
 }
 
-export default function ParetoChart({ data, serviceLabel }: Props) {
+export default function ParetoChart({ data, insight, serviceLabel }: Props) {
   if (!data.length) return null;
 
   return (
-    <div className="h-96 w-full flex flex-col">
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%" minHeight={0}>
+    <div className="w-full">
+      <div className="h-80 w-full sm:h-96">
+        <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 20, right: 10, bottom: 20, left: -10 }}>
             <CartesianGrid strokeDasharray="5 5" vertical={false} stroke="currentColor" opacity={0.05} />
             <XAxis
@@ -95,7 +90,7 @@ export default function ParetoChart({ data, serviceLabel }: Props) {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-2 pt-4 border-t border-border/30">
+      <div aria-label="Legend Root Cause Analysis" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-2 pt-4 border-t border-border/30">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded bg-[#f43f5e] opacity-80" />
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Critical Parameter</span>
@@ -116,6 +111,7 @@ export default function ParetoChart({ data, serviceLabel }: Props) {
           <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Garis Kumulatif (%)</span>
         </div>
       </div>
+      <ParetoImprovementInsight insight={insight} serviceLabel={serviceLabel} />
     </div>
   );
 }

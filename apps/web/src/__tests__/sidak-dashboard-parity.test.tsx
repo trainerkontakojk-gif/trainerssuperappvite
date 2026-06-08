@@ -218,7 +218,7 @@ describe("SIDAK dashboard legacy parity", () => {
     expect(container.querySelector('[data-testid="sidak-dashboard-skeleton"]')).toBeInTheDocument();
   });
 
-  it("passes full RCA parameter names to ParetoChart", async () => {
+  it("passes full RCA parameter names and insight from builder to ParetoChart", async () => {
     useApiMock.mockReturnValue({
       data: {
         ...mockDashboardData,
@@ -247,6 +247,12 @@ describe("SIDAK dashboard legacy parity", () => {
             fullName: "Kesesuaian Data pada Kertas Kerja",
           }),
         ]),
+        insight: expect.objectContaining({
+          primary: expect.objectContaining({
+            name: "Kesesuaian Data pada Kertas Kerja",
+            count: 32,
+          }),
+        }),
       }),
     );
   });

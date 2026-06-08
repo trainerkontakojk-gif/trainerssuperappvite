@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useApi } from "../../hooks/useApi";
-import type { DashboardData, ParetoData } from "@trainers/types";
+import type { DashboardData } from "@trainers/types";
 import {
   BarChart3,
   RefreshCw,
@@ -18,6 +18,7 @@ import {
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
 import { SERVICE_LABELS } from "../../lib/scoring";
+import { buildParetoViewModel } from "../../components/sidak/pareto-view-model";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ParetoChart from "../../components/sidak/ParetoChart";
 import FatalDonutChart from "../../components/sidak/FatalDonutChart";
@@ -162,23 +163,10 @@ export default function SidakDashboardPage() {
   const hasNoData = !data && !loading;
   const hasNoPeriods = data && !hasSummary && !loading;
 
-  const paretoSource = data?.paretoData;
-  const sortedPareto = useMemo(() => {
-    if (!paretoSource) return [];
-    return [...paretoSource]
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 12)
-      .map((p: ParetoData, _i: number, arr: ParetoData[]) => {
-        const total = arr.reduce((s: number, x: ParetoData) => s + x.count, 0);
-        return {
-          name: p.name,
-          fullName: p.fullName || p.name,
-          count: p.count,
-          cumulative: total > 0 ? Math.round((p.cumulative / total) * 100) : 0,
-          category: p.category,
-        };
-      });
-  }, [paretoSource]);
+  const paretoViewModel = useMemo(
+    () => buildParetoViewModel(data?.paretoData),
+    [data?.paretoData],
+  );
 
   const sparklines = data?.sparklines ?? {};
   const buildDelta = (
@@ -448,9 +436,10 @@ export default function SidakDashboardPage() {
                       </p>
                     </div>
                   </div>
-                  {sortedPareto.length > 0 ? (
+                  {paretoViewModel.chartData.length > 0 ? (
                     <ParetoChart
-                      data={sortedPareto}
+                      data={paretoViewModel.chartData}
+                      insight={paretoViewModel.insight}
                       serviceLabel={
                         SERVICE_LABELS[
                           selectedService as keyof typeof SERVICE_LABELS
