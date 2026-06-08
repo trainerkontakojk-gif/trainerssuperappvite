@@ -3,6 +3,7 @@ import type { TelefunAppSettings } from "./telefunSettings";
 import type { CallRecord } from "./types";
 import { validateAssessment } from "../../lib/voiceAssessmentUtils";
 import type { SessionMetrics } from "@trainers/types";
+import { parseTelefunTranscript } from "@trainers/types";
 
 export interface TelefunSessionRow {
   id: string;
@@ -30,6 +31,7 @@ export interface TelefunSessionRow {
   response_pacing_mode?: string | null;
   telefun_model_id?: string | null;
   telefun_transport?: string | null;
+  messages?: unknown;
 }
 
 export async function getTelefunSettings(): Promise<any> {
@@ -62,6 +64,8 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
       ? row.voice_dashboard_metrics.score
       : undefined;
 
+  const transcript = parseTelefunTranscript(row.messages);
+
   return {
     id: row.id,
     date: row.created_at ?? row.date ?? "",
@@ -86,5 +90,6 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
     responsePacingMode: row.response_pacing_mode ?? undefined,
     telefunModelId: row.telefun_model_id ?? undefined,
     telefunTransport: row.telefun_transport ?? undefined,
+    transcript,
   };
 }

@@ -13,6 +13,7 @@ import { generateOpenRouterContent } from "../lib/openrouter";
 import { requireRole } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
+import { parseTelefunTranscript } from "@trainers/types";
 import { getMonitoringHistory } from "../services/monitoring-history-service";
 import { getAiUsageSummary } from "../services/ai-usage-summary-service";
 import {
@@ -323,7 +324,7 @@ ai.get(
       if (module === "telefun") {
         const { data: history, error: historyError } = await admin
           .from("telefun_history")
-          .select("score, recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus")
+          .select("score, recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus, messages")
           .eq("id", id)
           .single();
 
@@ -346,6 +347,8 @@ ai.get(
             ? voiceAssessment.overallScore
             : history.score;
 
+        const transcript = parseTelefunTranscript(history.messages);
+
         return c.json({
           success: true,
           data: {
@@ -357,6 +360,7 @@ ai.get(
             scenario_title: history.scenario_title,
             duration_seconds: history.duration_seconds,
             voice_assessment: voiceAssessment || null,
+            transcript,
             ai_summary: history.ai_summary || null,
             strengths: history.strengths || null,
             weaknesses: history.weaknesses || null,

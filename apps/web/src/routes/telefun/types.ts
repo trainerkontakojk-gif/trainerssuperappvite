@@ -1,4 +1,4 @@
-import type { SessionMetrics, VoiceQualityAssessment } from "@trainers/types";
+import type { SessionMetrics, VoiceQualityAssessment, TelefunTranscriptEntry } from "@trainers/types";
 
 export interface CallRecord {
   id: string;
@@ -25,6 +25,7 @@ export interface CallRecord {
   responsePacingMode?: string;
   telefunModelId?: string;
   telefunTransport?: string;
+  transcript?: TelefunTranscriptEntry[];
 }
 
 export type TelefunSessionState =

@@ -65,4 +65,37 @@ describe("Telefun API Adapter", () => {
 
     expect(mapTelefunSessionRow(row).score).toBe(7);
   });
+
+  it("parses valid messages into transcript entries", () => {
+    const row: TelefunSessionRow = {
+      id: "session-transcript",
+      messages: [
+        { speaker: "agent", text: "Halo", startMs: 1000 },
+        { speaker: "consumer", text: "Halo juga", startMs: 3000 },
+      ],
+    };
+    const record = mapTelefunSessionRow(row);
+    expect(record.transcript).toHaveLength(2);
+    expect(record.transcript![0].speaker).toBe("agent");
+    expect(record.transcript![0].text).toBe("Halo");
+  });
+
+  it("cleans malformed messages via parseTelefunTranscript", () => {
+    const row: TelefunSessionRow = {
+      id: "session-malformed",
+      messages: [
+        { speaker: "agent", text: "Valid", startMs: 0 },
+        { speaker: "unknown", text: "Invalid", startMs: 0 },
+      ],
+    };
+    const record = mapTelefunSessionRow(row);
+    expect(record.transcript).toHaveLength(1);
+    expect(record.transcript![0].text).toBe("Valid");
+  });
+
+  it("returns empty array when messages is missing", () => {
+    const row: TelefunSessionRow = { id: "session-nomessages" };
+    const record = mapTelefunSessionRow(row);
+    expect(record.transcript).toEqual([]);
+  });
 });

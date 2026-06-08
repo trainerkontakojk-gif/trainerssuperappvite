@@ -99,6 +99,7 @@ describe("telefun live protocol", () => {
       message.setup.realtimeInputConfig.automaticActivityDetection.disabled,
     ).toBe(false);
     expect(message.setup.inputAudioTranscription).toEqual({});
+    expect(message.setup.outputAudioTranscription).toEqual({});
   });
 
   it("builds realtime audio JSON with base64 pcm16 data", () => {

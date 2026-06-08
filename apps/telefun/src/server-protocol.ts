@@ -38,3 +38,49 @@ export function isCurrentGeminiSocket(
 ): boolean {
   return activeSocket === eventSocket;
 }
+
+export interface GeminiTranscriptionChunk {
+  speaker: "agent" | "consumer";
+  text: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function extractGeminiTranscriptionChunks(
+  message: unknown,
+): GeminiTranscriptionChunk[] {
+  if (!isRecord(message)) return [];
+
+  const serverContent = message.serverContent;
+  if (!isRecord(serverContent)) return [];
+
+  const chunks: GeminiTranscriptionChunk[] = [];
+
+  const inputTranscription = serverContent.inputTranscription;
+  if (
+    isRecord(inputTranscription) &&
+    typeof inputTranscription.text === "string" &&
+    inputTranscription.text.trim().length > 0
+  ) {
+    chunks.push({
+      speaker: "agent",
+      text: inputTranscription.text,
+    });
+  }
+
+  const outputTranscription = serverContent.outputTranscription;
+  if (
+    isRecord(outputTranscription) &&
+    typeof outputTranscription.text === "string" &&
+    outputTranscription.text.trim().length > 0
+  ) {
+    chunks.push({
+      speaker: "consumer",
+      text: outputTranscription.text,
+    });
+  }
+
+  return chunks;
+}

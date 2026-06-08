@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { VoiceQualityAssessment } from "@trainers/types";
+import type { VoiceQualityAssessment, TelefunTranscriptEntry } from "@trainers/types";
 import {
   CheckCircle2,
   Loader2,
@@ -23,6 +23,7 @@ import { VoiceRadarChart } from "./VoiceRadarChart";
 import { CommunicationProfileZoomModal } from "./CommunicationProfileZoomModal";
 import { VoiceMetricCards } from "./VoiceMetricCards";
 import { HoldAssessmentCard } from "./HoldAssessmentCard";
+import { TelefunTranscript } from "./TelefunTranscript";
 import { postApi } from "../../../hooks/useApi";
 
 interface VoiceAssessmentSectionProps {
@@ -30,6 +31,7 @@ interface VoiceAssessmentSectionProps {
   initialAssessment?: VoiceQualityAssessment | null;
   hasAgentRecording?: boolean;
   onAssessmentUpdate?: (assessment: VoiceQualityAssessment) => void;
+  transcript?: TelefunTranscriptEntry[] | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -50,6 +52,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   initialAssessment,
   hasAgentRecording = true,
   onAssessmentUpdate,
+  transcript,
 }) => {
   const [assessment, setAssessment] = useState<VoiceQualityAssessment | null>(
     initialAssessment ? validateAssessment(initialAssessment) : null,
@@ -277,9 +280,10 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
           <MessageSquare className="h-4 w-4" />
           Transcript Lengkap
         </h3>
-        <div className="max-h-[200px] overflow-y-auto rounded-xl bg-slate-950/5 p-4 text-sm leading-relaxed text-slate-700 dark:bg-white/5 dark:text-white/70">
-          {assessment.transcript}
-        </div>
+        <TelefunTranscript
+          entries={transcript}
+          legacyText={assessment.transcript}
+        />
       </div>
 
       {/* Zoom Modal */}

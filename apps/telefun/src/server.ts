@@ -10,8 +10,8 @@ import {
   type LiveUsageSnapshot,
 } from "./usage.js";
 import { createSession, updateSession, getOwnedSessionId } from "./db.js";
-import { UtteranceBuffer } from "./silence.js";
 import { TurnManager } from "./turn-taking.js";
+import { TranscriptCollector } from "./transcript.js";
 import {
   isGeminiForwardableMessage,
   isGeminiSetupMessage,
@@ -19,6 +19,7 @@ import {
   getGeminiGoAwayTimeLeftSeconds,
   getSessionResumptionHandle,
   isCurrentGeminiSocket,
+  extractGeminiTranscriptionChunks,
 } from "./server-protocol.js";
 import { buildSafeCloseMetadata } from "./server-close.js";
 
@@ -71,17 +72,13 @@ function connectGemini(): WebSocket {
 
 wss.on("connection", async (ws, req) => {
   const pendingMessages: string[] = [];
-  const transcriptMessages: {
-    role: string;
-    text: string;
-    timestamp: number;
-  }[] = [];
+  const callStartedAt = Date.now();
+  const transcriptCollector = new TranscriptCollector(callStartedAt);
   let geminiWs: WebSocket | null = null;
   let isGeminiOpen = false;
   let authed = false;
   let userId = "";
   let sessionId = "";
-  const callStartedAt = Date.now();
   const requestId = `telefun-live-${randomUUID()}`;
   const url = new URL(
     req.url || "/",
@@ -107,7 +104,6 @@ wss.on("connection", async (ws, req) => {
     }
   }, 30_000);
 
-  const utteranceBuffer = new UtteranceBuffer(500, 1000);
   const turnManager = new TurnManager();
 
   const flushUsage = async () => {
@@ -118,11 +114,12 @@ wss.on("connection", async (ws, req) => {
 
   const saveAndCloseSession = async (status: string) => {
     const duration = Math.floor((Date.now() - callStartedAt) / 1000);
+    transcriptCollector.flush(Date.now());
     if (sessionId) {
       await updateSession(sessionId, {
         status,
         duration_seconds: duration,
-        messages: transcriptMessages as unknown[],
+        messages: transcriptCollector.snapshot(),
       });
     }
   };
@@ -235,19 +232,20 @@ wss.on("connection", async (ws, req) => {
             if (msg) sendToGemini(msg);
           }
         }
+        const transcriptChunks = extractGeminiTranscriptionChunks(parsed);
+        for (const chunk of transcriptChunks) {
+          transcriptCollector.append({
+            speaker: chunk.speaker,
+            text: chunk.text,
+            observedAtMs: Date.now(),
+          });
+        }
+
         if (parsed.serverContent?.modelTurn?.parts) {
           turnManager.startAiSpeaking();
-          for (const part of parsed.serverContent.modelTurn.parts) {
-            if (part.text) {
-              transcriptMessages.push({
-                role: "ai",
-                text: part.text,
-                timestamp: Date.now(),
-              });
-            }
-          }
         }
         if (parsed.serverContent?.turnComplete) {
+          transcriptCollector.completeTurn("consumer");
           turnManager.endAiSpeaking();
         }
 
@@ -352,21 +350,6 @@ wss.on("connection", async (ws, req) => {
       cachedSetupMessage = JSON.stringify(parsed);
     }
 
-    // Extract user text for transcript
-    if ((parsed as any).clientContent?.turns) {
-      for (const turn of (parsed as any).clientContent.turns) {
-        for (const part of turn.parts || []) {
-          if (part.text) {
-            transcriptMessages.push({
-              role: "user",
-              text: part.text,
-              timestamp: Date.now(),
-            });
-          }
-        }
-      }
-    }
-
     if (isGeminiSetupMessage(parsed) || geminiSetupComplete) {
       sendToGemini(JSON.stringify(parsed));
     } else {
@@ -384,7 +367,6 @@ wss.on("connection", async (ws, req) => {
       reconnectTimer = null;
     }
     clearInterval(keepaliveTimer);
-    utteranceBuffer.flushNow();
     if (
       geminiWs &&
       (geminiWs.readyState === WebSocket.OPEN ||
@@ -403,7 +385,6 @@ wss.on("connection", async (ws, req) => {
       reconnectTimer = null;
     }
     clearInterval(keepaliveTimer);
-    utteranceBuffer.clear();
     if (
       geminiWs &&
       (geminiWs.readyState === WebSocket.OPEN ||

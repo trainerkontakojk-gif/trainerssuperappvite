@@ -480,6 +480,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       initialAssessment={assessment || undefined}
                       hasAgentRecording={Boolean(record.agentRecordingPath)}
                       onAssessmentUpdate={handleAssessmentUpdate}
+                      transcript={record.transcript}
                     />
                   </motion.div>
                 )}

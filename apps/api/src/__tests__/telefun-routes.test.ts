@@ -21,6 +21,8 @@ import {
   buildTelefunFeedbackSummary,
 } from "../routes/telefun";
 
+import { telefunTranscriptSchema, parseTelefunTranscript } from "@trainers/types";
+
 describe("telefun API payload and security validators", () => {
   it("merges telefun settings without wiping other keys like ketik", () => {
     const existingSettings = {
@@ -281,5 +283,58 @@ describe("telefun API payload and security validators", () => {
     });
 
     expect(summary).toContain("Manajemen hold kurang.");
+  });
+
+  it("buildTelefunSessionUpdatePayload includes typed transcript entries", () => {
+    const entries = [
+      { speaker: "agent" as const, text: "Halo", startMs: 1000 },
+      { speaker: "consumer" as const, text: "Halo juga", startMs: 3000 },
+    ];
+    const payload = buildTelefunSessionUpdatePayload({
+      status: "completed",
+      messages: entries,
+    });
+    expect(payload.messages).toEqual(entries);
+  });
+
+  it("telefunTranscriptSchema rejects malformed transcript entries", () => {
+    const valid = telefunTranscriptSchema.safeParse([
+      { speaker: "agent", text: "Test", startMs: 0 },
+    ]);
+    expect(valid.success).toBe(true);
+
+    const invalidSpeaker = telefunTranscriptSchema.safeParse([
+      { speaker: "unknown", text: "Test", startMs: 0 },
+    ]);
+    expect(invalidSpeaker.success).toBe(false);
+
+    const negativeTimestamp = telefunTranscriptSchema.safeParse([
+      { speaker: "agent", text: "Test", startMs: -1 },
+    ]);
+    expect(negativeTimestamp.success).toBe(false);
+
+    const emptyText = telefunTranscriptSchema.safeParse([
+      { speaker: "agent", text: "", startMs: 0 },
+    ]);
+    expect(emptyText.success).toBe(false);
+  });
+
+  it("parseTelefunTranscript strips malformed items but keeps valid ones", () => {
+    const result = parseTelefunTranscript([
+      { speaker: "agent", text: "Valid", startMs: 0 },
+      { speaker: "unknown", text: "Invalid role", startMs: 0 },
+      { speaker: "consumer", text: "", startMs: 0 },
+      { speaker: "consumer", text: "Juga valid", startMs: 5000 },
+    ]);
+    expect(result).toHaveLength(2);
+    expect(result[0].text).toBe("Valid");
+    expect(result[1].text).toBe("Juga valid");
+  });
+
+  it("parseTelefunTranscript returns empty array for non-array input", () => {
+    expect(parseTelefunTranscript(null)).toEqual([]);
+    expect(parseTelefunTranscript(undefined)).toEqual([]);
+    expect(parseTelefunTranscript("string")).toEqual([]);
+    expect(parseTelefunTranscript({})).toEqual([]);
   });
 });

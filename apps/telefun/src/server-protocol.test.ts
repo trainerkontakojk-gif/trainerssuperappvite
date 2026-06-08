@@ -6,6 +6,7 @@ import {
   getGeminiGoAwayTimeLeftSeconds,
   getSessionResumptionHandle,
   isCurrentGeminiSocket,
+  extractGeminiTranscriptionChunks,
 } from "./server-protocol.js";
 
 describe("telefun proxy protocol", () => {
@@ -96,5 +97,79 @@ describe("telefun proxy protocol", () => {
 
     expect(isCurrentGeminiSocket(currentSocket, currentSocket)).toBe(true);
     expect(isCurrentGeminiSocket(currentSocket, staleSocket)).toBe(false);
+  });
+
+  it("extracts input transcription as agent speaker", () => {
+    const chunks = extractGeminiTranscriptionChunks({
+      serverContent: {
+        inputTranscription: { text: "Selamat pagi" },
+        turnComplete: false,
+      },
+    });
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].speaker).toBe("agent");
+    expect(chunks[0].text).toBe("Selamat pagi");
+  });
+
+  it("extracts output transcription as consumer speaker", () => {
+    const chunks = extractGeminiTranscriptionChunks({
+      serverContent: {
+        outputTranscription: { text: "Selamat pagi mas, ada yang bisa dibantu?" },
+        turnComplete: true,
+      },
+    });
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].speaker).toBe("consumer");
+    expect(chunks[0].text).toBe("Selamat pagi mas, ada yang bisa dibantu?");
+  });
+
+  it("extracts input and output transcription together when both present", () => {
+    const chunks = extractGeminiTranscriptionChunks({
+      serverContent: {
+        inputTranscription: { text: "Halo" },
+        outputTranscription: { text: "Halo, ada yang bisa dibantu?" },
+        turnComplete: false,
+      },
+    });
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0].speaker).toBe("agent");
+    expect(chunks[1].speaker).toBe("consumer");
+  });
+
+  it("returns empty array for malformed payload", () => {
+    expect(extractGeminiTranscriptionChunks(null)).toEqual([]);
+    expect(extractGeminiTranscriptionChunks("string")).toEqual([]);
+    expect(extractGeminiTranscriptionChunks({})).toEqual([]);
+  });
+
+  it("ignores empty or whitespace-only transcription text", () => {
+    const chunks = extractGeminiTranscriptionChunks({
+      serverContent: {
+        inputTranscription: { text: "" },
+        outputTranscription: { text: "   " },
+      },
+    });
+    expect(chunks).toHaveLength(0);
+  });
+
+  it("preserves significant whitespace in streaming fragments", () => {
+    const chunks = extractGeminiTranscriptionChunks({
+      serverContent: {
+        outputTranscription: { text: " pagi" },
+      },
+    });
+
+    expect(chunks[0].text).toBe(" pagi");
+  });
+
+  it("ignores modelTurn text as it is not transcription", () => {
+    const chunks = extractGeminiTranscriptionChunks({
+      serverContent: {
+        modelTurn: {
+          parts: [{ text: "some text" }],
+        },
+      },
+    });
+    expect(chunks).toHaveLength(0);
   });
 });

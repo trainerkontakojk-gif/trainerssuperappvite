@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from "./common";
 import type { VoiceQualityAssessment } from "./telefun-assessment";
+import type { TelefunTranscriptEntry } from "./telefun-transcript";
 
 export interface SpeechSegment {
   startMs: number;
@@ -48,6 +49,7 @@ export interface SessionMetrics {
 }
 
 export * from "./telefun-assessment";
+export * from "./telefun-transcript";
 
 export interface TelefunHistory {
   id: string;
@@ -58,7 +60,7 @@ export interface TelefunHistory {
   duration_seconds: number;
   status: "pending" | "active" | "completed" | "failed";
   score?: number | null;
-  messages?: TelefunMessage[] | null;
+  messages?: TelefunTranscriptEntry[] | null;
   ai_summary?: string | null;
   strengths?: string[] | null;
   weaknesses?: string[] | null;

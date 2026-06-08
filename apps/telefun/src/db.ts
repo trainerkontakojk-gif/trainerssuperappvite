@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "./env.js";
+import type { TelefunTranscriptEntry } from "@trainers/types";
 
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -27,7 +28,7 @@ export async function updateSession(
   sessionId: string,
   updates: {
     status?: string;
-    messages?: unknown[];
+    messages?: TelefunTranscriptEntry[];
     duration_seconds?: number;
   },
 ): Promise<void> {

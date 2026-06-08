@@ -102,6 +102,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.45.4
         version: 2.106.0
+      '@trainers/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       ws:
         specifier: ^8.18.0
         version: 8.20.1

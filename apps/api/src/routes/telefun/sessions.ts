@@ -3,6 +3,8 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
+import type { TelefunTranscriptEntry } from "@trainers/types";
+import { telefunTranscriptSchema } from "@trainers/types";
 
 type Variables = { user: User; profile: any };
 
@@ -132,7 +134,7 @@ telefunSessions.post(
 export function buildTelefunSessionUpdatePayload(body: {
   status?: "pending" | "active" | "completed" | "failed";
   duration_seconds?: number;
-  messages?: any[];
+  messages?: TelefunTranscriptEntry[];
   recording_path?: string;
   agent_recording_path?: string;
   session_metrics?: any;
@@ -174,7 +176,7 @@ telefunSessions.patch(
     z.object({
       status: z.enum(["pending", "active", "completed", "failed"]).optional(),
       duration_seconds: z.number().optional(),
-      messages: z.array(z.any()).optional(),
+      messages: telefunTranscriptSchema.optional(),
       recording_path: z.string().optional(),
       agent_recording_path: z.string().optional(),
       session_metrics: z.any().optional(),

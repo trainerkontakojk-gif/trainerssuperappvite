@@ -123,6 +123,7 @@ export function buildTelefunLiveSetupMessage(params: {
         turnCoverage: "TURN_INCLUDES_ONLY_ACTIVITY",
       },
       inputAudioTranscription: {},
+      outputAudioTranscription: {},
       sessionResumption: {},
       contextWindowCompression: {
         slidingWindow: {},

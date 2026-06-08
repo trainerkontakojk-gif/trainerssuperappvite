@@ -33,6 +33,8 @@ import {
 import { VoiceRadarChart } from "../../telefun/components/VoiceRadarChart";
 import { CommunicationProfileZoomModal } from "../../telefun/components/CommunicationProfileZoomModal";
 import { VoiceMetricCards } from "../../telefun/components/VoiceMetricCards";
+import { TelefunTranscript } from "../../telefun/components/TelefunTranscript";
+import { parseTelefunTranscript } from "@trainers/types";
 
 interface TelefunReviewData {
   module: string;
@@ -42,6 +44,7 @@ interface TelefunReviewData {
   scenario_title: string | null;
   duration_seconds: number | null;
   voice_assessment: unknown;
+  transcript?: unknown;
   ai_summary: string | null;
   strengths: string[] | null;
   weaknesses: string[] | null;
@@ -61,6 +64,11 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
       ? validateAssessment(data.voice_assessment)
       : null;
   }, [data]);
+
+  const transcriptEntries = useMemo(
+    () => parseTelefunTranscript(data?.transcript),
+    [data],
+  );
 
   const communicationProfile = useMemo(() => {
     return getCommunicationProfileFromAssessment(va);
@@ -467,32 +475,31 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           )}
 
           {/* Voice Transcript (collapsible) */}
-          {va.transcript && (
-            <div className="border-t border-border pt-4">
-              <button
-                onClick={() => setShowTranscript(!showTranscript)}
-                className="flex items-center gap-2 text-xs font-black text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors cursor-pointer"
-              >
-                {showTranscript ? (
-                  <ChevronUp size={14} />
-                ) : (
-                  <ChevronDown size={14} />
-                )}
-                Transcript Percakapan
-              </button>
-              {showTranscript && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  className="mt-4"
-                >
-                  <div className="p-4 rounded-xl bg-muted border border-border text-sm whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto">
-                    {va.transcript}
-                  </div>
-                </motion.div>
+          <div className="border-t border-border pt-4">
+            <button
+              onClick={() => setShowTranscript(!showTranscript)}
+              className="flex items-center gap-2 text-xs font-black text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors cursor-pointer"
+            >
+              {showTranscript ? (
+                <ChevronUp size={14} />
+              ) : (
+                <ChevronDown size={14} />
               )}
-            </div>
-          )}
+              Transcript Percakapan
+            </button>
+            {showTranscript && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mt-4"
+              >
+                <TelefunTranscript
+                  entries={transcriptEntries}
+                  legacyText={va.transcript}
+                />
+              </motion.div>
+            )}
+          </div>
         </>
       ) : (
         <div className="text-center py-6">
