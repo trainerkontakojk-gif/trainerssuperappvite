@@ -312,7 +312,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       isActive = false;
       mountedRef.current = false;
       stopHoldMusic();
-      sessionRef.current?.disconnect("cleanup");
+      (async () => { await sessionRef.current?.disconnect("cleanup"); })();
       if (
         uiAudioContextRef.current &&
         uiAudioContextRef.current.state !== "closed"
@@ -373,7 +373,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   };
 
   const handleEndCall = useCallback(
-    (reason?: string) => {
+    async (reason?: string) => {
       stopHoldMusic();
       if (
         uiAudioContextRef.current &&
@@ -386,7 +386,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           /* cleanup */
         }
       }
-      sessionRef.current?.disconnect(reason === "timeout" ? "timeout" : "user");
+      await sessionRef.current?.disconnect(reason === "timeout" ? "timeout" : "user");
       onEndSessionRef.current(reason);
     },
     [stopHoldMusic],

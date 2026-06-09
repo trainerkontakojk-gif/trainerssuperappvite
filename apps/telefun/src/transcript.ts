@@ -1,14 +1,20 @@
 import type { TelefunTranscriptEntry } from "@trainers/types";
 
-interface ActiveUtterance {
-  speaker: "agent" | "consumer";
+interface TranscriptLane {
   text: string;
-  startMs: number;
+  firstObservedAtMs: number;
+}
+
+interface PendingTranscriptTurn {
+  sequence: number;
+  agent: TranscriptLane | null;
+  consumer: TranscriptLane | null;
 }
 
 export class TranscriptCollector {
   private entries: TelefunTranscriptEntry[] = [];
-  private active: ActiveUtterance | null = null;
+  private pending: PendingTranscriptTurn | null = null;
+  private nextSequence = 0;
 
   constructor(private readonly startedAtMs: number) {}
 
@@ -17,66 +23,83 @@ export class TranscriptCollector {
     text: string;
     observedAtMs: number;
   }): void {
-    const text = params.text;
-    const normalizedText = text.trim();
+    const normalizedText = params.text.trim();
     if (!normalizedText) return;
 
     const offset = Math.max(0, params.observedAtMs - this.startedAtMs);
 
-    if (this.active && this.active.speaker === params.speaker) {
-      const activeText = this.active.text.trim();
+    if (!this.pending) {
+      this.pending = {
+        sequence: this.nextSequence++,
+        agent: null,
+        consumer: null,
+      };
+    }
+
+    const laneKey = params.speaker;
+    const lane = this.pending[laneKey];
+
+    if (lane) {
+      const existingText = lane.text.trim();
 
       if (
-        activeText === normalizedText ||
-        activeText.startsWith(normalizedText)
+        existingText === normalizedText ||
+        existingText.startsWith(normalizedText)
       ) {
         return;
       }
 
-      if (normalizedText.startsWith(activeText)) {
-        this.active.text = normalizedText;
+      if (normalizedText.startsWith(existingText)) {
+        lane.text = normalizedText;
         return;
       }
 
-      this.active.text += text;
-      return;
+      lane.text += params.text;
+    } else {
+      this.pending[laneKey] = {
+        text: params.text,
+        firstObservedAtMs: offset,
+      };
     }
-
-    if (this.active) {
-      this.flushEntry();
-    }
-
-    this.active = {
-      speaker: params.speaker,
-      text,
-      startMs: offset,
-    };
   }
 
-  completeTurn(speaker?: "agent" | "consumer"): void {
-    if (this.active && (!speaker || this.active.speaker === speaker)) {
-      this.flushEntry();
-    }
+  completeTurn(_speaker?: "agent" | "consumer"): void {
+    if (!this.pending) return;
+    this.commitTurn();
   }
 
   flush(_observedAtMs: number): void {
-    if (this.active) {
-      this.flushEntry();
-    }
+    if (!this.pending) return;
+    this.commitTurn();
   }
 
   snapshot(): TelefunTranscriptEntry[] {
-    return [...this.entries];
+    let previousStartMs = 0;
+    return this.entries.map((entry) => {
+      const startMs = Math.max(previousStartMs, entry.startMs);
+      previousStartMs = startMs;
+      return { ...entry, startMs };
+    });
   }
 
-  private flushEntry(): void {
-    if (!this.active) return;
-    this.entries.push({
-      speaker: this.active.speaker,
-      text: this.active.text.replace(/\s+/g, " ").trim(),
-      startMs: this.active.startMs,
-    });
-    this.active = null;
+  private commitTurn(): void {
+    const turn = this.pending;
+    if (!turn) return;
+    this.pending = null;
+
+    if (turn.agent) {
+      this.entries.push({
+        speaker: "agent",
+        text: turn.agent.text.replace(/\s+/g, " ").trim(),
+        startMs: turn.agent.firstObservedAtMs,
+      });
+    }
+    if (turn.consumer) {
+      this.entries.push({
+        speaker: "consumer",
+        text: turn.consumer.text.replace(/\s+/g, " ").trim(),
+        startMs: turn.consumer.firstObservedAtMs,
+      });
+    }
   }
 }
-

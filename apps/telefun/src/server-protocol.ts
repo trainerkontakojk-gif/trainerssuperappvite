@@ -84,3 +84,57 @@ export function extractGeminiTranscriptionChunks(
 
   return chunks;
 }
+
+export interface SessionEndRequest {
+  type: "session_end_request";
+  reason: "user" | "timeout" | "cleanup";
+}
+
+export interface SessionEndComplete {
+  type: "session_end_complete";
+  outcome: "turn_complete" | "quiet_timeout" | "hard_timeout";
+}
+
+export type TelefunControlMessage = SessionEndRequest | SessionEndComplete;
+
+const VALID_SESSION_END_REASONS = new Set(["user", "timeout", "cleanup"]);
+const VALID_SESSION_END_OUTCOMES = new Set([
+  "turn_complete",
+  "quiet_timeout",
+  "hard_timeout",
+]);
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+export function parseControlMessage(value: unknown): TelefunControlMessage | null {
+  if (!isRecord(value)) return null;
+  if (!isString(value.type)) return null;
+
+  if (value.type === "session_end_request") {
+    const reason = value.reason;
+    if (!isString(reason) || !VALID_SESSION_END_REASONS.has(reason)) return null;
+    return { type: "session_end_request", reason } as SessionEndRequest;
+  }
+
+  if (value.type === "session_end_complete") {
+    const outcome = value.outcome;
+    if (!isString(outcome) || !VALID_SESSION_END_OUTCOMES.has(outcome)) return null;
+    return { type: "session_end_complete", outcome } as SessionEndComplete;
+  }
+
+  return null;
+}
+
+export function isSessionEndRequest(
+  msg: TelefunControlMessage,
+): msg is SessionEndRequest {
+  return msg.type === "session_end_request";
+}
+
+export function isSessionEndComplete(
+  msg: TelefunControlMessage,
+): msg is SessionEndComplete {
+  return msg.type === "session_end_complete";
+}

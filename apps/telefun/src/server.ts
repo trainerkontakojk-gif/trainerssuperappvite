@@ -13,6 +13,8 @@ import { createSession, updateSession, getOwnedSessionId } from "./db.js";
 import { TurnManager } from "./turn-taking.js";
 import { TranscriptCollector } from "./transcript.js";
 import {
+  parseControlMessage,
+  isSessionEndRequest,
   isGeminiForwardableMessage,
   isGeminiSetupMessage,
   hasGeminiSetupComplete,
@@ -21,6 +23,7 @@ import {
   isCurrentGeminiSocket,
   extractGeminiTranscriptionChunks,
 } from "./server-protocol.js";
+import { DrainCoordinator, type DrainOutcome } from "./session-drain.js";
 import { buildSafeCloseMetadata } from "./server-close.js";
 
 process.on("uncaughtException", (err) =>
@@ -94,6 +97,9 @@ wss.on("connection", async (ws, req) => {
   let latestSessionHandle: string | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let clientClosed = false;
+  let finalized = false;
+  let drainCoordinator: DrainCoordinator | null = null;
+  let drainTimers: ReturnType<typeof setTimeout>[] = [];
 
   const keepaliveTimer = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
@@ -112,7 +118,12 @@ wss.on("connection", async (ws, req) => {
     await flushLiveUsage(requestId, userId, usageSnapshot, activeModelId);
   };
 
-  const saveAndCloseSession = async (status: string) => {
+  const finalizeSessionOnce = async (status: string, outcome?: DrainOutcome) => {
+    if (finalized) return;
+    finalized = true;
+    drainTimers.forEach(clearTimeout);
+    drainTimers = [];
+
     const duration = Math.floor((Date.now() - callStartedAt) / 1000);
     transcriptCollector.flush(Date.now());
     if (sessionId) {
@@ -121,6 +132,22 @@ wss.on("connection", async (ws, req) => {
         duration_seconds: duration,
         messages: transcriptCollector.snapshot(),
       });
+    }
+    void flushUsage();
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "session_end_complete",
+          outcome: outcome || "hard_timeout",
+        }),
+      );
+    }
+    if (geminiWs?.readyState === WebSocket.OPEN) {
+      geminiWs.close(1000, "Session finalized");
+    }
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1000, "Session finalized");
     }
   };
 
@@ -249,6 +276,12 @@ wss.on("connection", async (ws, req) => {
           turnManager.endAiSpeaking();
         }
 
+        if (drainCoordinator) {
+          if (transcriptChunks.length > 0) drainCoordinator.notifyActivity();
+          if (parsed.serverContent?.turnComplete)
+            drainCoordinator.notifyTurnComplete();
+        }
+
         const nextHandle = getSessionResumptionHandle(parsed);
         if (nextHandle) {
           latestSessionHandle = nextHandle;
@@ -337,6 +370,22 @@ wss.on("connection", async (ws, req) => {
       return;
     }
 
+    const controlMsg = parseControlMessage(parsed);
+    if (controlMsg) {
+      if (isSessionEndRequest(controlMsg)) {
+        clientClosed = true;
+        if (!drainCoordinator) {
+          drainCoordinator = new DrainCoordinator({
+            onFinalize: (outcome: DrainOutcome) => {
+              void finalizeSessionOnce("completed", outcome);
+            },
+          });
+        }
+        drainCoordinator.startDrain();
+      }
+      return;
+    }
+
     if (!isGeminiForwardableMessage(parsed)) {
       console.warn("[Telefun] Dropping unsupported client JSON message");
       return;
@@ -374,7 +423,7 @@ wss.on("connection", async (ws, req) => {
     ) {
       geminiWs.close(1000, "Client disconnected");
     }
-    await saveAndCloseSession("completed");
+    await finalizeSessionOnce("completed");
     setTimeout(() => void flushUsage(), 2000);
   });
 
@@ -392,7 +441,7 @@ wss.on("connection", async (ws, req) => {
     ) {
       geminiWs.close(1011, "Client WebSocket error");
     }
-    await saveAndCloseSession("failed");
+    await finalizeSessionOnce("failed");
     setTimeout(() => void flushUsage(), 2000);
   });
 

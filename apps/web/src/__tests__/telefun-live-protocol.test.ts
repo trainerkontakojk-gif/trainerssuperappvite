@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAudioStreamEndMessage,
+  buildSessionEndRequest,
+  isSessionEndCompleteMessage,
   normalizeTelefunWebSocketUrl,
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
@@ -18,6 +21,27 @@ import {
 } from "../routes/telefun/telefunVoiceRegistry";
 
 describe("telefun live protocol", () => {
+  it("builds and validates graceful drain messages", () => {
+    expect(buildAudioStreamEndMessage()).toEqual({
+      realtimeInput: { audioStreamEnd: true },
+    });
+    expect(buildSessionEndRequest("user")).toEqual({
+      type: "session_end_request",
+      reason: "user",
+    });
+    expect(
+      isSessionEndCompleteMessage({
+        type: "session_end_complete",
+        outcome: "turn_complete",
+      }),
+    ).toBe(true);
+    expect(
+      isSessionEndCompleteMessage({
+        type: "session_end_complete",
+        outcome: "invalid",
+      }),
+    ).toBe(false);
+  });
   it("normalizes http(s) URLs to ws(s) URLs", () => {
     expect(normalizeTelefunWebSocketUrl("https://telefun.up.railway.app")).toBe(
       "wss://telefun.up.railway.app/",

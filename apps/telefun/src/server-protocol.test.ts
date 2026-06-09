@@ -7,6 +7,9 @@ import {
   getSessionResumptionHandle,
   isCurrentGeminiSocket,
   extractGeminiTranscriptionChunks,
+  parseControlMessage,
+  isSessionEndRequest,
+  isSessionEndComplete,
 } from "./server-protocol.js";
 
 describe("telefun proxy protocol", () => {
@@ -171,5 +174,120 @@ describe("telefun proxy protocol", () => {
       },
     });
     expect(chunks).toHaveLength(0);
+  });
+
+  describe("control messages", () => {
+    it("parses a valid session_end_request", () => {
+      const msg = parseControlMessage({
+        type: "session_end_request",
+        reason: "user",
+      });
+      expect(msg).not.toBeNull();
+      if (msg) {
+        expect(isSessionEndRequest(msg)).toBe(true);
+        expect(msg.type).toBe("session_end_request");
+        expect((msg as any).reason).toBe("user");
+      }
+    });
+
+    it("parses a valid session_end_complete", () => {
+      const msg = parseControlMessage({
+        type: "session_end_complete",
+        outcome: "turn_complete",
+      });
+      expect(msg).not.toBeNull();
+      if (msg) {
+        expect(isSessionEndComplete(msg)).toBe(true);
+        expect(msg.type).toBe("session_end_complete");
+        expect((msg as any).outcome).toBe("turn_complete");
+      }
+    });
+
+    it("returns null for unknown message type", () => {
+      expect(
+        parseControlMessage({ type: "realtimeInput", realtimeInput: {} }),
+      ).toBeNull();
+      expect(
+        parseControlMessage({ type: "serverContent", serverContent: {} }),
+      ).toBeNull();
+      expect(parseControlMessage({ type: "unknown" })).toBeNull();
+    });
+
+    it("returns null for invalid session_end_request reason", () => {
+      expect(
+        parseControlMessage({
+          type: "session_end_request",
+          reason: "invalid",
+        }),
+      ).toBeNull();
+      expect(parseControlMessage({ type: "session_end_request" })).toBeNull();
+    });
+
+    it("returns null for invalid session_end_complete outcome", () => {
+      expect(
+        parseControlMessage({
+          type: "session_end_complete",
+          outcome: "invalid",
+        }),
+      ).toBeNull();
+    });
+
+    it("returns null for non-object input", () => {
+      expect(parseControlMessage(null)).toBeNull();
+      expect(parseControlMessage("string")).toBeNull();
+      expect(parseControlMessage(42)).toBeNull();
+    });
+
+    it("isSessionEndRequest and isSessionEndComplete type guards", () => {
+      const req = parseControlMessage({
+        type: "session_end_request",
+        reason: "timeout",
+      });
+      const complete = parseControlMessage({
+        type: "session_end_complete",
+        outcome: "quiet_timeout",
+      });
+
+      expect(req).not.toBeNull();
+      expect(complete).not.toBeNull();
+
+      if (req) {
+        expect(isSessionEndRequest(req)).toBe(true);
+        expect(isSessionEndComplete(req)).toBe(false);
+      }
+      if (complete) {
+        expect(isSessionEndComplete(complete)).toBe(true);
+        expect(isSessionEndRequest(complete)).toBe(false);
+      }
+    });
+
+    it("accepts all valid reasons for session_end_request", () => {
+      for (const reason of ["user", "timeout", "cleanup"] as const) {
+        const msg = parseControlMessage({ type: "session_end_request", reason });
+        expect(msg).not.toBeNull();
+        if (msg) {
+          expect(isSessionEndRequest(msg)).toBe(true);
+          expect((msg as any).reason).toBe(reason);
+        }
+      }
+    });
+
+    it("accepts all valid outcomes for session_end_complete", () => {
+      for (const outcome of [
+        "turn_complete",
+        "quiet_timeout",
+        "hard_timeout",
+      ] as const) {
+        const msg = parseControlMessage({
+          type: "session_end_complete",
+          outcome,
+        });
+        expect(msg).not.toBeNull();
+        if (msg) {
+          expect(isSessionEndComplete(msg)).toBe(true);
+          expect((msg as any).outcome).toBe(outcome);
+        }
+      }
+    });
   });
 });

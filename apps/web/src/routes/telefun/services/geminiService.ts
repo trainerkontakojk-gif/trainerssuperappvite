@@ -11,11 +11,14 @@ import {
   summarizeHoldMetrics,
   type HoldTrackerState,
 } from "./holdMetrics";
+import { LiveSessionDrain } from "./liveSessionDrain";
 import {
   normalizeTelefunWebSocketUrl,
   mapTelefunCloseEvent,
   buildTelefunLiveSetupMessage,
   buildRealtimeAudioMessage,
+  buildSessionEndRequest,
+  buildAudioStreamEndMessage,
   shouldSendRealtimeAudio,
   extractGeminiInlineAudioChunks,
   processInputAudioFrame,
@@ -682,16 +685,39 @@ export class LiveSession {
     });
   }
 
-  public disconnect(reason: "user" | "timeout" | "cleanup" = "user") {
+  public async disconnect(reason: "user" | "timeout" | "cleanup" = "user"): Promise<void> {
+    if (this.intentionalClose) return;
     this.intentionalClose = true;
     this.clearSetupTimeout();
     this.stopStalledWatchdog();
 
+    // Stop sending audio
+    this.stopRecordingOnce();
+
+    // Send drain handshake
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(buildAudioStreamEndMessage()));
+      this.ws.send(JSON.stringify(buildSessionEndRequest(reason)));
+
+      const drain = new LiveSessionDrain(5000);
+      this.ws.addEventListener('message', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'session_end_complete') {
+            drain.complete();
+          }
+        } catch { /* skip */ }
+      }, { once: true });
+
+      await drain.start();
+    }
+
+    // Close WebSocket after drain
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.close(TELEFUN_CLIENT_CLOSE_CODE, TELEFUN_CLIENT_CLOSE_REASON);
     }
 
-    this.stopRecordingOnce();
+    // Cleanup after drain
     this.cleanupAudio();
     this.emitTimelineEvent("disconnect", { reason });
   }

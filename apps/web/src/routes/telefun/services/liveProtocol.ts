@@ -160,6 +160,29 @@ export function buildRealtimeAudioMessage(buffer: ArrayBuffer) {
   };
 }
 
+export type SessionEndReason = "user" | "timeout" | "cleanup";
+export type SessionEndOutcome =
+  | "turn_complete"
+  | "quiet_timeout"
+  | "hard_timeout";
+
+export function buildSessionEndRequest(reason: SessionEndReason) {
+  return { type: "session_end_request" as const, reason };
+}
+
+export function isSessionEndCompleteMessage(
+  value: unknown,
+): value is { type: "session_end_complete"; outcome: SessionEndOutcome } {
+  if (!value || typeof value !== "object") return false;
+  const message = value as Record<string, unknown>;
+  return (
+    message.type === "session_end_complete" &&
+    (message.outcome === "turn_complete" ||
+      message.outcome === "quiet_timeout" ||
+      message.outcome === "hard_timeout")
+  );
+}
+
 export function buildAudioStreamEndMessage() {
   return {
     realtimeInput: {
