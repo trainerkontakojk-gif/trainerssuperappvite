@@ -394,6 +394,8 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 189.  **Access Approval Grouped Leader Cards** — Consolidated KTP/SIDAK request rows into one Leader identity card using leader_user_id, added per-module detail switching, preserved request-level approval/revoke/group mutations, and added contract plus UI regression coverage. 5 files modified + 4 new files + 3 test files, 39 regression tests passing. (DONE)
 190.  **Telefun Speaker & Timestamp Transcript** — Mengubah transcript Telefun dari satu paragraf AI-generated menjadi daftar percakapan bertimestamp dan berlabel pembicara dari Gemini Live transcription events. Added canonical `TelefunTranscriptEntry` contract, fragment-safe `TranscriptCollector`, typed server extractor, `outputAudioTranscription` setup, shared transcript UI for ReviewModal and Monitoring, API boundary validation, and legacy fallback. Post-execution audit removed internal `clientContent` prompt leakage, fixed streaming fragment whitespace/cumulative partial handling, separated model `turnComplete` from input chunks, added Monitoring and PATCH route coverage, and deleted dead `UtteranceBuffer`/`silence.ts`. 33 Telefun + 22 focused API + 38 focused Web tests passing; core tests, lint, and all workspace builds passing. (DONE)
 
+191.  **Telefun Transcript Ordering & Graceful Shutdown** — Fix 2 critical bugs: (1) TranscriptCollector pake single buffer → di-refactor per-speaker lanes (`agent`/`consumer`) dengan logical turn, snapshot clamp timestamp monoton; (2) Graceful shutdown handshake — client stop audio → `audioStreamEnd` → `session_end_request`, server drain via `DrainCoordinator` (open→draining→finalized), quiet window 2s setelah Gemini boundary + hard timeout 10s. 59 telefun + 677 web tests passing. (DONE)
+
 ## Key Files Changed (Phase 58 — 118)
 
 - `packages/types/src/index.ts` — **Phase 65**: Added `rankChange?: number | null` property to `TopAgentData` interface; **Phase 74**: Added `periodMonth?: number | null` property to `AgentDirectoryEntry` interface; **Phase 90**: Reduced from 1,158→9 lines (pure re-export barrel), types split into 8 domain files.
@@ -923,6 +925,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `package.json` — **Phase 187**: Added `test:fast` root script
 - `turbo.json` — **Phase 187**: Added `test:fast` task
 - `docs/rebuild-logs/phase-thermo-test-suite-optimization.md` — **NEW Phase 187**: Rebuild log for test suite optimization & tiering
+- `docs/rebuild-logs/phase-188-telefun-transcript-drain.md` — **NEW Phase 191**: Rebuild log for Telefun transcript ordering & graceful shutdown drain
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |

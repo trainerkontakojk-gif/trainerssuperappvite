@@ -1,4 +1,4 @@
-# Phase 131: Telefun Transcript Ordering & Graceful Shutdown
+# Phase 188: Telefun Transcript Ordering & Graceful Shutdown
 
 > **Goal:** Fix 2 critical bugs — transcript ordering kacau karena arrival order ≠ conversation order, dan ucapan terakhir hilang saat panggilan ditutup tanpa drain.
 
