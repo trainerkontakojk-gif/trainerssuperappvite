@@ -313,17 +313,17 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             </div>
 
             {/* Tab Navigation */}
-            <div className="px-6 pt-4 flex gap-4 border-b border-border bg-foreground/[0.01] overflow-x-auto">
+            <div className="px-6 pt-4 flex gap-6 border-b border-border bg-foreground/[0.01] overflow-x-auto scrollbar-hide shrink-0">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'details' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'details' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 Detail Sesi
                 {activeTab === 'details' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
               </button>
               <button
                 onClick={() => setActiveTab('assessment')}
-                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'assessment' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'assessment' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 Kualitas Suara Agen
                 {activeTab === 'assessment' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
@@ -332,14 +332,14 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 <>
                   <button
                     onClick={() => setActiveTab('voice_dashboard')}
-                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'voice_dashboard' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'voice_dashboard' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Evaluasi Suara
                     {activeTab === 'voice_dashboard' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
                   </button>
                   <button
                     onClick={() => setActiveTab('replay')}
-                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap ${activeTab === 'replay' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'replay' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Anotasi Replay
                     {activeTab === 'replay' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
