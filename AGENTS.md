@@ -395,6 +395,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 190.  **Telefun Speaker & Timestamp Transcript** — Mengubah transcript Telefun dari satu paragraf AI-generated menjadi daftar percakapan bertimestamp dan berlabel pembicara dari Gemini Live transcription events. Added canonical `TelefunTranscriptEntry` contract, fragment-safe `TranscriptCollector`, typed server extractor, `outputAudioTranscription` setup, shared transcript UI for ReviewModal and Monitoring, API boundary validation, and legacy fallback. Post-execution audit removed internal `clientContent` prompt leakage, fixed streaming fragment whitespace/cumulative partial handling, separated model `turnComplete` from input chunks, added Monitoring and PATCH route coverage, and deleted dead `UtteranceBuffer`/`silence.ts`. 33 Telefun + 22 focused API + 38 focused Web tests passing; core tests, lint, and all workspace builds passing. (DONE)
 
 191.  **Telefun Transcript Ordering & Graceful Shutdown** — Fix 2 critical bugs: (1) TranscriptCollector pake single buffer → di-refactor per-speaker lanes (`agent`/`consumer`) dengan logical turn, snapshot clamp timestamp monoton; (2) Graceful shutdown handshake — client stop audio → `audioStreamEnd` → `session_end_request`, server drain via `DrainCoordinator` (open→draining→finalized), quiet window 2s setelah Gemini boundary + hard timeout 10s. 59 telefun + 677 web tests passing. (DONE)
+192.  **KETIK/PDKT Custom Scenarios & Consumer Types via Draft Payload** — KETIK `POST /ketik/generate` dan PDKT `POST /pdkt/session/create` tidak bisa menggunakan scenario/consumer type kustom dari Settings UI karena backend hanya lookup by ID. Fix: implementasi draft-object pattern — frontend kirim full object (scenarioDraft/consumerTypeDraft), backend prioritaskan draft atas ID lookup. Base64 images di-strip dari draft untuk hindari payload besar. 9 files modified, 166/166 core tests passing. (DONE)
 
 ## Key Files Changed (Phase 58 — 118)
 
@@ -617,7 +618,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-191)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-192)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
@@ -927,6 +928,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `docs/rebuild-logs/phase-thermo-test-suite-optimization.md` — **NEW Phase 187**: Rebuild log for test suite optimization & tiering
 - `docs/rebuild-logs/phase-188-telefun-transcript-drain.md` — **NEW Phase 191**: Rebuild log for Telefun transcript ordering & graceful shutdown drain
 - `docs/rebuild-logs/phase-187-sidak-pareto-improvement-insight.md` — **Phase 105/187**: Rebuild log for SIDAK Pareto improvement insight with RCA analysis on dashboard.
+- `docs/rebuild-logs/phase-192-ketik-pdkt-custom-scenarios-draft.md` — **NEW Phase 192**: Rebuild log for KETIK/PDKT custom scenarios & consumer types via draft payload.
 - `docs/rebuild-logs/phase-188-access-approval-module-information.md` — **NEW Phase 188**: Rebuild log for access approval module information badges.
 - `docs/rebuild-logs/phase-188-sidak-agent-detail-zero-score-cache-remediation.md` — **Phase 109/188**: Rebuild log for SIDAK agent detail zero score cache remediation.
 - `docs/rebuild-logs/phase-189-access-approval-grouped-leader-cards.md` — **NEW Phase 189**: Rebuild log for consolidated leader access cards with grouped UI.
