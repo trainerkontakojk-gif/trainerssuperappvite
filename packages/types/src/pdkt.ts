@@ -169,6 +169,7 @@ export const generateEmailSchema = z.object({
   scenarioId: z.string().optional(),
   scenarioDraft: pdktScenarioSchema.optional(),
   consumerTypeId: z.string(),
+  consumerTypeDraft: pdktConsumerTypeSchema.optional(),
   identity: pdktIdentitySchema,
   enableImageGeneration: z.boolean().default(true),
   selectedModel: z.string().default("gemini-3.1-flash-lite"),

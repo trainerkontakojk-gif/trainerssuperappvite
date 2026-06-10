@@ -273,6 +273,16 @@ export interface KetikTypoFinding {
 
 // ── Zod Validation Schemas ─────────────────────────────
 export const chatSenderSchema = z.enum(["agent", "consumer", "system"]);
+
+export const ketikScenarioSchema = z.object({
+  id: z.string(),
+  category: z.string(),
+  title: z.string(),
+  description: z.string(),
+  isActive: z.boolean(),
+  script: z.string().optional(),
+  images: z.array(z.string()).optional(),
+});
 export const chatMessageSchema = z.object({
   id: z.string(),
   sender: chatSenderSchema,
@@ -297,6 +307,14 @@ export const chatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
+export const ketikConsumerTypeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  difficulty: z.enum(["Mudah", "Sedang", "Sulit"]),
+  isCustom: z.boolean().optional(),
+});
+
 export const ketikIdentitySchema = z.object({
   name: z.string(),
   city: z.string(),
@@ -309,7 +327,9 @@ export type KetikIdentity = z.infer<typeof ketikIdentitySchema>;
 
 export const generateMessageSchema = z.object({
   scenarioId: z.string(),
+  scenarioDraft: ketikScenarioSchema.optional(),
   consumerTypeId: z.string(),
+  consumerTypeDraft: ketikConsumerTypeSchema.optional(),
   identity: z.object({ name: z.string(), city: z.string(), phone: z.string() }),
   selectedModel: z.string().default("gemini-3.1-flash-lite"),
   simulationDuration: z.number().default(5),
@@ -320,3 +340,4 @@ export const generateMessageSchema = z.object({
   remainingSeconds: z.number().optional(),
   elapsedSeconds: z.number().optional(),
 });
+

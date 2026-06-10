@@ -173,6 +173,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {activeTab === "scenarios" && (
                     <PdktScenariosTab
                       scenarios={localSettings.scenarios}
+                      consumerTypes={localSettings.consumerTypes}
                       scenarioForm={scenarioForm}
                       enableImageGeneration={enableImageGeneration}
                       setEnableImageGeneration={setEnableImageGeneration}

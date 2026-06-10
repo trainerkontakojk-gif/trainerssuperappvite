@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { PdktScenario, PdktIdentity } from "@trainers/types";
+import { PdktScenario, PdktIdentity, PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { postApi } from "../../../../hooks/useApi";
@@ -15,6 +15,7 @@ import { ScenarioTemplateField } from "./scenarios/ScenarioTemplateField";
 
 interface PdktScenariosTabProps {
   scenarios: PdktScenario[];
+  consumerTypes: PdktConsumerType[];
   scenarioForm: ReturnType<typeof useCrudForm<PdktScenario>>;
   enableImageGeneration: boolean;
   setEnableImageGeneration: (val: boolean) => void;
@@ -25,6 +26,7 @@ interface PdktScenariosTabProps {
 
 export function PdktScenariosTab({
   scenarios,
+  consumerTypes,
   scenarioForm,
   enableImageGeneration,
   setEnableImageGeneration,
@@ -156,11 +158,18 @@ export function PdktScenariosTab({
         bodyName: customIdentity.bodyName || "Budi",
       };
 
+      const targetConsumerTypeId = globalConsumerTypeId === "random" ? "ramah" : globalConsumerTypeId;
+      const activeConsumerType = consumerTypes.find((ct) => ct.id === targetConsumerTypeId);
+
       const result = await postApi<{ subject: string; body: string }>(
         "/pdkt/generate-template",
         {
-          scenarioDraft: draft,
-          consumerTypeId: globalConsumerTypeId === "random" ? "ramah" : globalConsumerTypeId,
+          scenarioDraft: {
+            ...draft,
+            attachmentImages: draft.attachmentImages?.map(() => ""),
+          },
+          consumerTypeId: targetConsumerTypeId,
+          consumerTypeDraft: activeConsumerType,
           identity,
         }
       );

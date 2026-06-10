@@ -444,7 +444,9 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
         "/pdkt/session/create",
         {
           scenarioId: scenario.id,
+          scenarioDraft: scenario,
           consumerTypeId: config.consumerType.id,
+          consumerTypeDraft: config.consumerType,
           identity: config.identity,
           enableImageGeneration: config.enableImageGeneration,
           selectedModel: config.selectedModel,

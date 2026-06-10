@@ -5,6 +5,7 @@ import {
   PdktScenario,
   ResolvedConsumerNameMentionPattern,
   WritingStyleMode,
+  PdktConsumerType,
 } from "@trainers/types";
 import {
   initializeEmailSession,
@@ -18,6 +19,7 @@ export async function createMailboxSession(
     scenarioId?: string;
     scenarioDraft?: PdktScenario;
     consumerTypeId: string;
+    consumerTypeDraft?: PdktConsumerType;
     identity: PdktIdentity;
     enableImageGeneration?: boolean;
     selectedModel?: string;

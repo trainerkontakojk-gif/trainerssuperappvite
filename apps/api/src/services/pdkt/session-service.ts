@@ -383,6 +383,7 @@ export function resolvePdktGenerationConfig(body: {
   scenarioId?: string;
   scenarioDraft?: PdktScenario;
   consumerTypeId: string;
+  consumerTypeDraft?: PdktConsumerType;
   identity: PdktIdentity;
   enableImageGeneration?: boolean;
   selectedModel?: string;
@@ -395,10 +396,12 @@ export function resolvePdktGenerationConfig(body: {
 } {
   const scenarios = getScenarios();
   const consumerTypes = getConsumerTypes();
-  const scenario = body.scenarioId
-    ? scenarios.find((s) => s.id === body.scenarioId)
-    : body.scenarioDraft;
-  const consumerType = consumerTypes.find((ct) => ct.id === body.consumerTypeId);
+  const scenario = body.scenarioDraft
+    ? body.scenarioDraft
+    : body.scenarioId ? scenarios.find((s) => s.id === body.scenarioId) : body.scenarioDraft;
+  const consumerType = body.consumerTypeDraft
+    ? body.consumerTypeDraft
+    : consumerTypes.find((ct) => ct.id === body.consumerTypeId);
 
   if (!scenario || !consumerType) {
     throw new Error("Scenario atau consumer type tidak ditemukan.");

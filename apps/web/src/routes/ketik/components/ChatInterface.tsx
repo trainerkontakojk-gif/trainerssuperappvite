@@ -316,7 +316,12 @@ export function ChatInterface({
     try {
       const result = await ketikApi.generate({
         scenarioId: scenario.id,
+        scenarioDraft: {
+          ...scenario,
+          images: scenario.images?.map(() => ""),
+        },
         consumerTypeId: config.consumerType.id,
+        consumerTypeDraft: config.consumerType,
         identity: config.identity,
         selectedModel: config.selectedModel,
         simulationDuration: config.simulationDuration,

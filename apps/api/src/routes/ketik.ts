@@ -32,10 +32,13 @@ ketik.post(
 
     const scenarios = ketikService.getScenarios();
     const consumerTypes = ketikService.getConsumerTypes();
-    const scenario = scenarios.find((s) => s.id === body.scenarioId);
-    const consumerType = consumerTypes.find(
-      (ct) => ct.id === body.consumerTypeId,
-    );
+    // Prioritize scenarioDraft (custom scenarios) over ID lookup (default scenarios)
+    const scenario = body.scenarioDraft
+      ? body.scenarioDraft
+      : scenarios.find((s) => s.id === body.scenarioId);
+    const consumerType = body.consumerTypeDraft
+      ? body.consumerTypeDraft
+      : consumerTypes.find((ct) => ct.id === body.consumerTypeId);
 
     if (!scenario || !consumerType) {
       return c.json(
