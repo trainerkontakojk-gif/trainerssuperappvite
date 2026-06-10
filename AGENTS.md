@@ -617,7 +617,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - **`apps/web/src/__tests__/auth-login-flow.test.ts`** — 7 regression tests: CSRF header, 401 interception, qa type check
 - **`apps/web/src/__tests__/route-guards.test.ts`** — 12 regression tests: reset password + waiting approval guards
 - **`apps/web/src/__tests__/reset-password-validation.test.ts`** — 8 regression tests: password complexity rules
-- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-99)
+- `docs/rebuild-logs/` — per-phase completion logs (phase-1 through phase-191)
 - `docs/deployment.md` — full deployment guide with Railway settings, env vars, and troubleshooting
 - `docs/rebuild-logs/phase-70-monitoring-telefun-history-schema-fix.md` — **Phase 70**: Telefun history schema fix documentation
 - `apps/api/src/__tests__/monitoring-history-service.test.ts` — **NEW Phase 70**: 5 regression tests verifying correct Vite schema column usage in Telefun query
@@ -926,6 +926,11 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `turbo.json` — **Phase 187**: Added `test:fast` task
 - `docs/rebuild-logs/phase-thermo-test-suite-optimization.md` — **NEW Phase 187**: Rebuild log for test suite optimization & tiering
 - `docs/rebuild-logs/phase-188-telefun-transcript-drain.md` — **NEW Phase 191**: Rebuild log for Telefun transcript ordering & graceful shutdown drain
+- `docs/rebuild-logs/phase-187-sidak-pareto-improvement-insight.md` — **Phase 105/187**: Rebuild log for SIDAK Pareto improvement insight with RCA analysis on dashboard.
+- `docs/rebuild-logs/phase-188-access-approval-module-information.md` — **NEW Phase 188**: Rebuild log for access approval module information badges.
+- `docs/rebuild-logs/phase-188-sidak-agent-detail-zero-score-cache-remediation.md` — **Phase 109/188**: Rebuild log for SIDAK agent detail zero score cache remediation.
+- `docs/rebuild-logs/phase-189-access-approval-grouped-leader-cards.md` — **NEW Phase 189**: Rebuild log for consolidated leader access cards with grouped UI.
+- `docs/rebuild-logs/phase-190-telefun-speaker-timestamp-transcript.md` — **NEW Phase 190**: Rebuild log for Telefun speaker & timestamp transcript from Gemini Live events.
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |
