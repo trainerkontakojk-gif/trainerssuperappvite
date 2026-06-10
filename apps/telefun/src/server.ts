@@ -275,11 +275,17 @@ wss.on("connection", async (ws, req) => {
           transcriptCollector.completeTurn("consumer");
           turnManager.endAiSpeaking();
         }
+        if (parsed.serverContent?.interrupted) {
+          transcriptCollector.interruptTurn();
+          turnManager.endAiSpeaking();
+        }
 
         if (drainCoordinator) {
           if (transcriptChunks.length > 0) drainCoordinator.notifyActivity();
           if (parsed.serverContent?.turnComplete)
             drainCoordinator.notifyTurnComplete();
+          if (parsed.serverContent?.interrupted)
+            drainCoordinator.notifyInterrupted();
         }
 
         const nextHandle = getSessionResumptionHandle(parsed);

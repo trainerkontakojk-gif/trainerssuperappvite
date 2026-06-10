@@ -68,6 +68,11 @@ export class TranscriptCollector {
     this.commitTurn();
   }
 
+  interruptTurn(): void {
+    if (!this.pending) return;
+    this.commitTurn();
+  }
+
   flush(_observedAtMs: number): void {
     if (!this.pending) return;
     this.commitTurn();

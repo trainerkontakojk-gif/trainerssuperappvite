@@ -28,4 +28,10 @@ describe("Telefun server silence detector", () => {
     expect(serverSource).not.toContain('type: "silence"');
     expect(serverSource).not.toContain("Silence detected > 5s");
   });
+
+  it("treats Gemini interruption as transcript and drain boundaries", () => {
+    expect(serverSource).toContain("parsed.serverContent?.interrupted");
+    expect(serverSource).toContain("transcriptCollector.interruptTurn()");
+    expect(serverSource).toContain("drainCoordinator.notifyInterrupted()");
+  });
 });

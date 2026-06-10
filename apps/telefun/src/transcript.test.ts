@@ -193,4 +193,33 @@ describe("TranscriptCollector", () => {
     expect(s[2].speaker).toBe("agent");
     expect(s[2].startMs).toBe(6000);
   });
+
+  it("keeps post-interruption fragments in a new logical turn", () => {
+    const c = collector();
+    c.append({
+      speaker: "consumer",
+      text: "Jawaban sebelum terpotong",
+      observedAtMs: 3000,
+    });
+
+    c.interruptTurn();
+
+    c.append({
+      speaker: "agent",
+      text: "Maaf saya potong",
+      observedAtMs: 5000,
+    });
+    c.append({
+      speaker: "consumer",
+      text: "Baik, silakan",
+      observedAtMs: 7000,
+    });
+    c.completeTurn();
+
+    expect(c.snapshot().map(({ speaker, text }) => ({ speaker, text }))).toEqual([
+      { speaker: "consumer", text: "Jawaban sebelum terpotong" },
+      { speaker: "agent", text: "Maaf saya potong" },
+      { speaker: "consumer", text: "Baik, silakan" },
+    ]);
+  });
 });

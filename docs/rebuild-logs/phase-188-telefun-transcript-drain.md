@@ -74,3 +74,19 @@ Server: drain → wait turnComplete / quiet window → save → session_end_comp
 - Hapus handshake control message dan coordinator drain.
 - Kembalikan client ke direct close.
 - Pertahankan regression tests transcript.
+
+## Post-Release Bug Fix: Interrupted Turn Boundary
+
+**Bug:** `serverContent.interrupted` (Gemini barge-in) tidak di-wire — transkrip fragment bisa tercampur antar turn dan drain coordinator tidak mendeteksi interrupt.
+
+**Root Cause:** Di Task 3 (Server Integration), `DrainCoordinator.notifyInterrupted()` sudah ada di `session-drain.ts` tapi tidak dipanggil di `server.ts`. Juga tidak ada method `interruptTurn()` di `TranscriptCollector`.
+
+**Fix (commit aaa6768 follow-up):**
+| File | Change |
+|------|--------|
+| `apps/telefun/src/transcript.ts` | Tambah method `interruptTurn()` — commit pending lanes saat interrupt |
+| `apps/telefun/src/server.ts` | Wiring `parsed.serverContent?.interrupted` → `transcriptCollector.interruptTurn()` + `turnManager.endAiSpeaking()` + `drainCoordinator.notifyInterrupted()` |
+| `apps/telefun/src/transcript.test.ts` | + regression test `"keeps post-interruption fragments in a new logical turn"` |
+| `apps/telefun/src/server-silence-detector.test.ts` | + contract test `"treats Gemini interruption as transcript and drain boundaries"` |
+
+**Verifikasi:** `pnpm --filter @trainers/telefun test` → **61/61 passed** (5 files, +0/-0 regression)
