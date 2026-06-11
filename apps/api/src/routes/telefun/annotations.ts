@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
@@ -6,6 +7,33 @@ import { createAdminClient } from "../../lib/supabase";
 import { generateGeminiContent } from "../../lib/gemini";
 
 type Variables = { user: User; profile: any };
+
+export function createReplayAnnotationChecksum(
+  annotations: Array<{
+    timestamp_ms: number;
+    category: string;
+    moment: string | null;
+    text: string;
+    is_manual: boolean;
+  }>,
+): string {
+  const payload = annotations
+    .filter((annotation) => !annotation.is_manual)
+    .map(({ timestamp_ms, category, moment, text }) => ({
+      timestamp_ms,
+      category,
+      moment,
+      text,
+    }))
+    .sort((a, b) => {
+      if (a.timestamp_ms !== b.timestamp_ms) return a.timestamp_ms - b.timestamp_ms;
+      return `${a.category}:${a.moment ?? ""}:${a.text}`.localeCompare(
+        `${b.category}:${b.moment ?? ""}:${b.text}`,
+      );
+    });
+
+  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
 
 const telefunAnnotations = new Hono<{ Variables: Variables }>();
 
@@ -410,7 +438,7 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
       user_id: session.user_id,
       timestamp_ms: a.timestamp_ms,
       category: a.category,
-      moment: a.moment,
+      moment: a.moment ?? null,
       text: (a.text || "").slice(0, 500),
       is_manual: false,
     }));
@@ -423,25 +451,21 @@ Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 k
     if (insertError) throw insertError;
 
     // 6. Update coaching summary
-    const checksum = Buffer.from(
-      JSON.stringify(
-        annotations
-          .map((a: any) => `${a.timestamp_ms}:${a.category}:${a.text}`)
-          .sort()
-          .join("|"),
-      ),
-    ).toString("base64").slice(0, 64);
+    const checksum = createReplayAnnotationChecksum(annotationRows);
 
-    await adminClient.rpc("upsert_telefun_coaching_summary", {
+    const { error: rpcError } = await adminClient.rpc("upsert_telefun_coaching_summary", {
       p_session_id: sessionId,
-      p_user_id: session.user_id,
       p_recommendations: recommendations.map((r: any) => ({
         text: r.text,
         priority: r.priority,
       })),
-      p_ai_annotation_count: annotations.length,
+      p_ai_annotation_count: annotationRows.length,
       p_ai_annotation_checksum: checksum,
     });
+
+    if (rpcError) {
+      throw new Error(`Gagal menyimpan coaching summary: ${rpcError.message}`);
+    }
 
     return c.json({
       success: true,
