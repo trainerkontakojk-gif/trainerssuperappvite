@@ -12,6 +12,8 @@ import {
   Gauge,
   Maximize2,
   AlertCircle,
+  RefreshCw,
+  Clock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -58,6 +60,9 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
     initialAssessment ? validateAssessment(initialAssessment) : null,
   );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [scoringStatus, setScoringStatus] = useState<
+    "idle" | "pending" | "processing" | "failed" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
 
@@ -67,6 +72,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setError(null);
+    setScoringStatus("processing");
 
     try {
       const data = await postApi<unknown>(`/telefun/score/${sessionId}`, {});
@@ -75,21 +81,37 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
       if (result) {
         setAssessment(result.assessment);
         onAssessmentUpdate?.(result.assessment);
+        setScoringStatus(null);
       } else {
         setError("Format penilaian tidak valid");
+        setScoringStatus("failed");
       }
-    } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Terjadi kesalahan tak terduga saat analisis",
-      );
+    } catch (e: any) {
+      const scoringStatusRaw = e?.scoringStatus;
+      if (scoringStatusRaw === "processing") {
+        setScoringStatus("processing");
+        setError("Analisis suara sedang diproses otomatis. Silakan tunggu beberapa saat.");
+      } else if (scoringStatusRaw === "pending" || scoringStatusRaw === "failed") {
+        setScoringStatus(scoringStatusRaw);
+        setError(
+          scoringStatusRaw === "pending"
+            ? "Analisis suara sedang dalam antrian."
+            : e?.message || "Analisis suara gagal sebelumnya. Coba lagi.",
+        );
+      } else {
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Terjadi kesalahan tak terduga saat analisis",
+        );
+        setScoringStatus("failed");
+      }
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  if (!assessment && !isAnalyzing) {
+  if (!assessment && !isAnalyzing && scoringStatus !== "processing" && scoringStatus !== "pending") {
     return (
       <div className="rounded-2xl border border-dashed border-slate-950/10 bg-slate-950/5 p-8 text-center dark:border-white/10 dark:bg-white/5">
         <Sparkles className="mx-auto mb-3 h-8 w-8 text-emerald-500" />
@@ -118,15 +140,56 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
     );
   }
 
-  if (isAnalyzing) {
+  if (scoringStatus === "pending" || (isAnalyzing && scoringStatus !== "processing")) {
+    return (
+      <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
+        <Clock className="mb-4 h-12 w-12 text-amber-500" />
+        <h3 className="mb-1 text-xl font-bold">Menunggu Antrian Analisis</h3>
+        <p className="max-w-xs text-sm text-slate-500 dark:text-white/55">
+          Analisis suara Anda sedang dalam antrian dan akan diproses secara
+          otomatis.
+        </p>
+        <button
+          onClick={handleAnalyze}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-700"
+        >
+          <RefreshCw className="h-4 w-4" />
+          <span>Cek Status</span>
+        </button>
+      </div>
+    );
+  }
+
+  if (isAnalyzing || scoringStatus === "processing") {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
         <Loader2 className="mb-4 h-12 w-12 animate-spin text-emerald-500" />
         <h3 className="mb-1 text-xl font-bold">Menganalisis Suara...</h3>
         <p className="max-w-xs text-sm text-slate-500 dark:text-white/55">
-          AI sedang mendengarkan rekaman anda untuk memberikan penilaian
-          mendalam.
+          {scoringStatus === "processing" && !isAnalyzing
+            ? "AI sedang memproses rekaman anda secara otomatis."
+            : "AI sedang mendengarkan rekaman anda untuk memberikan penilaian mendalam."}
         </p>
+      </div>
+    );
+  }
+
+  if (scoringStatus === "failed" && !assessment) {
+    return (
+      <div className="rounded-2xl border border-dashed border-red-500/30 bg-red-500/5 p-8 text-center dark:border-red-500/20 dark:bg-red-500/10">
+        <AlertCircle className="mx-auto mb-3 h-8 w-8 text-red-500" />
+        <h3 className="mb-2 text-lg font-bold">Analisis Gagal</h3>
+        {error && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
+        )}
+        <button
+          onClick={handleAnalyze}
+          disabled={!hasAgentRecording}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow-lg shadow-emerald-900/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw className="h-4 w-4" />
+          <span>Coba Lagi</span>
+        </button>
       </div>
     );
   }
