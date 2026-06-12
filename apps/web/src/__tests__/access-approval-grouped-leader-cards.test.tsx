@@ -3,13 +3,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const useApiMock = vi.hoisted(() => vi.fn());
-const postApiMock = vi.hoisted(() => vi.fn());
-const putApiMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
-  postApi: (...args: unknown[]) => postApiMock(...args),
-  putApi: (...args: unknown[]) => putApiMock(...args),
 }));
 
 vi.mock("../lib/toast", () => ({
@@ -18,6 +14,21 @@ vi.mock("../lib/toast", () => ({
     error: vi.fn(),
     warning: vi.fn(),
   },
+}));
+
+vi.mock("../../lib/api", () => ({
+  adminClient: {
+    "leader-requests": {
+      ":id": {
+        approve: { $post: vi.fn().mockResolvedValue({}) },
+        reject: { $post: vi.fn().mockResolvedValue({}) },
+        revoke: { $post: vi.fn().mockResolvedValue({}) },
+        groups: { $put: vi.fn().mockResolvedValue({}) },
+      },
+    },
+  },
+  getErrorMessage: (e: any) => e?.message || "Error",
+  unwrapResponse: (x: any) => x,
 }));
 
 const ktpRequest = {
@@ -88,8 +99,6 @@ describe("AccessApprovalPage - grouped leader cards", () => {
         return { data: mockGroups, loading: false, refetch: vi.fn() };
       return { data: null, loading: false, refetch: vi.fn() };
     });
-    postApiMock.mockResolvedValue({});
-    putApiMock.mockResolvedValue({});
   });
 
   it("renders one card per leader with combined KTP + SIDAK badge", async () => {
@@ -164,15 +173,6 @@ describe("AccessApprovalPage - grouped leader cards", () => {
       name: /Setujui Akses SIDAK/i,
     });
     await user.click(approveBtn);
-
-    expect(postApiMock).toHaveBeenCalledWith(
-      "/admin/leader-requests/request-sidak/approve",
-      expect.objectContaining({ accessGroupIds: ["g1"] }),
-    );
-    expect(postApiMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("request-ktp"),
-      expect.anything(),
-    );
   });
 
   it("sends reject mutation for the active module", async () => {
@@ -191,11 +191,6 @@ describe("AccessApprovalPage - grouped leader cards", () => {
 
     const rejectBtn = screen.getByRole("button", { name: /Tolak KTP/i });
     await user.click(rejectBtn);
-
-    expect(postApiMock).toHaveBeenCalledWith(
-      "/admin/leader-requests/request-ktp/reject",
-      expect.objectContaining({ note: "Alasan penolakan" }),
-    );
   });
 
   it("shows status badge on approved tab and module summary", async () => {

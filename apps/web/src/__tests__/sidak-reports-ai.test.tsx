@@ -18,7 +18,6 @@ vi.mock("../../hooks/useApi", () => ({
     }
     return { data: null };
   },
-  postApi: vi.fn(),
 }));
 
 describe("SidakReportsAi Component", () => {

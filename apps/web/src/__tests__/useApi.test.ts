@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useApi, postApi, fetchApi } from "../hooks/useApi";
+import { useApi, fetchApi } from "../hooks/useApi";
 
 function mockLocalStorage() {
   const store = new Map<string, string>();
@@ -85,46 +85,6 @@ describe("useApi", () => {
 
     await result.current.refetch();
     await waitFor(() => expect(result.current.data).toEqual([{ id: "2" }]));
-  });
-});
-
-describe("postApi", () => {
-  beforeEach(() => {
-    mockLocalStorage();
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { id: "new" } }), {
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("sends POST with JSON body", async () => {
-    const data = await postApi("/test", { name: "foo" });
-    expect(data).toEqual({ id: "new" });
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/v1/test"),
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ name: "foo" }),
-      }),
-    );
-  });
-
-  it("throws on error response", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({ success: false, error: { message: "Bad request" } }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
-    );
-    await expect(postApi("/test", {})).rejects.toThrow("Bad request");
   });
 });
 

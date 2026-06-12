@@ -4,9 +4,6 @@ const useApiMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
-  postApi: vi.fn(),
-  putApi: vi.fn(),
-  deleteApi: vi.fn(),
 }));
 
 vi.mock("../lib/toast", () => ({

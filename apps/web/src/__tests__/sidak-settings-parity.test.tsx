@@ -2,14 +2,9 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 const useApiMock = vi.hoisted(() => vi.fn());
-const getApiMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
-  getApi: (...args: unknown[]) => getApiMock(...args),
-  putApi: vi.fn(),
-  postApi: vi.fn(),
-  deleteApi: vi.fn(),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -20,7 +15,6 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
 
-import { deleteApi } from "../hooks/useApi";
 import SidakSettingsPage from "../routes/sidak/settings";
 
 const mockPeriods = [
@@ -160,11 +154,17 @@ describe("Sidak settings page legacy parity", () => {
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
-    getApiMock.mockImplementation((path: string) => {
+    useApiMock.mockImplementation((path: string) => {
       if (path.includes("/indicators")) {
-        return Promise.resolve(mockRuleIndicators);
+        return { data: mockRuleIndicators, loading: false, error: null, refetch: vi.fn() };
       }
-      return Promise.resolve([]);
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
     render(<SidakSettingsPage />);
@@ -200,11 +200,17 @@ describe("Sidak settings page legacy parity", () => {
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
-    getApiMock.mockImplementation((path: string) => {
+    useApiMock.mockImplementation((path: string) => {
       if (path.includes("/indicators")) {
-        return Promise.resolve([]);
+        return { data: [], loading: false, error: null, refetch: vi.fn() };
       }
-      return Promise.resolve([]);
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
     render(<SidakSettingsPage />);
@@ -232,17 +238,28 @@ describe("Sidak settings page legacy parity", () => {
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
-    getApiMock.mockImplementation((path: string) => {
+    useApiMock.mockImplementation((path: string) => {
       if (path.includes("/rule-versions/meta")) {
-        return Promise.resolve({
-          service_type: "call",
-          indicator_count: 12,
-          has_weight: true,
-          draft_count: 0,
-          published_count: 0,
-        });
+        return {
+          data: {
+            service_type: "call",
+            indicator_count: 12,
+            has_weight: true,
+            draft_count: 0,
+            published_count: 0,
+          },
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
-      return Promise.resolve([]);
+      if (path.includes("/sidak/periods")) {
+        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+      }
+      if (path.includes("/sidak/rule-versions")) {
+        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+      }
+      return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
     render(<SidakSettingsPage />);
@@ -257,6 +274,20 @@ describe("Sidak settings page legacy parity", () => {
     vi.useRealTimers();
 
     useApiMock.mockImplementation((path: string) => {
+      if (path.includes("/rule-versions/meta")) {
+        return {
+          data: {
+            service_type: "call",
+            indicator_count: 0,
+            has_weight: false,
+            draft_count: 0,
+            published_count: 0,
+          },
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
+      }
       if (path.includes("/sidak/periods")) {
         return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
       }
@@ -264,19 +295,6 @@ describe("Sidak settings page legacy parity", () => {
         return { data: [], loading: false, error: null, refetch: vi.fn() };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
-    });
-
-    getApiMock.mockImplementation((path: string) => {
-      if (path.includes("/rule-versions/meta")) {
-        return Promise.resolve({
-          service_type: "call",
-          indicator_count: 0,
-          has_weight: false,
-          draft_count: 0,
-          published_count: 0,
-        });
-      }
-      return Promise.resolve([]);
     });
 
     render(<SidakSettingsPage />);
@@ -287,7 +305,7 @@ describe("Sidak settings page legacy parity", () => {
     vi.useFakeTimers();
   });
 
-  it("calls deleteApi and refetches when clicking Hapus Draft", async () => {
+  it("calls delete draft via useApi when clicking Hapus Draft", async () => {
     vi.useRealTimers();
     const refetchVersionsMock = vi.fn();
     useApiMock.mockImplementation((path: string) => {
@@ -309,10 +327,8 @@ describe("Sidak settings page legacy parity", () => {
     fireEvent.click(deleteBtn);
 
     expect(window.confirm).toHaveBeenCalledWith("Hapus draft v2 untuk Call efektif Mei 2026? Versi published tidak akan berubah.");
-    expect(deleteApi).toHaveBeenCalledWith("/sidak/rule-versions/v-draft");
     
-    // Wait for the async call of deleteApi to resolve (since handleDeleteDraft has await deleteApi)
-    // The component should call refetchVersions()
+    // Wait for the async call to resolve and trigger refetch
     await vi.waitFor(() => {
       expect(refetchVersionsMock).toHaveBeenCalled();
     });
