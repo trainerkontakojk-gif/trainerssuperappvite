@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { PdktScenario, PdktIdentity, PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
-import { postApi } from "../../../../hooks/useApi";
+import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { normalizePdktScenarioDraft } from "./pdktDraftNormalizers";
 
@@ -161,18 +161,19 @@ export function PdktScenariosTab({
       const targetConsumerTypeId = globalConsumerTypeId === "random" ? "ramah" : globalConsumerTypeId;
       const activeConsumerType = consumerTypes.find((ct) => ct.id === targetConsumerTypeId);
 
-      const result = await postApi<{ subject: string; body: string }>(
-        "/pdkt/generate-template",
-        {
-          scenarioDraft: {
-            ...draft,
-            attachmentImages: draft.attachmentImages?.map(() => ""),
+      const result = await unwrapResponse(
+        await pdktClient["generate-template"].$post({
+          json: {
+            scenarioDraft: {
+              ...draft,
+              attachmentImages: draft.attachmentImages?.map(() => ""),
+            },
+            consumerTypeId: targetConsumerTypeId,
+            consumerTypeDraft: activeConsumerType,
+            identity,
           },
-          consumerTypeId: targetConsumerTypeId,
-          consumerTypeDraft: activeConsumerType,
-          identity,
-        }
-      );
+        })
+      ) as { subject: string; body: string };
 
       scenarioForm.setDraft({
         sampleEmailTemplate: {

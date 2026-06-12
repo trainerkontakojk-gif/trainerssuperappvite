@@ -96,7 +96,7 @@ export function coercePdktModelId(modelId?: string | null): string {
 export function coerceWritingStyleMode(
   value?: string | null,
 ): "realistic" | "training" {
-  return WRITING_STYLE_MODES.includes(value as any)
+  return WRITING_STYLE_MODES.some((mode) => mode === value) && value != null
     ? (value as "realistic" | "training")
     : "training";
 }
@@ -104,7 +104,7 @@ export function coerceWritingStyleMode(
 export function coerceConsumerNameMentionPattern(
   value?: string | null,
 ): "random" | "upfront" | "middle" | "late" | "none" {
-  return CONSUMER_NAME_MENTION_PATTERNS.includes(value as any)
+  return CONSUMER_NAME_MENTION_PATTERNS.some((pattern) => pattern === value) && value != null
     ? (value as "random" | "upfront" | "middle" | "late" | "none")
     : "random";
 }

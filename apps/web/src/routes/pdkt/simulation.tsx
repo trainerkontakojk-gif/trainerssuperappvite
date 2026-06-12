@@ -5,7 +5,8 @@ import { ReplyComposer } from "./components/ReplyComposer";
 import { CreateEmailModal } from "./components/CreateEmailModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
-import { useApi, postApi, deleteApi, getApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { pdktClient, unwrapResponse } from "../../lib/api";
 import type {
   PdktMailboxItem,
   PdktScenario,
@@ -136,7 +137,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   // Fetch Settings & History from DB
   const fetchSettings = async () => {
     try {
-      const res = await getApi<PdktAppSettings | null>("/pdkt/settings");
+      const res = await (unwrapResponse(await pdktClient.settings.$get()) as Promise<PdktAppSettings | null>);
       if (res) {
         setSettings(res);
       } else {
@@ -151,7 +152,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
 
   const fetchHistory = async () => {
     try {
-      const res = await getApi<any[]>("/pdkt/history");
+      const res = (await unwrapResponse(await pdktClient.history.$get())) as any[];
       if (res) {
         const mapped = res.map((item: any) => ({
           id: item.id,
@@ -273,7 +274,11 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
     const checkStatus = async (item: PdktMailboxItem) => {
       if (!item.history_id) return;
       try {
-        const res = await getApi<any>(`/pdkt/history/eval/${item.history_id}`);
+        const res = (await unwrapResponse(
+          await pdktClient.history.eval[":id"].$get({
+            param: { id: item.history_id },
+          }),
+        )) as any;
         if (res) {
           const oldStatus = evaluations[item.id]?.status;
           const newStatus = res.evaluation_status;
@@ -320,7 +325,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   // Save Settings handler
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
     try {
-      await postApi("/pdkt/settings", { settings: newSettings });
+      await unwrapResponse(await pdktClient.settings.$post({ json: { settings: newSettings } }));
       setSettings(newSettings);
       // Refetch history as scenarios configuration might affect display
       await fetchHistory();
@@ -332,7 +337,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   // Delete specific history session
   const handleDeleteSession = async (historyId: string) => {
     try {
-      await deleteApi(`/pdkt/history/${historyId}`);
+      await unwrapResponse(await pdktClient.history[":id"].$delete({ param: { id: historyId } }));
       setHistory((prev) => prev.filter((h) => h.id !== historyId));
     } catch (err) {
       console.error("[PDKT] Failed to delete session:", err);
@@ -343,7 +348,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   // Clear all history
   const handleClearHistory = async () => {
     try {
-      await deleteApi("/pdkt/history");
+      await unwrapResponse(await pdktClient.history.$delete());
       setHistory([]);
     } catch (err) {
       notify.error("Gagal membersihkan riwayat.");
@@ -416,10 +421,9 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
     setIsStartingNew(true);
     try {
       // 1. Determine Identity (Fallback)
-      const fallbackIdentity = await postApi<PdktIdentity>(
-        "/pdkt/generate-identity",
-        {},
-      );
+      const fallbackIdentity = await unwrapResponse(
+        await pdktClient["generate-identity"].$post({ json: {} }),
+      ) as PdktIdentity;
 
       // 2. Build Config
       const currentSettings: PdktAppSettings = settings || {
@@ -440,22 +444,23 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
 
       // 3. Create session in backend (Orchestrated single boundary call)
       const clientRequestId = crypto.randomUUID();
-      const result = await postApi<{ id: string; message: EmailMessage }>(
-        "/pdkt/session/create",
-        {
-          scenarioId: scenario.id,
-          scenarioDraft: scenario,
-          consumerTypeId: config.consumerType.id,
-          consumerTypeDraft: config.consumerType,
-          identity: config.identity,
-          enableImageGeneration: config.enableImageGeneration,
-          selectedModel: config.selectedModel,
-          resolvedConsumerNameMentionPattern:
-            config.resolvedConsumerNameMentionPattern,
-          writingStyleMode: config.writingStyleMode,
-          client_request_id: clientRequestId,
-        },
-      );
+      const result = await unwrapResponse(
+        await pdktClient.session.create.$post({
+          json: {
+            scenarioId: scenario.id,
+            scenarioDraft: scenario,
+            consumerTypeId: config.consumerType.id,
+            consumerTypeDraft: config.consumerType,
+            identity: config.identity,
+            enableImageGeneration: config.enableImageGeneration,
+            selectedModel: config.selectedModel,
+            resolvedConsumerNameMentionPattern:
+              config.resolvedConsumerNameMentionPattern,
+            writingStyleMode: config.writingStyleMode,
+            client_request_id: clientRequestId,
+          },
+        }),
+      ) as { id: string; message: EmailMessage };
 
       await refetch();
       await fetchHistory(); // update history list as well
@@ -491,11 +496,15 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
         isAgent: true,
       };
 
-      await postApi("/pdkt/mailbox/reply", {
-        mailboxId: selectedId,
-        reply,
-        timeTaken,
-      });
+      await unwrapResponse(
+        await pdktClient.mailbox.reply.$post({
+          json: {
+            mailboxId: selectedId,
+            reply,
+            timeTaken,
+          },
+        }),
+      );
 
       await refetch();
       await fetchHistory();
@@ -521,7 +530,11 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       },
     }));
     try {
-      await postApi("/pdkt/history/retry-eval", { historyId });
+      await unwrapResponse(
+        await pdktClient.history["retry-eval"].$post({
+          json: { historyId },
+        }),
+      );
     } catch (err: any) {
       setEvaluations((prev) => ({
         ...prev,
@@ -557,11 +570,15 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
 
     try {
       const ids = Array.from(selectedBulkIds);
-      const result = await postApi<{
+      const result = (await unwrapResponse(
+        await pdktClient.mailbox["batch-delete"].$post({
+          json: { ids },
+        }),
+      )) as {
         successCount: number;
         failureCount: number;
         errors: string[];
-      }>("/pdkt/mailbox/batch-delete", { ids });
+      };
 
       if (result.failureCount > 0) {
         notify.warning(
@@ -586,7 +603,11 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus email ini?")) return;
     try {
-      await deleteApi(`/pdkt/mailbox/${id}`);
+      await unwrapResponse(
+        await pdktClient.mailbox[":id"].$delete({
+          param: { id },
+        }),
+      );
       await refetch();
       if (selectedId === id) setSelectedId(null);
     } catch (_err) {

@@ -6,7 +6,8 @@ import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
-import { useApi, getApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
 import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
 import type { PdktScenario, PdktConsumerType } from "@trainers/types";
@@ -84,7 +85,7 @@ export default function PdktLanding() {
 
   const fetchSettings = async () => {
     try {
-      const res = await getApi<PdktAppSettings | null>("/pdkt/settings");
+      const res = await (unwrapResponse(await pdktClient.settings.$get()) as Promise<PdktAppSettings | null>);
       if (res) {
         setSettings(res);
       } else {
@@ -99,7 +100,7 @@ export default function PdktLanding() {
 
   const fetchHistory = async () => {
     try {
-      const res = await getApi<any[]>("/pdkt/history");
+      const res = (await unwrapResponse(await pdktClient.history.$get())) as any[];
       if (res) {
         const mapped = res.map((item: any) => ({
           id: item.id,
@@ -129,8 +130,7 @@ export default function PdktLanding() {
 
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
     try {
-      const { postApi } = await import("../../hooks/useApi");
-      await postApi("/pdkt/settings", { settings: newSettings });
+      await unwrapResponse(await pdktClient.settings.$post({ json: { settings: newSettings } }));
       setSettings(newSettings);
       await fetchHistory();
     } catch (err) {
@@ -140,7 +140,7 @@ export default function PdktLanding() {
 
   const handleDeleteSession = async (historyId: string) => {
     try {
-      await deleteApi(`/pdkt/history/${historyId}`);
+      await unwrapResponse(await pdktClient.history[":id"].$delete({ param: { id: historyId } }));
       setHistory((prev) => prev.filter((h) => h.id !== historyId));
     } catch (err) {
       console.error("[PDKT] Failed to delete session:", err);
@@ -150,7 +150,7 @@ export default function PdktLanding() {
 
   const handleClearHistory = async () => {
     try {
-      await deleteApi("/pdkt/history");
+      await unwrapResponse(await pdktClient.history.$delete());
       setHistory([]);
     } catch (err) {
       notify.error("Gagal membersihkan riwayat.");
