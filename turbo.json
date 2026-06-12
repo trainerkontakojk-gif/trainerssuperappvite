@@ -40,6 +40,9 @@
     },
     "test:full": {
       "dependsOn": ["^build"]
+    },
+    "test:db-integration": {
+      "cache": false
     }
   }
 }

@@ -18,6 +18,7 @@
     "test:core": "turbo test:core",
     "test:fast": "turbo test:fast",
     "test:full": "turbo test:full",
+    "test:db-integration": "pnpm --filter @trainers/api test:db-integration",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "seed": "tsx scripts/seed.ts",
     "validate-migrations": "tsx scripts/validate-migrations.ts",

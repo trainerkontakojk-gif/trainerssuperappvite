@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@trainers/api": path.resolve(__dirname, "../../apps/api/src"),
     },
   },
   server: {

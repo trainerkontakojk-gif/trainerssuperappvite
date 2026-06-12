@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
       "@trainers/types": path.resolve(__dirname, "../../packages/types/src"),
+      "@trainers/api": path.resolve(__dirname, "../../apps/api/src"),
     },
   },
   test: {

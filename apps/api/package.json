@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/app.ts",
+    "./types": "./src/app.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
@@ -11,6 +15,7 @@
     "test:core": "vitest run src/__tests__/auth-middleware.test.ts src/__tests__/rls-role-based.test.ts src/__tests__/rls-mixed-access.test.ts src/__tests__/sidak-service.test.ts src/__tests__/sidak-versioning-parity.test.ts src/__tests__/telefun-routes.test.ts src/__tests__/telefun-schema-contract.test.ts src/__tests__/ketik-review-lifecycle.test.ts src/__tests__/pdkt.test.ts src/__tests__/monitoring-history-delete-migration.test.ts",
     "test:fast": "vitest run",
     "test:full": "vitest run",
+    "test:db-integration": "vitest run --config vitest.config.db-integration.ts",
     "lint": "eslint .",
     "start": "tsx src/index.ts"
   },
