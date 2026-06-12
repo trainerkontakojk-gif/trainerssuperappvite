@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { CallRecord } from "../types";
 import { notify } from "../../../lib/toast";
-import { getApi } from "../../../hooks/useApi";
+import { telefunClient, unwrapResponse } from "../../../lib/api";
 
 interface HistoryModalProps {
   isOpen: boolean;
@@ -130,9 +130,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       let downloadUrl = record.url;
 
       if (!downloadUrl && (record.recordingPath || record.agentRecordingPath)) {
-        const json = await getApi<any>(`/telefun/recording/${record.id}`);
-        if (json?.url) {
-          downloadUrl = json.url;
+        const json = await unwrapResponse(await telefunClient.recording[":id"].$get({ param: { id: record.id } }));
+        if ((json as any)?.url) {
+          downloadUrl = (json as any).url;
         }
       }
 

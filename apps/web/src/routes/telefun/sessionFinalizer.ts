@@ -1,5 +1,5 @@
 import { supabase } from "../../lib/supabase";
-import { postApi, patchApi } from "../../hooks/useApi";
+import { telefunClient, unwrapResponse } from "../../lib/api";
 import { buildTelefunRecordingPath } from "./recordingPath";
 import type { CallRecord } from "./types";
 import type { TelefunAppSettings } from "./telefunSettings";
@@ -49,13 +49,13 @@ const defaultDependencies: FinalizerDependencies = {
     return data?.path;
   },
   patchSession: async (sessionId, body) => {
-    await patchApi(`/telefun/sessions/${sessionId}`, body);
+    await unwrapResponse(await telefunClient.sessions[":sessionId"].$patch({ param: { sessionId }, json: body }));
   },
   finalizeRecording: async (params) => {
-    await postApi("/telefun/finalize-recording", params);
+    await unwrapResponse(await telefunClient["finalize-recording"].$post({ json: params }));
   },
   scoreSession: async (sessionId) => {
-    const response = await postApi<unknown>(`/telefun/score/${sessionId}`, {});
+    const response = await (unwrapResponse(await telefunClient.score[":sessionId"].$post({ param: { sessionId }, json: {} })) as any);
     const result = parseTelefunScoreResult(response);
     if (!result) {
       throw new Error("Format hasil penilaian Telefun tidak valid.");

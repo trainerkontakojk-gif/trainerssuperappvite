@@ -26,7 +26,7 @@ import { CommunicationProfileZoomModal } from "./CommunicationProfileZoomModal";
 import { VoiceMetricCards } from "./VoiceMetricCards";
 import { HoldAssessmentCard } from "./HoldAssessmentCard";
 import { TelefunTranscript } from "./TelefunTranscript";
-import { postApi } from "../../../hooks/useApi";
+import { telefunClient, unwrapResponse } from "../../../lib/api";
 
 interface VoiceAssessmentSectionProps {
   sessionId: string;
@@ -75,7 +75,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
     setScoringStatus("processing");
 
     try {
-      const data = await postApi<unknown>(`/telefun/score/${sessionId}`, {});
+      const data = await unwrapResponse(await telefunClient.score[":id"].$post({ param: { id: sessionId }, json: {} }));
       const result = parseTelefunScoreResult(data);
 
       if (result) {

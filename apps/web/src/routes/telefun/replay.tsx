@@ -15,7 +15,8 @@ import {
   Trash2,
   Loader2,
 } from "lucide-react";
-import { useApi, getApi, postApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { telefunClient, unwrapResponse } from "../../lib/api";
 import type {
   TelefunHistory,
   TelefunCoachingSummary,
@@ -61,7 +62,7 @@ export default function TelefunReplay() {
     if (session?.id) {
       const fetchAudio = async () => {
         try {
-          const json = await getApi<any>(`/telefun/recording/${session.id}`);
+          const json = await (unwrapResponse(await telefunClient.recordings[":sessionId"].$get({ param: { sessionId: session.id } })) as any);
           if (json?.url) {
             setAudioUrl(json.url);
           }
@@ -112,13 +113,13 @@ export default function TelefunReplay() {
     if (!newAnnotation.text.trim()) return;
     setIsAddingAnnotation(true);
     try {
-      await postApi(`/telefun/annotations/${id}`, {
+      await unwrapResponse(await telefunClient.annotations[":id"].$post({ param: { id }, json: {
         timestamp_ms: Math.round(currentTime * 1000),
         category: newAnnotation.category,
         moment: `Moment at ${formatTime(currentTime)}`,
         text: newAnnotation.text,
         is_manual: true,
-      });
+      } }));
       setNewAnnotation({ text: "", category: "strength" });
       await refetchAnnotations();
     } catch (err) {
@@ -130,7 +131,7 @@ export default function TelefunReplay() {
 
   const handleDeleteAnnotation = async (annoId: string) => {
     try {
-      await deleteApi(`/telefun/annotations/${annoId}`);
+      await unwrapResponse(await telefunClient.annotations[":annoId"].$delete({ param: { annoId } }));
       await refetchAnnotations();
     } catch (err) {
       notify.error("Gagal menghapus anotasi.");

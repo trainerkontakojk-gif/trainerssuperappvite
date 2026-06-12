@@ -11,7 +11,6 @@ import { SettingsModal } from "./components/SettingsModal";
 import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
-import { postApi } from "../../hooks/useApi";
 import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
@@ -22,6 +21,7 @@ import {
   getTelefunSettings,
   saveTelefunSettings,
   getTelefunSessions,
+  createTelefunSession,
   deleteTelefunSession,
   clearTelefunHistory,
   mapTelefunSessionRow,
@@ -218,7 +218,7 @@ export default function TelefunLanding() {
     }).catch(() => {});
 
     try {
-      const res = await postApi<any>("/telefun/sessions", {
+      const res = await createTelefunSession({
         scenario_title: randomScenario.title,
         consumer_name: identity.name,
         consumer_gender: identity.gender,
@@ -266,7 +266,7 @@ export default function TelefunLanding() {
     if (!sessionId) {
       console.warn("No activeSessionId found during finalization. Attempting fallback session creation.");
       try {
-        const res = await postApi<any>("/telefun/sessions", {
+        const res = await createTelefunSession({
           scenario_title: finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
           consumer_name: sessionConfig?.consumerName || consumerName || "Konsumen",
           consumer_gender: sessionConfig?.consumerGender || "female",

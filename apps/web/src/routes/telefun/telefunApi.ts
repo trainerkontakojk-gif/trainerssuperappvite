@@ -1,4 +1,4 @@
-import { getApi, putApi, deleteApi } from "../../hooks/useApi";
+import { telefunClient, unwrapResponse } from "../../lib/api";
 import type { TelefunAppSettings } from "./telefunSettings";
 import type { CallRecord } from "./types";
 import { validateAssessment } from "../../lib/voiceAssessmentUtils";
@@ -34,26 +34,53 @@ export interface TelefunSessionRow {
   messages?: unknown;
 }
 
-export async function getTelefunSettings(): Promise<any> {
-  return getApi<any>("/telefun/settings");
+export interface CreateTelefunSessionInput {
+  scenario_title: string;
+  consumer_name: string;
+  consumer_gender?: string;
+  consumer_phone?: string;
+  consumer_city?: string;
+  realistic_mode_enabled?: boolean;
+  persona_config?: { consumerType?: string };
+  disruption_config?: string[];
+  configured_duration?: number;
+  response_pacing_mode?: string;
+  telefun_model_id?: string;
+  telefun_transport?: string;
+}
+
+export async function getTelefunSettings(): Promise<Record<string, unknown> | null> {
+  return (await unwrapResponse(
+    await telefunClient.settings.$get(),
+  )) as Record<string, unknown> | null;
 }
 
 export async function saveTelefunSettings(
   settings: TelefunAppSettings,
 ): Promise<void> {
-  await putApi("/telefun/settings", settings);
+  await unwrapResponse(await telefunClient.settings.$put({ json: settings }));
 }
 
 export async function getTelefunSessions(): Promise<TelefunSessionRow[]> {
-  return getApi<TelefunSessionRow[]>("/telefun/sessions");
+  return (await unwrapResponse(
+    await telefunClient.sessions.$get(),
+  )) as TelefunSessionRow[];
+}
+
+export async function createTelefunSession(
+  input: CreateTelefunSessionInput,
+): Promise<TelefunSessionRow> {
+  return (await unwrapResponse(
+    await telefunClient.sessions.$post({ json: input }),
+  )) as TelefunSessionRow;
 }
 
 export async function deleteTelefunSession(id: string): Promise<void> {
-  await deleteApi(`/telefun/history/${id}`);
+  await unwrapResponse(await telefunClient.history[":id"].$delete({ param: { id } }));
 }
 
 export async function clearTelefunHistory(): Promise<void> {
-  await deleteApi("/telefun/history");
+  await unwrapResponse(await telefunClient.history.$delete());
 }
 
 export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {

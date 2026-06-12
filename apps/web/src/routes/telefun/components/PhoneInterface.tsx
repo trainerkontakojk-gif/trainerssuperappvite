@@ -70,12 +70,17 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const [agentVolume, setAgentVolume] = useState(0);
   const [activeHold, setActiveHold] = useState<ActiveHoldUi | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   const sentTimeCues = useRef<Set<TelefunTimeCue>>(new Set());
   const holdSequenceRef = useRef(0);
 
   const sessionRef = useRef<LiveSession | null>(null);
   const mountedRef = useRef(true);
+
+  // End-call idempotency refs
+  const isDisconnectingRef = useRef(false);
+  const endCallStartedRef = useRef(false);
 
   const uiAudioContextRef = useRef<AudioContext | null>(null);
   const holdMusicOscillators = useRef<OscillatorNode[]>([]);
@@ -290,7 +295,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               console.error("onRecordingReady failed:", err);
             }
           }
-          if (mountedRef.current) {
+          // If disconnect (end call) is in progress, handleEndCall will navigate home.
+          // Otherwise (session ended by server/error), navigate home here.
+          if (mountedRef.current && !isDisconnectingRef.current) {
             onEndSessionRef.current("completed");
           }
         };
@@ -312,7 +319,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       isActive = false;
       mountedRef.current = false;
       stopHoldMusic();
-      (async () => { await sessionRef.current?.disconnect("cleanup"); })();
+      if (!endCallStartedRef.current) {
+        (async () => { await sessionRef.current?.disconnect("cleanup"); })();
+      }
       if (
         uiAudioContextRef.current &&
         uiAudioContextRef.current.state !== "closed"
@@ -345,6 +354,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const isOnHold = activeHold !== null;
 
   const toggleHold = () => {
+    if (isDisconnectingRef.current) return;
     if (activeHold) {
       setActiveHold(null);
       stopHoldMusic();
@@ -374,6 +384,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
 
   const handleEndCall = useCallback(
     async (reason?: string) => {
+      // Guard: prevent concurrent end-call executions
+      if (endCallStartedRef.current) return;
+      endCallStartedRef.current = true;
+      setIsDisconnecting(true);
+      isDisconnectingRef.current = true;
+
       stopHoldMusic();
       if (
         uiAudioContextRef.current &&
@@ -386,8 +402,17 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           /* cleanup */
         }
       }
-      await sessionRef.current?.disconnect(reason === "timeout" ? "timeout" : "user");
-      onEndSessionRef.current(reason);
+
+      try {
+        await sessionRef.current?.disconnect(reason === "timeout" ? "timeout" : "user");
+      } catch (err) {
+        console.error("[Telefun] disconnect error:", err);
+      }
+
+      // Navigate home only after disconnect + recording finalization complete
+      if (mountedRef.current) {
+        onEndSessionRef.current(reason);
+      }
     },
     [stopHoldMusic],
   );
@@ -630,7 +655,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         <div className="flex flex-col items-center gap-2">
           <button
             onClick={toggleHold}
-            disabled={isRinging}
+            disabled={isRinging || isDisconnecting}
             className={`rounded-full border p-4 shadow-lg transition-all duration-200 md:p-5 ${
               isOnHold
                 ? "border-amber-400 bg-amber-400 text-black hover:bg-amber-300"
@@ -653,8 +678,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         {/* Mic Button */}
         <div className="flex flex-col items-center gap-2">
           <button
-            onClick={() => setIsMuted(!isMuted)}
-            disabled={isOnHold || isRinging}
+            onClick={() => {
+              if (!isDisconnectingRef.current) {
+                setIsMuted((muted) => !muted);
+              }
+            }}
+            disabled={isOnHold || isRinging || isDisconnecting}
             className={`rounded-full border p-4 shadow-lg transition-all duration-200 md:p-5 ${
               isMuted
                 ? "border-slate-950 bg-slate-950 text-white hover:opacity-90 dark:border-white dark:bg-white dark:text-slate-950"
@@ -676,14 +705,22 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         {/* End Call Button */}
         <div className="flex flex-col items-center gap-2">
           <button
-            onClick={() => handleEndCall()}
-            className="rounded-full border border-red-500 bg-red-600 p-5 text-white shadow-xl shadow-red-900/30 transition-all hover:scale-105 hover:bg-red-700 md:p-6"
-            title="End Call"
+            onClick={() => !isDisconnecting && handleEndCall()}
+            disabled={isDisconnecting}
+            className={`rounded-full border p-5 text-white shadow-xl shadow-red-900/30 transition-all md:p-6 ${
+              isDisconnecting
+                ? "cursor-not-allowed border-red-700 bg-red-800 opacity-50"
+                : "border-red-500 bg-red-600 hover:scale-105 hover:bg-red-700"
+            }`}
+            title={isDisconnecting ? "Mengakhiri panggilan..." : "End Call"}
+            aria-label={isDisconnecting ? "Mengakhiri panggilan, harap tunggu" : "Akhiri panggilan"}
           >
             <PhoneOff className="h-8 w-8 md:h-9 md:w-9" />
           </button>
-          <span className="text-[10px] uppercase font-bold tracking-wider text-red-500/70 hidden md:block">
-            Hangup
+          <span className={`text-[10px] uppercase font-bold tracking-wider hidden md:block ${
+            isDisconnecting ? "text-red-400" : "text-red-500/70"
+          }`}>
+            {isDisconnecting ? "Mengakhiri..." : "Hangup"}
           </span>
         </div>
       </div>

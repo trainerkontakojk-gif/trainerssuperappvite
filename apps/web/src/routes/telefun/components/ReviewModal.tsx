@@ -29,7 +29,8 @@ import {
   type ReplayAnnotationItem,
   type CoachingRecommendationItem,
 } from "./ReplayAnnotator";
-import { useApi, getApi, postApi, deleteApi } from "../../../hooks/useApi";
+import { useApi } from "../../../hooks/useApi";
+import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 
 interface ReviewModalProps {
@@ -151,12 +152,12 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     const loadRecordingUrl = async () => {
       setRecordingLoading(true);
       try {
-        const json = await getApi<any>(`/telefun/recording/${record.id}`);
+        const json = await unwrapResponse(await telefunClient.recording[":id"].$get({ param: { id: record.id } }));
 
         if (cancelled) return;
 
-        if (json?.url) {
-          setRecordingUrl(json.url);
+        if ((json as any)?.url) {
+          setRecordingUrl((json as any).url);
         } else {
           setRecordingUrl(null);
           setRecordingError(
@@ -225,13 +226,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       if (!record) return;
 
       try {
-        await postApi(`/telefun/annotations/${record.id}`, {
-          timestamp_ms: annotation.timestampMs,
-          category: annotation.category,
-          moment: annotation.moment,
-          text: annotation.text,
-          is_manual: true,
-        });
+        await unwrapResponse(await telefunClient.annotations[":id"].$post({
+          param: { id: record.id },
+          json: {
+            timestamp_ms: annotation.timestampMs,
+            category: annotation.category,
+            moment: annotation.moment,
+            text: annotation.text,
+            is_manual: true,
+          },
+        }));
 
         await refetchAnnotations();
         await refetchSummary();
@@ -248,7 +252,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   const handleDeleteAnnotation = useCallback(
     async (annotationId: string) => {
       try {
-        await deleteApi(`/telefun/annotations/${annotationId}`);
+        await unwrapResponse(await telefunClient.annotations[":annotationId"].$delete({ param: { annotationId } }));
         await refetchAnnotations();
         notify.success("Anotasi berhasil dihapus");
       } catch (error) {

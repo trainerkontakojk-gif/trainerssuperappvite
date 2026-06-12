@@ -94,6 +94,11 @@ export class LiveSession {
   private intentionalClose = false;
   private hasStoppedRecording = false;
   private lastLocalError: Error | null = null;
+  private disconnectPromise: Promise<void> | null = null;
+
+  // Recording finalization promise ensures disconnect waits for onRecordingComplete.
+  private recordingFinalizationPromise: Promise<void> = Promise.resolve();
+  private resolveRecordingFinalization: (() => void) | null = null;
 
   // Callbacks
   public onStatusChange: (status: string) => void = () => {};
@@ -685,7 +690,18 @@ export class LiveSession {
     });
   }
 
-  public async disconnect(reason: "user" | "timeout" | "cleanup" = "user"): Promise<void> {
+  public disconnect(
+    reason: "user" | "timeout" | "cleanup" = "user",
+  ): Promise<void> {
+    if (!this.disconnectPromise) {
+      this.disconnectPromise = this.performDisconnect(reason);
+    }
+    return this.disconnectPromise;
+  }
+
+  private async performDisconnect(
+    reason: "user" | "timeout" | "cleanup",
+  ): Promise<void> {
     if (this.intentionalClose) return;
     this.intentionalClose = true;
     this.clearSetupTimeout();
@@ -720,6 +736,9 @@ export class LiveSession {
     // Cleanup after drain
     this.cleanupAudio();
     this.emitTimelineEvent("disconnect", { reason });
+
+    // Wait for recording finalization before resolving.
+    await this.recordingFinalizationPromise.catch(() => {});
   }
 
   private stopRecordingOnce() {
@@ -738,6 +757,11 @@ export class LiveSession {
     ) {
       this.agentMediaRecorder.stop();
     }
+
+    // Create a new finalization promise that disconnect can await
+    this.recordingFinalizationPromise = new Promise<void>((resolve) => {
+      this.resolveRecordingFinalization = resolve;
+    });
 
     setTimeout(() => {
       this.emitRecording();
@@ -764,7 +788,7 @@ export class LiveSession {
     };
   }
 
-  private emitRecording() {
+  private async emitRecording(): Promise<void> {
     const fullBlob =
       this.recordedChunks.length > 0
         ? new Blob(this.recordedChunks, { type: "audio/webm" })
@@ -776,7 +800,16 @@ export class LiveSession {
     const url = fullBlob ? URL.createObjectURL(fullBlob) : null;
 
     const metrics = this.buildSessionMetrics();
-    this.onRecordingComplete(url, fullBlob, agentBlob, metrics);
+    try {
+      await this.onRecordingComplete(url, fullBlob, agentBlob, metrics);
+    } catch (err) {
+      console.error("[Telefun] onRecordingComplete error:", err);
+    }
+    // Resolve so disconnect() can finish after recording callback completes
+    if (this.resolveRecordingFinalization) {
+      this.resolveRecordingFinalization();
+      this.resolveRecordingFinalization = null;
+    }
   }
 
   private calculateVolumeConsistency(): number {
