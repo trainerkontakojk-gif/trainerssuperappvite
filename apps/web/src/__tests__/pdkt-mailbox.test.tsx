@@ -9,15 +9,13 @@ import {
 } from "@tanstack/react-router";
 import PdktSimulation from "../routes/pdkt/simulation";
 import { EmailDetailPane } from "../routes/pdkt/components/EmailDetailPane";
-import * as useApiModule from "../hooks/useApi";
 import type { PdktMailboxItem } from "@trainers/types";
+
+const useApiMock = vi.hoisted(() => vi.fn());
 
 // Mock the API hooks
 vi.mock("../hooks/useApi", () => ({
-  useApi: vi.fn(),
-  getApi: vi.fn(),
-  postApi: vi.fn(),
-  deleteApi: vi.fn(),
+  useApi: (...args: unknown[]) => useApiMock(...args),
 }));
 
 describe("PDKT Mailbox UX", () => {
@@ -25,7 +23,7 @@ describe("PDKT Mailbox UX", () => {
     vi.clearAllMocks();
 
     // Default mocks
-    (useApiModule.useApi as any).mockReturnValue({
+    useApiMock.mockReturnValue({
       data: [
         {
           id: "m1",
@@ -40,13 +38,6 @@ describe("PDKT Mailbox UX", () => {
       ],
       loading: false,
       refetch: vi.fn(),
-    });
-
-    (useApiModule.getApi as any).mockImplementation((url: string) => {
-      if (url === "/pdkt/settings")
-        return Promise.resolve(null);
-      if (url === "/pdkt/history") return Promise.resolve([]);
-      return Promise.resolve(null);
     });
   });
 
@@ -65,7 +56,7 @@ describe("PDKT Mailbox UX", () => {
   });
 
   it("shows error state when API returns error", async () => {
-    (useApiModule.useApi as any).mockReturnValue({
+    useApiMock.mockReturnValue({
       data: null,
       loading: false,
       error: "Anda tidak memiliki akses ke resource ini.",
@@ -91,7 +82,7 @@ describe("PDKT Mailbox UX", () => {
 
   it("calls refetch when retry button is clicked", async () => {
     const refetchMock = vi.fn();
-    (useApiModule.useApi as any).mockReturnValue({
+    useApiMock.mockReturnValue({
       data: null,
       loading: false,
       error: "Network error",
@@ -114,15 +105,12 @@ describe("PDKT Mailbox UX", () => {
   });
 
   it("does not show error state while loading", async () => {
-    (useApiModule.useApi as any).mockReturnValue({
+    useApiMock.mockReturnValue({
       data: null,
       loading: true,
       error: null,
       refetch: vi.fn(),
     });
-    (useApiModule.getApi as any).mockImplementation(
-      () => new Promise(() => {}),
-    );
 
     const rootRoute = createRootRoute();
     const indexRoute = createRoute({

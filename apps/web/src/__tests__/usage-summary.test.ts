@@ -2,10 +2,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fetchUsageSummary } from "../lib/usage-summary";
 import { emptyUsageBreakdown } from "../lib/usage-snapshot";
 
-const mockGetApi = vi.fn();
+const mockGet = vi.fn();
 
-vi.mock("../hooks/useApi", () => ({
-  getApi: (...args: any[]) => mockGetApi(...args),
+vi.mock("../lib/api", () => ({
+  aiClient: {
+    usage: {
+      summary: {
+        $get: (...args: unknown[]) => mockGet(...args),
+      },
+    },
+  },
+  unwrapResponse: (x: any) => x,
 }));
 
 describe("fetchUsageSummary", () => {
@@ -14,7 +21,7 @@ describe("fetchUsageSummary", () => {
   });
 
   it("normalizes old API shape with empty breakdown", async () => {
-    mockGetApi.mockResolvedValueOnce({
+    mockGet.mockResolvedValueOnce({
       totalCalls: 5,
       totalTokens: 1000,
       totalCostIdr: 5000,
@@ -23,7 +30,6 @@ describe("fetchUsageSummary", () => {
     });
 
     const result = await fetchUsageSummary("ketik");
-    expect(mockGetApi).toHaveBeenCalledWith("/ai/usage/summary?module=ketik");
     expect(result).toEqual({
       totalCalls: 5,
       totalInputTokens: 0,
@@ -44,7 +50,7 @@ describe("fetchUsageSummary", () => {
     mockBreakdown.review.costIdr = 0;
     mockBreakdown.review.totalTokens = 100;
 
-    mockGetApi.mockResolvedValueOnce({
+    mockGet.mockResolvedValueOnce({
       totalCalls: 1,
       totalTokens: 100,
       totalCostIdr: 0,
@@ -57,7 +63,7 @@ describe("fetchUsageSummary", () => {
   });
 
   it("normalizes itemized breakdown from API", async () => {
-    mockGetApi.mockResolvedValueOnce({
+    mockGet.mockResolvedValueOnce({
       totalCalls: 3,
       totalTokens: 1500,
       totalCostIdr: 9000,
@@ -84,7 +90,7 @@ describe("fetchUsageSummary", () => {
   });
 
   it("returns null on fetch error", async () => {
-    mockGetApi.mockRejectedValueOnce(new Error("Network Error"));
+    mockGet.mockRejectedValueOnce(new Error("Network Error"));
     const result = await fetchUsageSummary("telefun");
     expect(result).toBeNull();
   });

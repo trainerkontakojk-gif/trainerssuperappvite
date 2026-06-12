@@ -7,9 +7,6 @@ const useApiMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
-  fetchApi: vi.fn(),
-  putApi: vi.fn(),
-  deleteApi: vi.fn(),
 }));
 
 function buildAgentDetailData(selectedService: string | null) {

@@ -3,15 +3,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockUseApi = vi.fn();
-const mockGetApi = vi.fn();
-const mockPostApi = vi.fn();
-const mockDeleteApi = vi.fn();
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: any[]) => mockUseApi(...args),
-  getApi: (...args: any[]) => mockGetApi(...args),
-  postApi: (...args: any[]) => mockPostApi(...args),
-  deleteApi: (...args: any[]) => mockDeleteApi(...args),
 }));
 
 vi.mock("../lib/usage-summary", () => ({
@@ -37,19 +31,6 @@ describe("PDKT Landing Page", () => {
       loading: false,
       refetch: vi.fn(),
     });
-    mockGetApi.mockImplementation((url: string) => {
-      if (url === "/pdkt/settings") return Promise.resolve(null);
-      if (url === "/pdkt/history") return Promise.resolve([]);
-      if (url.startsWith("/ai/usage/summary"))
-        return Promise.resolve({
-          totalCalls: 0,
-          totalTokens: 0,
-          totalCostIdr: 0,
-        });
-      return Promise.resolve(null);
-    });
-    mockPostApi.mockResolvedValue(null);
-    mockDeleteApi.mockResolvedValue(null);
   });
 
   it("renders workspace intro with correct eyebrow", async () => {

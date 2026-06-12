@@ -6,11 +6,7 @@ import {
 } from "../routes/telefun/telefunApi";
 import type { TelefunSessionRow } from "../routes/telefun/telefunApi";
 
-vi.mock("../hooks/useApi", () => ({
-  getApi: vi.fn().mockResolvedValue({ success: true, selectedModel: "gemini" }),
-  putApi: vi.fn().mockResolvedValue({ success: true }),
-  deleteApi: vi.fn().mockResolvedValue({ success: true }),
-}));
+vi.mock("../hooks/useApi", () => ({}));
 
 describe("Telefun API Adapter", () => {
   it("fetches settings via getApi", async () => {

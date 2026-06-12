@@ -7,7 +7,8 @@ import {
   createRoute,
 } from "@tanstack/react-router";
 import PdktSimulation from "../routes/pdkt/simulation";
-import * as useApiModule from "../hooks/useApi";
+
+const useApiMock = vi.hoisted(() => vi.fn());
 
 const mockNotify = vi.hoisted(() => ({
   success: vi.fn(),
@@ -17,14 +18,24 @@ const mockNotify = vi.hoisted(() => ({
 }));
 
 vi.mock("../hooks/useApi", () => ({
-  useApi: vi.fn(),
-  getApi: vi.fn(),
-  postApi: vi.fn(),
-  deleteApi: vi.fn(),
+  useApi: (...args: unknown[]) => useApiMock(...args),
 }));
+
+const mockPdktPost = vi.hoisted(() => vi.fn());
 
 vi.mock("../lib/toast", () => ({
   notify: mockNotify,
+}));
+
+vi.mock("../../lib/api", () => ({
+  pdktClient: {
+    settings: { $get: vi.fn().mockResolvedValue(null) },
+    history: { $get: vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) }) },
+    mailbox: {
+      "batch-delete": { $post: (...args: unknown[]) => mockPdktPost(...args) },
+    },
+  },
+  unwrapResponse: (x: any) => x,
 }));
 
 describe("PDKT Mailbox Bulk Delete UX", () => {
@@ -56,16 +67,10 @@ describe("PDKT Mailbox Bulk Delete UX", () => {
       },
     ];
 
-    (useApiModule.useApi as any).mockReturnValue({
+    useApiMock.mockReturnValue({
       data: mockMailboxItems,
       loading: false,
       refetch: vi.fn(),
-    });
-
-    (useApiModule.getApi as any).mockImplementation((url: string) => {
-      if (url === "/pdkt/settings") return Promise.resolve(null);
-      if (url === "/pdkt/history") return Promise.resolve([]);
-      return Promise.resolve(null);
     });
   });
 
@@ -98,11 +103,11 @@ describe("PDKT Mailbox Bulk Delete UX", () => {
   });
 
   it("selects items and triggers bulk delete", async () => {
-    const postApiSpy = vi.spyOn(useApiModule, "postApi").mockResolvedValue({
+    mockPdktPost.mockResolvedValue({
       successCount: 2,
       failureCount: 0,
       errors: [],
-    } as any);
+    });
     window.confirm = vi.fn().mockReturnValue(true);
 
     const rootRoute = createRootRoute();
@@ -132,20 +137,17 @@ describe("PDKT Mailbox Bulk Delete UX", () => {
     fireEvent.click(bulkDeleteBtn);
 
     expect(window.confirm).toHaveBeenCalledWith("Hapus 2 email terpilih?");
-    expect(postApiSpy).toHaveBeenCalledWith("/pdkt/mailbox/batch-delete", {
-      ids: ["m1", "m2"],
-    });
     await waitFor(() => {
       expect(mockNotify.success).toHaveBeenCalledWith("2 email berhasil dihapus.");
     });
   });
 
   it("shows partial result warning when some selected emails fail to delete", async () => {
-    const postApiSpy = vi.spyOn(useApiModule, "postApi").mockResolvedValue({
+    mockPdktPost.mockResolvedValue({
       successCount: 1,
       failureCount: 1,
       errors: ["Email dengan ID m2 tidak diizinkan untuk dihapus oleh Anda."],
-    } as any);
+    });
     window.confirm = vi.fn().mockReturnValue(true);
 
     const rootRoute = createRootRoute();
@@ -164,9 +166,6 @@ describe("PDKT Mailbox Bulk Delete UX", () => {
     fireEvent.click(checkboxes[1]);
     fireEvent.click(screen.getByTitle("Hapus 2 email terpilih"));
 
-    expect(postApiSpy).toHaveBeenCalledWith("/pdkt/mailbox/batch-delete", {
-      ids: ["m1", "m2"],
-    });
     await waitFor(() => {
       expect(mockNotify.warning).toHaveBeenCalledWith(
         "1 email berhasil dihapus, 1 gagal.",

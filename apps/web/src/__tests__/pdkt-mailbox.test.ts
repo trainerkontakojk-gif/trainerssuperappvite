@@ -16,9 +16,6 @@ vi.mock("../../hooks/useApi", () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  getApi: vi.fn(() => Promise.resolve(null)),
-  postApi: vi.fn(),
-  deleteApi: vi.fn(),
 }));
 
 vi.mock("../../lib/toast", () => ({
