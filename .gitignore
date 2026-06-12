@@ -36,6 +36,9 @@ scratch/
 supabase/.temp/
 supabase/config.toml
 supabase/.gitignore
+.env.local.remote
+remote_data_public.sql
+supabase/seeds_backup/
 
 # ── Graphify Knowledge Graph ──
 graphify-out/manifest.json

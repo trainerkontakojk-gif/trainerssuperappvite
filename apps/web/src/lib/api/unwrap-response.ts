@@ -59,6 +59,12 @@ export async function unwrapResponse<TResponse extends ResponseLike>(
   res: TResponse,
 ): Promise<SuccessResponse<ResponseBody<TResponse>>> {
   type Data = SuccessResponse<ResponseBody<TResponse>>;
+  // Hono RPC client's $get()/etc return a Promise<ClientResponse>,
+  // and unwrapResponse may receive the Promise directly rather than
+  // the resolved ClientResponse.  Await it first so .headers works.
+  if (res && typeof (res as any).then === "function") {
+    res = (await (res as any)) as TResponse;
+  }
   const contentType = res.headers.get("content-type") ?? "";
 
   // Empty body (204, 205)

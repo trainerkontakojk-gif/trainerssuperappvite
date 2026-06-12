@@ -100,7 +100,7 @@ Struktur folder monorepo:
 ├── supabase/
 │   └── migrations/             # DB schemas (000 profiles, 001 SIDAK, 002 KETIK/PDKT/AI, 003 Telefun, 004 Admin, 005 carbon copy, 006 user settings, 007 report archives, 008 profile admin policies, 009 storage RLS, 010 activity_logs index)
 ├── docs/                       # Dokumentasi teknis sistem
-│   ├── rebuild-logs/           # Per-phase completion logs (phase-1 through phase-96)
+│   ├── rebuild-logs/           # Per-phase completion logs (phase-1 onward, including current profiler fixes)
 │   └── superpowers/            # Plans dan specs dari superpowers skills
 ├── opencode.json               # Project-level opencode config dengan context7 MCP
 ├── AGENTS.md                   # Panduan development untuk AI agents
