@@ -11,7 +11,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import { useApi, putApi, postApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
 import { Pagination } from "../../components/ui/Pagination";
 import type { ManagedUser } from "@trainers/types";
@@ -98,10 +99,15 @@ export default function UsersPage() {
     setUpdating(userId);
     try {
       // Map 'approved' to backend status or pass directly (Hono service maps approved to active/approved)
-      await putApi(`/admin/users/${userId}/status`, { status });
+      await unwrapResponse(
+        await adminClient.users[":id"]["status"].$put({
+          param: { id: userId },
+          json: { status },
+        }),
+      );
       await refetch();
-    } catch (err: any) {
-      notify.error(err.message || "Gagal memperbarui status pengguna.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal memperbarui status pengguna."));
     } finally {
       setUpdating(null);
     }
@@ -113,11 +119,16 @@ export default function UsersPage() {
 
     setUpdating(userId);
     try {
-      await putApi(`/admin/users/${userId}/role`, { role: nextRole });
+      await unwrapResponse(
+        await adminClient.users[":id"].role.$put({
+          param: { id: userId },
+          json: { role: nextRole },
+        }),
+      );
       await refetch();
       notify.success("Role berhasil diperbarui");
-    } catch (err: any) {
-      notify.error(err.message || "Gagal memperbarui role pengguna.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal memperbarui role pengguna."));
     } finally {
       setUpdating(null);
     }
@@ -133,11 +144,15 @@ export default function UsersPage() {
 
     setUpdating(userId);
     try {
-      await deleteApi(`/admin/users/${userId}`);
+      await unwrapResponse(
+        await adminClient.users[":id"].$delete({
+          param: { id: userId },
+        }),
+      );
       await refetch();
       notify.success("User berhasil dihapus");
-    } catch (err: any) {
-      notify.error(err.message || "Gagal menghapus pengguna.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal menghapus pengguna."));
     } finally {
       setUpdating(null);
     }
@@ -156,12 +171,17 @@ export default function UsersPage() {
 
     setUpdating(userId);
     try {
-      await postApi(`/admin/users/${userId}/reset-password`, { email: userEmail });
+      await unwrapResponse(
+        await adminClient.users[":id"]["reset-password"].$post({
+          param: { id: userId },
+          json: { email: userEmail },
+        }),
+      );
       setResetSuccess(userId);
       setTimeout(() => setResetSuccess(null), 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       notify.error(
-        `Gagal mengirim reset password: ${err.message || "unknown error"}`,
+        `Gagal mengirim reset password: ${getErrorMessage(err, "unknown error")}`,
       );
     } finally {
       setUpdating(null);

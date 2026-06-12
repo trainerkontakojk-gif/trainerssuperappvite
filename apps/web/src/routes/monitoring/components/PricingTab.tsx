@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { putApi, postApi } from "../../../hooks/useApi";
+import { aiClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 import { PricingRow } from "./PricingRow";
 import { mapError } from "../utils/formatting";
@@ -29,7 +29,9 @@ export function PricingTab({
 
   const handleSavePricing = async (entry: PricingEntry) => {
     try {
-      await putApi("/ai/monitoring/pricing", entry);
+      await unwrapResponse(
+        await aiClient["monitoring/pricing"].$put({ json: entry }),
+      );
       notify.success("Harga berhasil disimpan.");
       onRefresh();
     } catch (err) {
@@ -39,9 +41,11 @@ export function PricingTab({
 
   const handleSaveBilling = async () => {
     try {
-      await postApi("/ai/monitoring/billing", {
-        usd_to_idr_rate: localRate,
-      });
+      await unwrapResponse(
+        await aiClient["monitoring/billing"].$post({
+          json: { usd_to_idr_rate: localRate },
+        }),
+      );
       onBillingRateChange(localRate);
       notify.success("Kurs berhasil disimpan.");
     } catch (err) {

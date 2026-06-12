@@ -27,7 +27,7 @@ import {
   normalizeRoleLabel,
 } from "../lib/app-config";
 import { notify } from "../lib/toast";
-import { getApi, deleteApi } from "../hooks/useApi";
+import { sidakClient, adminClient, unwrapResponse } from "../lib/api";
 
 const DashboardTrendPanel = lazy(
   () => import("./dashboard/DashboardTrendPanel"),
@@ -158,12 +158,12 @@ export default function DashboardPage() {
     async function initDashboard() {
       setTrendLoading(true);
 
-      try { const years = await getApi<number[]>("/sidak/dashboard/available-years"); setAvailableYears(years || []); } catch (_) { /* degrade gracefully */ }
-      try { const trends = await getApi<{ trendMap: Record<"3m" | "6m" | "all", TrendData> }>("/sidak/dashboard/trend"); setServiceTrendMap(trends.trendMap); } catch (_) { /* degrade gracefully */ }
+      try { const years = await (unwrapResponse(await sidakClient.dashboard["available-years"].$get()) as any); setAvailableYears(years || []); } catch (_) { /* degrade gracefully */ }
+      try { const trends = await (unwrapResponse(await sidakClient.dashboard.trend.$get()) as any); setServiceTrendMap(trends.trendMap); } catch (_) { /* degrade gracefully */ }
 
       if (isManager) {
         setLogsLoading(true);
-        try { const logs = await getApi<any[]>("/admin/activity-logs"); setActivityLogs(logs || []); } catch (_) { /* degrade gracefully */ }
+        try { const logs = await (unwrapResponse(await (adminClient["activity-logs"] as any).$get()) as any); setActivityLogs(logs || []); } catch (_) { /* degrade gracefully */ }
         setLogsLoading(false);
       }
 
@@ -181,12 +181,14 @@ export default function DashboardPage() {
   ) => {
     setTrendLoading(true);
     try {
-      const startParam = start !== null ? `&startMonth=${start}` : "";
-      const endParam = end !== null ? `&endMonth=${end}` : "";
-      const data = await getApi<TrendData>(
-        `/sidak/dashboard/trend?year=${year}${startParam}${endParam}`,
-      );
-      setLocalTrendData(data);
+      const data = await unwrapResponse(await sidakClient.dashboard.trend.$get({
+        query: {
+          year: String(year),
+          ...(start !== null ? { startMonth: String(start) } : {}),
+          ...(end !== null ? { endMonth: String(end) } : {}),
+        },
+      }));
+      setLocalTrendData(data as any);
     } catch (err) {
       console.error("Fetch trend range error:", err);
     } finally {
@@ -229,8 +231,8 @@ export default function DashboardPage() {
   const handleDeleteActivity = async (id: string) => {
     if (confirm("Hapus log aktivitas ini?")) {
       try {
-        await deleteApi(`/admin/activity-logs/${id}`);
-        const logs = await getApi<any[]>("/admin/activity-logs");
+        await unwrapResponse(await (adminClient["activity-logs"] as any)[":id"].$delete({ param: { id } }));
+        const logs = await (unwrapResponse(await (adminClient["activity-logs"] as any).$get()) as any);
         setActivityLogs(logs || []);
       } catch (err) {
         console.error("Delete activity error:", err);

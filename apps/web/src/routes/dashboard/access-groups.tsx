@@ -12,25 +12,14 @@ import {
   Check,
   Filter,
 } from "lucide-react";
-import { useApi, postApi, putApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
-import type { AccessScopeOptions, AccessGroupItemRow } from "@trainers/types";
-
-interface AccessGroup {
-  id: string;
-  name: string;
-  description: string | null;
-  is_active: boolean | null;
-  created_at: string;
-}
-
-interface GroupItem {
-  id: string;
-  group_id: string;
-  field_name: string;
-  field_value: string;
-  created_at: string;
-}
+import type {
+  AccessGroupItemRow,
+  AccessGroupRow,
+  AccessScopeOptions,
+} from "@trainers/types";
 
 type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
 
@@ -46,7 +35,7 @@ export default function AccessGroupsPage() {
     data: groups,
     loading: loadingGroups,
     refetch: refetchGroups,
-  } = useApi<AccessGroup[]>("/admin/access-groups");
+  } = useApi<AccessGroupRow[]>("/admin/access-groups");
   const { data: scopeOptions } = useApi<AccessScopeOptions>(
     "/admin/access-scope-options",
   );
@@ -56,7 +45,7 @@ export default function AccessGroupsPage() {
     data: selectedGroupItems,
     loading: loadingItems,
     refetch: refetchItems,
-  } = useApi<GroupItem[]>(
+  } = useApi<AccessGroupItemRow[]>(
     selectedGroupId ? `/admin/access-groups/${selectedGroupId}/items` : null,
   );
 
@@ -65,7 +54,7 @@ export default function AccessGroupsPage() {
 
   // Group Create/Edit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<AccessGroup | null>(null);
+  const [editingGroup, setEditingGroup] = useState<AccessGroupRow | null>(null);
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [groupIsActive, setGroupIsActive] = useState(true);
@@ -92,7 +81,7 @@ export default function AccessGroupsPage() {
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (group: AccessGroup) => {
+  const handleOpenEditModal = (group: AccessGroupRow) => {
     setEditingGroup(group);
     setGroupName(group.name);
     setGroupDescription(group.description || "");
@@ -107,24 +96,30 @@ export default function AccessGroupsPage() {
     setSavingGroup(true);
     try {
       if (editingGroup) {
-        await putApi(`/admin/access-groups/${editingGroup.id}`, {
-          name: groupName,
-          description: groupDescription,
-          is_active: groupIsActive,
-        });
+        await unwrapResponse(
+          await adminClient["access-groups"][":id"].$put({
+            param: { id: editingGroup.id },
+            json: {
+              name: groupName,
+              description: groupDescription,
+              is_active: groupIsActive,
+            },
+          }),
+        );
         notify.success("Grup akses berhasil diperbarui");
       } else {
-        const newGroup = await postApi<AccessGroup>("/admin/access-groups", {
-          name: groupName,
-          description: groupDescription,
-        });
+        const newGroup = await unwrapResponse(
+          await adminClient["access-groups"].$post({
+            json: { name: groupName, description: groupDescription },
+          }),
+        );
         notify.success("Grup akses berhasil dibuat");
         setSelectedGroupId(newGroup.id);
       }
       setIsModalOpen(false);
       await refetchGroups();
-    } catch (err: any) {
-      notify.error(err.message || "Gagal menyimpan grup akses.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal menyimpan grup akses."));
     } finally {
       setSavingGroup(false);
     }
@@ -136,14 +131,16 @@ export default function AccessGroupsPage() {
 
     setAddingRule(true);
     try {
-      await postApi(`/admin/access-groups/${selectedGroupId}/items`, {
-        fieldName: ruleType,
-        fieldValue: ruleValue,
-      });
+      await unwrapResponse(
+        await adminClient["access-groups"][":id"].items.$post({
+          param: { id: selectedGroupId },
+          json: { fieldName: ruleType, fieldValue: ruleValue },
+        }),
+      );
       setRuleValue("");
       await refetchItems();
-    } catch (err: any) {
-      notify.error(err.message || "Gagal menambahkan aturan akses.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal menambahkan aturan akses."));
     } finally {
       setAddingRule(false);
     }
@@ -153,10 +150,14 @@ export default function AccessGroupsPage() {
     if (!confirm("Apakah Anda yakin ingin menghapus aturan akses ini?")) return;
 
     try {
-      await deleteApi(`/admin/access-groups/items/${itemId}`);
+      await unwrapResponse(
+        await adminClient["access-groups"].items[":itemId"].$delete({
+          param: { itemId },
+        }),
+      );
       await refetchItems();
-    } catch (err: any) {
-      notify.error(err.message || "Gagal menghapus aturan akses.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal menghapus aturan akses."));
     }
   };
 

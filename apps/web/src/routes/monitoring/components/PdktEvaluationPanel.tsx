@@ -11,28 +11,12 @@ import {
   Inbox,
   Send,
 } from "lucide-react";
-import { getApi } from "../../../hooks/useApi";
-
-interface PdktReviewData {
-  module: string;
-  review_status: string;
-  evaluation: {
-    score: number;
-    feedback: string;
-    typos: string[];
-    clarityIssues: string[];
-    contentGaps: string[];
-  } | null;
-  evaluation_error: string | null;
-  time_taken: number | null;
-  emails: Array<{
-    type?: string;
-    subject?: string;
-    body?: string;
-    content?: string;
-    timestamp?: string;
-  }>;
-}
+import {
+  aiClient,
+  getErrorMessage,
+  unwrapResponse,
+  type PdktMonitoringReview,
+} from "../../../lib/api";
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60);
@@ -42,7 +26,7 @@ function formatTime(seconds: number) {
 }
 
 export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
-  const [data, setData] = useState<PdktReviewData | null>(null);
+  const [data, setData] = useState<PdktMonitoringReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,12 +34,14 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const result = await getApi<PdktReviewData>(
-        `/ai/monitoring/history/pdkt/${entryId}/review`,
+      const result = await unwrapResponse(
+        await aiClient["monitoring/history/:module/:id/review"].$get({
+          param: { module: "pdkt", id: entryId },
+        }),
       );
       setData(result);
-    } catch (err: any) {
-      setError(err?.message || "Gagal memuat data evaluasi.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Gagal memuat data evaluasi."));
     } finally {
       setLoading(false);
     }
@@ -108,7 +94,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
             </h3>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {emails.map((email: any, i: number) => {
+            {emails.map((email, i) => {
               const isResponse =
                 email.isAgent === true ||
                 (email.type !== undefined && email.type !== "received");

@@ -24,7 +24,12 @@ import {
   Maximize2,
   AlertCircle,
 } from "lucide-react";
-import { getApi } from "../../../hooks/useApi";
+import {
+  aiClient,
+  getErrorMessage,
+  unwrapResponse,
+  type TelefunMonitoringReview,
+} from "../../../lib/api";
 import { getScoreGrade } from "../utils/formatting";
 import {
   validateAssessment,
@@ -36,23 +41,8 @@ import { VoiceMetricCards } from "../../telefun/components/VoiceMetricCards";
 import { TelefunTranscript } from "../../telefun/components/TelefunTranscript";
 import { parseTelefunTranscript } from "@trainers/types";
 
-interface TelefunReviewData {
-  module: string;
-  review_status: string;
-  score: number | null;
-  recording_path: string | null;
-  scenario_title: string | null;
-  duration_seconds: number | null;
-  voice_assessment: unknown;
-  transcript?: unknown;
-  ai_summary: string | null;
-  strengths: string[] | null;
-  weaknesses: string[] | null;
-  coaching_focus: string[] | null;
-}
-
 export function TelefunReviewPanel({ entryId }: { entryId: string }) {
-  const [data, setData] = useState<TelefunReviewData | null>(null);
+  const [data, setData] = useState<TelefunMonitoringReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -83,12 +73,14 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
     setError(null);
     setAudioError(false);
     try {
-      const result = await getApi<TelefunReviewData>(
-        `/ai/monitoring/history/telefun/${entryId}/review`,
+      const result = await unwrapResponse(
+        await aiClient["monitoring/history/:module/:id/review"].$get({
+          param: { module: "telefun", id: entryId },
+        }),
       );
       setData(result);
-    } catch (err: any) {
-      setError(err?.message || "Gagal memuat data penilaian suara.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Gagal memuat data penilaian suara."));
     } finally {
       setLoading(false);
     }

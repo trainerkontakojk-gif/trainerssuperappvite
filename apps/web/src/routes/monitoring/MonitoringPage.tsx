@@ -7,7 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import { getApi } from "../../hooks/useApi";
+import { aiClient, unwrapResponse } from "../../lib/api";
 import { mapError, type UnifiedHistoryEntry } from "./utils/formatting";
 import { HistoryTab } from "./components/HistoryTab";
 import { UsageTab, type UsageAggregation } from "./components/UsageTab";
@@ -38,8 +38,8 @@ export default function MonitoringPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getApi<UnifiedHistoryEntry[]>(
-        "/ai/monitoring/history",
+      const data = await unwrapResponse(
+        await aiClient["monitoring/history"].$get(),
       );
       setHistoryData(data);
     } catch (err) {
@@ -53,8 +53,14 @@ export default function MonitoringPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getApi<UsageAggregation[]>(
-        `/ai/monitoring/aggregation?year=${year}&month=${month}&module=${usageModule}`,
+      const data = await unwrapResponse(
+        await aiClient["monitoring/aggregation"].$get({
+          query: {
+            year: String(year),
+            month: String(month),
+            module: usageModule,
+          },
+        }),
       );
       setAggregation(data);
     } catch (err) {
@@ -69,11 +75,11 @@ export default function MonitoringPage() {
     setError(null);
     try {
       const [pData, bData] = await Promise.all([
-        getApi<PricingEntry[]>("/ai/monitoring/pricing"),
-        getApi<{ usd_to_idr_rate: number }>("/ai/monitoring/billing"),
+        unwrapResponse(await aiClient["monitoring/pricing"].$get()),
+        unwrapResponse(await aiClient["monitoring/billing"].$get()),
       ]);
       setPricing(pData);
-      setBillingRate(bData?.usd_to_idr_rate ?? 15000);
+      setBillingRate(bData.usd_to_idr_rate);
     } catch (err) {
       setError(mapError(err));
     }

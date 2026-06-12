@@ -22,7 +22,7 @@ import {
   formatDuration,
 } from "../utils/formatting";
 import { useAuthStore } from "../../../store/authStore";
-import { deleteApi } from "../../../hooks/useApi";
+import { aiClient, getErrorMessage, unwrapResponse } from "../../../lib/api";
 
 interface HistoryTabProps {
   historyData: UnifiedHistoryEntry[];
@@ -62,10 +62,14 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
     const dId = `${entry.module}-${entry.id}`;
     setIsDeleting(dId);
     try {
-      await deleteApi(`/ai/monitoring/history/${entry.module}/${entry.id}`);
+      await unwrapResponse(
+        await aiClient["monitoring/history/:module/:id"].$delete({
+          param: { module: entry.module, id: entry.id },
+        }),
+      );
       onRefresh?.();
-    } catch (err: any) {
-      alert(err.message || "Gagal menghapus riwayat.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Gagal menghapus riwayat."));
     } finally {
       setIsDeleting(null);
       setActiveDropdownId(null);

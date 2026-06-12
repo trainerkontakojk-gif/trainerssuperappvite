@@ -15,35 +15,13 @@ import {
   User,
   Bot,
 } from "lucide-react";
-import { getApi } from "../../../hooks/useApi";
+import {
+  aiClient,
+  getErrorMessage,
+  unwrapResponse,
+  type KetikMonitoringReview,
+} from "../../../lib/api";
 import { getScoreGrade } from "../utils/formatting";
-
-interface KetikReviewData {
-  module: string;
-  review_status: string;
-  scores?: {
-    final?: number;
-    empathy?: number;
-    probing?: number;
-    typo?: number;
-    compliance?: number;
-  };
-  review?: {
-    id: string;
-    sessionId: string;
-    aiSummary: string;
-    strengths: string[];
-    weaknesses: string[];
-    coachingFocus: string[];
-    createdAt: string;
-  };
-  typos?: Array<{
-    id: string;
-    originalWord: string;
-    correctedWord: string;
-    severity: string;
-  }>;
-}
 
 function ScoreBar({ score }: { score: number }) {
   return (
@@ -60,11 +38,16 @@ function ScoreBar({ score }: { score: number }) {
 
 interface KetikReviewPanelProps {
   entryId: string;
-  messages?: Array<{ role?: string; text?: string; content?: string }>;
+  messages?: Array<{
+    role?: string;
+    sender?: string;
+    text?: string;
+    content?: string;
+  }>;
 }
 
 export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
-  const [data, setData] = useState<KetikReviewData | null>(null);
+  const [data, setData] = useState<KetikMonitoringReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,12 +55,14 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await getApi<KetikReviewData>(
-        `/ai/monitoring/history/ketik/${entryId}/review`,
+      const result = await unwrapResponse(
+        await aiClient["monitoring/history/:module/:id/review"].$get({
+          param: { module: "ketik", id: entryId },
+        }),
       );
       setData(result);
-    } catch (err: any) {
-      setError(err?.message || "Gagal memuat data review.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Gagal memuat data review."));
     } finally {
       setLoading(false);
     }
@@ -99,7 +84,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             </h3>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {messages.map((msg: any, i: number) => {
+            {messages.map((msg, i) => {
               const isUser =
                 msg.sender === "agent" ||
                 msg.role === "user" ||

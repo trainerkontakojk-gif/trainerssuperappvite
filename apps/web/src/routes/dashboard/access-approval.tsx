@@ -10,7 +10,8 @@ import {
   UserMinus,
   Settings,
 } from "lucide-react";
-import { useApi, postApi, putApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
 import type {
   PendingLeaderRequest,
@@ -178,28 +179,40 @@ export default function AccessApprovalPage() {
     setProcessing(true);
     try {
       if (type === "approve") {
-        await postApi(`/admin/leader-requests/${selectedReqId}/approve`, {
-          accessGroupIds: selectedGroupIds,
-        });
+        await unwrapResponse(
+          await adminClient["leader-requests"][":id"]["approve"].$post({
+            param: { id: selectedReqId },
+            json: { accessGroupIds: selectedGroupIds },
+          }),
+        );
         notify.success(
           `Permintaan akses ${selectedModuleLabel} berhasil disetujui`,
         );
       } else if (type === "reject") {
-        await postApi(`/admin/leader-requests/${selectedReqId}/reject`, {
-          note: actionNote,
-        });
+        await unwrapResponse(
+          await adminClient["leader-requests"][":id"]["reject"].$post({
+            param: { id: selectedReqId },
+            json: { note: actionNote },
+          }),
+        );
         notify.success(
           `Permintaan akses ${selectedModuleLabel} berhasil ditolak`,
         );
       } else if (type === "revoke") {
-        await postApi(`/admin/leader-requests/${selectedReqId}/revoke`, {
-          note: actionNote,
-        });
+        await unwrapResponse(
+          await adminClient["leader-requests"][":id"]["revoke"].$post({
+            param: { id: selectedReqId },
+            json: { note: actionNote },
+          }),
+        );
         notify.success(`Akses ${selectedModuleLabel} berhasil dicabut`);
       } else if (type === "update_groups") {
-        await putApi(`/admin/leader-requests/${selectedReqId}/groups`, {
-          accessGroupIds: selectedGroupIds,
-        });
+        await unwrapResponse(
+          await adminClient["leader-requests"][":id"].groups.$put({
+            param: { id: selectedReqId },
+            json: { accessGroupIds: selectedGroupIds },
+          }),
+        );
         notify.success(`Grup akses ${selectedModuleLabel} berhasil diperbarui`);
       }
 
@@ -210,8 +223,8 @@ export default function AccessApprovalPage() {
       } else {
         await refetchApproved();
       }
-    } catch (err: any) {
-      notify.error(err.message || "Gagal memproses aksi.");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal memproses aksi."));
     } finally {
       setProcessing(false);
       setActionType(null);

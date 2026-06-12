@@ -11,7 +11,8 @@ import {
   HelpCircle,
   Trash2,
 } from "lucide-react";
-import { useApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
 import { Pagination } from "../../components/ui/Pagination";
 import type { ActivityLog } from "@trainers/types";
@@ -70,11 +71,15 @@ export default function ActivitiesPage() {
     if (!confirm("Hapus log aktivitas ini?")) return;
     setDeleting(logId);
     try {
-      await deleteApi(`/admin/activity-logs/${logId}`);
+      await unwrapResponse(
+        await adminClient["activity-logs"][":id"].$delete({
+          param: { id: logId },
+        }),
+      );
       notify.success("Log berhasil dihapus");
       refetch();
-    } catch (err: any) {
-      notify.error(err.message || "Gagal menghapus log");
+    } catch (err: unknown) {
+      notify.error(getErrorMessage(err, "Gagal menghapus log"));
     } finally {
       setDeleting(null);
     }
