@@ -53,11 +53,12 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
+          paths: [
             {
-              group: ['**/hooks/useApi'],
+              name: '../hooks/useApi',
+              importNames: ['getApi', 'postApi', 'putApi', 'patchApi', 'deleteApi'],
               message:
-                'Gunakan getApi/putApi/postApi/deleteApi dari lib/api.ts sebagai gantinya. hooks/useApi (useApi + fetchApi) hanya untuk internal.',
+                'Wrapper functions sudah dihapus. Gunakan Hono RPC client dari lib/api.ts sebagai gantinya.',
             },
           ],
         },
