@@ -61,22 +61,3 @@ export function useApi<T>(path: string | null) {
   return { data, loading, error, refetch };
 }
 
-export async function postApi<T>(path: string, body: any): Promise<T> {
-  return fetchApi<T>(path, { method: "POST", body: JSON.stringify(body) });
-}
-
-export async function putApi<T>(path: string, body: any): Promise<T> {
-  return fetchApi<T>(path, { method: "PUT", body: JSON.stringify(body) });
-}
-
-export async function patchApi<T>(path: string, body: any): Promise<T> {
-  return fetchApi<T>(path, { method: "PATCH", body: JSON.stringify(body) });
-}
-
-export async function deleteApi(path: string): Promise<void> {
-  await fetchApi(path, { method: "DELETE" });
-}
-
-export async function getApi<T>(path: string): Promise<T> {
-  return fetchApi<T>(path);
-}
