@@ -61,8 +61,6 @@ SELECT
   ) AS compliance_count
 FROM public.qa_temuan qt
 JOIN public.profiler_peserta pp ON pp.id = qt.peserta_id
-LEFT JOIN public.profiles p ON p.id = pp.user_id
-WHERE (p.is_deleted IS NULL OR p.is_deleted = false)
 GROUP BY qt.period_id, qt.service_type;
 
 -- B-tree indexes for fast lookups on period_id and service_type

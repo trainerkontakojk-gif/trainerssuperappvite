@@ -6,15 +6,15 @@
 -- ═══════════════════════════════════════════════════════
 
 -- 1. Add retry queue columns
-ALTER TABLE telefun_history
+ALTER TABLE public.telefun_history
   ADD COLUMN IF NOT EXISTS scoring_next_attempt_at TIMESTAMPTZ;
 
-COMMENT ON COLUMN telefun_history.scoring_next_attempt_at
+COMMENT ON COLUMN public.telefun_history.scoring_next_attempt_at
   IS 'Jadwal percobaan ulang berikutnya. NULL = segera diproses.';
 
 -- 2. Index untuk worker polling (pending/failed jobs yang sudah jatuh tempo)
 CREATE INDEX IF NOT EXISTS idx_telefun_scoring_retry_queue
-  ON telefun_history (scoring_next_attempt_at)
+  ON public.telefun_history (scoring_next_attempt_at)
   WHERE scoring_status IN ('pending', 'failed');
 
 -- 3. Perbarui claim_telefun_scoring agar menghormati next_attempt_at
@@ -36,7 +36,7 @@ DECLARE
 BEGIN
   SELECT scoring_status, scoring_claimed_at, scoring_next_attempt_at
   INTO v_current_status, v_claimed_at, v_next_attempt
-  FROM telefun_history
+  FROM public.telefun_history
   WHERE id = p_session_id
   FOR UPDATE;
 
@@ -66,7 +66,7 @@ BEGIN
   END IF;
 
   -- Claim: pending (due), failed (due), or stale processing
-  UPDATE telefun_history
+  UPDATE public.telefun_history
   SET
     scoring_status = 'processing',
     scoring_claimed_at = v_now,
@@ -92,7 +92,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  UPDATE telefun_history
+  UPDATE public.telefun_history
   SET
     scoring_status = 'failed',
     scoring_last_error = p_error,
@@ -115,7 +115,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  UPDATE telefun_history
+  UPDATE public.telefun_history
   SET
     scoring_status = 'pending',
     scoring_next_attempt_at = now()

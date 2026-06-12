@@ -4,6 +4,10 @@
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+-- Ensure is_deleted column exists (defined before GRANT that references it)
+-- Idempotent: migration 20260520054101 also adds this with IF NOT EXISTS
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_deleted boolean NOT NULL DEFAULT false;
+
 DROP POLICY IF EXISTS "profiles_select_admin" ON public.profiles;
 CREATE POLICY "profiles_select_admin" ON public.profiles
   FOR SELECT USING (
