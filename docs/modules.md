@@ -74,6 +74,12 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - Migrasi field legacy `script` → `sampleEmailTemplate` dijalankan saat settings dibaca.
   - DUMMY_PROFILES pool 20 identitas dengan 25 kota acak untuk variasi identitas konsumen.
   - Usage delta setelah evaluasi async di-retry hingga 2x (2s delay) untuk akurasi.
+- **Evaluasi AI (Single-Turn)**:
+  - Prompt hanya menerima tepat satu email inbound konsumen dan satu balasan agent OJK 157.
+  - Seluruh body kedua email diteruskan ke prompt tanpa konteks thread tambahan.
+  - Input dengan jumlah atau komposisi pesan selain satu inbound dan satu balasan ditolak sebelum AI dipanggil.
+  - Metadata panjang body dicatat via `console.debug` tanpa menyimpan isi email ke log.
+  - **Retry & JSON Contract**: Retry transient error (429/500/503/timeout) hingga 2x dengan delay 250/500ms tetap dipertahankan. Output JSON contract (`score`, `typos`, `clarityIssues`, `contentGaps`, `feedback`) tidak berubah.
 
 ## 4. TELEFUN (Telephone Fun)
 
