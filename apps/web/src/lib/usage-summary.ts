@@ -1,4 +1,4 @@
-import { getApi } from "../hooks/useApi";
+import { aiClient, unwrapResponse } from "./api";
 import {
   type UsageBreakdown,
   type UsageSnapshot,
@@ -23,7 +23,9 @@ interface UsageSummaryApiResponse {
 
 export async function fetchUsageSummary(module: UsageModule): Promise<UsageSnapshot | null> {
   try {
-    const data = await getApi<UsageSummaryApiResponse>(`/ai/usage/summary?module=${module}`);
+    const data = (await unwrapResponse(
+      await aiClient.usage.summary.$get({ query: { module } }),
+    )) as UsageSummaryApiResponse | null;
     if (!data) return null;
 
     return {

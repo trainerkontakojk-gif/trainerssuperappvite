@@ -5,13 +5,15 @@ import {
   TEXT_SIMULATION_MODELS,
 } from "@trainers/types";
 import type { AiModelModule } from "@trainers/types";
-import { getApi } from "../hooks/useApi";
+import { rpcClient, unwrapResponse } from "./api";
 
 export async function fetchAiModels(
   module: AiModelModule = "default",
 ) {
   try {
-    return await getApi<typeof AI_MODELS>(`/ai/models?module=${module}`);
+    return await (unwrapResponse(
+      (rpcClient as any).v1.ai.models.$get({ query: { module } }),
+    ) as unknown) as typeof AI_MODELS;
   } catch {
     return AI_MODELS;
   }

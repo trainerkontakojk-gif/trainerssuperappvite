@@ -1,4 +1,4 @@
-import { postApi, putApi, deleteApi, getApi } from "../hooks/useApi";
+import { profilerClient, unwrapResponse } from "./api";
 import { uploadProfilerPhoto } from "./profilerPhotoStorage";
 import type {
   ProfilerYear,
@@ -7,87 +7,112 @@ import type {
   ProfilerTim,
 } from "@trainers/types";
 
-const BASE = "/profiler";
-
 export const profilerApi = {
   // Years
-  getYears: () => getApi<ProfilerYear[]>(`${BASE}/years`),
-  createYear: (year: number) =>
-    postApi<ProfilerYear>(`${BASE}/years`, { year }),
-  deleteYear: (id: string) => deleteApi(`${BASE}/years/${id}`),
+  getYears: (): Promise<ProfilerYear[]> =>
+    unwrapResponse(profilerClient.years.$get()) as Promise<ProfilerYear[]>,
+  createYear: (year: number): Promise<ProfilerYear> =>
+    unwrapResponse(profilerClient.years.$post({ json: { year } })) as Promise<ProfilerYear>,
+  deleteYear: (id: string): Promise<void> =>
+    unwrapResponse(profilerClient.years[":id"].$delete({ param: { id } })) as Promise<void>,
 
   // Folders
-  getFolders: () => getApi<ProfilerFolder[]>(`${BASE}/folders`),
+  getFolders: (): Promise<ProfilerFolder[]> =>
+    unwrapResponse(profilerClient.folders.$get()) as Promise<ProfilerFolder[]>,
   createFolder: (data: {
     name: string;
     year_id?: string;
     parent_id?: string;
-  }) => postApi<ProfilerFolder>(`${BASE}/folders`, data),
-  renameFolder: (id: string, name: string) =>
-    putApi<ProfilerFolder>(`${BASE}/folders/${id}`, { name }),
-  deleteFolder: (id: string) => deleteApi(`${BASE}/folders/${id}`),
-  duplicateFolder: (folder_id: string, target_year_id: string) =>
-    postApi<{ folder: ProfilerFolder; participants: ProfilerPeserta[] }>(
-      `${BASE}/folders/duplicate`,
-      { folder_id, target_year_id },
-    ),
+  }): Promise<ProfilerFolder> =>
+    unwrapResponse(profilerClient.folders.$post({ json: data })) as Promise<ProfilerFolder>,
+  renameFolder: (id: string, name: string): Promise<ProfilerFolder> =>
+    unwrapResponse(
+      profilerClient.folders[":id"].$put({ param: { id }, json: { name } }),
+    ) as Promise<ProfilerFolder>,
+  deleteFolder: (id: string): Promise<void> =>
+    unwrapResponse(profilerClient.folders[":id"].$delete({ param: { id } })) as Promise<void>,
+  duplicateFolder: (
+    folder_id: string,
+    target_year_id: string,
+  ): Promise<{ folder: ProfilerFolder; participants: ProfilerPeserta[] }> =>
+    unwrapResponse(
+      profilerClient.folders.duplicate.$post({
+        json: { folder_id, target_year_id },
+      }),
+    ) as Promise<{ folder: ProfilerFolder; participants: ProfilerPeserta[] }>,
 
   // Counts
-  getFolderCounts: () => getApi<Record<string, number>>(`${BASE}/counts`),
+  getFolderCounts: (): Promise<Record<string, number>> =>
+    unwrapResponse(profilerClient.counts.$get()) as Promise<Record<string, number>>,
 
   // Peserta
   getPeserta: (params?: {
     batch_name?: string;
     tim?: string;
     search?: string;
-  }) => {
-    const q = new URLSearchParams();
-    if (params?.batch_name) q.set("batch_name", params.batch_name);
-    if (params?.tim) q.set("tim", params.tim);
-    if (params?.search) q.set("search", params.search);
-    const qs = q.toString();
-    return getApi<{ items: ProfilerPeserta[]; total: number }>(
-      `${BASE}/peserta${qs ? `?${qs}` : ""}`,
-    );
-  },
-  getPesertaById: (id: string) =>
-    getApi<ProfilerPeserta>(`${BASE}/peserta/${id}`),
-  getPesertaByBatch: (batchName: string) =>
-    getApi<ProfilerPeserta[]>(
-      `${BASE}/peserta/batch/${encodeURIComponent(batchName)}`,
-    ),
-  createPeserta: (data: Partial<ProfilerPeserta>) =>
-    postApi<ProfilerPeserta>(`${BASE}/peserta`, data),
-  updatePeserta: (id: string, data: Partial<ProfilerPeserta>) =>
-    putApi<ProfilerPeserta>(`${BASE}/peserta/${id}`, data),
-  deletePeserta: (id: string) => deleteApi(`${BASE}/peserta/${id}`),
-  bulkCreatePeserta: (items: Partial<ProfilerPeserta>[]) =>
-    postApi<ProfilerPeserta[]>(`${BASE}/peserta/bulk`, { items }),
-  copyPesertaToFolder: (peserta_ids: string[], target_batch_name: string) =>
-    postApi<ProfilerPeserta[]>(`${BASE}/peserta/copy`, {
-      peserta_ids,
-      target_batch_name,
-    }),
-  movePesertaToBatch: (peserta_ids: string[], target_batch_name: string) =>
-    postApi<{ moved: number }>(`${BASE}/peserta/move`, {
-      peserta_ids,
-      target_batch_name,
-    }),
-  reorderPeserta: (peserta_ids: string[]) =>
-    putApi<void>(`${BASE}/peserta/reorder`, { peserta_ids }),
-  bulkReorderPeserta: (updates: { id: string; nomor_urut: number }[]) =>
-    postApi<void>(`${BASE}/peserta/bulk-reorder`, { updates }),
-  getGlobalPesertaPool: (excludeBatch?: string) => {
-    const q = excludeBatch
-      ? `?exclude_batch=${encodeURIComponent(excludeBatch)}`
-      : "";
-    return getApi<ProfilerPeserta[]>(`${BASE}/peserta/global-pool${q}`);
+  }): Promise<{ items: ProfilerPeserta[]; total: number }> =>
+    unwrapResponse(
+      profilerClient.peserta.$get({ query: params ?? {} }),
+    ) as Promise<{ items: ProfilerPeserta[]; total: number }>,
+  getPesertaById: (id: string): Promise<ProfilerPeserta> =>
+    unwrapResponse(profilerClient.peserta[":id"].$get({ param: { id } })) as Promise<ProfilerPeserta>,
+  getPesertaByBatch: (batchName: string): Promise<ProfilerPeserta[]> =>
+    unwrapResponse(
+      profilerClient.peserta.batch[":batchName"].$get({ param: { batchName } }),
+    ) as Promise<ProfilerPeserta[]>,
+  createPeserta: (data: Partial<ProfilerPeserta>): Promise<ProfilerPeserta> =>
+    unwrapResponse(profilerClient.peserta.$post({ json: data })) as Promise<ProfilerPeserta>,
+  updatePeserta: (
+    id: string,
+    data: Partial<ProfilerPeserta>,
+  ): Promise<ProfilerPeserta> =>
+    unwrapResponse(
+      profilerClient.peserta[":id"].$put({ param: { id }, json: data }),
+    ) as Promise<ProfilerPeserta>,
+  deletePeserta: (id: string): Promise<void> =>
+    unwrapResponse(profilerClient.peserta[":id"].$delete({ param: { id } })) as Promise<void>,
+  bulkCreatePeserta: (items: Partial<ProfilerPeserta>[]): Promise<ProfilerPeserta[]> =>
+    unwrapResponse(profilerClient.peserta.bulk.$post({ json: { items } })) as Promise<ProfilerPeserta[]>,
+  copyPesertaToFolder: (
+    peserta_ids: string[],
+    target_batch_name: string,
+  ): Promise<ProfilerPeserta[]> =>
+    unwrapResponse(
+      profilerClient.peserta.copy.$post({
+        json: { peserta_ids, target_batch_name },
+      }),
+    ) as Promise<ProfilerPeserta[]>,
+  movePesertaToBatch: (
+    peserta_ids: string[],
+    target_batch_name: string,
+  ): Promise<{ moved: number }> =>
+    unwrapResponse(
+      profilerClient.peserta.move.$post({
+        json: { peserta_ids, target_batch_name },
+      }),
+    ) as Promise<{ moved: number }>,
+  reorderPeserta: (peserta_ids: string[]): Promise<void> =>
+    unwrapResponse(
+      profilerClient.peserta.reorder.$put({ json: { peserta_ids } }),
+    ) as Promise<void>,
+  bulkReorderPeserta: (
+    updates: { id: string; nomor_urut: number }[],
+  ): Promise<void> =>
+    unwrapResponse(
+      profilerClient.peserta["bulk-reorder"].$post({ json: { updates } }),
+    ) as Promise<void>,
+  getGlobalPesertaPool: (excludeBatch?: string): Promise<ProfilerPeserta[]> => {
+    const query = excludeBatch ? { exclude_batch: excludeBatch } : {};
+    return unwrapResponse(profilerClient.peserta["global-pool"].$get({ query })) as Promise<ProfilerPeserta[]>;
   },
 
   // Teams
-  getTeams: () => getApi<ProfilerTim[]>(`${BASE}/teams`),
-  createTeam: (nama: string) => postApi<ProfilerTim>(`${BASE}/teams`, { nama }),
-  deleteTeam: (id: string) => deleteApi(`${BASE}/teams/${id}`),
+  getTeams: (): Promise<ProfilerTim[]> =>
+    unwrapResponse(profilerClient.teams.$get()) as Promise<ProfilerTim[]>,
+  createTeam: (nama: string): Promise<ProfilerTim> =>
+    unwrapResponse(profilerClient.teams.$post({ json: { nama } })) as Promise<ProfilerTim>,
+  deleteTeam: (id: string): Promise<void> =>
+    unwrapResponse(profilerClient.teams[":id"].$delete({ param: { id } })) as Promise<void>,
 
   // File Upload
   uploadFoto: uploadProfilerPhoto,
