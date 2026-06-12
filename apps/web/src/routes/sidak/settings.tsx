@@ -1,4 +1,5 @@
-import { useApi, getApi, putApi, postApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -74,8 +75,11 @@ export default function SidakSettingsPage() {
   useEffect(() => {
     if (!versionsLoading && (!versions || versions.length === 0)) {
       let cancelled = false;
-      getApi<RuleVersionMeta>(`/sidak/rule-versions/meta?service_type=${activeTeam}`)
-        .then((result) => { if (!cancelled) setMeta(result); })
+      sidakClient["rule-versions"].meta.$get({ query: { service_type: activeTeam } })
+        .then((res: Response) => unwrapResponse(res))
+        .then((result: any) => {
+          if (!cancelled) setMeta(result as RuleVersionMeta);
+        })
         .catch(() => { if (!cancelled) setMeta(null); });
       return () => { cancelled = true; };
     }
@@ -85,8 +89,8 @@ export default function SidakSettingsPage() {
   const fetchVersionIndicators = useCallback(async (versionId: string) => {
     setLoadingIndicators(true);
     try {
-      const res = await getApi<QARuleIndicator[]>(`/sidak/rule-versions/${versionId}/indicators`);
-      setDraftIndicators(res ?? []);
+      const res = await unwrapResponse(await sidakClient["rule-versions"][":id"].indicators.$get({ param: { id: versionId } }));
+      setDraftIndicators((res as QARuleIndicator[]) ?? []);
     } catch {
       setDraftIndicators([]);
     } finally {
@@ -120,13 +124,13 @@ export default function SidakSettingsPage() {
 
   const handleCreateDraft = async (sourceId?: string) => {
     try {
-      const draft = await postApi<RuleVersion>("/sidak/rule-versions", {
+      const draft = await unwrapResponse(await sidakClient["rule-versions"].$post({ json: {
         service_type: activeTeam,
         source_version_id: sourceId,
-      });
+      }}));
       notify.success(sourceId ? "Draft revisi berhasil dibuat!" : "Draft baru berhasil dibuat!");
       refetchVersions();
-      setSelectedVersion(draft);
+      setSelectedVersion(draft as RuleVersion);
     } catch (e: any) {
       notify.error(e.message || "Gagal membuat draft");
     }
@@ -141,7 +145,7 @@ export default function SidakSettingsPage() {
       : "Hapus draft ini?";
     if (!confirm(msg)) return;
     try {
-      await deleteApi(`/sidak/rule-versions/${id}`);
+      await unwrapResponse(await sidakClient["rule-versions"][":id"].$delete({ param: { id } }));
       notify.success("Draft berhasil dihapus");
       refetchVersions();
       if (selectedVersion?.id === id) {
@@ -156,10 +160,10 @@ export default function SidakSettingsPage() {
     if (!selectedVersion || !publishPeriodId) return;
     setIsPublishing(true);
     try {
-      await postApi(`/sidak/rule-versions/${selectedVersion.id}/publish`, {
+      await unwrapResponse(await sidakClient["rule-versions"][":id"].publish.$post({ param: { id: selectedVersion.id }, json: {
         change_reason: changeReason || undefined,
         effective_period_id: publishPeriodId,
-      });
+      }}));
       notify.success("Rule version berhasil dipublish!");
       setPreviewVersion(null);
       setChangeReason("");
@@ -177,10 +181,10 @@ export default function SidakSettingsPage() {
     setSavingNew(true);
     try {
       const payload = indicatorFormToPayload(form, selectedVersion.scoring_mode);
-      await postApi(`/sidak/rule-versions/${selectedVersion.id}/indicators`, {
+      await unwrapResponse(await sidakClient["rule-versions"][":id"].indicators.$post({ param: { id: selectedVersion.id }, json: {
         service_type: activeTeam,
         ...payload,
-      });
+      }}));
       notify.success("Parameter berhasil ditambahkan ke draft.");
       setShowAddForm(false);
       fetchVersionIndicators(selectedVersion.id);
@@ -197,7 +201,7 @@ export default function SidakSettingsPage() {
     setSavingEdit(true);
     try {
       const payload = indicatorFormToPayload(form, selectedVersion.scoring_mode);
-      await putApi(`/sidak/rule-versions/${selectedVersion.id}/indicators/${editIndId}`, payload);
+      await unwrapResponse(await sidakClient["rule-versions"][":versionId"].indicators[":indicatorId"].$put({ param: { versionId: selectedVersion.id, indicatorId: editIndId }, json: payload }));
       notify.success("Parameter berhasil diperbarui.");
       setEditIndId(null);
       setEditForm(null);
@@ -213,7 +217,7 @@ export default function SidakSettingsPage() {
   const handleDeleteIndicator = async (id: string) => {
     if (!selectedVersion) return;
     try {
-      await deleteApi(`/sidak/rule-versions/${selectedVersion.id}/indicators/${id}`);
+      await unwrapResponse(await sidakClient["rule-versions"][":versionId"].indicators[":indicatorId"].$delete({ param: { versionId: selectedVersion.id, indicatorId: id } }));
       notify.success("Parameter dihapus dari draft.");
       fetchVersionIndicators(selectedVersion.id);
       refetchVersions();

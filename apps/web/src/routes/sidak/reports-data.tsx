@@ -5,7 +5,8 @@ import {
   ArrowLeft, Search, Download, Loader2, AlertCircle,
   FileText, Users,
 } from "lucide-react";
-import { useApi, postApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../lib/api";
 import { Pagination } from "../../components/ui/Pagination";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
@@ -40,14 +41,14 @@ export default function SidakReportsData() {
     setLoading(true);
     setError(null);
     try {
-      const data = await postApi<any[]>("/sidak/reports/data", {
+      const data = await unwrapResponse(await sidakClient.reports.data.$post({ json: {
         serviceType: mode === "layanan" ? (serviceType || undefined) : undefined,
         year,
         startMonth,
         endMonth,
         pesertaId: mode === "individu" ? (pesertaId || undefined) : undefined,
-      });
-      setResults(data);
+      }}));
+      setResults(data as any[]);
     } catch (e: any) {
       setError(e.message);
     }

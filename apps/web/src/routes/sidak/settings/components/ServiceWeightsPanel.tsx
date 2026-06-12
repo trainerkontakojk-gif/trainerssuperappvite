@@ -1,6 +1,6 @@
 import { Settings, Info } from "lucide-react";
 import type { RuleVersion } from "@trainers/types";
-import { putApi } from "../../../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../../../lib/api";
 import { notify } from "../../../../lib/toast";
 
 interface ServiceWeightsPanelProps {
@@ -40,11 +40,14 @@ export function ServiceWeightsPanel({
                 const ncVal = parseInt(e.target.value) / 100;
                 const cVal = (100 - parseInt(e.target.value)) / 100;
                 try {
-                  const updated = await putApi<RuleVersion>(`/sidak/rule-versions/${selectedVersion.id}`, {
-                    non_critical_weight: ncVal,
-                    critical_weight: cVal,
-                  });
-                  setSelectedVersion(updated);
+                  const updated = await unwrapResponse(await sidakClient["rule-versions"][":id"].$put({
+                    param: { id: selectedVersion.id },
+                    json: {
+                      non_critical_weight: ncVal,
+                      critical_weight: cVal,
+                    },
+                  }));
+                  setSelectedVersion(updated as any);
                 } catch (err: any) {
                   notify.error(err.message || "Gagal mengupdate bobot");
                 }

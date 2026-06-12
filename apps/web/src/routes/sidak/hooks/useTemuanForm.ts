@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { getApi, postApi } from "../../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
 
 interface AgentEntry {
@@ -120,13 +120,15 @@ export function useTemuanForm({
         ketidaksesuaian: entry.ketidaksesuaian || undefined,
         sebaiknya: entry.sebaiknya || undefined,
       }));
-      const preview = await postApi<any>("/sidak/temuan/batch/preview", {
-        peserta_id: selectedAgent.id,
-        period_id: selectedPeriod.id,
-        service_type: selectedService,
-        no_tiket: normalizedTicket || null,
-        items: temuanList,
-      });
+      const preview: any = await unwrapResponse(await sidakClient.temuan.batch.preview.$post({
+        json: {
+          peserta_id: selectedAgent.id,
+          period_id: selectedPeriod.id,
+          service_type: selectedService,
+          no_tiket: normalizedTicket || null,
+          items: temuanList,
+        },
+      }));
       if (preview.stats.invalid_count > 0) {
         setPreviewResult(preview);
         setErrorMsg(
@@ -141,24 +143,27 @@ export function useTemuanForm({
         if (!ok) return;
       }
       setSaving(true);
-      const created = await postApi<{
-        inserted: number;
-        skipped: number;
-        total: number;
-      }>("/sidak/temuan/batch", {
-        peserta_id: selectedAgent.id,
-        period_id: selectedPeriod.id,
-        service_type: selectedService,
-        no_tiket: normalizedTicket || null,
-        items: temuanList,
-      });
-      const updated = await getApi<{ items: QATemuan[]; total: number }>(
-        `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${selectedService}&limit=200`
-      );
-      setTemuan(updated.items ?? []);
+      const created = await unwrapResponse(await sidakClient.temuan.batch.$post({
+        json: {
+          peserta_id: selectedAgent.id,
+          period_id: selectedPeriod.id,
+          service_type: selectedService,
+          no_tiket: normalizedTicket || null,
+          items: temuanList,
+        },
+      }));
+      const updated = await unwrapResponse(await sidakClient.temuan.$get({
+        query: {
+          peserta_id: selectedAgent.id,
+          period_id: selectedPeriod.id,
+          service_type: selectedService,
+          limit: "200",
+        },
+      }));
+      setTemuan((updated as any).items ?? []);
       resetForm();
       setPreviewResult(null);
-      setSuccessMsg(`${created?.inserted ?? 0} temuan berhasil disimpan!`);
+      setSuccessMsg(`${(created as any)?.inserted ?? 0} temuan berhasil disimpan!`);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e: any) {
       setErrorMsg(e.message || "Gagal menyimpan temuan");
@@ -172,13 +177,15 @@ export function useTemuanForm({
     if (!selectedAgent || !selectedPeriod) return;
     setSaving(true);
     try {
-      const res = await postApi<any[]>("/sidak/temuan/perfect-session", {
-        peserta_id: selectedAgent.id,
-        period_id: selectedPeriod.id,
-        service_type: selectedService,
-      });
-      if (res && res.length > 0) {
-        setTemuan((prev) => [...res.reverse(), ...prev]);
+      const res = await unwrapResponse(await sidakClient.temuan["perfect-session"].$post({
+        json: {
+          peserta_id: selectedAgent.id,
+          period_id: selectedPeriod.id,
+          service_type: selectedService,
+        },
+      }));
+      if ((res as any[])?.length > 0) {
+        setTemuan((prev) => [...(res as any[]).reverse(), ...prev]);
       }
       setSuccessMsg(
         "Sesi Tanpa Temuan berhasil ditambahkan (phantom padding 5 sesi)."

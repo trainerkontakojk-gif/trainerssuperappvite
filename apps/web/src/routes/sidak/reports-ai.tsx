@@ -5,7 +5,8 @@ import {
   ArrowLeft, Brain, Loader2, AlertCircle, CheckCircle,
   FileText, Printer, Download, Sparkles, Users,
 } from "lucide-react";
-import { useApi, postApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../lib/api";
 import { TEXT_SIMULATION_MODELS } from "../../lib/aiModels";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
@@ -43,7 +44,7 @@ export default function SidakReportsAi() {
     setError(null);
     setReport(null);
     try {
-      const result = await postApi<any>("/sidak/reports/ai/generate", {
+      const result = await unwrapResponse(await sidakClient.reports.ai.generate.$post({ json: {
         modelId,
         serviceType: mode === "layanan" ? (serviceType || undefined) : undefined,
         year,
@@ -51,7 +52,7 @@ export default function SidakReportsAi() {
         endMonth,
         pesertaId: mode === "individu" ? (pesertaId || undefined) : undefined,
         mode,
-      });
+      }}));
       setReport(result);
     } catch (e: any) {
       setError(e.message || "Gagal generate laporan");

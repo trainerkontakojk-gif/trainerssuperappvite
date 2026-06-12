@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { useApi, getApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../lib/api";
 import { useAuthStore } from "../../store/authStore";
 import type { QAIndicator, QAPeriod, QATemuan, ServiceWeight, RuleVersion, AgentDirectoryResponse, ResolvedSidakInputConfig } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -97,15 +98,13 @@ export default function SidakInputPage() {
     setRuleVersionId(null);
     setHasDraftVersion(false);
     try {
-      const suffix = periodId ? `&period_id=${periodId}` : "";
-      const res = await getApi<ResolvedSidakInputConfig>(
-        `/sidak/resolved-input-config?service_type=${service}${suffix}`,
-      );
+      const response = await sidakClient["resolved-input-config"].$get({ query: { service_type: service, ...(periodId ? { period_id: periodId } : {}) } });
+      const res = (await unwrapResponse(response)) as ResolvedSidakInputConfig;
       if (res) {
         setResolvedIndicators(res.indicators || []);
         setActiveWeight(res.weight || null);
         setRuleVersionId(res.ruleVersionId || null);
-        setHasDraftVersion(res.hasDraftVersion || false);
+        setHasDraftVersion(!!res.hasDraftVersion);
       }
     } catch (err) {
       console.error("Gagal memuat konfigurasi input SIDAK:", err);
@@ -192,11 +191,9 @@ export default function SidakInputPage() {
       const svc = selectedService;
       const [_, result] = await Promise.all([
         loadResolvedConfig(svc, period.id),
-        getApi<{ items: QATemuan[]; total: number }>(
-          `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${period.id}&service_type=${svc}&limit=200`,
-        ),
+        unwrapResponse(await sidakClient.temuan.$get({ query: { peserta_id: selectedAgent.id, period_id: period.id, service_type: svc, limit: "200" } })),
       ]);
-      setTemuan(result.items ?? []);
+      setTemuan((result as { items: QATemuan[] }).items ?? []);
       setStep("list");
     } catch {
       setErrorMsg("Gagal memuat temuan");
@@ -216,10 +213,8 @@ export default function SidakInputPage() {
     try {
       await loadResolvedConfig(newService, selectedPeriod?.id);
       if (selectedAgent && selectedPeriod) {
-        const result = await getApi<{ items: QATemuan[]; total: number }>(
-          `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${newService}&limit=200`,
-        );
-        setTemuan(result.items ?? []);
+        const result = await unwrapResponse(await sidakClient.temuan.$get({ query: { peserta_id: selectedAgent.id, period_id: selectedPeriod.id, service_type: newService, limit: "200" } }));
+      setTemuan((result as { items: QATemuan[] }).items ?? []);
       }
     } catch {
       setErrorMsg("Gagal memuat data untuk layanan baru");
@@ -237,9 +232,7 @@ export default function SidakInputPage() {
 
     try {
       const year = new Date().getFullYear();
-      const result = await getApi<AgentDirectoryResponse>(
-        `/sidak/agents?year=${year}`,
-      );
+      const result = await unwrapResponse(await sidakClient.agents.$get({ query: { year: String(year) } }));
       const allAgents = normalizeAgentsResponse(result);
       const folderAgents = allAgents.filter(
         (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
@@ -257,7 +250,7 @@ export default function SidakInputPage() {
     setErrorMsg(null);
     try {
       const year = new Date().getFullYear();
-      const result = await getApi<AgentDirectoryResponse>(`/sidak/agents?year=${year}`);
+      const result = await unwrapResponse(await sidakClient.agents.$get({ query: { year: String(year) } }));
       const allAgents = normalizeAgentsResponse(result);
       const folderAgents = allAgents.filter(
         (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),

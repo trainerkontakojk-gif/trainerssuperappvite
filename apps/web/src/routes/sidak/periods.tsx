@@ -1,4 +1,5 @@
-import { useApi, postApi, deleteApi } from "../../hooks/useApi";
+import { useApi } from "../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../lib/api";
 import { useState } from "react";
 import type { QAPeriod } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,7 +29,7 @@ export default function SidakPeriodsPage() {
     setSaving(true);
     setErrorMsg(null);
     try {
-      await postApi("/sidak/periods", { month: selectedMonth, year: selectedYear });
+      await unwrapResponse(await sidakClient.periods.$post({ json: { month: selectedMonth, year: selectedYear } }));
       setShowForm(false);
       refetch();
     } catch (e: any) {
@@ -43,7 +44,7 @@ export default function SidakPeriodsPage() {
     setDeleting(true);
     setErrorMsg(null);
     try {
-      await deleteApi(`/sidak/periods/${confirmDelete.id}`);
+      await unwrapResponse(await sidakClient.periods[":id"].$delete({ param: { id: confirmDelete.id } }));
       setConfirmDelete(null);
       refetch();
     } catch (e: any) {

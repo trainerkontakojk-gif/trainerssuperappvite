@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { putApi, deleteApi } from "../../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QATemuan } from "@trainers/types";
 
 interface UseTemuanEditParams {
@@ -41,11 +41,11 @@ export function useTemuanEdit({
     setSavingEdit(true);
     setErrorMsg(null);
     try {
-      await putApi(`/sidak/temuan/${id}`, {
+      await unwrapResponse(await sidakClient.temuan[":id"].$put({ param: { id }, json: {
         nilai: editNilai,
         ketidaksesuaian: editKetidaksesuaian || null,
         sebaiknya: editSebaiknya || null,
-      });
+      }}));
       setTemuan((prev) =>
         prev.map((t) =>
           t.id === id
@@ -75,7 +75,7 @@ export function useTemuanEdit({
       return;
     }
     try {
-      await deleteApi(`/sidak/temuan/${id}`);
+      await unwrapResponse(await sidakClient.temuan[":id"].$delete({ param: { id } }));
       setTemuan((prev) => prev.filter((t) => t.id !== id));
       setDeletingId(null);
       setSuccessMsg("Temuan berhasil dihapus!");

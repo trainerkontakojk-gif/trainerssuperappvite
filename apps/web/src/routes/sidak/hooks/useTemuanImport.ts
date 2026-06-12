@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { getApi, postApi } from "../../../hooks/useApi";
+import { sidakClient, unwrapResponse } from "../../../lib/api";
 import type { QAIndicator, QAPeriod, QATemuan } from "@trainers/types";
 import type { ParsedImportRow as ImportRowType } from "../../../components/sidak/SidakInputImportPanel";
 
@@ -36,6 +36,14 @@ interface UseTemuanImportParams {
   setTemuan: React.Dispatch<React.SetStateAction<QATemuan[]>>;
   setErrorMsg: (msg: string | null) => void;
   setSuccessMsg: (msg: string | null) => void;
+}
+
+interface TemuanBatchPreview {
+  stats: {
+    invalid_count: number;
+    skipped_count: number;
+    valid_count: number;
+  };
 }
 
 export function useTemuanImport({
@@ -261,12 +269,14 @@ export function useTemuanImport({
         sebaiknya: r.sebaiknya || null,
         no_tiket: r.no_tiket || null,
       }));
-      const preview = await postApi<any>("/sidak/temuan/batch/preview", {
-        peserta_id: selectedAgent.id,
-        period_id: selectedPeriod.id,
-        service_type: selectedService,
-        items: importItems,
-      });
+      const preview = (await unwrapResponse(await sidakClient.temuan.batch.preview.$post({
+        json: {
+          peserta_id: selectedAgent.id,
+          period_id: selectedPeriod.id,
+          service_type: selectedService,
+          items: importItems,
+        },
+      }))) as TemuanBatchPreview;
       if (preview.stats.invalid_count > 0) {
         setErrorMsg(
           `${preview.stats.invalid_count} parameter tidak valid di server. Periksa kembali data import.`
@@ -279,19 +289,17 @@ export function useTemuanImport({
         );
         if (!ok) return;
       }
-      const created = await postApi<{
-        inserted: number;
-        skipped: number;
-        total: number;
-      }>("/sidak/temuan/batch", {
-        peserta_id: selectedAgent.id,
-        period_id: selectedPeriod.id,
-        service_type: selectedService,
-        items: importItems,
-      });
-      const updated = await getApi<{ items: QATemuan[]; total: number }>(
-        `/sidak/temuan?peserta_id=${selectedAgent.id}&period_id=${selectedPeriod.id}&service_type=${selectedService}&limit=200`
-      );
+      const created = await unwrapResponse(await sidakClient.temuan.batch.$post({
+        json: {
+          peserta_id: selectedAgent.id,
+          period_id: selectedPeriod.id,
+          service_type: selectedService,
+          items: importItems,
+        },
+      })) as { inserted: number; skipped: number; total: number };
+      const updated = await unwrapResponse(await sidakClient.temuan.$get({
+        query: { peserta_id: selectedAgent.id, period_id: selectedPeriod.id, service_type: selectedService, limit: "200" }
+      })) as { items: QATemuan[]; total: number };
       setTemuan(updated.items ?? []);
       setShowImport(false);
       setImportRows([]);
