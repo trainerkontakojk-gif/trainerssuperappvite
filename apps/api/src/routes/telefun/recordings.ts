@@ -214,6 +214,27 @@ telefunRecordings.post("/score/:id", async (c) => {
   const adminClient = createAdminClient();
 
   try {
+    // === Ownership Check ===
+    const { data: sessionOwner } = await adminClient
+      .from("telefun_history")
+      .select("user_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!sessionOwner) {
+      return c.json(
+        { success: false, error: { code: "NOT_FOUND", message: "Session tidak ditemukan." } },
+        404,
+      );
+    }
+
+    if (sessionOwner.user_id !== user.id) {
+      return c.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Anda tidak memiliki akses ke session ini." } },
+        403,
+      );
+    }
+
     // === Atomic Claim ===
     // Attempt to claim this session for scoring.
     // claim_telefun_scoring returns true only if status was pending/failed/stale-processing

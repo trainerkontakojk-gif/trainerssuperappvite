@@ -3,7 +3,10 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ApiResponse } from "@trainers/types";
 import { env } from "./lib/env";
-import { authMiddleware } from "./middleware/auth";
+import {
+  authMiddleware,
+  type AuthVariables,
+} from "./middleware/auth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
 import { sidak } from "./routes/sidak";
@@ -76,8 +79,8 @@ app.notFound((c) => {
   );
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const routes = app
+// ── Non-v1 routes (no auth middleware) ──
+const healthCheck = new Hono()
   .get("/health", (c) => c.json({ status: "ok" }))
   .get("/auth/me", (c) => {
     return c.json<ApiResponse<never>>(
@@ -91,9 +94,11 @@ const routes = app
       },
       410,
     );
-  })
-  .use("/v1/*", authMiddleware)
-  .get("/v1/me/access-status", async (c) => {
+  });
+
+// ── V1 routes (behind auth middleware) ──
+const v1Api = new Hono<{ Variables: AuthVariables }>()
+  .get("/me/access-status", async (c) => {
     const user = c.get("user");
     try {
       const status = await getLeaderAccessStatus(user.id);
@@ -111,18 +116,31 @@ const routes = app
       );
     }
   })
-  .get("/v1/me", (c) => {
+  .get("/me", (c) => {
     const user = c.get("user");
     const profile = c.get("profile");
     return c.json({ success: true, data: { user, profile } });
   })
-  .route("/v1/sidak", sidak)
-  .route("/v1/ketik", ketik)
-  .route("/v1/pdkt", pdkt)
-  .route("/v1/ai", ai)
-  .route("/v1/profiler", profiler)
-  .route("/v1/admin", adminRouter)
-  .route("/v1/telefun", telefun);
+  .route("/sidak", sidak)
+  .route("/ketik", ketik)
+  .route("/pdkt", pdkt)
+  .route("/ai", ai)
+  .route("/profiler", profiler)
+  .route("/admin", adminRouter)
+  .route("/telefun", telefun);
 
-export type AppType = typeof routes;
+// Combined for RPC type export — no `.use()` calls, clean type inference
+const _allRoutes = new Hono()
+  .route("/", healthCheck)
+  .route("/v1", v1Api);
+
+// ── Actual app with middleware ──
+app
+  .route("/", healthCheck)
+  .use("/v1/*", authMiddleware)
+  .route("/v1", v1Api);
+
+export type AppType = typeof _allRoutes;
+export type KetikRouteType = typeof ketik;
+export type HealthRouteType = typeof healthCheck;
 export default app;

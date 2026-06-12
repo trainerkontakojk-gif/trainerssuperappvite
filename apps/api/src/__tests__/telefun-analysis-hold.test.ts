@@ -27,12 +27,17 @@ vi.mock("../lib/supabase", () => ({
           ),
         })),
       })),
-      update: vi.fn((payload: Record<string, unknown>) => ({
-        eq: vi.fn(() => {
+      update: vi.fn((payload: Record<string, unknown>) => {
+        function eqHandler() {
           mockState.updates.push(payload);
-          return Promise.resolve({ error: mockState.updateError });
-        }),
-      })),
+          const result = Promise.resolve({ error: mockState.updateError });
+          (result as any).in = vi.fn(() =>
+            Promise.resolve({ error: mockState.updateError }),
+          );
+          return result;
+        }
+        return { eq: eqHandler };
+      }),
     })),
     storage: {
       from: vi.fn(() => ({
@@ -147,7 +152,10 @@ describe("Telefun analysis with hold assessment", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Format hasil analisis tidak valid.");
-    expect(mockState.updates).toHaveLength(0);
+    // Code marks scoring as failed (not completed with assessment)
+    expect(mockState.updates).toHaveLength(1);
+    expect(mockState.updates[0]).toHaveProperty("scoring_status", "failed");
+    expect(mockState.updates[0]).toHaveProperty("scoring_last_error");
   });
 
   it("fails closed when a generated assessment cannot be persisted", async () => {

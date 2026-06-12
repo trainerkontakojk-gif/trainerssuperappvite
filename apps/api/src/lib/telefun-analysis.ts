@@ -248,12 +248,14 @@ export async function analyzeVoiceQuality(
         throw new Error("Invalid assessment after hold normalization");
       }
 
-      // Save to DB
+      // Save to DB with lifecycle status
       const { error: updateError } = await adminClient
         .from("telefun_history")
         .update({
           voice_assessment: assessment,
           score: assessment.overallScore,
+          scoring_status: "completed",
+          scoring_completed_at: new Date().toISOString(),
         })
         .eq("id", sessionId);
       if (updateError) {
@@ -267,9 +269,28 @@ export async function analyzeVoiceQuality(
       return { success: true, assessment };
     } catch (err) {
       console.error("[Telefun] Parse error for assessment:", err);
+      // Mark scoring as failed
+      await adminClient
+        .from("telefun_history")
+        .update({
+          scoring_status: "failed",
+          scoring_last_error: err instanceof Error ? err.message : "Parse error",
+        })
+        .eq("id", sessionId)
+        .in("scoring_status", ["processing", "pending"]);
       return { success: false, error: "Format hasil analisis tidak valid." };
     }
   }
+
+  // Mark scoring as failed when Gemini call fails
+  await adminClient
+    .from("telefun_history")
+    .update({
+      scoring_status: "failed",
+      scoring_last_error: response.error || "Gemini assessment failed",
+    })
+    .eq("id", sessionId)
+    .in("scoring_status", ["processing", "pending"]);
 
   return {
     success: false,

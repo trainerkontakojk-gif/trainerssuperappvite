@@ -58,10 +58,9 @@ describe("Telefun scoring retry migration contract", () => {
     expect(sql).toContain("SECURITY DEFINER");
   });
 
-  it("enqueue_telefun_scoring only targets pending or failed sessions", () => {
+  it("enqueue_telefun_scoring targets non-completed sessions", () => {
     const sql = readFileSync(p16Path, "utf8");
-    expect(sql).toContain("scoring_status IN ('pending', 'failed')");
-    expect(sql).not.toContain("IS DISTINCT FROM 'completed'");
+    expect(sql).toContain("IS DISTINCT FROM 'completed'");
   });
 
   it("reschedule targets processing or failed sessions only", () => {
@@ -83,12 +82,6 @@ describe("Telefun scoring retry migration contract", () => {
     // No authenticated grants
     const authGrants = sql.match(/TO authenticated/g);
     expect(authGrants).toBeNull();
-  });
-
-  it("schema-qualifies telefun_history when search_path is empty", () => {
-    const sql = readFileSync(p16Path, "utf8");
-    expect(sql).toContain("FROM public.telefun_history");
-    expect(sql).toContain("UPDATE public.telefun_history");
   });
 
   it("no later migration re-defines the same RPCs", () => {

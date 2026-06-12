@@ -55,7 +55,6 @@ export function classifyScoringError(error: unknown): "transient" | "permanent" 
     "eaddrinfo",
     "socket",
     "network",
-    "5",
     "internal server error",
     "service unavailable",
   ];
@@ -68,6 +67,11 @@ export function classifyScoringError(error: unknown): "transient" | "permanent" 
   if (lower.includes("4") && !lower.includes("429")) {
     const fourxxMatch = msg.match(/\b(4\d{2})\b/);
     if (fourxxMatch && fourxxMatch[1] !== "429") return "permanent";
+  }
+
+  // Treat 5xx errors as transient (only actual HTTP status codes)
+  if (msg.match(/\b5\d{2}\b/)) {
+    return "transient";
   }
 
   // Default: treat unknown as permanent to avoid infinite retry loops

@@ -167,7 +167,7 @@ export async function fetchPendingJobs(
   const { data, error } = await adminClient
     .from("telefun_history")
     .select("id, user_id")
-    .in("scoring_status", ["pending", "failed"])
+    .in("scoring_status", ["pending", "failed", "processing"])
     .or(
       `scoring_next_attempt_at.lte.${now},scoring_next_attempt_at.is.null`,
     )

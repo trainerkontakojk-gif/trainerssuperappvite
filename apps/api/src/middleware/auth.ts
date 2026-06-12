@@ -2,10 +2,18 @@ import { Context, Next } from "hono";
 import { supabaseAdmin } from "../lib/supabase";
 import { normalizeAuthProfileStatus } from "../lib/profile";
 import { User } from "@supabase/supabase-js";
+import type { UserProfile } from "@trainers/types";
 
-type Variables = {
+export interface AuthProfile {
+  status: string | null;
+  role: UserProfile["role"];
+  full_name: string | null;
+  is_deleted: boolean | null;
+}
+
+export type AuthVariables = {
   user: User;
-  profile: any;
+  profile: AuthProfile;
 };
 
 function buildForbidden(code: string, message: string) {
@@ -16,7 +24,7 @@ function buildForbidden(code: string, message: string) {
 }
 
 export const authMiddleware = async (
-  c: Context<{ Variables: Variables }>,
+  c: Context<{ Variables: AuthVariables }>,
   next: Next,
 ) => {
   const authHeader = c.req.header("Authorization");

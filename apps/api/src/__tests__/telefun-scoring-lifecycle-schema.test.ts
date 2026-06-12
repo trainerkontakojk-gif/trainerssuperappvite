@@ -97,9 +97,27 @@ describe("Telefun scoring lifecycle migration contract", () => {
   });
 
   it("schema-qualifies telefun_history when search_path is empty", () => {
-    const sql = readFileSync(migrationPath, "utf8");
-    expect(sql).toContain("FROM public.telefun_history");
-    expect(sql).toContain("UPDATE public.telefun_history");
+    const lifecycleSql = readFileSync(migrationPath, "utf8");
+    const retrySql = readFileSync(
+      join(migrationsDir, "20260611201000_telefun_scoring_retry_queue.sql"),
+      "utf8",
+    );
+
+    for (const sql of [lifecycleSql, retrySql]) {
+      expect(sql).toContain("FROM public.telefun_history");
+      expect(sql).toContain("UPDATE public.telefun_history");
+    }
+  });
+
+  it("only P1.6 retry queue migration re-defines the lifecycle RPCs", () => {
+    const retryFile = "20260611201000_telefun_scoring_retry_queue.sql";
+    const allFiles = readdirSync(migrationsDir)
+      .filter((f) => f.endsWith(".sql") && f > migrationName && f !== retryFile)
+      .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
+      .join("\n");
+    expect(allFiles).not.toMatch(/FUNCTION\s+public\.claim_telefun_scoring/i);
+    expect(allFiles).not.toMatch(/FUNCTION\s+public\.complete_telefun_scoring/i);
+    expect(allFiles).not.toMatch(/FUNCTION\s+public\.fail_telefun_scoring/i);
   });
 });
 
