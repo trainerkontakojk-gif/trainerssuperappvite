@@ -8,13 +8,19 @@ import { createAdminClient } from "../../lib/supabase";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 import { callAI, isTransientAiError } from "./shared-utils";
 
+// ── Prompt Builder ────────────────────────────────────────────────────
+
 /**
- * AI-powered agent response evaluation.
- * Returns score, feedback, and granular issues (typos, clarity, content gaps).
+ * Build evaluation prompt from single inbound email + single agent reply.
+ *
+ * @param input.inboundEmailBody - The consumer's inbound email body.
+ * @param input.agentReplyBody - The agent's reply body (target of evaluation).
+ * @param input.scenarioTitle - Optional scenario title.
+ * @param input.scenarioCategory - Optional scenario category.
  */
 export function buildPdktEvaluationPrompt(input: {
-  consumerComplaint: string;
-  agentReply: string;
+  inboundEmailBody: string;
+  agentReplyBody: string;
   scenarioTitle?: string;
   scenarioCategory?: string;
 }): { systemInstruction: string; prompt: string } {
@@ -32,14 +38,17 @@ export function buildPdktEvaluationPrompt(input: {
     - Skenario: ${input.scenarioCategory || "Umum"} - ${input.scenarioTitle || "Tidak disebutkan"}.
     - Catatan penting: perusahaan terlapor dapat berupa bank/asuransi/leasing/pinjol, tetapi agent yang dinilai tetap agent OJK 157.
 
-    KELUHAN KONSUMEN:
-    "${input.consumerComplaint}"
+    EMAIL KONSUMEN:
+    "${input.inboundEmailBody}"
 
-    JAWABAN AGENT OJK 157:
-    "${input.agentReply}"
+    BALASAN AGENT OJK 157:
+    "${input.agentReplyBody}"
 
-    TUGAS: Nilai jawaban agent OJK 157 (Skor Awal 100).
-    1. TYPO: Salah ketik.
+    TUGAS:
+    Nilai balasan agent OJK 157 di atas terhadap email konsumen yang diterima.
+
+    KRITERIA PENILAIAN (Skor Awal 100):
+    1. TYPO: Salah ketik, ejaan, atau format.
     2. CLARITY: Apakah mudah dimengerti? Struktur logis?
     3. RELEVANSI: Apakah menjawab masalah inti dan mengarahkan konsumen dengan tepat sebagai OJK 157?
 
@@ -66,20 +75,37 @@ export async function evaluateAgentResponse(
 }> {
   const modelId = config.selectedModel || "gemini-3.1-flash-lite";
 
-  const lastAgentReply = [...emails].reverse().find((e) => e.isAgent);
-  const firstInbound = emails.find((e) => !e.isAgent);
+  const inboundEmails = emails.filter((email) => !email.isAgent);
+  const agentReplies = emails.filter((email) => email.isAgent);
 
-  if (!lastAgentReply || !firstInbound) {
-    return { success: false, error: "Missing email context for evaluation." };
+  if (
+    emails.length !== 2 ||
+    inboundEmails.length !== 1 ||
+    agentReplies.length !== 1
+  ) {
+    return {
+      success: false,
+      error:
+        "Invalid email context for evaluation. Need exactly one consumer email and one agent reply.",
+    };
   }
 
+  const inboundEmailBody = inboundEmails[0].body || "(kosong)";
+  const agentReplyBody = agentReplies[0].body || "(kosong)";
+
   const scenario = config.scenarios?.[0];
-  const { systemInstruction, prompt: evaluationPrompt } = buildPdktEvaluationPrompt({
-    consumerComplaint: firstInbound.body,
-    agentReply: lastAgentReply.body,
-    scenarioTitle: scenario?.title,
-    scenarioCategory: scenario?.category,
-  });
+  const { systemInstruction, prompt: evaluationPrompt } =
+    buildPdktEvaluationPrompt({
+      inboundEmailBody,
+      agentReplyBody,
+      scenarioTitle: scenario?.title,
+      scenarioCategory: scenario?.category,
+    });
+
+  // Log context for observability (no body content logged)
+  console.debug(
+    `[PDKT Evaluation] Single inbound → single reply (${inboundEmailBody.length}/${agentReplyBody.length} chars)`,
+  );
 
   let lastError: unknown;
   const retryDelaysMs = [250, 500];

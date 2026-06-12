@@ -209,6 +209,10 @@ export async function submitMailboxReply(
     throw new Error(error.message || "Gagal mengirim balasan mailbox.");
   }
 
+  if (typeof historyId !== "string" || historyId.trim().length === 0) {
+    throw new Error("Gagal mengirim balasan mailbox.");
+  }
+
   return historyId;
 }
 

@@ -293,6 +293,13 @@ export async function initializeEmailSession(
       };
     }
 
+    if (result.wordCount < 500) {
+      return {
+        success: false,
+        error: "Email awal terlalu pendek. Silakan coba lagi.",
+      };
+    }
+
     // Resolve attachments: Manual has priority over AI
     let attachments = customAttachments;
     let attachmentSource: "manual" | "ai" | "none" = hasCustomImages ? "manual" : "none";
