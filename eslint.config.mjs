@@ -50,6 +50,18 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-hooks/set-state-in-effect': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/hooks/useApi'],
+              message:
+                'Gunakan getApi/putApi/postApi/deleteApi dari lib/api.ts sebagai gantinya. hooks/useApi (useApi + fetchApi) hanya untuk internal.',
+            },
+          ],
+        },
+      ],
     },
     languageOptions: {
       globals: {
