@@ -3,15 +3,17 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 
-const mockGetApi = vi.fn();
-const mockPutApi = vi.fn();
-const mockPostApi = vi.fn();
+const mockAiClient = {
+  "monitoring/history": { $get: vi.fn() },
+  "monitoring/aggregation": { $get: vi.fn() },
+  "monitoring/pricing": { $get: vi.fn() },
+  "monitoring/billing": { $get: vi.fn() },
+};
 const mockToast = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() };
 
-vi.mock("../hooks/useApi", () => ({
-  getApi: (...args: any[]) => mockGetApi(...args),
-  putApi: (...args: any[]) => mockPutApi(...args),
-  postApi: (...args: any[]) => mockPostApi(...args),
+vi.mock("../lib/api", () => ({
+  aiClient: mockAiClient,
+  unwrapResponse: (x: any) => x,
 }));
 
 vi.mock("../lib/toast", () => ({ notify: mockToast }));
@@ -63,15 +65,10 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }
     vi.clearAllMocks();
     _mockProfile = { id: "u1", role: "trainer", full_name: "Test", status: "active", email: "test@test.com" };
 
-    mockGetApi.mockImplementation((url: string) => {
-      if (url === "/ai/monitoring/history") return Promise.resolve(SAMPLE_HISTORY);
-      if (url.includes("/ai/monitoring/aggregation")) return Promise.resolve(SAMPLE_AGGREGATION);
-      if (url === "/ai/monitoring/pricing") return Promise.resolve(SAMPLE_PRICING);
-      if (url === "/ai/monitoring/billing") return Promise.resolve(SAMPLE_BILLING);
-      return Promise.resolve([]);
-    });
-    mockPutApi.mockResolvedValue(null);
-    mockPostApi.mockResolvedValue(null);
+    mockAiClient["monitoring/history"].$get.mockResolvedValue(SAMPLE_HISTORY);
+    mockAiClient["monitoring/aggregation"].$get.mockResolvedValue(SAMPLE_AGGREGATION);
+    mockAiClient["monitoring/pricing"].$get.mockResolvedValue(SAMPLE_PRICING);
+    mockAiClient["monitoring/billing"].$get.mockResolvedValue(SAMPLE_BILLING);
   });
 
   afterEach(() => {
@@ -80,18 +77,17 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }
 
   // ── AC-01/02: No raw unauthenticated fetch ─────────────────────
   describe("Auth Transport", () => {
-    it("calls getApi for history with correct path", async () => {
+    it("calls aiClient monitoring/history $get", async () => {
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
-      await waitFor(() => expect(mockGetApi).toHaveBeenCalled());
-      expect(mockGetApi).toHaveBeenCalledWith("/ai/monitoring/history");
+      await waitFor(() => expect(mockAiClient["monitoring/history"].$get).toHaveBeenCalled());
     }, 30000);
 
     it("does NOT call global fetch (raw unauthenticated) for monitoring endpoints", async () => {
       const rawFetch = vi.spyOn(globalThis, "fetch");
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
-      await waitFor(() => expect(mockGetApi).toHaveBeenCalled());
+      await waitFor(() => expect(mockAiClient["monitoring/history"].$get).toHaveBeenCalled());
       const monitoringCalls = rawFetch.mock.calls.filter(
         ([input]: any[]) => typeof input === "string" && input.includes("/ai/monitoring")
       );
@@ -138,21 +134,21 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }
   // ── AC-03: Error mapping ───────────────────────────────────────
   describe("Error Mapping", () => {
     it("maps Unauthorized to user-friendly message", async () => {
-      mockGetApi.mockRejectedValue(new Error("Unauthorized"));
+      mockAiClient["monitoring/history"].$get.mockRejectedValue(new Error("Unauthorized"));
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
       await screen.findByText("Sesi Anda telah berakhir. Silakan login kembali.");
     });
 
     it("maps Invalid token to user-friendly message", async () => {
-      mockGetApi.mockRejectedValue(new Error("Invalid token"));
+      mockAiClient["monitoring/history"].$get.mockRejectedValue(new Error("Invalid token"));
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
       await screen.findByText("Sesi Anda telah berakhir. Silakan login kembali.");
     });
 
     it("passes through other error messages", async () => {
-      mockGetApi.mockRejectedValue(new Error("Server sedang sibuk"));
+      mockAiClient["monitoring/history"].$get.mockRejectedValue(new Error("Server sedang sibuk"));
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
       await screen.findByText("Server sedang sibuk");
@@ -234,9 +230,7 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }
       const user = userEvent.setup();
       await user.click(usageTab);
       await waitFor(() =>
-        expect(mockGetApi).toHaveBeenCalledWith(
-          expect.stringContaining("/ai/monitoring/aggregation"),
-        ),
+        expect(mockAiClient["monitoring/aggregation"].$get).toHaveBeenCalled(),
       );
     });
 
@@ -247,16 +241,13 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }
       const user = userEvent.setup();
       await user.click(pricingTab);
       await waitFor(() => {
-        expect(mockGetApi).toHaveBeenCalledWith("/ai/monitoring/pricing");
-        expect(mockGetApi).toHaveBeenCalledWith("/ai/monitoring/billing");
+        expect(mockAiClient["monitoring/pricing"].$get).toHaveBeenCalled();
+        expect(mockAiClient["monitoring/billing"].$get).toHaveBeenCalled();
       });
     });
 
     it("renders empty state when no history data", async () => {
-      mockGetApi.mockImplementation((url: string) => {
-        if (url === "/ai/monitoring/history") return Promise.resolve([]);
-        return Promise.resolve([]);
-      });
+      mockAiClient["monitoring/history"].$get.mockResolvedValue([]);
       const { default: MonitoringPage } = await import("../routes/monitoring");
       render(React.createElement(MonitoringPage));
       await screen.findByText("Belum ada riwayat simulasi.");
