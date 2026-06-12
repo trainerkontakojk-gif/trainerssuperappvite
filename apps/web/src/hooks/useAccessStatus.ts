@@ -1,22 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { fetchApi } from "./useApi";
+import type { LeaderAccessStatusItem } from "@trainers/types";
+import { rpcClient, unwrapResponse } from "../lib/api";
 import { supabase } from "../lib/supabase";
 
-type AccessStatus = "none" | "pending" | "approved" | "rejected" | "revoked";
-
-interface AccessStatusItem {
-  status: AccessStatus;
-  module: string;
-  created_at: string | null;
-}
-
-interface AccessStatusMap {
-  ktp: AccessStatusItem;
-  sidak: AccessStatusItem;
-}
-
 export function useAccessStatus(module: "ktp" | "sidak") {
-  const [statusItem, setStatusItem] = useState<AccessStatusItem | null>(null);
+  const [statusItem, setStatusItem] =
+    useState<LeaderAccessStatusItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +13,8 @@ export function useAccessStatus(module: "ktp" | "sidak") {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchApi<AccessStatusMap>("/me/access-status");
+      const res = await rpcClient.v1.me["access-status"].$get();
+      const data = await unwrapResponse(res);
       setStatusItem(data[module] || { status: "none", module, created_at: null });
     } catch (e: any) {
       setError(e.message);

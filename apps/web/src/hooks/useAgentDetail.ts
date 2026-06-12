@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useApi, putApi, deleteApi, fetchApi } from "./useApi";
+import { useApi } from "./useApi";
+import { sidakClient, unwrapResponse } from "../lib/api";
 import { VALID_SERVICE_TYPES } from "@trainers/types";
 import type { AgentDetailData, ServiceType } from "@trainers/types";
 import { useAuthStore } from "../store/authStore";
@@ -82,8 +83,8 @@ export function useAgentDetail(agentId: string) {
   const [foldersLoaded, setFoldersLoaded] = useState(false);
   useEffect(() => {
     if (!isStaffRole) { setFoldersLoaded(true); return; }
-    fetchApi<{ id: string; name: string }[]>("/sidak/folders")
-      .then((res) => { setTeams(res ?? []); setFoldersLoaded(true); })
+    (unwrapResponse(sidakClient.folders.$get()) as Promise<{ id: string; name: string }[]> as any)
+      .then((res: any) => { setTeams(res ?? []); setFoldersLoaded(true); })
       .catch(() => setFoldersLoaded(true));
   }, [isStaffRole]);
 
@@ -124,7 +125,9 @@ export function useAgentDetail(agentId: string) {
     if (!selectedTeam || !isStaffRole) { setAgentsInTeam([]); return; }
     setLoadingAgents(true);
     const encoded = encodeURIComponent(selectedTeam);
-    fetchApi<{ id: string; nama: string }[]>(`/sidak/folders/${encoded}/agents`)
+    (unwrapResponse(
+      sidakClient.folders[":folder"].agents.$get({ param: { folder: encoded } }),
+    ) as Promise<any>)
       .then((res) => setAgentsInTeam(res ?? []))
       .catch(() => setAgentsInTeam([]))
       .finally(() => setLoadingAgents(false));
@@ -382,7 +385,12 @@ export function useAgentDetail(agentId: string) {
     if (!editingTemuan) return;
     setIsSubmitting(true);
     try {
-      await putApi(`/sidak/temuan/${editingTemuan.id}`, editForm);
+      await unwrapResponse(
+        sidakClient.temuan[":id"].$put({
+          param: { id: editingTemuan.id },
+          json: editForm,
+        }),
+      );
       setEditingTemuan(null);
       refetch();
     } catch {
@@ -395,7 +403,9 @@ export function useAgentDetail(agentId: string) {
   const handleDelete = useCallback(async (id: string) => {
     setDeletingId(id);
     try {
-      await deleteApi(`/sidak/temuan/${id}`);
+      await unwrapResponse(
+        sidakClient.temuan[":id"].$delete({ param: { id } }),
+      );
       refetch();
     } catch {
       // silent
