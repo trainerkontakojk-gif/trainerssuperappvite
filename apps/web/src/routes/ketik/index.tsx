@@ -567,7 +567,7 @@ export default function KetikLanding() {
             ...prev,
             percent: nextPercent,
             etaSeconds: nextEta,
-            status: nextStatus as any,
+            status: nextStatus,
           };
         });
       }, 1000);
@@ -603,6 +603,10 @@ export default function KetikLanding() {
 
           const data = await ketikApi.getReviewStatus(currentSessionId);
           if (selectedSessionForReview?.id !== currentSessionId) return;
+
+          // A completed job can briefly precede the persisted review result.
+          // Keep polling instead of transitioning the local session too early.
+          if (data.status === "completed" && !data.resultReady) return;
 
           const updatedStatus = data.status;
           if (updatedStatus !== selectedSessionForReview.reviewStatus) {

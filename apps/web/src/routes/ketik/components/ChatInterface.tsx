@@ -356,8 +356,8 @@ export function ChatInterface({
       if (responseText) {
         const rawParts = responseText
           .split("[BREAK]")
-          .map((p) => p.trim())
-          .filter((p) => p);
+          .map((p: string) => p.trim())
+          .filter((p: string) => p);
         const parts = normalizeGeneratedParts(rawParts);
         const pacingMode = config.responsePacingMode || "realistic";
         const remaining = timeLeft;

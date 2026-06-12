@@ -6,37 +6,37 @@ import type {
   KetikConsumerType,
   ChatMessage,
 } from "@trainers/types";
-
-const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
-
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error?.message || "API Error");
-  return json.data;
-}
+import { aiClient, ketikClient, unwrapResponse } from "../../lib/api";
 
 export const ketikApi = {
-  getScenarios: () => apiFetch<KetikScenario[]>("/ketik/scenarios"),
-  getConsumerTypes: () =>
-    apiFetch<KetikConsumerType[]>("/ketik/consumer-types"),
-  generate: (body: any) =>
-    apiFetch<{ text: string }>("/ketik/generate", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  getScenarios: async () => {
+    const res = await ketikClient.scenarios.$get();
+    return unwrapResponse(res) as Promise<KetikScenario[]>;
+  },
+  getConsumerTypes: async () => {
+    const res = await ketikClient["consumer-types"].$get();
+    return unwrapResponse(res) as Promise<KetikConsumerType[]>;
+  },
+  generate: async (body: {
+    scenarioId: string;
+    scenarioDraft?: KetikScenario;
+    consumerTypeId: string;
+    consumerTypeDraft?: KetikConsumerType;
+    identity: { name: string; city: string; phone: string };
+    selectedModel: string;
+    simulationDuration: number;
+    responsePacingMode: "realistic" | "training_fast";
+    chatHistory: ChatMessage[];
+    remainingSeconds?: number;
+    elapsedSeconds?: number;
+  }) => {
+    const res = await ketikClient.generate.$post({ json: body });
+    return unwrapResponse(res) as Promise<{ text: string }>;
+  },
   getSettings: async () => {
     try {
-      const settings = await apiFetch<KetikAppSettings>("/ketik/settings");
+      const res = await ketikClient.settings.$get();
+      const settings = await unwrapResponse(res) as KetikAppSettings;
       localStorage.setItem("ketik_settings_backup", JSON.stringify(settings));
       return settings;
     } catch (error) {
@@ -53,45 +53,69 @@ export const ketikApi = {
   },
   saveSettings: async (settings: KetikAppSettings) => {
     localStorage.setItem("ketik_settings_backup", JSON.stringify(settings));
-    return apiFetch<void>("/ketik/settings", {
-      method: "PUT",
-      body: JSON.stringify(settings),
-    });
+    const res = await ketikClient.settings.$put({ json: settings });
+    await unwrapResponse(res);
   },
-  getHistory: () => apiFetch<KetikSessionHistoryItem[]>("/ketik/history"),
-  persistSession: (data: {
+  getHistory: async () => {
+    const res = await ketikClient.history.$get();
+    return unwrapResponse(res) as Promise<KetikSessionHistoryItem[]>;
+  },
+  persistSession: async (data: {
     scenarioTitle: string;
     consumerName: string;
     consumerPhone: string;
     consumerCity: string;
     messages: ChatMessage[];
     simulationDuration?: number;
-  }) =>
-    apiFetch<KetikSessionHistoryItem>("/ketik/history", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  deleteSession: (id: string) =>
-    apiFetch<void>(`/ketik/history/${id}`, { method: "DELETE" }),
-  clearHistory: () => apiFetch<void>("/ketik/history", { method: "DELETE" }),
-  startReview: (sessionId: string) =>
-    apiFetch<any>("/ketik/review", {
-      method: "POST",
-      body: JSON.stringify({ sessionId }),
-    }),
-  getReviewStatus: (sessionId: string) =>
-    apiFetch<any>(`/ketik/review/status/${sessionId}`),
-  getReviewDetail: (sessionId: string) =>
-    apiFetch<KetikReviewDetail>(`/ketik/review/${sessionId}`),
-  getUsageSummary: () => {
-    const token = localStorage.getItem("auth_token");
-    return fetch(`${API_BASE}/ai/usage/summary?module=ketik`, {
-      headers: {
-        "X-Requested-With": "XMLHttpRequest",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    })
-      .then((r) => r.json())
-      .then((j) => (j.success ? j.data : null));
+  }) => {
+    const res = await ketikClient.history.$post({ json: data });
+    return unwrapResponse(res) as Promise<KetikSessionHistoryItem>;
+  },
+  deleteSession: async (id: string) => {
+    const res = await ketikClient.history[":id"].$delete({
+      param: { id },
+    });
+    await unwrapResponse(res);
+  },
+  clearHistory: async () => {
+    const res = await ketikClient.history.$delete();
+    await unwrapResponse(res);
+  },
+  startReview: async (sessionId: string) => {
+    const res = await ketikClient.review.$post({
+      json: { sessionId },
+    });
+    return unwrapResponse(res) as Promise<{
+      status: string;
+      scores?: KetikReviewDetail["scores"];
+      error?: string;
+    }>;
+  },
+  getReviewStatus: async (sessionId: string) => {
+    const res = await ketikClient.review.status[":sessionId"].$get({
+      param: { sessionId },
+    });
+    return unwrapResponse(res) as Promise<{
+      status: "pending" | "processing" | "completed" | "failed";
+      scores: KetikReviewDetail["scores"] | null;
+      errorMessage?: string;
+      resultReady: boolean;
+    }>;
+  },
+  getReviewDetail: async (sessionId: string) => {
+    const res = await ketikClient.review[":sessionId"].$get({
+      param: { sessionId },
+    });
+    return unwrapResponse(res) as Promise<KetikReviewDetail>;
+  },
+  getUsageSummary: async () => {
+    try {
+      const res = await aiClient.usage.summary.$get({
+        query: { module: "ketik" },
+      });
+      return await unwrapResponse(res) as unknown;
+    } catch {
+      return null;
+    }
   },
 };
