@@ -180,6 +180,12 @@ export class LiveSession {
       if (this.config.sessionId) {
         wsUrl.searchParams.set("sessionId", this.config.sessionId);
       }
+      console.log("[Telefun] WebSocket target:", {
+        base: wsBase,
+        url: wsUrl.toString().replace(/token=[^&]+/, "token=[REDACTED]"),
+        hasSessionId: Boolean(this.config.sessionId),
+        transport: this.config.telefunTransport,
+      });
 
       this.ws = new WebSocket(wsUrl.toString());
       this.ws.binaryType = "arraybuffer";
@@ -217,6 +223,11 @@ export class LiveSession {
 
       this.ws.onclose = (event) => {
         const mapped = mapTelefunCloseEvent(event);
+        console.log("[Telefun] WebSocket closed:", {
+          code: event.code,
+          reason: event.reason,
+          mapped,
+        });
         this.setSessionState("ended");
         this.onStatusChange(
           mapped.severity === "normal" ? "Selesai" : "Terputus",

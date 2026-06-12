@@ -566,9 +566,9 @@ export default function TelefunLanding() {
               onRecordingReady={handleRecordingReady}
               onSessionCreated={(id) => {
                 setActiveSessionId(id);
-                setActiveSessionConfig((prev) =>
-                  prev ? { ...prev, sessionId: id } : prev,
-                );
+                // Jangan update activeSessionConfig di sini — bikin object reference baru
+                // yang trigger parent re-render → PhoneInterface unmount/remount
+                // sessionId udah disimpen di activeSessionId state terpisah
               }}
             />
           </motion.div>

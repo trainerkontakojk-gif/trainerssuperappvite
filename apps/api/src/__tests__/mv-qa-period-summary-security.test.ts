@@ -202,17 +202,24 @@ describe("mv_qa_period_summary security hardening", () => {
       expect(existsSync(rollbackPath017)).toBe(true);
     });
 
-    it("restores SELECT grant to authenticated and service_role", () => {
+    it("removes the SELECT grant added for service_role", () => {
       const sql = readFileSync(rollbackPath017, "utf-8");
       expect(sql).toContain(
-        "GRANT SELECT ON public.mv_qa_period_summary TO authenticated, service_role",
+        "REVOKE SELECT ON public.mv_qa_period_summary FROM service_role",
       );
     });
 
-    it("restores refresh function execute to authenticated and service_role", () => {
+    it("removes direct refresh function grants added or revoked by 017", () => {
       const sql = readFileSync(rollbackPath017, "utf-8");
       expect(sql).toContain(
-        "GRANT EXECUTE ON FUNCTION public.refresh_mv_qa_period_summary() TO authenticated, service_role",
+        "REVOKE EXECUTE ON FUNCTION public.refresh_mv_qa_period_summary()\nFROM authenticated, anon, service_role",
+      );
+    });
+
+    it("restores the refresh function default PUBLIC execute grant", () => {
+      const sql = readFileSync(rollbackPath017, "utf-8");
+      expect(sql).toContain(
+        "GRANT EXECUTE ON FUNCTION public.refresh_mv_qa_period_summary() TO PUBLIC",
       );
     });
   });
@@ -234,6 +241,14 @@ describe("mv_qa_period_summary security hardening", () => {
       expect(sql).toContain(
         "GRANT EXECUTE ON FUNCTION public.refresh_mv_qa_period_summary()\nTO authenticated, service_role",
       );
+    });
+
+    it("keeps PUBLIC execute revoked because CREATE OR REPLACE preserves permissions", () => {
+      const sql = readFileSync(rollbackPathTerminal, "utf-8");
+      expect(sql).not.toContain(
+        "GRANT EXECUTE ON FUNCTION public.refresh_mv_qa_period_summary() TO PUBLIC",
+      );
+      expect(sql).toContain("PUBLIC remains revoked");
     });
   });
 

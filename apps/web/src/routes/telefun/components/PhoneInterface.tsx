@@ -330,7 +330,8 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         uiAudioContextRef.current = null;
       }
     };
-  }, [config]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Hanya jalankan sekali saat mount — config object reference berubah tiap render parent
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
