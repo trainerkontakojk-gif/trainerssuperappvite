@@ -23,7 +23,7 @@ DECLARE
 BEGIN
   SELECT scoring_status, scoring_claimed_at
   INTO v_current_status, v_claimed_at
-  FROM telefun_history
+  FROM public.telefun_history
   WHERE id = p_session_id
   FOR UPDATE;
 
@@ -42,7 +42,7 @@ BEGIN
     END IF;
   END IF;
 
-  UPDATE telefun_history
+  UPDATE public.telefun_history
   SET
     scoring_status = 'processing',
     scoring_claimed_at = v_now,
@@ -54,13 +54,9 @@ BEGIN
 END;
 $$;
 
--- Revoke grant on dropped RPCs
-REVOKE ALL ON FUNCTION public.reschedule_telefun_scoring(UUID, TEXT, TIMESTAMPTZ) FROM public, anon;
-REVOKE ALL ON FUNCTION public.enqueue_telefun_scoring(UUID) FROM public, anon;
-
 -- Hapus index
 DROP INDEX IF EXISTS public.idx_telefun_scoring_retry_queue;
 
 -- Hapus kolom
-ALTER TABLE telefun_history
+ALTER TABLE public.telefun_history
   DROP COLUMN IF EXISTS scoring_next_attempt_at;

@@ -2,6 +2,8 @@
 --
 -- Restores the GRANT state from 20260525000200_restore_mv_qa_period_summary_contract.sql
 -- (authenticated + service_role for SELECT and EXECUTE).
+-- CREATE OR REPLACE FUNCTION preserves the permissions established by 017,
+-- so PUBLIC remains revoked in the restore state and is not granted here.
 --
 -- WARNING: This rollback re-opens mv_qa_period_summary to `authenticated` role.
 --          Only run this if the re-hardening migration causes a regression.
