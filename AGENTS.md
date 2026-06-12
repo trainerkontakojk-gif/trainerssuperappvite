@@ -173,6 +173,10 @@ Monorepo dengan pembagian tanggung jawab yang jelas:
 - **Error Handling**: Jangan biarkan error database mentah (misal: foreign key error) muncul ke user. Berikan pesan yang manusiawi.
 - **Linting**: ESLint 9 flat config (`eslint.config.mjs` di root) dengan `typescript-eslint` recommended, `react-hooks` recommended (kecuali `set-state-in-effect` dimatikan), dan `react-refresh`. Unused vars prefix `_` diperbolehkan (warning). `no-explicit-any` dimatikan. Formatting via Prettier (`pnpm format`).
 
+## Migration Status — RPC Migration Complete ✅
+
+Semua fungsi yang sebelumnya menggunakan `getApi`, `postApi`, `putApi`, `deleteApi` dari `hooks/useApi` sudah dimigrasi ke `fetchApi` (dari hooks/useApi — hanya untuk internal) atau menggunakan RPC/hc pattern. `getApi`/`postApi`/`putApi`/`deleteApi` sudah dihapus — jangan gunakan di kode baru. Gunakan `fetchApi` dari `hooks/useApi` untuk panggilan API langsung, atau gunakan Hono RPC client.
+
 ## Golden Rules
 
 ### 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build
