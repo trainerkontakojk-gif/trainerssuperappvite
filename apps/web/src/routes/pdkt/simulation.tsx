@@ -182,6 +182,16 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
 
   // Auto-sync selection when filter tab changes or items change
   useEffect(() => {
+    if (window.innerWidth < 768) {
+      if (selectedId && mailboxItems) {
+        const currentFiltered = filter === "all" ? mailboxItems : mailboxItems.filter(item => item.status === filter);
+        if (!currentFiltered.some(item => item.id === selectedId)) {
+          setSelectedId(null);
+        }
+      }
+      return;
+    }
+
     if (mailboxItems && mailboxItems.length > 0) {
       const currentFiltered = filter === "all" ? mailboxItems : mailboxItems.filter(item => item.status === filter);
       if (currentFiltered.length > 0) {
@@ -684,7 +694,7 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
             </div>
 
             {/* Main Detail Pane Skeleton */}
-            <div className="flex-1 flex flex-col min-w-0 bg-white animate-pulse">
+            <div className="hidden md:flex flex-1 flex-col min-w-0 bg-white animate-pulse">
               {/* Detail Header skeleton */}
               <div className="p-6 border-b border-gray-200 flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -802,41 +812,44 @@ export default function PdktSimulation({ onBack, onBeforeActivity, onAfterActivi
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
         <div className="flex-1 flex bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm relative">
-      <MailboxSidebar
-        items={filteredByTab}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onNew={() => setIsNewModalOpen(true)}
-        onSettings={() => setIsSettingsOpen(true)}
-        onHistory={async () => {
-          await fetchHistory();
-          setIsHistoryOpen(true);
-        }}
-        filter={filter}
-        onFilterChange={setFilter}
-        selectedBulkIds={selectedBulkIds}
-        onToggleBulkId={handleToggleBulkId}
-        isBulkMode={isBulkMode}
-        onToggleBulkMode={handleToggleBulkMode}
-        onBulkDelete={handleBulkDelete}
-      />
-
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        {selectedItem ? (
-          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <EmailDetailPane
-              item={selectedItem}
-              onReply={handleReplyOpen}
-              onDelete={() => handleDelete(selectedItem.id)}
-              isComposerOpen={isReplyOpen}
-              evaluation={evaluations[selectedItem.id]?.result || null}
-              evaluationStatus={evaluations[selectedItem.id]?.status || null}
-              evaluationError={evaluations[selectedItem.id]?.error || null}
-              onRetryEval={() =>
-                selectedItem.history_id &&
-                handleRetryEval(selectedItem.id, selectedItem.history_id)
-              }
+          <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-80 md:shrink-0`}>
+            <MailboxSidebar
+              items={filteredByTab}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onNew={() => setIsNewModalOpen(true)}
+              onSettings={() => setIsSettingsOpen(true)}
+              onHistory={async () => {
+                await fetchHistory();
+                setIsHistoryOpen(true);
+              }}
+              filter={filter}
+              onFilterChange={setFilter}
+              selectedBulkIds={selectedBulkIds}
+              onToggleBulkId={handleToggleBulkId}
+              isBulkMode={isBulkMode}
+              onToggleBulkMode={handleToggleBulkMode}
+              onBulkDelete={handleBulkDelete}
             />
+          </div>
+
+          <div className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex flex-col min-w-0 relative`}>
+            {selectedItem ? (
+              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <EmailDetailPane
+                  item={selectedItem}
+                  onReply={handleReplyOpen}
+                  onDelete={() => handleDelete(selectedItem.id)}
+                  isComposerOpen={isReplyOpen}
+                  evaluation={evaluations[selectedItem.id]?.result || null}
+                  evaluationStatus={evaluations[selectedItem.id]?.status || null}
+                  evaluationError={evaluations[selectedItem.id]?.error || null}
+                  onRetryEval={() =>
+                    selectedItem.history_id &&
+                    handleRetryEval(selectedItem.id, selectedItem.history_id)
+                  }
+                  onBackToList={() => setSelectedId(null)}
+                />
             {isReplyOpen && (
               <div className="shrink-0">
                 <ReplyComposer

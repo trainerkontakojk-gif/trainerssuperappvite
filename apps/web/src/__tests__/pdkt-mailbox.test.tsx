@@ -289,4 +289,24 @@ describe("EmailDetailPane Component", () => {
     expect(deleteBtn).toBeDefined();
     expect((deleteBtn as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("renders back button in EmailDetailPane and calls onBackToList when clicked", () => {
+    const handleBackToList = vi.fn();
+    render(
+      <EmailDetailPane
+        item={mockItem}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+        onBackToList={handleBackToList}
+      />,
+    );
+    const backBtn = screen.getByTitle("Kembali ke Daftar Email");
+    expect(backBtn).toBeDefined();
+    fireEvent.click(backBtn);
+    expect(handleBackToList).toHaveBeenCalledTimes(1);
+  });
 });

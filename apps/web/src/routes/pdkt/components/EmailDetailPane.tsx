@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Loader2,
   RotateCcw,
+  ArrowLeft,
 } from "lucide-react";
 import type { PdktMailboxItem } from "@trainers/types";
 import ScenarioImage from "./ScenarioImage";
@@ -23,6 +24,7 @@ interface EmailDetailPaneProps {
   evaluationStatus: "pending" | "processing" | "completed" | "failed" | null;
   evaluationError: string | null;
   onRetryEval: () => void;
+  onBackToList?: () => void;
 }
 
 interface EvaluationData {
@@ -42,6 +44,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   evaluationStatus,
   evaluationError,
   onRetryEval,
+  onBackToList,
 }) => {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -123,6 +126,15 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       {/* Pane Header */}
       <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
+          {onBackToList && (
+            <button
+              onClick={onBackToList}
+              className="w-10 h-10 -ml-2 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-colors md:hidden mr-1"
+              title="Kembali ke Daftar Email"
+            >
+              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            </button>
+          )}
           <div className="flex flex-col">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
               Detail Email

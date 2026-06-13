@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
   Phone,
+  MapPin,
   X,
   ArrowLeft,
   Download,
@@ -531,12 +532,12 @@ export function ChatInterface({
       className="module-clean-app flex flex-col h-full w-full bg-background overflow-hidden relative"
     >
       {/* Premium Header */}
-      <div className="module-clean-toolbar px-8 py-6 flex items-center justify-between border-b shrink-0 w-full z-50 relative">
-        <div className="flex items-center gap-4 w-1/4">
+      <div className="module-clean-toolbar px-4 py-4 md:px-8 md:py-6 flex items-center justify-between border-b shrink-0 w-full z-50 relative">
+        <div className="flex items-center gap-4 w-auto md:w-1/4 shrink-0">
           {isReviewMode && (
             <button
               onClick={() => onEndSession(messages)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-all group"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-all group cursor-pointer"
             >
               <div className="module-clean-button-secondary w-10 h-10 rounded-xl flex items-center justify-center transition-all">
                 <ArrowLeft className="w-5 h-5" />
@@ -547,29 +548,28 @@ export function ChatInterface({
             </button>
           )}
           {!isReviewMode && (
-            <div className="module-clean-panel w-12 h-12 rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center">
-              <div className="w-12 h-12 flex items-center justify-center bg-primary/20 text-primary text-lg font-black rounded-2xl">
+            <div className="module-clean-panel w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center">
+              <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-primary/20 text-primary text-base md:text-lg font-black rounded-xl md:rounded-2xl">
                 {config.identity.name.charAt(0).toUpperCase()}
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center w-2/4">
-          <h1 className="font-black text-foreground text-xl tracking-tighter truncate max-w-full text-center">
+        <div className="flex flex-col items-center justify-center flex-1 min-w-0 px-2 md:w-2/4">
+          <h1 className="font-black text-foreground text-base md:text-xl tracking-tighter truncate max-w-full text-center">
             {config.identity.name}
           </h1>
-          <div className="module-clean-panel flex items-center gap-3 mt-1.5 px-4 py-1 rounded-full">
-            <div className="flex items-center gap-1.5">
-              <Phone className="w-3 h-3 text-primary" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-1.5 max-w-full">
+            <div className="module-clean-panel flex items-center gap-1 px-2 py-0.5 md:px-3 md:py-1 rounded-full shrink-0">
+              <Phone className="w-2.5 h-2.5 text-primary" />
+              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {config.identity.phone}
               </span>
             </div>
-            <span className="w-1 h-1 bg-foreground/20 rounded-full"></span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px]">📍</span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <div className="module-clean-panel flex items-center gap-1 px-2 py-0.5 md:px-3 md:py-1 rounded-full min-w-0">
+              <MapPin className="w-2.5 h-2.5 text-primary shrink-0" />
+              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground truncate">
                 {config.identity.city}
               </span>
             </div>
@@ -594,7 +594,7 @@ export function ChatInterface({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 w-1/4">
+        <div className="flex items-center justify-end gap-3 w-auto md:w-1/4 shrink-0">
           {isReviewMode ? (
             <div className="flex items-center gap-2">
               <button
@@ -625,14 +625,14 @@ export function ChatInterface({
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="module-clean-button-secondary w-12 h-12 flex items-center justify-center hover:text-foreground rounded-2xl transition-all shadow-sm"
+                className="module-clean-button-secondary w-12 h-12 flex items-center justify-center hover:text-foreground rounded-2xl transition-all shadow-sm cursor-pointer"
                 title="Download CSV"
               >
                 <Download className="w-5 h-5" />
               </button>
               <button
                 onClick={() => onEndSession([])}
-                className="module-clean-button-secondary w-12 h-12 flex items-center justify-center hover:text-red-500 rounded-2xl transition-all shadow-sm"
+                className="module-clean-button-secondary w-12 h-12 flex items-center justify-center hover:text-red-500 rounded-2xl transition-all shadow-sm cursor-pointer"
                 title="Tutup Review"
               >
                 <X className="w-5 h-5" />
@@ -647,11 +647,11 @@ export function ChatInterface({
                 }
               }}
               disabled={isLoading || isEnding || !authReady}
-              className={`px-6 py-2.5 text-white font-black text-[10px] uppercase tracking-widest transition-all rounded-xl shadow-lg flex items-center gap-2
+              className={`px-4 py-2 md:px-6 md:py-2.5 text-white font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all rounded-xl shadow-lg flex items-center gap-2
                 ${
                   isLoading || isEnding || !authReady
                     ? "bg-red-400 cursor-not-allowed opacity-80"
-                    : "bg-red-500 hover:bg-red-600 shadow-red-500/20 active:scale-95"
+                    : "bg-red-500 hover:bg-red-600 shadow-red-500/20 active:scale-95 cursor-pointer"
                 }`}
             >
               {isEnding || !authReady ? (
@@ -748,15 +748,15 @@ export function ChatInterface({
       {/* Input Area */}
       {!isReviewMode &&
       (sessionPhase === "active" || sessionPhase === "expired") ? (
-        <div className="module-clean-toolbar p-6 border-t z-40 shrink-0 relative">
+        <div className="module-clean-toolbar p-4 md:p-6 border-t z-40 shrink-0 relative">
           <div className="absolute inset-x-0 -top-12 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
 
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-4 md:mb-6">
             <button
               onClick={isMaintenanceMode ? applyMaintenance : applyTemplate}
-              className="module-clean-button-secondary flex items-center gap-2.5 px-6 py-2.5 rounded-2xl shadow-sm text-[10px] font-black uppercase tracking-widest text-module-ketik transition-all group"
+              className="module-clean-button-secondary flex items-center gap-2 px-4 py-2 md:px-6 md:py-2.5 rounded-2xl shadow-sm text-[9px] md:text-[10px] font-black uppercase tracking-widest text-module-ketik transition-all group cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+              <Sparkles className="w-3 h-3 md:w-3.5 md:h-3.5 group-hover:rotate-12 transition-transform" />
               <span>
                 {isMaintenanceMode
                   ? "Gunakan Maintenance"
@@ -765,8 +765,8 @@ export function ChatInterface({
             </button>
           </div>
 
-          <div className="max-w-4xl mx-auto flex items-end gap-4">
-            <div className="module-clean-input-shell flex-1 rounded-[2rem] border-2 flex flex-col px-6 py-2.5 focus-within:border-module-ketik transition-all shadow-inner">
+          <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-4">
+            <div className="module-clean-input-shell flex-1 rounded-[2rem] border-2 flex flex-col px-4 py-2 md:px-6 md:py-2.5 focus-within:border-module-ketik transition-all shadow-inner">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50 mb-1 ml-1 select-none">
                 Pesan Baru
               </span>
@@ -804,7 +804,7 @@ export function ChatInterface({
                           key={t.id}
                           onClick={() => insertTemplate(t)}
                           onMouseEnter={() => setSelectedTemplateIndex(i)}
-                          className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex flex-col gap-0.5 ${
+                          className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex flex-col gap-0.5 cursor-pointer ${
                             i === selectedTemplateIndex
                               ? "bg-primary/10 border border-primary/20"
                               : "hover:bg-foreground/5 border border-transparent"
@@ -836,14 +836,14 @@ export function ChatInterface({
               whileHover={{ scale: 1.05 }}
               onClick={handleSend}
               disabled={!inputText.trim()}
-              className={`w-14 h-14 rounded-[2rem] flex items-center justify-center transition-all ${
+              className={`w-12 h-12 md:w-14 md:h-14 rounded-[2rem] flex items-center justify-center transition-all shrink-0 ${
                 inputText.trim()
-                  ? "module-clean-button-primary text-white"
-                  : "bg-foreground/5 text-muted-foreground"
+                  ? "module-clean-button-primary text-white cursor-pointer"
+                  : "bg-foreground/5 text-muted-foreground cursor-not-allowed"
               }`}
             >
               <Send
-                className={`w-6 h-6 ${inputText.trim() ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+                className={`w-5 h-5 md:w-6 md:h-6 ${inputText.trim() ? "translate-x-0.5 -translate-y-0.5" : ""}`}
               />
             </motion.button>
           </div>
