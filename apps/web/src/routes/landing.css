@@ -17,7 +17,7 @@
   width: 100%;
 }
 
-.dark .landing-wrapper, .auth-modal-wrapper {
+.dark .landing-wrapper, .dark .auth-modal-wrapper {
   --bg: #0a0a0a;
   --fg: #fafafa;
   --fg2: #a3a3a3;
