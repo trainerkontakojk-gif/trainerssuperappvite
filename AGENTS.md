@@ -1026,3 +1026,5 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - **Wiki:** Jika `graphify-out/wiki/index.md` ada, gunakan untuk navigasi broad daripada browsing raw source.
 - **GRAPH_REPORT.md:** Baca hanya untuk architecture review broad atau saat query/path/explain tidak cukup.
 - **Gratis (AST-only):** `graphify update .` hanya proses AST — tidak ada biaya API. Jadi tidak ada alasan untuk skip update setelah modifikasi kode.
+193.  **Mobile Bottom Tab Navigation** — Added bottom tab navigation for mobile devices to access main modules (Dashboard, Profiler, SIDAK, KETIK, PDKT, Telefun) and secondary tools. 2 files modified. (DONE)
+194.  **Landing Page Total Redesign** — Completely redesigned the landing page using a dark mode by default, modern typography (Outfit and Inter), and precise SVG layout matching the approved mockup. Removed the complex React components for a static, fully matching implementation. 2 files modified. (DONE)
