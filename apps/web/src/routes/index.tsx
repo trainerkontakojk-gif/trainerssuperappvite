@@ -38,24 +38,83 @@ function LandingContent() {
 
       <section className="hero">
         <div className="hero-in">
-          <div className="hero-massive">
-            <span>TRAINERS</span>
-            <span className="outlined">SUPER</span>
-            <span>APP.</span>
+          <div className="hero-left">
+            <div className="hero-massive">
+              <span>TRAINERS</span>
+              <span className="outlined">SUPER</span>
+              <span>APP.</span>
+            </div>
+            <div className="hero-bottom">
+              <p className="hero-desc">
+                Platform terpusat untuk simulasi, profiling, dan analitik — dibangun khusus untuk tim trainer agar bekerja lebih cepat dan tepat sasaran.
+              </p>
+              <div className="hero-cta">
+                {isCheckingAuth ? null : isLoggedIn ? (
+                  <Link to="/dashboard" className="hb hb-p">Buka Dashboard →</Link>
+                ) : (
+                  <>
+                    <button className="hb hb-p" onClick={() => openAuth('login')}>Masuk ke Platform →</button>
+                    <button className="hb hb-o" onClick={() => openAuth('register')}>Minta Akses</button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="hero-bottom">
-            <p className="hero-desc">
-              Platform terpusat untuk simulasi, profiling, dan analitik — dibangun khusus untuk tim trainer agar bekerja lebih cepat dan tepat sasaran.
-            </p>
-            <div className="hero-cta">
-              {isCheckingAuth ? null : isLoggedIn ? (
-                <Link to="/dashboard" className="hb hb-p">Buka Dashboard →</Link>
-              ) : (
-                <>
-                  <button className="hb hb-p" onClick={() => openAuth('login')}>Masuk ke Platform →</button>
-                  <button className="hb hb-o" onClick={() => openAuth('register')}>Minta Akses</button>
-                </>
-              )}
+          
+          <div className="hero-right hero-stack">
+            <div className="stack-card card-ketik">
+              <div className="sc-header">
+                <span className="sc-dot" style={{background: '#3B82F6'}}></span>
+                <span className="sc-title">KETIK Session</span>
+              </div>
+              <div className="sc-body">
+                <div className="sc-chat-bubble incoming">Selamat siang, saya ingin melaporkan petugas penagih yang mengancam saya.</div>
+                <div className="sc-chat-bubble outgoing typing">
+                  <span className="sc-dot-typing"></span><span className="sc-dot-typing"></span><span className="sc-dot-typing"></span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="stack-card card-pdkt">
+               <div className="sc-header">
+                <span className="sc-dot" style={{background: '#A855F7'}}></span>
+                <span className="sc-title">PDKT Draft</span>
+              </div>
+              <div className="sc-body sc-body-email">
+                <div className="sc-email-header">
+                  <div className="sc-email-field"><span className="sc-email-label">To:</span> konsumen@gmail.com</div>
+                  <div className="sc-email-field"><span className="sc-email-label">Sub:</span> Tindak Lanjut Konsumen #L1234</div>
+                </div>
+                <div className="sc-email-content">
+                  <p className="sc-email-text">Yth. Bapak/Ibu Konsumen,</p>
+                  <p className="sc-email-text">Sesuai dengan kewenangan dan tugasnya, OJK mengawasi Lembaga Jasa Keuangan (LJK) di sektor perbankan, pasar modal, lembaga keuangan non bank (seperti: asuransi, dana pensiun, perusahaan pembiayaan, dll).</p>
+                  <p className="sc-email-text dim">Hormat kami, Tim Layanan</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="stack-card card-telefun">
+               <div className="sc-header">
+                <span className="sc-dot" style={{background: '#10B981'}}></span>
+                <span className="sc-title">TELEFUN Call</span>
+              </div>
+              <div className="sc-body sc-body-call">
+                <div className="sc-call-info">
+                  <div className="sc-call-avatar">
+                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  </div>
+                  <div className="sc-call-name">Konsumen</div>
+                  <div className="sc-call-time">02:45 <span>•</span> Live</div>
+                </div>
+                <div className="sc-call-actions">
+                  <div className="sc-call-btn">
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                  </div>
+                  <div className="sc-call-btn end">
+                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path><line x1="22" y1="2" x2="2" y2="22"></line></svg>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
