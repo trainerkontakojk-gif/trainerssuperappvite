@@ -369,22 +369,6 @@
   background: var(--surface);
   color: var(--fg);
 }
-.am-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 100px;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--fg);
-  margin-bottom: 20px;
-}
 .am-title {
   font-family: 'Outfit', sans-serif;
   font-size: 32px;

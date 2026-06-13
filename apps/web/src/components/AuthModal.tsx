@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, ArrowRight, Loader2, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
 import {
@@ -348,14 +348,6 @@ export default function AuthModal({
                 transition={{ duration: 0.25 }}
               >
                 <div className="mb-6">
-                  <div className="am-badge">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {mode === "login"
-                      ? "Masuk aman"
-                      : mode === "register"
-                        ? "Permintaan akses"
-                        : "Pemulihan akun"}
-                  </div>
                   <h2 className="am-title">{content.title}</h2>
                   <p className="am-desc">{content.description}</p>
                 </div>
