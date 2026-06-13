@@ -92,6 +92,19 @@ const MANAGEMENT_LINKS = [
   },
 ];
 
+const MOBILE_TAB_IDS = [
+  "dashboard",
+  "ketik",
+  "pdkt",
+  "telefun",
+  "profiler",
+  "qa-analyzer",
+] as const;
+
+const MOBILE_TABS = APP_MODULES.filter((module) =>
+  MOBILE_TAB_IDS.some((id) => id === module.id),
+);
+
 function getHeaderContent(pathname: string) {
   if (pathname === "/dashboard") {
     return { eyebrow: "Dashboard Terpadu", title: "Pusat Kendali" };
@@ -177,6 +190,23 @@ export function DashboardLayoutContent() {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [sidakOpen, setSidakOpen] = useState(pathname.startsWith("/sidak"));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const effectiveIsCollapsed = isSidebarCollapsed && !isSidebarHovered;
   const isPublicRoute = [
@@ -481,7 +511,7 @@ export function DashboardLayoutContent() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
         {/* Sticky Glass Header */}
         {!pathname.startsWith("/profiler") && (
           <header className="sticky top-0 z-30 border-b border-border/40 bg-background/70 backdrop-blur-xl shrink-0">
@@ -505,11 +535,63 @@ export function DashboardLayoutContent() {
 
               <div className="flex items-center gap-3">
                 <ThemeToggle />
-                <div
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary"
-                  title={profile?.full_name || "User"}
-                >
-                  {userInitial}
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary hover:bg-primary/20 active:scale-95 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
+                    title={profile?.full_name || "User"}
+                    aria-expanded={userMenuOpen}
+                    aria-haspopup="true"
+                  >
+                    {userInitial}
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-border/40 bg-card/90 p-1.5 shadow-lg shadow-black/5 backdrop-blur-xl ring-1 ring-black/5 focus:outline-none animate-in fade-in slide-in-from-top-1 duration-200 z-50">
+                      <div className="px-3 py-2 border-b border-border/40 mb-1">
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Signed in as</p>
+                        <p className="text-sm font-semibold truncate text-foreground" title={profile?.email || session?.user?.email}>
+                          {profile?.email || session?.user?.email}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Role: {normalizeRoleLabel(profile?.role)}</p>
+                      </div>
+                      
+                      <Link
+                        to="/account"
+                        className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition cursor-pointer"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <UserCog className="h-4 w-4 shrink-0" />
+                        <span>Akun</span>
+                      </Link>
+
+                      <button
+                        onClick={() => {
+                          setTheme(theme === "dark" ? "light" : "dark");
+                          setUserMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition cursor-pointer text-left"
+                      >
+                        {theme === "dark" ? (
+                          <Sun className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <Moon className="h-4 w-4 shrink-0" />
+                        )}
+                        <span>Tema {theme === "dark" ? "Terang" : "Gelap"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-500/10 transition cursor-pointer text-left font-medium"
+                      >
+                        <LogOut className="h-4 w-4 shrink-0" />
+                        <span>Keluar</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -537,6 +619,50 @@ export function DashboardLayoutContent() {
           )}
         </section>
       </main>
+
+      {/* Bottom Tab Bar — Mobile Only */}
+      <nav
+        aria-label="Navigasi modul utama"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border/40 bg-background/90 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-xl lg:hidden"
+      >
+        <div className="flex h-14 items-center justify-around px-2">
+          {MOBILE_TABS.filter((tab) =>
+            isRoleAllowed(profile?.role, tab.allowedRoles),
+          ).map((tab) => {
+            const isTabActive =
+              tab.id === "dashboard"
+                ? pathname === tab.href
+                : pathname.startsWith(tab.href);
+
+            return (
+              <Link
+                key={tab.id}
+                to={tab.href as any}
+                aria-current={isTabActive ? "page" : undefined}
+                onClick={(event) => {
+                  if (tab.id === "telefun" && !hasTelefunAccess) {
+                    event.preventDefault();
+                    openMaintenance();
+                    return;
+                  }
+
+                  setMobileMenuOpen(false);
+                }}
+                className={`flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-1 transition-colors duration-200 ${
+                  isTabActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <tab.icon aria-hidden="true" className="h-5 w-5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  {tab.shortTitle}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       <MaintenanceModal isOpen={isMaintenanceOpen} role={profile?.role} />
     </div>
