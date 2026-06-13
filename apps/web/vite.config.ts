@@ -16,6 +16,7 @@ export default defineConfig({
   },
   server: {
     port: appPort,
+    allowedHosts: [".trycloudflare.com", ".lhr.life"],
     proxy: {
       "/api": {
         target: "http://localhost:3001",

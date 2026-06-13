@@ -23,7 +23,9 @@ const allowedOrigins =
     ? env.ALLOWED_ORIGINS?.split(",")
         .map((o) => o.trim())
         .filter(Boolean) || []
-    : ["http://localhost:3000", "http://localhost:3005"];
+    : (env.ALLOWED_ORIGINS?.split(",")
+        .map((o) => o.trim())
+        .filter(Boolean)) || ["http://localhost:3000", "http://localhost:3005"];
 
 if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.warn(
