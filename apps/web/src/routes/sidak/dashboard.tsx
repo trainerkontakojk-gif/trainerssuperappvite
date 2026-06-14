@@ -1,6 +1,14 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useApi } from "../../hooks/useApi";
-import type { DashboardData } from "@trainers/types";
+import { sidakClient, unwrapResponse } from "../../lib/api";
+import { notify } from "../../lib/toast";
+import type {
+  DashboardData,
+  SidakBatchForecastSnapshot,
+  SidakForecastLookupResult,
+  SidakForecastLookupStatus,
+  SidakForecastSeries,
+} from "@trainers/types";
 import {
   BarChart3,
   RefreshCw,
@@ -14,11 +22,13 @@ import {
   Sparkles,
   ArrowUp,
 } from "lucide-react";
+import { ForecastActionButton } from "../../components/sidak/ForecastActionButton";
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
 import { SERVICE_LABELS } from "../../lib/scoring";
 import { buildParetoViewModel } from "../../components/sidak/pareto-view-model";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
+import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
 import ParetoChart from "../../components/sidak/ParetoChart";
 import FatalDonutChart from "../../components/sidak/FatalDonutChart";
 import TopAgentsTable from "../../components/sidak/TopAgentsTable";
@@ -78,6 +88,12 @@ export default function SidakDashboardPage() {
     new Date().getMonth() + 1,
   );
   const [hiddenParams, setHiddenParams] = useState<Set<string> | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastStatus, setForecastStatus] =
+    useState<SidakForecastLookupStatus>("missing");
+  const [forecastResult, setForecastResult] =
+    useState<SidakBatchForecastSnapshot | null>(null);
+  const forecastRequestId = useRef(0);
 
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
@@ -93,12 +109,142 @@ export default function SidakDashboardPage() {
     `/sidak/dashboard?${queryParams}`,
   );
 
-  const availableServices = data?.availableServices ?? [];
-  const availableYears = data?.availableYears ?? [new Date().getFullYear()];
   const folders = (data?.folders ?? []).map((f: any) => ({
     id: f.id ?? "",
     nama: f.name ?? f.nama ?? "",
   }));
+
+  const paramTrendDatasets = data?.paramTrend?.datasets;
+  const defaultHiddenParams = useMemo(() => {
+    const next = new Set<string>();
+    for (const ds of paramTrendDatasets ?? []) {
+      if (!ds.isTotal) next.add(ds.label);
+    }
+    return next;
+  }, [paramTrendDatasets]);
+
+  const activeHiddenParams = hiddenParams ?? defaultHiddenParams;
+
+  const forecastFilters = useMemo(
+    () => ({
+      year: selectedYear,
+      serviceType: selectedService === "all" ? undefined : selectedService,
+      folderIds: selectedFolder === "ALL" ? undefined : [selectedFolder],
+      periodIds: (data?.periods ?? [])
+        .filter(
+          (period) =>
+            period.year === selectedYear &&
+            (!startMonth || period.month >= startMonth) &&
+            (!endMonth || period.month <= endMonth),
+        )
+        .map((period) => period.id),
+    }),
+    [
+      data?.periods,
+      selectedYear,
+      selectedService,
+      selectedFolder,
+      startMonth,
+      endMonth,
+    ],
+  );
+
+  const requestForecast = useCallback(
+    async (options: { forceRefresh?: boolean; cacheOnly?: boolean }) => {
+      if (!data || data.paramTrend.labels.length < 2) {
+        setForecastResult(null);
+        setForecastStatus("missing");
+        return null;
+      }
+      const requestId = ++forecastRequestId.current;
+      const response = await sidakClient.dashboard.forecast.$post({
+        json: {
+          filters: forecastFilters,
+          horizonMonths: 3,
+          forceRefresh: options.forceRefresh ?? false,
+          cacheOnly: options.cacheOnly ?? false,
+        },
+      });
+      const result = (await unwrapResponse(
+        response,
+      )) as SidakForecastLookupResult;
+      if (requestId === forecastRequestId.current) {
+        setForecastResult(result.snapshot);
+        setForecastStatus(result.status);
+      }
+      return result;
+    },
+    [data, forecastFilters],
+  );
+
+  const handleUpdateForecast = async () => {
+    if (!data || data.paramTrend.labels.length < 2) {
+      notify.error("Data tidak cukup untuk melakukan prediksi.");
+      return;
+    }
+
+    setForecastLoading(true);
+    try {
+      await requestForecast({ forceRefresh: true });
+    } catch (err: any) {
+      console.error("Forecast error:", err);
+      notify.error(err.message || "Gagal memperbarui prediksi.");
+    } finally {
+      setForecastLoading(false);
+    }
+  };
+
+  const forecastLookupKey = useMemo(
+    () =>
+      JSON.stringify({
+        filters: forecastFilters,
+        labels: data?.paramTrend.labels ?? [],
+        datasets: (data?.paramTrend.datasets ?? []).map((dataset) => ({
+          label: dataset.label,
+          data: dataset.data,
+        })),
+      }),
+    [forecastFilters, data?.paramTrend],
+  );
+
+  useEffect(() => {
+    if (!data || data.paramTrend.labels.length < 2) {
+      setForecastResult(null);
+      setForecastStatus("missing");
+      return;
+    }
+    void requestForecast({ cacheOnly: true }).catch((error) => {
+      console.error("Forecast cache lookup error:", error);
+    });
+  }, [forecastLookupKey, data, requestForecast]);
+
+  const visibleForecastParameters = useMemo(
+    () =>
+      (data?.paramTrend.datasets ?? []).filter(
+        (dataset) =>
+          !dataset.isTotal && !activeHiddenParams.has(dataset.label),
+      ),
+    [data?.paramTrend.datasets, activeHiddenParams],
+  );
+
+  const selectedForecastSeries: SidakForecastSeries | null = useMemo(() => {
+    if (!forecastResult) return null;
+    if (visibleForecastParameters.length === 1) {
+      return (
+        forecastResult.series.parameters[
+          visibleForecastParameters[0].label
+        ] ?? null
+      );
+    }
+    return forecastResult.series.total;
+  }, [forecastResult, visibleForecastParameters]);
+  const totalForecastSummary = forecastResult?.series.total.summary;
+
+  const availableServices = useMemo(
+    () => data?.availableServices ?? [],
+    [data?.availableServices],
+  );
+  const availableYears = data?.availableYears ?? [new Date().getFullYear()];
 
   // Normalize invalid selections
   useEffect(() => {
@@ -124,17 +270,6 @@ export default function SidakDashboardPage() {
     if (availableServices.length === 1) return availableServices[0];
     return null;
   }, [availableServices]);
-
-  const paramTrendDatasets = data?.paramTrend?.datasets;
-  const defaultHiddenParams = useMemo(() => {
-    const next = new Set<string>();
-    for (const ds of paramTrendDatasets ?? []) {
-      if (!ds.isTotal) next.add(ds.label);
-    }
-    return next;
-  }, [paramTrendDatasets]);
-
-  const activeHiddenParams = hiddenParams ?? defaultHiddenParams;
 
   const isAllShown = activeHiddenParams.size === 0;
 
@@ -379,13 +514,22 @@ export default function SidakDashboardPage() {
                     <LineChart className="w-5 h-5 shrink-0 text-muted-foreground" />
                     <div>
                       <h2 className="font-outfit text-lg font-bold">
-                        Tren Kualitas & Parameter
+                        Tren Kualitas, Parameter & Forecast
                       </h2>
                       <p className="text-sm text-muted-foreground">
                         Fluktuasi temuan berdasarkan parameter QA
                       </p>
                     </div>
                   </div>
+
+                  <ForecastActionButton
+                    status={forecastStatus}
+                    loading={forecastLoading}
+                    disabled={
+                      forecastLoading || !data || data.paramTrend.labels.length < 2
+                    }
+                    onClick={handleUpdateForecast}
+                  />
                 </div>
 
                 {!data.paramTrend || !data.paramTrend.labels?.length ? (
@@ -445,15 +589,29 @@ export default function SidakDashboardPage() {
                         />
                       </button>
                     </div>
-                    <div className="h-[360px] w-full mt-2">
+                    <div className="h-[360px] w-full mt-2 relative">
+                      {forecastLoading && (
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-surface/50 backdrop-blur-[1px] rounded-xl">
+                          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        </div>
+                      )}
                       <ParamTrendChart
                         labels={data.paramTrend.labels}
                         datasets={data.paramTrend.datasets}
                         showParameters={true}
                         hiddenKeys={activeHiddenParams}
                         hideTotal={hasVisibleParam}
+                        forecastResult={selectedForecastSeries}
                       />
                     </div>
+
+                    {forecastResult && totalForecastSummary && (
+                      <ForecastInsightPanel
+                        forecastResult={forecastResult}
+                        summary={totalForecastSummary}
+                        horizonMonths={forecastResult.series.total.forecast.length}
+                      />
+                    )}
                   </>
                 )}
               </div>
