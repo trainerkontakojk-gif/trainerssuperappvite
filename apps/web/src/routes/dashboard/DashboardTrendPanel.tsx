@@ -416,16 +416,16 @@ export default function DashboardTrendPanel({
       </div>
 
       {/* Performance Summary Panel */}
-      <div className="rounded-[2rem] border border-primary/20 bg-primary/95 text-primary-foreground p-6 flex flex-col shadow-2xl shadow-primary/10 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+      <div className="rounded-[2rem] border border-border bg-surface-sunken text-fg p-6 flex flex-col shadow-xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
-        <h2 className="font-display text-lg font-bold tracking-tight mb-4 relative z-10">
+        <h2 className="font-display text-lg font-bold tracking-tight mb-4 relative z-10 text-fg">
           Ringkasan Performa
         </h2>
         <div className="flex-1 flex flex-col justify-center gap-4 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
-              <Activity className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
+              <Activity className="w-6 h-6 text-primary" />
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -457,7 +457,7 @@ export default function DashboardTrendPanel({
                 ([svc, stats]) => (
                   <div
                     key={svc}
-                    className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex flex-col items-start gap-0.5 min-w-[70px]"
+                    className="px-3 py-1.5 rounded-xl bg-surface/50 border border-border flex flex-col items-start gap-0.5 min-w-[70px]"
                   >
                     <span className="text-[8px] uppercase tracking-tighter opacity-60 font-bold">
                       {SERVICE_LABELS[svc] || svc}
@@ -473,7 +473,7 @@ export default function DashboardTrendPanel({
 
           {selectedService === "all" && (
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
+              <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
                 <Target className="w-6 h-6" />
               </div>
               <div>
@@ -488,7 +488,7 @@ export default function DashboardTrendPanel({
           )}
 
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10">
+            <div className="w-12 h-12 rounded-2xl bg-surface border border-border flex items-center justify-center">
               <Users className="w-6 h-6" />
             </div>
             <div>
@@ -501,7 +501,7 @@ export default function DashboardTrendPanel({
             </div>
           </div>
 
-          <div className="mt-2 p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10">
+          <div className="mt-2 p-4 rounded-2xl bg-surface/50 border border-border">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium opacity-80">
                 Status Saat Ini
@@ -515,7 +515,7 @@ export default function DashboardTrendPanel({
           </div>
 
           {topParameter && (
-            <div className="mt-2 pt-4 border-t border-white/10 relative overflow-hidden">
+            <div className="mt-2 pt-4 border-t border-border relative overflow-hidden">
               <div className="flex items-start gap-3 relative z-10">
                 <div className="w-8 h-8 rounded-xl bg-amber-400/20 flex items-center justify-center border border-amber-400/20 shrink-0">
                   <AlertCircle className="w-4 h-4 text-amber-400" />

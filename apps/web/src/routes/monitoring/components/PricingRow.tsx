@@ -31,11 +31,12 @@ export function PricingRow({
       </td>
       <td className="px-6 py-3.5">
         <span
-          className={`inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-            entry.provider === "gemini"
-              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
-              : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-          }`}
+          className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+          style={{
+            backgroundColor: entry.provider === "gemini" ? 'var(--module-ketik-bg)' : 'var(--chart-amber)',
+            color: entry.provider === "gemini" ? 'var(--module-ketik)' : 'white',
+            border: entry.provider === "gemini" ? '1px solid var(--module-ketik-bg)' : 'none'
+          }}
         >
           {entry.provider}
         </span>

@@ -95,11 +95,9 @@ export default function AgentCard({ agent, index }: AgentCardProps) {
     <Link
       to="/sidak/agents/$id"
       params={{ id: agent.id }}
-      className="group relative block overflow-hidden rounded-[2rem] border border-border/50 bg-card/40 p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)] backdrop-blur-sm transition-all duration-300 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/10"
+      className="group relative block rounded-2xl border border-border bg-surface p-5 transition-all duration-200 hover:border-foreground/20"
       style={{ animationDelay: `${index * 0.05}s` }}
     >
-      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/5 blur-2xl transition-all duration-300 group-hover:bg-primary/20" />
-
       <div className="flex items-start justify-between">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/50">
           {agent.foto_url ? (
@@ -115,12 +113,15 @@ export default function AgentCard({ agent, index }: AgentCardProps) {
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div
-            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 ${BADGE_CLASSES[riskKey]}`}
+            className={`inline-flex items-center ${
+              riskKey === "atRisk"
+                ? "text-rose-500"
+                : riskKey === "compliant"
+                  ? "text-emerald-500"
+                  : "text-muted-foreground"
+            }`}
           >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${DOT_CLASSES[riskKey]} ${riskKey === "none" ? "" : "animate-pulse"}`}
-            />
-            <span className="text-[9px] font-black uppercase tracking-[0.14em]">
+            <span className="text-[10px] font-black uppercase tracking-wider">
               {riskKey === "atRisk"
                 ? "At Risk"
                 : riskKey === "compliant"

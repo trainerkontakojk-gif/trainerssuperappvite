@@ -57,21 +57,21 @@ function PdktAssessment({ entry }: { entry: UnifiedHistoryEntry }) {
         </span>
         <span className="text-muted-foreground/30">·</span>
         {ev.typos_count > 0 ? (
-          <span className="inline-flex items-center font-medium text-amber-600 dark:text-amber-500">
+          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-amber)' }}>
             {ev.typos_count} typo
           </span>
         ) : (
-          <span className="inline-flex items-center font-medium text-emerald-600 dark:text-emerald-500">
+          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-green)' }}>
             Tanpa typo
           </span>
         )}
         <span className="text-muted-foreground/30">·</span>
         {ev.clarity_issues_count > 0 ? (
-          <span className="inline-flex items-center font-medium text-amber-600 dark:text-amber-500">
+          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-amber)' }}>
             {ev.clarity_issues_count} kejelasan
           </span>
         ) : (
-          <span className="inline-flex items-center font-medium text-emerald-600 dark:text-emerald-500">
+          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-green)' }}>
             Jelas
           </span>
         )}
@@ -110,7 +110,7 @@ function TelefunAssessment({ entry }: { entry: UnifiedHistoryEntry }) {
         <span className="text-muted-foreground/30">·</span>
         <span className="flex items-center gap-0.5">
           <span>Filler</span>:
-          <span className={`font-semibold ${ta.filler_words_count > 3 ? "text-amber-600 dark:text-amber-500" : "text-foreground"}`}>{ta.filler_words_count}</span>
+          <span className="font-semibold" style={{ color: ta.filler_words_count > 3 ? 'var(--chart-amber)' : 'inherit' }}>{ta.filler_words_count}</span>
         </span>
       </div>
       {ta.emotional_tone && (

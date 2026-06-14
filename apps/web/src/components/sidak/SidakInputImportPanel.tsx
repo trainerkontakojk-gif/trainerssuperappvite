@@ -39,11 +39,11 @@ export default function SidakInputImportPanel({
   const hasDuplicateError = invalidRows.some((r) => r.error.toLowerCase().includes("duplicate"));
 
   return (
-    <div className="bg-card rounded-2xl border border-primary/20 overflow-hidden shadow-xl">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-primary/5">
+    <div className="bg-surface rounded-xl border border-border overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/20">
         <div className="flex items-center gap-2">
-          <FileSpreadsheet className="w-5 h-5 text-primary" />
-          <p className="font-bold">Import dari Excel</p>
+          <FileSpreadsheet className="w-5 h-5 text-muted-foreground" />
+          <p className="font-semibold text-foreground">Import dari Excel</p>
         </div>
         <button onClick={onClose} className="p-2 rounded-lg hover:bg-foreground/5 text-muted-foreground">
           <X className="w-5 h-5" />
@@ -55,8 +55,8 @@ export default function SidakInputImportPanel({
           <button
             key={tab}
             onClick={() => onSetImportTab(tab)}
-            className={`flex-1 py-3 text-xs font-bold transition-colors ${
-              importTab === tab ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"
+            className={`flex-1 py-3 text-xs font-semibold uppercase tracking-wide transition-colors ${
+              importTab === tab ? "text-foreground border-b-2 border-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {tab === "download" ? "Download Template" : "Upload & Preview"}
@@ -67,28 +67,28 @@ export default function SidakInputImportPanel({
       <div className="p-6 space-y-6">
         {importTab === "download" ? (
           <div className="space-y-4">
-            <div className="bg-blue-500/10 rounded-2xl p-4 border border-blue-500/20">
-              <p className="text-xs font-bold text-blue-500 mb-2">Cara menggunakan template</p>
+            <div className="bg-blue-500/5 rounded-xl p-4 border border-blue-500/20">
+              <p className="text-xs font-semibold text-blue-600 mb-2">Cara menggunakan template</p>
               <ul className="space-y-1.5 text-xs text-muted-foreground">
                 <li className="flex items-start gap-2">
-                  <span className="font-black mt-0.5">·</span>
-                  Sheet <strong>Input Temuan</strong>: isi no. tiket, pilih parameter, isi nilai 0–3
+                  <span className="font-semibold mt-0.5">·</span>
+                  <span>Sheet <strong>Input Temuan</strong>: isi no. tiket, pilih parameter, isi nilai 0–3</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="font-black mt-0.5">·</span>
-                  Parameter dengan nilai 3 (Sesuai) tidak perlu diisi
+                  <span className="font-semibold mt-0.5">·</span>
+                  <span>Parameter dengan nilai 3 (Sesuai) tidak perlu diisi</span>
                 </li>
               </ul>
             </div>
             <button
               onClick={onDownloadTemplate}
               disabled={generatingTemplate || disabled}
-              className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all"
             >
               {generatingTemplate ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4" />
               )}
               {generatingTemplate ? "Menyiapkan..." : "Download Template"}
             </button>
@@ -101,30 +101,30 @@ export default function SidakInputImportPanel({
         ) : (
           <div className="space-y-4">
             <label
-              className={`flex flex-col items-center justify-center gap-4 py-12 border-2 border-dashed rounded-2xl transition-all ${
+              className={`flex flex-col items-center justify-center gap-4 py-12 border border-dashed rounded-xl transition-all ${
                 disabled
                   ? "border-border bg-foreground/5 opacity-50 cursor-not-allowed"
                   : importFile
-                  ? "border-primary/40 bg-primary/5 cursor-pointer"
-                  : "border-border hover:border-primary/30 cursor-pointer"
+                  ? "border-foreground/35 bg-foreground/5 cursor-pointer"
+                  : "border-border hover:border-foreground/30 cursor-pointer"
               }`}
             >
               <input type="file" accept=".xlsx,.xls" className="hidden" onChange={onFileUpload} disabled={disabled} />
               {parsing ? (
-                <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-foreground/20 border-t-foreground rounded-full animate-spin" />
               ) : importFile ? (
                 <>
-                  <FileSpreadsheet className="w-10 h-10 text-primary" />
+                  <FileSpreadsheet className="w-8 h-8 text-muted-foreground" />
                   <div className="text-center">
-                    <p className="font-semibold">{importFile.name}</p>
+                    <p className="font-semibold text-foreground text-sm">{importFile.name}</p>
                     <p className="text-xs text-muted-foreground mt-1">Klik untuk ganti file</p>
                   </div>
                 </>
               ) : (
                 <>
-                  <Upload className="w-10 h-10 text-muted-foreground" />
+                  <Upload className="w-8 h-8 text-muted-foreground" />
                   <div className="text-center">
-                    <p className="font-semibold text-muted-foreground">Pilih file Excel</p>
+                    <p className="font-semibold text-muted-foreground text-sm">Pilih file Excel</p>
                     <p className="text-xs text-muted-foreground mt-1">.xlsx atau .xls</p>
                   </div>
                 </>
@@ -139,19 +139,19 @@ export default function SidakInputImportPanel({
             {importRows.length > 0 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-green-500/10 rounded-xl p-3 text-center border border-green-500/20">
-                    <p className="text-xl font-black text-green-500">{validRows.length}</p>
-                    <p className="text-[10px] text-green-500 font-bold">Siap import</p>
+                  <div className="bg-emerald-500/5 rounded-lg p-3 text-center border border-emerald-500/20">
+                    <p className="text-xl font-bold text-emerald-600">{validRows.length}</p>
+                    <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide">Siap import</p>
                   </div>
                   {invalidRows.length > 0 && (
-                    <div className="bg-red-500/10 rounded-xl p-3 text-center border border-red-500/20">
-                      <p className="text-xl font-black text-red-500">{invalidRows.length}</p>
-                      <p className="text-[10px] text-red-500 font-bold">Error</p>
+                    <div className="bg-red-500/5 rounded-lg p-3 text-center border border-red-500/20">
+                      <p className="text-xl font-bold text-red-650">{invalidRows.length}</p>
+                      <p className="text-[10px] text-red-650 font-semibold uppercase tracking-wide">Error</p>
                     </div>
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-border overflow-hidden max-h-60 overflow-y-auto">
+                <div className="rounded-xl border border-border overflow-hidden max-h-60 overflow-y-auto">
                   {importRows.map((row) => (
                     <div
                       key={row.rowNum}
@@ -166,11 +166,11 @@ export default function SidakInputImportPanel({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             {row.no_tiket && (
-                              <span className="text-[10px] font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] font-mono font-semibold text-foreground bg-muted px-1.5 py-0.5 rounded">
                                 {row.no_tiket}
                               </span>
                             )}
-                            <span className="text-xs font-semibold truncate">
+                            <span className="text-xs font-semibold text-foreground truncate">
                               {row.paramName || "—"}
                             </span>
                             {row.nilai !== null && (
@@ -192,8 +192,8 @@ export default function SidakInputImportPanel({
                 </div>
 
                 {hasDuplicateError && (
-                  <div className="bg-red-500/10 rounded-xl p-3 text-center border border-red-500/20">
-                    <p className="text-xs font-bold text-red-500">Hapus baris duplicate sebelum import</p>
+                  <div className="bg-red-500/5 rounded-lg p-3 text-center border border-red-500/25">
+                    <p className="text-xs font-semibold text-red-600">Hapus baris duplicate sebelum import</p>
                   </div>
                 )}
 
@@ -201,12 +201,12 @@ export default function SidakInputImportPanel({
                   <button
                     onClick={onImportSave}
                     disabled={importing}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all"
                   >
                     {importing ? (
-                      <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
                     ) : (
-                      <Check className="w-5 h-5" />
+                      <Check className="w-4 h-4" />
                     )}
                     {importing ? "Menyimpan..." : `Import ${validRows.length} Temuan`}
                   </button>

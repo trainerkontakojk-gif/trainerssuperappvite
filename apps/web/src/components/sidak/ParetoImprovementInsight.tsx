@@ -20,9 +20,7 @@ export default function ParetoImprovementInsight({ insight, serviceLabel }: Prop
       className="mt-4 rounded-xl border border-orange-500/20 bg-orange-500/5 p-4"
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
-          <Target className="h-4 w-4 text-orange-500" aria-hidden="true" />
-        </div>
+        <Target className="h-4 w-4 shrink-0 text-orange-500 mt-0.5" aria-hidden="true" />
         <div className="min-w-0 flex-1 space-y-2">
           <h3
             id="pareto-insight-title"

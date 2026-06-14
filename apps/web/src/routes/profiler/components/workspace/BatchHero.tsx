@@ -21,38 +21,31 @@ export default function BatchHero({
   onPickPeserta
 }: BatchHeroProps) {
   return (
-    <div className="relative overflow-hidden rounded-[3rem] bg-primary p-8 md:p-12 text-primary-foreground shadow-2xl shadow-primary/20">
-      {/* Decorative background */}
-      <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
-        <svg viewBox="0 0 400 400" className="w-full h-full">
-          <circle cx="400" cy="0" r="400" fill="white" />
-        </svg>
-      </div>
-      
+    <div className="relative overflow-hidden rounded-2xl bg-surface p-8 md:p-10 text-fg border border-border shadow-sm">
       <div className="relative z-10 flex flex-col md:flex-row items-start md:items-end justify-between gap-8">
-        <div className="space-y-4 max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 backdrop-blur-md">
-            <Layers size={12} className="text-white/80" />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Active Workspace</span>
+        <div className="space-y-6 max-w-xl">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-background border border-border">
+            <Layers size={11} className="text-fg2" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg2">Active Workspace</span>
           </div>
           
-          <h2 className="text-5xl font-black tracking-tighter leading-[0.8] drop-shadow-sm">
+          <h2 className="text-4xl md:text-5xl font-outfit font-bold tracking-tight text-fg leading-none">
             {name}
           </h2>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-8">
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Registered Data</span>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black tracking-tighter">{count}</span>
-                <span className="text-xs font-bold text-white/60">Participants</span>
-                {loading && <Loader2 size={14} className="animate-spin text-white/40" />}
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">Registered Data</span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-4xl md:text-5xl font-mono font-bold tracking-tight">{count}</span>
+                <span className="text-xs font-medium text-fg2">Participants</span>
+                {loading && <Loader2 size={12} className="animate-spin text-fg3" />}
               </div>
             </div>
-            <div className="w-px h-8 bg-white/10" />
+            <div className="hidden sm:block w-px h-10 bg-border" />
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Access Mode</span>
-              <span className="text-xs font-black uppercase tracking-widest text-white/80">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">Access Mode</span>
+              <span className="text-xs font-semibold text-fg mt-1">
                 {isReadOnly ? 'Read Only' : 'Full Control'}
               </span>
             </div>
@@ -60,28 +53,23 @@ export default function BatchHero({
         </div>
 
         {!isReadOnly && (
-          <div className="flex flex-col sm:flex-row items-stretch gap-3 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch gap-2 w-full md:w-auto">
             <button
               onClick={onPickPeserta}
-              className="flex items-center justify-center gap-3 px-6 py-4 bg-white text-primary rounded-[1.5rem] text-sm font-black uppercase tracking-widest shadow-xl shadow-black/10 hover:scale-105 active:scale-95 transition-all"
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-inv-bg text-inv-fg rounded-lg text-xs font-medium hover:opacity-90 transition-all duration-150"
             >
-              <UserPlus size={18} />
+              <UserPlus size={16} />
               Import Context
             </button>
             <button
               onClick={onAddPeserta}
-              className="flex items-center justify-center gap-3 px-6 py-4 bg-white/10 border border-white/20 backdrop-blur-md text-white rounded-[1.5rem] text-sm font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+              className="flex items-center justify-center gap-2 px-5 py-3 bg-transparent text-fg border border-border rounded-lg text-xs font-medium hover:bg-background transition-colors duration-150"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               New Entry
             </button>
           </div>
         )}
-      </div>
-      
-      {/* Floating accent icon */}
-      <div className="absolute -bottom-6 -right-6 opacity-5 rotate-12 scale-[3] pointer-events-none">
-        <Layers size={100} />
       </div>
     </div>
   );

@@ -345,11 +345,11 @@ export default function SidakInputPage() {
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="mx-auto max-w-6xl space-y-6">
           {/* COMPACT BREADCRUMB */}
-          <div className="flex items-center gap-1 text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap overflow-x-auto pb-1">
+          <div className="flex items-center gap-1 text-[10px] md:text-xs font-semibold uppercase tracking-wide whitespace-nowrap overflow-x-auto pb-1">
             <button
               type="button"
               onClick={() => resetToStep("folder")}
-              className={`transition-colors shrink-0 ${step === "folder" ? "text-primary" : "text-muted-foreground/60 hover:text-primary"}`}
+              className={`transition-colors shrink-0 ${step === "folder" ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
             >
               Folder
             </button>
@@ -358,7 +358,7 @@ export default function SidakInputPage() {
               type="button"
               onClick={() => selectedFolder && resetToStep("agent")}
               disabled={!selectedFolder}
-              className={`transition-colors truncate max-w-[120px] ${step === "agent" ? "text-primary" : selectedFolder ? "text-muted-foreground hover:text-primary" : "text-muted-foreground/30"}`}
+              className={`transition-colors truncate max-w-[120px] ${step === "agent" ? "text-foreground" : selectedFolder ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/30"}`}
             >
               {selectedFolder || "Agen"}
             </button>
@@ -369,7 +369,7 @@ export default function SidakInputPage() {
                   type="button"
                   onClick={() => selectedAgent && resetToStep("period")}
                   disabled={!selectedAgent}
-                  className={`transition-colors truncate max-w-[120px] ${step === "period" ? "text-primary" : selectedAgent ? "text-muted-foreground hover:text-primary" : "text-muted-foreground/30"}`}
+                  className={`transition-colors truncate max-w-[120px] ${step === "period" ? "text-foreground" : selectedAgent ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/30"}`}
                 >
                   {selectedAgent?.nama || "Agen"}
                 </button>
@@ -378,7 +378,7 @@ export default function SidakInputPage() {
             {selectedAgent && (
               <>
                 <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-                <span className={`truncate max-w-[120px] ${step === "list" ? "text-primary" : "text-muted-foreground/60"}`}>
+                <span className={`truncate max-w-[120px] ${step === "list" ? "text-foreground" : "text-muted-foreground/60"}`}>
                   {selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : "Periode"}
                 </span>
               </>
@@ -392,7 +392,7 @@ export default function SidakInputPage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 text-sm flex items-center gap-2"
+                className="p-3.5 rounded-lg bg-red-500/5 border border-red-500/25 text-red-650 text-sm flex items-center gap-2"
               >
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {errorMsg}
@@ -403,7 +403,7 @@ export default function SidakInputPage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 text-sm flex items-center gap-2"
+                className="p-3.5 rounded-lg bg-green-500/5 border border-green-500/25 text-emerald-600 text-sm flex items-center gap-2"
               >
                 <Check className="w-4 h-4 shrink-0" />
                 {successMsg}
@@ -420,8 +420,8 @@ export default function SidakInputPage() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <FolderOpen className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg font-bold text-foreground/90">
+                  <FolderOpen className="w-5 h-5 text-muted-foreground" />
+                  <h2 className="font-outfit text-lg font-bold text-foreground">
                     Pilih Folder
                   </h2>
                 </div>
@@ -436,10 +436,10 @@ export default function SidakInputPage() {
                     setTemuan([]);
                     setStep("folder");
                   }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wide transition-all border border-border ${
                     showAllData
-                      ? "bg-amber-500 text-white border-amber-500"
-                      : "bg-background border-border/50 text-muted-foreground hover:border-amber-400"
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-background text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   {showAllData ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -479,8 +479,8 @@ export default function SidakInputPage() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <UserIcon className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg font-bold text-foreground/90">
+                  <UserIcon className="w-5 h-5 text-muted-foreground" />
+                  <h2 className="font-outfit text-lg font-bold text-foreground">
                     Pilih Agen
                   </h2>
                 </div>
@@ -489,8 +489,8 @@ export default function SidakInputPage() {
               {loading ? (
                 <SidakSelectionGrid testId="agent-selection-skeleton">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="min-h-32 rounded-2xl border border-border bg-card/50 p-5 animate-pulse">
-                      <div className="h-11 w-11 rounded-xl bg-foreground/10" />
+                    <div key={i} className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse">
+                      <div className="h-11 w-11 rounded bg-foreground/10" />
                       <div className="mt-5 h-3 w-28 rounded bg-foreground/10" />
                       <div className="mt-2 h-2.5 w-20 rounded bg-foreground/10" />
                     </div>
@@ -529,8 +529,8 @@ export default function SidakInputPage() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg font-bold text-foreground/90">
+                  <CalendarDays className="w-5 h-5 text-muted-foreground" />
+                  <h2 className="font-outfit text-lg font-bold text-foreground">
                     Pilih Periode
                   </h2>
                 </div>
@@ -539,8 +539,8 @@ export default function SidakInputPage() {
               {loading ? (
                 <SidakSelectionGrid testId="period-selection-skeleton">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="min-h-32 rounded-2xl border border-border bg-card/50 p-5 animate-pulse">
-                      <div className="h-11 w-11 rounded-xl bg-foreground/10" />
+                    <div key={i} className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse">
+                      <div className="h-11 w-11 rounded bg-foreground/10" />
                       <div className="mt-5 h-3 w-24 rounded bg-foreground/10" />
                       <div className="mt-2 h-2.5 w-16 rounded bg-foreground/10" />
                     </div>
@@ -584,11 +584,11 @@ export default function SidakInputPage() {
                     <button
                       type="button"
                       onClick={() => resetToStep("period")}
-                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-foreground/5 rounded-lg transition-colors"
+                      className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <h1 className="text-2xl font-extrabold tracking-tight text-foreground/90">
+                    <h1 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
                       Daftar Temuan
                     </h1>
                   </div>
@@ -611,7 +611,7 @@ export default function SidakInputPage() {
                           importHook.setImportRows([]);
                           importHook.setImportFile(null);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border border-border text-foreground hover:bg-muted text-xs font-semibold uppercase tracking-wide transition-colors"
                       >
                         <Upload className="w-3.5 h-3.5" /> Import
                       </button>
@@ -622,8 +622,8 @@ export default function SidakInputPage() {
                           disabled={formHook.saving || formHook.hasBadFindings}
                           className={
                             formHook.hasBadFindings
-                              ? "flex items-center gap-1.5 px-3 py-2 rounded-xl bg-muted text-muted-foreground text-xs font-bold cursor-not-allowed opacity-50"
-                              : "flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/20"
+                              ? "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-semibold uppercase tracking-wide cursor-not-allowed opacity-50"
+                              : "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-background border border-border hover:bg-muted text-emerald-600 text-xs font-semibold uppercase tracking-wide transition-colors"
                           }
                           title={
                             formHook.hasBadFindings
@@ -638,7 +638,7 @@ export default function SidakInputPage() {
                       <button
                         type="button"
                         onClick={() => formHook.setShowForm(true)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:opacity-90 transition-opacity"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold uppercase tracking-wide hover:opacity-90 transition-all"
                       >
                         <Plus className="w-3.5 h-3.5" /> Tambah
                       </button>
@@ -648,19 +648,19 @@ export default function SidakInputPage() {
               </div>
 
               {/* Konfigurasi Audit card */}
-              <div className="bg-card rounded-2xl border border-border p-5 shadow-sm">
-                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">
+              <div className="bg-surface rounded-xl border border-border p-5">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">
                   Konfigurasi Audit
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground block mb-1.5">
                       Layanan Audit
                     </label>
                     <select
                       value={selectedService}
                       onChange={(e) => handleServiceChange(e.target.value as QAIndicator["service_type"])}
-                      className="w-full px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none"
+                      className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground cursor-pointer"
                     >
                       {SERVICE_TYPES.map((st) => (
                         <option key={st} value={st}>
@@ -670,10 +670,10 @@ export default function SidakInputPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground block mb-1.5">
                       Tim Agent
                     </label>
-                    <div className="px-3 py-2 rounded-xl border border-border bg-muted/20 text-sm text-foreground/70">
+                    <div className="flex items-center h-10 px-3 rounded-lg border border-border bg-background text-sm text-muted-foreground">
                       {selectedAgent?.tim || selectedAgent?.batch_name || '-'}
                     </div>
                   </div>
@@ -693,7 +693,7 @@ export default function SidakInputPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm flex items-center gap-2"
+                  className="p-3.5 rounded-lg bg-amber-500/5 border border-amber-500/25 text-amber-600 font-medium text-sm flex items-center gap-2"
                 >
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   Ada draft parameter yang belum dipublikasikan. Input temuan saat ini menggunakan parameter versi terakhir yang published.
@@ -704,7 +704,7 @@ export default function SidakInputPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 text-sm flex items-center gap-2"
+                  className="p-3.5 rounded-lg bg-amber-500/5 border border-amber-500/25 text-amber-600 font-medium text-sm flex items-center gap-2"
                 >
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   Belum ada parameter yang berlaku untuk {SERVICE_LABELS[selectedService]} pada periode ini. Cek Settings QA untuk mempublish parameter yang sesuai.
@@ -712,7 +712,7 @@ export default function SidakInputPage() {
               )}
 
               {/* Info bar */}
-              <div className="p-3 rounded-xl bg-card/50 border border-border text-sm text-muted-foreground flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-surface border border-border text-sm text-muted-foreground flex items-center gap-3">
                 <span>Total temuan: <strong className="text-foreground">{temuan.length}</strong></span>
                 <span className="text-muted-foreground/30">|</span>
                 <span>Group: <strong className="text-foreground">{groupedTemuan.length}</strong></span>
@@ -795,7 +795,7 @@ export default function SidakInputPage() {
                     <button
                       type="button"
                       onClick={() => formHook.setShowForm(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold"
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-foreground text-background text-xs font-semibold uppercase tracking-wide"
                     >
                       <Plus className="w-3.5 h-3.5" /> Tambah Temuan
                     </button>

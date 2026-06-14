@@ -55,13 +55,7 @@ export default function ParamTrendChart({
     <div className="h-full w-full animate-in fade-in duration-700">
       <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-          <defs>
-            <linearGradient id="totalTrendGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.05} />
           <XAxis
             dataKey="name"
             axisLine={false}
@@ -79,7 +73,7 @@ export default function ParamTrendChart({
               borderRadius: "8px",
               border: "1px solid var(--border)",
               backgroundColor: "var(--card)",
-              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              boxShadow: "none",
               fontSize: "12px",
               fontWeight: "500",
               color: "var(--foreground)",
@@ -100,12 +94,12 @@ export default function ParamTrendChart({
                   type="monotone"
                   dataKey={`dataset_${i}`}
                   stroke={color}
-                  strokeWidth={isFiltered ? 4 : 2}
+                  strokeWidth={isFiltered ? 2.5 : 1.5}
                   fill={color}
-                  fillOpacity={isFiltered ? 0.3 : 0.15}
+                  fillOpacity={isFiltered ? 0.15 : 0.05}
                   isAnimationActive={true}
                   animationDuration={1000}
-                  dot={isFiltered ? { r: 4, fill: "hsl(var(--card))", strokeWidth: 2, stroke: color } : false}
+                  dot={isFiltered ? { r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: color } : false}
                   connectNulls
                 />
               );
@@ -122,14 +116,14 @@ export default function ParamTrendChart({
                 name={ds.label}
                 type="monotone"
                 dataKey={`dataset_${i}`}
-                stroke="hsl(var(--primary))"
-                strokeWidth={4}
-                fill="url(#totalTrendGradient)"
-                fillOpacity={1}
+                stroke="var(--primary)"
+                strokeWidth={2.5}
+                fill="var(--primary)"
+                fillOpacity={0.06}
                 isAnimationActive={true}
                 animationDuration={1500}
-                dot={{ r: 4, fill: "hsl(var(--card))", strokeWidth: 2, stroke: "hsl(var(--primary))" }}
-                activeDot={{ r: 6, strokeWidth: 0, fill: "hsl(var(--primary))" }}
+                dot={{ r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: "var(--primary)" }}
+                activeDot={{ r: 5, strokeWidth: 0, fill: "var(--primary)" }}
                 connectNulls
               />
             );

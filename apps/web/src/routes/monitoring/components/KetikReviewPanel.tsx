@@ -247,9 +247,9 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             </summary>
             <div className="flex items-center gap-4 mt-3 flex-wrap">
               {[
-                { range: "90-100", label: "Sangat Baik", color: "text-emerald-600" },
-                { range: "75-89", label: "Baik", color: "text-sky-600" },
-                { range: "60-74", label: "Cukup", color: "text-amber-600" },
+                { range: "90-100", label: "Sangat Baik", color: "text-chart-green" },
+                { range: "75-89", label: "Baik", color: "text-chart-blue" },
+                { range: "60-74", label: "Cukup", color: "text-chart-amber" },
                 { range: "<60", label: "Perlu Coaching", color: "text-rose-600" },
               ].map((r) => (
                 <span key={r.label} className={`text-xs ${r.color} font-semibold`}>
@@ -278,13 +278,13 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
           <div className="grid md:grid-cols-2 gap-6">
             <section className="space-y-3">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-chart-green" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Kekuatan</h3>
               </div>
               <div className="space-y-2">
                 {data.review.strengths.map((str, i) => (
-                  <div key={i} className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                    <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <div key={i} className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-muted border border-border">
+                    <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--chart-green)' }} />
                     {str}
                   </div>
                 ))}
@@ -321,7 +321,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                     <div key={typo.id} className="flex items-center justify-between p-3 hover:bg-foreground/5 rounded-lg transition-colors">
                       <div className="flex items-center gap-3">
                         <span className="text-xs line-through text-muted-foreground">{typo.originalWord}</span>
-                        <span className="text-xs font-bold text-emerald-500">&rarr; {typo.correctedWord}</span>
+                        <span className="text-xs font-bold text-chart-green">&rarr; {typo.correctedWord}</span>
                       </div>
                       <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${typo.severity === "critical" ? "bg-rose-500 text-white" : typo.severity === "medium" ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"}`}>
                         {typo.severity}

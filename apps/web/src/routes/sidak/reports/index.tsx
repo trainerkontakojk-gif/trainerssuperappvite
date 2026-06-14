@@ -27,21 +27,21 @@ export default function SidakReportsLanding() {
 
   return (
     <main className="flex flex-1 flex-col overflow-hidden">
-      <header className="relative z-20 flex shrink-0 flex-col items-start justify-between gap-4 border-b border-border/50 bg-background/80 px-4 py-4 backdrop-blur-xl sm:h-28 sm:flex-row sm:items-center sm:px-6 sm:py-0 lg:px-10">
+      <header className="relative z-20 flex shrink-0 flex-col items-start justify-between gap-4 border-b border-border bg-background/95 px-4 py-4 backdrop-blur-sm sm:h-28 sm:flex-row sm:items-center sm:px-6 sm:py-0 lg:px-10">
         <div>
           <Link
             to="/sidak/dashboard"
-            className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary"
+            className="mb-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-3 w-3" /> Dashboard SIDAK
           </Link>
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             <FileText className="h-3 w-3" /> SIDAK
           </div>
-          <h1 className="text-3xl font-black tracking-tighter text-foreground">
+          <h1 className="font-outfit text-3xl font-black tracking-tight text-foreground">
             Menu Laporan
           </h1>
-          <p className="mt-1 text-xs text-foreground/50">
+          <p className="mt-1 text-xs text-muted-foreground">
             Pilih jenis laporan yang ingin Anda akses.
           </p>
         </div>
@@ -51,14 +51,13 @@ export default function SidakReportsLanding() {
         <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-6 md:grid-cols-2">
           {/* Laporan Data Card */}
           <motion.div
-            whileHover={{ y: -5 }}
-            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-border/50 bg-card/40 p-8 backdrop-blur-sm transition-all hover:bg-card/60"
+            whileHover={{ y: -2 }}
+            className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-foreground/20"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-500">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted border border-border text-muted-foreground group-hover:bg-foreground group-hover:text-background transition-colors">
               <Database className="h-8 w-8" />
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-foreground">
+            <h2 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
               Laporan Data
             </h2>
             <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
@@ -69,7 +68,7 @@ export default function SidakReportsLanding() {
             <div className="mt-8">
               <Link
                 to="/sidak/reports-data"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-foreground text-background px-6 text-xs font-black uppercase tracking-widest transition-all hover:opacity-90 group-hover:gap-3"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-foreground text-background px-6 text-xs font-semibold uppercase tracking-wide transition-all hover:opacity-90 group-hover:gap-3"
               >
                 Masuk ke Workspace <ArrowRight className="h-4 w-4" />
               </Link>
@@ -78,18 +77,17 @@ export default function SidakReportsLanding() {
 
           {/* Laporan AI Card */}
           <motion.div
-            whileHover={{ y: -5 }}
+            whileHover={{ y: -2 }}
             onClick={handleAiClick}
-            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-border/50 bg-card/40 p-8 backdrop-blur-sm transition-all hover:bg-card/60 cursor-pointer"
+            className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-foreground/20 cursor-pointer"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-amber-500/10 border border-amber-500/20 text-amber-500 relative">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted border border-border text-muted-foreground group-hover:bg-foreground group-hover:text-background transition-colors relative">
               <Sparkles className="h-8 w-8" />
-              <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">
+              <span className="absolute -top-1 -right-1 bg-foreground text-background text-[8px] font-semibold px-1.5 py-0.5 rounded-full border border-border">
                 AI
               </span>
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-foreground">
+            <h2 className="font-outfit text-2xl font-bold tracking-tight text-foreground">
               Laporan AI
             </h2>
             <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
@@ -97,7 +95,7 @@ export default function SidakReportsLanding() {
               laporan dalam format HTML, DOCX, atau PDF.
             </p>
             <div className="mt-8">
-              <span className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-amber-500/20 text-amber-500 px-6 text-xs font-black uppercase tracking-widest transition-all group-hover:gap-3">
+              <span className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-foreground/10 text-foreground px-6 text-xs font-semibold uppercase tracking-wide transition-all group-hover:gap-3">
                 Masuk ke Workspace <ArrowRight className="h-4 w-4" />
               </span>
             </div>
@@ -116,13 +114,13 @@ export default function SidakReportsLanding() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-card w-full max-w-md mx-4 rounded-[2rem] p-8 border border-border shadow-2xl"
+              className="bg-surface w-full max-w-md mx-4 rounded-2xl p-8 border border-border"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-6">
-                <AlertTriangle className="h-8 w-8 text-amber-500" />
+              <div className="mx-auto w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center mb-6 text-muted-foreground">
+                <AlertTriangle className="h-8 w-8" />
               </div>
-              <h3 className="text-xl font-black text-foreground text-center mb-3">
+              <h3 className="font-outfit text-xl font-bold text-foreground text-center mb-3">
                 Akses Terbatas & Notifikasi Biaya
               </h3>
               <p className="text-sm text-muted-foreground text-center leading-relaxed mb-8">
@@ -133,13 +131,13 @@ export default function SidakReportsLanding() {
               <div className="flex flex-col gap-2">
                 <button
                   onClick={handleContinueAi}
-                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-sm transition-all"
+                  className="w-full py-3 bg-foreground hover:opacity-90 text-background rounded-xl font-semibold text-sm transition-all"
                 >
                   Tetap Lanjutkan
                 </button>
                 <button
                   onClick={() => setShowWarning(false)}
-                  className="w-full py-4 bg-foreground/5 hover:bg-foreground/10 text-foreground rounded-2xl font-bold text-sm transition-all"
+                  className="w-full py-3 bg-transparent border border-border hover:bg-muted text-foreground rounded-xl font-semibold text-sm transition-all"
                 >
                   Kembali
                 </button>

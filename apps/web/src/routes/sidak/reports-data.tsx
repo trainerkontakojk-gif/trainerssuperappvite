@@ -98,7 +98,7 @@ export default function SidakReportsData() {
 
           {/* Filters */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-card/40 backdrop-blur-2xl border border-white/20 rounded-[2rem] shadow-xl p-6 space-y-4"
+            className="rounded-2xl border border-border bg-surface p-6 space-y-4"
           >
             {/* Mode Toggle */}
             <div className="flex items-center gap-4">
@@ -194,10 +194,10 @@ export default function SidakReportsData() {
           {/* Results */}
           {results && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              className="bg-card/40 backdrop-blur-2xl border border-white/20 rounded-[2rem] shadow-xl overflow-hidden"
+              className="rounded-2xl border border-border bg-surface overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-border/50 bg-foreground/5 flex items-center justify-between">
-                <p className="text-sm font-bold text-foreground/80">
+              <div className="px-6 py-4 border-b border-border bg-muted/50 flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">
                   {results.length} temuan ditemukan
                 </p>
               </div>
@@ -210,16 +210,16 @@ export default function SidakReportsData() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-white/50 dark:bg-black/20">
-                          <th className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">Layanan</th>
-                          <th className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">Periode</th>
-                          <th className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">Agen</th>
-                          <th className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">Parameter</th>
-                          <th className="text-left px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">Temuan</th>
-                          <th className="text-center px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">Skor</th>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Layanan</th>
+                          <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Periode</th>
+                          <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Agen</th>
+                          <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Parameter</th>
+                          <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temuan</th>
+                          <th className="text-center px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Skor</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                      <tbody className="divide-y divide-border">
                         {results.slice((page - 1) * pageSize, page * pageSize).map((r: any, i: number) => (
                           <tr key={r.id || i} className="hover:bg-primary/5 transition-colors">
                             <td className="px-6 py-4 text-foreground/80">{SERVICE_LABELS[r.service_type] || r.service_type}</td>

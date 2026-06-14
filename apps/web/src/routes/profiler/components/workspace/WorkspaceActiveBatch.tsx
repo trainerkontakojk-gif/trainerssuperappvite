@@ -90,21 +90,20 @@ export default function WorkspaceActiveBatch({
         >
           {/* Data Management Section */}
           {!isReadOnly && (
-            <section className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-primary rounded-full" />
-                <h3 className="text-xl font-black tracking-tight uppercase">Manajemen Data</h3>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-outfit font-bold text-fg">Manajemen Data</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <ActionToolTile 
-                  icon={<Plus size={24} />}
+                  icon={<Plus size={20} />}
                   accent="primary"
                   title="Input Manual"
                   desc="Antarmuka input manual untuk pendaftaran peserta baru satu per satu."
                   onClick={() => navigate({ to: `/profiler/add`, search: { batch: batchName } })}
                 />
                 <ActionToolTile 
-                  icon={<Upload size={24} />}
+                  icon={<Upload size={20} />}
                   accent="telefun"
                   title="Impor Data"
                   desc="Unggah dataset eksternal (Excel) untuk integrasi data massal."
@@ -115,15 +114,14 @@ export default function WorkspaceActiveBatch({
           )}
 
           {/* Analysis & Export Section */}
-          <section className="space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-6 bg-module-profiler rounded-full" />
-              <h3 className="text-xl font-black tracking-tight uppercase">Analisis & Ekspor</h3>
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-outfit font-bold text-fg">Analisis & Ekspor</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <ActionToolTile 
                 disabled={!hasPeserta}
-                icon={<Table2 size={24} />}
+                icon={<Table2 size={20} />}
                 accent="primary"
                 title="Database"
                 desc="Tabel database interaktif untuk audit dan manajemen data."
@@ -131,7 +129,7 @@ export default function WorkspaceActiveBatch({
               />
               <ActionToolTile 
                 disabled={!hasPeserta}
-                icon={<SlidersHorizontal size={24} />}
+                icon={<SlidersHorizontal size={20} />}
                 accent="pdkt"
                 title="Slide Profil"
                 desc="Visualisasi profil dalam format slide presentasi otomatis."
@@ -139,7 +137,7 @@ export default function WorkspaceActiveBatch({
               />
               <ActionToolTile 
                 disabled={!hasPeserta}
-                icon={<Download size={24} />}
+                icon={<Download size={20} />}
                 accent="sidak"
                 title="Ekspor Laporan"
                 desc="Generate dokumen PDF/Excel untuk laporan resmi."
@@ -147,7 +145,7 @@ export default function WorkspaceActiveBatch({
               />
               <ActionToolTile 
                 disabled={!hasPeserta}
-                icon={<PieChart size={24} />}
+                icon={<PieChart size={20} />}
                 accent="telefun"
                 title="Statistik Batch"
                 desc="Distribusi data dan statistik demografi batch aktif."
@@ -158,14 +156,13 @@ export default function WorkspaceActiveBatch({
 
           {/* Configuration Section */}
           {!isReadOnly && (
-            <section className="space-y-6 opacity-60 hover:opacity-100 transition-opacity duration-500">
-              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-muted-foreground/30 rounded-full" />
-                <h3 className="text-xl font-black tracking-tight uppercase text-muted-foreground/60">Konfigurasi</h3>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-outfit font-bold text-fg">Konfigurasi</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ActionToolTile 
-                  icon={<Settings2 size={24} />}
+                  icon={<Settings2 size={20} />}
                   accent="slate"
                   title="Manajemen Tim"
                   desc="Atur daftar tim dan parameter organisasi modul."

@@ -38,18 +38,21 @@ export interface TemuanGroupCardProps {
 }
 
 const NILAI_OPTIONS = [
-  { v: 0, label: "0", active: "bg-rose-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-  { v: 1, label: "1", active: "bg-orange-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-  { v: 2, label: "2", active: "bg-amber-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
-  { v: 3, label: "3", active: "bg-green-500 text-white border-transparent", inactive: "bg-gray-50 dark:bg-white/[0.04] border-gray-200 dark:border-white/10 text-gray-400 dark:text-gray-500" },
+  { v: 0, label: "0", active: "bg-rose-500/15 text-rose-600 border-rose-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 1, label: "1", active: "bg-orange-500/15 text-orange-600 border-orange-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 2, label: "2", active: "bg-amber-500/15 text-amber-600 border-amber-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
+  { v: 3, label: "3", active: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30", inactive: "bg-background border-border text-muted-foreground hover:bg-muted" },
 ];
 
-const NILAI_BADGE: Record<number, string> = {
-  0: "bg-rose-500", 1: "bg-orange-500", 2: "bg-amber-500", 3: "bg-green-500",
+const NILAI_BADGE_STYLE: Record<number, string> = {
+  0: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+  1: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  2: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  3: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
 };
 
 const NILAI_LABEL_COLOR: Record<number, string> = {
-  0: "text-red-500", 1: "text-orange-500", 2: "text-amber-500", 3: "text-green-500",
+  0: "text-rose-500", 1: "text-orange-500", 2: "text-amber-500", 3: "text-emerald-500",
 };
 
 export default function TemuanGroupCard({
@@ -59,18 +62,18 @@ export default function TemuanGroupCard({
   setEditNilai, setEditKetidaksesuaian, setEditSebaiknya,
 }: TemuanGroupCardProps) {
   return (
-    <article className="min-w-0 border border-border rounded-2xl overflow-hidden bg-card shadow-sm">
+    <article className="min-w-0 border border-border rounded-xl overflow-hidden bg-surface">
       {/* Session header */}
-      <div className="flex items-center gap-3 px-5 py-3 bg-foreground/[0.02] border-b border-border">
-        <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0 font-black text-[10px]">
+      <div className="flex items-center gap-3 px-5 py-2.5 bg-muted/20 border-b border-border">
+        <div className="w-6 h-6 rounded bg-foreground text-background flex items-center justify-center flex-shrink-0 font-semibold text-[10px]">
           {gIdx + 1}
         </div>
         {group.label ? (
-          <span className="text-xs font-mono font-bold text-primary">{group.label}</span>
+          <span className="text-xs font-mono font-semibold text-foreground">{group.label}</span>
         ) : (
           <span className="text-xs text-muted-foreground italic">Tanpa no. tiket</span>
         )}
-        <span className="text-[10px] text-muted-foreground ml-auto font-bold uppercase tracking-wider">
+        <span className="text-[10px] text-muted-foreground ml-auto font-semibold uppercase tracking-wide">
           {group.items.length} temuan
         </span>
       </div>
@@ -83,40 +86,40 @@ export default function TemuanGroupCard({
           return (
             <div key={item.id} className="p-5">
               {isEditing ? (
-                <div className="mt-0 p-4 rounded-2xl bg-primary/5 border border-primary/10 space-y-4">
-                  <p className="text-xs font-bold text-primary uppercase tracking-wider">Edit Temuan</p>
+                <div className="mt-0 p-4 rounded-xl bg-background/50 border border-border space-y-4">
+                  <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Edit Temuan</p>
                   <div>
-                    <label className="text-[10px] font-bold text-muted-foreground mb-2 block uppercase tracking-wider">Nilai</label>
+                    <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wide">Nilai</label>
                     <div className="grid grid-cols-4 gap-2">
                       {NILAI_OPTIONS.map((opt) => (
                         <button
                           key={opt.v}
                           type="button"
                           onClick={() => setEditNilai(opt.v)}
-                          className={`py-2 rounded-xl border-2 transition-all text-center ${editNilai === opt.v ? opt.active : opt.inactive}`}
+                          className={`py-2 rounded-lg border transition-all text-center ${editNilai === opt.v ? opt.active : opt.inactive}`}
                         >
-                          <p className="text-base font-black">{opt.label}</p>
+                          <p className="text-base font-semibold">{opt.label}</p>
                         </button>
                       ))}
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-[10px] font-bold text-muted-foreground mb-2 block uppercase tracking-wider">Ketidaksesuaian</label>
+                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wide">Ketidaksesuaian</label>
                       <textarea
                         value={editKetidaksesuaian}
                         onChange={(e) => setEditKetidaksesuaian(e.target.value)}
                         rows={2}
-                        className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                        className="w-full bg-transparent border border-border rounded-lg px-3 py-1.5 text-xs outline-none focus:border-foreground text-foreground resize-none"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-muted-foreground mb-2 block uppercase tracking-wider">Sebaiknya</label>
+                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wide">Sebaiknya</label>
                       <textarea
                         value={editSebaiknya}
                         onChange={(e) => setEditSebaiknya(e.target.value)}
                         rows={2}
-                        className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                        className="w-full bg-transparent border border-border rounded-lg px-3 py-1.5 text-xs outline-none focus:border-foreground text-foreground resize-none"
                       />
                     </div>
                   </div>
@@ -124,14 +127,14 @@ export default function TemuanGroupCard({
                     <button
                       type="button"
                       onClick={() => onSaveEdit(item.id)}
-                      className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold flex items-center justify-center gap-2"
+                      className="flex-1 py-2 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all flex items-center justify-center gap-2"
                     >
                       <Check className="w-4 h-4" /> Simpan
                     </button>
                     <button
                       type="button"
                       onClick={onCancelEdit}
-                      className="px-4 py-2.5 bg-foreground/5 text-muted-foreground rounded-xl font-bold text-xs"
+                      className="px-4 py-2 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-lg text-xs font-semibold uppercase tracking-wide transition"
                     >
                       Batal
                     </button>
@@ -145,7 +148,7 @@ export default function TemuanGroupCard({
                         {indicatorLabelMap.get(item.indicator_id) ?? item.indicator_id.slice(0, 8)}
                       </span>
                       {cat && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isCritical ? "bg-red-500/10 text-red-500" : "bg-blue-500/10 text-blue-500"}`}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${isCritical ? "bg-red-500/5 text-red-600 border-red-500/20" : "bg-blue-500/5 text-blue-600 border-blue-500/20"}`}>
                           {isCritical ? "Critical" : "Non-Critical"}
                         </span>
                       )}
@@ -153,13 +156,13 @@ export default function TemuanGroupCard({
                     <div className="space-y-1">
                       {item.ketidaksesuaian && (
                         <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/70">Ketidaksesuaian: </span>
+                          <span className="font-semibold text-foreground/70">Ketidaksesuaian: </span>
                           {item.ketidaksesuaian}
                         </p>
                       )}
                       {item.sebaiknya && (
                         <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/70">Sebaiknya: </span>
+                          <span className="font-semibold text-foreground/70">Sebaiknya: </span>
                           {item.sebaiknya}
                         </p>
                       )}
@@ -167,10 +170,10 @@ export default function TemuanGroupCard({
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="text-center">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${NILAI_BADGE[item.nilai]}`}>
+                      <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-semibold ${NILAI_BADGE_STYLE[item.nilai]}`}>
                         {item.nilai}
                       </div>
-                      <p className={`text-[9px] font-bold uppercase mt-1 ${NILAI_LABEL_COLOR[item.nilai]}`}>
+                      <p className={`text-[9px] font-semibold uppercase mt-1 ${NILAI_LABEL_COLOR[item.nilai]}`}>
                         {NILAI_LABELS[item.nilai]}
                       </p>
                     </div>
@@ -179,7 +182,7 @@ export default function TemuanGroupCard({
                         <button
                           type="button"
                           onClick={() => onStartEdit(item)}
-                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Pencil className="w-4 h-4" />

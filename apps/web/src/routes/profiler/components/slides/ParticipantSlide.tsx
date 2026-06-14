@@ -24,13 +24,13 @@ const Cell = ({
 }) => (
   <div className="flex flex-col gap-1">
     <div className="flex items-center gap-1.5">
-      {Icon && <Icon className="h-3 w-3 text-muted-foreground" />}
-      <span className="text-[9px] font-bold uppercase leading-none tracking-widest text-muted-foreground">
+      {Icon && <Icon className="h-3 w-3 text-fg3" />}
+      <span className="text-[9px] font-semibold uppercase leading-none tracking-widest text-fg3">
         {label}
       </span>
     </div>
     <span
-      className={`text-xs font-semibold leading-tight text-gray-900 dark:text-gray-100 ${
+      className={`text-xs font-semibold leading-tight text-fg ${
         multiline ? "break-words whitespace-normal" : "truncate"
       }`}
     >
@@ -52,29 +52,13 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
   const theme = timTheme(p.tim || "");
 
   const renderPolishedContent = (p: ProfilerPeserta) => {
-    const headlineGradient = {
-      background: `linear-gradient(160deg, ${theme.accent}14 0%, ${theme.accent}08 36%, transparent 100%)`,
-    };
-
     return (
-      <div
-        className="relative flex flex-1 overflow-hidden"
-        style={headlineGradient}
-      >
-        <div
-          className="absolute -left-20 -top-20 h-56 w-56 rounded-full blur-3xl"
-          style={{ background: `${theme.accent}24` }}
-        />
-        <div className="bg-primary/10 absolute -right-20 bottom-[-7rem] h-64 w-64 rounded-full blur-3xl" />
-
+      <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
         <div className="relative z-10 box-border flex flex-1 flex-col gap-5 overflow-y-auto p-7">
-          <section className="bg-card/80 dark:border-white/10 dark:bg-card/55 rounded-[1.5rem] border border-white/45 p-5 shadow-lg backdrop-blur-xl">
+          <section className="bg-surface border border-border rounded-xl p-5">
             <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[132px_1fr]">
               {p.foto_url ? (
-                <div
-                  className="ring-card relative h-40 w-40 overflow-hidden rounded-[2rem] shadow-xl ring-[5px]"
-                  style={{ boxShadow: `0 10px 24px ${theme.accent}32` }}
-                >
+                <div className="relative h-32 w-32 overflow-hidden rounded-xl border border-border">
                   <img
                     src={p.foto_url}
                     alt={p.nama || ""}
@@ -87,11 +71,9 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
                 </div>
               ) : (
                 <div
-                  className="ring-card flex h-40 w-40 items-center justify-center rounded-[2rem] text-5xl font-black shadow-lg ring-[5px]"
+                  className="flex h-32 w-32 items-center justify-center rounded-xl text-5xl font-semibold bg-surface border border-border"
                   style={{
-                    background: theme.light,
-                    color: theme.accent,
-                    border: `1px solid ${theme.accent}40`,
+                    color: "var(--fg2)",
                   }}
                 >
                   {p.nama?.charAt(0)}
@@ -99,26 +81,23 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
               )}
 
               <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-[0.24em]"
-                  style={{ color: theme.accent }}
-                >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-fg3">
                   Portrait A4
                 </p>
-                <h3 className="text-foreground mt-2 text-3xl font-black leading-tight tracking-tight">
+                <h3 className="text-fg mt-2 text-2xl font-bold leading-tight tracking-tight">
                   {p.nama}
                 </h3>
-                <p className="text-muted-foreground mt-2 text-[11px] font-bold uppercase tracking-[0.2em]">
+                <p className="text-fg2 mt-2 text-[11px] font-medium uppercase tracking-[0.2em]">
                   {labelJabatan[p.jabatan || ""] || p.jabatan} · {theme.label}
                 </p>
-                <div className="text-muted-foreground mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-[0.15em]">
-                  <span className="border-border/50 bg-background/75 rounded-full border px-2.5 py-1">
+                <div className="text-fg2 mt-3 flex flex-wrap gap-2 text-[10px] font-medium uppercase tracking-[0.15em]">
+                  <span className="border-border bg-surface rounded-lg border px-2.5 py-1">
                     Masa dinas:{" "}
                     {p.bergabung_date
                       ? hitungMasaDinas(p.bergabung_date)
                       : "-"}
                   </span>
-                  <span className="border-border/50 bg-background/75 rounded-full border px-2.5 py-1">
+                  <span className="border-border bg-surface rounded-lg border px-2.5 py-1">
                     Usia: {p.tgl_lahir ? `${hitungUsia(p.tgl_lahir)} tahun` : "-"}
                   </span>
                 </div>
@@ -126,14 +105,11 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
             </div>
           </section>
 
-          <section className="bg-card/80 dark:border-white/10 dark:bg-card/55 rounded-[1.5rem] border border-white/45 p-5 shadow-lg backdrop-blur-xl">
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.24em]"
-              style={{ color: theme.accent }}
-            >
+          <section className="bg-surface border border-border rounded-xl p-5">
+            <p className="text-fg font-semibold text-[10px] uppercase tracking-[0.24em] mb-4">
               Identitas dan Kontak
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Cell label="Email OJK" value={p.email_ojk} />
               <Cell label="No. Telepon" value={p.no_telepon} />
               <Cell
@@ -149,11 +125,11 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
             </div>
           </section>
 
-          <section className="border-border bg-muted/10 rounded-[1.5rem] border p-5 shadow-lg">
-            <p className="text-primary text-[10px] font-bold uppercase tracking-[0.24em]">
+          <section className="bg-surface border border-border rounded-xl p-5">
+            <p className="text-fg text-[10px] font-semibold uppercase tracking-[0.24em] mb-4">
               Data Pribadi dan Latar Belakang
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Cell label="Jenis Kelamin" value={p.jenis_kelamin} />
               <Cell label="Status Perkawinan" value={p.status_perkawinan} />
               <Cell label="Agama" value={p.agama} />
@@ -170,11 +146,11 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
             </div>
           </section>
 
-          <section className="bg-destructive/10 border-destructive/20 rounded-[1.5rem] border p-5 shadow-sm">
-            <p className="text-destructive text-[10px] font-bold uppercase tracking-[0.24em]">
+          <section className="bg-surface border border-border rounded-xl p-5">
+            <p className="text-fg text-[10px] font-semibold uppercase tracking-[0.24em] mb-4">
               Data Sensitif
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Cell label="No. KTP" value={p.no_ktp} />
               <Cell label="No. NPWP" value={p.no_npwp} />
               <Cell
@@ -196,19 +172,19 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
           </section>
 
           <section className="grid grid-cols-1 gap-4 pb-1 sm:grid-cols-2">
-            <div className="bg-amber-500/10 border-amber-500/25 rounded-[1.4rem] border p-4 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-400">
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-fg2">
                 Catatan Tambahan
               </p>
-              <p className="text-foreground/85 mt-2 text-sm leading-6">
+              <p className="text-fg2 mt-2 text-sm leading-6">
                 {p.catatan_tambahan || "Tidak ada catatan tambahan."}
               </p>
             </div>
-            <div className="border-border/55 bg-card/75 rounded-[1.4rem] border p-4 shadow-sm">
-              <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.24em]">
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <p className="text-fg2 text-[10px] font-semibold uppercase tracking-[0.24em]">
                 Keterangan Internal
               </p>
-              <p className="text-foreground/80 mt-2 text-sm leading-6">
+              <p className="text-fg2 mt-2 text-sm leading-6">
                 {p.keterangan || "Tidak ada keterangan internal."}
               </p>
             </div>
@@ -220,14 +196,11 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
 
   if (slideMode === "original") {
     return (
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
         {/* LEFT SIDEBAR 30% */}
-        <div className="bg-muted/20 border-border/40 flex w-[30%] shrink-0 flex-col items-center gap-6 overflow-y-auto border-r box-border px-6 pb-12 pt-8">
+        <div className="bg-surface border-border flex w-[30%] shrink-0 flex-col items-center gap-6 overflow-y-auto border-r box-border px-6 pb-12 pt-8">
           {p.foto_url ? (
-            <div
-              className="ring-card relative h-32 w-32 shrink-0 overflow-hidden rounded-[2rem] shadow-lg ring-[6px]"
-              style={{ boxShadow: `0 8px 24px ${theme.accent}30` }}
-            >
+            <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-xl border border-border">
               <img
                 src={p.foto_url}
                 alt={p.nama || ""}
@@ -238,11 +211,9 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
             </div>
           ) : (
             <div
-              className="ring-card flex h-32 w-32 shrink-0 items-center justify-center rounded-[2rem] text-4xl font-bold shadow-md ring-[6px]"
+              className="flex h-32 w-32 shrink-0 items-center justify-center rounded-xl text-4xl font-semibold bg-surface border border-border"
               style={{
-                background: theme.light,
-                color: theme.accent,
-                border: `1px solid ${theme.accent}40`,
+                color: "var(--fg2)",
               }}
             >
               {p.nama?.charAt(0)}
@@ -250,35 +221,26 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
           )}
 
           <div className="w-full shrink-0 text-center">
-            <h2 className="text-foreground truncate text-2xl font-black leading-tight tracking-tight">
+            <h2 className="text-fg truncate text-xl font-bold leading-tight tracking-tight">
               {p.nama}
             </h2>
-            <p
-              className="mt-1 text-[10px] font-bold uppercase tracking-widest opacity-80"
-              style={{ color: theme.accent }}
-            >
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-fg2">
               {labelJabatan[p.jabatan || ""] || p.jabatan}
             </p>
-            <div
-              className="bg-card border-border/40 mt-3 inline-flex items-center gap-2 rounded-full border px-3 py-1 font-bold shadow-sm"
-              style={{ fontSize: "9px", color: theme.accent }}
-            >
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ background: theme.accent }}
-              />
+            <div className="bg-surface border-border mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-1 font-semibold text-[9px] text-fg2">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-fg2" />
               {theme.label}
             </div>
           </div>
 
-          <div className="bg-card border-border/40 w-full shrink-0 rounded-3xl border p-4 text-center shadow-sm">
-            <p className="text-muted-foreground mb-1 text-[9px] font-bold uppercase tracking-[0.15em]">
+          <div className="bg-surface border-border w-full shrink-0 rounded-xl border p-4 text-center">
+            <p className="text-fg3 mb-1 text-[9px] font-semibold uppercase tracking-[0.15em]">
               Masa Dinas
             </p>
-            <p className="text-foreground text-[22px] font-black leading-none tracking-tight">
+            <p className="text-fg text-lg font-bold leading-none tracking-tight">
               {p.bergabung_date ? hitungMasaDinas(p.bergabung_date) : "-"}
             </p>
-            <p className="text-muted-foreground mt-1.5 text-[10px] font-medium tracking-tight">
+            <p className="text-fg3 mt-1.5 text-[9px] font-medium tracking-tight">
               {p.bergabung_date ? `Sejak ${formatTanggal(p.bergabung_date)}` : "-"}
             </p>
           </div>
@@ -300,10 +262,10 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
                   key={label as string}
                   className="flex items-center justify-between gap-2 px-1"
                 >
-                  <span className="text-muted-foreground shrink-0 text-[9px] font-bold uppercase tracking-widest">
+                  <span className="text-fg3 shrink-0 text-[9px] font-semibold uppercase tracking-widest">
                     {label}
                   </span>
-                  <span className="text-foreground/80 truncate text-right text-[10px] font-bold tracking-tight">
+                  <span className="text-fg truncate text-right text-[10px] font-medium tracking-tight">
                     {value as string}
                   </span>
                 </div>
@@ -315,10 +277,10 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
         <div className="box-border flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto px-10 pb-12 pt-8">
           <div className="flex shrink-0 flex-col gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em]">
+              <span className="text-fg2 text-[10px] font-semibold uppercase tracking-[0.2em]">
                 Data Pekerjaan
               </span>
-              <div className="bg-border/40 h-px flex-1" />
+              <div className="bg-border/60 h-px flex-1" />
             </div>
             <div className="grid grid-cols-3 gap-x-8 gap-y-4">
               <Cell label="Email OJK" value={p.email_ojk} />
@@ -338,10 +300,10 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
 
           <div className="flex shrink-0 flex-col gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em]">
+              <span className="text-fg2 text-[10px] font-semibold uppercase tracking-[0.2em]">
                 Latar Belakang
               </span>
-              <div className="bg-border/40 h-px flex-1" />
+              <div className="bg-border/60 h-px flex-1" />
             </div>
             <div className="grid grid-cols-3 gap-x-8 gap-y-4">
               <Cell label="Pendidikan" value={p.pendidikan} />
@@ -354,10 +316,10 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
 
           <div className="flex shrink-0 flex-col gap-3">
             <div className="flex items-center gap-3">
-              <span className="text-destructive text-[10px] font-black uppercase tracking-[0.2em]">
-                🔒 Data Sensitif
+              <span className="text-fg2 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                Data Sensitif
               </span>
-              <div className="bg-destructive/20 h-px flex-1" />
+              <div className="bg-border/60 h-px flex-1" />
             </div>
             <div className="grid grid-cols-3 gap-x-8 gap-y-4">
               <Cell label="No. KTP" value={p.no_ktp} />
@@ -385,21 +347,21 @@ export const ParticipantSlide: React.FC<ParticipantSlideProps> = ({
 
           <div className="mt-auto flex shrink-0 gap-4">
             {p.catatan_tambahan && (
-              <div className="bg-amber-500/10 border-amber-500/20 shadow-sm flex-1 rounded-3xl border p-4">
-                <p className="text-amber-600 dark:text-amber-500 mb-1.5 text-[9px] font-black uppercase tracking-[0.2em]">
-                  ⭐ Catatan
+              <div className="bg-surface border-border shadow-sm flex-1 rounded-xl border p-4">
+                <p className="text-fg2 mb-1.5 text-[9px] font-semibold uppercase tracking-[0.2em]">
+                  Catatan
                 </p>
-                <p className="text-amber-900 dark:text-amber-200/80 line-clamp-2 text-[11px] font-medium leading-relaxed">
+                <p className="text-fg2 line-clamp-2 text-[11px] font-medium leading-relaxed">
                   {p.catatan_tambahan}
                 </p>
               </div>
             )}
             {p.keterangan && (
-              <div className="bg-muted/30 border-border/40 shadow-sm flex-1 rounded-3xl border p-4">
-                <p className="text-muted-foreground mb-1.5 text-[9px] font-black uppercase tracking-[0.2em]">
+              <div className="bg-surface border-border shadow-sm flex-1 rounded-xl border p-4">
+                <p className="text-fg2 mb-1.5 text-[9px] font-semibold uppercase tracking-[0.2em]">
                   Keterangan
                 </p>
-                <p className="text-foreground/70 line-clamp-2 text-[11px] font-medium leading-relaxed tracking-tight">
+                <p className="text-fg2 line-clamp-2 text-[11px] font-medium leading-relaxed tracking-tight">
                   {p.keterangan}
                 </p>
               </div>

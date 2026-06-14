@@ -56,16 +56,14 @@ export default function DashboardFilters({
     : SERVICE_LABELS;
 
   return (
-    <div className="flex flex-col gap-3 rounded-[2rem] border border-border/70 bg-card px-3 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] lg:flex-row lg:items-center lg:gap-4">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface px-3 py-3 lg:flex-row lg:items-center lg:gap-4">
       <div className="flex shrink-0 items-center gap-3 px-2 py-1">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border/70 bg-muted/60">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-        </div>
+        <Filter className="h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase tracking-[0.32em] text-muted-foreground">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Konfigurasi
           </span>
-          <span className="text-sm font-black tracking-tight text-foreground">
+          <span className="font-outfit text-sm font-bold tracking-tight text-foreground">
             Filter Data
           </span>
         </div>
@@ -82,7 +80,7 @@ export default function DashboardFilters({
               value={leaderLockedService ? leaderLockedService : selectedService}
               onChange={(e) => onServiceChange(e.target.value)}
               disabled={!!leaderLockedService}
-              className={`h-11 w-full appearance-none rounded-[1.2rem] border border-border/70 bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 ${leaderLockedService ? "cursor-not-allowed opacity-70" : ""}`}
+              className={`h-10 w-full appearance-none rounded-lg border border-border bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground transition-all focus:border-foreground focus:outline-none ${leaderLockedService ? "cursor-not-allowed opacity-70" : ""}`}
             >
               {leaderLockedService ? (
                 <option value={leaderLockedService}>
@@ -109,7 +107,7 @@ export default function DashboardFilters({
             <select
               value={selectedFolder}
               onChange={(e) => onFolderChange(e.target.value)}
-              className="h-11 w-full appearance-none rounded-[1.2rem] border border-border/70 bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
+              className="h-10 w-full appearance-none rounded-lg border border-border bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground transition-all focus:border-foreground focus:outline-none"
             >
               <option value="ALL">Semua Tim</option>
               {folders.map((f) => (
@@ -131,7 +129,7 @@ export default function DashboardFilters({
             <select
               value={selectedYear}
               onChange={(e) => onYearChange(Number(e.target.value))}
-              className="h-11 w-full appearance-none rounded-[1.2rem] border border-border/70 bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
+              className="h-10 w-full appearance-none rounded-lg border border-border bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground transition-all focus:border-foreground focus:outline-none"
             >
               {availableYears.map((y) => (
                 <option key={y} value={y}>

@@ -59,41 +59,41 @@ export default function TopAgentsTable({ agents, serviceType, selectedYear }: Pr
         </Link>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="divide-y divide-border">
         {agents.slice(0, 5).map((agent, i) => (
           <Link
             key={agent.agentId}
             to="/sidak/agents/$id"
             params={{ id: agent.agentId }}
-            className="group flex items-center gap-2.5 rounded-[1.15rem] border border-border/60 bg-background px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all hover:border-border hover:bg-muted/20 hover:shadow-sm"
+            className="group flex items-center gap-3 py-3 transition-colors hover:text-foreground first:pt-1 last:pb-1"
           >
-            <div className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-black text-muted-foreground transition-colors group-hover:text-foreground">
-              #{String(i + 1).padStart(2, "0")}
+            <div className="w-5 shrink-0 text-xs font-mono text-muted-foreground transition-colors group-hover:text-foreground">
+              {String(i + 1).padStart(2, "0")}
             </div>
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="truncate text-[13px] font-semibold text-foreground">
+                <span className="truncate text-[13px] font-semibold text-foreground group-hover:text-primary">
                   {agent.nama}
                 </span>
               </div>
 
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                <span className="truncate text-muted-foreground">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>
                   {agent.tim || agent.batch}
                 </span>
-                <span className="text-muted-foreground/40">•</span>
-                <span className="font-bold text-blue-500">
+                <span>•</span>
+                <span>
                   Skor: {agent.score.toFixed(1)}%
                 </span>
               </div>
             </div>
 
             <div className="shrink-0 text-right">
-              <div className="text-[15px] font-black leading-none text-red-500 tabular-nums">
+              <div className="text-sm font-bold text-foreground tabular-nums">
                 {agent.defects}
               </div>
-              <div className="mt-0.5 text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="text-[9px] uppercase tracking-wider text-muted-foreground font-medium">
                 Temuan
               </div>
             </div>

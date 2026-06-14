@@ -105,15 +105,15 @@ export default function SidakAgentDetailPage() {
       {/* Back + Header */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center px-6 lg:px-8 pt-6">
         <div className="flex items-center gap-3">
-          <Link to="/sidak/agents" className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+          <Link to="/sidak/agents" className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">SIDAK PERSONAL AUDIT</p>
-            <h1 className="text-sm font-black tracking-tight">{data.peserta.nama}</h1>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">SIDAK PERSONAL AUDIT</p>
+            <h1 className="font-outfit text-sm font-bold tracking-tight text-foreground">{data.peserta.nama}</h1>
           </div>
         </div>
-        <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">
+        <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted text-foreground">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           {loading ? "Memuat..." : "Refresh"}
         </button>
@@ -156,7 +156,7 @@ export default function SidakAgentDetailPage() {
       />
 
       {/* Nav Tabs (sticky) */}
-      <div className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur-sm">
+      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="flex gap-4 overflow-x-auto sm:gap-8 no-scrollbar">
             {SECTIONS.map((sec) => (
@@ -167,9 +167,9 @@ export default function SidakAgentDetailPage() {
                   const ref = sec.id === "summary" ? summaryRef : sec.id === "trend" ? trendRef : temuanRef;
                   ref.current?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className={`border-b-2 py-3 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${
+                className={`border-b-2 py-3 text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap transition-all ${
                   activeSection === sec.id
-                    ? "border-primary text-primary"
+                    ? "border-foreground text-foreground font-bold"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                 }`}
               >
@@ -184,19 +184,19 @@ export default function SidakAgentDetailPage() {
         {/* ── SECTION: RINGKASAN SKOR ── */}
         <div ref={summaryRef} data-section="summary" id="section-summary" className="scroll-mt-24 space-y-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase leading-tight tracking-tight">Analisis Performa Bulanan</h3>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Analisis Performa Bulanan</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Tahun {selectedYear} &bull; Layanan {selectedService.toUpperCase()}
               </p>
             </div>
           </div>
 
           {monthlySummaries.length === 0 ? (
-            <div className="rounded-2xl border border-border/50 bg-card p-12 shadow-sm">
+            <div className="rounded-2xl border border-border bg-surface p-12">
               <QaStatePanel
                 type="empty"
                 title="Data belum tersedia"
@@ -237,17 +237,17 @@ export default function SidakAgentDetailPage() {
         {/* ── SECTION: GRAFIK TREN ── */}
         <div ref={trendRef} data-section="trend" id="section-trend" className="scroll-mt-20 space-y-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <BarChart2 className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase leading-tight tracking-tight">Tren Pergerakan Skor</h3>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Tren Pergerakan Skor</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Rentang Statistik: {monthsFull[trendStartMonth - 1]?.slice(0, 3)} &ndash; {monthsFull[trendEndMonth - 1]?.slice(0, 3)} {selectedYear}
               </p>
             </div>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface">
             {trendMounted && selectedService ? (
               <AgentTrendTab
                 labels={data.personalTrend.labels}
@@ -263,12 +263,12 @@ export default function SidakAgentDetailPage() {
         {/* ── SECTION: DAFTAR TEMUAN ── */}
         <div ref={temuanRef} data-section="temuan" id="section-temuan" className="scroll-mt-20 space-y-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <Activity className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-black uppercase leading-tight tracking-tight">Riwayat Temuan Detil</h3>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Dikelompokkan per bulan audit</p>
+              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Riwayat Temuan Detil</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dikelompokkan per bulan audit</p>
             </div>
           </div>
           {temuanMounted ? (

@@ -151,29 +151,29 @@ export function UsageTab({
         {/* Card 3: Biaya Simulasi */}
         <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Simulasi
             </span>
-            <p className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-500">
+            <p className="text-2xl font-bold tracking-tight" style={{ color: 'var(--chart-green)' }}>
               Rp {Math.round(totalSummary.simulationCost).toLocaleString()}
             </p>
           </div>
-          <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug">
+          <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Chat, email, & suara
           </p>
         </div>
 
         {/* Card 4: Biaya Penilaian AI */}
-        <div className="bg-card rounded-xl border border-border/50 p-5 flex flex-col justify-between">
+        <div className="bg-card rounded-2xl border border-border/50 p-6 flex flex-col justify-between shadow-sm">
           <div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Penilaian AI
             </span>
-            <p className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-500">
+            <p className="text-2xl font-bold tracking-tight" style={{ color: 'var(--chart-amber)' }}>
               Rp {Math.round(totalSummary.reviewCost).toLocaleString()}
             </p>
           </div>
-          <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug">
+          <p className="text-[10px] text-muted-foreground/75 mt-2.5 leading-snug font-medium">
             Evaluasi & analisis AI
           </p>
         </div>
@@ -255,10 +255,10 @@ export function UsageTab({
               <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
                 Token
               </th>
-              <th className="px-6 py-3.5 text-right font-semibold text-emerald-600 dark:text-emerald-500 uppercase tracking-wider">
+              <th className="px-6 py-3.5 text-right font-bold uppercase tracking-widest opacity-80" style={{ color: 'var(--chart-green)' }}>
                 Simulasi (Rp)
               </th>
-              <th className="px-6 py-3.5 text-right font-semibold text-amber-600 dark:text-amber-500 uppercase tracking-wider">
+              <th className="px-6 py-3.5 text-right font-bold uppercase tracking-widest opacity-80" style={{ color: 'var(--chart-amber)' }}>
                 Penilaian AI (Rp)
               </th>
               <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
@@ -291,12 +291,12 @@ export function UsageTab({
                 <td className="px-6 py-4 text-right font-medium text-foreground">
                   {a.total_tokens.toLocaleString()}
                 </td>
-                <td className="px-6 py-4 text-right text-emerald-600 dark:text-emerald-500 font-semibold">
+                <td className="px-6 py-4 text-right font-semibold" style={{ color: 'var(--chart-green)' }}>
                   {(a.simulation_cost_idr || 0) > 0
                     ? formatIdr(a.simulation_cost_idr)
                     : "-"}
                 </td>
-                <td className="px-6 py-4 text-right text-amber-600 dark:text-amber-500 font-semibold">
+                <td className="px-6 py-4 text-right font-semibold" style={{ color: 'var(--chart-amber)' }}>
                   {(a.review_cost_idr || 0) > 0
                     ? formatIdr(a.review_cost_idr)
                     : "-"}
@@ -379,11 +379,11 @@ export function UsageTab({
                     </td>
                     <td className="px-6 py-3.5">
                       {m.action_category === "simulation" ? (
-                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border border-emerald-500/20">
+                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-green)', color: 'white' }}>
                           Simulasi
                         </span>
                       ) : m.action_category === "review" ? (
-                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20">
+                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-amber)', color: 'white' }}>
                           Penilaian
                         </span>
                       ) : (
@@ -455,11 +455,11 @@ export function UsageTab({
                   </td>
                   <td className="px-6 py-3.5">
                     {m.action_category === "simulation" ? (
-                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 border border-emerald-500/20">
+                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-green)', color: 'white' }}>
                         Simulasi
                       </span>
                     ) : m.action_category === "review" ? (
-                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20">
+                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-amber)', color: 'white' }}>
                         Penilaian
                       </span>
                     ) : (

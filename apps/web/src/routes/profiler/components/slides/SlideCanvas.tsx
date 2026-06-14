@@ -95,15 +95,10 @@ export const SlideCanvas = forwardRef<SlideCanvasRef, SlideCanvasProps>(
       >
         <div
           ref={slideRef}
-          className={`bg-card border-border/40 flex h-full w-full flex-col rounded-[2rem] border shadow-2xl dark:shadow-black/60 ${
+          className={`bg-surface border border-border flex h-full w-full flex-col rounded-2xl ${
             isA4Portrait ? "overflow-y-auto" : "overflow-hidden"
           }`}
         >
-          <div
-            className="h-[6px] w-full shrink-0"
-            style={{ background: theme.accent }}
-          />
-
           {children}
 
           <div className="h-6 shrink-0" />

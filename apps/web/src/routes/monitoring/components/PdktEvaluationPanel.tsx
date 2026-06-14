@@ -187,7 +187,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
                 </ul>
               ) : (
                 <p className="text-xs text-muted-foreground italic font-medium flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-emerald-500" />
+                  <CheckCircle2 size={12} className="text-chart-green" />
                   Tidak ditemukan typo.
                 </p>
               )}
@@ -208,7 +208,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
                 </ul>
               ) : (
                 <p className="text-xs text-muted-foreground italic font-medium flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-emerald-500" />
+                  <CheckCircle2 size={12} className="text-chart-green" />
                   Kalimat sudah jelas.
                 </p>
               )}
@@ -229,7 +229,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
                 </ul>
               ) : (
                 <p className="text-xs text-muted-foreground italic font-medium flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-emerald-500" />
+                  <CheckCircle2 size={12} className="text-chart-green" />
                   Jawaban relevan.
                 </p>
               )}

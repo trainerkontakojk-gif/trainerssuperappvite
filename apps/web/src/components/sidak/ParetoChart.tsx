@@ -10,7 +10,7 @@ interface Props {
 
 const CATEGORY_META: Record<string, { label: string; color: string }> = {
   critical: { label: "Critical Parameter", color: "#f43f5e" },
-  non_critical: { label: "Non-Critical Parameter", color: "hsl(var(--primary))" },
+  non_critical: { label: "Non-Critical Parameter", color: "var(--primary)" },
   none: { label: "No Category", color: "#64748b" },
 };
 
@@ -27,7 +27,7 @@ export function ParetoTooltip({ active, payload, serviceLabel }: any) {
   const category = getCategoryMeta(item.category);
 
   return (
-    <div className="min-w-48 rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
+    <div className="min-w-48 rounded-lg border border-border bg-card px-3 py-2 text-xs">
       <p className="mb-2 max-w-64 font-semibold leading-snug text-foreground">{item.fullName || item.name}</p>
       <div className="space-y-1 text-muted-foreground">
         {serviceLabel ? (
@@ -81,7 +81,7 @@ export default function ParetoChart({ data, insight, serviceLabel }: Props) {
               content={(props) => <ParetoTooltip {...props} serviceLabel={serviceLabel} />}
               wrapperStyle={{ outline: "none" }}
             />
-            <Bar yAxisId="left" dataKey="count" radius={[8, 8, 0, 0]} maxBarSize={32} minPointSize={4}>
+            <Bar yAxisId="left" dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={32} minPointSize={4}>
               {data.map((entry, i) => (
                 <Cell key={i} fill={getCategoryMeta(entry.category).color} fillOpacity={0.85} />
               ))}

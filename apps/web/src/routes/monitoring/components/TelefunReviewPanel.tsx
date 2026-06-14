@@ -133,37 +133,36 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
     if (score >= 8)
       return {
         label: "Sangat Baik",
-        color: "text-emerald-600",
-        bg: "bg-emerald-50",
-        border: "border-emerald-200",
+        color: "text-chart-green",
+        bg: "bg-chart-green/10",
+        border: "border-chart-green/20",
       };
     if (score >= 6)
       return {
         label: "Baik",
-        color: "text-sky-600",
-        bg: "bg-sky-50",
-        border: "border-sky-200",
+        color: "text-chart-blue",
+        bg: "bg-chart-blue/10",
+        border: "border-chart-blue/20",
       };
     if (score >= 4)
       return {
         label: "Cukup",
-        color: "text-amber-600",
-        bg: "bg-amber-50",
-        border: "border-amber-200",
+        color: "text-chart-amber",
+        bg: "bg-chart-amber/10",
+        border: "border-chart-amber/20",
       };
     return {
       label: "Perlu Coaching",
-      color: "text-rose-600",
-      bg: "bg-rose-50",
-      border: "border-rose-200",
+      color: "text-chart-red",
+      bg: "bg-chart-red/10",
+      border: "border-chart-red/20",
     };
   };
 
   const STATUS_COLORS: Record<string, string> = {
-    good: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    needs_improvement:
-      "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-    poor: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20",
+    good: "bg-muted text-muted-foreground border border-border", // using neutral for details
+    needs_improvement: "bg-muted text-muted-foreground border border-border",
+    poor: "bg-muted text-muted-foreground border border-border",
   };
 
   const STATUS_LABELS: Record<string, string> = {
@@ -306,7 +305,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                   Semakin sesuai dengan area target, semakin baik
                 </p>
               </div>
-              <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-500">
+              <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-chart-green">
                 <Sparkles className="h-3 w-3" />
                 <span>{va.overallScore}/10</span>
               </div>
@@ -356,15 +355,15 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 Hasil Anda
               </div>
               <div className="flex items-center gap-1.5">
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
+                <TrendingUp className="h-3 w-3 text-chart-green" />
                 Semakin tinggi
               </div>
               <div className="flex items-center gap-1.5">
-                <TrendingDown className="h-3 w-3 text-amber-500" />
+                <TrendingDown className="h-3 w-3 text-chart-amber" />
                 Semakin rendah
               </div>
               <div className="flex items-center gap-1.5">
-                <Gauge className="h-3 w-3 text-blue-500" />
+                <Gauge className="h-3 w-3 text-chart-blue" />
                 Rentang ideal
               </div>
             </div>
@@ -402,7 +401,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           {va.fillerWords.examples && va.fillerWords.examples.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center gap-2">
-                <Ban className="w-4 h-4 text-amber-500" />
+                <Ban className="w-4 h-4 text-chart-amber" />
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                   Contoh Filler Words ({va.fillerWords.examples.length})
                 </h3>
@@ -513,7 +512,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
         <div className="grid md:grid-cols-2 gap-6">
           <section className="space-y-3">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-chart-green" />
               <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                 Kekuatan
               </h3>

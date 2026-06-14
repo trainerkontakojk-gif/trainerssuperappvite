@@ -7,7 +7,6 @@ import {
   Loader2,
   AlertTriangle,
   LineChart,
-  Info,
   ArrowRight,
   PieChart,
   Search,
@@ -22,7 +21,6 @@ import { buildParetoViewModel } from "../../components/sidak/pareto-view-model";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ParetoChart from "../../components/sidak/ParetoChart";
 import FatalDonutChart from "../../components/sidak/FatalDonutChart";
-import ServiceBarChart from "../../components/sidak/ServiceBarChart";
 import TopAgentsTable from "../../components/sidak/TopAgentsTable";
 import DashboardFilters from "../../components/sidak/DashboardFilters";
 
@@ -32,15 +30,15 @@ function DashboardSkeleton() {
       data-testid="sidak-dashboard-skeleton"
       className="space-y-6 animate-pulse"
     >
-      <div className="rounded-[2rem] border border-border/70 bg-card p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="h-[120px] rounded-[1.5rem] bg-muted/40" />
+      <div className="rounded-2xl border border-border bg-surface p-3">
+        <div className="h-[120px] rounded-xl bg-muted/40" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={index}
-            className="min-h-[286px] rounded-[2rem] border border-border/70 bg-card p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+            className="min-h-[286px] rounded-2xl border border-border bg-surface p-6"
           >
             <div className="flex items-start justify-between">
               <div className="h-12 w-12 rounded-full bg-muted/60" />
@@ -51,20 +49,20 @@ function DashboardSkeleton() {
               <div className="h-12 w-40 rounded-full bg-muted/60" />
               <div className="h-4 w-48 rounded-full bg-muted/60" />
             </div>
-            <div className="mt-8 h-16 rounded-b-[1.5rem] bg-muted/40" />
+            <div className="mt-8 h-16 rounded-b-2xl bg-muted/40" />
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <div className="h-[560px] rounded-[2rem] border border-border/70 bg-card" />
-          <div className="h-[420px] rounded-[2rem] border border-border/70 bg-card" />
+          <div className="h-[560px] rounded-2xl border border-border bg-surface" />
+          <div className="h-[420px] rounded-2xl border border-border bg-surface" />
         </div>
         <div className="space-y-6">
-          <div className="h-[520px] rounded-[2rem] border border-border/70 bg-card" />
-          <div className="h-[360px] rounded-[2rem] border border-border/70 bg-card" />
-          <div className="h-[320px] rounded-[2rem] border border-border/70 bg-card" />
+          <div className="h-[520px] rounded-2xl border border-border bg-surface" />
+          <div className="h-[360px] rounded-2xl border border-border bg-surface" />
+          <div className="h-[320px] rounded-2xl border border-border bg-surface" />
         </div>
       </div>
     </div>
@@ -264,17 +262,17 @@ export default function SidakDashboardPage() {
 
         {/* Error */}
         {hasNoData && (
-          <div className="flex flex-col items-center justify-center py-32 bg-card rounded-2xl border border-border shadow-sm">
+          <div className="flex flex-col items-center justify-center py-32 bg-surface rounded-2xl border border-border">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h2 className="text-lg font-bold mb-2">Gagal memuat data</h2>
+            <h2 className="font-outfit text-lg font-bold mb-2">Gagal memuat data</h2>
             <p className="text-muted-foreground text-sm max-w-sm text-center px-6">
               Terjadi kesalahan. Silakan coba lagi.
             </p>
             <button
               onClick={() => refetch()}
-              className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2"
+              className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-transparent hover:bg-muted transition-colors inline-flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" /> Coba Lagi
             </button>
@@ -283,17 +281,17 @@ export default function SidakDashboardPage() {
 
         {/* No Data */}
         {hasNoPeriods && (
-          <div className="flex flex-col items-center justify-center py-32 bg-card rounded-2xl border border-border shadow-sm">
+          <div className="flex flex-col items-center justify-center py-32 bg-surface rounded-2xl border border-border">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h2 className="text-lg font-bold mb-2">Data Tidak Ditemukan</h2>
+            <h2 className="font-outfit text-lg font-bold mb-2">Data Tidak Ditemukan</h2>
             <p className="text-muted-foreground text-sm max-w-sm text-center px-6">
               Tidak ada rekaman QA untuk filter yang Anda pilih.
             </p>
             <button
               onClick={handleReset}
-              className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-background hover:bg-muted transition-colors inline-flex items-center gap-2"
+              className="mt-6 px-6 py-2.5 rounded-lg text-sm font-medium border border-border bg-transparent hover:bg-muted transition-colors inline-flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" /> Reset Filter
             </button>
@@ -328,196 +326,167 @@ export default function SidakDashboardPage() {
               ))}
             </div>
 
-            {/* Analysis Workspace */}
+            {/* Top Agents & Severity Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
-              {/* Left Lane (2/3) */}
-              <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-                {/* Trend Section */}
-                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <LineChart className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold">
-                          Tren Kualitas & Parameter
-                        </h2>
-                        <p className="text-sm text-muted-foreground">
-                          Fluktuasi temuan berdasarkan parameter QA
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-xl border border-border/50">
-                      <Info className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
-                        Mode Awal: Total Temuan
-                      </span>
-                    </div>
-                  </div>
-
-                  {!data.paramTrend || !data.paramTrend.labels?.length ? (
-                    <div className="h-[400px] flex flex-col items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                      <p className="text-sm text-muted-foreground font-medium">
-                        Data tren tidak tersedia untuk filter ini
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center gap-1.5 pb-2">
-                        <span className="text-xs font-bold text-muted-foreground mr-2 uppercase tracking-tighter">
-                          Parameter:
-                        </span>
-                        {data.paramTrend.datasets
-                          .filter((ds) => !ds.isTotal)
-                          .map((ds) => {
-                            const isHidden = activeHiddenParams.has(ds.label);
-                            return (
-                              <button
-                                key={ds.label}
-                                onClick={() => {
-                                  setHiddenParams((prev) => {
-                                    const next = new Set(
-                                      prev ?? defaultHiddenParams,
-                                    );
-                                    if (next.has(ds.label))
-                                      next.delete(ds.label);
-                                    else next.add(ds.label);
-                                    return next;
-                                  });
-                                }}
-                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold border transition-all ${isHidden ? "bg-transparent border-transparent text-muted-foreground hover:bg-muted" : "border-border shadow-sm scale-105 z-10"}`}
-                              >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : ""}`}
-                                />
-                                <span className="max-w-[120px] truncate">
-                                  {ds.label}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        <button
-                          onClick={() =>
-                            setHiddenParams(isAllShown ? null : new Set())
-                          }
-                          className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-black text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest ml-auto"
-                        >
-                          {isAllShown ? "Sembunyikan Semua" : "Tampilkan Semua"}{" "}
-                          <ArrowRight
-                            className={`w-3 h-3 transition-transform duration-200 ${isAllShown ? "rotate-90" : ""}`}
-                          />
-                        </button>
-                      </div>
-                      <div className="h-[360px] w-full mt-2">
-                        <ParamTrendChart
-                          labels={data.paramTrend.labels}
-                          datasets={data.paramTrend.datasets}
-                          showParameters={true}
-                          hiddenKeys={activeHiddenParams}
-                          hideTotal={hasVisibleParam}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Pareto */}
-                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                      <BarChart3 className="w-5 h-5 text-orange-500" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold">Root Cause Analysis</h2>
-                      <p className="text-sm text-muted-foreground">
-                        Prinsip Pareto: 80% temuan biasanya berasal dari 20%
-                        kategori utama
-                      </p>
-                    </div>
-                  </div>
-                  {paretoViewModel.chartData.length > 0 ? (
-                    <ParetoChart
-                      data={paretoViewModel.chartData}
-                      insight={paretoViewModel.insight}
-                      serviceLabel={
-                        SERVICE_LABELS[
-                          selectedService as keyof typeof SERVICE_LABELS
-                        ] || selectedService
-                      }
-                    />
-                  ) : (
-                    <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                      <p className="text-sm text-muted-foreground font-medium">
-                        Data kategori temuan belum tersedia
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Lane (1/3) */}
-              <div className="space-y-8">
-                {/* Top Agents */}
-                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
+              {/* Top Agents (2/3 span) */}
+              <div className="lg:col-span-2">
+                <div className="bg-surface p-4 rounded-2xl border border-border h-full">
                   <TopAgentsTable
                     agents={data.topAgents.slice(0, 5)}
                     serviceType={selectedService}
                     selectedYear={selectedYear}
                   />
                 </div>
-
-                {/* Severity Donut */}
-                <div className="bg-card p-4 rounded-2xl border border-border shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                      <PieChart className="w-5 h-5 text-indigo-500" />
+              </div>
+              {/* Severity Donut (1/3 span) */}
+              <div className="bg-surface p-4 rounded-2xl border border-border">
+                <div className="flex items-center gap-3 mb-6">
+                  <PieChart className="w-5 h-5 shrink-0 text-muted-foreground" />
+                  <div>
+                    <h3 className="font-outfit text-base font-bold text-foreground">
+                      Komposisi Severity
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Parameter Kritikal vs Non-Kritikal
+                    </p>
+                  </div>
+                </div>
+                {data.donutData && data.donutData.total > 0 ? (
+                  <FatalDonutChart
+                    critical={data.donutData.critical}
+                    nonCritical={data.donutData.nonCritical}
+                    total={data.donutData.total}
+                  />
+                ) : (
+                  <div className="h-64 flex flex-col items-center justify-center text-center p-6 grayscale opacity-60">
+                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                      <PieChart className="w-6 h-6 text-muted-foreground/40" />
                     </div>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                      Belum Ada Data
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Analysis Workspace (Full Width Stack) */}
+            <div className="space-y-6 lg:space-y-8">
+              {/* Trend Section */}
+              <div className="bg-surface p-4 rounded-2xl border border-border">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                  <div className="flex items-center gap-3">
+                    <LineChart className="w-5 h-5 shrink-0 text-muted-foreground" />
                     <div>
-                      <h3 className="text-base font-bold">
-                        Komposisi Severity
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Parameter Kritikal vs Non-Kritikal
+                      <h2 className="font-outfit text-lg font-bold">
+                        Tren Kualitas & Parameter
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Fluktuasi temuan berdasarkan parameter QA
                       </p>
                     </div>
                   </div>
-                  {data.donutData && data.donutData.total > 0 ? (
-                    <FatalDonutChart
-                      critical={data.donutData.critical}
-                      nonCritical={data.donutData.nonCritical}
-                      total={data.donutData.total}
-                    />
-                  ) : (
-                    <div className="h-64 flex flex-col items-center justify-center text-center p-6 grayscale opacity-60">
-                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
-                        <PieChart className="w-6 h-6 text-muted-foreground/40" />
-                      </div>
-                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                        Belum Ada Data
-                      </p>
-                    </div>
-                  )}
                 </div>
 
-                {/* Service Distribution */}
-                <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
-                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-primary rounded-full" />
-                    Distribusi per Layanan
-                  </h3>
-                  {data.serviceData.length > 0 ? (
-                    <div className="h-[280px] w-full">
-                      <ServiceBarChart data={data.serviceData} />
+                {!data.paramTrend || !data.paramTrend.labels?.length ? (
+                  <div className="h-[400px] flex flex-col items-center justify-center bg-muted/20 rounded-xl border border-dashed">
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Data tren tidak tersedia untuk filter ini
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1.5 pb-2">
+                      <span className="text-[11px] font-semibold text-muted-foreground mr-2 uppercase tracking-wide">
+                        Parameter:
+                      </span>
+                      {data.paramTrend.datasets
+                        .filter((ds) => !ds.isTotal)
+                        .map((ds) => {
+                          const isHidden = activeHiddenParams.has(ds.label);
+                          return (
+                            <button
+                              key={ds.label}
+                              onClick={() => {
+                                setHiddenParams((prev) => {
+                                  const next = new Set(
+                                    prev ?? defaultHiddenParams,
+                                  );
+                                  if (next.has(ds.label))
+                                    next.delete(ds.label);
+                                  else next.add(ds.label);
+                                  return next;
+                                  });
+                              }}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
+                                isHidden
+                                  ? "bg-transparent border-border/60 text-muted-foreground hover:bg-muted"
+                                  : "bg-foreground text-background border-foreground scale-105 z-10"
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : "bg-background"}`}
+                              />
+                              <span className="max-w-[120px] truncate">
+                                {ds.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      <button
+                        onClick={() =>
+                          setHiddenParams(isAllShown ? null : new Set())
+                        }
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest ml-auto"
+                      >
+                        {isAllShown ? "Sembunyikan Semua" : "Tampilkan Semua"}{" "}
+                        <ArrowRight
+                          className={`w-3 h-3 transition-transform duration-200 ${isAllShown ? "rotate-90" : ""}`}
+                        />
+                      </button>
                     </div>
-                  ) : (
-                    <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
-                      <p className="text-sm text-muted-foreground font-medium">
-                        Data temuan per layanan belum tersedia
-                      </p>
+                    <div className="h-[360px] w-full mt-2">
+                      <ParamTrendChart
+                        labels={data.paramTrend.labels}
+                        datasets={data.paramTrend.datasets}
+                        showParameters={true}
+                        hiddenKeys={activeHiddenParams}
+                        hideTotal={hasVisibleParam}
+                      />
                     </div>
-                  )}
+                  </>
+                )}
+              </div>
+
+              {/* Pareto */}
+              <div className="bg-surface p-4 rounded-2xl border border-border">
+                <div className="flex items-center gap-3 mb-6">
+                  <BarChart3 className="w-5 h-5 shrink-0 text-muted-foreground" />
+                  <div>
+                    <h2 className="font-outfit text-lg font-bold text-foreground">Root Cause Analysis</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Prinsip Pareto: 80% temuan biasanya berasal dari 20%
+                      kategori utama
+                    </p>
+                  </div>
                 </div>
+                {paretoViewModel.chartData.length > 0 ? (
+                  <ParetoChart
+                    data={paretoViewModel.chartData}
+                    insight={paretoViewModel.insight}
+                    serviceLabel={
+                      SERVICE_LABELS[
+                        selectedService as keyof typeof SERVICE_LABELS
+                      ] || selectedService
+                    }
+                  />
+                ) : (
+                  <div className="h-64 flex items-center justify-center bg-muted/20 rounded-xl border border-dashed">
+                    <p className="text-sm text-muted-foreground font-medium">
+                      Data kategori temuan belum tersedia
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -527,7 +496,7 @@ export default function SidakDashboardPage() {
       {/* Mobile FAB */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-6 right-6 z-[100] md:hidden w-14 h-14 rounded-2xl bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+        className="fixed bottom-6 right-6 z-[100] md:hidden w-14 h-14 rounded-2xl bg-foreground text-background flex items-center justify-center hover:opacity-90 transition-all"
       >
         <ArrowUp className="w-6 h-6" />
       </button>

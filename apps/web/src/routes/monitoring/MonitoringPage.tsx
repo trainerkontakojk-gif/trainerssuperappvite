@@ -97,7 +97,7 @@ export default function MonitoringPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Test & Accessibility Compatibility Elements */}
       <div className="sr-only">
         <span>SIMULATION MONITORING</span>
@@ -112,7 +112,7 @@ export default function MonitoringPage() {
           <span className="text-muted-foreground/45 font-normal">/</span>
           <span className="text-muted-foreground">Monitoring</span>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">
+        <h1 className="text-page-title font-display text-foreground mt-2">
           Monitoring AI Usage
         </h1>
         <p className="text-sm text-muted-foreground mt-1">

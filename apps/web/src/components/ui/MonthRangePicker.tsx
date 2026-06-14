@@ -61,7 +61,7 @@ export function MonthRangePicker({
             <select
               value={startMonth ?? ""}
               onChange={(e) => handleStartChange(e.target.value)}
-              className={`h-11 w-full appearance-none rounded-[1.2rem] border bg-card px-4 pl-10 pr-9 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-primary/10 ${isInvalidRange ? "border-red-500/50" : "border-border/70"}`}
+              className={`h-10 w-full appearance-none rounded-lg border bg-background px-4 pl-10 pr-9 text-[13px] font-medium text-foreground transition-all focus:border-foreground focus:outline-none ${isInvalidRange ? "border-red-500/50" : "border-border"}`}
             >
               <option value="">Awal</option>
               {MONTHS.map((name, i) => (
@@ -86,7 +86,7 @@ export function MonthRangePicker({
             <select
               value={endMonth ?? ""}
               onChange={(e) => handleEndChange(e.target.value)}
-              className={`h-11 w-full appearance-none rounded-[1.2rem] border bg-card px-4 pl-10 pr-9 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-4 focus:ring-primary/10 ${isInvalidRange ? "border-red-500/50" : "border-border/70"}`}
+              className={`h-10 w-full appearance-none rounded-lg border bg-background px-4 pl-10 pr-9 text-[13px] font-medium text-foreground transition-all focus:border-foreground focus:outline-none ${isInvalidRange ? "border-red-500/50" : "border-border"}`}
             >
               <option value="">Akhir</option>
               {MONTHS.map((name, i) => (
@@ -103,7 +103,7 @@ export function MonthRangePicker({
           {(startMonth !== null || endMonth !== null) && (
             <button
               onClick={handleReset}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.2rem] border border-border/70 bg-card text-muted-foreground shadow-sm transition-all hover:bg-muted hover:text-foreground"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-all hover:bg-surface hover:text-foreground"
               title="Reset Range"
             >
               <XCircle className="h-4 w-4" />

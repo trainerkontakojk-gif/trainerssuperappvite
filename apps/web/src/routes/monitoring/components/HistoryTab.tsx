@@ -207,22 +207,22 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
     switch (mod) {
       case "ketik":
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50">
-            <MessageSquare size={12} className="text-emerald-600 dark:text-emerald-400" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit" style={{ backgroundColor: 'var(--module-ketik-bg)', color: 'var(--module-ketik)', borderColor: 'var(--module-ketik-bg)' }}>
+            <MessageSquare size={12} />
             <span className="uppercase">ketik</span>
           </div>
         );
       case "pdkt":
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-900/50">
-            <Mail size={12} className="text-purple-600 dark:text-purple-400" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit" style={{ backgroundColor: 'var(--module-pdkt-bg)', color: 'var(--module-pdkt)', borderColor: 'var(--module-pdkt-bg)' }}>
+            <Mail size={12} />
             <span className="uppercase">pdkt</span>
           </div>
         );
       case "telefun":
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50">
-            <Phone size={12} className="text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit" style={{ backgroundColor: 'var(--module-telefun-bg)', color: 'var(--module-telefun)', borderColor: 'var(--module-telefun-bg)' }}>
+            <Phone size={12} />
             <span className="uppercase">telefun</span>
           </div>
         );
@@ -235,29 +235,29 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
     switch (status) {
       case "completed":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30">
-            <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Selesai Sukses</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
+            <CheckCircle2 size={12} style={{ color: 'var(--chart-green)' }} />
+            <span style={{ color: 'var(--chart-green)' }}>Selesai Sukses</span>
           </div>
         );
       case "processing":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30 animate-pulse">
-            <Loader2 size={12} className="animate-spin text-amber-600 dark:text-amber-400" />
-            <span>Diproses</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border animate-pulse">
+            <Loader2 size={12} className="animate-spin" style={{ color: 'var(--chart-amber)' }} />
+            <span style={{ color: 'var(--chart-amber)' }}>Diproses</span>
           </div>
         );
       case "failed":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30">
-            <AlertCircle size={12} className="text-red-600 dark:text-red-400" />
-            <span>Gagal</span>
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
+            <AlertCircle size={12} style={{ color: 'var(--chart-red)' }} />
+            <span style={{ color: 'var(--chart-red)' }}>Gagal</span>
           </div>
         );
       default:
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-gray-50 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700">
-            <AlertCircle size={12} className="text-gray-400" />
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
+            <AlertCircle size={12} className="text-muted-foreground" />
             <span>Belum Mulai</span>
           </div>
         );
@@ -287,13 +287,10 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         <div className="flex items-center gap-6">
           {/* Main Score Badge */}
           <div
-            className={`flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] ${
-              finalVal >= 80
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
-                : finalVal >= 60
-                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50"
-                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
-            }`}
+            className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
+            style={{ 
+              color: finalVal >= 80 ? 'var(--chart-green)' : finalVal >= 60 ? 'var(--chart-amber)' : 'var(--chart-red)',
+            }}
           >
             <span>{finalVal}</span>
             <span className="text-[9px] text-muted-foreground/50 ml-0.5">/100</span>
@@ -330,13 +327,10 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         <div className="flex items-center gap-6">
           {/* Main Score Badge */}
           <div
-            className={`flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] ${
-              finalVal >= 80
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
-                : finalVal >= 60
-                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50"
-                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
-            }`}
+            className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
+            style={{ 
+              color: finalVal >= 80 ? 'var(--chart-green)' : finalVal >= 60 ? 'var(--chart-amber)' : 'var(--chart-red)',
+            }}
           >
             <span>{finalVal}</span>
             <span className="text-[9px] text-muted-foreground/50 ml-0.5">/100</span>
@@ -373,13 +367,10 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         <div className="flex items-center gap-6">
           {/* Main Score Badge */}
           <div
-            className={`flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] ${
-              finalVal >= 8.0
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50"
-                : finalVal >= 6.0
-                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50"
-                  : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50"
-            }`}
+            className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
+            style={{ 
+              color: finalVal >= 8.0 ? 'var(--chart-green)' : finalVal >= 6.0 ? 'var(--chart-amber)' : 'var(--chart-red)',
+            }}
           >
             <span>{finalVal}</span>
             <span className="text-[9px] text-muted-foreground/50 ml-0.5">/10</span>
@@ -427,12 +418,12 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
       {/* Top KPI Row - Combined 4 Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Sesi */}
-        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-            <MessageSquare size={18} />
+        <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary">
+            <MessageSquare size={20} />
           </div>
           <div>
-            <span className="text-xs font-medium text-muted-foreground block">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
               Total Sesi
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -442,12 +433,12 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         </div>
 
         {/* Card 2: KETIK */}
-        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-            <PenTool size={18} />
+        <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--module-ketik-bg)', color: 'var(--module-ketik)' }}>
+            <PenTool size={20} />
           </div>
           <div>
-            <span className="text-xs font-medium text-muted-foreground block uppercase">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block uppercase">
               ketik
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -457,12 +448,12 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         </div>
 
         {/* Card 3: PDKT */}
-        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
-            <Mail size={18} />
+        <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--module-pdkt-bg)', color: 'var(--module-pdkt)' }}>
+            <Mail size={20} />
           </div>
           <div>
-            <span className="text-xs font-medium text-muted-foreground block uppercase">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block uppercase">
               pdkt
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -472,12 +463,12 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         </div>
 
         {/* Card 4: Telefun */}
-        <div className="bg-card rounded-xl border border-border/40 p-5 flex items-center gap-4 shadow-sm bg-white dark:bg-card">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
-            <Phone size={18} />
+        <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--module-telefun-bg)', color: 'var(--module-telefun)' }}>
+            <Phone size={20} />
           </div>
           <div>
-            <span className="text-xs font-medium text-muted-foreground block capitalize">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block capitalize">
               telefun
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground mt-0.5">
@@ -550,7 +541,7 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
               <ChevronDown size={12} className="text-muted-foreground/60" />
             </button>
             {showDatePicker && (
-              <div className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3 bg-white dark:bg-card">
+              <div className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mulai</label>
                   <input
@@ -618,7 +609,7 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
       </div>
 
       {/* Spacious Telemetry Table */}
-      <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm bg-white dark:bg-card">
+      <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -707,7 +698,7 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
                               className="fixed inset-0 z-40"
                               onClick={() => setActiveDropdownId(null)}
                             />
-                            <div className="absolute right-0 mt-1 w-36 bg-card border border-border/80 rounded-xl shadow-xl z-50 py-1 bg-white dark:bg-card text-left">
+                            <div className="absolute right-0 mt-1 w-36 bg-card border border-border/80 rounded-xl shadow-xl z-50 py-1 text-left">
                               <button
                                 onClick={() => {
                                   onViewDetail(entry);
@@ -750,7 +741,7 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
       {/* Pagination Bar */}
       {filteredHistory.length > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card rounded-xl border border-border/40 p-4 shadow-sm bg-white dark:bg-card text-xs text-muted-foreground font-semibold">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card rounded-xl border border-border/40 p-4 shadow-sm text-xs text-muted-foreground font-semibold">
           {/* Items Range Indicator */}
           <div>
             Menampilkan {Math.min(totalItems, (currentPage - 1) * pageSize + 1)}-

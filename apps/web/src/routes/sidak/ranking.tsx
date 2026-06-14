@@ -150,7 +150,7 @@ export default function SidakRankingPage() {
                 <div className="p-3 bg-primary/10 rounded-2xl">
                   <Trophy className="w-6 h-6 text-primary" />
                 </div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-foreground/90">
+                <h1 className="font-outfit text-3xl font-black tracking-tight text-foreground">
                   Ranking Agen
                 </h1>
               </div>
@@ -165,18 +165,18 @@ export default function SidakRankingPage() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-1 rounded-[2rem] bg-background/40 backdrop-blur-3xl border border-white/20 shadow-2xl overflow-hidden"
+            className="rounded-2xl border border-border bg-surface overflow-hidden"
           >
             <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
               {/* Layanan */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                  <LayoutGrid className="w-3 h-3" /> Layanan
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
+                  <LayoutGrid className="w-3.5 h-3.5" /> Layanan
                 </label>
                 <select
                   value={selectedService}
                   onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full h-12 bg-white/50 dark:bg-black/20 backdrop-blur-md border border-black/5 dark:border-white/10 rounded-2xl px-4 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-semibold text-sm cursor-pointer"
+                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   {(availableServices.length > 0
                     ? availableServices
@@ -191,13 +191,13 @@ export default function SidakRankingPage() {
 
               {/* Periode */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                  <Calendar className="w-3 h-3" /> Periode
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
+                  <Calendar className="w-3.5 h-3.5" /> Periode
                 </label>
                 <select
                   value={selectedPeriod}
                   onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full h-12 bg-white/50 dark:bg-black/20 backdrop-blur-md border border-black/5 dark:border-white/10 rounded-2xl px-4 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-semibold text-sm cursor-pointer"
+                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   <option value="ytd">Year to Date (YTD)</option>
                   <option value="alltime">All Time</option>
@@ -213,13 +213,13 @@ export default function SidakRankingPage() {
 
               {/* Tahun */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                  <Calendar className="w-3 h-3" /> Tahun
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
+                  <Calendar className="w-3.5 h-3.5" /> Tahun
                 </label>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full h-12 bg-white/50 dark:bg-black/20 backdrop-blur-md border border-black/5 dark:border-white/10 rounded-2xl px-4 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-semibold text-sm cursor-pointer"
+                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   {(data?.availableYears ?? []).map((y) => (
                     <option key={y} value={y}>
@@ -231,13 +231,13 @@ export default function SidakRankingPage() {
 
               {/* Folder/Tim */}
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                  <Users className="w-3 h-3" /> Folder/Tim
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2 px-1">
+                  <Users className="w-3.5 h-3.5" /> Folder/Tim
                 </label>
                 <select
                   value={selectedFolder}
                   onChange={(e) => setSelectedFolder(e.target.value)}
-                  className="w-full h-12 bg-white/50 dark:bg-black/20 backdrop-blur-md border border-black/5 dark:border-white/10 rounded-2xl px-4 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all font-semibold text-sm cursor-pointer"
+                  className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   <option value="ALL">Semua Tim</option>
                   {(data?.folders ?? []).map((f) => (
@@ -254,16 +254,16 @@ export default function SidakRankingPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-background/40 backdrop-blur-2xl border border-white/20 rounded-[2.5rem] shadow-xl overflow-hidden"
+            className="rounded-2xl border border-border bg-surface overflow-hidden"
           >
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-white/50 dark:bg-black/20">
-                    <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60 w-16">
+                  <tr className="bg-muted/50">
+                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground w-16">
                       Rank
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       <button
                         type="button"
                         onClick={() => toggleSort("nama", "asc")}
@@ -273,10 +273,10 @@ export default function SidakRankingPage() {
                         {renderSortIcon("nama")}
                       </button>
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       Tim/Batch
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60 text-right">
+                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-right">
                       <button
                         type="button"
                         onClick={() => toggleSort("defects", "desc")}
@@ -286,7 +286,7 @@ export default function SidakRankingPage() {
                         {renderSortIcon("defects")}
                       </button>
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60 text-right">
+                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-right">
                       <button
                         type="button"
                         onClick={() => toggleSort("score", "desc")}
@@ -296,7 +296,7 @@ export default function SidakRankingPage() {
                         {renderSortIcon("score")}
                       </button>
                     </th>
-                    <th className="px-6 py-5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60 text-center">
+                    <th className="px-6 py-5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground text-center">
                       Status
                     </th>
                   </tr>

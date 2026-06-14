@@ -142,7 +142,7 @@ export default function SidakReportsAi() {
 
           {/* Filters */}
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-card/40 backdrop-blur-2xl border border-white/20 rounded-[2rem] shadow-xl p-6 space-y-4"
+            className="rounded-2xl border border-border bg-surface p-6 space-y-4"
           >
             {/* Mode + Model Selectors */}
             <div className="flex items-center flex-wrap gap-6">
@@ -255,7 +255,7 @@ export default function SidakReportsAi() {
         {report && (
           <div className="max-w-4xl mx-auto mt-6 space-y-4 px-4 md:px-8" ref={printRef}>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-              className="no-print flex items-center gap-3 p-4 rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/20"
+              className="no-print flex items-center gap-3 p-4 rounded-2xl border border-border bg-surface"
             >
               <CheckCircle className="h-5 w-5 text-emerald-500" />
               <span className="text-sm font-bold text-foreground/80">Laporan berhasil digenerate</span>
@@ -278,7 +278,7 @@ export default function SidakReportsAi() {
             </motion.div>
 
             {report.report?.executiveSummary && (
-              <div className="print-area rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/20 p-6">
+              <div className="print-area rounded-2xl border border-border bg-surface p-6">
                 <h3 className="text-sm font-bold text-foreground/90 mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4 text-amber-500" /> Ringkasan Eksekutif
                 </h3>
@@ -289,7 +289,7 @@ export default function SidakReportsAi() {
             )}
 
             {report.report?.keyFindings?.length > 0 && (
-              <div className="print-area rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/20 p-6">
+              <div className="print-area rounded-2xl border border-border bg-surface p-6">
                 <h3 className="text-sm font-bold text-foreground/90 mb-3">Temuan Penting</h3>
                 <ul className="space-y-2">
                   {report.report.keyFindings.map((f: string, i: number) => (
@@ -303,7 +303,7 @@ export default function SidakReportsAi() {
             )}
 
             {report.report?.recommendations?.length > 0 && (
-              <div className="print-area rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/20 p-6">
+              <div className="print-area rounded-2xl border border-border bg-surface p-6">
                 <h3 className="text-sm font-bold text-foreground/90 mb-3">Rekomendasi</h3>
                 <ul className="space-y-2">
                   {report.report.recommendations.map((r: string, i: number) => (
@@ -317,7 +317,7 @@ export default function SidakReportsAi() {
             )}
 
             {report.report?.priorityAreas?.length > 0 && (
-              <div className="print-area rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/20 p-6">
+              <div className="print-area rounded-2xl border border-border bg-surface p-6">
                 <h3 className="text-sm font-bold text-foreground/90 mb-3">Area Prioritas</h3>
                 <div className="flex flex-wrap gap-2">
                   {report.report.priorityAreas.map((a: string, i: number) => (
@@ -330,7 +330,7 @@ export default function SidakReportsAi() {
             )}
 
             {report.report?.scoreAnalysis && (
-              <div className="print-page rounded-2xl bg-card/40 backdrop-blur-2xl border border-white/20 p-6">
+              <div className="print-page rounded-2xl border border-border bg-surface p-6">
                 <h3 className="text-sm font-bold text-foreground/90 mb-3">Analisis Skor</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {report.report.scoreAnalysis}

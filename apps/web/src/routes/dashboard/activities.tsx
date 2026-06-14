@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   History,
   Search,
@@ -55,16 +56,39 @@ export default function ActivitiesPage() {
   const getActionColor = (action: string) => {
     const act = action.toUpperCase();
     if (act.includes("APPROVE") || act.includes("CREATE"))
-      return "bg-emerald-50 text-emerald-700 border-emerald-100";
+      return "bg-muted text-foreground border-border"; // semantic neutral for success-ish
     if (
       act.includes("REJECT") ||
       act.includes("REVOKE") ||
       act.includes("DELETE")
     )
-      return "bg-red-50 text-red-700 border-red-100";
+      return "bg-muted text-foreground border-border"; // semantic neutral
     if (act.includes("UPDATE") || act.includes("REASSIGN"))
-      return "bg-indigo-50 text-indigo-700 border-indigo-100";
-    return "bg-slate-50 text-slate-700 border-slate-100";
+      return "bg-muted text-foreground border-border"; // semantic neutral
+    return "bg-muted text-muted-foreground border-border";
+  };
+
+  const renderActionBadge = (action: string) => {
+    const act = action.toUpperCase();
+    let color = "var(--muted-foreground)";
+    if (act.includes("APPROVE") || act.includes("CREATE")) color = "var(--chart-green)";
+    if (
+      act.includes("REJECT") ||
+      act.includes("REVOKE") ||
+      act.includes("DELETE")
+    )
+      color = "var(--chart-red)";
+    if (act.includes("UPDATE") || act.includes("REASSIGN"))
+      color = "var(--chart-blue)";
+
+    return (
+      <span
+        className="inline-flex rounded-full border border-border bg-muted px-2.5 py-0.5 font-bold uppercase tracking-widest text-[9px]"
+        style={{ color }}
+      >
+        {action}
+      </span>
+    );
   };
 
   const handleDelete = async (logId: string) => {
@@ -120,20 +144,25 @@ export default function ActivitiesPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-8"
+    >
       {/* Page Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-            <History className="h-3.5 w-3.5" />
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-2 rounded-full bg-muted border border-border px-3 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <History className="h-3 w-3" />
             Audit Trail
           </div>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="text-4xl font-bold tracking-tight text-foreground font-outfit">
             Log Aktivitas
           </h2>
-          <p className="mt-1 text-gray-500">
+          <p className="text-sm text-muted-foreground font-medium max-w-2xl leading-relaxed">
             Rekaman jejak audit dari seluruh mutasi akses, approval, dan
-            perubahan status pengguna.
+            perubahan status pengguna dalam sistem secara realtime.
           </p>
         </div>
 
@@ -141,10 +170,10 @@ export default function ActivitiesPage() {
           <button
             onClick={() => refetch()}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted/50 transition-all shadow-sm cursor-pointer active:scale-95"
           >
             <RefreshCw
-              className={`h-3.5 w-3.5 text-gray-400 ${loading ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 text-muted-foreground ${loading ? "animate-spin" : ""}`}
             />
             Refresh
           </button>
@@ -152,7 +181,7 @@ export default function ActivitiesPage() {
           <button
             onClick={exportLogsToCsv}
             disabled={filteredLogs.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-600/10 hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground shadow-lg shadow-primary/10 hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer active:scale-95"
           >
             <ArrowDownToLine className="h-4 w-4" />
             Ekspor CSV
@@ -163,13 +192,13 @@ export default function ActivitiesPage() {
       {/* Filters */}
       <div className="grid gap-4 md:grid-cols-[1fr_240px]">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Cari aktor, target user, detail..."
+            placeholder="Cari aktor, tipe aksi, atau modul..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white pl-12 pr-4 py-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+            className="w-full rounded-xl border border-border bg-card pl-12 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all"
           />
         </div>
 
@@ -177,7 +206,7 @@ export default function ActivitiesPage() {
           <select
             value={selectedActionType}
             onChange={(e) => setSelectedActionType(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+            className="w-full h-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground font-semibold focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer"
           >
             <option value="ALL">Semua Jenis Aksi</option>
             {actionTypes.map((t) => (
@@ -190,19 +219,19 @@ export default function ActivitiesPage() {
       </div>
 
       {/* Logs Table Card */}
-      <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-            <span className="mt-4 text-sm font-medium">
+          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <span className="mt-4 text-xs font-bold uppercase tracking-widest">
               Memuat audit logs...
             </span>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="py-20 text-center text-gray-400">
-            <History className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="font-semibold text-gray-900">Belum ada aktivitas</h3>
-            <p className="text-xs text-gray-500 mt-1">
+          <div className="py-24 text-center text-muted-foreground">
+            <History className="mx-auto h-12 w-12 text-muted-foreground/20 mb-4" />
+            <h3 className="font-bold text-foreground">Belum ada aktivitas</h3>
+            <p className="text-xs mt-1 font-medium">
               Belum ada rekaman mutasi yang terekam.
             </p>
           </div>
@@ -211,45 +240,50 @@ export default function ActivitiesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <tr className="border-b border-border bg-muted/30 text-[10px] font-black text-muted-foreground uppercase tracking-[0.15em]">
                     <th className="px-6 py-4">Waktu</th>
                     <th className="px-6 py-4">Aktor</th>
                     <th className="px-6 py-4">Aksi</th>
-                    <th className="px-6 py-4">Tipe</th>
-                    <th className="px-6 py-4">Modul</th>
+                    <th className="px-6 py-4 text-center">Tipe & Modul</th>
                     <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y text-xs text-gray-700">
+                <tbody className="divide-y divide-border/40 text-xs text-foreground">
                   {paginatedLogs.map((log) => (
                     <tr
                       key={log.id}
-                      className="hover:bg-gray-50/50 transition-colors"
+                      className="hover:bg-muted/10 transition-colors group"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">
-                        {new Date(log.created_at).toLocaleString("id-ID")}
+                      <td className="px-6 py-5 whitespace-nowrap text-muted-foreground font-medium tabular-nums">
+                        {new Date(log.created_at).toLocaleString("id-ID", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </td>
-                      <td className="px-6 py-4 font-semibold text-gray-900">
+                      <td className="px-6 py-5 font-bold text-foreground">
                         {log.user_name || "-"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex rounded border px-2 py-0.5 font-bold uppercase tracking-wide text-[10px] ${getActionColor(log.action)}`}
-                        >
-                          {log.action}
-                        </span>
+                      <td className="px-6 py-5 whitespace-nowrap">
+                        {renderActionBadge(log.action)}
                       </td>
-                      <td className="px-6 py-4 text-gray-500">
-                        {log.type || "-"}
+                      <td className="px-6 py-5">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            {log.type || "-"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-foreground/5 text-[9px] font-black uppercase border border-border/50 text-foreground/70">
+                            {log.module || "-"}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-gray-500">
-                        {log.module || "-"}
-                      </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-5 text-right">
                         <button
                           onClick={() => handleDelete(log.id)}
                           disabled={deleting === log.id}
-                          className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                          className="text-muted-foreground hover:text-chart-red p-2 rounded-xl hover:bg-chart-red/10 transition-all disabled:opacity-50 cursor-pointer active:scale-90"
                           title="Hapus log"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -260,7 +294,7 @@ export default function ActivitiesPage() {
                 </tbody>
               </table>
             </div>
-            <div className="px-6 py-4 border-t">
+            <div className="px-6 py-4 border-t border-border bg-muted/10">
               <Pagination
                 page={page}
                 pageSize={pageSize}
@@ -276,6 +310,6 @@ export default function ActivitiesPage() {
           </>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

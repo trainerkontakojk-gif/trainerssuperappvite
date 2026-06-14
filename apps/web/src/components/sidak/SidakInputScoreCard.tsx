@@ -36,20 +36,17 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
   const strokeDashoffset = circumference - (Math.max(0, Math.min(100, score)) / 100) * circumference;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-card/75 backdrop-blur-md p-6 shadow-md transition-all duration-300 hover:shadow-lg">
-      {/* Glow effect */}
-      <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-primary/5 blur-3xl" />
-
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6 transition-all duration-200 hover:border-foreground/20">
       {/* Header Bar */}
-      <div className="flex items-center justify-between border-b border-border/50 pb-4 mb-6">
+      <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground/90">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Skor Kualitas (Live)
             </h3>
             <ModeIndicator mode={liveScore.mode} />
           </div>
-          <p className="text-[11px] font-bold text-muted-foreground mt-1.5">
+          <p className="text-[11px] font-semibold text-muted-foreground mt-1.5">
             {agentName} &middot; {periodLabel}
           </p>
         </div>
@@ -60,7 +57,7 @@ export default function SidakInputScoreCard({ liveScore, activeWeight, agentName
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
           </span>
-          <span className="text-[9px] font-black uppercase tracking-widest text-green-600">Kalkulasi Live</span>
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-green-600">Kalkulasi Live</span>
         </div>
       </div>
 

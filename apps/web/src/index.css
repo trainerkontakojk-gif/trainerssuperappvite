@@ -27,6 +27,16 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-fg2: var(--fg2);
+  --color-fg3: var(--fg3);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-inv-bg: var(--inv-bg);
+  --color-inv-fg: var(--inv-fg);
+
   /* Module colors */
   --color-module-ketik:    var(--module-ketik);
   --color-module-pdkt:     var(--module-pdkt);
@@ -62,26 +72,35 @@
     --font-display: 'Outfit', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    /* Sophisticated Ivory & Minimalist Clarity */
-    --background: #FAFAF9;      /* Stone-50 */
-    --foreground: #1C1917;      /* Stone-900 */
-    --card: #FFFFFF;
-    --card-foreground: #1C1917;
-    --popover: #FFFFFF;
-    --popover-foreground: #1C1917;
-    --primary: #1E293B;         /* Slate-800 - Navy */
-    --primary-foreground: #F8FAFC;
-    --secondary: #F5F5F4;       /* Stone-100 */
-    --secondary-foreground: #1C1917;
-    --muted: #FAFAF9;
-    --muted-foreground: #78716C; /* Stone-500 */
-    --accent: #F1F5F9;          /* Slate-100 */
-    --accent-foreground: #1E293B;
-    --destructive: #DC2626;     /* Red-600 */
-    --destructive-foreground: #FAFAFA;
-    --border: #E7E5E4;          /* Stone-200 */
-    --input: #E7E5E4;
-    --ring: #1E293B;
+    /* ── Canonical tokens (from docs/design.md) ──── */
+    --bg: #fafafa;
+    --surface: #f5f5f5;
+    --border: #e5e5e5;
+    --fg: #0a0a0a;
+    --fg2: #525252;
+    --fg3: #a3a3a3;
+    --inv-bg: #0a0a0a;
+    --inv-fg: #fafafa;
+
+    /* ── Tailwind compatibility aliases ────────── */
+    --background: var(--bg);
+    --foreground: var(--fg);
+    --card: var(--surface);
+    --card-foreground: var(--fg);
+    --popover: var(--surface);
+    --popover-foreground: var(--fg);
+    --primary: var(--inv-bg);          /* Primary action = inverted bg */
+    --primary-foreground: var(--inv-fg);
+    --secondary: var(--surface);
+    --secondary-foreground: var(--fg);
+    --muted: var(--bg);
+    --muted-foreground: var(--fg3);
+    --accent: var(--surface);
+    --accent-foreground: var(--fg);
+    --destructive: #DC2626;
+    --destructive-foreground: #fafafa;
+    --input: var(--border);
+    --ring: var(--fg);
     
     --radius: 0.75rem;
     --radius-sm: calc(var(--radius) - 4px);
@@ -96,7 +115,14 @@
     /* Custom tokens */
     --ivory: #FAFAF9;
     --navy: #1E293B;
+
+    /* ── New Layout Tokens ── */
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 72px;
+    --header-height: 56px;
+    --content-max-width: 1400px;
     --surface-elevated: #FFFFFF;
+    --surface-sunken: #F0F0EF;
 
     /* ── Module Identity Colors ──────────────────────── */
     /* Dipakai di dashboard card dan header modul          */
@@ -117,41 +143,53 @@
     --chart-orange:    #F97316;
     --chart-red:       #EF4444;
     --chart-green:     #10B981;
-    --chart-amber:     #F59E0B;
+    --chart-amber:     rgb(245, 158, 11);
     --chart-violet:    #8B5CF6;
     --chart-cyan:      #06B6D4;
   }
 
   .dark {
-    /* Dark Luxury & Clean Utility */
-    --background: #09090B;      /* Zinc-950 */
-    --foreground: #FAFAFA;      /* Zinc-50 */
-    --card: #18181B;            /* Zinc-900 */
-    --card-foreground: #FAFAFA;
-    --popover: #18181B;
-    --popover-foreground: #FAFAFA;
-    --primary: #F59E0B;         /* Amber-500 - Gold */
-    --primary-foreground: #09090B;
-    --secondary: #27272A;       /* Zinc-800 */
-    --secondary-foreground: #FAFAFA;
-    --muted: #18181B;
-    --muted-foreground: #A1A1AA; /* Zinc-400 */
+    /* ── Canonical tokens (dark) ──── */
+    --bg: #0a0a0a;
+    --surface: #171717;
+    --border: #262626;
+    --fg: #fafafa;
+    --fg2: #a3a3a3;
+    --fg3: #525252;
+    --inv-bg: #fafafa;
+    --inv-fg: #0a0a0a;
+
+    /* ── Tailwind compatibility (derived) ────── */
+    --background: var(--bg);
+    --foreground: var(--fg);
+    --card: var(--surface);
+    --card-foreground: var(--fg);
+    --popover: var(--surface);
+    --popover-foreground: var(--fg);
+    --primary: var(--inv-bg);
+    --primary-foreground: var(--inv-fg);
+    --secondary: #27272A;
+    --secondary-foreground: var(--fg);
+    --muted: var(--surface);
+    --muted-foreground: var(--fg2);
     --accent: #27272A;
-    --accent-foreground: #FAFAFA;
+    --accent-foreground: var(--fg);
     --destructive: #DC2626;
     --destructive-foreground: #FEF2F2;
-    --border: #27272A;
-    --input: #27272A;
-    --ring: #F59E0B;
+    --input: var(--border);
+    --ring: var(--fg);
     
     --shadow-sm: 0 1px 2px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.05);
     --shadow-md: 0 4px 6px -1px rgba(0,0,0,.4), 0 2px 4px -1px rgba(255,255,255,.05);
     --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.5), 0 4px 6px -2px rgba(255,255,255,.05);
 
     /* Custom tokens */
-    --gold: #F59E0B;
+    --gold: rgb(245, 158, 11);
     --gold-muted: #D97706;
+
+    /* ── New Layout Tokens ── */
     --surface-elevated: #1F1F23;
+    --surface-sunken: #111113;
 
     /* ── Module Identity Colors (dark) ────────────────── */
     --module-ketik:          #3B82F6;
@@ -159,7 +197,7 @@
     --module-pdkt:           #A855F7;
     --module-pdkt-bg:        #A855F715;
     --module-telefun:        #10B981;
-    --module-telefun-bg:       #10B98115;
+    --module-telefun-bg:     #10B98115;
     --module-profiler:       #8B5CF6;
     --module-profiler-bg:    #8B5CF615;
     --module-sidak:          #F43F5E;
@@ -170,7 +208,7 @@
     --chart-orange:    #F97316;
     --chart-red:       #EF4444;
     --chart-green:     #10B981;
-    --chart-amber:     #F59E0B;
+    --chart-amber:     rgb(245, 158, 11);
     --chart-violet:    #8B5CF6;
     --chart-cyan:      #06B6D4;
   }
@@ -193,6 +231,59 @@
 }
 
 @layer utilities {
+  /* ── Sidebar Rail ──────────────── */
+  .sidebar-rail {
+    width: var(--sidebar-collapsed-width);  /* 72px from Plan 001 */
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0;
+    gap: 4px;
+    z-index: 20;
+    transition: none;
+  }
+
+  .sidebar-rail-item {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: var(--fg3);
+    transition: all 0.15s ease;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .sidebar-rail-item:hover {
+    background: color-mix(in srgb, var(--fg) 8%, transparent);
+    color: var(--fg);
+  }
+
+  .sidebar-rail-item[data-active="true"] {
+    background: var(--inv-bg);
+    color: var(--inv-fg);
+  }
+
+  /* ── Sidebar Flyout Panel ──────── */
+  .sidebar-flyout {
+    width: 0;
+    overflow: hidden;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    transition: width 0.2s ease, opacity 0.15s ease;
+    opacity: 0;
+    z-index: 19;
+  }
+
+  .sidebar-flyout[data-open="true"] {
+    width: 260px;
+    opacity: 1;
+  }
+
   .auth-input {
     @apply w-full rounded-2xl border border-border/50 bg-background/80 px-4 py-3.5 text-sm font-medium text-foreground placeholder:text-muted-foreground/80 shadow-sm transition focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/15;
   }
@@ -351,6 +442,70 @@
     background:
       linear-gradient(180deg, color-mix(in srgb, var(--module-clean-accent) 92%, white 8%), color-mix(in srgb, var(--module-clean-accent) 82%, black 18%));
     box-shadow: 0 20px 44px -28px color-mix(in srgb, var(--module-clean-accent) 60%, black 40%);
+  }
+
+  /* ── Bento Grid Layout ── */
+  .bento-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+
+  @media (min-width: 768px) {
+    .bento-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .bento-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .bento-card {
+    background-color: var(--surface);
+    border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 24px -12px rgba(0, 0, 0, 0.05);
+  }
+
+  .bento-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .bento-card:hover {
+    border-color: color-mix(in srgb, var(--fg) 15%, var(--border));
+    box-shadow: 0 8px 32px -12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .bento-col-span-2 {
+    grid-column: span 1 / span 1;
+  }
+
+  @media (min-width: 768px) {
+    .bento-col-span-2 {
+      grid-column: span 2 / span 2;
+    }
+  }
+
+  .bento-row-span-2 {
+    grid-row: span 1 / span 1;
+  }
+
+  @media (min-width: 1280px) {
+    .bento-row-span-2 {
+      grid-row: span 2 / span 2;
+    }
   }
 }
 

@@ -28,6 +28,7 @@ import {
 } from "../lib/app-config";
 import { notify } from "../lib/toast";
 import { sidakClient, adminClient, unwrapResponse } from "../lib/api";
+import { FadeIn, StaggerList, StaggerItem } from "../components/motion";
 
 const DashboardTrendPanel = lazy(
   () => import("./dashboard/DashboardTrendPanel"),
@@ -326,16 +327,16 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-col gap-10 px-6 py-8 lg:px-10 lg:py-10">
+    <div className="relative z-10 mx-auto flex w-full max-w-[1200px] flex-col gap-12 px-6 py-10 lg:px-10 lg:py-14">
       {/* Background Radial Glow */}
-      <div className="pointer-events-none absolute left-1/2 top-0 h-[36rem] w-full max-w-[1200px] -translate-x-1/2 rounded-full bg-primary/6 blur-[140px]" />
+      <div className="pointer-events-none absolute left-1/2 top-0 h-[36rem] w-full max-w-[1200px] -translate-x-1/2 rounded-full bg-primary/5 blur-[140px]" />
 
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800/30">
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 text-sm rounded-lg border border-red-200 dark:border-red-800/30">
           <AlertCircle size={14} />
           <span>{error}</span>
           <button
-            className="ml-auto text-xs underline"
+            className="ml-auto text-xs underline font-medium"
             onClick={() => setError(null)}
           >
             Tutup
@@ -343,116 +344,107 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Hero Card */}
-      <section className="overflow-hidden rounded-[2rem] border border-border/50 bg-card/40 shadow-xl shadow-black/5 backdrop-blur-xl">
-        <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-          {/* Left Column */}
-          <div className="flex flex-col justify-center p-8 lg:p-12">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
-              <Sparkles className="h-3.5 w-3.5" />
-              Pusat Kendali
-            </div>
-            <div className="mt-6 space-y-4">
-              <h2 className="font-display text-4xl font-bold tracking-tight text-balance lg:text-5xl">
-                Halo, {displayName}.
-              </h2>
-              <p className="max-w-2xl text-base leading-relaxed text-muted-foreground lg:text-lg">
-                Anda memiliki akses untuk{" "}
-                {roleLabel === "Agent"
-                  ? "mempelajari skenario latihan baru dan memvalidasi skor capaian bulanan secara komprehensif"
-                  : "memantau tren performa layanan utama, mengevaluasi aktivitas harian staf, dan menggunakan perangkat manajemen"}{" "}
-                dalam satu platform.
-              </p>
-            </div>
+      <StaggerList className="flex flex-col gap-12" stagger={0.05}>
+        
+        {/* Section 1: Hero & Quick Stats */}
+        <StaggerItem className="flex flex-col lg:flex-row justify-between items-start gap-8 lg:gap-12">
+          <div className="flex-1 max-w-2xl">
+            <h2 className="font-display text-4xl font-bold tracking-tight text-fg mb-3">
+              Halo, {displayName}.
+            </h2>
+            <p className="text-base text-fg2 font-normal leading-relaxed">
+              Anda masuk sebagai <span className="font-semibold text-fg">{roleLabel}</span>.{" "}
+              {roleLabel === "Agent"
+                ? "Pelajari skenario latihan baru, ikuti simulasi interaktif, dan validasi skor capaian bulanan secara komprehensif."
+                : "Pantau tren performa layanan utama, mengevaluasi aktivitas harian staf, dan kelola operasional dalam satu platform."}
+            </p>
+          </div>
 
-            {managementActions.length > 0 && (
-              <div className="mt-10 lg:mt-12">
-                <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-                  Opsi Manajerial
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {managementActions.map((action) => (
-                    <Link
-                      key={action.href}
-                      to={action.href}
-                      className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-background/60 px-5 py-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-background hover:shadow-md"
-                    >
-                      <action.icon className="h-4 w-4 text-primary/70" />
-                      <span className="text-sm font-semibold text-foreground/90">
-                        {action.title}
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-primary/40 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
-                    </Link>
-                  ))}
+          {/* Quick Stats right aligned */}
+          <div className="flex shrink-0 gap-6 lg:gap-10 p-6 rounded-2xl bg-surface border border-border">
+            {showAnalytics && serviceTrendMap ? (
+              <>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-display font-bold tracking-tight text-fg">
+                    {localTrendData?.totalSummary.auditedAgents ?? serviceTrendMap.all.totalSummary.auditedAgents ?? 0}
+                  </span>
+                  <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
+                    Agen Diaudit
+                  </span>
                 </div>
+                <div className="w-px bg-border"></div>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-display font-bold tracking-tight text-fg">
+                    {localTrendData?.totalSummary.totalDefects ?? serviceTrendMap.all.totalSummary.totalDefects ?? 0}
+                  </span>
+                  <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
+                    Temuan
+                  </span>
+                </div>
+                <div className="w-px bg-border"></div>
+                <div className="flex flex-col">
+                  <span className="text-3xl font-display font-bold tracking-tight text-fg">
+                    {localTrendData?.totalSummary.activeServiceCount ?? serviceTrendMap.all.totalSummary.activeServiceCount ?? 0}
+                  </span>
+                  <span className="text-xs text-fg3 font-medium uppercase tracking-wider mt-1">
+                    Layanan
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 text-fg2">
+                <Clock className="w-5 h-5 text-fg3" />
+                <span className="text-sm font-medium">Sesi latihan Anda siap dimulai</span>
               </div>
             )}
           </div>
+        </StaggerItem>
 
-          {/* Right Column */}
-          <div className="flex flex-col justify-center border-t border-border/40 bg-muted/20 p-8 lg:border-l lg:border-t-0 lg:p-12">
-            <p className="mb-6 text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-              Pintasan Modul
-            </p>
-            <div className="flex flex-col gap-3">
-              {shortcutsToDisplay.map((shortcut) => (
+        {/* Section 2: Trainer Shortcuts (Prominent Top Placement) */}
+        {isManager && (
+          <StaggerItem>
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-fg tracking-tight">Pintasan Cepat</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {trainerShortcuts.slice(0, 3).map((shortcut) => (
                 <Link
                   key={shortcut.href}
                   to={shortcut.href}
-                  className="group flex items-center gap-4 rounded-3xl border border-background/50 bg-background/50 p-3 transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:bg-background hover:shadow-sm"
+                  className="group flex items-center gap-4 rounded-xl border border-border bg-surface p-4 transition-all hover:border-fg/30 hover:bg-surface"
                 >
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${shortcut.accentSoftClassName} ${shortcut.accentClassName}`}
-                  >
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${shortcut.accentSoftClassName} ${shortcut.accentClassName}`}>
                     <shortcut.icon className="h-5 w-5" />
                   </div>
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <p className="text-sm font-semibold tracking-tight text-foreground/90">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-fg">
                       {shortcut.title}
                     </p>
-                    <p className="text-[11px] font-medium leading-4 text-muted-foreground">
-                      {shortcut.expandedTitle || shortcut.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground pr-2">
+                    <p className="text-xs text-fg3 truncate mt-0.5">
                       {shortcut.description}
                     </p>
                   </div>
-                  <div className="mr-2 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 shrink-0">
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <ArrowRight className="h-4 w-4 text-fg3 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1" />
                 </Link>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
+          </StaggerItem>
+        )}
 
-      {/* Workspace Modules Showcase */}
-      <section className="space-y-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground">
-            Workspace Terpadu
-          </p>
-          <h3 className="font-display mt-2 text-2xl font-semibold tracking-tight lg:text-[2.1rem]">
-            Lebih mudah berpindah dari satu modul ke modul yang lain
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {visibleModules.map((module, idx) => {
-            const colors = getModuleColors(module.id);
-            return (
-              <div
-                key={module.id}
-                className="animate-in fade-in slide-in-from-bottom-4"
-                style={{
-                  animationDuration: "400ms",
-                  animationFillMode: "both",
-                  animationDelay: `${idx * 80}ms`,
-                }}
-              >
+        {/* Section 3: Workspace Terpadu */}
+        <StaggerItem>
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-fg tracking-tight">Workspace Terpadu</h3>
+            <p className="text-xs text-fg2 mt-1">Akses modul utama untuk pelatihan dan penilaian</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {visibleModules.map((module) => {
+              const colors = getModuleColors(module.id);
+              return (
                 <Link
+                  key={module.id}
                   to={module.href}
-                  className="group flex h-full flex-col rounded-[2rem] border border-border/50 bg-card/70 p-5 backdrop-blur-md transition hover:-translate-y-1 hover:border-primary/20 hover:shadow-lg hover:shadow-black/5"
+                  className="group flex flex-col justify-between rounded-xl border border-border bg-surface p-5 transition-all hover:border-fg/30 hover:shadow-sm"
                   onClick={(e) => {
                     if (module.id === "telefun" && !hasTelefunAccess) {
                       e.preventDefault();
@@ -460,152 +452,166 @@ export default function DashboardPage() {
                     }
                   }}
                 >
-                  <div className="mb-5 flex items-start justify-between gap-4">
-                    <div
-                      className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colors.soft} ${colors.text}`}
-                    >
-                      <module.icon className="h-5 w-5" />
+                  <div>
+                    <div className="mb-5 flex items-center justify-between">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${colors.soft} ${colors.text}`}>
+                        <module.icon className="h-5 w-5" />
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-fg3 transition-transform group-hover:translate-x-1 group-hover:text-fg" />
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
-                  </div>
-                  <h4 className="text-lg font-semibold tracking-tight">
-                    {module.title}
-                  </h4>
-                  <p className="mt-1 text-sm font-medium leading-5 text-muted-foreground">
-                    {module.expandedTitle}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {module.description}
-                  </p>
-                  <div className="mt-auto pt-5 text-[10px] font-bold uppercase tracking-[0.24em] text-primary">
-                    Buka Modul
+                    <h4 className="text-sm font-semibold text-fg">
+                      {module.title}
+                    </h4>
+                    <p className="mt-1.5 text-xs text-fg3 leading-relaxed">
+                      {module.description}
+                    </p>
                   </div>
                 </Link>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* QA Trend Analytics Chart Section (Only for Manager or Leader) */}
-      {showAnalytics && serviceTrendMap && (
-        <Suspense
-          fallback={
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-              <div className="lg:col-span-2 h-[420px] rounded-[2rem] border border-border/40 bg-card/30 animate-pulse" />
-              <div className="h-[420px] rounded-[2rem] border border-border/40 bg-card/30 animate-pulse" />
-            </div>
-          }
-        >
-          <DashboardTrendPanel
-            serviceTrendMap={serviceTrendMap}
-            availableYears={availableYears}
-            selectedYear={selectedYear}
-            trendStartMonth={trendStartMonth}
-            trendEndMonth={trendEndMonth}
-            trendLoading={trendLoading}
-            localTrendData={localTrendData}
-            onYearChange={handleYearChange}
-            onRangeChange={handleRangeChange}
-          />
-        </Suspense>
-      )}
-
-      {/* Activity Logs Section (Only for Admin or Trainer) */}
-      {isManager && (
-        <div className="rounded-[2rem] border border-border/40 bg-card/40 backdrop-blur-sm p-8 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h3 className="font-display text-sm font-bold text-foreground">
-                Aktivitas Terakhir
-              </h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Rekam jejak kegiatan operasional tim
-              </p>
-            </div>
-            <Link
-              to="/dashboard/activities"
-              className="text-[10px] font-mono uppercase tracking-widest text-primary hover:text-primary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-2 py-1 transition-colors"
-            >
-              Lihat Semua
-            </Link>
+              );
+            })}
           </div>
+        </StaggerItem>
 
-          {logsLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        {/* Section 4: Trend Panel */}
+        {showAnalytics && serviceTrendMap && (
+          <StaggerItem>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-fg tracking-tight">Tren Performa Kualitas</h3>
+                <p className="text-xs text-fg2 mt-1">Visualisasi deviasi temuan bulanan</p>
+              </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {formattedLogs.length > 0 ? (
-                formattedLogs.slice(0, 5).map((log) => {
-                  const isLogin = log.type === "login";
-                  const isEdit = log.type === "edit";
-                  const isAdd = log.type === "add";
+            
+            <div className="rounded-2xl border border-border bg-surface p-1 min-h-[360px]">
+              <Suspense
+                fallback={
+                  <div className="w-full h-[360px] flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-fg3" />
+                  </div>
+                }
+              >
+                <DashboardTrendPanel
+                  serviceTrendMap={serviceTrendMap}
+                  availableYears={availableYears}
+                  selectedYear={selectedYear}
+                  trendStartMonth={trendStartMonth}
+                  trendEndMonth={trendEndMonth}
+                  trendLoading={trendLoading}
+                  localTrendData={localTrendData}
+                  onYearChange={handleYearChange}
+                  onRangeChange={handleRangeChange}
+                />
+              </Suspense>
+            </div>
+          </StaggerItem>
+        )}
 
-                  return (
-                    <div
-                      key={log.id}
-                      className="flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-border/30 hover:border-primary/30 transition-all group relative"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${
-                            isLogin
-                              ? "bg-blue-500/10 text-blue-500"
-                              : isEdit
-                                ? "bg-purple-500/10 text-purple-500"
-                                : isAdd
-                                  ? "bg-emerald-500/10 text-emerald-500"
-                                  : "bg-orange-500/10 text-orange-500"
-                          }`}
-                        >
-                          {isLogin ? (
-                            <Users className="w-5 h-5" />
-                          ) : isEdit ? (
-                            <Activity className="w-5 h-5" />
-                          ) : isAdd ? (
-                            <Target className="w-5 h-5" />
-                          ) : (
-                            <Clock className="w-5 h-5" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold tracking-tight">
-                            {log.user}
-                          </div>
-                          <div className="text-xs text-foreground/50 font-light mt-0.5 leading-relaxed">
-                            {log.action}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-mono text-muted-foreground shrink-0">
-                          {log.time}
-                        </span>
-                        <button
-                          onClick={() =>
-                            handleDeleteActivity(log.id.toString())
-                          }
-                          className="p-2 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Hapus Log"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full py-8 text-center text-foreground/50 text-sm border border-dashed border-border/40 rounded-2xl bg-background/30">
-                  Belum ada aktivitas terbaru.
+        {/* Section 5: Activity Logs & Management (Two Columns if space permits) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Recent Activities */}
+          {isManager && (
+            <StaggerItem className="lg:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-fg tracking-tight">Aktivitas Terakhir</h3>
                 </div>
-              )}
-            </div>
+                <Link
+                  to="/dashboard/activities"
+                  className="text-xs text-fg2 hover:text-fg hover:underline transition-colors"
+                >
+                  Lihat Semua
+                </Link>
+              </div>
+
+              <div className="rounded-xl border border-border bg-surface overflow-hidden">
+                {logsLoading ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="w-5 h-5 animate-spin text-fg3" />
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {formattedLogs.length > 0 ? (
+                      formattedLogs.slice(0, 5).map((log) => {
+                        const isLogin = log.type === "login";
+                        const isEdit = log.type === "edit";
+                        const isAdd = log.type === "add";
+
+                        return (
+                          <div
+                            key={log.id}
+                            className="flex items-center justify-between p-4 hover:bg-surface-sunken transition-colors group"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="relative flex items-center justify-center shrink-0">
+                                <span className={`w-2 h-2 rounded-full ${
+                                  isLogin ? "bg-blue-500" : isEdit ? "bg-purple-500" : isAdd ? "bg-emerald-500" : "bg-amber-500"
+                                }`} />
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-fg">
+                                  {log.user}
+                                </div>
+                                <div className="text-xs text-fg2 mt-0.5">
+                                  {log.action}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className="text-[11px] font-mono text-fg3">
+                                {log.time}
+                              </span>
+                              <button
+                                onClick={() => handleDeleteActivity(log.id.toString())}
+                                className="p-1 text-fg3 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Hapus Log"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="py-10 text-center text-fg3 text-sm">
+                        Belum ada aktivitas terbaru.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </StaggerItem>
           )}
+
+          {/* Opsi Manajerial (Settings etc) */}
+          <StaggerItem className="lg:col-span-1">
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-fg tracking-tight">Opsi Manajerial</h3>
+            </div>
+            <div className="flex flex-col gap-3">
+              {managementActions.map((action) => (
+                <Link
+                  key={action.href}
+                  to={action.href}
+                  className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-3.5 transition-all hover:border-fg/30 hover:bg-surface"
+                >
+                  <action.icon className="h-4.5 w-4.5 text-fg2" />
+                  <span className="text-sm font-medium text-fg">{action.title}</span>
+                  <ArrowRight className="h-4 w-4 text-fg3 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1 ml-auto" />
+                </Link>
+              ))}
+              <Link
+                to="/account"
+                className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-3.5 transition-all hover:border-fg/30 hover:bg-surface mt-2"
+              >
+                <UserCog className="h-4.5 w-4.5 text-fg2" />
+                <span className="text-sm font-medium text-fg">Pengaturan Profil</span>
+                <ArrowRight className="h-4 w-4 text-fg3 opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-1 ml-auto" />
+              </Link>
+            </div>
+          </StaggerItem>
         </div>
-      )}
+
+      </StaggerList>
     </div>
   );
 }

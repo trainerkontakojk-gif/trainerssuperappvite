@@ -255,10 +255,6 @@ export default function ProfilerLanding() {
 
       <div className="flex flex-1 overflow-hidden relative">
         <main className="flex-1 overflow-hidden relative group">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none overflow-hidden z-0">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/3 rounded-full blur-[120px]" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-module-profiler/5 rounded-full blur-[120px]" />
-          </div>
 
           <AnimatePresence mode="wait">
             {!selectedBatch ? (
@@ -343,7 +339,7 @@ export default function ProfilerLanding() {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed top-0 right-0 z-[70] h-full w-[85%] max-w-sm bg-card shadow-2xl md:hidden"
+                className="fixed top-0 right-0 z-[70] h-full w-[85%] max-w-sm bg-surface border-l border-border md:hidden"
               >
                 <HierarchyPanel 
                   years={years}
@@ -370,18 +366,18 @@ export default function ProfilerLanding() {
       {/* Modals */}
       {showAddYear && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md">
-          <div className="bg-card w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-border/40">
-            <h3 className="text-xl font-black tracking-tight mb-6">Tambah Tahun</h3>
+          <div className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-border shadow-xl">
+            <h3 className="text-lg font-outfit font-bold mb-4 text-fg">Tambah Tahun</h3>
             <input 
               type="number"
               value={newYearValue}
               onChange={e => setNewYearValue(parseInt(e.target.value))}
-              className="w-full px-5 py-4 rounded-2xl border border-border/40 bg-background mb-6 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold"
+              className="w-full px-3 py-2 rounded-md border border-border bg-background mb-4 transition-all focus:border-fg focus:outline-none text-fg font-medium"
               min="2000" max="2100"
             />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowAddYear(false)} className="px-5 py-3 rounded-xl font-bold text-muted-foreground hover:bg-accent transition-all">Batal</button>
-              <button onClick={handleAddYear} className="px-5 py-3 rounded-xl font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all shadow-lg shadow-primary/20">Simpan</button>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowAddYear(false)} className="px-4 py-2 border border-border rounded-md font-medium text-xs text-fg bg-transparent hover:bg-background transition-colors">Batal</button>
+              <button onClick={handleAddYear} className="px-4 py-2 rounded-md font-medium text-xs bg-inv-bg text-inv-fg hover:opacity-90 transition-opacity">Simpan</button>
             </div>
           </div>
         </div>
@@ -389,8 +385,8 @@ export default function ProfilerLanding() {
 
       {showAddFolder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md">
-          <div className="bg-card w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-border/40">
-            <h3 className="text-xl font-black tracking-tight mb-6">
+          <div className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-border shadow-xl">
+            <h3 className="text-lg font-outfit font-bold mb-4 text-fg">
               Tambah {showAddFolder.parentId ? 'Batch/Group' : 'Tim/Folder'}
             </h3>
             <input 
@@ -398,12 +394,12 @@ export default function ProfilerLanding() {
               value={newFolderName}
               onChange={e => setNewFolderName(e.target.value)}
               placeholder="Nama"
-              className="w-full px-5 py-4 rounded-2xl border border-border/40 bg-background mb-6 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold"
+              className="w-full px-3 py-2 rounded-md border border-border bg-background mb-4 transition-all focus:border-fg focus:outline-none text-fg font-medium"
               autoFocus
             />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowAddFolder(null)} className="px-5 py-3 rounded-xl font-bold text-muted-foreground hover:bg-accent transition-all">Batal</button>
-              <button onClick={handleAddFolder} disabled={!newFolderName.trim()} className="px-5 py-3 rounded-xl font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">Simpan</button>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowAddFolder(null)} className="px-4 py-2 border border-border rounded-md font-medium text-xs text-fg bg-transparent hover:bg-background transition-colors">Batal</button>
+              <button onClick={handleAddFolder} disabled={!newFolderName.trim()} className="px-4 py-2 rounded-md font-medium text-xs bg-inv-bg text-inv-fg hover:opacity-90 disabled:opacity-50 transition-opacity">Simpan</button>
             </div>
           </div>
         </div>
@@ -411,18 +407,18 @@ export default function ProfilerLanding() {
 
       {renamingFolder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md">
-          <div className="bg-card w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-border/40">
-            <h3 className="text-xl font-black tracking-tight mb-6">Ubah Nama</h3>
+          <div className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-border shadow-xl">
+            <h3 className="text-lg font-outfit font-bold mb-4 text-fg">Ubah Nama</h3>
             <input 
               type="text"
               value={renameValue}
               onChange={e => setRenameValue(e.target.value)}
-              className="w-full px-5 py-4 rounded-2xl border border-border/40 bg-background mb-6 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 font-bold"
+              className="w-full px-3 py-2 rounded-md border border-border bg-background mb-4 transition-all focus:border-fg focus:outline-none text-fg font-medium"
               autoFocus
             />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setRenamingFolder(null)} className="px-5 py-3 rounded-xl font-bold text-muted-foreground hover:bg-accent transition-all">Batal</button>
-              <button onClick={handleRenameFolder} disabled={!renameValue.trim() || renameValue === renamingFolder.name} className="px-5 py-3 rounded-xl font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50">Simpan</button>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setRenamingFolder(null)} className="px-4 py-2 border border-border rounded-md font-medium text-xs text-fg bg-transparent hover:bg-background transition-colors">Batal</button>
+              <button onClick={handleRenameFolder} disabled={!renameValue.trim() || renameValue === renamingFolder.name} className="px-4 py-2 rounded-md font-medium text-xs bg-inv-bg text-inv-fg hover:opacity-90 disabled:opacity-50 transition-opacity">Simpan</button>
             </div>
           </div>
         </div>
@@ -430,17 +426,17 @@ export default function ProfilerLanding() {
 
       {confirmDeleteFolder && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md" onClick={() => !deleting && setConfirmDeleteFolder(null)}>
-          <div className="bg-card w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border border-destructive/20" onClick={e => e.stopPropagation()}>
-            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-              <Trash2 className="w-6 h-6 text-destructive" />
+          <div className="bg-surface w-full max-w-sm rounded-2xl p-6 border border-border shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-5 h-5 text-destructive" />
             </div>
-            <h3 className="text-xl font-black tracking-tight text-destructive mb-3 text-center">Hapus Folder?</h3>
-            <p className="text-sm text-muted-foreground font-medium mb-6 leading-relaxed">
-              Folder <span className="font-bold text-foreground">"{confirmDeleteFolder.name}"</span> dan semua isinya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
+            <h3 className="text-lg font-outfit font-bold text-destructive mb-2 text-center">Hapus Folder?</h3>
+            <p className="text-xs text-fg2 mb-6 leading-relaxed text-center">
+              Folder <span className="underline font-semibold">"{confirmDeleteFolder.name}"</span> dan semua isinya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
             </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setConfirmDeleteFolder(null)} className="px-5 py-3 rounded-xl font-bold text-muted-foreground hover:bg-accent transition-all" disabled={deleting}>Batal</button>
-              <button onClick={handleDeleteFolder} disabled={deleting} className="px-5 py-3 rounded-xl font-bold bg-destructive text-destructive-foreground hover:opacity-90 transition-all shadow-lg shadow-destructive/20 flex items-center gap-2">
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDeleteFolder(null)} className="px-4 py-2 border border-border rounded-md font-medium text-xs text-fg bg-transparent hover:bg-background transition-colors" disabled={deleting}>Batal</button>
+              <button onClick={handleDeleteFolder} disabled={deleting} className="px-4 py-2 rounded-md font-medium text-xs bg-destructive text-white hover:bg-destructive/90 transition-colors flex items-center gap-2">
                 {deleting ? 'Menghapus...' : 'Ya, Hapus'}
               </button>
             </div>
@@ -480,30 +476,30 @@ export default function ProfilerLanding() {
 
       {showBirthdayModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md" onClick={() => setShowBirthdayModal(false)}>
-          <div className="bg-card w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-border/40 overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="p-8 bg-module-profiler text-white">
-              <h3 className="text-2xl font-black flex items-center gap-3 tracking-tighter">
-                <Cake size={28} /> 
+          <div className="bg-surface w-full max-w-sm rounded-2xl border border-border overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-outfit font-bold flex items-center gap-2 text-fg">
+                <Cake size={20} className="text-fg" /> 
                 Ulang Tahun
               </h3>
-              <p className="text-xs font-bold text-white/60 uppercase tracking-widest mt-1">Acara mendatang di {selectedBatch}</p>
+              <p className="text-[10px] text-fg3 font-medium uppercase tracking-wider mt-0.5">Acara mendatang di {selectedBatch}</p>
             </div>
-            <div className="p-4 space-y-2">
+            <div className="p-4 space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
               {upcomingBirthdays.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-sm text-muted-foreground font-medium italic opacity-40">Tidak ada data ulang tahun.</p>
+                  <p className="text-xs text-fg3 font-medium italic">Tidak ada data ulang tahun.</p>
                 </div>
               ) : (
                 upcomingBirthdays.map((b, i) => (
-                  <div key={i} className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${b.days === 0 ? 'bg-module-profiler/5 border-module-profiler/20' : 'bg-background border-border/40'}`}>
+                  <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${b.days === 0 ? 'bg-inv-bg text-inv-fg border-transparent' : 'bg-background border-border'}`}>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-black truncate tracking-tight ${b.days === 0 ? 'text-module-profiler' : 'text-foreground'}`}>
+                      <p className={`text-sm font-semibold truncate ${b.days === 0 ? 'text-inv-fg' : 'text-fg'}`}>
                         {b.nama}
                       </p>
-                      <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider mt-0.5">{formatDate(b.tglLahir)} · {b.age} TAHUN</p>
+                      <p className={`text-[10px] mt-0.5 ${b.days === 0 ? 'text-inv-fg/80' : 'text-fg3'}`}>{formatDate(b.tglLahir)} · {b.age} TAHUN</p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${b.days === 0 ? 'text-module-profiler animate-pulse' : 'text-muted-foreground/40'}`}>
+                      <p className={`text-[10px] font-medium tracking-wide ${b.days === 0 ? 'text-inv-fg animate-pulse' : 'text-fg3'}`}>
                         {b.days === 0 ? 'HARI INI' : `${b.days} HARI LAGI`}
                       </p>
                     </div>
@@ -512,8 +508,8 @@ export default function ProfilerLanding() {
               )}
             </div>
             {upcomingBirthdays.length > 0 && (
-              <div className="px-8 pb-6">
-                <p className="text-[10px] text-muted-foreground/30 text-center font-black uppercase tracking-widest">
+              <div className="px-6 pb-4">
+                <p className="text-[10px] text-fg3 text-center font-medium">
                   Menampilkan 5 data terdekat
                 </p>
               </div>

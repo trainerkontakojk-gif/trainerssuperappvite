@@ -37,10 +37,10 @@ export default function FatalDonutChart({ critical, nonCritical, total }: Props)
           <Tooltip
             formatter={(value: any) => [value, "Kasus"]}
             contentStyle={{
-              borderRadius: 12,
+              borderRadius: 8,
               border: "1px solid var(--border)",
               backgroundColor: "var(--card)",
-              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+              boxShadow: "none",
               fontSize: 12,
               fontWeight: 600,
               color: "var(--foreground)",

@@ -26,6 +26,8 @@ opencode.json
 .superpowers
 docs/superpowers/
 plan/
+.agents/
+skills-lock.json
 
 # ── Project-specific ──
 apps/api/src/inspect_db.ts

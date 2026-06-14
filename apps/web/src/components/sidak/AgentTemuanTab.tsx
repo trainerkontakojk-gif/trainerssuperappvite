@@ -109,49 +109,55 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
         const monthLabel = `${MONTHS_FULL[month - 1]} ${year}`;
 
         return (
-          <div key={key} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+          <div key={key} className="border-b border-border pb-4 mb-4 last:border-0 last:mb-0 last:pb-0">
             <button
               type="button"
               onClick={() => toggleMonth(key)}
-              className="w-full px-6 py-5 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+              className="w-full px-4 py-4 rounded-2xl flex items-center justify-between group transition-all hover:bg-muted/40"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-primary shadow-sm">
-                  <BarChart2 className="w-5 h-5" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-transparent text-muted-foreground transition-colors group-hover:border-primary/30 group-hover:text-primary">
+                  <BarChart2 className="h-4 w-4" />
                 </div>
                 <div className="text-left">
-                  <h4 className="text-base font-black tracking-tight text-slate-900 dark:text-white uppercase">{monthLabel}</h4>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{monthItems.length} Temuan • {Object.keys(tickets).length} Tiket</p>
+                  <h4 className="text-base font-black tracking-tight text-foreground uppercase transition-colors">{monthLabel}</h4>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{monthItems.length} Temuan • {Object.keys(tickets).length} Tiket</p>
                 </div>
               </div>
-              {isOpen ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-transparent transition-colors group-hover:bg-background">
+                {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </div>
             </button>
 
             {isOpen && (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
+              <div className="space-y-8 pt-4">
                 {Object.entries(tickets).map(([ticketKey, ticket], ticketIndex) => (
-                  <div key={ticketKey} className="p-6 space-y-6 bg-white dark:bg-slate-900">
-                    <div className="flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-100 dark:border-slate-800/50">
+                  <div key={ticketKey} className="space-y-6">
+                    <div className="flex items-center justify-between gap-4 border-b border-border pb-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-slate-900 text-white text-[10px] font-black flex items-center justify-center">{ticketIndex + 1}</div>
-                        <Ticket className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm font-black italic text-muted-foreground/40 w-6">#{ticketIndex + 1}</span>
+                        <Ticket className="w-4 h-4 text-muted-foreground" />
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.18em]">No Tiket</span>
-                          <span className="text-[11px] font-black font-mono text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                          <span className="text-[8px] font-black text-muted-foreground/60 uppercase tracking-[0.18em]">No Tiket</span>
+                          <span className="text-[11px] font-black font-mono text-foreground uppercase tracking-wider">
                             {ticket.label}
                           </span>
                         </div>
                       </div>
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">{ticket.items.length} PARAMETER</span>
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">{ticket.items.length} PARAMETER</span>
                     </div>
 
-                    <div className="space-y-8 pl-2">
+                    <div className="space-y-8 pl-9">
                       {ticket.items.map((t) => {
                         const isCritical = t.category === 'critical';
                         
                         return (
                           <div key={t.id} className="flex gap-6 items-start relative group/item">
-                            <NilaiBadge nilai={t.nilai} />
+                            <div className="flex flex-col items-center gap-1 shrink-0 w-12 pt-1">
+                              <span className="text-xl font-black text-foreground">{t.nilai}</span>
+                              <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-widest">Poin</span>
+                            </div>
+                            
                             <div className="flex-1 min-w-0 space-y-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -160,7 +166,7 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                                       {t.category}
                                     </span>
                                   </div>
-                                  <h5 className="text-base font-black text-slate-900 dark:text-white leading-snug">{t.indicatorName}</h5>
+                                  <h5 className="text-base font-black text-foreground leading-snug">{t.indicatorName}</h5>
                                 </div>
 
                                 {canEdit && (
@@ -173,22 +179,22 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                                 )}
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800/50">
-                                  <div className="flex items-center gap-1.5 mb-2 text-slate-500">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
                                     <AlertCircle className="w-3 h-3" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Ketidaksesuaian</span>
                                   </div>
-                                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
                                     {t.ketidaksesuaian || '—'}
                                   </p>
                                 </div>
-                                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
-                                  <div className="flex items-center gap-1.5 mb-2 text-primary">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-1.5 text-primary">
                                     <ShieldCheck className="w-3 h-3" />
                                     <span className="text-[9px] font-bold uppercase tracking-widest">Rekomendasi</span>
                                   </div>
-                                  <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-bold italic">
+                                  <p className="text-xs text-foreground leading-relaxed font-bold italic">
                                     {t.sebaiknya || '—'}
                                   </p>
                                 </div>

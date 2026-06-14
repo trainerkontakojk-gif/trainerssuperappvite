@@ -47,14 +47,14 @@ export default function SidakAgentsPage() {
   const batches = data?.batches ?? [];
 
   return (
-    <div className="min-h-screen bg-foreground/[0.02] pb-12">
-      <header className="sticky top-0 z-30 w-full border-b border-border/40 bg-background/70 backdrop-blur-xl">
+    <div className="min-h-screen bg-background pb-12">
+      <header className="sticky top-0 z-30 w-full border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               SIDAK / DIRECTORY AGENT
             </p>
-            <h1 className="text-xl font-black tracking-tighter sm:text-2xl">
+            <h1 className="font-outfit text-xl font-black tracking-tight sm:text-2xl text-foreground">
               Direktori Agent
             </h1>
           </div>
@@ -63,7 +63,7 @@ export default function SidakAgentsPage() {
               setShowAll((s) => !s);
               setVisibleCount(INITIAL_VISIBLE);
             }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background px-3.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all hover:border-primary/30"
+            className="inline-flex items-center gap-1.5 bg-transparent text-[11px] font-bold uppercase tracking-wider transition-all hover:opacity-75 text-foreground"
           >
             {showAll ? (
               <EyeOff size={14} className="text-amber-500" />
@@ -79,10 +79,10 @@ export default function SidakAgentsPage() {
         <div className="group relative">
           <Search
             size={18}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground"
           />
           <input
-            className="w-full rounded-2xl border border-border/50 bg-background py-2.5 pl-11 pr-4 text-sm outline-none ring-0 transition-all focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-xl border border-border bg-transparent py-2.5 pl-11 pr-4 text-sm outline-none transition-all focus:border-foreground"
             placeholder="Cari agent..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -96,10 +96,10 @@ export default function SidakAgentsPage() {
                 setSelectedBatch(null);
                 setVisibleCount(INITIAL_VISIBLE);
               }}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-all ${
                 selectedBatch === null
-                  ? "border-primary bg-primary text-white shadow-lg shadow-primary/20"
-                  : "border-border/50 bg-background text-muted-foreground hover:border-primary/40"
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border bg-transparent text-muted-foreground hover:border-foreground/20"
               }`}
             >
               Semua Batch
@@ -111,10 +111,10 @@ export default function SidakAgentsPage() {
                   setSelectedBatch(b === selectedBatch ? null : b);
                   setVisibleCount(INITIAL_VISIBLE);
                 }}
-                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-all ${
                   selectedBatch === b
-                    ? "border-primary bg-primary text-white shadow-lg shadow-primary/20"
-                    : "border-border/50 bg-background text-muted-foreground hover:border-primary/40"
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border bg-transparent text-muted-foreground hover:border-foreground/20"
                 }`}
               >
                 {b}
@@ -128,7 +128,7 @@ export default function SidakAgentsPage() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse rounded-[2rem] border border-border/50 bg-card/40 p-5"
+                className="animate-pulse rounded-2xl border border-border bg-surface p-5"
               >
                 <div className="flex items-start justify-between">
                   <div className="h-16 w-16 rounded-2xl bg-muted/60" />
@@ -162,7 +162,7 @@ export default function SidakAgentsPage() {
                     setShowAll(false);
                     setVisibleCount(INITIAL_VISIBLE);
                   }}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background px-3.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all hover:bg-muted/50"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-all hover:bg-muted"
                 >
                   <RotateCcw size={12} />
                   Reset Filter
@@ -181,7 +181,7 @@ export default function SidakAgentsPage() {
               <div className="flex justify-center pt-2">
                 <button
                   onClick={() => setVisibleCount((s) => s + INITIAL_VISIBLE)}
-                  className="rounded-2xl border border-border/50 bg-background px-8 py-2.5 text-[11px] font-black uppercase tracking-widest transition-all hover:bg-muted/50"
+                  className="rounded-xl border border-border bg-transparent px-8 py-2.5 text-[11px] font-semibold uppercase tracking-wide transition-all hover:bg-muted"
                 >
                   Muat {nextLoadCount} Agent Lagi
                 </button>

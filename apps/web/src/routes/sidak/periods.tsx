@@ -75,11 +75,11 @@ export default function SidakPeriodsPage() {
           className="flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <CalendarDays className="w-5 h-5 text-primary-foreground" />
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center border border-border text-muted-foreground">
+              <CalendarDays className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-foreground/90">
+              <h1 className="font-outfit text-xl font-black tracking-tight text-foreground">
                 Periode Pelaporan
               </h1>
               <p className="text-xs text-muted-foreground">
@@ -114,13 +114,13 @@ export default function SidakPeriodsPage() {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="bg-card rounded-2xl border border-border p-5 space-y-4 shadow-sm">
-                <p className="text-sm font-bold text-foreground">
+              <div className="bg-surface rounded-2xl border border-border p-5 space-y-4">
+                <p className="font-outfit text-sm font-bold text-foreground">
                   Tambah Periode Baru
                 </p>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <p className="text-[10px] text-muted-foreground mb-2 font-bold uppercase tracking-wider">
+                    <p className="text-[11px] text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
                       Bulan
                     </p>
                     <div className="grid grid-cols-4 gap-1.5">
@@ -128,10 +128,10 @@ export default function SidakPeriodsPage() {
                         <button
                           key={i}
                           onClick={() => setSelectedMonth(i + 1)}
-                          className={`py-2 rounded-xl text-[10px] font-bold uppercase transition-all border ${
+                          className={`py-2 rounded-xl text-[10px] font-semibold uppercase transition-all border ${
                             selectedMonth === i + 1
-                              ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
-                              : "bg-foreground/5 text-muted-foreground border-transparent hover:border-primary/40"
+                              ? "bg-foreground text-background border-foreground"
+                              : "bg-transparent text-muted-foreground border-border hover:border-foreground/20"
                           }`}
                         >
                           {m.slice(0, 3)}
@@ -140,7 +140,7 @@ export default function SidakPeriodsPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[10px] text-muted-foreground mb-2 font-bold uppercase tracking-wider">
+                    <p className="text-[11px] text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
                       Tahun
                     </p>
                     <div className="flex flex-col gap-1.5">
@@ -148,10 +148,10 @@ export default function SidakPeriodsPage() {
                         <button
                           key={y}
                           onClick={() => setSelectedYear(y)}
-                          className={`py-2 px-4 rounded-xl text-xs font-bold transition-all border ${
+                          className={`py-2 px-4 rounded-xl text-xs font-semibold transition-all border ${
                             selectedYear === y
-                              ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
-                              : "bg-foreground/5 text-muted-foreground border-transparent hover:border-primary/40"
+                              ? "bg-foreground text-background border-foreground"
+                              : "bg-transparent text-muted-foreground border-border hover:border-foreground/20"
                           }`}
                         >
                           {y}
@@ -159,10 +159,10 @@ export default function SidakPeriodsPage() {
                       ))}
                     </div>
                     <div
-                      className={`mt-4 px-3 py-2.5 rounded-xl text-center text-xs font-bold border transition-colors ${
+                      className={`mt-4 px-3 py-2.5 rounded-xl text-center text-xs font-semibold border transition-colors ${
                         alreadyExists
                           ? "bg-destructive/10 text-destructive border-destructive/20"
-                          : "bg-primary/10 text-primary border-primary/20"
+                          : "bg-muted text-muted-foreground border-border"
                       }`}
                     >
                       {alreadyExists
@@ -175,10 +175,10 @@ export default function SidakPeriodsPage() {
                   <button
                     onClick={handleAdd}
                     disabled={saving || alreadyExists}
-                    className="flex-1 py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-2xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                    className="flex-1 py-3 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2"
                   >
                     {saving ? (
-                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
                     ) : (
                       <Check className="w-5 h-5" />
                     )}
@@ -186,7 +186,7 @@ export default function SidakPeriodsPage() {
                   </button>
                   <button
                     onClick={() => setShowForm(false)}
-                    className="px-6 py-3 bg-foreground/5 hover:bg-foreground/10 text-muted-foreground rounded-2xl text-sm font-bold transition-all"
+                    className="px-6 py-3 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-xl text-sm font-semibold transition-all"
                   >
                     Batal
                   </button>
@@ -203,9 +203,9 @@ export default function SidakPeriodsPage() {
                 setShowForm(true);
                 setErrorMsg(null);
               }}
-              className="w-full h-14 flex items-center justify-center gap-2 bg-card border border-dashed border-border hover:border-primary/40 hover:bg-primary/5 rounded-2xl text-sm font-bold text-muted-foreground hover:text-primary transition-all group"
+              className="w-full h-14 flex items-center justify-center gap-2 bg-transparent border border-dashed border-border hover:border-foreground/20 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground transition-all group"
             >
-              <div className="w-8 h-8 rounded-lg bg-foreground/5 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-foreground/5 group-hover:bg-foreground/10 flex items-center justify-center transition-colors">
                 <Plus className="w-4 h-4" />
               </div>
               Tambah Periode Pelaporan
@@ -219,7 +219,7 @@ export default function SidakPeriodsPage() {
             {[1, 2].map((y) => (
               <div key={y} className="space-y-3">
                 <div className="h-4 w-24 bg-foreground/5 rounded animate-pulse" />
-                <div className="bg-card rounded-3xl border border-border overflow-hidden">
+                <div className="bg-surface rounded-2xl border border-border overflow-hidden">
                   {[1, 2, 3].map((p) => (
                     <div key={p} className="h-16 bg-foreground/5 animate-pulse border-t border-border/50" />
                   ))}
@@ -246,31 +246,31 @@ export default function SidakPeriodsPage() {
                   className="space-y-3"
                 >
                   <div className="flex items-center gap-2 px-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                    <div className="w-1.5 h-1.5 rounded-full bg-foreground" />
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                       TAHUN {year}
                     </p>
                   </div>
-                  <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden">
+                  <div className="bg-surface rounded-2xl border border-border overflow-hidden">
                     {items
                       .sort((a, b) => b.month - a.month)
                       .map((period, i) => (
                         <div
                           key={period.id}
-                          className={`flex items-center gap-4 px-6 py-4 group transition-colors hover:bg-foreground/[0.02] ${
-                            i !== 0 ? "border-t border-border/50" : ""
+                          className={`flex items-center gap-4 px-6 py-4 group transition-colors hover:bg-muted ${
+                            i !== 0 ? "border-t border-border" : ""
                           }`}
                         >
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-black text-primary">
+                          <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-semibold text-foreground">
                               {String(period.month).padStart(2, "0")}
                             </span>
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm font-bold text-foreground">
+                            <p className="text-sm font-semibold text-foreground">
                               {MONTHS[period.month - 1]}
                             </p>
-                            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                               {year}
                             </p>
                           </div>
@@ -279,7 +279,7 @@ export default function SidakPeriodsPage() {
                               setErrorMsg(null);
                               setConfirmDelete(period);
                             }}
-                            className="opacity-0 group-hover:opacity-100 p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -302,20 +302,19 @@ export default function SidakPeriodsPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-card w-full max-w-sm rounded-[2rem] p-8 border border-border shadow-2xl overflow-hidden relative"
+                className="bg-surface w-full max-w-sm rounded-2xl p-8 border border-border overflow-hidden relative"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-destructive" />
                 <div className="flex justify-center mb-6">
-                  <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center">
-                    <Trash2 className="w-8 h-8 text-destructive" />
+                  <div className="w-16 h-16 bg-muted border border-border text-destructive rounded-2xl flex items-center justify-center">
+                    <Trash2 className="w-8 h-8" />
                   </div>
                 </div>
-                <h3 className="text-xl font-black text-foreground text-center mb-2">
+                <h3 className="font-outfit text-xl font-bold text-foreground text-center mb-2">
                   Hapus Periode?
                 </h3>
-                <div className="px-4 py-2 bg-foreground/5 rounded-xl mx-auto w-fit mb-4">
-                  <p className="text-xs font-black text-muted-foreground uppercase tracking-widest text-center">
+                <div className="px-4 py-2 bg-muted rounded-xl mx-auto w-fit mb-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center">
                     {MONTHS[confirmDelete.month - 1]} {confirmDelete.year}
                   </p>
                 </div>
@@ -327,14 +326,14 @@ export default function SidakPeriodsPage() {
                   <button
                     onClick={handleDelete}
                     disabled={deleting}
-                    className="w-full py-4 bg-destructive hover:bg-destructive/90 disabled:opacity-50 text-white rounded-2xl font-black text-sm transition-all shadow-lg shadow-destructive/20"
+                    className="w-full py-3 bg-destructive hover:opacity-90 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-all"
                   >
                     {deleting ? "Menghapus..." : "Ya, Hapus Permanen"}
                   </button>
                   <button
                     onClick={() => setConfirmDelete(null)}
                     disabled={deleting}
-                    className="w-full py-4 bg-foreground/5 hover:bg-foreground/10 text-muted-foreground rounded-2xl font-bold text-sm transition-all"
+                    className="w-full py-3 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-xl font-semibold text-sm transition-all"
                   >
                     Batal
                   </button>

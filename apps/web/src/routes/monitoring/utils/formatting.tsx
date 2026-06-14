@@ -106,42 +106,42 @@ export function getScoreColor(score: number | null, scale: number = 100): string
   if (score === null) return "text-muted-foreground";
   // Normalize to percentage for consistent color coding
   const pct = scale === 10 ? score * 10 : score;
-  if (pct >= 80) return "text-emerald-500";
-  if (pct >= 60) return "text-amber-500";
-  return "text-red-500";
+  if (pct >= 80) return "text-chart-green";
+  if (pct >= 60) return "text-chart-amber";
+  return "text-chart-red";
 }
 
 export function getScoreGrade(score: number) {
   if (score >= 90)
     return {
       label: "Sangat Baik",
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10",
-      border: "border-emerald-500/25",
-      bar: "bg-emerald-500",
+      color: "text-chart-green",
+      bg: "bg-chart-green/10",
+      border: "border-chart-green/25",
+      bar: "bg-chart-green",
     };
   if (score >= 75)
     return {
       label: "Baik",
-      color: "text-sky-600",
-      bg: "bg-sky-500/10",
-      border: "border-sky-500/25",
-      bar: "bg-sky-500",
+      color: "text-chart-blue",
+      bg: "bg-chart-blue/10",
+      border: "border-chart-blue/25",
+      bar: "bg-chart-blue",
     };
   if (score >= 60)
     return {
       label: "Cukup",
-      color: "text-amber-600",
-      bg: "bg-amber-500/10",
-      border: "border-amber-500/25",
-      bar: "bg-amber-500",
+      color: "text-chart-amber",
+      bg: "bg-chart-amber/10",
+      border: "border-chart-amber/25",
+      bar: "bg-chart-amber",
     };
   return {
     label: "Perlu Coaching",
-    color: "text-rose-600",
-    bg: "bg-rose-500/10",
-    border: "border-rose-500/25",
-    bar: "bg-rose-500",
+    color: "text-chart-red",
+    bg: "bg-chart-red/10",
+    border: "border-chart-red/25",
+    bar: "bg-chart-red",
   };
 }
 

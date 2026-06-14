@@ -235,13 +235,13 @@ export default function SidakSettingsPage() {
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Header Sticky */}
-      <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-card/50 backdrop-blur-xl border-b border-border sticky top-0 z-30">
+      <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-background/95 backdrop-blur-sm border-b border-border sticky top-0 z-30">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <History className="w-4 h-4 text-primary-foreground" />
+            <div className="w-8 h-8 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
+              <History className="w-4 h-4" />
             </div>
-            <h1 className="text-lg font-bold text-foreground">Versioning Parameter QA</h1>
+            <h1 className="font-outfit text-lg font-bold text-foreground">Versioning Parameter QA</h1>
           </div>
         </div>
 
@@ -254,14 +254,14 @@ export default function SidakSettingsPage() {
                   setPublishConfirmed(false);
                   setPublishPeriodId(selectedVersion.effective_period_id || "");
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
               >
                 <Rocket className="w-3.5 h-3.5" />
                 Publish
               </button>
               <button
                 onClick={() => handleDeleteDraft(selectedVersion.id)}
-                className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-destructive/20"
+                className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Hapus Draft
@@ -271,7 +271,7 @@ export default function SidakSettingsPage() {
           {selectedVersion?.status === "published" && (
             <button
               onClick={() => handleCreateDraft(selectedVersion.id)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-primary/20"
+              className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
             >
               <GitBranch className="w-3.5 h-3.5" />
               Create Revision
@@ -280,7 +280,7 @@ export default function SidakSettingsPage() {
           {!selectedVersion && !versionsLoading && (!versions || !versions.some((v) => v.status === "draft")) && (
             <button
               onClick={() => handleCreateDraft()}
-              className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-primary/20"
+              className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
             >
               <Plus className="w-3.5 h-3.5" />
               Buat Draft Baru
@@ -305,7 +305,7 @@ export default function SidakSettingsPage() {
         />
 
         {/* Main Content: Version Detail & Editor */}
-        <section className="flex-1 overflow-y-auto bg-foreground/[0.01] p-4 lg:p-8">
+        <section className="flex-1 overflow-y-auto p-4 lg:p-8">
           <AnimatePresence mode="wait">
             {selectedVersion ? (
               <motion.div
@@ -345,9 +345,9 @@ export default function SidakSettingsPage() {
               </motion.div>
             ) : (
               <div className="h-full flex items-center justify-center py-20">
-                <div className="text-center p-8 border border-border bg-card/40 rounded-3xl max-w-sm mx-auto shadow-xl">
+                <div className="text-center p-8 border border-border bg-surface rounded-2xl max-w-sm mx-auto">
                   <Settings className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-sm font-bold text-foreground/80">Pilih atau buat versi rules untuk melihat detail</p>
+                  <p className="font-outfit text-sm font-bold text-foreground">Pilih atau buat versi rules untuk melihat detail</p>
                   <p className="text-xs text-muted-foreground mt-1">Gunakan panel di sebelah kiri untuk melihat riwayat versi parameter QA.</p>
                 </div>
               </div>

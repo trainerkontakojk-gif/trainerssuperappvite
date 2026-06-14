@@ -39,11 +39,11 @@ export function AccessModuleBadge({
 
   return (
     <span
-      className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[10px] font-semibold text-indigo-700"
+      className="inline-flex max-w-full items-center gap-1 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium text-fg2 font-mono uppercase"
       aria-label={`Modul akses: ${label}`}
     >
-      <span className="uppercase tracking-wide text-indigo-500">Modul</span>
-      <span className="truncate">{label}</span>
+      <span className="text-fg3 font-semibold">Modul:</span>
+      <span className="truncate text-fg">{label}</span>
     </span>
   );
 }

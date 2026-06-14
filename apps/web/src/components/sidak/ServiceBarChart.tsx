@@ -55,13 +55,13 @@ export default function ServiceBarChart({ data }: Props) {
                 borderRadius: 8,
                 border: "1px solid var(--border)",
                 backgroundColor: "var(--card)",
-                boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                boxShadow: "none",
                 fontSize: 12,
                 fontWeight: 500,
                 color: "var(--foreground)",
               }}
             />
-            <Bar dataKey="total" radius={[0, 8, 8, 0]} barSize={24}>
+            <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={24}>
               {sorted.map((entry, i) => (
                 <Cell key={i} fill={getSeverityColor(entry.severity)} fillOpacity={0.8} />
               ))}

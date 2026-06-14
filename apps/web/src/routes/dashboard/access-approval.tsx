@@ -13,6 +13,7 @@ import {
 import { useApi } from "../../hooks/useApi";
 import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
 import { notify } from "../../lib/toast";
+import { StaggerList, StaggerItem } from "../../components/motion";
 import type {
   PendingLeaderRequest,
   ApprovedLeaderAccess,
@@ -234,24 +235,24 @@ export default function AccessApprovalPage() {
   const activeGroups = (groups || []).filter((g) => g.is_active !== false);
 
   return (
-    <div className="space-y-8">
+    <div className="relative z-10 mx-auto flex w-full max-w-[1400px] flex-col gap-8 px-6 py-8 lg:px-10 lg:py-16">
       {/* Page Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-            <UserCheck className="h-3.5 w-3.5" />
+          <div className="inline-flex items-center gap-1.5 rounded border border-border bg-surface px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-fg3">
+            <UserCheck className="h-3.5 w-3.5 text-fg2" />
             Verification Center
           </div>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-2 text-3xl font-bold font-display tracking-tight text-fg">
             Persetujuan Akses
           </h2>
-          <p className="mt-1 text-gray-500">
+          <p className="mt-1 text-fg2 text-sm max-w-lg">
             Review permintaan hak akses kepemimpinan (Leader) dan petakan
             wilayah data mereka.
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-xl border bg-white p-1 shadow-sm">
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-surface p-1">
           {[
             { id: "pending", label: "Menunggu Review" },
             { id: "approved", label: "Telah Disetujui" },
@@ -263,10 +264,10 @@ export default function AccessApprovalPage() {
                 setSelectedLeaderUserId(null);
                 setSelectedReqId(null);
               }}
-              className={`rounded-lg px-4 py-2 text-xs font-semibold tracking-wide transition-all ${
+              className={`rounded-md px-3.5 py-1.5 text-[13px] font-medium transition-all duration-150 ${
                 activeTab === tab.id
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/10"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                  ? "bg-bg text-fg border border-border"
+                  : "text-fg2 hover:bg-bg/50 hover:text-fg border border-transparent"
               }`}
             >
               {tab.label}
@@ -276,134 +277,122 @@ export default function AccessApprovalPage() {
       </div>
 
       {/* Main Split Layout */}
-      <div className="grid gap-8 lg:grid-cols-[380px_1fr]">
+      <div className="border border-border bg-surface rounded-xl overflow-hidden min-h-[600px] grid lg:grid-cols-[360px_1fr]">
         {/* Left Side: Grouped Requests List */}
-        <div className="space-y-4">
+        <div className="border-r border-border p-5 flex flex-col gap-4 bg-bg/20">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg3" />
             <input
               type="text"
-              placeholder="Cari nama, email, atau modul..."
+              placeholder="Cari nama, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white pl-12 pr-4 py-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+              className="w-full rounded-md border border-border bg-bg pl-10 pr-4 py-2 text-sm text-fg placeholder:text-fg3 focus:border-fg focus:outline-none transition-all"
             />
           </div>
 
-          <div className="rounded-2xl border bg-white p-2 shadow-sm space-y-1 max-h-[600px] overflow-y-auto">
+          <div className="flex-1 overflow-y-auto space-y-1 pr-1 max-h-[550px]">
             {(activeTab === "pending" ? loadingPending : loadingApproved) ? (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-                <span className="mt-2 text-xs font-semibold">
-                  Memproses data...
+              <div className="flex flex-col items-center justify-center py-20 text-fg3">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-fg" />
+                <span className="mt-2 text-xs font-medium uppercase tracking-wider opacity-50">
+                  Memproses...
                 </span>
               </div>
             ) : filteredGroups.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">
-                <UserCheck className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                <p className="text-xs font-semibold">Tidak ada permintaan</p>
+              <div className="py-20 text-center text-fg3 font-mono text-xs">
+                <UserCheck className="mx-auto h-8 w-8 text-fg3 mb-3 opacity-20" />
+                <span>// TIDAK ADA PERMINTAAN</span>
               </div>
             ) : (
-              filteredGroups.map((group) => {
-                const timestamps = group.requests.map((r) =>
-                  "created_at" in r ? r.created_at : r.approved_at,
-                );
-                const uniqueTimestamps = new Set(timestamps);
-                const showLatest =
-                  group.requests.length > 1 && uniqueTimestamps.size > 1;
+              <StaggerList className="space-y-1">
+                {filteredGroups.map((group) => {
+                  const timestamps = group.requests.map((r) =>
+                    "created_at" in r ? r.created_at : r.approved_at,
+                  );
+                  const uniqueTimestamps = new Set(timestamps);
+                  const showLatest =
+                    group.requests.length > 1 && uniqueTimestamps.size > 1;
 
-                return (
-                  <button
-                    key={group.leaderUserId}
-                    onClick={() => handleSelectLeader(group)}
-                    className={`w-full text-left rounded-xl p-4 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
-                      selectedLeaderUserId === group.leaderUserId
-                        ? "bg-indigo-50 text-indigo-700 font-medium"
-                        : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-sm truncate">
-                        {group.leaderName || "Tanpa Nama"}
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px] text-gray-400">
-                        {showLatest && (
-                          <span className="font-semibold">Terbaru</span>
-                        )}
-                        {new Date(group.latestTimestamp).toLocaleDateString(
-                          "id-ID",
-                        )}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-gray-400 truncate font-normal">
-                      {group.leaderEmail}
-                    </p>
-                    <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
-                      <AccessModuleBadge label={group.moduleLabel} />
-                    </div>
-                    {group.requests.length > 1 && (
-                      <p className="mt-1 text-[10px] text-gray-400">
-                        {group.requests.length} permintaan
-                      </p>
-                    )}
-                    {group.accessGroupNames.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {group.accessGroupNames.slice(0, 2).map((name, i) => (
-                          <span
-                            key={i}
-                            className="rounded bg-indigo-100/50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700"
-                          >
-                            {name}
+                  const isSelected = selectedLeaderUserId === group.leaderUserId;
+
+                  return (
+                    <StaggerItem key={group.leaderUserId}>
+                      <button
+                        onClick={() => handleSelectLeader(group)}
+                        className={`w-full text-left rounded-lg p-3.5 border transition-all duration-150 focus-visible:outline-none ${
+                          isSelected
+                            ? "bg-bg text-fg border-border"
+                            : "border-transparent text-fg2 hover:bg-bg/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`font-semibold text-sm truncate ${isSelected ? 'text-fg' : 'text-fg2'}`}>
+                            {group.leaderName || "Tanpa Nama"}
                           </span>
-                        ))}
-                        {group.accessGroupNames.length > 2 && (
-                          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold text-gray-500">
-                            +{group.accessGroupNames.length - 2} grup
+                          <span className="flex items-center gap-1 text-[10px] text-fg3 font-medium">
+                            {showLatest && (
+                              <span className="font-bold text-fg/60">LATEST</span>
+                            )}
+                            {new Date(group.latestTimestamp).toLocaleDateString(
+                              "id-ID",
+                            )}
                           </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-fg3 truncate font-normal">
+                          {group.leaderEmail}
+                        </p>
+                        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1.5">
+                          <AccessModuleBadge label={group.moduleLabel} />
+                        </div>
+                        {group.requests.length > 1 && (
+                          <p className="mt-2 text-[10px] font-bold text-fg3 uppercase tracking-tighter opacity-60">
+                            {group.requests.length} Permintaan
+                          </p>
                         )}
-                      </div>
-                    )}
-                  </button>
-                );
-              })
+                      </button>
+                    </StaggerItem>
+                  );
+                })}
+              </StaggerList>
             )}
           </div>
         </div>
 
         {/* Right Side: Request Action Panel */}
-        <div className="space-y-6">
+        <div className="p-8 flex flex-col justify-start">
           {selectedGroup && selectedReq ? (
-            <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
+            <div className="space-y-8">
               {/* Header Info */}
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">
+                  <h3 className="text-2xl font-bold font-display tracking-tight text-fg">
                     {selectedReq.leader_name || "Tanpa Nama"}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-fg2 font-medium">
                     {selectedReq.leader_email}
                   </p>
-                  <p className="mt-2 text-xs text-gray-400">
+                  <p className="mt-2 text-[10px] text-fg3 font-bold uppercase tracking-widest">
                     {"created_at" in selectedReq
-                      ? `Diminta pada: ${new Date(selectedReq.created_at).toLocaleString("id-ID")}`
-                      : `Disetujui pada: ${new Date((selectedReq as ApprovedLeaderAccess).approved_at).toLocaleString("id-ID")}`}
+                      ? `Diminta: ${new Date(selectedReq.created_at).toLocaleString("id-ID")}`
+                      : `Disetujui: ${new Date((selectedReq as ApprovedLeaderAccess).approved_at).toLocaleString("id-ID")}`}
                   </p>
                 </div>
                 <div>
                   {"status" in selectedReq ? (
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+                      className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border ${
                         selectedReq.status === "pending"
-                          ? "bg-amber-100 text-amber-800"
+                          ? "border-amber-500/20 bg-amber-500/10 text-amber-500"
                           : selectedReq.status === "approved"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-red-100 text-red-800"
+                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                            : "border-red-500/20 bg-red-500/10 text-red-500"
                       }`}
                     >
                       {selectedReq.status}
                     </span>
                   ) : (
-                    <span className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                    <span className="rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
                       Approved
                     </span>
                   )}
@@ -412,14 +401,14 @@ export default function AccessApprovalPage() {
 
               {/* Module Switcher */}
               {selectedGroup.requests.length > 1 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                <div className="space-y-3">
+                  <p className="text-[10px] font-bold text-fg3 uppercase tracking-wider">
                     Akses Modul
                   </p>
                   <div
                     role="group"
                     aria-label="Pilih request modul"
-                    className="grid grid-cols-2 gap-2"
+                    className="flex flex-wrap gap-2"
                   >
                     {selectedGroup.requests.map((request) => {
                       const presentation = getAccessModulePresentation(
@@ -434,10 +423,10 @@ export default function AccessApprovalPage() {
                           aria-pressed={active}
                           aria-label={`Pilih request ${presentation.label}`}
                           onClick={() => handleSelectModule(request.id)}
-                          className={`min-h-11 rounded-lg border px-3 py-2 text-xs font-bold transition-all ${
+                          className={`min-h-9 rounded-md border px-4 py-1.5 text-xs font-semibold transition-all duration-150 ${
                             active
-                              ? "border-indigo-600 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-600"
-                              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              ? "border-fg bg-bg text-fg"
+                              : "border-border bg-surface text-fg2 hover:bg-bg/40 hover:text-fg"
                           }`}
                         >
                           {presentation.label}
@@ -445,24 +434,17 @@ export default function AccessApprovalPage() {
                       );
                     })}
                   </div>
-                  {selectedGroup.requests.some((r) => r.module === "all") &&
-                    selectedGroup.requests.length > 1 && (
-                      <p className="text-[10px] text-amber-600 bg-amber-50 rounded px-2 py-1">
-                        Coverage akses tumpang tindih. Tinjau setiap request
-                        sebelum melakukan aksi.
-                      </p>
-                    )}
                 </div>
               )}
 
               {/* Access Scope Settings */}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div>
-                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-indigo-500" />
-                    Penugasan Wilayah Kerja (Access Groups)
+                  <h4 className="text-sm font-bold text-fg flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-fg2" />
+                    Penugasan Wilayah Kerja
                   </h4>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-fg2 mt-1">
                     Tentukan satu atau lebih grup akses agar Leader ini dapat
                     memantau data peserta di dalamnya.
                   </p>
@@ -482,29 +464,29 @@ export default function AccessApprovalPage() {
                             selectedReq.status !== "pending" &&
                             actionType !== "update_groups")
                         }
-                        className={`flex items-start text-left gap-3 rounded-xl border p-4 transition-all ${
+                        className={`flex items-start text-left gap-3 rounded-lg border p-4 transition-all duration-150 ${
                           isChecked
-                            ? "border-indigo-600 bg-indigo-50/40 ring-1 ring-indigo-600"
-                            : "border-gray-200 hover:bg-gray-50"
+                            ? "border-fg bg-bg text-fg"
+                            : "border-border bg-surface text-fg2 hover:bg-bg/40"
                         } disabled:opacity-70`}
                       >
                         <div
-                          className={`mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border transition-all ${
+                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
                             isChecked
-                              ? "border-indigo-600 bg-indigo-600 text-white"
-                              : "border-gray-300"
+                              ? "border-fg bg-fg text-bg"
+                              : "border-border bg-transparent"
                           }`}
                         >
                           {isChecked && (
-                            <Check className="h-3 w-3 stroke-[3]" />
+                            <Check className="h-3 w-3 stroke-[3.5]" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          <span className="font-semibold text-xs text-gray-900 block truncate">
+                          <span className="font-semibold text-xs text-fg block truncate">
                             {group.name}
                           </span>
                           {group.description && (
-                            <p className="text-[10px] text-gray-400 line-clamp-2 mt-0.5 leading-normal">
+                            <p className="text-[10px] text-fg3 line-clamp-1 mt-0.5 font-medium">
                               {group.description}
                             </p>
                           )}
@@ -516,34 +498,33 @@ export default function AccessApprovalPage() {
               </div>
 
               {/* Action Box */}
-              <div className="rounded-xl border bg-gray-50/50 p-5 space-y-4">
+              <div className="rounded-xl border border-border bg-surface p-6 space-y-5">
                 {"status" in selectedReq && selectedReq.status === "pending" ? (
                   <>
-                    <div className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-fg2 uppercase tracking-wider">
                       <ShieldAlert className="h-4 w-4 text-amber-500" />
                       Keputusan Approval
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                          Catatan Internal / Alasan Penolakan (Wajib jika
-                          menolak)
+                        <label className="text-[10px] font-bold text-fg3 uppercase tracking-wider block mb-2">
+                          Catatan Internal / Alasan Penolakan
                         </label>
                         <textarea
                           placeholder="Tulis alasan jika menolak permintaan..."
                           value={actionNote}
                           onChange={(e) => setActionNote(e.target.value)}
                           rows={2}
-                          className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"
+                          className="w-full rounded-md border border-border bg-bg px-4 py-2.5 text-sm text-fg placeholder:text-fg3 focus:outline-none focus:border-fg resize-none transition-all"
                         />
                       </div>
 
-                      <div className="flex flex-wrap gap-3 pt-2">
+                      <div className="flex flex-wrap gap-3 pt-1">
                         <button
                           onClick={() => handleAction("approve")}
                           disabled={processing || selectedGroupIds.length === 0}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-md bg-inv-bg px-5 py-2.5 text-xs font-semibold text-inv-fg hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
                         >
                           <Check className="h-4 w-4" />
                           Setujui Akses {selectedModuleLabel}
@@ -551,21 +532,21 @@ export default function AccessApprovalPage() {
                         <button
                           onClick={() => handleAction("reject")}
                           disabled={processing || !actionNote.trim()}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-5 py-2.5 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-5 py-2.5 text-xs font-semibold text-fg2 hover:bg-surface hover:text-red-500 transition-all disabled:opacity-50 cursor-pointer"
                         >
                           <XCircle className="h-4 w-4" />
-                          Tolak {selectedModuleLabel}
+                          Tolak
                         </button>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b pb-4">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between border-b border-border pb-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-fg3">
                         Modul: {selectedModuleLabel}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-fg3 font-medium">
                         Disetujui:{" "}
                         {new Date(
                           (selectedReq as ApprovedLeaderAccess).approved_at,
@@ -579,7 +560,7 @@ export default function AccessApprovalPage() {
                           <button
                             onClick={() => handleAction("update_groups")}
                             disabled={processing}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-md bg-inv-bg px-5 py-2.5 text-xs font-semibold text-inv-fg hover:opacity-90 transition-all cursor-pointer"
                           >
                             <Save className="h-3.5 w-3.5" />
                             Simpan Perubahan
@@ -590,7 +571,7 @@ export default function AccessApprovalPage() {
                               const ids = (selectedReq as ApprovedLeaderAccess).access_group_ids;
                               if (ids) setSelectedGroupIds(ids);
                             }}
-                            className="rounded-lg border bg-white px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                            className="rounded-md border border-border bg-transparent px-5 py-2.5 text-xs font-semibold text-fg2 hover:bg-surface transition-colors cursor-pointer"
                           >
                             Batal
                           </button>
@@ -599,27 +580,27 @@ export default function AccessApprovalPage() {
                         <>
                           <button
                             onClick={() => setActionType("update_groups")}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-5 py-2.5 text-xs font-semibold text-fg hover:bg-bg transition-colors cursor-pointer"
                           >
                             <Settings className="h-3.5 w-3.5" />
-                            Ubah Grup Akses {selectedModuleLabel}
+                            Ubah Grup Akses
                           </button>
 
-                          <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                          <div className="flex gap-2 w-full sm:w-auto">
                             <input
                               type="text"
                               placeholder="Alasan cabut akses (Wajib)..."
                               value={actionNote}
                               onChange={(e) => setActionNote(e.target.value)}
-                              className="flex-1 rounded-lg border bg-white px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
+                              className="flex-1 rounded-md border border-border bg-bg px-3 py-1.5 text-xs text-fg placeholder:text-fg3 focus:outline-none focus:border-fg transition-all"
                             />
                             <button
                               onClick={() => handleAction("revoke")}
                               disabled={processing || !actionNote.trim()}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50 shrink-0"
+                              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-4 py-2.5 text-xs font-semibold text-fg2 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20 transition-all disabled:opacity-50 shrink-0 cursor-pointer"
                             >
                               <UserMinus className="h-3.5 w-3.5" />
-                              Cabut Akses {selectedModuleLabel}
+                              Cabut Akses
                             </button>
                           </div>
                         </>
@@ -630,10 +611,10 @@ export default function AccessApprovalPage() {
               </div>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed py-24 text-center bg-white shadow-sm flex flex-col items-center justify-center">
-              <UserCheck className="h-12 w-12 text-gray-300 mb-4" />
-              <h3 className="font-semibold text-gray-900">Pilih Permintaan</h3>
-              <p className="text-xs text-gray-500 mt-1 max-w-sm">
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-24">
+              <UserCheck className="h-12 w-12 text-fg3 mb-4 opacity-10" />
+              <h3 className="font-bold text-fg font-display text-xl tracking-tight">Pilih Permintaan</h3>
+              <p className="text-xs text-fg2 mt-2 max-w-[280px] leading-relaxed">
                 Pilih salah satu permintaan di sebelah kiri untuk meninjau
                 penugasan grup akses atau membuat keputusan approval.
               </p>

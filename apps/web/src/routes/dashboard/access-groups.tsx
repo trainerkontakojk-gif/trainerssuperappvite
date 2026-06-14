@@ -2,15 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Layers,
   Plus,
-  Search,
-  HelpCircle,
-  Save,
-  Trash2,
-  Shield,
   Settings,
-  Info,
   Check,
-  Filter,
 } from "lucide-react";
 import { useApi } from "../../hooks/useApi";
 import { adminClient, getErrorMessage, unwrapResponse } from "../../lib/api";
@@ -21,14 +14,12 @@ import type {
   AccessScopeOptions,
 } from "@trainers/types";
 
-type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
+// Extracted Components
+import { GroupSidebar } from "./components/access-groups/GroupSidebar";
+import { RuleList } from "./components/access-groups/RuleList";
+import { RuleBuilderForm } from "./components/access-groups/RuleBuilderForm";
 
-const RULE_TYPE_LABELS: Record<RuleType, string> = {
-  tim: "Team",
-  service_type: "Service",
-  batch_name: "Batch",
-  peserta_id: "Specific Agent",
-};
+type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
 
 export default function AccessGroupsPage() {
   const {
@@ -161,12 +152,14 @@ export default function AccessGroupsPage() {
     }
   };
 
-  const filteredGroups = (groups || []).filter(
-    (g) =>
-      g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (g.description &&
-        g.description.toLowerCase().includes(searchTerm.toLowerCase())),
-  );
+  const filteredGroups = useMemo(() => {
+    return (groups || []).filter(
+      (g) =>
+        g.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (g.description &&
+          g.description.toLowerCase().includes(searchTerm.toLowerCase())),
+    );
+  }, [groups, searchTerm]);
 
   const selectedGroup = (groups || []).find((g) => g.id === selectedGroupId);
 
@@ -196,301 +189,103 @@ export default function AccessGroupsPage() {
       return svc?.label || val;
     }
     return val;
-  }; 
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-10 w-full animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Page Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
             <Layers className="h-3.5 w-3.5" />
-            Access Scopes
+            Access Scopes Builder
           </div>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-900">
+          <h1 className="mt-3 text-page-title font-display text-foreground">
             Grup Akses
-          </h2>
-          <p className="mt-1 text-gray-500">
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
             Definisikan batasan wilayah kerja (skup data) untuk Leader
-            berdasarkan kriteria dinamis.
+            berdasarkan kriteria dinamis untuk memastikan keamanan dan privasi data.
           </p>
         </div>
         <button
           onClick={handleOpenCreateModal}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-indigo-600/10 hover:bg-indigo-700 transition-all hover:scale-[1.02]"
+          className="inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           <Plus className="h-4 w-4" />
-          Grup Baru
+          Buat Grup Baru
         </button>
       </div>
 
       {/* Main Layout: Master-Detail Split */}
-      <div className="grid gap-8 lg:grid-cols-[380px_1fr]">
+      <div className="grid gap-10 lg:grid-cols-[340px_1fr]">
         {/* Left Side: Groups List */}
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Cari nama grup..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white pl-12 pr-4 py-3 text-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
-            />
-          </div>
-
-          <div className="rounded-2xl border bg-white p-2 shadow-sm space-y-1 max-h-[600px] overflow-y-auto">
-            {loadingGroups ? (
-              <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-                <span className="mt-2 text-xs font-semibold">
-                  Memuat grup akses...
-                </span>
-              </div>
-            ) : filteredGroups.length === 0 ? (
-              <div className="py-8 text-center text-gray-400">
-                <Layers className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                <p className="text-xs font-semibold">
-                  Tidak ada grup ditemukan
-                </p>
-              </div>
-            ) : (
-              filteredGroups.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setSelectedGroupId(g.id)}
-                  className={`w-full text-left rounded-xl p-4 transition-all ${
-                    selectedGroupId === g.id
-                      ? "bg-indigo-50 text-indigo-700 font-medium"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-sm truncate">
-                      {g.name}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                        g.is_active !== false
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {g.is_active !== false ? "Aktif" : "Nonaktif"}
-                    </span>
-                  </div>
-                  {g.description && (
-                    <p className="mt-1 text-xs text-gray-400 line-clamp-1 leading-normal font-normal">
-                      {g.description}
-                    </p>
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        <GroupSidebar
+          groups={filteredGroups}
+          loading={loadingGroups}
+          selectedGroupId={selectedGroupId}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onSelectGroup={setSelectedGroupId}
+        />
 
         {/* Right Side: Group Rules Builder */}
-        <div className="space-y-6">
+        <div className="space-y-8">
           {selectedGroup ? (
-            <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-6">
+            <div className="rounded-3xl border border-border bg-card p-8 shadow-sm space-y-10 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-primary/40" />
+              
               {/* Header Group Details */}
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
+              <div className="flex flex-wrap items-start justify-between gap-6">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">
+                  <h3 className="text-2xl font-bold font-display text-foreground tracking-tight">
                     {selectedGroup.name}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {selectedGroup.description || "Tidak ada deskripsi."}
+                  <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed max-w-xl">
+                    {selectedGroup.description || "Grup ini belum memiliki deskripsi detail."}
                   </p>
                 </div>
                 <button
                   onClick={() => handleOpenEditModal(selectedGroup)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all shadow-sm"
                 >
-                  <Settings className="h-3.5 w-3.5 text-gray-400" />
-                  Edit Grup
+                  <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+                  Pengaturan Grup
                 </button>
               </div>
 
-              {/* Rules List */}
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-indigo-500" />
-                    Aturan Wilayah Kerja (Data Rules)
-                  </h4>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Anggota grup ini hanya diperbolehkan mengakses data peserta
-                    yang memenuhi kriteria aturan di bawah.
-                  </p>
-                </div>
+              {/* Rules List Section */}
+              <RuleList
+                items={selectedGroupItems || []}
+                loading={loadingItems}
+                onDelete={handleDeleteRule}
+                getRuleValueLabel={getRuleValueLabel}
+              />
 
-                <div className="space-y-2">
-                  {loadingItems ? (
-                    <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-                      <span className="mt-2 text-xs font-medium">
-                        Memuat aturan akses...
-                      </span>
-                    </div>
-                  ) : !selectedGroupItems || selectedGroupItems.length === 0 ? (
-                    <div className="rounded-xl border border-dashed py-10 text-center bg-gray-50/50">
-                      <Info className="mx-auto h-6 w-6 text-gray-400 mb-2" />
-                      <p className="text-xs font-semibold text-gray-600">
-                        Belum ada aturan akses
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">
-                        Semua data peserta terproteksi penuh hingga aturan
-                        dibuat.
-                      </p>
-                    </div>
-                  ) : (
-                    selectedGroupItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between rounded-xl border bg-white p-4 shadow-sm hover:shadow"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">
-                            <Filter className="h-3 w-3" />
-                            {RULE_TYPE_LABELS[item.field_name as RuleType] || item.field_name}
-                          </span>
-                          <span className="text-xs text-gray-400 font-medium">
-                            =
-                          </span>
-                          <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-800">
-                            {getRuleValueLabel(item.field_name, item.field_value)}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteRule(item.id)}
-                          className="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                          title="Hapus aturan"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Add Rule Form */}
-              {scopeOptions && (
-                <form
-                  onSubmit={handleAddRule}
-                  className="rounded-xl border bg-indigo-50/30 p-5 space-y-4"
-                >
-                  <div>
-                    <h5 className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
-                      Tambah Aturan Baru
-                    </h5>
-                    <p className="text-[11px] text-indigo-700 mt-0.5">
-                      Pilih tipe aturan dan nilainya.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                        Tipe
-                      </label>
-                      <select
-                        value={ruleType}
-                        onChange={(e) => {
-                          setRuleType(e.target.value as RuleType);
-                          setRuleValue("");
-                        }}
-                        className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                      >
-                        <option value="tim">Team</option>
-                        <option value="service_type">Service</option>
-                        <option value="peserta_id">Specific Agent</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                        {ruleType === "tim" ? "Pilih Team" : ruleType === "service_type" ? "Pilih Service" : "Pilih Agent"}
-                      </label>
-                      {ruleType === "peserta_id" ? (
-                        <>
-                          <select
-                            value={filterTeam}
-                            onChange={(e) => {
-                              setFilterTeam(e.target.value);
-                              setRuleValue("");
-                            }}
-                            className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 mb-1"
-                          >
-                            <option value="">Pilih Team terlebih dahulu</option>
-                            {(scopeOptions?.teams || []).map((t) => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                          <select
-                            value={ruleValue}
-                            onChange={(e) => setRuleValue(e.target.value)}
-                            disabled={!filterTeam}
-                            className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            <option value="">
-                              {filterTeam
-                                ? "Pilih Name"
-                                : "Pilih Team terlebih dahulu"}
-                            </option>
-                            {ruleValueOptions.map((id) => (
-                              <option key={id} value={id}>
-                                {getRuleValueLabel("peserta_id", id)}
-                              </option>
-                            ))}
-                          </select>
-                        </>
-                      ) : (
-                        <select
-                          value={ruleValue}
-                          onChange={(e) => setRuleValue(e.target.value)}
-                          className="w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                        >
-                          <option value="">Pilih nilai...</option>
-                          {ruleType === "tim"
-                            ? (scopeOptions?.teams || []).map((v) => (
-                                <option key={v} value={v}>{v}</option>
-                              ))
-                            : (scopeOptions?.services || []).map((s) => (
-                                <option key={s.value} value={s.value}>{s.label}</option>
-                              ))}
-                        </select>
-                      )}
-                    </div>
-
-                    <div className="flex items-end">
-                      <button
-                        type="submit"
-                        disabled={addingRule || !ruleValue}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Tambah
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    {ruleType === "peserta_id"
-                      ? "Pilih Team terlebih dahulu untuk menampilkan Name yang tersedia di team tersebut."
-                      : "Dropdown hanya menampilkan data yang tersedia saat halaman dibuka."}
-                  </p>
-                </form>
-              )}
+              {/* Add Rule Form Section */}
+              <RuleBuilderForm
+                scopeOptions={scopeOptions}
+                ruleType={ruleType}
+                onRuleTypeChange={(val) => {
+                  setRuleType(val);
+                  setRuleValue("");
+                }}
+                ruleValue={ruleValue}
+                onRuleValueChange={setRuleValue}
+                filterTeam={filterTeam}
+                onFilterTeamChange={setFilterTeam}
+                addingRule={addingRule}
+                onSubmit={handleAddRule}
+                getRuleValueLabel={getRuleValueLabel}
+                ruleValueOptions={ruleValueOptions}
+              />
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed py-24 text-center bg-white shadow-sm flex flex-col items-center justify-center">
-              <Layers className="h-12 w-12 text-gray-300 mb-4" />
-              <h3 className="font-semibold text-gray-900">Pilih Grup Akses</h3>
-              <p className="text-xs text-gray-500 mt-1 max-w-sm">
-                Pilih salah satu grup akses di sebelah kiri untuk melihat detail
-                atau mengelola aturan wilayah kerja.
+            <div className="rounded-3xl border border-dashed border-border py-32 text-center bg-card shadow-sm flex flex-col items-center justify-center animate-pulse-slow">
+              <Layers className="h-16 w-16 text-muted-foreground/20 mb-6" />
+              <h3 className="text-lg font-bold font-display text-foreground/80">Pilih Grup Akses</h3>
+              <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+                Pilih salah satu grup akses di sebelah kiri untuk mengelola batasan data yang dapat diakses oleh Leader.
               </p>
             </div>
           )}
@@ -499,19 +294,18 @@ export default function AccessGroupsPage() {
 
       {/* Group Create/Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border bg-white p-6 shadow-xl animate-in fade-in zoom-in duration-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              {editingGroup ? "Edit Grup Akses" : "Buat Grup Akses Baru"}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold font-display text-foreground mb-2">
+              {editingGroup ? "Edit Grup Akses" : "Grup Akses Baru"}
             </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              Nama grup sebaiknya representatif untuk mempermudah identifikasi
-              penugasan leader.
+            <p className="text-xs text-muted-foreground mb-8">
+              Nama grup membantu identifikasi cepat saat proses persetujuan akses Leader.
             </p>
 
-            <form onSubmit={handleSaveGroup} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+            <form onSubmit={handleSaveGroup} className="space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">
                   Nama Grup
                 </label>
                 <input
@@ -520,56 +314,63 @@ export default function AccessGroupsPage() {
                   placeholder="Contoh: Tim Java, Area Jabodetabek"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
                 />
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                  Deskripsi
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">
+                  Deskripsi Singkat
                 </label>
                 <textarea
-                  placeholder="Jelaskan ruang lingkup atau peruntukan grup akses ini..."
+                  placeholder="Jelaskan peruntukan grup akses ini..."
                   value={groupDescription}
                   onChange={(e) => setGroupDescription(e.target.value)}
                   rows={3}
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 resize-none"
+                  className="w-full rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all resize-none"
                 />
               </div>
 
               {editingGroup && (
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="is_active"
-                    checked={groupIsActive}
-                    onChange={(e) => setGroupIsActive(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
+                <div className="flex items-center gap-3 px-1">
+                  <div className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={groupIsActive}
+                      onChange={(e) => setGroupIsActive(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-10 h-5 bg-muted rounded-full peer peer-checked:bg-primary after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                  </div>
                   <label
                     htmlFor="is_active"
-                    className="text-sm font-semibold text-gray-700"
+                    className="text-sm font-bold text-foreground/80 cursor-pointer select-none"
                   >
-                    Status Grup Aktif
+                    Grup Aktif
                   </label>
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t">
+              <div className="flex justify-end gap-3 pt-6 border-t border-border">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-lg border px-4 py-2.5 text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                  className="h-11 rounded-xl border border-border px-5 text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={savingGroup || !groupName.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  className="h-11 inline-flex items-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
                 >
-                  <Check className="h-4 w-4" />
-                  Simpan
+                  {savingGroup ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                  Simpan Perubahan
                 </button>
               </div>
             </form>

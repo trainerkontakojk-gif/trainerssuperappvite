@@ -35,31 +35,28 @@ export default function ActionToolTile({
       onClick={onClick}
       disabled={disabled}
       className={`
-        group relative flex flex-col gap-4 p-6 bg-card border border-border/40 rounded-[2rem] text-left transition-all
-        hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1 active:translate-y-0
-        ${disabled ? 'opacity-30 grayscale cursor-not-allowed' : ''}
+        group relative flex flex-col gap-4 p-5 bg-surface border border-border rounded-xl text-left transition-all duration-150 ease-out
+        hover:border-fg3 hover:bg-surface/90 shadow-sm
+        ${disabled ? 'opacity-30 grayscale cursor-not-allowed pointer-events-none' : ''}
         ${className}
       `}
     >
-      <div className={`
-        w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-3
-        ${accentConfig[accent]}
-      `}>
+      <div className="w-10 h-10 rounded-lg border border-border flex items-center justify-center bg-background text-fg2 group-hover:text-fg transition-colors duration-150">
         {icon}
       </div>
       
       <div className="space-y-1">
-        <h4 className="text-base font-black tracking-tight text-foreground group-hover:text-primary transition-colors">
+        <h4 className="text-sm font-outfit font-bold tracking-tight text-fg transition-colors">
           {title}
         </h4>
-        <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+        <p className="text-xs text-fg2 leading-relaxed font-normal">
           {desc}
         </p>
       </div>
 
-      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-        <div className="w-6 h-6 rounded-full bg-primary/5 flex items-center justify-center text-primary">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-150 translate-x-2 group-hover:translate-x-0">
+        <div className="w-6 h-6 border border-border flex items-center justify-center text-fg2 bg-background rounded-md shadow-sm">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14m-7-7 7 7-7 7"/>
           </svg>
         </div>

@@ -79,31 +79,31 @@ export default function HierarchyPanel({
   return (
     <div className={`
       flex flex-col h-full overflow-hidden relative z-20 
-      ${isMobile ? 'w-full' : 'w-72 border-l border-border/40 bg-card/40 backdrop-blur-xl shadow-sm shrink-0'}
+      ${isMobile ? 'w-full' : 'w-72 border-l border-border bg-surface shrink-0'}
     `}>
-      <div className="p-6 border-b border-border/40 flex items-center justify-between">
+      <div className="p-5 border-b border-border flex items-center justify-between">
         <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground/60">Navigator</span>
-          <h2 className="text-sm font-bold tracking-tight text-foreground">Hierarki</h2>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-fg3">Navigator</span>
+          <h2 className="text-sm font-outfit font-bold text-fg">Hierarki</h2>
         </div>
         {!isReadOnly && (
           <button 
             onClick={onAddYear}
-            className="w-8 h-8 flex items-center justify-center bg-primary/5 hover:bg-primary hover:text-primary-foreground rounded-xl text-primary transition-all duration-300 border border-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-7 h-7 flex items-center justify-center bg-transparent text-fg2 hover:text-fg hover:bg-background rounded-md transition-all duration-150 border border-border focus-visible:outline-none"
             title="Tambah Tahun"
           >
-            <Plus size={16} />
+            <Plus size={14} />
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
         {years.length === 0 && (
-          <div className="p-8 text-center flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground/30">
-              <CalendarDays size={24} />
+          <div className="p-8 text-center flex flex-col items-center gap-3 border border-dashed border-border rounded-xl bg-background">
+            <div className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-fg3 bg-surface">
+              <CalendarDays size={20} />
             </div>
-            <p className="text-xs text-muted-foreground font-medium italic">
+            <p className="text-xs text-fg2 font-medium">
               Arsip tidak ditemukan.
             </p>
           </div>
@@ -113,20 +113,20 @@ export default function HierarchyPanel({
           <div key={year.id} className="space-y-1">
             <button
               onClick={() => toggleYear(year.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-150 ease-out group focus-visible:outline-none border ${
                 selectedYearId === year.id 
-                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/10 font-bold' 
-                  : 'hover:bg-accent/50 text-muted-foreground'
+                  ? 'bg-inv-bg text-inv-fg border-transparent font-semibold' 
+                  : 'hover:bg-background/80 text-fg2 hover:text-fg border-transparent'
               }`}
             >
               <div className={`transition-transform duration-300 ${expandedYears[year.id] ? 'rotate-90' : ''}`}>
-                <ChevronRight size={14} className={selectedYearId === year.id ? 'text-primary-foreground' : 'text-primary/40'} />
+                <ChevronRight size={12} className={selectedYearId === year.id ? 'text-inv-fg/80' : 'text-fg3'} />
               </div>
-              <span className="flex-1 text-left text-xs uppercase tracking-widest font-black">
+              <span className="flex-1 text-left text-xs font-semibold tracking-wide">
                 {cleanYearLabel(year.label)}
               </span>
               {selectedYearId === year.id && (
-                <motion.div layoutId="activeYearIndicator" className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                <motion.div layoutId="activeYearIndicator" className="w-1.5 h-1.5 rounded-full bg-inv-fg" />
               )}
             </button>
 
@@ -136,10 +136,11 @@ export default function HierarchyPanel({
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="ml-3 mt-1 space-y-1 overflow-hidden pl-2 border-l border-primary/10"
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="ml-3 mt-0.5 space-y-1 overflow-hidden pl-3 border-l border-border"
                 >
                   {rootFolders(year.id).length === 0 ? (
-                    <div className="py-2 pl-4 text-[10px] text-muted-foreground italic font-medium">
+                    <div className="py-2 pl-2 text-[10px] text-fg3 font-medium italic">
                       Belum ada tim terdaftar.
                     </div>
                   ) : (
@@ -151,27 +152,27 @@ export default function HierarchyPanel({
                               onSelectFolder(folder.id);
                               if (subFolders(folder.id).length > 0) toggleFolder(folder.id);
                             }}
-                            className={`flex-1 flex items-center gap-3 p-2.5 rounded-xl text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            className={`flex-1 flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-all duration-150 ease-out focus-visible:outline-none border ${
                               selectedFolderId === folder.id
-                                ? 'bg-module-profiler/10 text-module-profiler font-bold border border-module-profiler/20'
-                                : 'hover:bg-accent/50 text-foreground/70 border border-transparent'
+                                ? 'bg-inv-bg text-inv-fg font-semibold border-transparent'
+                                : 'hover:bg-background/80 text-fg2 hover:text-fg border-transparent'
                             }`}
                           >
                             <div className="flex-shrink-0">
                               {subFolders(folder.id).length > 0 ? (
                                 <div className={`transition-transform duration-300 ${expandedFolders[folder.id] ? 'rotate-90' : ''}`}>
-                                  <ChevronRight size={12} className={selectedFolderId === folder.id ? 'text-module-profiler' : 'text-muted-foreground/40'} />
+                                  <ChevronRight size={12} className={selectedFolderId === folder.id ? 'text-inv-fg/80' : 'text-fg3'} />
                                 </div>
                               ) : (
-                                <div className={selectedFolderId === folder.id ? 'text-module-profiler' : 'text-muted-foreground/40'}>
+                                <div className={selectedFolderId === folder.id ? 'text-inv-fg/80' : 'text-fg3'}>
                                   {getDynamicIcon(folder.name, 12)}
                                 </div>
                               )}
                             </div>
-                            <span className="flex-1 text-left truncate tracking-tight">{folder.name}</span>
+                            <span className="flex-1 text-left truncate font-medium">{folder.name}</span>
                             {counts[folder.name] > 0 && (
-                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${
-                                selectedFolderId === folder.id ? 'bg-module-profiler/20 text-module-profiler' : 'bg-muted text-muted-foreground'
+                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md border ${
+                                selectedFolderId === folder.id ? 'bg-surface text-fg border-border' : 'bg-background border-border text-fg2'
                               }`}>
                                 {counts[folder.name]}
                               </span>
@@ -181,43 +182,43 @@ export default function HierarchyPanel({
                           {!isReadOnly && (
                             <div className={`
                               ${isMobile && selectedFolderId === folder.id ? 'flex' : 'hidden group-hover:flex'} 
-                              items-center gap-0.5 pr-1 animate-in fade-in slide-in-from-right-2 duration-200
+                              items-center gap-0.5 pr-1 animate-in fade-in slide-in-from-right-2 duration-150
                             `}>
-                              <button onClick={(e) => { e.stopPropagation(); onAddFolder(year.id, folder.id); }} className="p-1 hover:bg-primary/10 hover:text-primary rounded text-muted-foreground/40 transition-colors" title="Tambah Batch"><Plus size={12} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onDuplicateFolder(folder); }} className="p-1 hover:bg-primary/10 hover:text-primary rounded text-muted-foreground/40 transition-colors" title="Duplikat"><Copy size={12} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onRenameFolder(folder); }} className="p-1 hover:bg-primary/10 hover:text-primary rounded text-muted-foreground/40 transition-colors" title="Rename"><Pencil size={12} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder); }} className="p-1 hover:bg-destructive/10 hover:text-destructive rounded text-muted-foreground/40 transition-colors" title="Hapus"><Trash2 size={12} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); onAddFolder(year.id, folder.id); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Tambah Batch"><Plus size={11} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); onDuplicateFolder(folder); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Duplikat"><Copy size={11} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); onRenameFolder(folder); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Rename"><Pencil size={11} /></button>
+                              <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder); }} className="p-1 border border-border rounded-md hover:bg-destructive/10 text-destructive transition-colors" title="Hapus"><Trash2 size={11} /></button>
                             </div>
                           )}
                         </div>
 
                         {expandedFolders[folder.id] && (
-                          <div className="ml-4 space-y-1 border-l border-module-profiler/10 pl-2">
+                          <div className="ml-3 space-y-1 border-l border-border pl-3 mt-0.5">
                             {subFolders(folder.id).map(sub => (
                               <div key={sub.id} className={`group flex items-center gap-1`}>
                                   <button
                                     onClick={() => onSelectFolder(sub.id)}
-                                    className={`flex-1 flex items-center gap-2.5 p-2 rounded-lg text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                                    className={`flex-1 flex items-center gap-2 px-2 py-1 rounded-lg text-xs transition-all duration-150 ease-out focus-visible:outline-none border ${
                                       selectedFolderId === sub.id
-                                        ? 'bg-module-profiler/5 text-module-profiler font-semibold'
-                                        : 'hover:bg-accent/40 text-muted-foreground'
+                                        ? 'bg-inv-bg text-inv-fg font-semibold border-transparent'
+                                        : 'hover:bg-background/80 text-fg2 hover:text-fg border-transparent'
                                     }`}
                                   >
-                                    <div className={selectedFolderId === sub.id ? 'text-module-profiler' : 'text-muted-foreground/30'}>
-                                      {getDynamicIcon(sub.name, 12)}
+                                    <div className={selectedFolderId === sub.id ? 'text-inv-fg/80' : 'text-fg3'}>
+                                      {getDynamicIcon(sub.name, 11)}
                                     </div>
-                                    <span className="flex-1 text-left truncate tracking-tight">{sub.name}</span>
+                                    <span className="flex-1 text-left truncate font-medium">{sub.name}</span>
                                     {counts[sub.name] > 0 && (
-                                      <span className="text-[10px] opacity-50 font-mono">({counts[sub.name]})</span>
+                                      <span className="text-[10px] font-mono text-fg3">({counts[sub.name]})</span>
                                     )}
                                   </button>
                                   {!isReadOnly && (
                                     <div className={`
                                       ${isMobile && selectedFolderId === sub.id ? 'flex' : 'hidden group-hover:flex'} 
-                                      items-center gap-0.5 pr-1 animate-in fade-in slide-in-from-right-1 duration-200
+                                      items-center gap-0.5 pr-1 animate-in fade-in slide-in-from-right-1 duration-150
                                     `}>
-                                      <button onClick={(e) => { e.stopPropagation(); onRenameFolder(sub); }} className="p-1 hover:bg-primary/10 hover:text-primary rounded text-muted-foreground/40 transition-colors" title="Rename"><Pencil size={12} /></button>
-                                      <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(sub); }} className="p-1 hover:bg-destructive/10 hover:text-destructive rounded text-muted-foreground/40 transition-colors" title="Hapus"><Trash2 size={12} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); onRenameFolder(sub); }} className="p-1 border border-border rounded-md hover:bg-background text-fg2 hover:text-fg transition-colors" title="Rename"><Pencil size={11} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); onDeleteFolder(sub); }} className="p-1 border border-border rounded-md hover:bg-destructive/10 text-destructive transition-colors" title="Hapus"><Trash2 size={11} /></button>
                                     </div>
                                   )}
                               </div>
@@ -231,9 +232,9 @@ export default function HierarchyPanel({
                   {!isReadOnly && (
                     <button
                       onClick={() => onAddFolder(year.id)}
-                      className="w-full flex items-center gap-2 p-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 hover:bg-accent/50 hover:text-primary transition-all border border-dashed border-border/60 mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider text-fg2 hover:text-fg hover:bg-background transition-all duration-150 ease-out border border-dashed border-border mt-2 focus-visible:outline-none"
                     >
-                      <Plus size={12} />
+                      <Plus size={11} />
                       <span>Tim Baru</span>
                     </button>
                   )}
@@ -244,14 +245,14 @@ export default function HierarchyPanel({
         ))}
       </div>
 
-      <div className="p-6 border-t border-border/40 bg-muted/20">
+      <div className="p-5 border-t border-border bg-surface">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-module-profiler/10 flex items-center justify-center text-module-profiler">
+          <div className="w-8 h-8 rounded-lg border border-border flex items-center justify-center text-fg2 bg-background">
             <Layers size={14} />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Data</span>
-            <span className="text-sm font-bold text-foreground">{folders.length} Node</span>
+            <span className="text-[10px] font-medium text-fg3 uppercase tracking-wide">Total Data</span>
+            <span className="text-xs font-semibold text-fg">{folders.length} Node</span>
           </div>
         </div>
       </div>
