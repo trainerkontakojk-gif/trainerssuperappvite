@@ -164,6 +164,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           donutData: { critical: 0, nonCritical: 0, total: 0 },
           availableServices: ["call"],
           paramTrend: [] as any,
+          periodMetrics: [],
           sparklines: {} as any,
           availableYears: [] as any,
           currentYear: 2026,
@@ -183,6 +184,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
         donutData: { critical: 0, nonCritical: 0, total: 0 },
         availableServices: ["call"],
         paramTrend: [] as any,
+        periodMetrics: [],
         sparklines: {} as any,
         availableYears: [] as any,
         currentYear: 2026,
@@ -227,6 +229,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
           donutData: { critical: 0, nonCritical: 0, total: 0 },
           availableServices: ["call"],
           paramTrend: [] as any,
+          periodMetrics: [],
           sparklines: {} as any,
           availableYears: [] as any,
           currentYear: 2026,
@@ -246,6 +249,7 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
         donutData: { critical: 0, nonCritical: 0, total: 0 },
         availableServices: ["call"],
         paramTrend: [] as any,
+        periodMetrics: [],
         sparklines: {} as any,
         availableYears: [] as any,
         currentYear: 2026,
@@ -266,4 +270,3 @@ describe("Sidak Ranking Route monthly / YTD / All-Time filtering", () => {
     expect(rankings[1].rankChange).toBe(-1);
   });
 });
-

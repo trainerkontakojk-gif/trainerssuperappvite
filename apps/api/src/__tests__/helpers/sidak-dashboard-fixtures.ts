@@ -22,6 +22,20 @@ export const mockIndicators = [
     service_type: "call",
     bobot: 1,
   },
+  {
+    id: "ind-chat-1",
+    name: "Chat Greeting",
+    category: "non_critical",
+    service_type: "chat",
+    bobot: 1,
+  },
+  {
+    id: "ind-email-1",
+    name: "Email Greeting",
+    category: "non_critical",
+    service_type: "email",
+    bobot: 1,
+  },
 ];
 
 export const mockWeights = [

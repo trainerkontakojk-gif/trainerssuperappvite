@@ -213,6 +213,8 @@ export default function SidakDashboardPage() {
       setForecastStatus("missing");
       return;
     }
+    setForecastResult(null);
+    setForecastStatus("missing");
     void requestForecast({ cacheOnly: true }).catch((error) => {
       console.error("Forecast cache lookup error:", error);
     });

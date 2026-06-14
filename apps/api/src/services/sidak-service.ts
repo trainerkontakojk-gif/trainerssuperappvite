@@ -9,6 +9,7 @@ export * from "./sidak/rule-versions";
 export * from "./sidak/report-archives";
 export * from "./sidak/report-data";
 export * from "./sidak/ai-report-service";
+export * from "./sidak/dashboard-forecast";
 export { roundTo } from "../lib/math-utils";
 export * from "./sidak/rule-version-resolver";
 export * from "./sidak/period-scoring-context";

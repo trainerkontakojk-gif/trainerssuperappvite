@@ -151,6 +151,63 @@ describe("dashboard batch forecast service", () => {
     expect(geminiLib.generateGeminiContent).not.toHaveBeenCalled();
   });
 
+  it.each([
+    {
+      change: "insert",
+      periodMetrics: [
+        ...dashboardData.periodMetrics,
+        { periodId: "p4", label: "Apr 26", total: 24 },
+      ],
+    },
+    {
+      change: "update",
+      periodMetrics: dashboardData.periodMetrics.map((metric: any) =>
+        metric.periodId === "p3" ? { ...metric, total: 21 } : metric,
+      ),
+    },
+    {
+      change: "delete",
+      periodMetrics: dashboardData.periodMetrics.slice(0, 2),
+    },
+  ])(
+    "returns stale when an underlying $change changes the historical fingerprint",
+    async ({ periodMetrics }) => {
+      vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(
+        true,
+      );
+
+      await generateSidakTrendForecast({
+        filters: { year: 2026 },
+        cacheOnly: true,
+        userId: "user-1",
+      });
+      const baselineFingerprint = vi.mocked(
+        forecastStore.findForecastSnapshot,
+      ).mock.calls[0][0].dataFingerprint;
+      vi.mocked(forecastStore.findForecastSnapshot).mockClear();
+
+      vi.mocked(dashboardDataService.getDashboardData).mockResolvedValue({
+        ...dashboardData,
+        periodMetrics,
+      });
+
+      const result = await generateSidakTrendForecast({
+        filters: { year: 2026 },
+        cacheOnly: true,
+        userId: "user-1",
+      });
+
+      expect(result).toEqual({ status: "stale", snapshot: null });
+      expect(forecastStore.findForecastSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dataFingerprint: expect.not.stringMatching(
+            new RegExp(`^${baselineFingerprint}$`),
+          ),
+        }),
+      );
+    },
+  );
+
   it("force refresh bypasses cache and marks the new snapshot refreshed", async () => {
     vi.mocked(forecastStore.findForecastSnapshot).mockResolvedValue({} as any);
 

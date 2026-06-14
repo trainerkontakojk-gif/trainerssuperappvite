@@ -169,6 +169,84 @@ sidakDashboard.post(
   },
 );
 
+sidakDashboard.post(
+  "/dashboard/forecast",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const body = await c.req.json();
+
+    const parsed = z
+      .object({
+        filters: z.object({
+          year: z.number().optional(),
+          periodIds: z.array(z.string().uuid()).optional(),
+          serviceType: z.string().optional(),
+          folderIds: z.array(z.string().uuid()).optional(),
+          batchNames: z.array(z.string()).optional(),
+          startMonth: z.number().int().min(1).max(12).optional(),
+          endMonth: z.number().int().min(1).max(12).optional(),
+        }),
+        horizonMonths: z.number().min(1).max(6).optional(),
+        forceRefresh: z.boolean().optional(),
+        cacheOnly: z.boolean().optional(),
+      })
+      .safeParse(body);
+
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+        },
+        400,
+      );
+    }
+
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    if (accessibleIds && accessibleIds.length === 0) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Anda belum memiliki scope agent SIDAK.",
+          },
+        },
+        403,
+      );
+    }
+    const filterScope = await resolveSidakFilterScope(c);
+
+    try {
+      const result = await sidakService.generateSidakTrendForecast({
+        ...parsed.data,
+        forceRefresh: parsed.data.forceRefresh ?? false,
+        cacheOnly: parsed.data.cacheOnly ?? false,
+        filters: {
+          ...parsed.data.filters,
+          agentIds: accessibleIds ?? undefined,
+          allowedServiceTypes: filterScope?.allowedServices ?? undefined,
+        },
+        userId: user.id,
+      });
+      return c.json({ success: true, data: result });
+    } catch (e: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "FORECAST_ERROR", message: e.message },
+        },
+        400,
+      );
+    }
+  },
+);
+
 sidakDashboard.get(
   "/dashboard/available-years",
   requireRole("admin", "trainer", "leader"),

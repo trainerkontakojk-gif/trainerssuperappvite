@@ -58,6 +58,7 @@ export function emptyDashboardResponse(periods: QAPeriod[]): DashboardData {
     paretoData: [],
     donutData: { critical: 0, nonCritical: 0, total: 0 },
     paramTrend: { labels: [], datasets: [] },
+    periodMetrics: [],
     sparklines: {},
     availableYears: [],
     currentYear: new Date().getFullYear(),

@@ -102,4 +102,20 @@ describe("ForecastActionButton", () => {
     await user.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the compact variant at least 44px tall", () => {
+    render(
+      <ForecastActionButton
+        status="fresh"
+        loading={false}
+        disabled={false}
+        onClick={vi.fn()}
+        compact
+      />,
+    );
+
+    const button = screen.getByRole("button");
+    expect(button).toHaveClass("min-h-11");
+    expect(button).not.toHaveClass("h-9");
+  });
 });

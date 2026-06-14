@@ -71,9 +71,10 @@ Struktur folder monorepo:
 │   │   │   │   ├── profiler.ts #   Profiler endpoints
 │   │   │   │   └── admin.ts    #   Admin endpoints
 │   │   │   ├── services/       # Business logic — decomposed per module:
-│   │   │   │   ├── sidak-service.ts   # barrel (13 sub-modules: shared-constants, access-scope,
+│   │   │   │   ├── sidak-service.ts   # barrel (14+ sub-modules: shared-constants, access-scope,
 │   │   │   │   │                   #   period-indicator, temuan-service, agent-directory,
-│   │   │   │   │                   #   rule-versions, service-trends, dashboard-*, report-*)
+│   │   │   │   │                   #   rule-versions, service-trends, dashboard-*, report-*,
+│   │   │   │   │                   #   dashboard-forecast)
 │   │   │   │   ├── sidak/            #   SIDAK sub-modules
 │   │   │   │   ├── sidak-ranking-service.ts  #   Ranking extraction
 │   │   │   │   ├── ketik-service.ts
@@ -122,6 +123,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - History simulasi KETIK/PDKT menggunakan tabel modul masing-masing sebagai sumber utama.
 - Module settings (KETIK, PDKT, Telefun) disimpan namespaced di `user_settings.settings.<module>` agar tidak saling timpa. Setiap modul wajib membaca existing settings sebelum menulis.
 - **SIDAK Dashboard Performance**: Endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi. Materialized view (`mv_qa_period_summary`) dan tabel cache/summary (`qa_dashboard_period_summary`) dipelihara terpisah untuk kompatibilitas database, workflows backfill, dan offline analytics, namun tidak digunakan pada read-path dashboard utama.
+- **SIDAK Dashboard Forecast**: Prediksi dashboard menggunakan batch forecast persistence dengan SHA-256 fingerprinting. 3-state lifecycle (`missing`/`fresh`/`stale`) dengan visual attention effects. Angka menggunakan regresi linear deterministik, narasi menggunakan Gemini 3.1 Flash Lite. Snapshot disimpan di tabel `sidak_dashboard_forecast_snapshots` dengan akses terbatas ke `service_role` saja. `cacheOnly` lookup di mount page — Gemini hanya dipanggil saat user klik "Perbarui Prediksi".
 - **Soft-delete Exclusion**: Semua query SIDAK (dashboard, agents, data reports) otomatis mengecualikan peserta yang terhubung ke profile soft-deleted/inactive, dengan opsi `show_archived=true` untuk override.
 
 ## AI Integration Pattern

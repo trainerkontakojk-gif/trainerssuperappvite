@@ -155,6 +155,44 @@ Kalau satu periode hanya berisi phantom padding:
 
 Hasilnya tetap masuk audited population, tetap tampil di ranking, tetapi tidak menambah defect.
 
+## Dashboard Forecast (Prediksi)
+
+Fitur forecasting SIDAK Dashboard memproyeksikan tren temuan dan parameter untuk N bulan ke depan (default 3, range 1–6).
+
+### Arsitektur
+
+1. **Batch Generation**: Satu request menghasilkan forecast untuk Total Temuan + seluruh parameter dalam satu panggilan Gemini.
+2. **Regresi Linear (Deterministik)**: Angka forecast dihitung secara deterministik via regresi linear — tidak menggunakan AI untuk angka.
+3. **Narasi AI**: Gemini 3.1 Flash Lite (temperature 0.3) menghasilkan insight naratif berdasarkan hasil regresi. Dipanggil sekali per generasi.
+4. **Persistence**: Snapshot disimpan di `sidak_dashboard_forecast_snapshots` dengan SHA-256 fingerprint untuk deteksi stale (perubahan data historis).
+5. **Cache-Only Lookup**: Setiap mount page melakukan `POST /dashboard/forecast { cacheOnly: true }` — tidak memanggil Gemini, hanya lookup DB.
+6. **Leader Scope**: Scope leader di-hash ke dalam `filterKey`, mencegah kebocoran snapshot antar scope akses.
+
+### 3-State Lifecycle
+
+| State     | Makna                                   | Visual                                |
+| --------- | --------------------------------------- | ------------------------------------- |
+| `missing` | Belum ada snapshot untuk filter ini     | Button "Update Prediksi"              |
+| `fresh`   | Snapshot ada dan data masih sama        | Insight panel tampil, button tersedia |
+| `stale`   | Snapshot ada tapi data historis berubah | Button pulse animasi, insight hidden  |
+
+### Endpoint
+
+`POST /api/v1/sidak/dashboard/forecast`
+
+| Parameter       | Type    | Default   | Deskripsi                                     |
+| --------------- | ------- | --------- | --------------------------------------------- |
+| `filters`       | object  | required  | Filter dashboard (year, serviceType, dll)     |
+| `horizonMonths` | number  | `3`       | Jumlah bulan forecast (1–6)                   |
+| `forceRefresh`  | boolean | `false`   | Skip cache, regenerasi paksa                  |
+| `cacheOnly`     | boolean | `false`   | Lookup saja, jangan generate                  |
+
+### Komponen Frontend
+
+- **ForecastActionButton**: 4-state button (missing/fresh/stale/loading) dengan pulse animation untuk stale, `motion-reduce:animate-none` untuk aksesibilitas.
+- **ForecastInsightPanel**: Panel insight naratif dengan 3 metric cards (arah tren, proyeksi perubahan, metode) + parsed narrative body.
+- **ParamTrendChart**: Dashed forecast line (`strokeDasharray="5 5"`) untuk parameter visible atau Total Temuan, anchor point di bulan aktual terakhir.
+
 ## Catatan Praktis
 
 - `weighted`, `flat`, dan `no_category` punya rumus dasar yang berbeda pada level sesi.

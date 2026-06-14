@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import type { SidakForecastSeries } from "@trainers/types";
 
 interface TrendDataset {
   label: string;
@@ -16,6 +17,7 @@ interface Props {
   filterLabel?: string;
   isFiltered?: boolean;
   colorMap?: Record<string, string>;
+  forecastResult?: SidakForecastSeries | null;
 }
 
 export default function ParamTrendChart({
@@ -27,21 +29,52 @@ export default function ParamTrendChart({
   filterLabel,
   isFiltered,
   colorMap,
+  forecastResult,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  const chartData = useMemo(() => {
+    const points = labels.map((name, i) => {
+      const row: Record<string, string | number | null> = { name };
+      datasets.forEach((ds, di) => {
+        row[`actual_dataset_${di}`] = ds.data[i] ?? 0;
+        row[`forecast_dataset_${di}`] = null;
+      });
+      return row;
+    });
+
+    if (forecastResult) {
+      const forecastDatasetIndex = datasets.findIndex(
+        (ds) =>
+          (forecastResult.scope.type === "total" && ds.isTotal) ||
+          ds.label === forecastResult.scope.parameterId,
+      );
+
+      if (forecastDatasetIndex >= 0 && points.length > 0) {
+        const lastActual = points[points.length - 1];
+        lastActual[`forecast_dataset_${forecastDatasetIndex}`] =
+          lastActual[`actual_dataset_${forecastDatasetIndex}`];
+      }
+
+      const forecastPoints = forecastResult.forecast.map((f) => {
+        const row: Record<string, string | number | null> = { name: f.label, isForecast: 1 };
+        datasets.forEach((ds, di) => {
+          row[`actual_dataset_${di}`] = null;
+          row[`forecast_dataset_${di}`] =
+            di === forecastDatasetIndex ? f.value : null;
+        });
+        return row;
+      });
+      return [...points, ...forecastPoints];
+    }
+
+    return points;
+  }, [labels, datasets, forecastResult]);
+
   if (!mounted) {
     return <div className="h-full w-full animate-pulse rounded-[1.5rem] bg-muted/10" />;
   }
-
-  const chartData = labels.map((name, i) => {
-    const row: Record<string, string | number> = { name };
-    datasets.forEach((ds, di) => {
-      row[`dataset_${di}`] = ds.data[i] ?? 0;
-    });
-    return row;
-  });
 
   if (!chartData.length) return null;
 
@@ -78,6 +111,17 @@ export default function ParamTrendChart({
               fontWeight: "500",
               color: "var(--foreground)",
             }}
+            formatter={(value: any, name: any, props: any) => {
+              const isForecastSeries = String(props.dataKey).startsWith("forecast_");
+              const isForecast = props.payload.isForecast === 1;
+              if (isForecastSeries && !isForecast) return null;
+              return [
+                <span key="val" className="flex items-center gap-1.5">
+                  {value} {isForecast && <span className="text-[9px] px-1 py-0.5 bg-primary/20 text-primary rounded font-bold uppercase">Prediksi</span>}
+                </span>,
+                name
+              ];
+            }}
           />
 
           {/* Parameter lines */}
@@ -87,21 +131,41 @@ export default function ParamTrendChart({
               if (isFiltered && ds.label !== filterLabel) return null;
               if (!isFiltered && hiddenKeys?.has(ds.label)) return null;
               const color = getColor(ds, i);
+              const isForecastingThis =
+                forecastResult?.scope.parameterId === ds.label;
+
               return (
-                <Area
-                  key={`param-${i}`}
-                  name={ds.label}
-                  type="monotone"
-                  dataKey={`dataset_${i}`}
-                  stroke={color}
-                  strokeWidth={isFiltered ? 2.5 : 1.5}
-                  fill={color}
-                  fillOpacity={isFiltered ? 0.15 : 0.05}
-                  isAnimationActive={true}
-                  animationDuration={1000}
-                  dot={isFiltered ? { r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: color } : false}
-                  connectNulls
-                />
+                <g key={`param-group-${i}`}>
+                  <Area
+                    key={`param-${i}`}
+                    name={ds.label}
+                    type="monotone"
+                    dataKey={`actual_dataset_${i}`}
+                    stroke={color}
+                    strokeWidth={isFiltered ? 2.5 : 1.5}
+                    fill={color}
+                    fillOpacity={isFiltered ? 0.15 : 0.05}
+                    isAnimationActive={true}
+                    animationDuration={1000}
+                    dot={isFiltered ? { r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: color } : false}
+                    connectNulls
+                  />
+                  {isForecastingThis && (
+                    <Area
+                      key={`param-forecast-${i}`}
+                      name={`Prediksi ${ds.label}`}
+                      type="monotone"
+                      dataKey={`forecast_dataset_${i}`}
+                      stroke={color}
+                      strokeWidth={2.5}
+                      strokeDasharray="5 5"
+                      fill="transparent"
+                      isAnimationActive={true}
+                      animationDuration={1000}
+                      dot={{ r: 3, fill: "var(--card)", strokeWidth: 1, stroke: color }}
+                    />
+                  )}
+                </g>
               );
             })}
 
@@ -110,22 +174,42 @@ export default function ParamTrendChart({
             if (!ds.isTotal) return null;
             if (hideTotal) return null;
             if (isFiltered && ds.label !== filterLabel) return null;
+            const isForecastingTotal =
+              forecastResult?.scope.type === "total";
+
             return (
-              <Area
-                key={`total-${i}`}
-                name={ds.label}
-                type="monotone"
-                dataKey={`dataset_${i}`}
-                stroke="var(--primary)"
-                strokeWidth={2.5}
-                fill="var(--primary)"
-                fillOpacity={0.06}
-                isAnimationActive={true}
-                animationDuration={1500}
-                dot={{ r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: "var(--primary)" }}
-                activeDot={{ r: 5, strokeWidth: 0, fill: "var(--primary)" }}
-                connectNulls
-              />
+              <g key={`total-group-${i}`}>
+                <Area
+                  key={`total-${i}`}
+                  name={ds.label}
+                  type="monotone"
+                  dataKey={`actual_dataset_${i}`}
+                  stroke="var(--primary)"
+                  strokeWidth={2.5}
+                  fill="var(--primary)"
+                  fillOpacity={0.06}
+                  isAnimationActive={true}
+                  animationDuration={1500}
+                  dot={{ r: 3.5, fill: "var(--card)", strokeWidth: 1.5, stroke: "var(--primary)" }}
+                  activeDot={{ r: 5, strokeWidth: 0, fill: "var(--primary)" }}
+                  connectNulls
+                />
+                {isForecastingTotal && (
+                  <Area
+                    key={`total-forecast-${i}`}
+                    name={`Prediksi ${ds.label}`}
+                    type="monotone"
+                    dataKey={`forecast_dataset_${i}`}
+                    stroke="var(--primary)"
+                    strokeWidth={2.5}
+                    strokeDasharray="5 5"
+                    fill="transparent"
+                    isAnimationActive={true}
+                    animationDuration={1500}
+                    dot={{ r: 3, fill: "var(--card)", strokeWidth: 1, stroke: "var(--primary)" }}
+                  />
+                )}
+              </g>
             );
           })}
         </AreaChart>
