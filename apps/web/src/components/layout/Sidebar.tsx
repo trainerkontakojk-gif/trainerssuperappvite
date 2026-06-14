@@ -98,18 +98,6 @@ export function Sidebar({
     setMobileMenuOpen(false);
   };
 
-  const getModuleColor = (id: string) => {
-    switch (id) {
-      case "dashboard": return "var(--fg)";
-      case "ketik": return "var(--module-ketik)";
-      case "pdkt": return "var(--module-pdkt)";
-      case "telefun": return "var(--module-telefun)";
-      case "profiler": return "var(--module-profiler)";
-      case "qa-analyzer": return "var(--module-sidak)";
-      default: return "var(--fg)";
-    }
-  };
-
   const getModuleId = (id: string) => {
     if (id === "qa-analyzer") return "sidak";
     return id;
@@ -167,14 +155,6 @@ export function Sidebar({
                 to={module.href as any}
                 className="sidebar-rail-item group"
                 data-active={isActive}
-                style={
-                  isActive
-                    ? ({
-                        "--rail-accent": getModuleColor(module.id),
-                        boxShadow: "inset 3px 0 0 var(--rail-accent)",
-                      } as React.CSSProperties)
-                    : undefined
-                }
                 onClick={(e) => {
                   if (module.id === "telefun" && !hasTelefunAccess) {
                     e.preventDefault();
@@ -193,58 +173,60 @@ export function Sidebar({
           })}
 
           {/* SIDAK Module (qa-analyzer) */}
-          {isQaAllowed && qaModule && (
-            <button
-              className="sidebar-rail-item group"
-              data-active={pathname.startsWith("/sidak") || flyoutModule === "sidak"}
-              style={
-                pathname.startsWith("/sidak") || flyoutModule === "sidak"
-                  ? ({
-                      "--rail-accent": getModuleColor("qa-analyzer"),
-                      boxShadow: "inset 3px 0 0 var(--rail-accent)",
-                    } as React.CSSProperties)
-                  : undefined
-              }
-              onClick={() => {
-                if (flyoutModule === "sidak" && flyoutOpen) {
-                  setFlyoutOpen(false);
-                  setFlyoutModule(null);
-                } else {
-                  setFlyoutModule("sidak");
-                  setFlyoutOpen(true);
-                }
-              }}
-            >
-              <qaModule.icon className="h-[18px] w-[18px]" />
-              <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
-                {qaModule.shortTitle}
-              </div>
-            </button>
-          )}
+          {isQaAllowed && qaModule && (() => {
+            const isSidakActive = pathname.startsWith("/sidak");
+            const isSidakOpen = flyoutModule === "sidak" && flyoutOpen;
+            return (
+              <button
+                className="sidebar-rail-item group"
+                data-active={isSidakActive}
+                data-open={isSidakOpen}
+                onClick={() => {
+                  if (flyoutModule === "sidak" && flyoutOpen) {
+                    setFlyoutOpen(false);
+                    setFlyoutModule(null);
+                  } else {
+                    setFlyoutModule("sidak");
+                    setFlyoutOpen(true);
+                  }
+                }}
+              >
+                <qaModule.icon className="h-[18px] w-[18px]" />
+                <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                  {qaModule.shortTitle}
+                </div>
+              </button>
+            );
+          })()}
         </div>
 
         {/* Footer actions inside rail */}
         <div className="mt-auto flex flex-col gap-2 w-full items-center border-t border-border pt-4">
-          {showManagementButton && (
-            <button
-              className="sidebar-rail-item group"
-              data-active={pathname.startsWith("/dashboard/users") || pathname.startsWith("/dashboard/access-") || pathname === "/monitoring" || pathname === "/dashboard/activities" || flyoutModule === "management"}
-              onClick={() => {
-                if (flyoutModule === "management" && flyoutOpen) {
-                  setFlyoutOpen(false);
-                  setFlyoutModule(null);
-                } else {
-                  setFlyoutModule("management");
-                  setFlyoutOpen(true);
-                }
-              }}
-            >
-              <Settings className="h-[18px] w-[18px]" />
-              <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
-                Management
-              </div>
-            </button>
-          )}
+          {showManagementButton && (() => {
+            const isManagementActive = pathname.startsWith("/dashboard/users") || pathname.startsWith("/dashboard/access-") || pathname === "/monitoring" || pathname === "/dashboard/activities";
+            const isManagementOpen = flyoutModule === "management" && flyoutOpen;
+            return (
+              <button
+                className="sidebar-rail-item group"
+                data-active={isManagementActive}
+                data-open={isManagementOpen}
+                onClick={() => {
+                  if (flyoutModule === "management" && flyoutOpen) {
+                    setFlyoutOpen(false);
+                    setFlyoutModule(null);
+                  } else {
+                    setFlyoutModule("management");
+                    setFlyoutOpen(true);
+                  }
+                }}
+              >
+                <Settings className="h-[18px] w-[18px]" />
+                <div className="absolute left-16 z-50 scale-0 group-hover:scale-100 bg-neutral-900 text-white text-[10px] font-bold tracking-wider uppercase px-2 py-1 rounded shadow-md transition-all duration-150 origin-left whitespace-nowrap">
+                  Management
+                </div>
+              </button>
+            );
+          })()}
 
           <Link
             to="/account"
