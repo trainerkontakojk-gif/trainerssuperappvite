@@ -261,10 +261,76 @@ export interface DashboardData {
     labels: string[];
     datasets: { label: string; data: number[]; isTotal: boolean }[];
   };
+  periodMetrics: Array<{
+    periodId: string;
+    label: string;
+    total: number;
+    avg: number;
+    zero: number;
+    compliance: number;
+    complianceRate: number;
+    avgAgentScore: number;
+    totalAudited: number;
+  }>;
   sparklines: Record<string, DashboardSparklinePoint[]>;
   availableYears: number[];
   currentYear: number;
   availableServices: ServiceType[];
+}
+
+export interface SidakForecastPoint {
+  label: string;
+  date: string;
+  value: number;
+}
+
+export interface SidakForecastHistoricalPoint extends SidakForecastPoint {
+  periodId: string;
+}
+
+export interface SidakForecastSummary {
+  direction: "up" | "down" | "stable";
+  projectedChange: number;
+  projectedChangePercent: number | null;
+  confidence: "low" | "medium" | "high";
+  method: "linear-regression";
+  sourcePointCount: number;
+}
+
+export interface SidakForecastSeries {
+  scope: {
+    type: "total" | "parameter";
+    parameterId?: string;
+    label: string;
+  };
+  historical: SidakForecastHistoricalPoint[];
+  forecast: SidakForecastPoint[];
+  summary: SidakForecastSummary;
+  status: "ready";
+}
+
+export interface SidakBatchForecastSnapshot {
+  series: {
+    total: SidakForecastSeries;
+    parameters: Record<string, SidakForecastSeries>;
+  };
+  insight: {
+    text: string | null;
+    status: "generated" | "unavailable";
+  };
+  cache: {
+    status: "hit" | "generated" | "refreshed";
+    filterKey: string;
+    dataFingerprint: string;
+  };
+  generatedAt: string;
+}
+
+export type SidakForecastLookupStatus = "missing" | "fresh" | "stale";
+
+export interface SidakForecastLookupResult {
+  status: SidakForecastLookupStatus;
+  snapshot: SidakBatchForecastSnapshot | null;
 }
 
 export interface AgentDetailData {
@@ -326,4 +392,3 @@ export const resolvedSidakInputConfigSchema = z.object({
 });
 
 export type ResolvedSidakInputConfig = z.infer<typeof resolvedSidakInputConfigSchema>;
-
