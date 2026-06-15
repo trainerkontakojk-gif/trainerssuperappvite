@@ -18,6 +18,7 @@ interface Props {
   isFiltered?: boolean;
   colorMap?: Record<string, string>;
   forecastResult?: SidakForecastSeries | null;
+  forecastResults?: SidakForecastSeries[];
 }
 
 export default function ParamTrendChart({
@@ -30,9 +31,17 @@ export default function ParamTrendChart({
   isFiltered,
   colorMap,
   forecastResult,
+  forecastResults,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  const normalizedForecastResults = useMemo(
+    () =>
+      forecastResults ??
+      (forecastResult ? [forecastResult] : []),
+    [forecastResult, forecastResults],
+  );
 
   const chartData = useMemo(() => {
     const points = labels.map((name, i) => {
@@ -44,33 +53,61 @@ export default function ParamTrendChart({
       return row;
     });
 
-    if (forecastResult) {
-      const forecastDatasetIndex = datasets.findIndex(
-        (ds) =>
-          (forecastResult.scope.type === "total" && ds.isTotal) ||
-          ds.label === forecastResult.scope.parameterId,
-      );
+    if (normalizedForecastResults.length > 0) {
+      const futureRows = new Map<string, Record<string, string | number | null>>();
 
-      if (forecastDatasetIndex >= 0 && points.length > 0) {
-        const lastActual = points[points.length - 1];
-        lastActual[`forecast_dataset_${forecastDatasetIndex}`] =
-          lastActual[`actual_dataset_${forecastDatasetIndex}`];
+      for (const series of normalizedForecastResults) {
+        const forecastDatasetIndex = datasets.findIndex(
+          (ds) =>
+            (series.scope.type === "total" && ds.isTotal) ||
+            ds.label === series.scope.parameterId,
+        );
+
+        if (forecastDatasetIndex < 0) continue;
+
+        if (points.length > 0) {
+          const lastActual = points[points.length - 1];
+          lastActual[`forecast_dataset_${forecastDatasetIndex}`] =
+            lastActual[`actual_dataset_${forecastDatasetIndex}`];
+        }
+
+        for (const forecastPoint of series.forecast) {
+          const existingRow = futureRows.get(forecastPoint.label);
+          const row =
+            existingRow ??
+            ({ name: forecastPoint.label, isForecast: 1 } as Record<
+              string,
+              string | number | null
+            >);
+          if (!existingRow) {
+            datasets.forEach((_ds, di) => {
+              row[`actual_dataset_${di}`] = null;
+              row[`forecast_dataset_${di}`] = null;
+            });
+            futureRows.set(forecastPoint.label, row);
+          }
+
+          row[`forecast_dataset_${forecastDatasetIndex}`] = forecastPoint.value;
+        }
       }
 
-      const forecastPoints = forecastResult.forecast.map((f) => {
-        const row: Record<string, string | number | null> = { name: f.label, isForecast: 1 };
-        datasets.forEach((ds, di) => {
-          row[`actual_dataset_${di}`] = null;
-          row[`forecast_dataset_${di}`] =
-            di === forecastDatasetIndex ? f.value : null;
-        });
-        return row;
-      });
-      return [...points, ...forecastPoints];
+      return [...points, ...Array.from(futureRows.values())];
     }
 
     return points;
-  }, [labels, datasets, forecastResult]);
+  }, [labels, datasets, normalizedForecastResults]);
+
+  const forecastedDatasetKeys = useMemo(
+    () =>
+      new Set(
+        normalizedForecastResults.map((series) =>
+          series.scope.type === "total"
+            ? "__total__"
+            : (series.scope.parameterId ?? ""),
+        ),
+      ),
+    [normalizedForecastResults],
+  );
 
   if (!mounted) {
     return <div className="h-full w-full animate-pulse rounded-[1.5rem] bg-muted/10" />;
@@ -131,8 +168,7 @@ export default function ParamTrendChart({
               if (isFiltered && ds.label !== filterLabel) return null;
               if (!isFiltered && hiddenKeys?.has(ds.label)) return null;
               const color = getColor(ds, i);
-              const isForecastingThis =
-                forecastResult?.scope.parameterId === ds.label;
+              const isForecastingThis = forecastedDatasetKeys.has(ds.label);
 
               return (
                 <g key={`param-group-${i}`}>
@@ -174,8 +210,7 @@ export default function ParamTrendChart({
             if (!ds.isTotal) return null;
             if (hideTotal) return null;
             if (isFiltered && ds.label !== filterLabel) return null;
-            const isForecastingTotal =
-              forecastResult?.scope.type === "total";
+            const isForecastingTotal = forecastedDatasetKeys.has("__total__");
 
             return (
               <g key={`total-group-${i}`}>

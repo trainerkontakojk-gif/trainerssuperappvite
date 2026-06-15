@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useApi } from "../../hooks/useApi";
+import { DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
 import type { TopAgentData, QAPeriod } from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -46,6 +47,7 @@ export default function SidakRankingPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedFolder, setSelectedFolder] = useState("ALL");
   const [sortKey, setSortKey] = useState<SortKey>("defects");
+  const initialFolderSetRef = useRef(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const queryParams = useMemo(() => {
@@ -61,6 +63,16 @@ export default function SidakRankingPage() {
     `/sidak/ranking?${queryParams}`,
   );
 
+  const [allFolders, setAllFolders] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (data?.folders) {
+      if (selectedFolder === "ALL" || data.folders.length > allFolders.length) {
+        setAllFolders(data.folders);
+      }
+    }
+  }, [data?.folders, selectedFolder, allFolders.length]);
+
   const availableServices = data?.availableServices ?? [];
 
   // Normalize invalid selections
@@ -72,12 +84,29 @@ export default function SidakRankingPage() {
   }, [availableServices, selectedService, loading, data]);
 
   useEffect(() => {
-    if (loading || !data) return;
-    if (selectedFolder !== "ALL" && (data?.folders ?? []).length > 0) {
-      const valid = (data?.folders ?? []).some((f) => f.id === selectedFolder);
-      if (!valid) setSelectedFolder("ALL");
+    if (loading) return;
+    const folders = allFolders;
+    if (folders.length > 0) {
+      if (selectedFolder !== "ALL") {
+        const valid = folders.some((f) => f.id === selectedFolder);
+        if (!valid) setSelectedFolder("ALL");
+      }
+
+      // Default folder pairing on initial load/mount when data is fetched
+      if (!initialFolderSetRef.current && selectedFolder === "ALL") {
+        const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[selectedService];
+        if (targetFolderName) {
+          const matchedFolder = folders.find(
+            (f) => f.name.toLowerCase() === targetFolderName.toLowerCase()
+          );
+          if (matchedFolder) {
+            setSelectedFolder(matchedFolder.id);
+            initialFolderSetRef.current = true;
+          }
+        }
+      }
     }
-  }, [data, selectedFolder, loading]);
+  }, [allFolders, selectedFolder, loading, selectedService]);
 
   const rankings = data?.rankings;
   const sortedRankings = useMemo(() => {
@@ -175,7 +204,24 @@ export default function SidakRankingPage() {
                 </label>
                 <select
                   value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
+                  onChange={(e) => {
+                    const svc = e.target.value;
+                    setSelectedService(svc);
+                    const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
+                    const folders = allFolders;
+                    if (targetFolderName && folders.length > 0) {
+                      const matchedFolder = folders.find(
+                        (f) => f.name.toLowerCase() === targetFolderName.toLowerCase()
+                      );
+                      if (matchedFolder) {
+                        setSelectedFolder(matchedFolder.id);
+                      } else {
+                        setSelectedFolder("ALL");
+                      }
+                    } else {
+                      setSelectedFolder("ALL");
+                    }
+                  }}
                   className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   {(availableServices.length > 0
@@ -240,7 +286,7 @@ export default function SidakRankingPage() {
                   className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   <option value="ALL">Semua Tim</option>
-                  {(data?.folders ?? []).map((f) => (
+                  {allFolders.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
                     </option>

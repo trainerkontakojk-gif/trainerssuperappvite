@@ -319,4 +319,86 @@ describe("DashboardTrendPanel Forecast", () => {
       "",
     );
   });
+
+  it("renders multiple parameter forecasts on shared future months", () => {
+    render(
+      <ParamTrendChart
+        labels={["Jan 26", "Feb 26", "Mar 26"]}
+        datasets={[
+          {
+            label: "Critical",
+            data: [10, 20, 30],
+            isTotal: false,
+          },
+          {
+            label: "Greeting",
+            data: [5, 6, 7],
+            isTotal: false,
+          },
+          {
+            label: "Total Temuan",
+            data: [15, 26, 37],
+            isTotal: true,
+          },
+        ]}
+        showParameters
+        forecastResults={[
+          {
+            scope: {
+              type: "parameter",
+              parameterId: "Critical",
+              label: "Critical",
+            },
+            historical: [],
+            forecast: [
+              { label: "Apr 26", value: 35 },
+              { label: "Mei 26", value: 40 },
+            ],
+            summary: {},
+            status: "ready",
+          },
+          {
+            scope: {
+              type: "parameter",
+              parameterId: "Greeting",
+              label: "Greeting",
+            },
+            historical: [],
+            forecast: [
+              { label: "Apr 26", value: 8 },
+              { label: "Mei 26", value: 9 },
+            ],
+            summary: {},
+            status: "ready",
+          },
+        ] as any}
+      />,
+    );
+
+    const chartData = JSON.parse(
+      screen.getByTestId("area-chart").getAttribute("data-chart") || "[]",
+    );
+
+    expect(chartData.map((point: any) => point.name)).toEqual([
+      "Jan 26",
+      "Feb 26",
+      "Mar 26",
+      "Apr 26",
+      "Mei 26",
+    ]);
+    expect(chartData[2]).toMatchObject({
+      actual_dataset_0: 30,
+      forecast_dataset_0: 30,
+      actual_dataset_1: 7,
+      forecast_dataset_1: 7,
+    });
+    expect(chartData[3]).toMatchObject({
+      actual_dataset_0: null,
+      forecast_dataset_0: 35,
+      actual_dataset_1: null,
+      forecast_dataset_1: 8,
+    });
+    expect(screen.getByTestId("area-forecast_dataset_0")).toBeInTheDocument();
+    expect(screen.getByTestId("area-forecast_dataset_1")).toBeInTheDocument();
+  });
 });

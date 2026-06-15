@@ -25,7 +25,7 @@ import {
 import { ForecastActionButton } from "../../components/sidak/ForecastActionButton";
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
-import { SERVICE_LABELS } from "../../lib/scoring";
+import { SERVICE_LABELS, DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
 import { buildParetoViewModel } from "../../components/sidak/pareto-view-model";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
@@ -80,6 +80,7 @@ function DashboardSkeleton() {
 }
 
 export default function SidakDashboardPage() {
+  const maxVisibleParameters = 2;
   const [selectedService, setSelectedService] = useState("call");
   const [selectedFolder, setSelectedFolder] = useState("ALL");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -88,12 +89,14 @@ export default function SidakDashboardPage() {
     new Date().getMonth() + 1,
   );
   const [hiddenParams, setHiddenParams] = useState<Set<string> | null>(null);
+  const [showTotalTrend, setShowTotalTrend] = useState(true);
   const [forecastLoading, setForecastLoading] = useState(false);
   const [forecastStatus, setForecastStatus] =
     useState<SidakForecastLookupStatus>("missing");
   const [forecastResult, setForecastResult] =
     useState<SidakBatchForecastSnapshot | null>(null);
   const forecastRequestId = useRef(0);
+  const initialFolderSetRef = useRef(false);
 
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
@@ -109,10 +112,22 @@ export default function SidakDashboardPage() {
     `/sidak/dashboard?${queryParams}`,
   );
 
-  const folders = (data?.folders ?? []).map((f: any) => ({
-    id: f.id ?? "",
-    nama: f.name ?? f.nama ?? "",
-  }));
+  const [allFolders, setAllFolders] = useState<{ id: string; nama: string }[]>([]);
+
+  useEffect(() => {
+    if (data?.folders) {
+      const mapped = data.folders.map((f: any) => ({
+        id: f.id ?? "",
+        nama: f.name ?? f.nama ?? "",
+      }));
+      if (selectedFolder === "ALL" || mapped.length > allFolders.length) {
+        setAllFolders(mapped);
+      }
+    }
+  }, [data?.folders, selectedFolder, allFolders.length]);
+
+  const folders = allFolders;
+
 
   const paramTrendDatasets = data?.paramTrend?.datasets;
   const defaultHiddenParams = useMemo(() => {
@@ -228,6 +243,16 @@ export default function SidakDashboardPage() {
       ),
     [data?.paramTrend.datasets, activeHiddenParams],
   );
+  const totalParameterCount = useMemo(
+    () =>
+      (data?.paramTrend.datasets ?? []).filter((dataset) => !dataset.isTotal)
+        .length,
+    [data?.paramTrend.datasets],
+  );
+  const visibleParamCount = visibleForecastParameters.length;
+  const visibleSeriesCount = visibleParamCount + (showTotalTrend ? 1 : 0);
+  const canActivateMoreParams = visibleSeriesCount < maxVisibleParameters;
+  const canShowTotalTrend = showTotalTrend || visibleSeriesCount < maxVisibleParameters;
 
   const selectedForecastSeries: SidakForecastSeries | null = useMemo(() => {
     if (!forecastResult) return null;
@@ -240,6 +265,19 @@ export default function SidakDashboardPage() {
     }
     return forecastResult.series.total;
   }, [forecastResult, visibleForecastParameters]);
+  const selectedForecastSeriesList = useMemo(() => {
+    if (!forecastResult) return [];
+    if (visibleForecastParameters.length === 0 && showTotalTrend) {
+      return [forecastResult.series.total];
+    }
+    const parameterSeries = visibleForecastParameters
+      .map((dataset) => forecastResult.series.parameters[dataset.label] ?? null)
+      .filter((series): series is SidakForecastSeries => series !== null);
+
+    return showTotalTrend
+      ? [forecastResult.series.total, ...parameterSeries]
+      : parameterSeries;
+  }, [forecastResult, showTotalTrend, visibleForecastParameters]);
   const totalForecastSummary = forecastResult?.series.total.summary;
 
   const availableServices = useMemo(
@@ -261,11 +299,27 @@ export default function SidakDashboardPage() {
 
   useEffect(() => {
     if (loading || !data) return;
-    if (selectedFolder !== "ALL" && folders.length > 0) {
-      const valid = folders.some((f) => f.id === selectedFolder);
-      if (!valid) setSelectedFolder("ALL");
+    if (folders.length > 0) {
+      if (selectedFolder !== "ALL") {
+        const valid = folders.some((f) => f.id === selectedFolder);
+        if (!valid) setSelectedFolder("ALL");
+      }
+
+      // Default folder pairing on initial load when folders are fetched
+      if (!initialFolderSetRef.current && selectedFolder === "ALL") {
+        const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[selectedService];
+        if (targetFolderName) {
+          const matchedFolder = folders.find(
+            (f) => f.nama.toLowerCase() === targetFolderName.toLowerCase()
+          );
+          if (matchedFolder) {
+            setSelectedFolder(matchedFolder.id);
+            initialFolderSetRef.current = true;
+          }
+        }
+      }
     }
-  }, [folders, selectedFolder, loading, data]);
+  }, [folders, selectedFolder, loading, data, selectedService]);
 
   // Compute leader locked service
   const leaderLockedService = useMemo(() => {
@@ -273,24 +327,22 @@ export default function SidakDashboardPage() {
     return null;
   }, [availableServices]);
 
-  const isAllShown = activeHiddenParams.size === 0;
-
-  const hasVisibleParam =
-    data?.paramTrend?.datasets?.some(
-      (ds) => !ds.isTotal && !activeHiddenParams.has(ds.label),
-    ) ?? false;
+  const shouldHideTotalLine = !showTotalTrend;
 
   useEffect(() => {
     setHiddenParams(null);
+    setShowTotalTrend(true);
   }, [queryParams]);
 
   const handleReset = useCallback(() => {
+    initialFolderSetRef.current = false;
     setSelectedService("call");
     setSelectedFolder("ALL");
     setSelectedYear(new Date().getFullYear());
     setStartMonth(1);
     setEndMonth(new Date().getMonth() + 1);
     setHiddenParams(null);
+    setShowTotalTrend(true);
   }, []);
 
   const summary = data?.summary;
@@ -377,7 +429,22 @@ export default function SidakDashboardPage() {
         {/* Filter Bar */}
         <DashboardFilters
           selectedService={selectedService}
-          onServiceChange={setSelectedService}
+          onServiceChange={(svc) => {
+            setSelectedService(svc);
+            const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
+            if (targetFolderName && folders.length > 0) {
+              const matchedFolder = folders.find(
+                (f) => f.nama.toLowerCase() === targetFolderName.toLowerCase()
+              );
+              if (matchedFolder) {
+                setSelectedFolder(matchedFolder.id);
+              } else {
+                setSelectedFolder("ALL");
+              }
+            } else {
+              setSelectedFolder("ALL");
+            }
+          }}
           selectedFolder={selectedFolder}
           onFolderChange={setSelectedFolder}
           selectedYear={selectedYear}
@@ -546,14 +613,44 @@ export default function SidakDashboardPage() {
                       <span className="text-[11px] font-semibold text-muted-foreground mr-2 uppercase tracking-wide">
                         Parameter:
                       </span>
+                      <button
+                        type="button"
+                        aria-pressed={showTotalTrend}
+                        disabled={!canShowTotalTrend}
+                        onClick={() => {
+                          if (!canShowTotalTrend) return;
+                          setShowTotalTrend((prev) => !prev);
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
+                          showTotalTrend
+                            ? "bg-foreground text-background border-foreground scale-105 z-10"
+                            : !canShowTotalTrend
+                              ? "bg-transparent border-border/40 text-muted-foreground/50 cursor-not-allowed opacity-60"
+                              : "bg-transparent border-border/60 text-muted-foreground hover:bg-muted"
+                        }`}
+                        title={
+                          !canShowTotalTrend
+                            ? "Maksimal 2 data tampil. Nonaktifkan salah satu parameter terlebih dahulu."
+                            : undefined
+                        }
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${showTotalTrend ? "bg-background" : "bg-muted-foreground/30"}`}
+                        />
+                        <span>Total Temuan</span>
+                      </button>
                       {data.paramTrend.datasets
                         .filter((ds) => !ds.isTotal)
                         .map((ds) => {
                           const isHidden = activeHiddenParams.has(ds.label);
+                          const disableActivation =
+                            isHidden && !canActivateMoreParams;
                           return (
                             <button
                               key={ds.label}
+                              disabled={disableActivation}
                               onClick={() => {
+                                if (disableActivation) return;
                                 setHiddenParams((prev) => {
                                   const next = new Set(
                                     prev ?? defaultHiddenParams,
@@ -566,9 +663,16 @@ export default function SidakDashboardPage() {
                               }}
                               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
                                 isHidden
-                                  ? "bg-transparent border-border/60 text-muted-foreground hover:bg-muted"
+                                  ? disableActivation
+                                    ? "bg-transparent border-border/40 text-muted-foreground/50 cursor-not-allowed opacity-60"
+                                    : "bg-transparent border-border/60 text-muted-foreground hover:bg-muted"
                                   : "bg-foreground text-background border-foreground scale-105 z-10"
                               }`}
+                              title={
+                                disableActivation
+                                  ? "Maksimal 2 parameter aktif. Nonaktifkan salah satu terlebih dahulu."
+                                  : undefined
+                              }
                             >
                               <span
                                 className={`w-1.5 h-1.5 rounded-full ${isHidden ? "bg-muted-foreground/30" : "bg-background"}`}
@@ -580,14 +684,39 @@ export default function SidakDashboardPage() {
                           );
                         })}
                       <button
-                        onClick={() =>
-                          setHiddenParams(isAllShown ? null : new Set())
-                        }
+                        onClick={() => {
+                          if (visibleSeriesCount > 0) {
+                            setHiddenParams(defaultHiddenParams);
+                            setShowTotalTrend(false);
+                            return;
+                          }
+                          const firstVisibleLabels = new Set(
+                            (data.paramTrend.datasets ?? [])
+                              .filter((dataset) => !dataset.isTotal)
+                              .slice(0, maxVisibleParameters)
+                              .map((dataset) => dataset.label),
+                          );
+                          setHiddenParams(
+                            new Set(
+                              (data.paramTrend.datasets ?? [])
+                                .filter(
+                                  (dataset) =>
+                                    !dataset.isTotal &&
+                                    !firstVisibleLabels.has(dataset.label),
+                                )
+                                .map((dataset) => dataset.label),
+                            ),
+                          );
+                        }}
                         className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-primary hover:bg-primary/5 transition-colors uppercase tracking-widest ml-auto"
                       >
-                        {isAllShown ? "Sembunyikan Semua" : "Tampilkan Semua"}{" "}
+                        {visibleSeriesCount > 0
+                          ? "Sembunyikan Semua"
+                          : totalParameterCount > maxVisibleParameters
+                            ? "Tampilkan 2 Parameter"
+                            : "Tampilkan Semua"}{" "}
                         <ArrowRight
-                          className={`w-3 h-3 transition-transform duration-200 ${isAllShown ? "rotate-90" : ""}`}
+                          className={`w-3 h-3 transition-transform duration-200 ${visibleSeriesCount > 0 ? "rotate-90" : ""}`}
                         />
                       </button>
                     </div>
@@ -602,8 +731,9 @@ export default function SidakDashboardPage() {
                         datasets={data.paramTrend.datasets}
                         showParameters={true}
                         hiddenKeys={activeHiddenParams}
-                        hideTotal={hasVisibleParam}
+                        hideTotal={shouldHideTotalLine}
                         forecastResult={selectedForecastSeries}
+                        forecastResults={selectedForecastSeriesList}
                       />
                     </div>
 

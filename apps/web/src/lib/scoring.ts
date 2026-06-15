@@ -78,6 +78,16 @@ export const SERVICE_LABELS: Record<ServiceType, string> = {
   slik: "SLIK",
 };
 
+export const DEFAULT_SERVICE_FOLDER_MAP: Record<string, string> = {
+  call: "Tim Call",
+  chat: "Tim Whatsapp",
+  email: "Tim Email",
+  cso: "Tim Mix",
+  pencatatan: "Tim Mix",
+  bko: "Tim BKO",
+};
+
+
 function scoreSession(
   indicators: QAIndicator[],
   temuan: { indicator_id: string; nilai: number }[],

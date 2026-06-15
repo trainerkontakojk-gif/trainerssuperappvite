@@ -20,6 +20,29 @@ vi.mock("../hooks/useApi", () => ({
   useApi: vi.fn(),
 }));
 
+vi.mock("../components/sidak/ParamTrendChart", () => ({
+  default: (props: any) => (
+    <div data-testid="param-trend-chart-props">
+      {JSON.stringify({
+        hideTotal: props.hideTotal,
+        forecastScopes:
+          props.forecastResults?.map((series: any) => ({
+            type: series.scope?.type ?? null,
+            parameterId: series.scope?.parameterId ?? null,
+          })) ??
+          (props.forecastResult
+            ? [
+                {
+                  type: props.forecastResult.scope?.type ?? null,
+                  parameterId: props.forecastResult.scope?.parameterId ?? null,
+                },
+              ]
+            : []),
+      })}
+    </div>
+  ),
+}));
+
 // Mock ResizeObserver for Recharts
 class ResizeObserverMock {
   observe() {}
@@ -55,6 +78,19 @@ describe("SidakDashboardPage forecast state", () => {
     availableYears: [2026],
   };
 
+  const multiParameterDashboardData = {
+    ...dashboardData,
+    paramTrend: {
+      labels: ["Jan 26", "Feb 26", "Mar 26"],
+      datasets: [
+        { label: "Critical", data: [1, 2, 3], isTotal: false },
+        { label: "Greeting", data: [2, 1, 2], isTotal: false },
+        { label: "Closing", data: [3, 2, 1], isTotal: false },
+        { label: "Total", data: [6, 5, 6], isTotal: true },
+      ],
+    },
+  };
+
   const mockForecastResult = {
     series: {
       total: {
@@ -85,6 +121,49 @@ describe("SidakDashboardPage forecast state", () => {
       dataFingerprint: "old-data",
     },
     generatedAt: "2026-06-14T00:00:00.000Z",
+  };
+
+  mockForecastResult.series.parameters = {
+    Critical: {
+      scope: {
+        type: "parameter",
+        parameterId: "Critical",
+        label: "Critical",
+      },
+      historical: [],
+      forecast: [
+        { label: "Apr 26", date: "2026-04-01T00:00:00.000Z", value: 5 },
+      ],
+      summary: {
+        direction: "up",
+        projectedChange: 2,
+        projectedChangePercent: 66.7,
+        confidence: "low",
+        method: "linear-regression",
+        sourcePointCount: 3,
+      },
+      status: "ready",
+    },
+    Greeting: {
+      scope: {
+        type: "parameter",
+        parameterId: "Greeting",
+        label: "Greeting",
+      },
+      historical: [],
+      forecast: [
+        { label: "Apr 26", date: "2026-04-01T00:00:00.000Z", value: 3 },
+      ],
+      summary: {
+        direction: "up",
+        projectedChange: 1,
+        projectedChangePercent: 50,
+        confidence: "low",
+        method: "linear-regression",
+        sourcePointCount: 3,
+      },
+      status: "ready",
+    },
   };
 
   beforeEach(() => {
@@ -191,5 +270,115 @@ describe("SidakDashboardPage forecast state", () => {
         name: "Data baru — Perbarui Prediksi",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("limits visible parameters to two and unlocks another after one is unselected", async () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: multiParameterDashboardData,
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+    vi.mocked(unwrapResponse).mockResolvedValue({
+      status: "missing",
+      snapshot: null,
+    });
+
+    await act(async () => {
+      render(<SidakDashboardPage />);
+    });
+
+    const criticalButton = screen.getByRole("button", { name: /Critical/i });
+    const greetingButton = screen.getByRole("button", { name: /Greeting/i });
+    const closingButton = screen.getByRole("button", { name: /Closing/i });
+    const totalButton = screen.getByRole("button", { name: /Total Temuan/i });
+
+    expect(totalButton).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(totalButton);
+    await userEvent.click(criticalButton);
+    await userEvent.click(greetingButton);
+
+    expect(closingButton).toBeDisabled();
+    expect(totalButton).toBeDisabled();
+
+    await userEvent.click(criticalButton);
+
+    expect(closingButton).not.toBeDisabled();
+    expect(totalButton).not.toBeDisabled();
+  });
+
+  it("passes two parameter forecasts without auto-including total after total is turned off", async () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: multiParameterDashboardData,
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+    vi.mocked(unwrapResponse).mockResolvedValue({
+      status: "fresh",
+      snapshot: mockForecastResult,
+    });
+
+    await act(async () => {
+      render(<SidakDashboardPage />);
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /Total Temuan/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Critical/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Greeting/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+        '"parameterId":"Critical"',
+      );
+      expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+        '"parameterId":"Greeting"',
+      );
+      expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+        '"hideTotal":true',
+      );
+      expect(screen.getByTestId("param-trend-chart-props")).not.toHaveTextContent(
+        '"type":"total"',
+      );
+    });
+  });
+
+  it("lets total temuan compare with one parameter and blocks a second parameter", async () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: multiParameterDashboardData,
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+    vi.mocked(unwrapResponse).mockResolvedValue({
+      status: "fresh",
+      snapshot: mockForecastResult,
+    });
+
+    await act(async () => {
+      render(<SidakDashboardPage />);
+    });
+
+    const totalButton = screen.getByRole("button", { name: /Total Temuan/i });
+    const criticalButton = screen.getByRole("button", { name: /Critical/i });
+    const greetingButton = screen.getByRole("button", { name: /Greeting/i });
+
+    await userEvent.click(criticalButton);
+
+    expect(totalButton).toHaveAttribute("aria-pressed", "true");
+    expect(greetingButton).toBeDisabled();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+        '"type":"total"',
+      );
+      expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+        '"parameterId":"Critical"',
+      );
+      expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+        '"hideTotal":false',
+      );
+    });
   });
 });
