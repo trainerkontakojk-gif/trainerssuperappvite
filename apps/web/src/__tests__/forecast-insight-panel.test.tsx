@@ -9,12 +9,12 @@ const sampleInsight = `Berikut adalah analisis snapshot forecast SIDAK berdasark
 Total temuan diproyeksikan turun 53.1% (-42.5 poin), menandakan perbaikan performa.
 
 ### **Analisis Parameter**
-**Parameter Berisiko:**
-- Etika Bertelepon (-7.3): peningkatan temuan pada parameter ini.
-- Keakuratan Solusi (-5.1): perlu perhatian khusus.
+**Perbaikan Terbesar:**
+- Etika Bertelepon (-7.3): jumlah temuan diproyeksikan menurun.
+- Keakuratan Solusi (-5.1): jumlah temuan diproyeksikan menurun.
 
-**Parameter yang Meningkat:**
-- Kemampuan Pencatatan (+7.3): penurunan temuan signifikan.
+**Parameter Berisiko:**
+- Kemampuan Pencatatan (+7.3): jumlah temuan diproyeksikan meningkat.
 
 ### **Tindakan yang Dapat Dilakukan**
 1. **Coaching Etika:** Fokuskan sesi coaching pada etika bertelepon.
@@ -63,7 +63,8 @@ describe("parseForecastInsightText", () => {
     expect(parsed.sections).toHaveLength(4);
     expect(parsed.sections[0].title).toBe("Ringkasan Eksekutif");
     expect(parsed.sections[1].subsections).toHaveLength(2);
-    expect(parsed.sections[1].subsections[0].items[0].tone).toBe("risk");
+    expect(parsed.sections[1].subsections[0].items[0].tone).toBe("positive");
+    expect(parsed.sections[1].subsections[1].items[0].tone).toBe("risk");
     expect(parsed.sections[2].actions).toHaveLength(3);
     expect(parsed.sections[3].kind).toBe("disclaimer");
   });
@@ -86,6 +87,29 @@ Data ini bersifat prediktif.`;
     expect(parsed.sections[0].subsections).toHaveLength(0);
   });
 
+  it("uses finding-count direction when an AI subsection title is contradictory", () => {
+    const rawText = `### **Analisis Parameter**
+**Parameter Berisiko:**
+- Etika Bertelepon (-9): heading lama yang bertentangan dengan angka.`;
+
+    const parsed = parseForecastInsightText(rawText);
+
+    expect(parsed.sections[0].subsections[0].items[0].tone).toBe("positive");
+  });
+
+  it("recognizes Indonesian decimal commas and optional finding units", () => {
+    const rawText = `### **Analisis Parameter**
+**Parameter Berisiko:**
+- Kemampuan Menyimak (-4,2 temuan): jumlah temuan diproyeksikan menurun.`;
+
+    const parsed = parseForecastInsightText(rawText);
+
+    expect(parsed.sections[0].subsections[0].items[0]).toMatchObject({
+      changeValue: -4.2,
+      tone: "positive",
+    });
+  });
+
   it("parses action sections formatted with bullet points correctly", () => {
     const rawText = `Berikut adalah analisis:
 
@@ -98,8 +122,12 @@ Data ini bersifat prediktif.`;
     expect(parsed.sections[0].title).toBe("Tindakan yang Dapat Dilakukan");
     expect(parsed.sections[0].kind).toBe("actions");
     expect(parsed.sections[0].actions).toHaveLength(2);
-    expect(parsed.sections[0].actions[0].title).toBe("Fokus pada Akurasi Input");
-    expect(parsed.sections[0].actions[0].body).toBe("Pengecekan ulang SOP penginputan data.");
+    expect(parsed.sections[0].actions[0].title).toBe(
+      "Fokus pada Akurasi Input",
+    );
+    expect(parsed.sections[0].actions[0].body).toBe(
+      "Pengecekan ulang SOP penginputan data.",
+    );
   });
 });
 
@@ -114,10 +142,12 @@ describe("ForecastInsightPanel", () => {
     );
 
     expect(screen.getByTestId("forecast-insight-panel")).toBeInTheDocument();
-    expect(screen.getByText(/Insight Prediksi AI/i)).toBeInTheDocument();
+    expect(screen.getByText(/Insight Forecast/i)).toBeInTheDocument();
     expect(screen.getByText(/Ringkasan Eksekutif/i)).toBeInTheDocument();
     expect(screen.getByText(/Coaching Etika/i)).toBeInTheDocument();
-    expect(screen.getByText(/Menurun/i)).toBeInTheDocument();
-    expect(screen.queryByText(/### \*\*Ringkasan Eksekutif\*\*/)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Menurun$/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/### \*\*Ringkasan Eksekutif\*\*/),
+    ).not.toBeInTheDocument();
   });
 });

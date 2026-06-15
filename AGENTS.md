@@ -243,6 +243,18 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
    - Panggil `query-docs` dengan library ID tersebut untuk ambil dokumentasi.
      Hindari penggunaan API yang deprecated dari data training lama.
 
+### 9. Wajib Referensi `docs/design.md` untuk Setiap Perubahan UI/UX
+
+Setiap perubahan tampilan (build, redesign, implement komponen, atau fix styling) **WAJIB** merujuk pada `docs/design.md` sebagai *source of truth* desain. Aturan ini mencakup:
+
+1. **Color Palette:** Gunakan variabel CSS (`--bg`, `--surface`, `--border`, `--fg`, `--fg2`, `--fg3`, `--inv-bg`, `--inv-fg`) yang sudah didefinisikan. Jangan *hardcode* warna hex, tailwind arbitrary values, atau opacities yang tidak konsisten dengan sistem.
+2. **Typography:** Ikuti font stack yang ditetapkan (Outfit untuk heading, Inter untuk body). Jangan gunakan ukuran font atau weight yang melenceng dari skala yang sudah ada.
+3. **Spacing & Layout:** Gunakan jarak yang konsisten (gap-3, gap-4, p-5, dll). Hindari padding/margin yang tidak biasa atau tidak proporsional.
+4. **Komponen:** Patuhi gaya yang sudah ada: glassmorphism untuk card, border tegas untuk surface elements, ikon minimalis, tombol dengan hover state yang halus.
+5. **"No AI Slop":** Dilarang menambahkan dekorasi tidak bermakna (badge ornamental, gradien berlebihan, floating blobs, neon colors) — kecuali diinstruksikan secara eksplisit.
+
+Kegagalan mematuhi `docs/design.md` akan menyebabkan redesign ulang, jadi pastikan dibaca sebelum ngoding dan dicek ulang setelah selesai.
+
 ## AI Integration Conventions
 
 - **Model registry**: `apps/api/src/lib/ai-models.ts` adalah sumber kebenaran untuk ID model dan provider mapping.
@@ -406,6 +418,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 196.  **Landing Page Hero Stack Cards** — Added interactive hero stack cards — visual previews of KETIK (chat bubbles), PDKT (email draft), and TELEFUN (call interface) as stacked glassmorphism cards with hover animation. Enhanced with animated state transitions: PDKT email with send button click → "Draft Terkirim!" success state; TELEFUN two-state machine (incoming call with ringing/accept/decline → active call with mute/end/live timer) running 10s CSS animation loop per card. 2 files modified. (DONE)
 197.  **UI Radical Redesign Wave — Design System, Layout, SIDAK, Dashboard, Users** — Massive UI redesign across 8+ modules following `docs/design.md` design system. (1) Canonical CSS variable tokens (`--bg`, `--surface`, `--border`, `--fg`, `--fg2`, `--fg3`, `--inv-bg`, `--inv-fg`) replacing hardcoded Tailwind colors in `index.css` with Tailwind compatibility aliases. (2) Layout decomposition — extracted Sidebar, AppHeader, MobileTabBar, MobileDrawer, UserMenu, nav-config into `layout/` components, reducing Layout.tsx from 566→18 lines. (3) Motion primitives — FadeIn, StaggerList, StaggerItem, PageTransition for consistent entrance animations. (4) SIDAK Module radical redesign — all 21 SIDAK components updated with new design tokens (AgentCard, AgentProfileBar, AgentTemuanTab, Dashboards, KpiCard, ParetoChart, ScoreDetailCard, etc.). (5) Dashboard Bento layout — minimal greeting with date, 3-column bento grid with module cards, quick stats panel, SIDAK sparkline overview, recent activities card. (6) User Management redesign — stripped decorative icons/colored badges, clean card layout, CSS variables, AnimatePresence transitions. (7) Activity Logs refactor — semantic colors, responsive padding, clean table with module badges. (8) Profiler workspace redesign — updated BatchHero, HierarchyPanel, InsightPanel, ActionToolTile, WorkspaceNavigator. (9) Monitoring visual polish — consistent surface/border tokens across KetikReviewPanel, PdktEvaluationPanel, TelefunReviewPanel. 68 files modified, ~3049 insertions, ~2222 deletions. (DONE)
 198.  **SIDAK Dashboard Forecast Stale Attention & Persistence Hardening** — Implemented batch forecast persistence for SIDAK Dashboard with SHA-256 fingerprinting. 3-state lifecycle (missing/fresh/stale) with visual attention effects (pulse animation on stale, reduced-motion support). Batch generation produces forecast series for total temuan + all parameters in one Gemini call. Deterministic linear regression for numbers, Gemini 3.1 Flash Lite for narrative insight. `POST /api/v1/sidak/dashboard/forecast` endpoint with `cacheOnly`/`forceRefresh` modes. Migration `20260614090000` creates `sidak_dashboard_forecast_snapshots` table with RLS locked to service_role. New components: `ForecastActionButton`, `ForecastInsightPanel`, `ForecastInsightParser`, upgraded `ParamTrendChart` with dashed forecast lines. 17+ files modified, 40+ regression tests. (DONE)
+199.  **SIDAK Forecast Finding Delta Semantics** — Fixed forecast insight delta interpretation: parameter series adalah jumlah temuan, bukan skor kualitas, jadi delta negatif = perbaikan. Prompt diperbarui dengan aturan semantik eksplisit. Frontend parser memprioritaskan nilai numerik atas judul subsection AI. Confidence badge dengan color coding (emerald/amber/rose). Fingerprint mencakup `contractVersion` agar snapshot lama menjadi stale. 8+ files modified, 4+ regression tests baru. (DONE)
 
 ## Key Files Changed (Phase 58 — 118)
 
@@ -577,6 +590,13 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/web/src/__tests__/forecast-action-button.test.tsx` — **NEW Phase 198**: 16 frontend tests for button states (missing/fresh/stale/loading/disabled/compact/motion-reduce)
 - `apps/web/src/__tests__/sidak-dashboard-forecast-state.test.tsx` — **NEW Phase 198**: 167+ lines of state machine tests (stale detection, filter change, reload guard)
 - `apps/web/src/__tests__/forecast-insight-panel.test.tsx` — **NEW Phase 198**: Component tests for insight panel rendering, parsed sections, Gemini-unavailable fallback
+- `apps/api/src/services/sidak/dashboard-forecast.ts` — **Phase 199**: Added `contractVersion` to fingerprint, updated prompt with explicit finding-delta semantics, `describeFindingChange()` helper
+- `apps/web/src/components/sidak/ForecastInsightPanel.tsx` — **Phase 199**: Confidence badge color coding (emerald/amber/rose), title renamed to "Insight Forecast", text-justify paragraphs
+- `apps/web/src/components/sidak/forecast-insight-parser.ts` — **Phase 199**: `classifyListTone` prioritizes numeric change value over subsection title; `extractChangeValue` handles Indonesian decimal commas and optional "temuan" suffix
+- `apps/api/src/__tests__/sidak-dashboard-forecast.test.ts` — **Phase 199**: Added tests for finding-delta prompt instruction, fingerprint contract version change
+- `apps/web/src/__tests__/forecast-insight-panel.test.tsx` — **Phase 199**: Tests for contradictory AI subsection titles, Indonesian decimal commas, "Insight Forecast" title
+- `docs/SIDAK_LOGIC_AND_SCORING.md` — **Phase 199**: Added Confidence Forecast rules, Makna Perubahan Parameter table, endpoint table formatting fix
+- `docs/rebuild-logs/phase-199-sidak-forecast-finding-delta-semantics.md` — **NEW Phase 199**: Documentation for forecast finding delta semantics
 
 ## Relevant Files
 

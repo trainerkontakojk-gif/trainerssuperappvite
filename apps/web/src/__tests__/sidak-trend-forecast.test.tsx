@@ -159,7 +159,7 @@ describe("DashboardTrendPanel Forecast", () => {
           cacheOnly: false,
         }),
       });
-      expect(screen.getByText(/Insight Prediksi AI/i)).toBeInTheDocument();
+      expect(screen.getByText(/Insight Forecast/i)).toBeInTheDocument();
       expect(screen.getByText(/Tren meningkat./i)).toBeInTheDocument();
     });
 

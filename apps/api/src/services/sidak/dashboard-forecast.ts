@@ -31,6 +31,8 @@ const MONTHS_SHORT = [
   "Des",
 ];
 
+const FORECAST_CONTRACT_VERSION = "finding-delta-semantics-v2";
+
 export interface SidakTrendForecastRequest {
   filters: {
     year?: number;
@@ -74,6 +76,7 @@ export async function generateSidakTrendForecast(
   const parameterHistorical = extractParameterHistorical(dashboardData);
   const filterKey = hashValue(canonicalizeFilters(req.filters));
   const dataFingerprint = hashValue({
+    contractVersion: FORECAST_CONTRACT_VERSION,
     total: totalHistorical,
     parameters: parameterHistorical,
   });
@@ -121,11 +124,7 @@ export async function generateSidakTrendForecast(
     ]),
   );
 
-  const insight = await generateBatchInsight(
-    total,
-    parameters,
-    req.userId,
-  );
+  const insight = await generateBatchInsight(total, parameters, req.userId);
   const generatedAt = new Date().toISOString();
   const payload: SidakBatchForecastSnapshot = {
     series: { total, parameters },
@@ -221,14 +220,10 @@ function calculateLinearForecast(
   const y = historical.map((point) => point.value);
   const sumX = x.reduce((sum, value) => sum + value, 0);
   const sumY = y.reduce((sum, value) => sum + value, 0);
-  const sumXY = x.reduce(
-    (sum, value, index) => sum + value * y[index],
-    0,
-  );
+  const sumXY = x.reduce((sum, value, index) => sum + value * y[index], 0);
   const sumXX = x.reduce((sum, value) => sum + value * value, 0);
   const denominator = n * sumXX - sumX * sumX;
-  const slope =
-    denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
+  const slope = denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
   const intercept = (sumY - slope * sumX) / n;
 
   const lastLabel = historical[n - 1].label;
@@ -250,8 +245,7 @@ function calculateLinearForecast(
     });
   }
 
-  const projectedChange =
-    forecast[horizon - 1].value - historical[n - 1].value;
+  const projectedChange = forecast[horizon - 1].value - historical[n - 1].value;
   const projectedChangePercent =
     historical[n - 1].value === 0
       ? null
@@ -259,8 +253,7 @@ function calculateLinearForecast(
   const errors = y.map((value, index) =>
     Math.abs(value - (slope * index + intercept)),
   );
-  const averageError =
-    errors.reduce((sum, value) => sum + value, 0) / n;
+  const averageError = errors.reduce((sum, value) => sum + value, 0) / n;
   const averageValue = sumY / n;
   let confidence: "low" | "medium" | "high" =
     n < 4 ? "low" : n >= 8 ? "high" : "medium";
@@ -286,9 +279,7 @@ function calculateLinearForecast(
   };
 }
 
-function canonicalizeFilters(
-  filters: SidakTrendForecastRequest["filters"],
-) {
+function canonicalizeFilters(filters: SidakTrendForecastRequest["filters"]) {
   return {
     year: filters.year ?? null,
     periodIds: [...(filters.periodIds ?? [])].sort(),
@@ -312,10 +303,10 @@ async function generateBatchInsight(
   userId: string,
 ): Promise<SidakBatchForecastSnapshot["insight"]> {
   const parameterSummary = Object.values(parameters)
-    .map(
-      (series) =>
-        `- ${series.scope.label}: ${series.summary.direction}, perubahan ${series.summary.projectedChange}`,
-    )
+    .map((series) => {
+      const change = series.summary.projectedChange;
+      return `- ${series.scope.label} (${change}): ${describeFindingChange(change)}`;
+    })
     .join("\n");
   const response = await generateGeminiContent({
     model: "gemini-3.1-flash-lite",
@@ -325,13 +316,17 @@ async function generateBatchInsight(
       action: "generate-trend-forecast",
     },
     systemInstruction: `Anda adalah analis Quality Assurance. Jelaskan snapshot forecast SIDAK secara ringkas dalam Bahasa Indonesia.
-Angka sudah dihitung secara statistik dan tidak boleh diubah. Soroti tren total, parameter paling berisiko, tindakan yang dapat dilakukan, dan disclaimer estimasi. Jangan mengarang penyebab yang tidak ada pada data.`,
+Semua series Total Temuan dan parameter adalah JUMLAH TEMUAN/DEFECT, bukan skor kualitas. Aturan utama: penurunan jumlah temuan berarti perbaikan; kenaikan jumlah temuan berarti peningkatan risiko.
+Tuliskan delta dalam notasi ringkas seperti \`(-9)\` atau \`(+7,3)\`; jangan menambahkan kata "temuan" setelah angka delta di dalam label.
+Delta negatif wajib dijelaskan sebagai temuan berkurang atau membaik. Delta positif wajib dijelaskan sebagai temuan bertambah atau perlu perhatian. Delta nol dijelaskan sebagai stabil.
+Jangan pernah menyebut delta negatif sebagai penurunan kualitas, parameter berisiko, atau kondisi yang memburuk.
+Angka sudah dihitung secara statistik dan tidak boleh diubah. Soroti perbaikan terbesar, parameter dengan kenaikan temuan paling berisiko, tindakan yang dapat dilakukan, dan disclaimer estimasi. Jangan mengarang penyebab yang tidak ada pada data.`,
     contents: [
       {
         role: "user",
         parts: [
           {
-            text: `Total Temuan: arah ${total.summary.direction}, perubahan ${total.summary.projectedChange} (${total.summary.projectedChangePercent ?? "N/A"}%).
+            text: `Total Temuan: arah ${total.summary.direction}, delta ${total.summary.projectedChange} (${total.summary.projectedChangePercent ?? "N/A"}%).
 Parameter:
 ${parameterSummary || "- Tidak ada parameter."}`,
           },
@@ -344,4 +339,14 @@ ${parameterSummary || "- Tidak ada parameter."}`,
   return response.success && response.text
     ? { text: response.text, status: "generated" }
     : { text: null, status: "unavailable" };
+}
+
+function describeFindingChange(change: number): string {
+  if (change < -0.1) {
+    return "membaik";
+  }
+  if (change > 0.1) {
+    return "berisiko";
+  }
+  return "stabil";
 }

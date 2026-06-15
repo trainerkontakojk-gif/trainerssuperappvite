@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 import * as dashboardDataService from "../services/sidak/dashboard-data";
 import * as forecastStore from "../services/sidak/dashboard-forecast-store";
 import * as geminiLib from "../lib/gemini";
@@ -46,7 +47,9 @@ describe("dashboard batch forecast service", () => {
       dashboardData,
     );
     vi.mocked(forecastStore.findForecastSnapshot).mockResolvedValue(null);
-    vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(false);
+    vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(
+      false,
+    );
     vi.mocked(forecastStore.saveForecastSnapshot).mockImplementation(
       async (snapshot) => snapshot.payload,
     );
@@ -64,21 +67,19 @@ describe("dashboard batch forecast service", () => {
     }))!;
 
     expect(result.status).toBe("fresh");
-    expect(result.snapshot?.series.total.forecast.map((point) => point.label)).toEqual([
-      "Apr 26",
-      "Mei 26",
-      "Jun 26",
-    ]);
+    expect(
+      result.snapshot?.series.total.forecast.map((point) => point.label),
+    ).toEqual(["Apr 26", "Mei 26", "Jun 26"]);
     expect(Object.keys(result.snapshot!.series.parameters)).toEqual([
       "Etika Bertelepon",
       "Verifikasi Data",
     ]);
-    expect(result.snapshot!.series.parameters["Etika Bertelepon"].summary.direction).toBe(
-      "up",
-    );
-    expect(result.snapshot!.series.parameters["Verifikasi Data"].summary.direction).toBe(
-      "down",
-    );
+    expect(
+      result.snapshot!.series.parameters["Etika Bertelepon"].summary.direction,
+    ).toBe("up");
+    expect(
+      result.snapshot!.series.parameters["Verifikasi Data"].summary.direction,
+    ).toBe("down");
     expect(geminiLib.generateGeminiContent).toHaveBeenCalledTimes(1);
     expect(geminiLib.generateGeminiContent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -88,6 +89,71 @@ describe("dashboard batch forecast service", () => {
     );
     expect(forecastStore.saveForecastSnapshot).toHaveBeenCalledTimes(1);
     expect(result.snapshot!.cache.status).toBe("generated");
+  });
+
+  it("tells the narrative model that lower finding counts are improvements", async () => {
+    await generateSidakTrendForecast({
+      filters: { year: 2026 },
+      horizonMonths: 3,
+      userId: "user-1",
+    });
+
+    expect(geminiLib.generateGeminiContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.stringContaining(
+          "Tuliskan delta dalam notasi ringkas seperti `(-9)` atau `(+7,3)`",
+        ),
+        contents: [
+          expect.objectContaining({
+            parts: [
+              expect.objectContaining({
+                text: expect.stringContaining("Etika Bertelepon ("),
+              }),
+            ],
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("versions the data fingerprint when forecast semantics change", async () => {
+    await generateSidakTrendForecast({
+      filters: { year: 2026 },
+      horizonMonths: 3,
+      userId: "user-1",
+    });
+
+    const legacyFingerprint = createHash("sha256")
+      .update(
+        JSON.stringify({
+          total: [
+            { periodId: "p1", label: "Jan 26", date: "", value: 10 },
+            { periodId: "p2", label: "Feb 26", date: "", value: 15 },
+            { periodId: "p3", label: "Mar 26", date: "", value: 20 },
+          ],
+          parameters: {
+            "Etika Bertelepon": [
+              { periodId: "p1", label: "Jan 26", date: "", value: 2 },
+              { periodId: "p2", label: "Feb 26", date: "", value: 4 },
+              { periodId: "p3", label: "Mar 26", date: "", value: 6 },
+            ],
+            "Verifikasi Data": [
+              { periodId: "p1", label: "Jan 26", date: "", value: 5 },
+              { periodId: "p2", label: "Feb 26", date: "", value: 3 },
+              { periodId: "p3", label: "Mar 26", date: "", value: 1 },
+            ],
+          },
+        }),
+      )
+      .digest("hex");
+
+    expect(forecastStore.findForecastSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataFingerprint: expect.not.stringMatching(
+          new RegExp(`^${legacyFingerprint}$`),
+        ),
+      }),
+    );
   });
 
   it("returns a matching persisted snapshot without calling Gemini", async () => {
@@ -126,7 +192,9 @@ describe("dashboard batch forecast service", () => {
   });
 
   it("returns missing when no snapshot exists for the filter", async () => {
-    vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(false);
+    vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(
+      false,
+    );
     const result = await generateSidakTrendForecast({
       filters: { year: 2026 },
       cacheOnly: true,
@@ -139,7 +207,9 @@ describe("dashboard batch forecast service", () => {
   });
 
   it("returns stale when current fingerprint misses but the filter has an older snapshot", async () => {
-    vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(true);
+    vi.mocked(forecastStore.hasForecastSnapshotForFilter).mockResolvedValue(
+      true,
+    );
 
     const result = await generateSidakTrendForecast({
       filters: { year: 2026 },
@@ -181,9 +251,8 @@ describe("dashboard batch forecast service", () => {
         cacheOnly: true,
         userId: "user-1",
       });
-      const baselineFingerprint = vi.mocked(
-        forecastStore.findForecastSnapshot,
-      ).mock.calls[0][0].dataFingerprint;
+      const baselineFingerprint = vi.mocked(forecastStore.findForecastSnapshot)
+        .mock.calls[0][0].dataFingerprint;
       vi.mocked(forecastStore.findForecastSnapshot).mockClear();
 
       vi.mocked(dashboardDataService.getDashboardData).mockResolvedValue({
@@ -262,7 +331,10 @@ describe("dashboard batch forecast service", () => {
 
     expect(result.status).toBe("fresh");
     expect(result.snapshot?.series.total.forecast).toHaveLength(3);
-    expect(result.snapshot?.insight).toEqual({ text: null, status: "unavailable" });
+    expect(result.snapshot?.insight).toEqual({
+      text: null,
+      status: "unavailable",
+    });
     expect(forecastStore.saveForecastSnapshot).toHaveBeenCalledTimes(1);
   });
 });

@@ -40,6 +40,16 @@ function confidenceLabel(confidence: SidakForecastSummary["confidence"]) {
   if (confidence === "medium") return "Sedang";
   return "Rendah";
 }
+function confidenceBadgeClass(confidence: SidakForecastSummary["confidence"]) {
+  if (confidence === "high") {
+    return "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400";
+  }
+  if (confidence === "medium") {
+    return "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400";
+  }
+  return "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400";
+}
+
 
 function directionMeta(direction: SidakForecastSummary["direction"]) {
   if (direction === "down") {
@@ -87,7 +97,7 @@ function SectionBlock({ section }: { section: ForecastInsightSection }) {
           {section.title}
         </p>
         {section.paragraphs.map((paragraph) => (
-          <p key={paragraph} className="mt-2 text-sm leading-6 text-fg3">
+          <p key={paragraph} className="mt-2 text-sm leading-6 text-fg3 text-justify">
             {renderInlineMarkdown(paragraph)}
           </p>
         ))}
@@ -113,7 +123,7 @@ function SectionBlock({ section }: { section: ForecastInsightSection }) {
                 </span>
                 {action.title}
               </p>
-              <p className="mt-1 text-sm leading-6 text-fg2">{action.body}</p>
+              <p className="mt-1 text-sm leading-6 text-fg2 text-justify">{action.body}</p>
             </li>
           ))}
         </ol>
@@ -151,7 +161,7 @@ function SectionBlock({ section }: { section: ForecastInsightSection }) {
         {section.title}
       </h4>
       {section.paragraphs.map((paragraph) => (
-        <p key={paragraph} className="text-sm leading-6 text-fg2">
+        <p key={paragraph} className="text-sm leading-6 text-fg2 text-justify">
           {renderInlineMarkdown(paragraph)}
         </p>
       ))}
@@ -209,9 +219,9 @@ export default function ForecastInsightPanel({
                 id="forecast-insight-title"
                 className="font-outfit text-base font-bold tracking-tight text-fg"
               >
-                Insight Prediksi AI
+                Insight Forecast
               </h3>
-              <span className="rounded-md border border-border px-2 py-0.5 text-xs font-medium text-fg2">
+              <span className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${confidenceBadgeClass(summary.confidence)}`}>
                 Confidence {confidenceLabel(summary.confidence)}
               </span>
             </div>

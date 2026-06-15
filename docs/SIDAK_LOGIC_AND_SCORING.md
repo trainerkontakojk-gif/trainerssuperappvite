@@ -176,16 +176,52 @@ Fitur forecasting SIDAK Dashboard memproyeksikan tren temuan dan parameter untuk
 | `fresh`   | Snapshot ada dan data masih sama        | Insight panel tampil, button tersedia |
 | `stale`   | Snapshot ada tapi data historis berubah | Button pulse animasi, insight hidden  |
 
+### Confidence Forecast
+
+Label `Confidence` pada forecast SIDAK menunjukkan tingkat keyakinan hasil regresi linear, bukan confidence statistik formal.
+
+Aturan yang dipakai saat ini:
+
+| Kondisi                                  | Confidence                    |
+| ---------------------------------------- | ----------------------------- |
+| Titik historis `< 4`                     | `low`                         |
+| Titik historis `4-7`                     | `medium`                      |
+| Titik historis `>= 8`                    | `high`                        |
+| Jika `averageError / averageValue > 0.4` | Turun 1 level dari hasil awal |
+
+Interpretasi praktis:
+
+- Tren bisa tetap `down` atau `up` walaupun confidence masih `medium`.
+- Confidence turun bila data historis masih sedikit atau sebaran titik historis terlalu jauh dari garis regresi.
+- Nilai `direction` dan `confidence` dihitung terpisah, jadi tren yang konsisten belum tentu otomatis menjadi `high`.
+
+### Makna Perubahan Parameter
+
+Series parameter forecast berisi **jumlah temuan**, bukan skor kualitas. Karena
+itu, arah perubahannya dibaca sebagai berikut:
+
+| Nilai perubahan          | Makna                                                                |
+| ------------------------ | -------------------------------------------------------------------- |
+| Negatif, misalnya `-9`   | Jumlah temuan diproyeksikan turun sekitar 9; ini merupakan perbaikan |
+| Positif, misalnya `+7.3` | Jumlah temuan diproyeksikan naik sekitar 7,3; ini merupakan risiko   |
+| Mendekati `0`            | Jumlah temuan relatif stabil                                         |
+
+Narasi AI wajib memakai format delta ringkas seperti `(-9)` atau `(+7,3)`.
+Penurunan jumlah temuan tetap berarti perbaikan, jadi jangan menyebut delta
+negatif sebagai penurunan kualitas. Perubahan kontrak semantik forecast
+dimasukkan ke data fingerprint agar snapshot dengan narasi lama ditandai stale
+dan perlu diperbarui.
+
 ### Endpoint
 
 `POST /api/v1/sidak/dashboard/forecast`
 
-| Parameter       | Type    | Default   | Deskripsi                                     |
-| --------------- | ------- | --------- | --------------------------------------------- |
-| `filters`       | object  | required  | Filter dashboard (year, serviceType, dll)     |
-| `horizonMonths` | number  | `3`       | Jumlah bulan forecast (1–6)                   |
-| `forceRefresh`  | boolean | `false`   | Skip cache, regenerasi paksa                  |
-| `cacheOnly`     | boolean | `false`   | Lookup saja, jangan generate                  |
+| Parameter       | Type    | Default  | Deskripsi                                 |
+| --------------- | ------- | -------- | ----------------------------------------- |
+| `filters`       | object  | required | Filter dashboard (year, serviceType, dll) |
+| `horizonMonths` | number  | `3`      | Jumlah bulan forecast (1–6)               |
+| `forceRefresh`  | boolean | `false`  | Skip cache, regenerasi paksa              |
+| `cacheOnly`     | boolean | `false`  | Lookup saja, jangan generate              |
 
 ### Komponen Frontend
 

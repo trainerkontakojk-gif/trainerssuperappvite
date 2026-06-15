@@ -40,9 +40,11 @@ function stripMarkdownEmphasis(value: string): string {
 }
 
 function extractChangeValue(text: string): number | null {
-  const match = text.match(/\(([+-]?\d+(?:\.\d+)?)\)/);
+  const match = text.match(
+    /\(([+-]?\d+(?:[.,]\d+)?)(?:\s+(?:temuan|defects?|poin))?\)/i,
+  );
   if (!match) return null;
-  const parsed = Number.parseFloat(match[1]);
+  const parsed = Number.parseFloat(match[1].replace(",", "."));
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -50,11 +52,17 @@ function classifyListTone(
   subsectionTitle: string,
   changeValue: number | null,
 ): ForecastInsightListItem["tone"] {
+  if (changeValue !== null) {
+    if (changeValue < 0) return "positive";
+    if (changeValue > 0) return "risk";
+    return "neutral";
+  }
+
   const normalized = subsectionTitle.toLowerCase();
   if (
     normalized.includes("berisiko") ||
     normalized.includes("risiko") ||
-    normalized.includes("menurun") && normalized.includes("kualitas")
+    (normalized.includes("menurun") && normalized.includes("kualitas"))
   ) {
     return "risk";
   }
@@ -65,9 +73,6 @@ function classifyListTone(
   ) {
     return "positive";
   }
-  if (changeValue === null) return "neutral";
-  if (changeValue < 0) return "risk";
-  if (changeValue > 0) return "positive";
   return "neutral";
 }
 
@@ -120,7 +125,9 @@ function parseNumberedActions(block: string): ForecastInsightActionItem[] {
     }));
   }
 
-  const bulletMatches = [...block.matchAll(/^[-*•]\s+\*\*([^*]+)\*\*:?\s*(.+)$/gm)];
+  const bulletMatches = [
+    ...block.matchAll(/^[-*•]\s+\*\*([^*]+)\*\*:?\s*(.+)$/gm),
+  ];
   if (bulletMatches.length > 0) {
     return bulletMatches.map((match, index) => ({
       index: index + 1,
