@@ -164,6 +164,7 @@ Fitur forecasting SIDAK Dashboard memproyeksikan tren temuan dan parameter untuk
 1. **Batch Generation**: Satu request menghasilkan forecast untuk Total Temuan + seluruh parameter dalam satu panggilan Gemini.
 2. **Regresi Linear (Deterministik)**: Angka forecast dihitung secara deterministik via regresi linear — tidak menggunakan AI untuk angka.
 3. **Narasi AI**: Gemini 3.1 Flash Lite (temperature 0.3) menghasilkan insight naratif berdasarkan hasil regresi. Dipanggil sekali per generasi.
+   - Blok parameter tidak dibiarkan bergantung penuh pada format model; backend menormalkan ulang bagian itu agar tiga blok delta tetap tampil konsisten.
 4. **Persistence**: Snapshot disimpan di `sidak_dashboard_forecast_snapshots` dengan SHA-256 fingerprint untuk deteksi stale (perubahan data historis).
 5. **Cache-Only Lookup**: Setiap mount page melakukan `POST /dashboard/forecast { cacheOnly: true }` — tidak memanggil Gemini, hanya lookup DB.
 6. **Leader Scope**: Scope leader di-hash ke dalam `filterKey`, mencegah kebocoran snapshot antar scope akses.
@@ -211,6 +212,9 @@ Penurunan jumlah temuan tetap berarti perbaikan, jadi jangan menyebut delta
 negatif sebagai penurunan kualitas. Perubahan kontrak semantik forecast
 dimasukkan ke data fingerprint agar snapshot dengan narasi lama ditandai stale
 dan perlu diperbarui.
+Jika model menulis blok parameter yang tidak rapi atau menghilangkan delta,
+backend akan menggantinya dengan ringkasan parameter deterministik supaya
+insight tetap mudah dibaca oleh orang awam.
 
 ### Endpoint
 

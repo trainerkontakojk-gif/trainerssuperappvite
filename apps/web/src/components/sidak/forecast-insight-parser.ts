@@ -185,7 +185,7 @@ function parseSubsections(block: string): ForecastInsightSubsection[] {
 
   const subsections: ForecastInsightSubsection[] = [];
   for (let i = 0; i < parts.length - 1; i += 2) {
-    const title = stripMarkdownEmphasis(parts[i]);
+    const title = stripMarkdownEmphasis(parts[i]).replace(/:$/, "").trim();
     const body = parts[i + 1] ?? "";
     const items = parseListItems(body).map((item) => ({
       ...item,

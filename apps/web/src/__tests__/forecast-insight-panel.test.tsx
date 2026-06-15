@@ -13,8 +13,11 @@ Total temuan diproyeksikan turun 53.1% (-42.5 poin), menandakan perbaikan perfor
 - Etika Bertelepon (-7.3): jumlah temuan diproyeksikan menurun.
 - Keakuratan Solusi (-5.1): jumlah temuan diproyeksikan menurun.
 
-**Parameter Berisiko:**
+**Risiko Terbesar:**
 - Kemampuan Pencatatan (+7.3): jumlah temuan diproyeksikan meningkat.
+
+**Stabil:**
+- Kejelasan Informasi (0): tidak ada perubahan signifikan.
 
 ### **Tindakan yang Dapat Dilakukan**
 1. **Coaching Etika:** Fokuskan sesi coaching pada etika bertelepon.
@@ -62,9 +65,10 @@ describe("parseForecastInsightText", () => {
     expect(parsed.intro).toContain("analisis snapshot forecast");
     expect(parsed.sections).toHaveLength(4);
     expect(parsed.sections[0].title).toBe("Ringkasan Eksekutif");
-    expect(parsed.sections[1].subsections).toHaveLength(2);
+    expect(parsed.sections[1].subsections).toHaveLength(3);
     expect(parsed.sections[1].subsections[0].items[0].tone).toBe("positive");
     expect(parsed.sections[1].subsections[1].items[0].tone).toBe("risk");
+    expect(parsed.sections[1].subsections[2].items[0].tone).toBe("neutral");
     expect(parsed.sections[2].actions).toHaveLength(3);
     expect(parsed.sections[3].kind).toBe("disclaimer");
   });
@@ -108,6 +112,17 @@ Data ini bersifat prediktif.`;
       changeValue: -4.2,
       tone: "positive",
     });
+  });
+
+  it("renders stable parameter sections as neutral lists", () => {
+    const rawText = `### **Analisis Parameter**
+**Stabil:**
+- Salam Penutup & Magic Word (0): tidak ada perubahan signifikan.`;
+
+    const parsed = parseForecastInsightText(rawText);
+
+    expect(parsed.sections[0].subsections[0].title).toBe("Stabil");
+    expect(parsed.sections[0].subsections[0].items[0].tone).toBe("neutral");
   });
 
   it("parses action sections formatted with bullet points correctly", () => {

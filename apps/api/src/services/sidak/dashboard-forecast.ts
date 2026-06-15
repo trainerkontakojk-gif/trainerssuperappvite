@@ -302,12 +302,7 @@ async function generateBatchInsight(
   parameters: Record<string, SidakForecastSeries>,
   userId: string,
 ): Promise<SidakBatchForecastSnapshot["insight"]> {
-  const parameterSummary = Object.values(parameters)
-    .map((series) => {
-      const change = series.summary.projectedChange;
-      return `- ${series.scope.label} (${change}): ${describeFindingChange(change)}`;
-    })
-    .join("\n");
+  const parameterSummary = buildParameterSummary(parameters);
   const response = await generateGeminiContent({
     model: "gemini-3.1-flash-lite",
     userId,
@@ -317,16 +312,24 @@ async function generateBatchInsight(
     },
     systemInstruction: `Anda adalah analis Quality Assurance. Jelaskan snapshot forecast SIDAK secara ringkas dalam Bahasa Indonesia.
 Semua series Total Temuan dan parameter adalah JUMLAH TEMUAN/DEFECT, bukan skor kualitas. Aturan utama: penurunan jumlah temuan berarti perbaikan; kenaikan jumlah temuan berarti peningkatan risiko.
-Tuliskan delta dalam notasi ringkas seperti \`(-9)\` atau \`(+7,3)\`; jangan menambahkan kata "temuan" setelah angka delta di dalam label.
+Susun parameter dalam tiga blok: Perbaikan Terbesar, Risiko Terbesar, dan Stabil.
+Gunakan notasi delta ringkas seperti \`(-9)\` atau \`(+7,3)\` pada setiap item. Jangan menambahkan kata "temuan" setelah angka delta di dalam label.
 Delta negatif wajib dijelaskan sebagai temuan berkurang atau membaik. Delta positif wajib dijelaskan sebagai temuan bertambah atau perlu perhatian. Delta nol dijelaskan sebagai stabil.
 Jangan pernah menyebut delta negatif sebagai penurunan kualitas, parameter berisiko, atau kondisi yang memburuk.
-Angka sudah dihitung secara statistik dan tidak boleh diubah. Soroti perbaikan terbesar, parameter dengan kenaikan temuan paling berisiko, tindakan yang dapat dilakukan, dan disclaimer estimasi. Jangan mengarang penyebab yang tidak ada pada data.`,
+Angka sudah dihitung secara statistik dan tidak boleh diubah. Soroti perbaikan terbesar dan parameter dengan kenaikan temuan paling berisiko.
+
+Wajib menyusun keluaran dalam urutan heading berikut secara berurutan:
+1. ### **Ringkasan Eksekutif**
+2. ### **Analisis Parameter**
+3. ### **Tindakan yang Dapat Dilakukan**
+   Bagian ini wajib ditulis sebagai daftar bernomor (numbered list) dengan baris baru untuk setiap rekomendasi tindakan. Format setiap rekomendasi harus: "1. **Nama Tindakan**: Deskripsi..." (Gunakan tanda titik dua setelah teks tebal). Jangan menggabungkan bagian ini ke dalam satu baris paragraf narasi.
+4. ### **Disclaimer**`,
     contents: [
       {
         role: "user",
         parts: [
           {
-            text: `Total Temuan: arah ${total.summary.direction}, delta ${total.summary.projectedChange} (${total.summary.projectedChangePercent ?? "N/A"}%).
+            text: `Total Temuan: arah ${total.summary.direction}, delta ${formatFindingDelta(total.summary.projectedChange)} (${total.summary.projectedChangePercent ?? "N/A"}%).
 Parameter:
 ${parameterSummary || "- Tidak ada parameter."}`,
           },
@@ -336,9 +339,14 @@ ${parameterSummary || "- Tidak ada parameter."}`,
     temperature: 0.3,
   });
 
-  return response.success && response.text
-    ? { text: response.text, status: "generated" }
-    : { text: null, status: "unavailable" };
+  if (!response.success || !response.text) {
+    return { text: null, status: "unavailable" };
+  }
+
+  return {
+    text: normalizeForecastInsightText(response.text, parameterSummary),
+    status: "generated",
+  };
 }
 
 function describeFindingChange(change: number): string {
@@ -349,4 +357,93 @@ function describeFindingChange(change: number): string {
     return "berisiko";
   }
   return "stabil";
+}
+
+function buildParameterSummary(
+  parameters: Record<string, SidakForecastSeries>,
+): string {
+  const entries = Object.values(parameters).map((series) => ({
+    label: series.scope.label,
+    change: series.summary.projectedChange,
+  }));
+
+  const improving = entries
+    .filter((entry) => entry.change < -0.1)
+    .sort((a, b) => a.change - b.change);
+  const risky = entries
+    .filter((entry) => entry.change > 0.1)
+    .sort((a, b) => b.change - a.change);
+  const stable = entries
+    .filter((entry) => Math.abs(entry.change) <= 0.1)
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  return [
+    formatParameterBlock("Perbaikan Terbesar", improving, "membaik"),
+    formatParameterBlock("Risiko Terbesar", risky, "berisiko"),
+    formatParameterBlock("Stabil", stable, "stabil"),
+  ].join("\n\n");
+}
+
+function formatParameterBlock(
+  title: string,
+  entries: Array<{ label: string; change: number }>,
+  defaultStatus: string,
+): string {
+  const lines = entries.length
+    ? entries.map(
+        (entry) =>
+          `- ${entry.label} (${formatFindingDelta(entry.change)}): ${describeFindingChange(entry.change)}`,
+      )
+    : [`- Tidak ada parameter ${defaultStatus}.`];
+
+  return `**${title}:**\n${lines.join("\n")}`;
+}
+
+function formatFindingDelta(change: number): string {
+  const sign = change > 0 ? "+" : "";
+  const rounded = roundTo(change, 1);
+  return Number.isInteger(rounded)
+    ? `${sign}${rounded}`
+    : `${sign}${String(rounded).replace(".", ",")}`;
+}
+
+function normalizeForecastInsightText(
+  text: string,
+  parameterSummary: string,
+): string {
+  const parameterHeading = "### **Analisis Parameter**";
+  const normalizedParameterBlock = `${parameterHeading}\n${parameterSummary}`;
+
+  const parameterHeadingPattern = /^###\s+\*\*Analisis Parameter\*\*\s*$/m;
+  const parameterHeadingMatch = text.match(parameterHeadingPattern);
+  if (parameterHeadingMatch?.index != null) {
+    const sectionStart = parameterHeadingMatch.index;
+    const nextHeadingMatch = text
+      .slice(sectionStart + parameterHeadingMatch[0].length)
+      .match(/\n###\s+\*\*[^*]+\*\*\s*$/m);
+    const sectionEnd =
+      nextHeadingMatch?.index != null
+        ? sectionStart +
+          parameterHeadingMatch[0].length +
+          nextHeadingMatch.index +
+          1
+        : text.length;
+
+    return [
+      text.slice(0, sectionStart).trimEnd(),
+      normalizedParameterBlock,
+      text.slice(sectionEnd).trimStart(),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  const insertionPattern =
+    /^###\s+\*\*(Tindakan yang Dapat Dilakukan|Disclaimer)\*\*\s*$/m;
+  const insertionMatch = text.match(insertionPattern);
+  if (insertionMatch?.index != null) {
+    return `${text.slice(0, insertionMatch.index).trimEnd()}\n\n${normalizedParameterBlock}\n\n${text.slice(insertionMatch.index).trimStart()}`;
+  }
+
+  return `${text.trimEnd()}\n\n${normalizedParameterBlock}`;
 }

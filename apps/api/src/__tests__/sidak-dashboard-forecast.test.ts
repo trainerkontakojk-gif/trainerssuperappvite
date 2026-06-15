@@ -98,22 +98,53 @@ describe("dashboard batch forecast service", () => {
       userId: "user-1",
     });
 
-    expect(geminiLib.generateGeminiContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        systemInstruction: expect.stringContaining(
-          "Tuliskan delta dalam notasi ringkas seperti `(-9)` atau `(+7,3)`",
-        ),
-        contents: [
-          expect.objectContaining({
-            parts: [
-              expect.objectContaining({
-                text: expect.stringContaining("Etika Bertelepon ("),
-              }),
-            ],
-          }),
-        ],
-      }),
+    const call = vi.mocked(geminiLib.generateGeminiContent).mock.calls[0]?.[0];
+    expect(call?.systemInstruction).toContain(
+      "Susun parameter dalam tiga blok: Perbaikan Terbesar, Risiko Terbesar, dan Stabil",
     );
+    expect(call?.contents?.[0]?.parts?.[0]?.text).toContain(
+      "Perbaikan Terbesar",
+    );
+    expect(call?.contents?.[0]?.parts?.[0]?.text).toContain("Risiko Terbesar");
+    expect(call?.contents?.[0]?.parts?.[0]?.text).toContain("Stabil");
+    expect(call?.contents?.[0]?.parts?.[0]?.text).toContain(
+      "Etika Bertelepon (",
+    );
+  });
+
+  it("normalizes the AI parameter section so delta details stay visible", async () => {
+    vi.mocked(geminiLib.generateGeminiContent).mockResolvedValueOnce({
+      success: true,
+      text: `Berikut adalah analisis snapshot forecast SIDAK:
+
+### **Ringkasan Eksekutif**
+Total temuan menurun.
+
+### **Analisis Parameter**
+Stabil
+---
+
+### **Tindakan yang Dapat Dilakukan**
+1. **Coaching:** Fokus pada area prioritas.
+
+### **Disclaimer**
+Data ini bersifat estimasi.`,
+    });
+
+    const result = await generateSidakTrendForecast({
+      filters: { year: 2026 },
+      horizonMonths: 3,
+      userId: "user-1",
+    });
+
+    expect(result.snapshot?.insight.text).toContain(
+      "### **Analisis Parameter**",
+    );
+    expect(result.snapshot?.insight.text).toContain("Perbaikan Terbesar");
+    expect(result.snapshot?.insight.text).toContain("Risiko Terbesar");
+    expect(result.snapshot?.insight.text).toContain("Stabil");
+    expect(result.snapshot?.insight.text).toMatch(/Etika Bertelepon \([+-]/);
+    expect(result.snapshot?.insight.text).not.toContain("\n---\n");
   });
 
   it("versions the data fingerprint when forecast semantics change", async () => {
