@@ -133,7 +133,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs` via `logAiUsage()`.
 - `logAiUsage()` sekarang menerima parameter `status` (`'success'` | `'failed'` | `'timeout'`) dan `errorMessage`. Jika gagal/timeout, token di-set ke 0 dan error message dicatat.
 - `resolveModelProvider()` mendeteksi Gemini (tanpa `/`) vs OpenRouter (dengan `/`).
-- OpenRouter punya 4-attempt retry dengan backoff untuk 429.
+- OpenRouter punya 4-attempt retry dengan backoff untuk 429. Error response dipetakan via `formatOpenRouterError()` — 401 (API Key invalid), 402 (Insufficient Credit), 403 (Access Denied), dan error codes lain dengan detail message dari response body. KETIK `ChatInterface` menekan console noise untuk expected AI errors via `shouldLogKetikGenerationError()` guard.
 - Caller modul tidak boleh mengasumsikan bentuk response SDK/provider selalu stabil; ekstraksi `text` harus defensif.
 - Usage AI dicatat server-side setelah request final (sukses maupun gagal). Setiap `request_id` unik — retry/fallback internal tidak menghasilkan row tambahan. Response tanpa metadata token tidak boleh menghasilkan usage log palsu.
 

@@ -94,22 +94,10 @@ export async function generateOpenRouterContent(options: {
       const errorText = lastResponse
         ? await lastResponse.text()
         : "No response";
-      if (status === 429)
-        return { success: false, error: "Server AI sedang sibuk. Coba lagi." };
-      if (status === 401)
-        return { success: false, error: "API Key OpenRouter tidak valid." };
-      try {
-        const errJson = JSON.parse(errorText);
-        return {
-          success: false,
-          error: errJson.error?.message || `AI Error (${status})`,
-        };
-      } catch {
-        return {
-          success: false,
-          error: `Gagal menghubungi server AI (Error ${status}).`,
-        };
-      }
+      return {
+        success: false,
+        error: formatOpenRouterError(status, errorText),
+      };
     }
 
     const data = await lastResponse.json();
@@ -163,6 +151,47 @@ export async function generateOpenRouterContent(options: {
     console.error("[OpenRouter] Error:", error);
     return { success: false, error: "Terjadi kesalahan koneksi ke server AI." };
   }
+}
+
+function parseOpenRouterErrorMessage(errorText: string): string | undefined {
+  try {
+    const parsed = JSON.parse(errorText) as {
+      error?: { message?: unknown };
+    };
+    return typeof parsed.error?.message === "string"
+      ? parsed.error.message
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatOpenRouterError(
+  status: number,
+  errorText: string,
+): string {
+  const detail = parseOpenRouterErrorMessage(errorText);
+
+  if (status === 429) {
+    return "Server AI sedang sibuk. Coba lagi.";
+  }
+  if (status === 401) {
+    return detail
+      ? `API Key OpenRouter tidak valid: ${detail}`
+      : "API Key OpenRouter tidak valid.";
+  }
+  if (status === 402) {
+    return detail
+      ? `Kredit OpenRouter tidak cukup: ${detail}`
+      : "Kredit OpenRouter tidak cukup.";
+  }
+  if (status === 403) {
+    return detail
+      ? `OpenRouter menolak akses: ${detail}`
+      : "OpenRouter menolak akses.";
+  }
+
+  return detail || `Gagal menghubungi server AI (Error ${status}).`;
 }
 
 function normalizeOpenRouterImages(images: unknown): string[] {

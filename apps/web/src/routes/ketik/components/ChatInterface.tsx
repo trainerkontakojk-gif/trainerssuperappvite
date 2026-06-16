@@ -17,6 +17,7 @@ import type {
   PacingMeta,
 } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
+import { shouldLogKetikGenerationError } from "../lib/ketik-error";
 import {
   IMAGE_TAG_PATTERN,
   IMAGE_TAG_PATTERN_GLOBAL,
@@ -455,7 +456,9 @@ export function ChatInterface({
         setSessionPhase("closed");
       }
     } catch (error) {
-      console.error("Error generating response", error);
+      if (shouldLogKetikGenerationError(error)) {
+        console.error("Error generating response", error);
+      }
       setIsLoading(false);
       setMessages((prev) => [
         ...prev,

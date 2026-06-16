@@ -421,6 +421,7 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 199.  **SIDAK Forecast Finding Delta Semantics** — Fixed forecast insight delta interpretation: parameter series adalah jumlah temuan, bukan skor kualitas, jadi delta negatif = perbaikan. Prompt diperbarui dengan aturan semantik eksplisit. Frontend parser memprioritaskan nilai numerik atas judul subsection AI. Confidence badge dengan color coding (emerald/amber/rose). Fingerprint mencakup `contractVersion` agar snapshot lama menjadi stale. 8+ files modified, 4+ regression tests baru. (DONE)
 200.  **SIDAK Forecast Parameter Normalization & Three-Block Layout** — Backend menormalkan blok parameter insight AI menjadi tiga blok deterministik (Perbaikan Terbesar, Risiko Terbesar, Stabil) menggantikan output model yang tidak rapi. `buildParameterSummary()`, `formatParameterBlock()`, `formatFindingDelta()`, `normalizeForecastInsightText()` — replace atau insert blok parameter deterministik. Frontend parser mendukung subsection "Stabil" dengan tone neutral. 5 files modified. (DONE)
 201.  **SIDAK Dashboard & Ranking Default Filter Pairing** — Auto-select folder based on selected service type on both Dashboard and Ranking pages using `DEFAULT_SERVICE_FOLDER_MAP`. Folder state persistence via `useState`+`useEffect` prevents option list shrinkage when API returns filtered results. Dashboard: max 2 visible parameter series with total trend toggle. Ranking: one-time initial folder pairing via `initialFolderSetRef`. `ParamTrendChart` multi-forecast series support (`forecastResults` array). 7 files modified, 2 new test files. (DONE)
+202.  **OpenRouter Error Refactoring & DeepSeek Models** — Refactored OpenRouter error handling: extracted `formatOpenRouterError()` and `parseOpenRouterErrorMessage()` helpers, added structured error messages for 402 (Insufficient Credit) and 403 (Access Denied) error codes. Added `shouldLogKetikGenerationError()` guard to suppress console stack traces for expected AI errors in KETIK chat UI. Cleaned up model registry: removed deprecated `openai/gpt-oss-120b:free` and `google/gemini-2.0-flash-lite`, added `deepseek/deepseek-v4-pro` and `deepseek/deepseek-v4-flash`. 6 files modified, 4 regression tests (3 unit + 1 API). (DONE)
 
 ## Key Files Changed (Phase 58 — 118)
 
@@ -999,6 +1000,15 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `docs/rebuild-logs/phase-188-sidak-agent-detail-zero-score-cache-remediation.md` — **Phase 109/188**: Rebuild log for SIDAK agent detail zero score cache remediation.
 - `docs/rebuild-logs/phase-189-access-approval-grouped-leader-cards.md` — **NEW Phase 189**: Rebuild log for consolidated leader access cards with grouped UI.
 - `docs/rebuild-logs/phase-190-telefun-speaker-timestamp-transcript.md` — **NEW Phase 190**: Rebuild log for Telefun speaker & timestamp transcript from Gemini Live events.
+
+- `apps/api/src/lib/openrouter.ts` — **Phase 202**: Extracted `formatOpenRouterError()` and `parseOpenRouterErrorMessage()` helpers; added structured error messages for 402 (Insufficient Credit) and 403 (Access Denied) error codes.
+- `apps/api/src/__tests__/openrouter.test.ts` — **NEW Phase 202**: Unit test for OpenRouter 401 error with detail passthrough.
+- `apps/web/src/routes/ketik/lib/ketik-error.ts` — **NEW Phase 202**: `shouldLogKetikGenerationError()` guard that suppresses console.error for expected `ApiError` with `AI_ERROR` code.
+- `apps/web/src/__tests__/ketik-error.test.ts` — **NEW Phase 202**: 3 unit tests for `shouldLogKetikGenerationError` (AI_ERROR suppressed, NOT_FOUND logged, non-ApiError logged).
+- `apps/web/src/routes/ketik/components/ChatInterface.tsx` — **Phase 202**: Replaced unconditional `console.error` with `shouldLogKetikGenerationError` guard to reduce console noise during expected AI errors.
+- `packages/types/src/ai-models.ts` — **Phase 202**: Removed deprecated `openai/gpt-oss-120b:free` and `google/gemini-2.0-flash-lite`; added `deepseek/deepseek-v4-pro` and `deepseek/deepseek-v4-flash`.
+- `docs/modules.md` — **Phase 202**: Added "Expected AI errors" note — expected AI errors are displayed to user but suppressed from console stack trace.
+- `docs/rebuild-logs/phase-202-openrouter-error-refactoring-deepseek-models.md` — **NEW Phase 202**: Rebuild log for OpenRouter error refactoring, KETIK error suppression, and DeepSeek models.
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |
