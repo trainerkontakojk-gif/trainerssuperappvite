@@ -12,6 +12,7 @@ Perbaikan bug kritis pada modul PDKT terkait kebocoran nama identitas di email b
 2.  **Placement-Aware Natural Context Clues**:
     *   Menghilangkan fallback teks perkenalan diri generik ("Oya, saya Budi...") yang terlalu mudah dideteksi oleh AI/renderer sebagai pola kaku.
     *   Mengimplementasikan `NAME_CLUE_TEMPLATES` yang berisi 11 variasi teks natural berkonteks (terkait dokumen, SLIK OJK, billing tagihan, dll) terbagi berdasarkan penempatan `upfront` (awal email) dan `middle` (tengah email).
+    *   Untuk pattern `middle`, nama kini disisipkan ke paragraf tengah yang sudah ada alih-alih ditambahkan sebagai paragraf berdiri sendiri, sehingga hasilnya lebih natural dan tidak terlalu mencolok.
     *   Penentuan template menggunakan indeks deterministik berbasis *seed text* dari skenario, sehingga hasil simulasi konsisten namun variatif.
 
 3.  **Structured AI Image Generation Diagnostics**:

@@ -237,19 +237,19 @@ export const NAME_CLUE_TEMPLATES: NameClueTemplate[] = [
   },
   {
     placement: "middle",
-    render: (name) => `Waktu saya cek lagi berkas administrasinya, nama yang tertera di sana ${name}, jadi saya makin bingung kenapa prosesnya dianggap tidak cocok.`,
+    render: (name) => `nama yang tertera di berkas administrasinya adalah ${name}`,
   },
   {
     placement: "middle",
-    render: (name) => `Pihak penagihan juga beberapa kali menyebut nama ${name}, tapi penjelasan mereka tetap berubah-ubah dan tidak membantu.`,
+    render: (name) => `di surat pemberitahuan yang saya terima, nama penerimanya ${name}`,
   },
   {
     placement: "middle",
-    render: (name) => `Dalam surat pemberitahuan yang dikirimkan, nama penerima yang tertulis adalah ${name}, padahal data pendukungnya sudah lengkap.`,
+    render: (name) => `pada data administrasi yang saya cek lagi, nama saya masih tercantum sebagai ${name}`,
   },
   {
     placement: "middle",
-    render: (name) => `Saya sempat memastikan ke petugas, dan mereka mengonfirmasi data tersebut atas nama ${name}.`,
+    render: (name) => `waktu saya minta penjelasan ulang, petugas menyebut nama ${name}`,
   },
   {
     placement: "late",
@@ -300,6 +300,22 @@ export function pickNameClueTemplate(
   }
   const idx = getDeterministicIndex(seedText, filtered.length);
   return filtered[idx];
+}
+
+function weaveClauseIntoParagraph(paragraph: string, clause: string): string {
+  const trimmedParagraph = paragraph.trim();
+  const trimmedClause = clause.trim().replace(/[.?!]+$/g, "");
+
+  if (!trimmedParagraph) {
+    return `${trimmedClause}.`;
+  }
+
+  const sentenceMatch = trimmedParagraph.match(/^(.+?[.!?])(\s+.+)?$/s);
+  if (sentenceMatch && sentenceMatch[2]) {
+    return `${sentenceMatch[1]} ${trimmedClause}${sentenceMatch[2]}`;
+  }
+
+  return `${trimmedParagraph.replace(/[.,;:]\s*$/g, "")}, ${trimmedClause}.`;
 }
 
 export function renderPdktIdentityByMentionPattern(
@@ -371,15 +387,14 @@ export function renderPdktIdentityByMentionPattern(
 
     if (!replacedPlaceholder) {
       const clue = pickNameClueTemplate("middle", seedText).render(mentionName);
-      if (paragraphs.length >= 2) {
-        paragraphs.splice(
-          Math.floor(paragraphs.length / 2),
-          0,
-          clue,
-        );
-      } else {
-        paragraphs.push(clue);
-      }
+      const targetIndex = Math.min(
+        Math.max(Math.floor(paragraphs.length / 2), 0),
+        paragraphs.length - 1,
+      );
+      paragraphs[targetIndex] = weaveClauseIntoParagraph(
+        paragraphs[targetIndex],
+        clue,
+      );
     }
     resolvedBody = paragraphs.join("\n\n");
   } else if (mentionPattern === "late") {
@@ -504,7 +519,7 @@ export function validatePdktEmailPolicyCompliance(
       .split("\n\n")
       .map((p) => p.trim())
       .filter(Boolean);
-    if (paragraphs.length > 0) {
+    if (paragraphs.length > 1) {
       const firstParaLower = paragraphs[0].toLowerCase();
       if (firstParaLower.includes(mentionNameLower)) {
         violations.push(

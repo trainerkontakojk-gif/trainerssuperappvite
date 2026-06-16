@@ -118,8 +118,10 @@ describe("pdkt-email-policy", () => {
       );
 
       const paragraphs = result.body.split("\n\n");
+      expect(paragraphs).toHaveLength(3);
       expect(paragraphs[0]).not.toContain("Budi");
-      expect(paragraphs.some(p => p.includes("Budi"))).toBe(true);
+      expect(paragraphs[1]).toContain("Budi");
+      expect(paragraphs.filter((p) => p.includes("Budi"))).toHaveLength(1);
     });
 
     it("uses bodyName instead of name in the body and avoids name leakage", () => {
