@@ -1,7 +1,7 @@
 import type { KetikAppSettings } from "@trainers/types";
 import { Check, Clock, Settings, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TEXT_SIMULATION_MODELS as TEXT_MODELS } from "../../../../lib/aiModels"; // Shared model registry
+import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels"; // Shared model registry
 
 export interface KetikSystemTabProps {
   localSettings: KetikAppSettings;
@@ -81,6 +81,8 @@ export function KetikSystemTab({
                       className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${
                         model.provider === "openrouter"
                           ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
+                          : model.provider === "deepseek"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                           : "bg-blue-500/10 text-blue-500 border-blue-500/20"
                       }`}
                     >

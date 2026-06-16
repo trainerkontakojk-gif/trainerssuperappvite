@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_MODELS } from "@trainers/types";
+import { KETIK_PDKT_MODELS, TEXT_MODELS } from "@trainers/types";
 import { getModelsForModule, resolveModelProvider } from "../lib/ai-models";
 
 describe("ai model registry", () => {
@@ -30,5 +30,25 @@ describe("ai model registry", () => {
     expect(models.some((model) => model.id === "gemini-3.5-flash")).toBe(true);
     expect(models.every((model) => model.capabilities?.supportsText)).toBe(true);
     expect(models.some((model) => model.capabilities?.supportsText === false)).toBe(false);
+  });
+
+  it("exposes DeepSeek direct models only for ketik and pdkt", () => {
+    expect(
+      KETIK_PDKT_MODELS.some((model) => model.id === "deepseek-v4-pro"),
+    ).toBe(true);
+    expect(
+      getModelsForModule("ketik").some((model) => model.id === "deepseek-v4-flash"),
+    ).toBe(true);
+    expect(
+      getModelsForModule("qa-analyzer").some((model) => model.id === "deepseek-v4-pro"),
+    ).toBe(false);
+  });
+
+  it("routes DeepSeek direct models to the DeepSeek provider", () => {
+    expect(resolveModelProvider("deepseek-v4-pro")).toMatchObject({
+      modelId: "deepseek-v4-pro",
+      provider: "deepseek",
+      isFallback: false,
+    });
   });
 });

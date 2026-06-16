@@ -8,6 +8,10 @@ vi.mock("../lib/openrouter", () => ({
   generateOpenRouterContent: vi.fn(),
 }));
 
+vi.mock("../lib/deepseek", () => ({
+  generateDeepSeekContent: vi.fn(),
+}));
+
 vi.mock("../lib/ai-models", () => ({
   resolveModelProvider: vi.fn(),
 }));
@@ -20,11 +24,13 @@ import {
 } from "../services/ketik/consumer-response";
 import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenRouterContent } from "../lib/openrouter";
+import { generateDeepSeekContent } from "../lib/deepseek";
 import { resolveModelProvider } from "../lib/ai-models";
 import type { KetikScenario, ChatMessage } from "@trainers/types";
 
 const mockGeminiContent = vi.mocked(generateGeminiContent);
 const mockOpenRouterContent = vi.mocked(generateOpenRouterContent);
+const mockDeepSeekContent = vi.mocked(generateDeepSeekContent);
 const mockResolveProvider = vi.mocked(resolveModelProvider);
 
 function buildConfig(overrides: Record<string, any> = {}) {
@@ -70,6 +76,13 @@ function mockOpenRouterSuccess(text: string) {
   });
 }
 
+function mockDeepSeekSuccess(text: string) {
+  mockDeepSeekContent.mockResolvedValueOnce({
+    success: true,
+    text,
+  });
+}
+
 function setupGeminiProvider() {
   mockResolveProvider.mockReturnValue({
     modelId: "gemini-3.1-flash-lite",
@@ -85,6 +98,15 @@ function setupOpenRouterProvider() {
     provider: "openrouter",
     isFallback: false,
     timeoutMs: 120_000,
+  });
+}
+
+function setupDeepSeekProvider() {
+  mockResolveProvider.mockReturnValue({
+    modelId: "deepseek-v4-pro",
+    provider: "deepseek",
+    isFallback: false,
+    timeoutMs: 180_000,
   });
 }
 
@@ -120,6 +142,21 @@ describe("generateConsumerResponse", () => {
       expect(result.text).toBe("Saya mau lapor penipuan.");
       expect(mockOpenRouterContent).toHaveBeenCalledTimes(1);
       expect(mockGeminiContent).not.toHaveBeenCalled();
+    });
+
+    it("calls DeepSeek when provider is deepseek", async () => {
+      setupDeepSeekProvider();
+      mockDeepSeekSuccess("Saya mau lapor masalah saya.");
+      const result = await generateConsumerResponse(
+        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        testScenario,
+        testHistory,
+      );
+      expect(result.success).toBe(true);
+      expect(result.text).toBe("Saya mau lapor masalah saya.");
+      expect(mockDeepSeekContent).toHaveBeenCalledTimes(1);
+      expect(mockGeminiContent).not.toHaveBeenCalled();
+      expect(mockOpenRouterContent).not.toHaveBeenCalled();
     });
   });
 
@@ -252,7 +289,7 @@ describe("generateConsumerResponse", () => {
       );
       expect(result.success).toBe(true);
       const callArgs = mockOpenRouterContent.mock.calls[0][0];
-      expect(callArgs.systemInstruction).toContain("OPENROUTER SCRIPT MODE");
+      expect(callArgs.systemInstruction).toContain("MODEL SCRIPT MODE");
       expect(callArgs.systemInstruction).toContain("WAJIB PATUH");
     });
 

@@ -37,6 +37,14 @@ export function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function parseJsonText(text: string): unknown {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("Empty response body");
+  }
+  return JSON.parse(trimmed);
+}
+
 /**
  * Normalise the JSON body of a Hono RPC response.
  *
@@ -72,21 +80,30 @@ export async function unwrapResponse<TResponse extends ResponseLike>(
     return undefined as Data;
   }
 
-  // Non-JSON — should not happen for our API, but guard anyway
-  if (!contentType.includes("application/json") && !contentType.includes("application/")) {
-    const text = await res.text().catch(() => "");
-    throw new ApiError(
-      "UNEXPECTED_FORMAT",
-      `Expected JSON response but got ${contentType || "empty"}. ${
-        text ? `Body: ${text.slice(0, 200)}` : ""
-      }`,
-    );
-  }
-
   let body: unknown;
   try {
-    body = await res.json();
-  } catch {
+    if (contentType.includes("application/json") || contentType.includes("application/")) {
+      body = await res.json();
+    } else {
+      const text = await res.text().catch(() => "");
+      if (!text) {
+        throw new ApiError(
+          "UNEXPECTED_FORMAT",
+          `Expected JSON response but got ${contentType || "empty"}.`,
+        );
+      }
+
+      try {
+        body = parseJsonText(text);
+      } catch {
+        throw new ApiError(
+          "UNEXPECTED_FORMAT",
+          `Expected JSON response but got ${contentType || "empty"}. Body: ${text.slice(0, 200)}`,
+        );
+      }
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(
       "PARSE_ERROR",
       "Gagal memproses respons server. Silakan coba lagi.",

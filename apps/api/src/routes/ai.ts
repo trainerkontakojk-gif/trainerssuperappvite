@@ -10,6 +10,7 @@ import {
 import type { AiModelModule } from "@trainers/types";
 import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenRouterContent } from "../lib/openrouter";
+import { generateDeepSeekContent } from "../lib/deepseek";
 import { requireRole } from "../middleware/role";
 import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
@@ -56,6 +57,7 @@ ai.post(
       body.model || "gemini-3.1-flash-lite",
     );
     const isOpenRouter = provider === "openrouter";
+    const isDeepSeek = provider === "deepseek";
 
     const callPayload = {
       model: modelId,
@@ -69,7 +71,9 @@ ai.post(
 
     const response = isOpenRouter
       ? await generateOpenRouterContent(callPayload)
-      : await generateGeminiContent(callPayload);
+      : isDeepSeek
+        ? await generateDeepSeekContent(callPayload)
+        : await generateGeminiContent(callPayload);
 
     if (!response.success) {
       return c.json(

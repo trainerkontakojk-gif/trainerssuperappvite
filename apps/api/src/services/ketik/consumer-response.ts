@@ -5,6 +5,7 @@ import {
 } from "@trainers/types";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenRouterContent } from "../../lib/openrouter";
+import { generateDeepSeekContent } from "../../lib/deepseek";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { UsageContext } from "../../lib/ai-usage";
 
@@ -313,18 +314,19 @@ ATURAN BALASAN:
 
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
   const isOpenRouter = provider === "openrouter";
+  const isDeepSeek = provider === "deepseek";
 
-  const providerSystemInstruction = isOpenRouter && hasScript
-    ? `${systemInstruction}\n\nOPENROUTER SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
+  const providerSystemInstruction = (isOpenRouter || isDeepSeek) && hasScript
+    ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
     : systemInstruction;
 
   const callPayload = {
     model: modelId,
     systemInstruction: providerSystemInstruction,
     contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
-    temperature: isOpenRouter && hasScript
+    temperature: (isOpenRouter || isDeepSeek) && hasScript
       ? Math.min(0.82, 0.55)
-      : isOpenRouter
+      : isOpenRouter || isDeepSeek
         ? 0.55
         : 0.82,
     usageContext,
@@ -334,7 +336,9 @@ ATURAN BALASAN:
   try {
     const response = isOpenRouter
       ? await generateOpenRouterContent(callPayload)
-      : await generateGeminiContent(callPayload);
+      : isDeepSeek
+        ? await generateDeepSeekContent(callPayload)
+        : await generateGeminiContent(callPayload);
 
     if (!response.success) {
       return { success: false, error: response.error || "AI tidak tersedia." };

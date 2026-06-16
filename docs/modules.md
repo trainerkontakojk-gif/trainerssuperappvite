@@ -48,6 +48,7 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Role restriction**: Hanya role `admin`, `trainer`, dan `qa` yang dapat menjalankan analisis AI. Role lain melihat tombol disabled dengan pesan akses.
   - **Sanitizer safety**: Structured JSON response tidak disanitasi sebelum parsing. Sanitasi hanya diterapkan ke field string setelah parse untuk mencegah corrupt JSON.
   - **Expected AI errors**: Error AI yang sudah dipahami backend tetap ditampilkan ke user, tetapi tidak dicetak sebagai stack trace console oleh chat UI agar simulasi tidak penuh noise.
+  - **DeepSeek direct**: Model `DeepSeek V4 Pro` dan `DeepSeek V4 Flash` tersedia untuk KETIK jika `DEEPSEEK_API_KEY` diset di environment backend.
   - **Review lifecycle**: `POST /ketik/review` memproses job secara sinkron (await claimAndProcess). Job `queued` dan job `processing` dengan lease expired langsung di-reclaim. Job `failed` di-reset ke `queued` sebelum retry. Frontend polling memiliki timeout 120s — jika tidak mencapai terminal state, UI forced ke `failed` dengan tombol retry. Status reconciliation di `getKetikReviewStatus()` menandai stale processing (lease +30s grace) dan stale queue (5 menit TTL) sebagai `failed`.
   - **JSON extraction**: Parser review menggunakan `extractJsonObjectText()` untuk extrak JSON object dari output AI. Menangani plain JSON, markdown-fenced `json ... `, dan JSON dengan teks di sekitar. Tanpa ini, output fenced dari OpenRouter bisa menyebabkan parse error walaupun konten JSON-nya valid.
   - **Error messaging**: Polling status (`GET /ketik/review/status/:id`) mengembalikan `errorMessage` dengan teks manusiawi (Indonesia) jika status `failed`. Frontend menampilkan error toast. Job-level `error_message` (untuk log teknis) tidak diekspos langsung ke UI.
@@ -75,6 +76,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - Migrasi field legacy `script` → `sampleEmailTemplate` dijalankan saat settings dibaca.
   - DUMMY_PROFILES pool 20 identitas dengan 25 kota acak untuk variasi identitas konsumen.
   - Usage delta setelah evaluasi async di-retry hingga 2x (2s delay) untuk akurasi.
+  - **DeepSeek direct**: Model `DeepSeek V4 Pro` dan `DeepSeek V4 Flash` tersedia di pengaturan PDKT jika `DEEPSEEK_API_KEY` diset di environment backend.
 - **Evaluasi AI (Single-Turn)**:
   - Prompt hanya menerima tepat satu email inbound konsumen dan satu balasan agent OJK 157.
   - Seluruh body kedua email diteruskan ke prompt tanpa konteks thread tambahan.

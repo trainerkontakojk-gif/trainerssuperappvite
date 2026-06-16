@@ -153,17 +153,34 @@ describe("unwrapResponse", () => {
     });
   });
 
+  it("parses JSON body even when content-type is text/plain", async () => {
+    const data = await unwrapResponse({
+      status: 200,
+      headers: new Headers({ "content-type": "text/plain; charset=utf-8" }),
+      json: () => Promise.reject(new Error("Should not use json()")),
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            success: true,
+            data: { id: "plain-json" },
+          }),
+        ),
+    });
+
+    expect(data).toEqual({ id: "plain-json" });
+  });
+
   it("throws ApiError when body is not valid JSON", async () => {
     const res = {
       status: 200,
-      headers: new Headers({ "content-type": "application/json" }),
+      headers: new Headers({ "content-type": "text/plain; charset=utf-8" }),
       json: () => Promise.reject(new Error("JSON parse error")),
       text: () => Promise.resolve("not json"),
     };
 
     await expect(unwrapResponse(res)).rejects.toThrow(ApiError);
     await expect(unwrapResponse(res)).rejects.toMatchObject({
-      code: "PARSE_ERROR",
+      code: "UNEXPECTED_FORMAT",
     });
   });
 

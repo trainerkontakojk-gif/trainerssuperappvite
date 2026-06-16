@@ -163,6 +163,27 @@ function escapeRegExp(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function buildSelfIntroductionPatterns(names: string[]): RegExp[] {
+  return names
+    .map((name) => name.trim())
+    .filter((name) => name.length > 1)
+    .map((name) => escapeRegExp(name))
+    .flatMap((escapedName) => [
+      new RegExp(
+        `(?:perkenalkan,?\\s+)?nama\\s+saya\\s+(?:adalah\\s+)?${escapedName}\\b`,
+        "i",
+      ),
+      new RegExp(
+        `(?:perkenalkan,?\\s+)?saya\\s+(?:yang\\s+)?bernama\\s+${escapedName}\\b`,
+        "i",
+      ),
+      new RegExp(
+        `(?:perkenalkan,?\\s+)?saya\\s+${escapedName}\\b`,
+        "i",
+      ),
+    ]);
+}
+
 export const CONSUMER_PLACEHOLDER_PATTERNS = [
   /\{\{\s*consumer_name\s*\}\}/gi,
   /\[(?:nama\s*)?(?:konsumen|nasabah|pengirim|pelapor|diri)(?:\s+[^\]]+)?\]/gi,
@@ -312,7 +333,7 @@ function weaveClauseIntoParagraph(paragraph: string, clause: string): string {
 
   const sentenceMatch = trimmedParagraph.match(/^(.+?[.!?])(\s+.+)?$/s);
   if (sentenceMatch && sentenceMatch[2]) {
-    return `${sentenceMatch[1]} ${trimmedClause}${sentenceMatch[2]}`;
+    return `${sentenceMatch[1]} ${trimmedClause}. ${sentenceMatch[2].trimStart()}`;
   }
 
   return `${trimmedParagraph.replace(/[.,;:]\s*$/g, "")}, ${trimmedClause}.`;
@@ -366,6 +387,8 @@ export function renderPdktIdentityByMentionPattern(
       .map((p) => p.trim())
       .filter(Boolean);
     if (paragraphs.length === 0) paragraphs = [""];
+    const hasDedicatedClosingParagraph = paragraphs.length >= 3;
+    const lastParagraphIndex = paragraphs.length - 1;
 
     paragraphs[0] = replaceConsumerPlaceholders(paragraphs[0], "");
     paragraphs[0] = cleanNameOccurrences(
@@ -374,8 +397,23 @@ export function renderPdktIdentityByMentionPattern(
       identity.bodyName,
     );
 
+    if (hasDedicatedClosingParagraph) {
+      paragraphs[lastParagraphIndex] = replaceConsumerPlaceholders(
+        paragraphs[lastParagraphIndex],
+        "",
+      );
+      paragraphs[lastParagraphIndex] = cleanNameOccurrences(
+        paragraphs[lastParagraphIndex],
+        identity.name,
+        identity.bodyName,
+      );
+    }
+
     let replacedPlaceholder = false;
-    for (let i = 1; i < paragraphs.length; i++) {
+    const middleEndExclusive = hasDedicatedClosingParagraph
+      ? lastParagraphIndex
+      : paragraphs.length;
+    for (let i = 1; i < middleEndExclusive; i++) {
       const hasPl = CONSUMER_PLACEHOLDER_PATTERNS.some((p) =>
         p.test(paragraphs[i]),
       );
@@ -388,8 +426,8 @@ export function renderPdktIdentityByMentionPattern(
     if (!replacedPlaceholder) {
       const clue = pickNameClueTemplate("middle", seedText).render(mentionName);
       const targetIndex = Math.min(
-        Math.max(Math.floor(paragraphs.length / 2), 0),
-        paragraphs.length - 1,
+        Math.max(Math.floor(paragraphs.length / 2), 1),
+        hasDedicatedClosingParagraph ? lastParagraphIndex - 1 : lastParagraphIndex,
       );
       paragraphs[targetIndex] = weaveClauseIntoParagraph(
         paragraphs[targetIndex],
@@ -456,6 +494,11 @@ export function validatePdktEmailPolicyCompliance(
   const bodyName = identity.bodyName ? identity.bodyName.toLowerCase() : "";
   const mentionNameLower = getPdktMentionName(identity).toLowerCase();
   const forbiddenNames = getPdktForbiddenBodyNames(identity).map(n => n.toLowerCase());
+  const selfIntroductionPatterns = buildSelfIntroductionPatterns([
+    identity.name,
+    identity.bodyName || "",
+    getPdktMentionName(identity),
+  ]);
 
   const subjectLower = email.subject.toLowerCase();
   const bodyLower = email.body.toLowerCase();
@@ -532,10 +575,35 @@ export function validatePdktEmailPolicyCompliance(
         "Nama konsumen tidak disebutkan sama sekali pada pattern 'middle'",
       );
     }
+    const namedParagraphIndexes = paragraphs
+      .map((paragraph, index) =>
+        paragraph.toLowerCase().includes(mentionNameLower) ? index : -1,
+      )
+      .filter((index) => index >= 0);
+    if (
+      paragraphs.length >= 3 &&
+      namedParagraphIndexes.length > 0 &&
+      namedParagraphIndexes.every((index) => index === paragraphs.length - 1)
+    ) {
+      violations.push(
+        "Nama konsumen hanya muncul di paragraf penutup pada pattern 'middle'",
+      );
+    }
+    if (
+      paragraphs.length >= 3 &&
+      paragraphs[paragraphs.length - 1]?.toLowerCase().includes(mentionNameLower)
+    ) {
+      violations.push(
+        "Nama konsumen muncul lagi di paragraf penutup pada pattern 'middle'",
+      );
+    }
     for (const phrase of introPhrases) {
       if (bodyLower.includes(phrase)) {
         violations.push(`Menggunakan frasa perkenalan diri generik "${phrase}" pada pattern middle`);
       }
+    }
+    if (selfIntroductionPatterns.some((pattern) => pattern.test(email.body))) {
+      violations.push('Menggunakan perkenalan diri dengan nama pada pattern "middle"');
     }
   } else if (mentionPattern === "late") {
     const paragraphs = email.body
@@ -561,6 +629,9 @@ export function validatePdktEmailPolicyCompliance(
       if (bodyLower.includes(phrase)) {
         violations.push(`Menggunakan frasa perkenalan diri generik "${phrase}" pada pattern late`);
       }
+    }
+    if (selfIntroductionPatterns.some((pattern) => pattern.test(email.body))) {
+      violations.push('Menggunakan perkenalan diri dengan nama pada pattern "late"');
     }
   }
 

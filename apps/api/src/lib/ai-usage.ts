@@ -1,5 +1,6 @@
 import { createAdminClient } from "./supabase";
 import { normalizeModelId } from "./ai-models";
+import type { AIProvider } from "@trainers/types";
 
 export interface UsageContext {
   module: "ketik" | "pdkt" | "telefun" | "qa-analyzer";
@@ -30,7 +31,7 @@ function isMissingAiUsageStatusColumnError(error: any): boolean {
 export async function logAiUsage(options: {
   requestId: string;
   userId: string;
-  provider: "gemini" | "openrouter";
+  provider: AIProvider;
   modelId: string;
   usageContext: UsageContext;
   tokens: TokenUsage;

@@ -1,4 +1,4 @@
-import { PdktScenario, PdktSessionConfig } from "@trainers/types";
+import { AIProvider, PdktScenario, PdktSessionConfig } from "@trainers/types";
 import {
   resolveModelProvider,
   getImageGenerationMode,
@@ -18,7 +18,7 @@ const MAX_DATA_URI_LENGTH = 650_000;
  */
 export type PdktImageGenerationDiagnostics = {
   attemptedModel: string;
-  provider: "gemini" | "openrouter";
+  provider: AIProvider;
   imageGenerationMode: "native" | "openrouter-modalities" | "none";
   reason?: "disabled" | "manual-attachment" | "provider-error" | "empty-output" | "oversized-output";
   error?: string;
@@ -60,12 +60,12 @@ export async function generatePdktScenarioImages(
       success: false,
       images: [],
       warning: "Model tidak mendukung pembuatan gambar/bukti lampiran.",
-      diagnostics: {
-        attemptedModel: resolvedModel,
-        provider: provider as "gemini" | "openrouter",
-        imageGenerationMode: "none",
-        reason: "disabled",
-      },
+        diagnostics: {
+          attemptedModel: resolvedModel,
+          provider,
+          imageGenerationMode: "none",
+          reason: "disabled",
+        },
     };
   }
 
@@ -74,12 +74,12 @@ export async function generatePdktScenarioImages(
     return {
       success: true,
       images: [],
-      diagnostics: {
-        attemptedModel: resolvedModel,
-        provider: provider as "gemini" | "openrouter",
-        imageGenerationMode: mode,
-        reason: "disabled",
-      },
+        diagnostics: {
+          attemptedModel: resolvedModel,
+          provider,
+          imageGenerationMode: mode,
+          reason: "disabled",
+        },
     };
   }
 
@@ -88,12 +88,12 @@ export async function generatePdktScenarioImages(
     return {
       success: true,
       images: [],
-      diagnostics: {
-        attemptedModel: resolvedModel,
-        provider: provider as "gemini" | "openrouter",
-        imageGenerationMode: mode,
-        reason: "manual-attachment",
-      },
+        diagnostics: {
+          attemptedModel: resolvedModel,
+          provider,
+          imageGenerationMode: mode,
+          reason: "manual-attachment",
+        },
     };
   }
 
@@ -223,7 +223,7 @@ export async function generatePdktScenarioImages(
       warning: `Gagal membuat bukti gambar (${errorStr}).`,
       diagnostics: {
         attemptedModel: resolvedModel,
-        provider: provider as "gemini" | "openrouter",
+        provider,
         imageGenerationMode: mode,
         reason: "provider-error",
         error: errorStr,

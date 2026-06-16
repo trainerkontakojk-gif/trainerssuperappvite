@@ -130,8 +130,7 @@ export function PdktSystemTab({
         <div className="grid grid-cols-1 gap-2.5">
           {TEXT_MODELS.map((model) => {
             const isSelected = selectedModel === model.id;
-            const isOrModel = model.id.includes("/");
-            const providerLabel = isOrModel ? "openrouter" : "gemini";
+            const providerLabel = model.provider;
             return (
               <div
                 key={model.id}
@@ -154,6 +153,8 @@ export function PdktSystemTab({
                       className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
                         providerLabel === "openrouter"
                           ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
+                          : providerLabel === "deepseek"
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                           : "bg-blue-500/10 text-blue-500 border-blue-500/20"
                       }`}
                     >

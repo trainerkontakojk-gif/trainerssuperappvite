@@ -175,6 +175,65 @@ describe("pdkt-email-policy", () => {
       expect(result.body).toMatch(/atas nama Susanto|nama yang tertera.*Susanto|nama Susanto|penyebutan nama.*Susanto/i);
     });
 
+    it("removes direct name signoff from the closing paragraph for middle pattern", () => {
+      const config: any = {
+        scenarios: [scenario],
+        consumerType: {} as any,
+        identity: {
+          name: "Black Cat",
+          email: "kucing.hitam@gmail.com",
+          city: "Bandung",
+          bodyName: "Susanto",
+        },
+        enableImageGeneration: false,
+        resolvedConsumerNameMentionPattern: "middle",
+        writingStyleMode: "training",
+      };
+      const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
+      const result = renderPdktIdentityByMentionPattern(
+        [
+          "Paragraph 1 isi aduan.",
+          "Paragraph 2 detail kronologi dengan nama yang tertera di berkas administrasinya adalah Susanto.",
+          "Salam,\nSusanto",
+        ].join("\n\n"),
+        "Aduan KPR",
+        policy,
+      );
+
+      const paragraphs = result.body.split("\n\n");
+      expect(paragraphs[1]).toContain("Susanto");
+      expect(paragraphs[paragraphs.length - 1]).not.toContain("Susanto");
+    });
+
+    it("adds a clear separator after the inserted middle-name clue", () => {
+      const config: any = {
+        scenarios: [scenario],
+        consumerType: {} as any,
+        identity: {
+          name: "Black Cat",
+          email: "kucing.hitam@gmail.com",
+          city: "Bandung",
+          bodyName: "Susanto",
+        },
+        enableImageGeneration: false,
+        resolvedConsumerNameMentionPattern: "middle",
+        writingStyleMode: "training",
+      };
+      const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
+      const result = renderPdktIdentityByMentionPattern(
+        [
+          "Paragraph 1 isi aduan.",
+          "Waktu saya minta penjelasan ulang. Teman saya bilang ada orang yang mengaku dari perusahaan itu menelepon dia.",
+          "Paragraph 3 penutup aduan.",
+        ].join("\n\n"),
+        "Aduan KPR",
+        policy,
+      );
+
+      expect(result.body).toMatch(/Susanto\.\s+Teman saya bilang/i);
+      expect(result.body).not.toMatch(/Susanto\s+Teman saya bilang/i);
+    });
+
     it("handles late pattern by ensuring name is only in the last paragraph/salam", () => {
       const config: any = {
         scenarios: [scenario],
@@ -224,6 +283,87 @@ describe("pdkt-email-policy", () => {
 
       expect(violations.length).toBeGreaterThan(0);
       expect(violations[0]).toContain("Mengandung bahasa meta/AI");
+    });
+
+    it("returns violation when middle pattern introduces the consumer by name in the closing paragraph", () => {
+      const middleConfig: any = {
+        ...config,
+        resolvedConsumerNameMentionPattern: "middle",
+      };
+      const policy = buildPdktEmailGenerationPolicy(
+        middleConfig,
+        scenario,
+        "template",
+      );
+      const email = {
+        subject: "Subjek",
+        body: [
+          "Saya ingin mengadukan klaim asuransi saya yang sudah lama tidak jelas.",
+          "Saya sudah berkali-kali menghubungi pihak perusahaan tetapi belum ada penjelasan tertulis.",
+          "Oh iya, saya hampir lupa, nama saya Budi dan saya dari Jakarta.",
+        ].join("\n\n"),
+      };
+
+      const violations = validatePdktEmailPolicyCompliance(email, policy);
+
+      expect(violations).toContain(
+        'Menggunakan perkenalan diri dengan nama pada pattern "middle"',
+      );
+      expect(violations).toContain(
+        "Nama konsumen hanya muncul di paragraf penutup pada pattern 'middle'",
+      );
+    });
+
+    it("returns violation when middle pattern still mentions the name in the closing paragraph after a valid middle mention", () => {
+      const middleConfig: any = {
+        ...config,
+        resolvedConsumerNameMentionPattern: "middle",
+      };
+      const policy = buildPdktEmailGenerationPolicy(
+        middleConfig,
+        scenario,
+        "template",
+      );
+      const email = {
+        subject: "Subjek",
+        body: [
+          "Saya ingin mengadukan klaim asuransi saya yang sudah lama tidak jelas.",
+          "Waktu saya minta penjelasan ulang, petugas menyebut nama Budi di sistem mereka.",
+          "Salam,\nBudi",
+        ].join("\n\n"),
+      };
+
+      const violations = validatePdktEmailPolicyCompliance(email, policy);
+
+      expect(violations).toContain(
+        "Nama konsumen muncul lagi di paragraf penutup pada pattern 'middle'",
+      );
+    });
+
+    it("returns violation when late pattern uses self-introduction with name in the closing paragraph", () => {
+      const lateConfig: any = {
+        ...config,
+        resolvedConsumerNameMentionPattern: "late",
+      };
+      const policy = buildPdktEmailGenerationPolicy(
+        lateConfig,
+        scenario,
+        "template",
+      );
+      const email = {
+        subject: "Subjek",
+        body: [
+          "Saya sudah berupaya mencari penjelasan atas penolakan klaim ini.",
+          "Semua bukti sudah saya kumpulkan dan saya berharap ada tindak lanjut yang jelas.",
+          "Terima kasih, nama saya Budi Santoso dan saya menunggu kabar baiknya.",
+        ].join("\n\n"),
+      };
+
+      const violations = validatePdktEmailPolicyCompliance(email, policy);
+
+      expect(violations).toContain(
+        'Menggunakan perkenalan diri dengan nama pada pattern "late"',
+      );
     });
 
     it("returns zero violations for compliant email", () => {

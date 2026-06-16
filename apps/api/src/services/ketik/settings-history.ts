@@ -8,10 +8,10 @@ import {
   DEFAULT_KETIK_SETTINGS,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
-import { TEXT_SIMULATION_MODELS } from "../../lib/ai-models";
+import { KETIK_PDKT_MODELS } from "../../lib/ai-models";
 
 const coerceKetikModelId = (modelId?: string) =>
-  TEXT_SIMULATION_MODELS.some((m) => m.id === modelId)
+  KETIK_PDKT_MODELS.some((m) => m.id === modelId)
     ? modelId!
     : "gemini-3.1-flash-lite";
 

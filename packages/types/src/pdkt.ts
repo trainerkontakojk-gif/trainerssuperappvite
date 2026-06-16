@@ -90,7 +90,7 @@ export const pdktAttachmentDiagnosticsSchema = z.object({
     ])
     .optional(),
   attemptedModel: z.string().optional(),
-  provider: z.enum(["gemini", "openrouter"]).optional(),
+  provider: z.enum(["gemini", "openrouter", "deepseek"]).optional(),
   message: z.string().optional(),
 });
 export type PdktAttachmentDiagnostics = z.infer<

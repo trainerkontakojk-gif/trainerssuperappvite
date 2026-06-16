@@ -34,7 +34,7 @@ const CONSUMER_NAME_MENTION_PATTERNS = [
 
 export const DEFAULT_PDKT_MODEL_ID = "gemini-3.1-flash-lite";
 
-import { TEXT_SIMULATION_MODELS as TEXT_MODELS } from "../../lib/aiModels";
+import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../lib/aiModels";
 export { TEXT_MODELS };
 
 const DUMMY_CITIES = [

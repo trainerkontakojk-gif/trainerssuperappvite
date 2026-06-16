@@ -4,14 +4,17 @@ import {
   AIProvider,
   AI_MODELS,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  DEEPSEEK_MODELS,
+  KETIK_PDKT_MODELS,
   TEXT_SIMULATION_MODELS,
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
 } from "@trainers/types";
 import type { AiModelModule } from "@trainers/types";
-export { 
+export {
   AI_MODELS,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
+  KETIK_PDKT_MODELS,
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
   TEXT_SIMULATION_MODELS,
@@ -26,13 +29,19 @@ const LEGACY_ALIASES: Record<string, string> = {
   "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite",
 };
 
+const MODEL_REGISTRY = [...AI_MODELS, ...DEEPSEEK_MODELS];
+
 export function normalizeModelId(modelId?: string | null): string {
   if (!modelId) return DEFAULT_MODEL_ID;
   return LEGACY_ALIASES[modelId] || modelId;
 }
 
 export function getProviderFromModelId(modelId: string): AIProvider {
-  return normalizeModelId(modelId).includes("/") ? "openrouter" : "gemini";
+  const normalized = normalizeModelId(modelId);
+  return (
+    MODEL_REGISTRY.find((model) => model.id === normalized)?.provider ||
+    (normalized.includes("/") ? "openrouter" : "gemini")
+  );
 }
 
 export function resolveModelProvider(modelId?: string | null): {
@@ -42,7 +51,7 @@ export function resolveModelProvider(modelId?: string | null): {
   timeoutMs?: number;
 } {
   const normalized = normalizeModelId(modelId);
-  const found = AI_MODELS.find((m) => m.id === normalized);
+  const found = MODEL_REGISTRY.find((m) => m.id === normalized);
   if (found)
     return {
       modelId: found.id,
@@ -65,7 +74,7 @@ export function getModelsForModule(module: AiModelModule = "default"): AiModelIn
     module === "pdkt" ||
     module === "qa-analyzer"
   ) {
-    return TEXT_SIMULATION_MODELS;
+    return module === "qa-analyzer" ? TEXT_SIMULATION_MODELS : KETIK_PDKT_MODELS;
   }
   return AI_MODELS;
 }

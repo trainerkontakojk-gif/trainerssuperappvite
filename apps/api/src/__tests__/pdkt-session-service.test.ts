@@ -8,6 +8,10 @@ vi.mock("../lib/openrouter", () => ({
   generateOpenRouterContent: vi.fn(),
 }));
 
+vi.mock("../lib/deepseek", () => ({
+  generateDeepSeekContent: vi.fn(),
+}));
+
 vi.mock("../lib/ai-models", () => ({
   resolveModelProvider: vi.fn(),
 }));
@@ -26,6 +30,7 @@ vi.mock("../services/pdkt-email-policy", async () => {
 
 import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenRouterContent } from "../lib/openrouter";
+import { generateDeepSeekContent } from "../lib/deepseek";
 import { resolveModelProvider } from "../lib/ai-models";
 import { parseJsonFromModelText } from "../lib/ai-json";
 import { validatePdktEmailPolicyCompliance } from "../services/pdkt-email-policy";
@@ -43,6 +48,7 @@ import type {
 
 const mockGeminiContent = vi.mocked(generateGeminiContent);
 const mockOpenRouterContent = vi.mocked(generateOpenRouterContent);
+const mockDeepSeekContent = vi.mocked(generateDeepSeekContent);
 const mockResolveProvider = vi.mocked(resolveModelProvider);
 const mockParseJson = vi.mocked(parseJsonFromModelText);
 const mockValidateCompliance = vi.mocked(validatePdktEmailPolicyCompliance);
@@ -62,6 +68,15 @@ function setupOpenRouterProvider() {
     provider: "openrouter",
     isFallback: false,
     timeoutMs: 120_000,
+  });
+}
+
+function setupDeepSeekProvider() {
+  mockResolveProvider.mockReturnValue({
+    modelId: "deepseek-v4-pro",
+    provider: "deepseek",
+    isFallback: false,
+    timeoutMs: 180_000,
   });
 }
 
@@ -110,6 +125,7 @@ beforeEach(() => {
   // Full reset to clear mockResolvedValueOnce queues from prior tests
   mockGeminiContent.mockReset();
   mockOpenRouterContent.mockReset();
+  mockDeepSeekContent.mockReset();
   mockResolveProvider.mockReset();
   mockParseJson.mockReset();
   mockValidateCompliance.mockReset();
@@ -423,6 +439,83 @@ describe("generateScenarioEmailTemplate", () => {
       expect(result.success).toBe(true);
       expect(mockOpenRouterContent).toHaveBeenCalled();
       expect(mockGeminiContent).not.toHaveBeenCalled();
+    });
+
+    it("uses DeepSeek when selectedModel is DeepSeek direct", async () => {
+      setupDeepSeekProvider();
+      const body = buildBody(600);
+      mockDeepSeekContent.mockReset().mockResolvedValue({
+        success: true,
+        text: JSON.stringify({ subject: "DeepSeek Test", body }),
+      });
+      mockParseJson.mockReset().mockReturnValue({ subject: "DeepSeek Test", body });
+      mockValidateCompliance.mockReset().mockReturnValue([]);
+
+      const result = await generateScenarioEmailTemplate(
+        mockPinjolScenario,
+        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+      );
+      expect(result.success).toBe(true);
+      expect(mockDeepSeekContent).toHaveBeenCalled();
+      expect(mockGeminiContent).not.toHaveBeenCalled();
+      expect(mockOpenRouterContent).not.toHaveBeenCalled();
+    });
+
+    it("allows DeepSeek direct template generation to continue even when the output is short", async () => {
+      setupDeepSeekProvider();
+      const shortBody = buildBody(100);
+      mockDeepSeekContent
+        .mockReset()
+        .mockResolvedValueOnce({
+          success: true,
+          text: JSON.stringify({ subject: "DeepSeek Template", body: shortBody }),
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          text: JSON.stringify({ subject: "DeepSeek Template Retry", body: shortBody }),
+        });
+      mockParseJson
+        .mockReset()
+        .mockReturnValueOnce({ subject: "DeepSeek Template", body: shortBody })
+        .mockReturnValueOnce({ subject: "DeepSeek Template Retry", body: shortBody });
+      mockValidateCompliance.mockReset().mockReturnValue([]);
+
+      const result = await generateScenarioEmailTemplate(
+        mockPinjolScenario,
+        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.body?.split(/\s+/).filter(Boolean).length).toBe(100);
+      expect(mockDeepSeekContent).toHaveBeenCalledTimes(2);
+    });
+
+    it("allows DeepSeek direct to continue even when the first email is still short", async () => {
+      setupDeepSeekProvider();
+      const shortBody = buildBody(100);
+      mockDeepSeekContent
+        .mockReset()
+        .mockResolvedValueOnce({
+          success: true,
+          text: JSON.stringify({ subject: "DeepSeek Short", body: shortBody }),
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          text: JSON.stringify({ subject: "DeepSeek Short Retry", body: shortBody }),
+        });
+      mockParseJson
+        .mockReset()
+        .mockReturnValueOnce({ subject: "DeepSeek Short", body: shortBody })
+        .mockReturnValueOnce({ subject: "DeepSeek Short Retry", body: shortBody });
+      mockValidateCompliance.mockReset().mockReturnValue([]);
+
+      const result = await initializeEmailSession(
+        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.message?.body?.split(/\s+/).filter(Boolean).length).toBe(100);
+      expect(mockDeepSeekContent).toHaveBeenCalledTimes(2);
     });
   });
 });

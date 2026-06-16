@@ -10,6 +10,7 @@ import {
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { parseJsonFromModelText } from "../../lib/ai-json";
+import { resolveModelProvider } from "../../lib/ai-models";
 import { resolvePdktTemplateBody } from "../pdkt-template-resolver";
 import { generatePdktScenarioImages } from "./image-generation";
 import {
@@ -24,6 +25,17 @@ import {
 } from "../pdkt-email-policy";
 import { callAI, normalizeSubject } from "./shared-utils";
 import { getScenarios, getConsumerTypes } from "./catalog-service";
+
+const PDKT_MIN_WORD_COUNT = 500;
+
+function getPdktWordCountPolicy(model: string) {
+  const provider = resolveModelProvider(model).provider;
+  return {
+    provider,
+    retryLengthThreshold: PDKT_MIN_WORD_COUNT,
+    failureLengthThreshold: provider === "deepseek" ? 1 : PDKT_MIN_WORD_COUNT,
+  };
+}
 
 /**
  * Generates an email template for a specific scenario using AI.
@@ -64,6 +76,7 @@ export async function generateScenarioEmailTemplate(
   }
 
   const model = config.selectedModel || "gemini-3.1-flash-lite";
+  const wordCountPolicy = getPdktWordCountPolicy(model);
   const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
   const systemInstruction = buildPdktSystemInstruction(policy, false);
   const prompt = `Tulis template email pengaduan lengkap untuk skenario: ${scenario.title}. Deskripsi: ${scenario.description}. Karakter: ${config.consumerType.name}. PENTING: Template harus sangat panjang (500-1000 kata), terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;
@@ -110,7 +123,7 @@ export async function generateScenarioEmailTemplate(
 
     if (
       result.leftoverPlaceholders.length > 0 ||
-      result.wordCount < 500 ||
+      result.wordCount < wordCountPolicy.retryLengthThreshold ||
       result.violations.length > 0
     ) {
       const placeholderHint =
@@ -118,7 +131,7 @@ export async function generateScenarioEmailTemplate(
           ? `Template sebelumnya masih mengandung placeholder ${result.leftoverPlaceholders.join(", ")}. Ganti semuanya dengan teks konkret tanpa tanda kurung siku atau kurung kurawal.`
           : "";
       const lengthHint =
-        result.wordCount < 500
+        result.wordCount < wordCountPolicy.retryLengthThreshold
           ? "Template sebelumnya terlalu pendek. Buat jauh lebih panjang, detail, dan bertele-tele (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
           : "";
       const violationHint =
@@ -142,7 +155,7 @@ export async function generateScenarioEmailTemplate(
       };
     }
 
-    if (result.wordCount < 500) {
+    if (result.wordCount < wordCountPolicy.failureLengthThreshold) {
       return {
         success: false,
         error: "Hasil template terlalu pendek. Silakan klik Generate ulang untuk mencoba lagi.",
@@ -225,6 +238,7 @@ export async function initializeEmailSession(
   const customAttachments: string[] = scenario.attachmentImages || [];
   const hasCustomImages = customAttachments.length > 0;
   const model = config.selectedModel || "gemini-3.1-flash-lite";
+  const wordCountPolicy = getPdktWordCountPolicy(model);
   const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
   const systemInstruction = buildPdktSystemInstruction(policy, hasCustomImages);
 
@@ -269,11 +283,14 @@ export async function initializeEmailSession(
   try {
     let result = await executeSessionGeneration();
 
-    if (result.violations.length > 0 || result.wordCount < 500) {
+    if (
+      result.violations.length > 0 ||
+      result.wordCount < wordCountPolicy.retryLengthThreshold
+    ) {
       const violationHint =
         result.violations.length > 0 ? buildPdktRetryHint(result.violations, policy) : "";
       const lengthHint =
-        result.wordCount < 500
+        result.wordCount < wordCountPolicy.retryLengthThreshold
           ? "Email terlalu pendek. Buat jauh lebih panjang (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
           : "";
 
@@ -293,7 +310,7 @@ export async function initializeEmailSession(
       };
     }
 
-    if (result.wordCount < 500) {
+    if (result.wordCount < wordCountPolicy.failureLengthThreshold) {
       return {
         success: false,
         error: "Email awal terlalu pendek. Silakan coba lagi.",

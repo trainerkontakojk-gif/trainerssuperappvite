@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getDataReportRows } from "./report-data";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenRouterContent } from "../../lib/openrouter";
+import { generateDeepSeekContent } from "../../lib/deepseek";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 
@@ -100,6 +101,8 @@ Buat laporan dengan format JSON:
   const result =
     modelInfo.provider === "openrouter"
       ? await generateOpenRouterContent(genOptions)
+      : modelInfo.provider === "deepseek"
+        ? await generateDeepSeekContent(genOptions)
       : await generateGeminiContent(genOptions);
 
   if (!result.success) {

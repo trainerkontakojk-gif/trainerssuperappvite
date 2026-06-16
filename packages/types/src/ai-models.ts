@@ -11,9 +11,10 @@ export interface AiModelInfo {
   provider: AIProvider;
   timeoutMs?: number;
   capabilities?: AiModelCapabilities;
+  availableModules?: AiModelModule[];
 }
 
-export type AIProvider = "gemini" | "openrouter";
+export type AIProvider = "gemini" | "openrouter" | "deepseek";
 export type AiModelModule = "ketik" | "pdkt" | "qa-analyzer" | "default";
 
 export const DEFAULT_AI_MODEL_ID = "gemini-3.1-flash-lite";
@@ -100,21 +101,39 @@ export const TEXT_MODELS: AiModelInfo[] = [
     },
   },
   {
-    id: "deepseek/deepseek-v4-pro",
-    name: "DeepSeek V4 Pro",
-    description: "Model Pro terbaru DeepSeek dengan performa tinggi untuk tugas kompleks.",
-    provider: "openrouter",
-    timeoutMs: 180_000,
-    capabilities: { supportsText: true, supportsImage: false },
-  },
-  {
-    id: "deepseek/deepseek-v4-flash",
-    name: "DeepSeek V4 Flash",
-    description: "Model Flash DeepSeek yang cepat dan efisien.",
+    id: "qwen/qwen3.5-flash-02-23",
+    name: "Qwen 3.5 Flash",
+    description: "Model Qwen cepat dan efisien.",
     provider: "openrouter",
     timeoutMs: 120_000,
     capabilities: { supportsText: true, supportsImage: false },
   },
+];
+
+export const DEEPSEEK_MODELS: AiModelInfo[] = [
+  {
+    id: "deepseek-v4-pro",
+    name: "DeepSeek V4 Pro",
+    description: "Model DeepSeek langsung untuk tugas kompleks dan respons lebih dalam.",
+    provider: "deepseek",
+    timeoutMs: 180_000,
+    capabilities: { supportsText: true, supportsImage: false },
+    availableModules: ["ketik", "pdkt"],
+  },
+  {
+    id: "deepseek-v4-flash",
+    name: "DeepSeek V4 Flash",
+    description: "Model DeepSeek langsung yang cepat dan efisien.",
+    provider: "deepseek",
+    timeoutMs: 120_000,
+    capabilities: { supportsText: true, supportsImage: false },
+    availableModules: ["ketik", "pdkt"],
+  },
+];
+
+export const KETIK_PDKT_MODELS: AiModelInfo[] = [
+  ...TEXT_MODELS,
+  ...DEEPSEEK_MODELS,
 ];
 
 export const IMAGE_GENERATION_MODELS: AiModelInfo[] = [

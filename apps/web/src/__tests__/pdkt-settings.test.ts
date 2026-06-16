@@ -48,6 +48,7 @@ describe("PDKT Settings Helpers", () => {
     expect(coercePdktModelId("gemini-3.1-pro-preview")).toBe(
       "gemini-3.1-pro-preview",
     );
+    expect(coercePdktModelId("deepseek-v4-pro")).toBe("deepseek-v4-pro");
   });
 
   it("resolves random name mention to a valid pattern", () => {
