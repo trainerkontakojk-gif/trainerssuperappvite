@@ -30,6 +30,42 @@ function buildApp() {
   return app;
 }
 
+function buildPaginatedQuery(rows: any[]) {
+  let rangeFrom = 0;
+  let rangeTo = Number.MAX_SAFE_INTEGER;
+  let usedRange = false;
+
+  const q: any = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === "then") {
+          return (resolve: any) => {
+            if (!usedRange) {
+              return resolve({ data: rows.slice(0, 1000), error: null });
+            }
+            return resolve({
+              data: rows.filter((_, idx) => idx >= rangeFrom && idx <= rangeTo),
+              error: null,
+            });
+          };
+        }
+        if (prop === "range") {
+          return (from: number, to: number) => {
+            usedRange = true;
+            rangeFrom = from;
+            rangeTo = to;
+            return q;
+          };
+        }
+        return (..._args: any[]) => q;
+      },
+    },
+  );
+
+  return q;
+}
+
 describe("AI Usage Summary — simulation/review breakdown", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,19 +81,7 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       { action: "evaluate_response", input_tokens: 300, output_tokens: 500, total_tokens: 800, estimated_cost_usd: 0.003, estimated_cost_idr: 4500 },
     ];
 
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mockFrom.mockReturnValue(buildPaginatedQuery(mockLogs));
 
     const app = buildApp();
     const res = await app.request("/usage/summary?module=ketik");
@@ -77,19 +101,7 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       { action: "voice_live", input_tokens: 100, output_tokens: 200, total_tokens: 300, estimated_cost_usd: 0.001, estimated_cost_idr: 1500 },
     ];
 
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mockFrom.mockReturnValue(buildPaginatedQuery(mockLogs));
 
     const app = buildApp();
     const res = await app.request("/usage/summary?module=telefun");
@@ -101,19 +113,7 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
   });
 
   it("handles empty logs gracefully", async () => {
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                then: (resolve: any) => resolve({ data: [], error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mockFrom.mockReturnValue(buildPaginatedQuery([]));
 
     const app = buildApp();
     const res = await app.request("/usage/summary?module=pdkt");
@@ -137,19 +137,7 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       },
     ];
 
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mockFrom.mockReturnValue(buildPaginatedQuery(mockLogs));
 
     const app = buildApp();
     const res = await app.request("/usage/summary?module=ketik");
@@ -168,19 +156,7 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       { action: "coaching_review", input_tokens: 500, output_tokens: 800, total_tokens: 1300, estimated_cost_usd: 0, estimated_cost_idr: 0 },
     ];
 
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mockFrom.mockReturnValue(buildPaginatedQuery(mockLogs));
 
     const app = buildApp();
     const res = await app.request("/usage/summary?module=ketik");
@@ -234,19 +210,7 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       },
     ];
 
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                then: (resolve: any) => resolve({ data: mockLogs, error: null }),
-              }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mockFrom.mockReturnValue(buildPaginatedQuery(mockLogs));
 
     const app = buildApp();
     const res = await app.request("/usage/summary?module=pdkt");
