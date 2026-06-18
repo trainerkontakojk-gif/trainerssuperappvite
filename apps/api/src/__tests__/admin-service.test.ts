@@ -146,23 +146,44 @@ describe("admin-service", () => {
   });
 
   describe("getAccessGroups", () => {
-    it("returns active access groups", async () => {
+    it("returns active access groups from the count view", async () => {
       pendingResolve = () => ({
         data: [
           {
             id: "g1",
             name: "Group A",
             description: "Desc A",
-            scope_type: "tim",
+            scope_type: "union",
             is_active: true,
             created_at: "",
+            item_count: "4",
           },
         ],
         error: null,
       });
+
       const res = await adminService.getAccessGroups();
-      expect(res).toHaveLength(1);
-      expect(res[0].name).toBe("Group A");
+
+      expect(res).toEqual([
+        {
+          id: "g1",
+          name: "Group A",
+          description: "Desc A",
+          scope_type: "union",
+          is_active: true,
+          created_at: "",
+          item_count: 4,
+        },
+      ]);
+    });
+
+    it("throws on view query error", async () => {
+      pendingResolve = () => ({
+        data: null,
+        error: { message: "view broke" },
+      });
+
+      await expect(adminService.getAccessGroups()).rejects.toThrow("view broke");
     });
   });
 
