@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
 import { isCountableFinding } from "./shared-constants";
 import { getIndicators } from "./period-indicator";
@@ -409,14 +410,20 @@ export async function refreshDashboardSummary(
     {},
   );
 
-  let query = supabaseAdmin
-    .from("qa_temuan")
-    .select("*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)")
-    .eq("period_id", periodId);
+  const allTemuan = await fetchAllPages<RefreshDashboardRow>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("qa_temuan")
+        .select("*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan)")
+        .eq("period_id", periodId)
+        .order("id", { ascending: true })
+        .range(from, to);
 
-  if (serviceType) query = query.eq("service_type", serviceType);
+      if (serviceType) q = q.eq("service_type", serviceType);
 
-  const { data: allTemuan } = await query;
+      return q;
+    },
+  });
   type RefreshDashboardRow = DashboardTemuanRow & {
     profiler_peserta?: {
       nama?: string | null;
@@ -425,7 +432,7 @@ export async function refreshDashboardSummary(
       jabatan?: string | null;
     } | null;
   };
-  const rows = (allTemuan ?? []) as RefreshDashboardRow[];
+  const rows = allTemuan;
 
   if (rows.length === 0) {
     return {
