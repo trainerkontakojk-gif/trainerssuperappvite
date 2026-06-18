@@ -4,11 +4,12 @@ import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import { DEFAULT_SERVICE_WEIGHTS } from "../../lib/scoring";
 
 export async function getPeriods(): Promise<QAPeriod[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("qa_periods")
     .select("*")
     .order("year", { ascending: false })
     .order("month", { ascending: false });
+  if (error) throw new Error(`Gagal mengambil periode QA: ${error.message}`);
   return data ?? [];
 }
 
@@ -66,7 +67,7 @@ export async function deletePeriod(id: string): Promise<{ success: boolean }> {
 export async function resolveActivePublishedRuleVersion(
   serviceType: string,
 ): Promise<{ id: string } | null> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("qa_service_rule_versions")
     .select("id")
     .eq("service_type", serviceType)
@@ -74,17 +75,23 @@ export async function resolveActivePublishedRuleVersion(
     .order("version_number", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (error) {
+    throw new Error(`Gagal mengambil versi aturan aktif: ${error.message}`);
+  }
   return data;
 }
 
 export async function hasDraftRuleVersion(
   serviceType: string,
 ): Promise<boolean> {
-  const { count } = await supabaseAdmin
+  const { count, error } = await supabaseAdmin
     .from("qa_service_rule_versions")
     .select("*", { count: "exact", head: true })
     .eq("service_type", serviceType)
     .eq("status", "draft");
+  if (error) {
+    throw new Error(`Gagal memeriksa draft versi aturan: ${error.message}`);
+  }
   return (count ?? 0) > 0;
 }
 
@@ -93,7 +100,8 @@ export async function getIndicators(
 ): Promise<QAIndicator[]> {
   let query = supabaseAdmin.from("qa_indicators").select("*");
   if (serviceType) query = query.eq("service_type", serviceType);
-  const { data } = await query.order("service_type").order("name");
+  const { data, error } = await query.order("service_type").order("name");
+  if (error) throw new Error(`Gagal mengambil indikator QA: ${error.message}`);
   return data ?? [];
 }
 
