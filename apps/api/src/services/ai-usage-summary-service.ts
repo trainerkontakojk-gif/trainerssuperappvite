@@ -34,17 +34,31 @@ export async function getAiUsageSummary(params: {
   month: number;
   periodLabel: string;
 }) {
-  const { data: logs, error } = await params.admin
-    .from("ai_usage_logs")
-    .select("action, input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr")
-    .eq("user_id", params.userId)
-    .eq("module", params.module)
-    .gte("created_at", params.startIso)
-    .lte("created_at", params.endIso);
+  const PAGE_SIZE = 1000;
+  const logs: any[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await params.admin
+      .from("ai_usage_logs")
+      .select("action, input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr")
+      .eq("user_id", params.userId)
+      .eq("module", params.module)
+      .gte("created_at", params.startIso)
+      .lte("created_at", params.endIso)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      logs.push(...data);
+      hasMore = data.length === PAGE_SIZE;
+      from += PAGE_SIZE;
+    }
+  }
 
-  if (error) throw error;
-
-  let totalCalls = 0;
+  const totalCalls = logs.length;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalTokens = 0;
@@ -60,9 +74,7 @@ export async function getAiUsageSummary(params: {
   };
   const itemMap = new Map<string, UsageBreakdownItemized>();
 
-  if (logs) {
-    totalCalls = logs.length;
-    for (const log of logs) {
+  for (const log of logs) {
       const inputTokens = log.input_tokens || 0;
       const outputTokens = log.output_tokens || 0;
       const tokens = log.total_tokens || 0;
@@ -106,7 +118,6 @@ export async function getAiUsageSummary(params: {
       item.costIdr += costIdr;
       itemMap.set(definition.itemKey, item);
     }
-  }
 
   return {
     module: params.module,

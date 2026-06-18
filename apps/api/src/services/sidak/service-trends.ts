@@ -362,19 +362,34 @@ export function sliceTrendData(data: any, months: number) {
 export async function getAvailableYears(
   agent_ids?: string[],
 ): Promise<number[]> {
-  let query = supabaseAdmin
-    .from("qa_temuan")
-    .select("tahun")
-    .not("tahun", "is", null);
+  const PAGE_SIZE = 1000;
+  const allData: { tahun: number | null }[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    let query = supabaseAdmin
+      .from("qa_temuan")
+      .select("tahun")
+      .not("tahun", "is", null)
+      .order("tahun", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
 
-  if (agent_ids && agent_ids.length > 0) {
-    query = query.in("peserta_id", agent_ids);
+    if (agent_ids && agent_ids.length > 0) {
+      query = query.in("peserta_id", agent_ids);
+    }
+
+    const { data } = await query;
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allData.push(...data);
+      hasMore = data.length === PAGE_SIZE;
+      from += PAGE_SIZE;
+    }
   }
 
-  const { data } = await query.order("tahun", { ascending: false });
-
   const years = [
-    ...new Set((data ?? []).map((r) => r.tahun).filter(Boolean)),
+    ...new Set(allData.map((r) => r.tahun).filter(Boolean)),
   ] as number[];
   return years;
 }

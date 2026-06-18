@@ -19,14 +19,27 @@ import type {
 
 // ── User Management ──────────────────────────────────────────
 export async function getUsers(): Promise<ManagedUser[]> {
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .select("*")
-    .is("is_deleted", false)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const PAGE_SIZE = 1000;
+  const allData: ManagedUser[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .is("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allData.push(...(data as ManagedUser[]));
+      hasMore = data.length === PAGE_SIZE;
+      from += PAGE_SIZE;
+    }
+  }
+  return allData;
 }
 
 export async function updateUserStatus(
@@ -170,15 +183,28 @@ export async function getAccessGroups(): Promise<AccessGroupRow[]> {
   const groupIds = (data || []).map((g) => g.id);
   if (groupIds.length === 0) return [];
 
-  const { data: counts, error: countError } = await supabaseAdmin
-    .from("access_group_items")
-    .select("access_group_id")
-    .in("access_group_id", groupIds);
-
-  if (countError) throw new Error(countError.message);
+  const PAGE_SIZE = 1000;
+  const counts: { access_group_id: string }[] = [];
+  let itemsFrom = 0;
+  let itemsHasMore = true;
+  while (itemsHasMore) {
+    const { data: page, error: countError } = await supabaseAdmin
+      .from("access_group_items")
+      .select("access_group_id")
+      .in("access_group_id", groupIds)
+      .range(itemsFrom, itemsFrom + PAGE_SIZE - 1);
+    if (countError) throw new Error(countError.message);
+    if (!page || page.length === 0) {
+      itemsHasMore = false;
+    } else {
+      counts.push(...page);
+      itemsHasMore = page.length === PAGE_SIZE;
+      itemsFrom += PAGE_SIZE;
+    }
+  }
 
   const countMap = new Map<string, number>();
-  (counts || []).forEach((c) => {
+  counts.forEach((c) => {
     countMap.set(c.access_group_id, (countMap.get(c.access_group_id) || 0) + 1);
   });
 
@@ -222,15 +248,28 @@ export async function updateAccessGroup(
 export async function getAccessGroupItems(
   groupId: string,
 ): Promise<AccessGroupItemRow[]> {
-  const { data, error } = await supabaseAdmin
-    .from("access_group_items")
-    .select("*")
-    .eq("access_group_id", groupId)
-    .order("field_name")
-    .order("field_value");
-
-  if (error) throw new Error(error.message);
-  return (data || []) as AccessGroupItemRow[];
+  const PAGE_SIZE = 1000;
+  const allData: AccessGroupItemRow[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await supabaseAdmin
+      .from("access_group_items")
+      .select("*")
+      .eq("access_group_id", groupId)
+      .order("field_name")
+      .order("field_value")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allData.push(...(data as AccessGroupItemRow[]));
+      hasMore = data.length === PAGE_SIZE;
+      from += PAGE_SIZE;
+    }
+  }
+  return allData;
 }
 
 export async function addAccessGroupItem(

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import { fetchAllPages } from "../lib/supabase-pagination";
 import type { ServiceType } from "@trainers/types";
 
 export type ApprovalStatus =
@@ -131,13 +132,28 @@ export async function getLeaderScopeSnapshot(
 
   const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
 
-  const { data: items } = await supabaseAdmin
-    .from("access_group_items")
-    .select("field_name, field_value")
-    .in("access_group_id", groupIds)
-    .eq("is_active", true);
+  const PAGE_SIZE = 1000;
 
-  if (!items || items.length === 0) return { ...empty, requestIds };
+  const items: { field_name: string; field_value: string }[] = [];
+  let itemsFrom = 0;
+  let itemsHasMore = true;
+  while (itemsHasMore) {
+    const { data: page } = await supabaseAdmin
+      .from("access_group_items")
+      .select("field_name, field_value")
+      .in("access_group_id", groupIds)
+      .eq("is_active", true)
+      .range(itemsFrom, itemsFrom + PAGE_SIZE - 1);
+    if (!page || page.length === 0) {
+      itemsHasMore = false;
+    } else {
+      items.push(...page);
+      itemsHasMore = page.length === PAGE_SIZE;
+      itemsFrom += PAGE_SIZE;
+    }
+  }
+
+  if (items.length === 0) return { ...empty, requestIds };
 
   const rawPesertaIds: string[] = [];
   const batchNames: string[] = [];
@@ -154,19 +170,27 @@ export async function getLeaderScopeSnapshot(
   const resolvedIds = [...rawPesertaIds];
 
   if (batchNames.length > 0) {
-    const { data: batchData } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("id")
-      .in("batch_name", batchNames);
-    if (batchData) resolvedIds.push(...batchData.map((b) => b.id));
+    const batchData = await fetchAllPages<{ id: string }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("id")
+          .in("batch_name", batchNames)
+          .range(from, to),
+    });
+    resolvedIds.push(...batchData.map((b) => b.id));
   }
 
   if (tims.length > 0) {
-    const { data: timData } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("id")
-      .in("tim", tims);
-    if (timData) resolvedIds.push(...timData.map((t) => t.id));
+    const timData = await fetchAllPages<{ id: string }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("id")
+          .in("tim", tims)
+          .range(from, to),
+    });
+    resolvedIds.push(...timData.map((t) => t.id));
   }
 
   const validServiceTypes = serviceTypes.filter(

@@ -62,18 +62,33 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
     let prevPeriodIds: string[] | undefined = undefined;
 
     if (period === "ytd" && periodsForYearAsc.length > 1) {
-      let temuanQuery = supabaseAdmin
-        .from("qa_temuan")
-        .select("period_id")
-        .eq("tahun", year);
-      if (service_type && service_type !== "all") {
-        temuanQuery = temuanQuery.eq("service_type", service_type);
+      const PAGE_SIZE = 1000;
+      const temuanPeriods: { period_id: string }[] = [];
+      let from = 0;
+      let hasMore = true;
+      while (hasMore) {
+        let temuanQuery = supabaseAdmin
+          .from("qa_temuan")
+          .select("period_id")
+          .eq("tahun", year)
+          .order("period_id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+        if (service_type && service_type !== "all") {
+          temuanQuery = temuanQuery.eq("service_type", service_type);
+        }
+        if (accessibleIds && accessibleIds.length > 0) {
+          temuanQuery = temuanQuery.in("peserta_id", accessibleIds);
+        }
+        const { data: page } = await temuanQuery;
+        if (!page || page.length === 0) {
+          hasMore = false;
+        } else {
+          temuanPeriods.push(...page);
+          hasMore = page.length === PAGE_SIZE;
+          from += PAGE_SIZE;
+        }
       }
-      if (accessibleIds && accessibleIds.length > 0) {
-        temuanQuery = temuanQuery.in("peserta_id", accessibleIds);
-      }
-      const { data: temuanPeriods } = await temuanQuery;
-      const activePeriodIds = new Set((temuanPeriods ?? []).map((t: any) => t.period_id));
+      const activePeriodIds = new Set(temuanPeriods.map((t) => t.period_id));
 
       let latestIdx = -1;
       for (let i = periodsForYearAsc.length - 1; i >= 0; i--) {

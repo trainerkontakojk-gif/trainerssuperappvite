@@ -61,11 +61,14 @@ export async function getTemuan(params: {
 
   query = query.order("created_at", { ascending: false });
 
-  if (params.limit)
+  const MAX_LIMIT = 1000;
+  if (params.limit) {
+    const safeLimit = Math.min(params.limit, MAX_LIMIT);
     query = query.range(
       params.offset ?? 0,
-      (params.offset ?? 0) + params.limit - 1,
+      (params.offset ?? 0) + safeLimit - 1,
     );
+  }
 
   const { data, count, error } = await query;
   if (error) throw new Error(`Failed to get temuan: ${error.message}`);
