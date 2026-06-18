@@ -228,9 +228,6 @@ export async function getDashboardData(params: {
     fetchDistinctServiceTypes({
       period_ids: params.period_ids,
       year: params.year,
-      peserta_id: params.peserta_id,
-      agent_ids: params.agent_ids,
-      folderNames,
       excludedIds,
       allowedSvcs,
     }),
