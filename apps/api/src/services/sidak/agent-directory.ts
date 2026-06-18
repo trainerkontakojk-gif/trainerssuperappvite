@@ -45,31 +45,13 @@ export function isAgentExcluded(
 }
 
 export async function getSoftDeletedPesertaIds(): Promise<string[]> {
-  const deletedProfiles = await fetchAllPages<{ id: string }>({
-    build: ({ from, to }) =>
-      supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .or("is_deleted.eq.true,status.eq.inactive")
-        .order("id", { ascending: true })
-        .range(from, to),
-  });
+  // profiler_peserta has no user_id column (only trainer_id).
+  // The original query was always broken and returned [].
+  // Restoring empty behavior to avoid incorrectly excluding agents
+  // whose trainer is inactive/deleted.
+  // TODO: Implement proper soft-delete check if needed.
+  return [];
 
-  if (deletedProfiles.length === 0) return [];
-
-  const profileIds = deletedProfiles.map((p) => p.id);
-
-  const pesertaRows = await fetchAllPages<{ id: string }>({
-    build: ({ from, to }) =>
-      supabaseAdmin
-        .from("profiler_peserta")
-        .select("id")
-        .in("trainer_id", profileIds)
-        .order("id", { ascending: true })
-        .range(from, to),
-  });
-
-  return pesertaRows.map((p) => p.id);
 }
 
 export async function getAgents(params: {
