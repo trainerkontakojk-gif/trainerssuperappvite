@@ -838,29 +838,26 @@ export async function deleteTeam(id: string): Promise<void> {
 export async function getFolderCounts(
   accessibleIds?: string[] | null,
 ): Promise<Record<string, number>> {
-  const data = await fetchAllPages<{ batch_name: string }>({
-    build: ({ from, to }) => {
-      let q = supabaseAdmin
-        .from("profiler_peserta")
-        .select("batch_name")
-        .order("batch_name", { ascending: true })
-        .order("id", { ascending: true })
-        .range(from, to);
+  if (
+    accessibleIds !== null &&
+    accessibleIds !== undefined &&
+    accessibleIds.length === 0
+  ) {
+    return {};
+  }
 
-      if (accessibleIds !== null && accessibleIds !== undefined) {
-        if (accessibleIds.length === 0) {
-          return Promise.resolve({ data: [], error: null });
-        }
-        q = q.in("id", accessibleIds);
-      }
-
-      return q;
+  const { data, error } = await supabaseAdmin.rpc(
+    "get_profiler_folder_counts",
+    {
+      p_accessible_ids: accessibleIds ?? null,
     },
-  });
+  );
+
+  if (error) throw new Error(error.message);
 
   const counts: Record<string, number> = {};
-  for (const row of data) {
-    counts[row.batch_name] = (counts[row.batch_name] ?? 0) + 1;
+  for (const row of data ?? []) {
+    counts[row.batch_name] = Number(row.peserta_count ?? 0);
   }
   return counts;
 }
