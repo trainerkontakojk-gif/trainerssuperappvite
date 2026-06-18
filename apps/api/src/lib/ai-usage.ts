@@ -5,6 +5,7 @@ import {
   DEFAULT_USD_TO_IDR_RATE,
   getBillingRate,
 } from "./ai-billing-settings";
+import { calculateModalityCost } from "./modality-pricing";
 
 export interface UsageContext {
   module: "ketik" | "pdkt" | "telefun" | "qa-analyzer";
@@ -15,21 +16,44 @@ interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  inputTextTokens?: number;
+  inputAudioTokens?: number;
+  outputTextTokens?: number;
+  outputAudioTokens?: number;
 }
 
-function isMissingAiUsageStatusColumnError(error: any): boolean {
+function isPostgrestError(error: unknown): error is {
+  code?: string;
+  message?: string;
+} {
+  return Boolean(error && typeof error === "object");
+}
+
+function isMissingAiUsageStatusColumnError(error: unknown): boolean {
   if (!error) return false;
-  const msg = (error.message || "").toLowerCase();
+  const err = isPostgrestError(error) ? error : {};
+  const msg = (err.message || "").toLowerCase();
+  const newColumnPattern =
+    "status|error_message|input_text_tokens|input_audio_tokens|input_unspecified_tokens|output_text_tokens|output_audio_tokens|output_unspecified_tokens|input_text_price_usd_per_million|input_audio_price_usd_per_million|output_text_price_usd_per_million|output_audio_price_usd_per_million";
   
-  if (error.code === "42703") {
-    return /ai_usage_logs\.(status|error_message)|column .*status|column .*error_message/.test(msg);
+  if (err.code === "42703") {
+    return new RegExp(
+      `ai_usage_logs\\.(${newColumnPattern})|column .*(${newColumnPattern})`,
+    ).test(msg);
   }
   
-  if (error.code === "PGRST204") {
-    return msg.includes("schema cache") && (msg.includes("status") || msg.includes("error_message"));
+  if (err.code === "PGRST204") {
+    return (
+      msg.includes("schema cache") &&
+      new RegExp(newColumnPattern).test(msg)
+    );
   }
   
   return false;
+}
+
+function getKnownTokenCount(...values: Array<number | undefined>): number {
+  return values.reduce<number>((total, value) => total + (value ?? 0), 0);
 }
 
 export async function logAiUsage(options: {
@@ -94,9 +118,35 @@ export async function logAiUsage(options: {
         pricing.output_price_usd_per_million ?? defaultOutput;
     }
 
-    const estimatedCostUsd =
-      (inputTokens / 1_000_000) * inputPricePerMillion +
-      (outputTokens / 1_000_000) * outputPricePerMillion;
+    const inputKnownTokens = getKnownTokenCount(
+      options.tokens.inputTextTokens,
+      options.tokens.inputAudioTokens,
+    );
+    const outputKnownTokens = getKnownTokenCount(
+      options.tokens.outputTextTokens,
+      options.tokens.outputAudioTokens,
+    );
+    const inputUnspecifiedTokens = Math.max(inputTokens - inputKnownTokens, 0);
+    const outputUnspecifiedTokens = Math.max(
+      outputTokens - outputKnownTokens,
+      0,
+    );
+    const modalityCost = calculateModalityCost(
+      {
+        inputTextTokens: options.tokens.inputTextTokens ?? 0,
+        inputAudioTokens: options.tokens.inputAudioTokens ?? 0,
+        inputUnspecifiedTokens,
+        outputTextTokens: options.tokens.outputTextTokens ?? 0,
+        outputAudioTokens: options.tokens.outputAudioTokens ?? 0,
+        outputUnspecifiedTokens,
+      },
+      {
+        inputPriceUsdPerMillion: inputPricePerMillion,
+        outputPriceUsdPerMillion: outputPricePerMillion,
+      },
+      usdToIdrRate,
+      normalizedModelId,
+    );
 
     const payload = {
       request_id: options.requestId,
@@ -108,11 +158,27 @@ export async function logAiUsage(options: {
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       total_tokens: totalTokens,
+      input_text_tokens: options.tokens.inputTextTokens ?? null,
+      input_audio_tokens: options.tokens.inputAudioTokens ?? null,
+      input_unspecified_tokens:
+        inputUnspecifiedTokens > 0 ? inputUnspecifiedTokens : null,
+      output_text_tokens: options.tokens.outputTextTokens ?? null,
+      output_audio_tokens: options.tokens.outputAudioTokens ?? null,
+      output_unspecified_tokens:
+        outputUnspecifiedTokens > 0 ? outputUnspecifiedTokens : null,
+      input_text_price_usd_per_million:
+        modalityCost.inputTextPriceUsdPerMillion,
+      input_audio_price_usd_per_million:
+        modalityCost.inputAudioPriceUsdPerMillion,
+      output_text_price_usd_per_million:
+        modalityCost.outputTextPriceUsdPerMillion,
+      output_audio_price_usd_per_million:
+        modalityCost.outputAudioPriceUsdPerMillion,
       input_price_usd_per_million: inputPricePerMillion,
       output_price_usd_per_million: outputPricePerMillion,
       usd_to_idr_rate: usdToIdrRate,
-      estimated_cost_usd: Math.round(estimatedCostUsd * 1_000_000) / 1_000_000,
-      estimated_cost_idr: Math.round(estimatedCostUsd * usdToIdrRate),
+      estimated_cost_usd: modalityCost.costUsd,
+      estimated_cost_idr: modalityCost.costIdr,
       status: requestStatus,
       error_message: errorMessageValue,
     };
@@ -126,6 +192,16 @@ export async function logAiUsage(options: {
       const {
         status: _status,
         error_message: _errorMessage,
+        input_text_tokens: _inputTextTokens,
+        input_audio_tokens: _inputAudioTokens,
+        input_unspecified_tokens: _inputUnspecifiedTokens,
+        output_text_tokens: _outputTextTokens,
+        output_audio_tokens: _outputAudioTokens,
+        output_unspecified_tokens: _outputUnspecifiedTokens,
+        input_text_price_usd_per_million: _inputTextPriceUsdPerMillion,
+        input_audio_price_usd_per_million: _inputAudioPriceUsdPerMillion,
+        output_text_price_usd_per_million: _outputTextPriceUsdPerMillion,
+        output_audio_price_usd_per_million: _outputAudioPriceUsdPerMillion,
         ...legacyPayload
       } = payload;
       const legacyResult = await admin
@@ -134,7 +210,7 @@ export async function logAiUsage(options: {
       if (legacyResult.error) throw legacyResult.error;
     }
   } catch (error) {
-    const err = error as { code?: string };
+    const err = isPostgrestError(error) ? error : {};
     if (err?.code === "23505") {
       console.warn(`[AI Usage] Duplicate request_id "${options.requestId}".`);
       return;
