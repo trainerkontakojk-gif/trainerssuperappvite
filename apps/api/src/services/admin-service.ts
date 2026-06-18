@@ -175,51 +175,17 @@ export async function resetUserPassword(
 // ── Access Groups ────────────────────────────────────────────
 export async function getAccessGroups(): Promise<AccessGroupRow[]> {
   const { data, error } = await supabaseAdmin
-    .from("access_groups")
-    .select("*")
+    .from("v_access_groups_with_item_counts")
+    .select(
+      "id, name, description, scope_type, is_active, created_at, item_count",
+    )
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
 
-  const groupIds = (data || []).map((g) => g.id);
-  if (groupIds.length === 0) return [];
-
-  const PAGE_SIZE = 1000;
-  const counts: { access_group_id: string }[] = [];
-  let itemsFrom = 0;
-  let itemsHasMore = true;
-  while (itemsHasMore) {
-    const { data: page, error: countError } = await supabaseAdmin
-      .from("access_group_items")
-      .select("access_group_id")
-      .in("access_group_id", groupIds)
-      .order("access_group_id", { ascending: true })
-      .order("field_name", { ascending: true })
-      .order("field_value", { ascending: true })
-      .range(itemsFrom, itemsFrom + PAGE_SIZE - 1);
-    if (countError) throw new Error(countError.message);
-    if (!page || page.length === 0) {
-      itemsHasMore = false;
-    } else {
-      counts.push(...page);
-      itemsHasMore = page.length === PAGE_SIZE;
-      itemsFrom += PAGE_SIZE;
-    }
-  }
-
-  const countMap = new Map<string, number>();
-  counts.forEach((c) => {
-    countMap.set(c.access_group_id, (countMap.get(c.access_group_id) || 0) + 1);
-  });
-
-  return (data || []).map((row) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    scope_type: row.scope_type,
-    is_active: row.is_active,
-    created_at: row.created_at,
-    item_count: countMap.get(row.id) || 0,
+  return (data ?? []).map((row) => ({
+    ...row,
+    item_count: Number(row.item_count ?? 0),
   }));
 }
 
