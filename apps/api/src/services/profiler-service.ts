@@ -22,7 +22,7 @@ export async function getAccessiblePesertaIds(
     const { data } = await supabaseAdmin
       .from("profiler_peserta")
       .select("id")
-      .eq("user_id", userId)
+      .eq("trainer_id", userId)
       .maybeSingle();
     return data ? [data.id] : [];
   }
