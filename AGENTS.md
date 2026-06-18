@@ -177,6 +177,38 @@ Monorepo dengan pembagian tanggung jawab yang jelas:
 
 Semua fungsi yang sebelumnya menggunakan `getApi`, `postApi`, `putApi`, `deleteApi` dari `hooks/useApi` sudah dimigrasi ke `fetchApi` (dari hooks/useApi — hanya untuk internal) atau menggunakan RPC/hc pattern. `getApi`/`postApi`/`putApi`/`deleteApi` sudah dihapus — jangan gunakan di kode baru. Gunakan `fetchApi` dari `hooks/useApi` untuk panggilan API langsung, atau gunakan Hono RPC client.
 
+## Pagination Fix & RPC Migration (2026-06-18)
+
+### fetchAllPages Generic Helper
+- File: `apps/api/src/lib/supabase-pagination.ts`
+- Purpose: Paginate Supabase queries that can exceed 1000 rows (REST API auto-cap)
+- Usage: `fetchAllPages<T>({ build: ({ from, to }) => supabaseAdmin.from("table").select("*").order("id").range(from, to) })`
+- Applied to 22 queries across `apps/api/src/services/` (commits 27ac441..750f001)
+
+### RPC/View Server-Side Aggregation
+Migrated 3 high-volume aggregation functions from client-side pagination to server-side SQL:
+
+| Function | Migration | Object | File |
+|----------|-----------|--------|------|
+| `getFolderCounts()` | `20260618100000_add_get_profiler_folder_counts_rpc.sql` | RPC `get_profiler_folder_counts(uuid[])` | `profiler-service.ts` |
+| `getAccessGroups()` | `20260618101000_add_access_groups_count_view.sql` | View `v_access_groups_with_item_counts` | `admin-service.ts` |
+| `getLeaderScopeSnapshot()` | `20260618102000_add_get_leader_scope_snapshot_rpc.sql` | RPC `get_leader_scope_snapshot(uuid, text)` + 2 indexes | `leader-access-service.ts` |
+
+### Migration Files
+All in `supabase/migrations/`:
+- `20260618100000_add_get_profiler_folder_counts_rpc.sql`
+- `20260618101000_add_access_groups_count_view.sql`
+- `20260618102000_add_get_leader_scope_snapshot_rpc.sql`
+
+### Rollback SQL
+```sql
+DROP FUNCTION IF EXISTS public.get_profiler_folder_counts(uuid[]);
+DROP VIEW IF EXISTS public.v_access_groups_with_item_counts;
+DROP FUNCTION IF EXISTS public.get_leader_scope_snapshot(uuid, text);
+DROP INDEX IF EXISTS public.idx_leader_access_requests_approved_scope;
+DROP INDEX IF EXISTS public.idx_access_group_items_active_group_scope;
+```
+
 ## Golden Rules
 
 ### 1. FCP/LCP Wajib Dipertimbangkan di Setiap Build

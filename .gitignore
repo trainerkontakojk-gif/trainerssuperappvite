@@ -28,6 +28,7 @@ docs/superpowers/
 plan/
 .agents/
 skills-lock.json
+.hermes/
 
 # ── Project-specific ──
 apps/api/src/inspect_db.ts
