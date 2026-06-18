@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 
 let totalRowsReturned = 0;
+let serviceWeightsError: { message: string } | null = null;
 
 function makePaginatedMock(allRows: any[]) {
   totalRowsReturned = 0;
@@ -8,7 +9,10 @@ function makePaginatedMock(allRows: any[]) {
     if (table === "qa_service_weights") {
       const q: any = new Proxy({}, {
         get(_t: any, prop: PropertyKey) {
-          if (prop === "then") return (resolve: any) => resolve({ data: [], error: null });
+          if (prop === "then") {
+            return (resolve: any) =>
+              resolve({ data: [], error: serviceWeightsError });
+          }
           return (..._args: any[]) => q;
         },
       });
@@ -85,6 +89,10 @@ vi.mock("../services/sidak/period-scoring-context", () => ({
 import { refreshDashboardSummary } from "../services/sidak/temuan-service";
 
 describe("refreshDashboardSummary pagination", () => {
+  beforeEach(() => {
+    serviceWeightsError = null;
+  });
+
   it("fetches all rows when >1000 (no truncation)", async () => {
     const { supabaseAdmin } = await import("../lib/supabase");
     const allRows = Array.from({ length: 1100 }, (_, i) => ({
@@ -99,5 +107,15 @@ describe("refreshDashboardSummary pagination", () => {
 
     // Without fix: 1000 rows returned (truncated). With fix: all 1100 rows across pages.
     expect(totalRowsReturned).toBe(1100);
+  });
+
+  it("throws when service weights cannot be loaded", async () => {
+    const { supabaseAdmin } = await import("../lib/supabase");
+    vi.mocked(supabaseAdmin.from).mockImplementation(makePaginatedMock([]));
+    serviceWeightsError = { message: "weights unavailable" };
+
+    await expect(refreshDashboardSummary("p1", "call")).rejects.toThrow(
+      "weights unavailable",
+    );
   });
 });

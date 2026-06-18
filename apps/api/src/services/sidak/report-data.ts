@@ -142,7 +142,8 @@ export async function getReportChartData(params: {
 }
 
 export async function getServiceWeights(): Promise<any[]> {
-  const { data } = await supabaseAdmin.from("qa_service_weights").select("*");
+  const { data, error } = await supabaseAdmin.from("qa_service_weights").select("*");
+  if (error) throw new Error(`Gagal mengambil service weight: ${error.message}`);
   return data ?? [];
 }
 

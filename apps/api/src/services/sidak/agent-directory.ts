@@ -141,31 +141,25 @@ export async function getAgentDirectorySummary(
     ...new Set(filteredAgents.map((a: any) => a.batch_name).filter(Boolean)),
   ] as string[];
 
-  const allTemuan: any[] = [];
-  let from = 0;
-  const step = 1000;
-  let finished = false;
-  while (!finished) {
-    let query = supabaseAdmin
-      .from("qa_temuan")
-      .select(
-        "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
-      )
-      .eq("tahun", year)
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false });
-    if (allowedServiceTypes && allowedServiceTypes.length > 0) {
-      query = query.in("service_type", allowedServiceTypes);
-    }
-    const { data } = await query.range(from, from + step - 1);
-    if (!data || data.length === 0) {
-      finished = true;
-    } else {
-      allTemuan.push(...data);
-      if (data.length < step) finished = true;
-      else from += step;
-    }
-  }
+  const allTemuan = await fetchAllPages<any>({
+    build: ({ from, to }) => {
+      let query = supabaseAdmin
+        .from("qa_temuan")
+        .select(
+          "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
+        )
+        .eq("tahun", year)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+
+      if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+        query = query.in("service_type", allowedServiceTypes);
+      }
+
+      return query;
+    },
+  });
 
   const periods = await getPeriods();
   const periodsMap = new Map(periods.map((p) => [p.id, p]));
@@ -297,6 +291,7 @@ export async function getAgentDetail(
   ]);
 
   if (peserta.error) throw new Error("Agent tidak ditemukan");
+  if (weightsResult.error) throw new Error(weightsResult.error.message);
 
   const currentYear = year ?? new Date().getFullYear();
 

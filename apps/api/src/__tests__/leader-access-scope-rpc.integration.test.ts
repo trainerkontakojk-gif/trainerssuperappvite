@@ -9,8 +9,8 @@ import {
 
 describe("Leader Scope Snapshot RPC Integration", () => {
   let sbAdmin: SupabaseClient;
-  let leaderUser: TestUser;
-  let trainerUser: TestUser;
+  let leaderUser: TestUser | undefined;
+  let trainerUser: TestUser | undefined;
   let leaderClient: SupabaseClient;
   let trainerClient: SupabaseClient;
   let pesertaId: string;
@@ -71,17 +71,27 @@ describe("Leader Scope Snapshot RPC Integration", () => {
   });
 
   afterAll(async () => {
-    await sbAdmin.from("leader_access_request_groups").delete().eq("request_id", requestId);
-    await sbAdmin.from("leader_access_requests").delete().eq("id", requestId);
-    await sbAdmin.from("access_group_items").delete().eq("access_group_id", groupId);
-    await sbAdmin.from("access_groups").delete().eq("id", groupId);
-    await sbAdmin.from("profiler_peserta").delete().eq("id", pesertaId);
-    await sbAdmin.from("profiles").delete().in("id", [leaderUser.id, trainerUser.id]);
+    if (!sbAdmin) return;
+    if (requestId) {
+      await sbAdmin.from("leader_access_request_groups").delete().eq("request_id", requestId);
+      await sbAdmin.from("leader_access_requests").delete().eq("id", requestId);
+    }
+    if (groupId) {
+      await sbAdmin.from("access_group_items").delete().eq("access_group_id", groupId);
+      await sbAdmin.from("access_groups").delete().eq("id", groupId);
+    }
+    if (pesertaId) {
+      await sbAdmin.from("profiler_peserta").delete().eq("id", pesertaId);
+    }
+    const profileIds = [leaderUser?.id, trainerUser?.id].filter(Boolean);
+    if (profileIds.length > 0) {
+      await sbAdmin.from("profiles").delete().in("id", profileIds);
+    }
   });
 
   it("service_role can execute get_leader_scope_snapshot and receives the expected shape", async () => {
     const { data, error } = await sbAdmin.rpc("get_leader_scope_snapshot", {
-      p_leader_user_id: leaderUser.id,
+      p_leader_user_id: leaderUser!.id,
       p_module: "sidak",
     });
 
@@ -96,7 +106,7 @@ describe("Leader Scope Snapshot RPC Integration", () => {
 
   it("authenticated non-service clients do not gain direct execute access", async () => {
     const { error } = await leaderClient.rpc("get_leader_scope_snapshot", {
-      p_leader_user_id: leaderUser.id,
+      p_leader_user_id: leaderUser!.id,
       p_module: "sidak",
     });
 

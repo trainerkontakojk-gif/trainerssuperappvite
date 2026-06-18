@@ -3,6 +3,11 @@ import { getRankingData } from "../services/sidak-ranking-service";
 import * as sidakService from "../services/sidak-service";
 
 // ─── Supabase Mock ─────────────────────────────────────────────────────────────
+let profilerFoldersResult = {
+  data: [{ id: "folder-1", name: "Folder A" }],
+  error: null as null | { message: string },
+};
+
 function buildQuery(onAwait: () => any) {
   const q: any = new Proxy(
     {},
@@ -22,10 +27,7 @@ vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
     from: vi.fn((tableName: string) => {
       if (tableName === "profiler_folders") {
-        return buildQuery(() => ({
-          data: [{ id: "folder-1", name: "Folder A" }],
-          error: null,
-        }));
+        return buildQuery(() => profilerFoldersResult);
       }
       return buildQuery(() => ({ data: [], error: null }));
     }),
@@ -57,6 +59,10 @@ vi.mock("../services/sidak-service", async (importOriginal) => {
 describe("Sidak Ranking Service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    profilerFoldersResult = {
+      data: [{ id: "folder-1", name: "Folder A" }],
+      error: null,
+    };
   });
 
   it("fetches ranking data correctly for alltime", async () => {
@@ -100,5 +106,23 @@ describe("Sidak Ranking Service", () => {
         agent_ids: ["agent-1"],
       })
     );
+  });
+
+  it("throws when the folder metadata query fails", async () => {
+    profilerFoldersResult = {
+      data: null as any,
+      error: { message: "folder query failed" },
+    };
+
+    await expect(
+      getRankingData({
+        period: "alltime",
+        service_type: "call",
+        year: 2026,
+        folder: "ALL",
+        accessibleIds: null,
+        filterScope: null,
+      }),
+    ).rejects.toThrow("folder query failed");
   });
 });

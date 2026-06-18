@@ -42,6 +42,8 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
       sidakService.getAvailableYears(accessibleIds ?? undefined),
     ]);
 
+  if (folders.error) throw new Error(folders.error.message);
+
   const scopedFolders = filterScope
     ? filterScope.allowedFolders
     : (folders?.data ?? []).map((f: any) => ({ id: f.id, name: f.name }));

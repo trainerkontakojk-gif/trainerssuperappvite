@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { isCountableFinding } from "./shared-constants";
 import { getPeriods, getIndicators } from "./period-indicator";
 import type { QAPeriod } from "@trainers/types";
@@ -362,32 +363,23 @@ export function sliceTrendData(data: any, months: number) {
 export async function getAvailableYears(
   agent_ids?: string[],
 ): Promise<number[]> {
-  const PAGE_SIZE = 1000;
-  const allData: { tahun: number | null }[] = [];
-  let from = 0;
-  let hasMore = true;
-  while (hasMore) {
-    let query = supabaseAdmin
-      .from("qa_temuan")
-      .select("tahun")
-      .not("tahun", "is", null)
-      .order("tahun", { ascending: false })
-      .order("id", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
+  const allData = await fetchAllPages<{ tahun: number | null }>({
+    build: ({ from, to }) => {
+      let query = supabaseAdmin
+        .from("qa_temuan")
+        .select("tahun")
+        .not("tahun", "is", null)
+        .order("tahun", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
 
-    if (agent_ids && agent_ids.length > 0) {
-      query = query.in("peserta_id", agent_ids);
-    }
+      if (agent_ids && agent_ids.length > 0) {
+        query = query.in("peserta_id", agent_ids);
+      }
 
-    const { data } = await query;
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData.push(...data);
-      hasMore = data.length === PAGE_SIZE;
-      from += PAGE_SIZE;
-    }
-  }
+      return query;
+    },
+  });
 
   const years = [
     ...new Set(allData.map((r) => r.tahun).filter(Boolean)),

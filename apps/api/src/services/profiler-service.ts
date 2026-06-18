@@ -41,34 +41,48 @@ export async function getYears(
 ): Promise<ProfilerYear[]> {
   if (accessibleIds !== null && accessibleIds !== undefined) {
     if (accessibleIds.length === 0) return [];
-    const { data: scopedBatchRows } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("batch_name")
-      .in("id", accessibleIds);
+    const scopedBatchRows = await fetchAllPages<{ batch_name: string | null }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("batch_name")
+          .in("id", accessibleIds)
+          .order("batch_name", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     const scopedBatches = [
-      ...new Set((scopedBatchRows ?? []).map((r) => r.batch_name).filter(Boolean)),
+      ...new Set(scopedBatchRows.map((r) => r.batch_name).filter(Boolean)),
     ] as string[];
     if (scopedBatches.length === 0) return [];
-    const { data: scopedFolders } = await supabaseAdmin
-      .from("profiler_folders")
-      .select("year_id")
-      .in("name", scopedBatches);
+    const scopedFolders = await fetchAllPages<{ year_id: string | null }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_folders")
+          .select("year_id")
+          .in("name", scopedBatches)
+          .order("year_id", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     const scopedYearIds = [
-      ...new Set((scopedFolders ?? []).map((f) => f.year_id).filter(Boolean)),
+      ...new Set(scopedFolders.map((f) => f.year_id).filter(Boolean)),
     ] as string[];
     if (scopedYearIds.length === 0) return [];
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("profiler_years")
       .select("*")
       .in("id", scopedYearIds)
       .order("year", { ascending: false });
+    if (error) throw new Error(error.message);
     return data ?? [];
   }
 
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("profiler_years")
     .select("*")
     .order("year", { ascending: false });
+  if (error) throw new Error(error.message);
   return data ?? [];
 }
 
@@ -97,26 +111,42 @@ export async function getFolders(
 ): Promise<ProfilerFolder[]> {
   if (accessibleIds !== null && accessibleIds !== undefined) {
     if (accessibleIds.length === 0) return [];
-    const { data: scopedBatchRows } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("batch_name")
-      .in("id", accessibleIds);
+    const scopedBatchRows = await fetchAllPages<{ batch_name: string | null }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("batch_name")
+          .in("id", accessibleIds)
+          .order("batch_name", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     const scopedBatches = [
-      ...new Set((scopedBatchRows ?? []).map((r) => r.batch_name).filter(Boolean)),
+      ...new Set(scopedBatchRows.map((r) => r.batch_name).filter(Boolean)),
     ] as string[];
     if (scopedBatches.length === 0) return [];
-    const { data } = await supabaseAdmin
-      .from("profiler_folders")
-      .select("*")
-      .in("name", scopedBatches)
-      .order("name");
+    const data = await fetchAllPages<ProfilerFolder>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_folders")
+          .select("*")
+          .in("name", scopedBatches)
+          .order("name")
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     return data ?? [];
   }
 
-  const { data } = await supabaseAdmin
-    .from("profiler_folders")
-    .select("*")
-    .order("name");
+  const data = await fetchAllPages<ProfilerFolder>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_folders")
+        .select("*")
+        .order("name")
+        .order("id", { ascending: true })
+        .range(from, to),
+  });
   return data ?? [];
 }
 
@@ -794,25 +824,42 @@ export async function getTeams(
 ): Promise<ProfilerTim[]> {
   if (accessibleIds !== null && accessibleIds !== undefined) {
     if (accessibleIds.length === 0) return [];
-    const { data: scopedTimRows } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("tim")
-      .in("id", accessibleIds);
+    const scopedTimRows = await fetchAllPages<{ tim: string | null }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("tim")
+          .in("id", accessibleIds)
+          .order("tim", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     const scopedTims = [
-      ...new Set((scopedTimRows ?? []).map((r) => r.tim).filter(Boolean)),
+      ...new Set(scopedTimRows.map((r) => r.tim).filter(Boolean)),
     ] as string[];
-    const { data } = await supabaseAdmin
-      .from("profiler_tim_list")
-      .select("*")
-      .in("nama", scopedTims)
-      .order("nama");
+    if (scopedTims.length === 0) return [];
+    const data = await fetchAllPages<ProfilerTim>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_tim_list")
+          .select("*")
+          .in("nama", scopedTims)
+          .order("nama")
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     return data ?? [];
   }
 
-  const { data } = await supabaseAdmin
-    .from("profiler_tim_list")
-    .select("*")
-    .order("nama");
+  const data = await fetchAllPages<ProfilerTim>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_tim_list")
+        .select("*")
+        .order("nama")
+        .order("id", { ascending: true })
+        .range(from, to),
+  });
   return data ?? [];
 }
 

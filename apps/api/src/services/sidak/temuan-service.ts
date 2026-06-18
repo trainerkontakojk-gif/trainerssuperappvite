@@ -405,6 +405,10 @@ export async function refreshDashboardSummary(
     supabaseAdmin.from("qa_service_weights").select("*"),
   ]);
 
+  if (weights.error) {
+    throw new Error(`Gagal mengambil bobot layanan: ${weights.error.message}`);
+  }
+
   const weightMap = (weights?.data ?? []).reduce(
     (acc: Partial<Record<ServiceType, ServiceWeight>>, w: ServiceWeight) => {
       acc[w.service_type] = w;

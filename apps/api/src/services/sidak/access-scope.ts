@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getLeaderScopeSnapshot } from "../leader-access-service";
 import { TRAINER_ROLES, LEADER_ROLES } from "./shared-constants";
 import type { ServiceType } from "@trainers/types";
@@ -51,23 +52,37 @@ export async function getAccessibleSidakFilters(
       };
     }
 
-    const { data: batchRows } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("batch_name")
-      .in("id", snapshot.pesertaIds);
+    const batchRows = await fetchAllPages<{ batch_name: string | null }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("batch_name")
+          .in("id", snapshot.pesertaIds)
+          .order("batch_name", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to),
+    });
     const scopedBatches = [
-      ...new Set((batchRows ?? []).map((r) => r.batch_name).filter(Boolean)),
+      ...new Set(batchRows.map((r) => r.batch_name).filter(Boolean)),
     ] as string[];
 
-    const { data: folderRows } = await supabaseAdmin
-      .from("profiler_folders")
-      .select("id, name")
-      .in("name", scopedBatches)
-      .order("name");
+    const folderRows =
+      scopedBatches.length === 0
+        ? []
+        : await fetchAllPages<{ id: string; name: string }>({
+            build: ({ from, to }) =>
+              supabaseAdmin
+                .from("profiler_folders")
+                .select("id, name")
+                .in("name", scopedBatches)
+                .order("name")
+                .order("id", { ascending: true })
+                .range(from, to),
+          });
 
     return {
       agentIds: snapshot.pesertaIds,
-      allowedFolders: (folderRows ?? []).map((f: any) => ({
+      allowedFolders: folderRows.map((f: any) => ({
         id: f.id,
         name: f.name,
       })),
