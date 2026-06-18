@@ -80,7 +80,8 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
         if (accessibleIds && accessibleIds.length > 0) {
           temuanQuery = temuanQuery.in("peserta_id", accessibleIds);
         }
-        const { data: page } = await temuanQuery;
+        const { data: page, error: pageError } = await temuanQuery;
+        if (pageError) throw new Error(pageError.message);
         if (!page || page.length === 0) {
           hasMore = false;
         } else {

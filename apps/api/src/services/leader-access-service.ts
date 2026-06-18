@@ -34,13 +34,15 @@ export async function fetchLeaderModuleRequests(
   userId: string,
   module: string,
 ): Promise<LeaderRequestRow[]> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("leader_access_requests")
     .select("id, module, status, created_at, updated_at")
     .eq("leader_user_id", userId)
     .in("module", [module, "all"])
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
 
   return (data ?? []) as LeaderRequestRow[];
 }
