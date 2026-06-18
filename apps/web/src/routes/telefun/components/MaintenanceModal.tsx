@@ -1,6 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Home, ArrowRight } from "lucide-react";
+import { Lock, Home, ArrowRight } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTelefunWarning } from "../../../context/TelefunWarningContext";
 
@@ -49,11 +49,11 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
             <div className="absolute top-0 left-0 w-full h-1 bg-destructive/20" />
             
             <div className="w-20 h-20 bg-destructive/10 rounded-3xl mx-auto mb-6 flex items-center justify-center">
-              <AlertTriangle className="w-10 h-10 text-destructive" />
+              <Lock className="w-10 h-10 text-destructive" />
             </div>
             
             <h3 className="text-xl font-black text-foreground mb-4 tracking-tight">
-              {isAllowedRole ? "Modul Dalam Pengembangan" : "Akses Dibatasi"}
+              {isAllowedRole ? "Modul Dalam Pengembangan" : "Akses Terbatas"}
             </h3>
             
             <div className="text-sm text-muted-foreground leading-relaxed mb-2 font-medium px-4">
@@ -61,17 +61,11 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
                 <span>Modul ini masih dalam pengembangan dan mungkin tidak berjalan stabil. Anda dapat melanjutkan atau menggunakan versi Lite yang lebih stabil.</span>
               ) : (
                 <span>
-                  Modul ini tidak berjalan dengan baik pada aplikasi ini. <br />
-                  <span className="text-destructive font-bold">Silakan menghubungi trainer</span> untuk informasi lebih lanjut.
+                  Modul Telefun hanya dapat diakses oleh Trainer.
                 </span>
               )}
             </div>
             
-            {!isAllowedRole && (
-              <p className="text-xs text-muted-foreground leading-relaxed mb-8 font-medium px-4">
-                Modul Telefun hanya dapat diakses oleh role <span className="text-foreground font-bold">Trainer</span>.
-              </p>
-            )}
 
             {isAllowedRole && <div className="mb-6" />}
 

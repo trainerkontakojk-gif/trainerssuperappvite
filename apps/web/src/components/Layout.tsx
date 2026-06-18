@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "@tanstack/react-router";
+import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { Suspense, useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
@@ -16,19 +16,28 @@ function DashboardLayoutContent() {
   const profile = useAuthStore((s) => s.profile);
   const session = useAuthStore((s) => s.session);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { theme, setTheme } = useThemeMode();
 
   const {
     isMaintenanceOpen,
     openMaintenance,
     hasTelefunAccess,
+    grantTelefunAccess,
     revokeTelefunAccess,
   } = useTelefunWarning();
   const prevPathnameRef = useRef(pathname);
 
   useEffect(() => {
     if (pathname.startsWith("/telefun") && !hasTelefunAccess && profile) {
-      openMaintenance();
+      const normalizedRole = profile.role?.toLowerCase().trim();
+      const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+      if (isAllowedRole) {
+        grantTelefunAccess();
+        navigate({ to: "/telefun" });
+      } else {
+        openMaintenance();
+      }
     }
 
     if (
@@ -43,8 +52,10 @@ function DashboardLayoutContent() {
     pathname,
     hasTelefunAccess,
     openMaintenance,
+    grantTelefunAccess,
     revokeTelefunAccess,
     profile,
+    navigate,
   ]);
 
   const [flyoutOpen, setFlyoutOpen] = useState(false);

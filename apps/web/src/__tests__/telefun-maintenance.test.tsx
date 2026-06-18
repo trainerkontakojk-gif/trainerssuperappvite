@@ -23,7 +23,7 @@ describe("Telefun MaintenanceModal Component", () => {
     vi.clearAllMocks();
   });
 
-  it("renders correctly for allowed roles (trainer)", async () => {
+  it("renders correctly for allowed roles (trainer) when modal is explicitly opened", async () => {
     render(
       <TestWrapper>
         <MaintenanceModal isOpen={true} role="trainer" />
@@ -41,7 +41,7 @@ describe("Telefun MaintenanceModal Component", () => {
     expect(screen.getByText("Kembali ke Dashboard")).toBeDefined();
   });
 
-  it("renders correctly for allowed roles (admin)", async () => {
+  it("renders correctly for allowed roles (admin) when modal is explicitly opened", async () => {
     render(
       <TestWrapper>
         <MaintenanceModal isOpen={true} role="admin" />
@@ -52,7 +52,7 @@ describe("Telefun MaintenanceModal Component", () => {
     expect(screen.getByText("Lanjut ke Telefun")).toBeDefined();
   });
 
-  it("renders correctly for legacy trainers role alias", async () => {
+  it("renders correctly for legacy trainers role alias when modal is explicitly opened", async () => {
     render(
       <TestWrapper>
         <MaintenanceModal isOpen={true} role="trainers" />
@@ -63,21 +63,34 @@ describe("Telefun MaintenanceModal Component", () => {
     expect(screen.getByText("Lanjut ke Telefun")).toBeDefined();
   });
 
-  it("renders restricted access message for agent/other roles", async () => {
+  it("renders restricted access message for non-allowed roles (agent)", async () => {
     render(
       <TestWrapper>
         <MaintenanceModal isOpen={true} role="agent" />
       </TestWrapper>
     );
 
-    expect(screen.getByText("Akses Dibatasi")).toBeDefined();
+    expect(screen.getByText("Akses Terbatas")).toBeDefined();
     expect(screen.queryByText("Lanjut ke Telefun")).toBeNull();
     expect(screen.queryByText("Berpindah ke App Lite")).toBeNull();
     expect(screen.getByText("Kembali ke Dashboard")).toBeDefined();
     expect(
-      screen.getByText((content) =>
-        content.includes("Modul Telefun hanya dapat diakses oleh role")
-      )
+      screen.getByText("Modul Telefun hanya dapat diakses oleh Trainer.")
+    ).toBeDefined();
+  });
+
+  it("renders restricted access message for non-allowed roles (leader)", async () => {
+    render(
+      <TestWrapper>
+        <MaintenanceModal isOpen={true} role="leader" />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText("Akses Terbatas")).toBeDefined();
+    expect(screen.queryByText("Lanjut ke Telefun")).toBeNull();
+    expect(screen.getByText("Kembali ke Dashboard")).toBeDefined();
+    expect(
+      screen.getByText("Modul Telefun hanya dapat diakses oleh Trainer.")
     ).toBeDefined();
   });
 
