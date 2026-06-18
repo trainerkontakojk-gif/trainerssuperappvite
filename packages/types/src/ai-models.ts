@@ -68,17 +68,6 @@ export const TEXT_MODELS: AiModelInfo[] = [
     },
   },
   {
-    id: "gemini-2.0-flash-lite",
-    name: "Gemini 2.0 Flash Lite",
-    description: "Model ringan Gemini 2.0 untuk respons cepat dan hemat biaya.",
-    provider: "gemini",
-    timeoutMs: 120_000,
-    capabilities: {
-      supportsText: true,
-      supportsImage: true,
-    },
-  },
-  {
     id: "google/gemini-3.1-flash-lite",
     name: "Gemini 3.1 Flash Lite (OR)",
     description: "Model ringan Google via OpenRouter.",
