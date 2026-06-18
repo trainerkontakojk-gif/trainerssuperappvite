@@ -160,12 +160,14 @@ Perilaku editor:
 
 ### Kurs USD/IDR
 
-Kurs aktif dibaca dari entri terbaru di `ai_billing_settings`.
+Kurs aktif dibaca dari baris singleton di `ai_billing_settings` (`key='default'`).
 
-Saat kurs baru disimpan:
+Saat admin/trainer menyimpan kurs baru:
 
-- request baru memakai kurs terbaru
-- histori lama tetap memakai snapshot kurs yang sudah tersimpan di `ai_usage_logs`
+- Tabel hanya memiliki 1 baris (upsert pattern — tidak ada duplikat)
+- Kurs baru langsung berlaku untuk semua pengguna dan semua AI logging
+- Histori lama tetap memakai snapshot kurs yang sudah tersimpan di `ai_usage_logs`
+- Code memiliki legacy fallback: jika column `key` belum ada (pre-migration), otomatis query by `ORDER BY created_at DESC LIMIT 1`
 
 ## Access Matrix
 

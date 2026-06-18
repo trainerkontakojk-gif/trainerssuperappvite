@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { aiClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 import { PricingRow } from "./PricingRow";
@@ -26,6 +26,10 @@ export function PricingTab({
   onRefresh,
 }: PricingTabProps) {
   const [localRate, setLocalRate] = useState(billingRate);
+
+  useEffect(() => {
+    setLocalRate(billingRate);
+  }, [billingRate]);
 
   const handleSavePricing = async (entry: PricingEntry) => {
     try {

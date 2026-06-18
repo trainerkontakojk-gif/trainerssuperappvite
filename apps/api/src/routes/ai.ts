@@ -18,6 +18,10 @@ import { parseTelefunTranscript } from "@trainers/types";
 import { getMonitoringHistory } from "../services/monitoring-history-service";
 import { getAiUsageSummary } from "../services/ai-usage-summary-service";
 import {
+  getBillingRate,
+  upsertBillingRate,
+} from "../lib/ai-billing-settings";
+import {
   deleteMonitoringHistory,
   MonitoringHistoryDeleteError,
 } from "../services/monitoring-history-delete-service";
@@ -685,22 +689,21 @@ ai.put(
 // ── Billing ───────────────────────────────────────────
 ai.get("/monitoring/billing", requireRole("admin", "trainer"), async (c) => {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("ai_billing_settings")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error)
+  try {
+    const usdToIdrRate = await getBillingRate(admin);
+    return c.json({
+      success: true,
+      data: { usd_to_idr_rate: usdToIdrRate },
+    });
+  } catch (error: any) {
     return c.json(
-      { success: false, error: { code: "DB_ERROR", message: error.message } },
+      {
+        success: false,
+        error: { code: "DB_ERROR", message: error?.message || "DB error." },
+      },
       500,
     );
-  return c.json({
-    success: true,
-    data: { usd_to_idr_rate: data?.usd_to_idr_rate ?? 15000 },
-  });
+  }
 });
 
 const billingUpdateSchema = z.object({
@@ -715,14 +718,17 @@ ai.post(
     const body = c.req.valid("json");
 
     const admin = createAdminClient();
-    const { error } = await admin
-      .from("ai_billing_settings")
-      .insert({ usd_to_idr_rate: body.usd_to_idr_rate });
-    if (error)
+    try {
+      await upsertBillingRate(admin, body.usd_to_idr_rate);
+    } catch (error: any) {
       return c.json(
-        { success: false, error: { code: "DB_ERROR", message: error.message } },
+        {
+          success: false,
+          error: { code: "DB_ERROR", message: error?.message || "DB error." },
+        },
         500,
       );
+    }
     return c.json({ success: true, data: null });
   },
 );

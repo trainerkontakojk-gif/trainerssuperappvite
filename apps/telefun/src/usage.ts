@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "./env.js";
 
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+const DEFAULT_USD_TO_IDR_RATE = 15000;
 
 export interface LiveUsageSnapshot {
   promptTokenCount: number;
@@ -67,6 +68,50 @@ export function mergeSnapshot(
   };
 }
 
+function isMissingBillingKeyColumnError(error: any): boolean {
+  if (!error) return false;
+  const message = String(error.message || "").toLowerCase();
+
+  if (error.code === "42703") {
+    return (
+      message.includes("ai_billing_settings.key") ||
+      /column .*key/.test(message)
+    );
+  }
+
+  if (error.code === "PGRST204") {
+    return message.includes("schema cache") && message.includes("key");
+  }
+
+  return false;
+}
+
+async function getBillingRate(): Promise<number> {
+  const singletonResult = await admin
+    .from("ai_billing_settings")
+    .select("usd_to_idr_rate")
+    .eq("key", "default")
+    .maybeSingle();
+
+  if (!singletonResult.error) {
+    return singletonResult.data?.usd_to_idr_rate ?? DEFAULT_USD_TO_IDR_RATE;
+  }
+
+  if (!isMissingBillingKeyColumnError(singletonResult.error)) {
+    throw singletonResult.error;
+  }
+
+  const legacyResult = await admin
+    .from("ai_billing_settings")
+    .select("usd_to_idr_rate")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (legacyResult.error) throw legacyResult.error;
+  return legacyResult.data?.usd_to_idr_rate ?? DEFAULT_USD_TO_IDR_RATE;
+}
+
 export async function flushLiveUsage(
   requestId: string,
   userId: string,
@@ -74,21 +119,15 @@ export async function flushLiveUsage(
   modelId: string,
 ): Promise<void> {
   try {
-    const [{ data: pricing }, { data: billing }] = await Promise.all([
+    const [{ data: pricing }, usdToIdrRate] = await Promise.all([
       admin
         .from("ai_pricing_settings")
         .select("input_price_usd_per_million, output_price_usd_per_million")
         .eq("model_id", modelId)
         .maybeSingle(),
-      admin
-        .from("ai_billing_settings")
-        .select("usd_to_idr_rate")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      getBillingRate(),
     ]);
 
-    const usdToIdrRate = billing?.usd_to_idr_rate ?? 15000;
     const isLiveModel = modelId.includes("live");
     const inputPricePerMillion =
       pricing?.input_price_usd_per_million ?? (isLiveModel ? 3.0 : 0);

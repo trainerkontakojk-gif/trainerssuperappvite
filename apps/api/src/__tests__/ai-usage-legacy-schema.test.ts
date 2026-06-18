@@ -46,11 +46,9 @@ describe("logAiUsage legacy schema compatibility", () => {
       if (table === "ai_billing_settings") {
         return {
           select: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { usd_to_idr_rate: 15000 },
-                }),
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { usd_to_idr_rate: 15000 },
               }),
             }),
           }),
@@ -114,11 +112,9 @@ describe("logAiUsage legacy schema compatibility", () => {
       if (table === "ai_billing_settings") {
         return {
           select: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              limit: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { usd_to_idr_rate: 15000 },
-                }),
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { usd_to_idr_rate: 15000 },
               }),
             }),
           }),
@@ -150,5 +146,67 @@ describe("logAiUsage legacy schema compatibility", () => {
     });
     expect(insert.mock.calls[1][0]).not.toHaveProperty("status");
     expect(insert.mock.calls[1][0]).not.toHaveProperty("error_message");
+  });
+
+  it("falls back to legacy billing lookup when singleton key column is unavailable", async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "ai_pricing_settings") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: {
+                  input_price_usd_per_million: 1,
+                  output_price_usd_per_million: 2,
+                },
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === "ai_billing_settings") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: null,
+                error: {
+                  code: "42703",
+                  message: 'column "key" does not exist',
+                },
+              }),
+            }),
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { usd_to_idr_rate: 17000 },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+
+      return { insert };
+    });
+
+    await logAiUsage({
+      requestId: "req-3",
+      userId: "user-3",
+      provider: "gemini",
+      modelId: "gemini-3.1-flash-lite",
+      usageContext: { module: "ketik", action: "generate_consumer_response" },
+      tokens: { inputTokens: 1000, outputTokens: 2000, totalTokens: 3000 },
+    });
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.calls[0][0]).toMatchObject({
+      request_id: "req-3",
+      usd_to_idr_rate: 17000,
+    });
   });
 });

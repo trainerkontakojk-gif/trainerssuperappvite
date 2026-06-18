@@ -1,6 +1,10 @@
 import { createAdminClient } from "./supabase";
 import { normalizeModelId } from "./ai-models";
 import type { AIProvider } from "@trainers/types";
+import {
+  DEFAULT_USD_TO_IDR_RATE,
+  getBillingRate,
+} from "./ai-billing-settings";
 
 export interface UsageContext {
   module: "ketik" | "pdkt" | "telefun" | "qa-analyzer";
@@ -60,23 +64,18 @@ export async function logAiUsage(options: {
       }
     }
 
-    const [{ data: pricing }, { data: billing }] = await Promise.all([
+    const [{ data: pricing }, billingRate] = await Promise.all([
       admin
         .from("ai_pricing_settings")
         .select("input_price_usd_per_million, output_price_usd_per_million")
         .eq("model_id", normalizedModelId)
         .maybeSingle(),
-      admin
-        .from("ai_billing_settings")
-        .select("usd_to_idr_rate")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single(),
+      getBillingRate(admin),
     ]);
 
     let inputPricePerMillion = 0;
     let outputPricePerMillion = 0;
-    const usdToIdrRate = billing?.usd_to_idr_rate ?? 15000;
+    const usdToIdrRate = billingRate ?? DEFAULT_USD_TO_IDR_RATE;
 
     const isLiveModel = normalizedModelId.includes("live");
     const defaultInput = isLiveModel ? 3.0 : 0;

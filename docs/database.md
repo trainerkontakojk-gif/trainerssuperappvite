@@ -134,7 +134,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`mv_qa_period_summary`**: Materialized view untuk ringkasan KPI dashboard SIDAK per periode. Dipelihara secara terpisah; endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi.
 - **`ai_usage_logs`**: Log 1 baris per AI call (sukses maupun gagal/timeout). Menyimpan `request_id`, `user_id`, `provider`, `model_id`, `module`, `action`, token, harga, kurs, estimasi biaya, `status` (success/failed/timeout), dan `error_message`.
 - **`ai_pricing_settings`**: Harga token input/output per model kanonik.
-- **`ai_billing_settings`**: Riwayat nilai kurs global USD ke IDR.
+- **`ai_billing_settings`**: Singleton table — tepat 1 baris (`key='default'`) menyimpan nilai kurs global USD ke IDR. Admin/trainer update via upsert, langsung berlaku untuk semua pengguna. Memiliki fallback legacy untuk kompatibilitas sebelum migrasi `20260618200000`.
 
 ## Keamanan Data (Explicit Grants & RLS Policies)
 

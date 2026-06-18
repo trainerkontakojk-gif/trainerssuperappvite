@@ -246,6 +246,20 @@ describe("MonitoringPage - Unauthorized & Visual Parity Fix", { timeout: 30000 }
       });
     });
 
+    it("syncs billing input with the fetched billing rate", async () => {
+      mockAiClient["monitoring/billing"].$get.mockResolvedValue({
+        usd_to_idr_rate: 16500,
+      });
+      const { default: MonitoringPage } = await import("../routes/monitoring");
+      render(React.createElement(MonitoringPage));
+      const pricingTab = await screen.findByText("Harga & Kurs");
+      const user = userEvent.setup();
+      await user.click(pricingTab);
+
+      await screen.findByDisplayValue("16500");
+      expect(screen.getByText(/Rp 16,500/)).toBeTruthy();
+    });
+
     it("renders empty state when no history data", async () => {
       mockAiClient["monitoring/history"].$get.mockResolvedValue([]);
       const { default: MonitoringPage } = await import("../routes/monitoring");

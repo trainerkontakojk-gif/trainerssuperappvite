@@ -153,7 +153,7 @@ describe("PDKT Image Generation Integration", () => {
       const { generatePdktScenarioImages } = await vi.importActual<typeof import("../services/pdkt/image-generation")>(
         "../services/pdkt/image-generation"
       );
-      const configNoImageCapability = { ...mockConfig, selectedModel: "qwen/qwen3.5-flash-02-23" };
+      const configNoImageCapability = { ...mockConfig, selectedModel: "deepseek-v4-flash" };
       
       const { generateGeminiContent } = await import("../lib/gemini");
       vi.mocked(generateGeminiContent).mockResolvedValueOnce({

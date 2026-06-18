@@ -101,12 +101,26 @@ export const TEXT_MODELS: AiModelInfo[] = [
     },
   },
   {
-    id: "qwen/qwen3.5-flash-02-23",
-    name: "Qwen 3.5 Flash",
-    description: "Model Qwen cepat dan efisien.",
+    id: "xiaomi/mimo-v2.5",
+    name: "MiMo V 2.5",
+    description: "Model Xiaomi MiMo V2.5 — agentic, cepat, dan efficient.",
     provider: "openrouter",
     timeoutMs: 120_000,
-    capabilities: { supportsText: true, supportsImage: false },
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+    },
+  },
+  {
+    id: "xiaomi/mimo-v2.5-pro",
+    name: "MiMo 2.5 Pro",
+    description: "Model Xiaomi MiMo V2.5 Pro — flagship untuk tugas kompleks, agentic, dan software engineering.",
+    provider: "openrouter",
+    timeoutMs: 180_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: true,
+    },
   },
 ];
 
