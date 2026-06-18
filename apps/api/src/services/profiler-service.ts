@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import { fetchAllPages } from "../lib/supabase-pagination";
 import { getLeaderScopeSnapshot } from "./leader-access-service";
 import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
 import type {
@@ -738,21 +739,27 @@ export async function getGlobalPesertaPool(
   excludeBatch?: string,
   accessibleIds?: string[] | null,
 ): Promise<ProfilerPeserta[]> {
-  let query = supabaseAdmin
-    .from("profiler_peserta")
-    .select("*")
-    .order("batch_name")
-    .order("nama");
+  return fetchAllPages<ProfilerPeserta>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("profiler_peserta")
+        .select("*")
+        .order("batch_name")
+        .order("nama")
+        .range(from, to);
 
-  if (accessibleIds !== null && accessibleIds !== undefined) {
-    if (accessibleIds.length === 0) return [];
-    query = query.in("id", accessibleIds);
-  }
+      if (accessibleIds !== null && accessibleIds !== undefined) {
+        if (accessibleIds.length === 0) {
+          return Promise.resolve({ data: [], error: null });
+        }
+        q = q.in("id", accessibleIds);
+      }
 
-  if (excludeBatch) query = query.neq("batch_name", excludeBatch);
+      if (excludeBatch) q = q.neq("batch_name", excludeBatch);
 
-  const { data } = await query;
-  return data ?? [];
+      return q;
+    },
+  });
 }
 
 // ── Teams ────────────────────────────────────────────────
@@ -805,16 +812,26 @@ export async function deleteTeam(id: string): Promise<void> {
 export async function getFolderCounts(
   accessibleIds?: string[] | null,
 ): Promise<Record<string, number>> {
-  let query = supabaseAdmin.from("profiler_peserta").select("batch_name");
+  const data = await fetchAllPages<{ batch_name: string }>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("profiler_peserta")
+        .select("batch_name")
+        .range(from, to);
 
-  if (accessibleIds !== null && accessibleIds !== undefined) {
-    if (accessibleIds.length === 0) return {};
-    query = query.in("id", accessibleIds);
-  }
+      if (accessibleIds !== null && accessibleIds !== undefined) {
+        if (accessibleIds.length === 0) {
+          return Promise.resolve({ data: [], error: null });
+        }
+        q = q.in("id", accessibleIds);
+      }
 
-  const { data } = await query;
+      return q;
+    },
+  });
+
   const counts: Record<string, number> = {};
-  for (const row of data ?? []) {
+  for (const row of data) {
     counts[row.batch_name] = (counts[row.batch_name] ?? 0) + 1;
   }
   return counts;

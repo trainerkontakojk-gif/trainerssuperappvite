@@ -45,21 +45,29 @@ export function isAgentExcluded(
 }
 
 export async function getSoftDeletedPesertaIds(): Promise<string[]> {
-  const { data: deletedProfiles } = await supabaseAdmin
-    .from("profiles")
-    .select("id")
-    .or("is_deleted.eq.true,status.eq.inactive");
+  const deletedProfiles = await fetchAllPages<{ id: string }>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .or("is_deleted.eq.true,status.eq.inactive")
+        .range(from, to),
+  });
 
-  if (!deletedProfiles || deletedProfiles.length === 0) return [];
+  if (deletedProfiles.length === 0) return [];
 
   const profileIds = deletedProfiles.map((p) => p.id);
 
-  const { data: pesertaRows } = await supabaseAdmin
-    .from("profiler_peserta")
-    .select("id")
-    .in("user_id", profileIds);
+  const pesertaRows = await fetchAllPages<{ id: string }>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_peserta")
+        .select("id")
+        .in("user_id", profileIds)
+        .range(from, to),
+  });
 
-  return (pesertaRows ?? []).map((p) => p.id);
+  return pesertaRows.map((p) => p.id);
 }
 
 export async function getAgents(params: {
@@ -73,23 +81,28 @@ export async function getAgents(params: {
     ? []
     : await getSoftDeletedPesertaIds();
 
-  let query = supabaseAdmin
-    .from("profiler_peserta")
-    .select("id, nama, tim, batch_name, foto_url, jabatan")
-    .order("nama");
+  const data = await fetchAllPages<any>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("profiler_peserta")
+        .select("id, nama, tim, batch_name, foto_url, jabatan")
+        .order("nama")
+        .range(from, to);
 
-  if (params.batch_name) query = query.eq("batch_name", params.batch_name);
-  if (params.tim) query = query.eq("tim", params.tim);
-  if (params.search) query = query.ilike("nama", `%${params.search}%`);
-  if (params.agent_ids && params.agent_ids.length > 0)
-    query = query.in("id", params.agent_ids);
+      if (params.batch_name) q = q.eq("batch_name", params.batch_name);
+      if (params.tim) q = q.eq("tim", params.tim);
+      if (params.search) q = q.ilike("nama", `%${params.search}%`);
+      if (params.agent_ids && params.agent_ids.length > 0)
+        q = q.in("id", params.agent_ids);
 
-  if (excludedIds.length > 0) {
-    query = query.not("id", "in", `(${excludedIds.join(",")})`);
-  }
+      if (excludedIds.length > 0) {
+        q = q.not("id", "in", `(${excludedIds.join(",")})`);
+      }
 
-  const { data } = await query;
-  return data ?? [];
+      return q;
+    },
+  });
+  return data;
 }
 
 export async function getAgentDirectorySummary(
@@ -98,26 +111,30 @@ export async function getAgentDirectorySummary(
   includeExcluded?: boolean,
   allowedServiceTypes?: ServiceType[],
 ): Promise<{ agents: AgentDirectoryEntry[]; batches: string[] }> {
-  const { data: agentData } = await supabaseAdmin
-    .from("profiler_peserta")
-    .select("id, nama, tim, batch_name, foto_url, jabatan")
-    .order("nama");
+  const agents = await fetchAllPages<any>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_peserta")
+        .select("id, nama, tim, batch_name, foto_url, jabatan")
+        .order("nama")
+        .range(from, to),
+  });
 
-  let agents = agentData ?? [];
+  let filteredAgents = agents;
 
   if (agentIds) {
     const idSet = new Set(agentIds);
-    agents = agents.filter((a: any) => idSet.has(a.id));
+    filteredAgents = filteredAgents.filter((a: any) => idSet.has(a.id));
   }
 
   if (!includeExcluded) {
-    agents = agents.filter(
+    filteredAgents = filteredAgents.filter(
       (a: any) => !isAgentExcluded(a.tim, a.batch_name, a.jabatan),
     );
   }
 
   const batches = [
-    ...new Set(agents.map((a: any) => a.batch_name).filter(Boolean)),
+    ...new Set(filteredAgents.map((a: any) => a.batch_name).filter(Boolean)),
   ] as string[];
 
   const allTemuan: any[] = [];
@@ -162,7 +179,7 @@ export async function getAgentDirectorySummary(
     indicatorCache.set(st, await getIndicators(st));
   }
 
-  const entries: AgentDirectoryEntry[] = agents.map((a: any) => ({
+  const entries: AgentDirectoryEntry[] = filteredAgents.map((a: any) => ({
     id: a.id,
     nama: a.nama,
     tim: a.tim ?? "",

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import { fetchAllPages } from "../lib/supabase-pagination";
 import { logActivity } from "./activity-log-service";
 import {
   fetchLeaderModuleRequests,
@@ -261,11 +262,15 @@ export async function removeAccessGroupItem(itemId: string): Promise<void> {
 }
 
 export async function getAccessScopeOptions(): Promise<AccessScopeOptions> {
-  const { data, error } = await supabaseAdmin
-    .from("profiler_peserta")
-    .select("id, nama, tim, batch_name")
-    .order("tim", { ascending: true })
-    .order("nama", { ascending: true });
+  const data = await fetchAllPages<any>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_peserta")
+        .select("id, nama, tim, batch_name")
+        .order("tim", { ascending: true })
+        .order("nama", { ascending: true })
+        .range(from, to),
+  });
 
   const VALID_SERVICES = [
     "call",
@@ -285,17 +290,6 @@ export async function getAccessScopeOptions(): Promise<AccessScopeOptions> {
     bko: "BKO/Backoffice",
     slik: "SLIK Checking",
   };
-
-  if (error) {
-    return {
-      teams: [],
-      services: VALID_SERVICES.map((srv) => ({
-        value: srv,
-        label: SERVICE_LABELS[srv] || srv,
-      })),
-      agentsByTeam: {},
-    };
-  }
 
   const teamSet = new Set<string>();
   const agentsByTeam: Record<string, AccessScopeAgentOption[]> = {};
