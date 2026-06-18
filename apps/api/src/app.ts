@@ -44,6 +44,16 @@ app.use("/v1/*", rateLimitMiddleware);
 
 app.onError((err, c) => {
   console.error(`[ERROR] ${err.message}`);
+
+  const originHeader = c.req.header("Origin");
+  const matchedOrigin =
+    originHeader && allowedOrigins.includes(originHeader)
+      ? originHeader
+      : allowedOrigins[0] || "*";
+
+  c.header("Access-Control-Allow-Origin", matchedOrigin);
+  c.header("Access-Control-Allow-Credentials", "true");
+
   if (err instanceof HTTPException) {
     return c.json<ApiResponse<never>>(
       {
