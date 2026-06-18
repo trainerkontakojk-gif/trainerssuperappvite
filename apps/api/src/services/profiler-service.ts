@@ -226,13 +226,17 @@ export async function duplicateFolder(
   if (error) throw new Error(error.message);
 
   // Copy participants
-  const { data: participants } = await supabaseAdmin
-    .from("profiler_peserta")
-    .select("*")
-    .eq("batch_name", source.name);
+  const participants = await fetchAllPages<any>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_peserta")
+        .select("*")
+        .eq("batch_name", source.name)
+        .range(from, to),
+  });
 
   const newParticipants: ProfilerPeserta[] = [];
-  if (participants && participants.length > 0) {
+  if (participants.length > 0) {
     const rows = participants.map((p) => ({
       batch_name: newName,
       nomor_urut: p.nomor_urut,
@@ -338,20 +342,26 @@ export async function getPesertaByBatch(
   batchName: string,
   accessibleIds?: string[] | null,
 ): Promise<ProfilerPeserta[]> {
-  let query = supabaseAdmin
-    .from("profiler_peserta")
-    .select("*")
-    .eq("batch_name", batchName)
-    .order("nomor_urut")
-    .order("nama");
+  return fetchAllPages<ProfilerPeserta>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("profiler_peserta")
+        .select("*")
+        .eq("batch_name", batchName)
+        .order("nomor_urut")
+        .order("nama")
+        .range(from, to);
 
-  if (accessibleIds !== null && accessibleIds !== undefined) {
-    if (accessibleIds.length === 0) return [];
-    query = query.in("id", accessibleIds);
-  }
+      if (accessibleIds !== null && accessibleIds !== undefined) {
+        if (accessibleIds.length === 0) {
+          return Promise.resolve({ data: [], error: null });
+        }
+        q = q.in("id", accessibleIds);
+      }
 
-  const { data } = await query;
-  return data ?? [];
+      return q;
+    },
+  });
 }
 
 function cleanEmptyStrings(obj: any) {
@@ -501,18 +511,20 @@ export async function bulkCreatePeserta(
 
   const existingNamesByBatch: Record<string, Set<string>> = {};
   if (batchNames.length > 0) {
-    const { data: existing } = await supabaseAdmin
-      .from("profiler_peserta")
-      .select("batch_name, nama")
-      .in("batch_name", batchNames);
+    const existing = await fetchAllPages<{ batch_name: string; nama: string }>({
+      build: ({ from, to }) =>
+        supabaseAdmin
+          .from("profiler_peserta")
+          .select("batch_name, nama")
+          .in("batch_name", batchNames)
+          .range(from, to),
+    });
 
-    if (existing) {
-      for (const p of existing) {
-        if (!existingNamesByBatch[p.batch_name]) {
-          existingNamesByBatch[p.batch_name] = new Set();
-        }
-        existingNamesByBatch[p.batch_name].add(p.nama.toLowerCase().trim());
+    for (const p of existing) {
+      if (!existingNamesByBatch[p.batch_name]) {
+        existingNamesByBatch[p.batch_name] = new Set();
       }
+      existingNamesByBatch[p.batch_name].add(p.nama.toLowerCase().trim());
     }
   }
 
@@ -600,13 +612,17 @@ export async function copyPesertaToFolder(
   if (!sourcePeserta || sourcePeserta.length === 0)
     throw new Error("Peserta tidak ditemukan");
 
-  const { data: existingPeserta } = await supabaseAdmin
-    .from("profiler_peserta")
-    .select("nama")
-    .eq("batch_name", targetBatchName);
+  const existingPeserta = await fetchAllPages<{ nama: string }>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("profiler_peserta")
+        .select("nama")
+        .eq("batch_name", targetBatchName)
+        .range(from, to),
+  });
 
   const existingNames = new Set(
-    (existingPeserta || []).map((p) => p.nama.toLowerCase().trim()),
+    existingPeserta.map((p) => p.nama.toLowerCase().trim()),
   );
 
   const uniqueRowsToInsert: typeof sourcePeserta = [];
