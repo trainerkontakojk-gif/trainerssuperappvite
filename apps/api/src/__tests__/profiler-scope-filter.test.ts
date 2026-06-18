@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 let tableResults: Record<string, any> = {};
 
@@ -86,11 +86,28 @@ describe("getAccessiblePesertaIds", () => {
   });
 
   describe("leader role", () => {
-    it("returns empty array when no approved request exists", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [],
-        error: null,
-      };
+    let scopeSnapshotSpy: any;
+
+    beforeEach(async () => {
+      const leaderAccessService = await import(
+        "../services/leader-access-service"
+      );
+      scopeSnapshotSpy = vi
+        .spyOn(leaderAccessService, "getLeaderScopeSnapshot")
+        .mockResolvedValue({
+          requestIds: [],
+          pesertaIds: [],
+          batchNames: [],
+          tims: [],
+          serviceTypes: [],
+        });
+    });
+
+    afterEach(() => {
+      scopeSnapshotSpy?.mockRestore();
+    });
+
+    it("returns empty array when snapshot has no pesertaIds", async () => {
       const result = await profilerService.getAccessiblePesertaIds(
         "user-1",
         "leader",
@@ -98,58 +115,14 @@ describe("getAccessiblePesertaIds", () => {
       expect(result).toEqual([]);
     });
 
-    it("returns empty array when request exists but no group links", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [],
-        error: null,
-      };
-      const result = await profilerService.getAccessiblePesertaIds(
-        "user-1",
-        "leader",
-      );
-      expect(result).toEqual([]);
-    });
-
-    it("returns empty array when group links exist but no active items", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [{ access_group_id: "group-1" }],
-        error: null,
-      };
-      tableResults["access_group_items"] = {
-        data: [],
-        error: null,
-      };
-      const result = await profilerService.getAccessiblePesertaIds(
-        "user-1",
-        "leader",
-      );
-      expect(result).toEqual([]);
-    });
-
-    it("resolves direct peserta_id items", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [{ access_group_id: "group-1" }],
-        error: null,
-      };
-      tableResults["access_group_items"] = {
-        data: [
-          { field_name: "peserta_id", field_value: "peserta-1" },
-          { field_name: "peserta_id", field_value: "peserta-2" },
-        ],
-        error: null,
-      };
+    it("returns pesertaIds from snapshot", async () => {
+      scopeSnapshotSpy.mockResolvedValue({
+        requestIds: ["req-1"],
+        pesertaIds: ["peserta-1", "peserta-2"],
+        batchNames: [],
+        tims: [],
+        serviceTypes: [],
+      });
       const result = await profilerService.getAccessiblePesertaIds(
         "user-1",
         "leader",
@@ -157,125 +130,41 @@ describe("getAccessiblePesertaIds", () => {
       expect(result).toEqual(["peserta-1", "peserta-2"]);
     });
 
-    it("resolves batch_name items", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [{ access_group_id: "group-1" }],
-        error: null,
-      };
-      tableResults["access_group_items"] = {
-        data: [
-          { field_name: "batch_name", field_value: "Batch A" },
-        ],
-        error: null,
-      };
-      tableResults["profiler_peserta"] = {
-        data: [{ id: "p1" }, { id: "p2" }],
-        error: null,
-      };
-      const result = await profilerService.getAccessiblePesertaIds(
-        "user-1",
-        "leader",
-      );
-      expect(result).toEqual(["p1", "p2"]);
-    });
-
-    it("resolves tim items", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [{ access_group_id: "group-1" }],
-        error: null,
-      };
-      tableResults["access_group_items"] = {
-        data: [
-          { field_name: "tim", field_value: "Tim A" },
-        ],
-        error: null,
-      };
-      tableResults["profiler_peserta"] = {
-        data: [{ id: "p1" }],
-        error: null,
-      };
-      const result = await profilerService.getAccessiblePesertaIds(
-        "user-1",
-        "leader",
-      );
-      expect(result).toEqual(["p1"]);
-    });
-
-    it("skips service_type items (not relevant for KTP)", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [{ access_group_id: "group-1" }],
-        error: null,
-      };
-      tableResults["access_group_items"] = {
-        data: [
-          { field_name: "peserta_id", field_value: "p-direct" },
-          { field_name: "service_type", field_value: "call" },
-        ],
-        error: null,
-      };
-      const result = await profilerService.getAccessiblePesertaIds(
-        "user-1",
-        "leader",
-      );
-      expect(result).toEqual(["p-direct"]);
-    });
-
-    it("combines all scope types into unique IDs", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "ktp", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [{ access_group_id: "group-1" }],
-        error: null,
-      };
-      tableResults["access_group_items"] = {
-        data: [
-          { field_name: "peserta_id", field_value: "direct-1" },
-          { field_name: "batch_name", field_value: "Batch A" },
-          { field_name: "tim", field_value: "Tim A" },
-        ],
-        error: null,
-      };
-      // Mock different results for batch vs tim queries
-      tableResults["profiler_peserta"] = {
-        data: [{ id: "batch-p1" }, { id: "tim-p1" }],
-        error: null,
-      };
-      const result = await profilerService.getAccessiblePesertaIds(
-        "user-1",
-        "leader",
-      );
-      // deduplication: both batch and tim queries resolve, plus direct
-      expect(result).toEqual(["direct-1", "batch-p1", "tim-p1"]);
-    });
-
-    it("requests module all counts as ktp", async () => {
-      tableResults["leader_access_requests"] = {
-        data: [{ id: "req-1", module: "all", status: "approved" }],
-        error: null,
-      };
-      tableResults["leader_access_request_groups"] = {
-        data: [],
-        error: null,
-      };
+    it("returns empty when snapshot pesertaIds is empty", async () => {
+      scopeSnapshotSpy.mockResolvedValue({
+        requestIds: ["req-1"],
+        pesertaIds: [],
+        batchNames: ["Batch A"],
+        tims: ["Tim A"],
+        serviceTypes: ["call"],
+      });
       const result = await profilerService.getAccessiblePesertaIds(
         "user-1",
         "leader",
       );
       expect(result).toEqual([]);
+    });
+
+    it("calls getLeaderScopeSnapshot with ktp module", async () => {
+      await profilerService.getAccessiblePesertaIds("user-1", "leader");
+      expect(scopeSnapshotSpy).toHaveBeenCalledWith("user-1", "ktp");
+    });
+
+    it("keeps leader scope consumers working when snapshot comes pre-expanded from RPC", async () => {
+      scopeSnapshotSpy.mockResolvedValue({
+        requestIds: ["req-1"],
+        pesertaIds: ["p1", "p2"],
+        batchNames: ["Batch A"],
+        tims: ["Tim A"],
+        serviceTypes: ["call"],
+      });
+
+      const result = await profilerService.getAccessiblePesertaIds(
+        "leader-user",
+        "leader",
+      );
+
+      expect(result).toEqual(["p1", "p2"]);
     });
   });
 });

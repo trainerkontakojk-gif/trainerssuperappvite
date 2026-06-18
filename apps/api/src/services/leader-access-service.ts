@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "../lib/supabase";
-import { fetchAllPages } from "../lib/supabase-pagination";
 import type { ServiceType } from "@trainers/types";
 
 export type ApprovalStatus =
@@ -112,7 +111,6 @@ export async function getLeaderScopeSnapshot(
   userId: string,
   module: string,
 ): Promise<LeaderScopeSnapshot> {
-  const requestIds = await getApprovedRequestIds(userId, module);
   const empty: LeaderScopeSnapshot = {
     requestIds: [],
     pesertaIds: [],
@@ -121,82 +119,27 @@ export async function getLeaderScopeSnapshot(
     serviceTypes: [],
   };
 
-  if (!requestIds || requestIds.length === 0) return empty;
-
-  const { data: groupLinks } = await supabaseAdmin
-    .from("leader_access_request_groups")
-    .select("access_group_id")
-    .in("request_id", requestIds);
-
-  if (!groupLinks || groupLinks.length === 0) return { ...empty, requestIds };
-
-  const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
-
-  const items = await fetchAllPages<{ field_name: string; field_value: string }>({
-    build: ({ from, to }) =>
-      supabaseAdmin
-        .from("access_group_items")
-        .select("field_name, field_value")
-        .in("access_group_id", groupIds)
-        .eq("is_active", true)
-        .order("access_group_id", { ascending: true })
-        .order("field_name", { ascending: true })
-        .order("field_value", { ascending: true })
-        .range(from, to),
-  });
-
-  if (items.length === 0) return { ...empty, requestIds };
-
-  const rawPesertaIds: string[] = [];
-  const batchNames: string[] = [];
-  const tims: string[] = [];
-  const serviceTypes: string[] = [];
-
-  for (const item of items) {
-    if (item.field_name === "peserta_id") rawPesertaIds.push(item.field_value);
-    else if (item.field_name === "batch_name") batchNames.push(item.field_value);
-    else if (item.field_name === "tim") tims.push(item.field_value);
-    else if (item.field_name === "service_type") serviceTypes.push(item.field_value);
-  }
-
-  const resolvedIds = [...rawPesertaIds];
-
-  if (batchNames.length > 0) {
-    const batchData = await fetchAllPages<{ id: string }>({
-      build: ({ from, to }) =>
-        supabaseAdmin
-          .from("profiler_peserta")
-          .select("id")
-          .in("batch_name", batchNames)
-          .order("id", { ascending: true })
-          .range(from, to),
-    });
-    resolvedIds.push(...batchData.map((b) => b.id));
-  }
-
-  if (tims.length > 0) {
-    const timData = await fetchAllPages<{ id: string }>({
-      build: ({ from, to }) =>
-        supabaseAdmin
-          .from("profiler_peserta")
-          .select("id")
-          .in("tim", tims)
-          .order("id", { ascending: true })
-          .range(from, to),
-    });
-    resolvedIds.push(...timData.map((t) => t.id));
-  }
-
-  const validServiceTypes = serviceTypes.filter(
-    (s): s is ServiceType =>
-      ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(s),
+  const { data, error } = await supabaseAdmin.rpc(
+    "get_leader_scope_snapshot",
+    {
+      p_leader_user_id: userId,
+      p_module: module,
+    },
   );
 
+  if (error) throw new Error(error.message);
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return empty;
+
   return {
-    requestIds,
-    pesertaIds: [...new Set(resolvedIds)],
-    batchNames: [...new Set(batchNames)],
-    tims: [...new Set(tims)],
-    serviceTypes: [...new Set(validServiceTypes)],
+    requestIds: row.request_ids ?? [],
+    pesertaIds: row.peserta_ids ?? [],
+    batchNames: row.batch_names ?? [],
+    tims: row.tims ?? [],
+    serviceTypes: (row.service_types ?? []).filter(
+      (s: string): s is ServiceType =>
+        ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(s),
+    ),
   };
 }
