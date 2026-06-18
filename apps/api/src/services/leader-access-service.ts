@@ -132,26 +132,18 @@ export async function getLeaderScopeSnapshot(
 
   const groupIds = [...new Set(groupLinks.map((g) => g.access_group_id))];
 
-  const PAGE_SIZE = 1000;
-
-  const items: { field_name: string; field_value: string }[] = [];
-  let itemsFrom = 0;
-  let itemsHasMore = true;
-  while (itemsHasMore) {
-    const { data: page } = await supabaseAdmin
-      .from("access_group_items")
-      .select("field_name, field_value")
-      .in("access_group_id", groupIds)
-      .eq("is_active", true)
-      .range(itemsFrom, itemsFrom + PAGE_SIZE - 1);
-    if (!page || page.length === 0) {
-      itemsHasMore = false;
-    } else {
-      items.push(...page);
-      itemsHasMore = page.length === PAGE_SIZE;
-      itemsFrom += PAGE_SIZE;
-    }
-  }
+  const items = await fetchAllPages<{ field_name: string; field_value: string }>({
+    build: ({ from, to }) =>
+      supabaseAdmin
+        .from("access_group_items")
+        .select("field_name, field_value")
+        .in("access_group_id", groupIds)
+        .eq("is_active", true)
+        .order("access_group_id", { ascending: true })
+        .order("field_name", { ascending: true })
+        .order("field_value", { ascending: true })
+        .range(from, to),
+  });
 
   if (items.length === 0) return { ...empty, requestIds };
 
@@ -176,6 +168,7 @@ export async function getLeaderScopeSnapshot(
           .from("profiler_peserta")
           .select("id")
           .in("batch_name", batchNames)
+          .order("id", { ascending: true })
           .range(from, to),
     });
     resolvedIds.push(...batchData.map((b) => b.id));
@@ -188,6 +181,7 @@ export async function getLeaderScopeSnapshot(
           .from("profiler_peserta")
           .select("id")
           .in("tim", tims)
+          .order("id", { ascending: true })
           .range(from, to),
     });
     resolvedIds.push(...timData.map((t) => t.id));

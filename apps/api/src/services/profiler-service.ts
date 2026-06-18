@@ -232,6 +232,9 @@ export async function duplicateFolder(
         .from("profiler_peserta")
         .select("*")
         .eq("batch_name", source.name)
+        .order("nomor_urut", { ascending: true })
+        .order("nama", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to),
   });
 
@@ -350,6 +353,7 @@ export async function getPesertaByBatch(
         .eq("batch_name", batchName)
         .order("nomor_urut")
         .order("nama")
+        .order("id", { ascending: true })
         .range(from, to);
 
       if (accessibleIds !== null && accessibleIds !== undefined) {
@@ -517,6 +521,9 @@ export async function bulkCreatePeserta(
           .from("profiler_peserta")
           .select("batch_name, nama")
           .in("batch_name", batchNames)
+          .order("batch_name", { ascending: true })
+          .order("nama", { ascending: true })
+          .order("id", { ascending: true })
           .range(from, to),
     });
 
@@ -618,6 +625,8 @@ export async function copyPesertaToFolder(
         .from("profiler_peserta")
         .select("nama")
         .eq("batch_name", targetBatchName)
+        .order("nama", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to),
   });
 
@@ -762,6 +771,7 @@ export async function getGlobalPesertaPool(
         .select("*")
         .order("batch_name")
         .order("nama")
+        .order("id", { ascending: true })
         .range(from, to);
 
       if (accessibleIds !== null && accessibleIds !== undefined) {
@@ -833,6 +843,8 @@ export async function getFolderCounts(
       let q = supabaseAdmin
         .from("profiler_peserta")
         .select("batch_name")
+        .order("batch_name", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to);
 
       if (accessibleIds !== null && accessibleIds !== undefined) {

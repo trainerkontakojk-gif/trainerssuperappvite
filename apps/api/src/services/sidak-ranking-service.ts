@@ -72,6 +72,7 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
           .select("period_id")
           .eq("tahun", year)
           .order("period_id", { ascending: true })
+          .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
         if (service_type && service_type !== "all") {
           temuanQuery = temuanQuery.eq("service_type", service_type);

@@ -51,6 +51,7 @@ export async function getSoftDeletedPesertaIds(): Promise<string[]> {
         .from("profiles")
         .select("id")
         .or("is_deleted.eq.true,status.eq.inactive")
+        .order("id", { ascending: true })
         .range(from, to),
   });
 
@@ -64,6 +65,7 @@ export async function getSoftDeletedPesertaIds(): Promise<string[]> {
         .from("profiler_peserta")
         .select("id")
         .in("user_id", profileIds)
+        .order("id", { ascending: true })
         .range(from, to),
   });
 
@@ -87,6 +89,7 @@ export async function getAgents(params: {
         .from("profiler_peserta")
         .select("id, nama, tim, batch_name, foto_url, jabatan")
         .order("nama")
+        .order("id", { ascending: true })
         .range(from, to);
 
       if (params.batch_name) q = q.eq("batch_name", params.batch_name);
@@ -117,6 +120,7 @@ export async function getAgentDirectorySummary(
         .from("profiler_peserta")
         .select("id, nama, tim, batch_name, foto_url, jabatan")
         .order("nama")
+        .order("id", { ascending: true })
         .range(from, to),
   });
 
@@ -147,7 +151,9 @@ export async function getAgentDirectorySummary(
       .select(
         "peserta_id, indicator_id, nilai, no_tiket, service_type, period_id, created_at, is_phantom_padding",
       )
-      .eq("tahun", year);
+      .eq("tahun", year)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
     if (allowedServiceTypes && allowedServiceTypes.length > 0) {
       query = query.in("service_type", allowedServiceTypes);
     }
@@ -314,6 +320,7 @@ export async function getAgentDetail(
         .eq("peserta_id", agentId)
         .eq("tahun", currentYear)
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(from, to);
 
       if (allowedServiceTypes && allowedServiceTypes.length > 0) {

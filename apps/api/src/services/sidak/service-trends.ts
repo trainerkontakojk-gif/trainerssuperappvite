@@ -372,6 +372,7 @@ export async function getAvailableYears(
       .select("tahun")
       .not("tahun", "is", null)
       .order("tahun", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 
     if (agent_ids && agent_ids.length > 0) {

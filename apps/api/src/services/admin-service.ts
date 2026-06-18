@@ -29,6 +29,7 @@ export async function getUsers(): Promise<ManagedUser[]> {
       .select("*")
       .is("is_deleted", false)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) {
@@ -192,6 +193,9 @@ export async function getAccessGroups(): Promise<AccessGroupRow[]> {
       .from("access_group_items")
       .select("access_group_id")
       .in("access_group_id", groupIds)
+      .order("access_group_id", { ascending: true })
+      .order("field_name", { ascending: true })
+      .order("field_value", { ascending: true })
       .range(itemsFrom, itemsFrom + PAGE_SIZE - 1);
     if (countError) throw new Error(countError.message);
     if (!page || page.length === 0) {
@@ -259,6 +263,7 @@ export async function getAccessGroupItems(
       .eq("access_group_id", groupId)
       .order("field_name")
       .order("field_value")
+      .order("id", { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) {
@@ -308,6 +313,7 @@ export async function getAccessScopeOptions(): Promise<AccessScopeOptions> {
         .select("id, nama, tim, batch_name")
         .order("tim", { ascending: true })
         .order("nama", { ascending: true })
+        .order("id", { ascending: true })
         .range(from, to),
   });
 

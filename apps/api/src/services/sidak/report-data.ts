@@ -27,6 +27,7 @@ export async function getDataReportRows(params: {
           "*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan), qa_indicators!inner(id, name, category), qa_periods!inner(id, month, year)",
         )
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .range(from, to);
 
       if (params.serviceType) q = q.eq("service_type", params.serviceType);
