@@ -68,6 +68,18 @@ export const TEXT_MODELS: AiModelInfo[] = [
     },
   },
   {
+    id: "gemini-3.1-flash-live-preview",
+    name: "Gemini 3.1 Flash Live",
+    description: "Model live audio untuk Telefun — billing per-modality (audio $3/$12, text $0.75/$4.50).",
+    provider: "gemini",
+    timeoutMs: 300_000,
+    capabilities: {
+      supportsText: true,
+      supportsImage: false,
+    },
+    availableModules: ["default"],
+  },
+  {
     id: "google/gemini-3.1-flash-lite",
     name: "Gemini 3.1 Flash Lite (OR)",
     description: "Model ringan Google via OpenRouter.",
