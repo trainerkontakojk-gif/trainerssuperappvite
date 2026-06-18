@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { roundTo } from "../../lib/math-utils";
 import {
   EXCLUDED_FOLDERS,
@@ -275,21 +276,40 @@ export async function getAgentDetail(
   if (peserta.error) throw new Error("Agent tidak ditemukan");
 
   const currentYear = year ?? new Date().getFullYear();
-  let temuanQuery = supabaseAdmin
-    .from("qa_temuan")
-    .select("*")
-    .eq("peserta_id", agentId)
-    .eq("tahun", currentYear);
 
-  if (allowedServiceTypes && allowedServiceTypes.length > 0) {
-    temuanQuery = temuanQuery.in("service_type", allowedServiceTypes);
+  // Resolve startMonth/endMonth to period IDs for query-level filtering
+  let startPeriodId: string | undefined;
+  let endPeriodId: string | undefined;
+  if (startMonth && currentYear) {
+    const sp = periods.find((p) => p.month === startMonth && p.year === currentYear);
+    if (sp) startPeriodId = sp.id;
+  }
+  if (endMonth && currentYear) {
+    const ep = periods.find((p) => p.month === endMonth && p.year === currentYear);
+    if (ep) endPeriodId = ep.id;
   }
 
-  const { data: temuan } = await temuanQuery.order("created_at", {
-    ascending: false,
+  const temuan = await fetchAllPages<any>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("qa_temuan")
+        .select("*")
+        .eq("peserta_id", agentId)
+        .eq("tahun", currentYear)
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+        q = q.in("service_type", allowedServiceTypes);
+      }
+      if (startPeriodId) q = q.gte("period_id", startPeriodId);
+      if (endPeriodId) q = q.lte("period_id", endPeriodId);
+
+      return q;
+    },
   });
 
-  const rows = temuan ?? [];
+  const rows = temuan;
 
   // Build resolved weights from DB overrides + defaults
   const rawWeights = weightsResult?.data ?? [];

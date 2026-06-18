@@ -1,4 +1,7 @@
-type QueryExecutor<T> = (range: { from: number; to: number }) => Promise<{
+type QueryExecutor<T> = (range: {
+  from: number;
+  to: number;
+}) => PromiseLike<{
   data: T[] | null;
   error: { message: string } | null;
 }>;
