@@ -64,7 +64,7 @@ export async function getSoftDeletedPesertaIds(): Promise<string[]> {
       supabaseAdmin
         .from("profiler_peserta")
         .select("id")
-        .in("user_id", profileIds)
+        .in("trainer_id", profileIds)
         .order("id", { ascending: true })
         .range(from, to),
   });
