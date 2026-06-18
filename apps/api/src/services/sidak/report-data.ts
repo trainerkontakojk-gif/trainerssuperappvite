@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../../lib/supabase";
+import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
 import { getIndicators } from "./period-indicator";
 
@@ -18,48 +19,51 @@ export async function getDataReportRows(params: {
     ? []
     : await getSoftDeletedPesertaIds();
 
-  let query = supabaseAdmin
-    .from("qa_temuan")
-    .select(
-      "*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan), qa_indicators!inner(id, name, category), qa_periods!inner(id, month, year)",
-    );
+  const rows = await fetchAllPages<any>({
+    build: async ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("qa_temuan")
+        .select(
+          "*, profiler_peserta!inner(id, nama, batch_name, tim, jabatan), qa_indicators!inner(id, name, category), qa_periods!inner(id, month, year)",
+        )
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
-  if (params.serviceType) query = query.eq("service_type", params.serviceType);
-  if (params.year) query = query.eq("tahun", params.year);
-  if (params.pesertaId) query = query.eq("peserta_id", params.pesertaId);
-  if (params.indicatorId) query = query.eq("indicator_id", params.indicatorId);
-  if (params.agent_ids && params.agent_ids.length > 0)
-    query = query.in("peserta_id", params.agent_ids);
+      if (params.serviceType) q = q.eq("service_type", params.serviceType);
+      if (params.year) q = q.eq("tahun", params.year);
+      if (params.pesertaId) q = q.eq("peserta_id", params.pesertaId);
+      if (params.indicatorId) q = q.eq("indicator_id", params.indicatorId);
+      if (params.agent_ids && params.agent_ids.length > 0)
+        q = q.in("peserta_id", params.agent_ids);
 
-  // Apply soft-delete exclusion at database level
-  if (excludedIds.length > 0) {
-    query = query.not("peserta_id", "in", `(${excludedIds.join(",")})`);
-  }
+      if (excludedIds.length > 0) {
+        q = q.not("peserta_id", "in", `(${excludedIds.join(",")})`);
+      }
 
-  if (params.startMonth && params.year) {
-    const startPeriod = await supabaseAdmin
-      .from("qa_periods")
-      .select("id")
-      .eq("month", params.startMonth)
-      .eq("year", params.year)
-      .single();
-    if (startPeriod.data) query = query.gte("period_id", startPeriod.data.id);
-  }
+      if (params.startMonth && params.year) {
+        const startPeriod = await supabaseAdmin
+          .from("qa_periods")
+          .select("id")
+          .eq("month", params.startMonth)
+          .eq("year", params.year)
+          .single();
+        if (startPeriod.data) q = q.gte("period_id", startPeriod.data.id);
+      }
 
-  if (params.endMonth && params.year) {
-    const endPeriod = await supabaseAdmin
-      .from("qa_periods")
-      .select("id")
-      .eq("month", params.endMonth)
-      .eq("year", params.year)
-      .single();
-    if (endPeriod.data) query = query.lte("period_id", endPeriod.data.id);
-  }
+      if (params.endMonth && params.year) {
+        const endPeriod = await supabaseAdmin
+          .from("qa_periods")
+          .select("id")
+          .eq("month", params.endMonth)
+          .eq("year", params.year)
+          .single();
+        if (endPeriod.data) q = q.lte("period_id", endPeriod.data.id);
+      }
 
-  const { data } = await query
-    .order("created_at", { ascending: false })
-    .limit(1000);
-  return data ?? [];
+      return q;
+    },
+  });
+  return rows;
 }
 
 export async function getReportChartData(params: {
