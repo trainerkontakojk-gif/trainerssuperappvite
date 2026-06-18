@@ -230,6 +230,36 @@ describe("profiler-service", () => {
     });
   });
 
+  describe("getFolderCounts", () => {
+    it("maps RPC rows into folder count record", async () => {
+      pendingRpcResolve = () => ({
+        data: [
+          { batch_name: "Batch 1", peserta_count: 2 },
+          { batch_name: "Batch 2", peserta_count: "5" },
+        ],
+        error: null,
+      });
+
+      await expect(profilerService.getFolderCounts()).resolves.toEqual({
+        "Batch 1": 2,
+        "Batch 2": 5,
+      });
+    });
+
+    it("returns empty object for empty scoped ID list", async () => {
+      await expect(profilerService.getFolderCounts([])).resolves.toEqual({});
+    });
+
+    it("throws on RPC error", async () => {
+      pendingRpcResolve = () => ({
+        data: null,
+        error: { message: "boom" },
+      });
+
+      await expect(profilerService.getFolderCounts()).rejects.toThrow("boom");
+    });
+  });
+
   describe("bulkReorderPeserta", () => {
     it("resolves on success", async () => {
       pendingRpcResolve = () => ({ error: null });
