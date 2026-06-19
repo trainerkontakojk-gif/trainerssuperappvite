@@ -350,8 +350,32 @@ telefunSessions.delete("/history", async (c) => {
   const adminClient = createAdminClient();
 
   try {
-    // Note: This only deletes the history records. Storage cleanup for bulk is more complex,
-    // usually handled by a background job or bucket lifecycle policy.
+    const { data: sessions, error: fetchError } = await adminClient
+      .from("telefun_history")
+      .select("recording_path, agent_recording_path")
+      .eq("user_id", user.id);
+
+    if (fetchError) throw fetchError;
+
+    const filesToDelete = Array.from(
+      new Set(
+        (sessions ?? []).flatMap((session) =>
+          [session.recording_path, session.agent_recording_path].filter(
+            Boolean,
+          ),
+        ),
+      ),
+    ) as string[];
+
+    for (let index = 0; index < filesToDelete.length; index += 1000) {
+      const batch = filesToDelete.slice(index, index + 1000);
+      const { error: storageError } = await adminClient.storage
+        .from("telefun-recordings")
+        .remove(batch);
+
+      if (storageError) throw storageError;
+    }
+
     const { error } = await adminClient
       .from("telefun_history")
       .delete()
