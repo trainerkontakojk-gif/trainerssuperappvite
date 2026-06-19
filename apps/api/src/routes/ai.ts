@@ -497,7 +497,7 @@ ai.get(
     let query = admin
       .from("ai_usage_logs")
       .select(
-        "user_id, model_id, module, action, input_tokens, output_tokens, total_tokens, estimated_cost_idr",
+        "user_id, model_id, module, action, input_tokens, output_tokens, total_tokens, estimated_cost_idr, final_cost_idr",
       )
       .gte("created_at", monthStart)
       .lte("created_at", monthEnd);
@@ -551,7 +551,7 @@ ai.get(
         };
       }
       const agg = userAgg[log.user_id];
-      const cost = log.estimated_cost_idr || 0;
+      const cost = Number(log.final_cost_idr ?? log.estimated_cost_idr ?? 0);
       agg.total_calls += 1;
       agg.total_input_tokens += log.input_tokens || 0;
       agg.total_output_tokens += log.output_tokens || 0;

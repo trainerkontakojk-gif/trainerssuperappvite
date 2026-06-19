@@ -10,6 +10,15 @@ const GEMINI_LIVE_PRICING = {
   outputAudioPriceUsdPerMillion: 12.0,
 } as const;
 
+const PER_MINUTE_AUDIO_INPUT_USD = 0.005;
+const PER_MINUTE_AUDIO_OUTPUT_USD = 0.018;
+const PER_MINUTE_AUDIO_TOTAL_USD =
+  PER_MINUTE_AUDIO_INPUT_USD + PER_MINUTE_AUDIO_OUTPUT_USD;
+
+function roundUsd(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
+
 export interface ModalityTokenBreakdown {
   text: number;
   audio: number;
@@ -21,6 +30,55 @@ export interface LiveUsageSnapshot {
   totalTokenCount: number;
   promptModality?: ModalityTokenBreakdown;
   responseModality?: ModalityTokenBreakdown;
+}
+
+export type LiveUsageBoundary =
+  | "turnComplete"
+  | "interrupted"
+  | "session_flush";
+
+export interface LiveUsageTurn {
+  index: number;
+  observedAtMs: number;
+  boundary: LiveUsageBoundary;
+  snapshot: LiveUsageSnapshot;
+  rawUsageMetadata: Record<string, unknown>;
+  key: string;
+}
+
+export interface LiveUsageAccumulator {
+  turns: LiveUsageTurn[];
+  pending: {
+    snapshot: LiveUsageSnapshot;
+    rawUsageMetadata: Record<string, unknown>;
+    observedAtMs: number;
+    key: string;
+  } | null;
+  latestSnapshot: LiveUsageSnapshot | null;
+  seenKeys: Set<string>;
+  nextIndex: number;
+}
+
+export interface LiveUsageAggregate {
+  turnCount: number;
+  billedPromptTokenCount: number;
+  billedResponseTokenCount: number;
+  billedTotalTokenCount: number;
+  billedPromptModality?: ModalityTokenBreakdown;
+  billedResponseModality?: ModalityTokenBreakdown;
+  latestSnapshot: LiveUsageSnapshot;
+  rawUsageMetadata: {
+    billing_model: "gemini_live_context_window_per_turn_v1";
+    turn_count: number;
+    latest: LiveUsageSnapshot;
+    turns: Array<{
+      index: number;
+      observedAtMs: number;
+      boundary: LiveUsageBoundary;
+      snapshot: LiveUsageSnapshot;
+      rawUsageMetadata: Record<string, unknown>;
+    }>;
+  };
 }
 
 function sumModalityDetails(
@@ -37,8 +95,8 @@ function sumModalityDetails(
   return result;
 }
 
-function calculateLiveUsageCost(
-  snapshot: LiveUsageSnapshot,
+export function calculateLiveUsageCost(
+  aggregate: LiveUsageAggregate,
   inputPricePerMillion: number,
   outputPricePerMillion: number,
   usdToIdrRate: number,
@@ -48,16 +106,16 @@ function calculateLiveUsageCost(
   inputUnspecifiedTokens: number;
   outputUnspecifiedTokens: number;
 } {
-  const inputTextTokens = snapshot.promptModality?.text ?? 0;
-  const inputAudioTokens = snapshot.promptModality?.audio ?? 0;
-  const outputTextTokens = snapshot.responseModality?.text ?? 0;
-  const outputAudioTokens = snapshot.responseModality?.audio ?? 0;
+  const inputTextTokens = aggregate.billedPromptModality?.text ?? 0;
+  const inputAudioTokens = aggregate.billedPromptModality?.audio ?? 0;
+  const outputTextTokens = aggregate.billedResponseModality?.text ?? 0;
+  const outputAudioTokens = aggregate.billedResponseModality?.audio ?? 0;
   const inputUnspecifiedTokens = Math.max(
-    snapshot.promptTokenCount - inputTextTokens - inputAudioTokens,
+    aggregate.billedPromptTokenCount - inputTextTokens - inputAudioTokens,
     0,
   );
   const outputUnspecifiedTokens = Math.max(
-    snapshot.responseTokenCount - outputTextTokens - outputAudioTokens,
+    aggregate.billedResponseTokenCount - outputTextTokens - outputAudioTokens,
     0,
   );
   const costUsd =
@@ -73,10 +131,67 @@ function calculateLiveUsageCost(
     (outputUnspecifiedTokens / 1_000_000) * outputPricePerMillion;
 
   return {
-    costUsd: Math.round(costUsd * 1_000_000) / 1_000_000,
+    costUsd: roundUsd(costUsd),
     costIdr: Math.round(costUsd * usdToIdrRate),
     inputUnspecifiedTokens,
     outputUnspecifiedTokens,
+  };
+}
+
+export function calculatePerMinuteCost(
+  sessionDurationMs: number | undefined,
+  usdToIdrRate: number,
+): { costUsd: number; costIdr: number } | null {
+  if (
+    typeof sessionDurationMs !== "number" ||
+    !Number.isFinite(sessionDurationMs)
+  ) {
+    return null;
+  }
+
+  const minutes = Math.max(sessionDurationMs, 0) / 60_000;
+  const costUsd = minutes * PER_MINUTE_AUDIO_TOTAL_USD;
+
+  return {
+    costUsd: roundUsd(costUsd),
+    costIdr: Math.round(costUsd * usdToIdrRate),
+  };
+}
+
+export function calculateFinalLiveUsageCost({
+  modelId,
+  perTokenCostUsd,
+  sessionDurationMs,
+  usdToIdrRate,
+}: {
+  modelId: string;
+  perTokenCostUsd: number;
+  sessionDurationMs?: number;
+  usdToIdrRate: number;
+}): {
+  sessionDurationMs: number | null;
+  perMinuteCostUsd: number | null;
+  perMinuteCostIdr: number | null;
+  finalCostUsd: number;
+  finalCostIdr: number;
+} {
+  const isLiveModel = modelId.toLowerCase().includes("live");
+  const normalizedDurationMs =
+    typeof sessionDurationMs === "number" && Number.isFinite(sessionDurationMs)
+      ? Math.max(Math.floor(sessionDurationMs), 0)
+      : null;
+  const perMinuteCost =
+    isLiveModel && normalizedDurationMs !== null
+      ? calculatePerMinuteCost(normalizedDurationMs, usdToIdrRate)
+      : null;
+  const finalCostUsd = Math.max(perTokenCostUsd, perMinuteCost?.costUsd ?? 0);
+
+  return {
+    sessionDurationMs: normalizedDurationMs,
+    perMinuteCostUsd: perMinuteCost?.costUsd ?? null,
+    perMinuteCostIdr: perMinuteCost?.costIdr ?? null,
+    finalCostUsd: roundUsd(finalCostUsd),
+    finalCostIdr: Math.round(finalCostUsd * usdToIdrRate),
   };
 }
 
@@ -183,6 +298,144 @@ export function mergeSnapshot(
   };
 }
 
+function buildSnapshotKey(snapshot: LiveUsageSnapshot): string {
+  return JSON.stringify({
+    p: snapshot.promptTokenCount,
+    r: snapshot.responseTokenCount,
+    t: snapshot.totalTokenCount,
+    pm: snapshot.promptModality ?? null,
+    rm: snapshot.responseModality ?? null,
+  });
+}
+
+export function createLiveUsageAccumulator(): LiveUsageAccumulator {
+  return {
+    turns: [],
+    pending: null,
+    latestSnapshot: null,
+    seenKeys: new Set(),
+    nextIndex: 0,
+  };
+}
+
+export function observeLiveUsageMetadata(
+  accumulator: LiveUsageAccumulator,
+  rawUsageMetadata: unknown,
+  observedAtMs?: number,
+): boolean {
+  const snapshot = parseUsageMetadata(rawUsageMetadata);
+  if (!snapshot) return false;
+
+  const key = buildSnapshotKey(snapshot);
+  const ts = observedAtMs ?? Date.now();
+
+  // Update latestSnapshot always
+  accumulator.latestSnapshot = snapshot;
+
+  // If same as current pending, just update latest
+  if (accumulator.pending && accumulator.pending.key === key) {
+    accumulator.pending.snapshot = snapshot;
+    return false;
+  }
+
+  // If already committed, ignore
+  if (accumulator.seenKeys.has(key)) {
+    return false;
+  }
+
+  // Set as new pending
+  accumulator.pending = {
+    snapshot,
+    rawUsageMetadata: (rawUsageMetadata as Record<string, unknown>) ?? {},
+    observedAtMs: ts,
+    key,
+  };
+  return true;
+}
+
+export function commitPendingLiveUsageTurn(
+  accumulator: LiveUsageAccumulator,
+  boundary: LiveUsageBoundary,
+): boolean {
+  if (!accumulator.pending) return false;
+  if (accumulator.seenKeys.has(accumulator.pending.key)) {
+    accumulator.pending = null;
+    return false;
+  }
+
+  accumulator.turns.push({
+    index: accumulator.nextIndex++,
+    observedAtMs: accumulator.pending.observedAtMs,
+    boundary,
+    snapshot: accumulator.pending.snapshot,
+    rawUsageMetadata: accumulator.pending.rawUsageMetadata,
+    key: accumulator.pending.key,
+  });
+  accumulator.seenKeys.add(accumulator.pending.key);
+  accumulator.pending = null;
+  return true;
+}
+
+export function summarizeLiveUsageAccumulator(
+  accumulator: LiveUsageAccumulator,
+): LiveUsageAggregate | null {
+  if (accumulator.turns.length === 0) return null;
+
+  let billedPromptTokenCount = 0;
+  let billedResponseTokenCount = 0;
+  let billedTotalTokenCount = 0;
+  let promptText = 0;
+  let promptAudio = 0;
+  let responseText = 0;
+  let responseAudio = 0;
+
+  for (const turn of accumulator.turns) {
+    billedPromptTokenCount += turn.snapshot.promptTokenCount;
+    billedResponseTokenCount += turn.snapshot.responseTokenCount;
+    billedTotalTokenCount += turn.snapshot.totalTokenCount;
+    if (turn.snapshot.promptModality) {
+      promptText += turn.snapshot.promptModality.text;
+      promptAudio += turn.snapshot.promptModality.audio;
+    }
+    if (turn.snapshot.responseModality) {
+      responseText += turn.snapshot.responseModality.text;
+      responseAudio += turn.snapshot.responseModality.audio;
+    }
+  }
+
+  const billedPromptModality =
+    promptText > 0 || promptAudio > 0
+      ? { text: promptText, audio: promptAudio }
+      : undefined;
+  const billedResponseModality =
+    responseText > 0 || responseAudio > 0
+      ? { text: responseText, audio: responseAudio }
+      : undefined;
+
+  const latest = accumulator.latestSnapshot!;
+  return {
+    turnCount: accumulator.turns.length,
+    billedPromptTokenCount,
+    billedResponseTokenCount,
+    billedTotalTokenCount,
+    billedPromptModality,
+    billedResponseModality,
+    latestSnapshot: latest,
+    rawUsageMetadata: {
+      billing_model: "gemini_live_context_window_per_turn_v1",
+      turn_count: accumulator.turns.length,
+      latest,
+      turns: accumulator.turns.map((t) => ({
+        index: t.index,
+        observedAtMs: t.observedAtMs,
+        boundary: t.boundary,
+        snapshot: t.snapshot,
+        rawUsageMetadata: t.rawUsageMetadata,
+      })),
+    },
+  };
+}
+
 function isPostgrestError(error: unknown): error is {
   code?: string;
   message?: string;
@@ -214,7 +467,7 @@ function isMissingAiUsageModalityColumnError(error: unknown): boolean {
   const err = isPostgrestError(error) ? error : {};
   const message = String(err.message || "").toLowerCase();
   const newColumnPattern =
-    "input_text_tokens|input_audio_tokens|input_unspecified_tokens|output_text_tokens|output_audio_tokens|output_unspecified_tokens|input_text_price_usd_per_million|input_audio_price_usd_per_million|output_text_price_usd_per_million|output_audio_price_usd_per_million";
+    "input_text_tokens|input_audio_tokens|input_unspecified_tokens|output_text_tokens|output_audio_tokens|output_unspecified_tokens|input_text_price_usd_per_million|input_audio_price_usd_per_million|output_text_price_usd_per_million|output_audio_price_usd_per_million|session_duration_ms|per_minute_cost_usd|per_minute_cost_idr|final_cost_usd|final_cost_idr|raw_usage_metadata|live_turn_count|latest_input_tokens|latest_output_tokens|latest_total_tokens|context_rebilled_cost_usd|context_rebilled_cost_idr";
 
   if (err.code === "42703") {
     return new RegExp(
@@ -261,8 +514,9 @@ async function getBillingRate(): Promise<number> {
 export async function flushLiveUsage(
   requestId: string,
   userId: string,
-  snapshot: LiveUsageSnapshot,
+  aggregate: LiveUsageAggregate,
   modelId: string,
+  sessionDurationMs?: number,
 ): Promise<void> {
   try {
     const [{ data: pricing }, usdToIdrRate] = await Promise.all([
@@ -280,12 +534,19 @@ export async function flushLiveUsage(
     const outputPricePerMillion =
       pricing?.output_price_usd_per_million ?? (isLiveModel ? 12.0 : 0);
 
-    const modalityCost = calculateLiveUsageCost(
-      snapshot,
+    const contextTokenCost = calculateLiveUsageCost(
+      aggregate,
       inputPricePerMillion,
       outputPricePerMillion,
       usdToIdrRate,
     );
+
+    const billingCost = calculateFinalLiveUsageCost({
+      modelId,
+      perTokenCostUsd: contextTokenCost.costUsd,
+      sessionDurationMs,
+      usdToIdrRate,
+    });
 
     const payload = {
       request_id: requestId,
@@ -294,20 +555,20 @@ export async function flushLiveUsage(
       model_id: modelId,
       module: "telefun",
       action: "voice_live",
-      input_tokens: snapshot.promptTokenCount,
-      output_tokens: snapshot.responseTokenCount,
-      total_tokens: snapshot.totalTokenCount,
-      input_text_tokens: snapshot.promptModality?.text ?? null,
-      input_audio_tokens: snapshot.promptModality?.audio ?? null,
+      input_tokens: aggregate.billedPromptTokenCount,
+      output_tokens: aggregate.billedResponseTokenCount,
+      total_tokens: aggregate.billedTotalTokenCount,
+      input_text_tokens: aggregate.billedPromptModality?.text ?? null,
+      input_audio_tokens: aggregate.billedPromptModality?.audio ?? null,
       input_unspecified_tokens:
-        modalityCost.inputUnspecifiedTokens > 0
-          ? modalityCost.inputUnspecifiedTokens
+        contextTokenCost.inputUnspecifiedTokens > 0
+          ? contextTokenCost.inputUnspecifiedTokens
           : null,
-      output_text_tokens: snapshot.responseModality?.text ?? null,
-      output_audio_tokens: snapshot.responseModality?.audio ?? null,
+      output_text_tokens: aggregate.billedResponseModality?.text ?? null,
+      output_audio_tokens: aggregate.billedResponseModality?.audio ?? null,
       output_unspecified_tokens:
-        modalityCost.outputUnspecifiedTokens > 0
-          ? modalityCost.outputUnspecifiedTokens
+        contextTokenCost.outputUnspecifiedTokens > 0
+          ? contextTokenCost.outputUnspecifiedTokens
           : null,
       input_text_price_usd_per_million:
         GEMINI_LIVE_PRICING.inputTextPriceUsdPerMillion,
@@ -320,8 +581,20 @@ export async function flushLiveUsage(
       input_price_usd_per_million: inputPricePerMillion,
       output_price_usd_per_million: outputPricePerMillion,
       usd_to_idr_rate: usdToIdrRate,
-      estimated_cost_usd: modalityCost.costUsd,
-      estimated_cost_idr: modalityCost.costIdr,
+      estimated_cost_usd: contextTokenCost.costUsd,
+      estimated_cost_idr: contextTokenCost.costIdr,
+      live_turn_count: aggregate.turnCount,
+      latest_input_tokens: aggregate.latestSnapshot.promptTokenCount,
+      latest_output_tokens: aggregate.latestSnapshot.responseTokenCount,
+      latest_total_tokens: aggregate.latestSnapshot.totalTokenCount,
+      context_rebilled_cost_usd: contextTokenCost.costUsd,
+      context_rebilled_cost_idr: contextTokenCost.costIdr,
+      session_duration_ms: billingCost.sessionDurationMs,
+      per_minute_cost_usd: billingCost.perMinuteCostUsd,
+      per_minute_cost_idr: billingCost.perMinuteCostIdr,
+      final_cost_usd: billingCost.finalCostUsd,
+      final_cost_idr: billingCost.finalCostIdr,
+      raw_usage_metadata: aggregate.rawUsageMetadata,
     };
 
     const { error } = await admin.from("ai_usage_logs").insert(payload);
@@ -339,6 +612,18 @@ export async function flushLiveUsage(
           input_audio_price_usd_per_million: _inputAudioPriceUsdPerMillion,
           output_text_price_usd_per_million: _outputTextPriceUsdPerMillion,
           output_audio_price_usd_per_million: _outputAudioPriceUsdPerMillion,
+          session_duration_ms: _sessionDurationMs,
+          per_minute_cost_usd: _perMinuteCostUsd,
+          per_minute_cost_idr: _perMinuteCostIdr,
+          final_cost_usd: _finalCostUsd,
+          final_cost_idr: _finalCostIdr,
+          raw_usage_metadata: _rawUsageMetadata,
+          live_turn_count: _liveTurnCount,
+          latest_input_tokens: _latestInputTokens,
+          latest_output_tokens: _latestOutputTokens,
+          latest_total_tokens: _latestTotalTokens,
+          context_rebilled_cost_usd: _contextRebilledCostUsd,
+          context_rebilled_cost_idr: _contextRebilledCostIdr,
           ...legacyPayload
         } = payload;
         const legacyResult = await admin

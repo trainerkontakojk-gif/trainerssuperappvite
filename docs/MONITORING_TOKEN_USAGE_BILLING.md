@@ -103,6 +103,20 @@ Yang dicatat pada setiap row `ai_usage_logs`:
 - `input_tokens`, `output_tokens`, `total_tokens` (0 jika gagal/timeout)
 - `input_price_usd_per_million`, `output_price_usd_per_million`
 - `usd_to_idr_rate`, `estimated_cost_usd`, `estimated_cost_idr` (0 jika gagal/timeout)
+- Telefun Live only: `session_duration_ms`, `per_minute_cost_usd`, `per_minute_cost_idr`, `final_cost_usd`, `final_cost_idr`
+
+Untuk Telefun Live, `usageMetadata` diakumulasi per turn karena Gemini Live menagih seluruh Session Context Window pada setiap turn. `estimated_cost_*` menyimpan biaya token hasil SUM per turn. `per_minute_cost_*` menyimpan estimasi durasi audio sebagai fallback/sanity floor. `final_cost_*` adalah angka reporting: `MAX(estimated_cost_*, per_minute_cost_*)`.
+
+Kolom tambahan untuk audit:
+- `live_turn_count` — jumlah turn yang di-bill
+- `latest_input_tokens`, `latest_output_tokens`, `latest_total_tokens` — snapshot terakhir dari Gemini
+- `context_rebilled_cost_usd`, `context_rebilled_cost_idr` — biaya token dari context-window re-billing
+- `raw_usage_metadata` — JSON detail semua turn
+
+Referensi:
+- https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing
+- https://ai.google.dev/api/live
+
 
 Aturan penting:
 

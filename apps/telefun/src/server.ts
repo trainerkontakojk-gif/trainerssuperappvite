@@ -4,10 +4,11 @@ import { WebSocketServer, WebSocket } from "ws";
 import { env } from "./env.js";
 import { verifyToken } from "./auth.js";
 import {
-  parseUsageMetadata,
-  mergeSnapshot,
   flushLiveUsage,
-  type LiveUsageSnapshot,
+  createLiveUsageAccumulator,
+  observeLiveUsageMetadata,
+  commitPendingLiveUsageTurn,
+  summarizeLiveUsageAccumulator,
 } from "./usage.js";
 import { createSession, updateSession, getOwnedSessionId } from "./db.js";
 import { TurnManager } from "./turn-taking.js";
@@ -87,7 +88,7 @@ wss.on("connection", async (ws, req) => {
     req.url || "/",
     `http://${req.headers.host || "localhost"}`,
   );
-  let usageSnapshot: LiveUsageSnapshot | null = null;
+  const usageAccumulator = createLiveUsageAccumulator();
   let usageFlushed = false;
   let activeModelId = "gemini-3.1-flash-live-preview";
   let reconnectAttempts = 0;
@@ -112,10 +113,19 @@ wss.on("connection", async (ws, req) => {
 
   const turnManager = new TurnManager();
 
-  const flushUsage = async () => {
-    if (usageFlushed || !authed || !usageSnapshot) return;
+  const flushUsage = async (sessionDurationMs?: number) => {
+    if (usageFlushed || !authed) return;
+    commitPendingLiveUsageTurn(usageAccumulator, "session_flush");
+    const usageAggregate = summarizeLiveUsageAccumulator(usageAccumulator);
+    if (!usageAggregate) return;
     usageFlushed = true;
-    await flushLiveUsage(requestId, userId, usageSnapshot, activeModelId);
+    await flushLiveUsage(
+      requestId,
+      userId,
+      usageAggregate,
+      activeModelId,
+      sessionDurationMs,
+    );
   };
 
   const finalizeSessionOnce = async (status: string, outcome?: DrainOutcome) => {
@@ -133,7 +143,7 @@ wss.on("connection", async (ws, req) => {
         messages: transcriptCollector.snapshot(),
       });
     }
-    void flushUsage();
+    void flushUsage(duration * 1000);
 
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(
@@ -233,19 +243,23 @@ wss.on("connection", async (ws, req) => {
       if (!isCurrentGeminiSocket(geminiWs, socket)) return;
       const raw = data.toString();
 
-      if (raw.includes('"usageMetadata"')) {
-        try {
-          const parsed = JSON.parse(raw);
-          const meta = parseUsageMetadata(parsed.usageMetadata);
-          if (meta) usageSnapshot = mergeSnapshot(usageSnapshot, meta);
-        } catch {
-          /* skip */
-        }
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return;
+      }
+
+      if (parsed?.usageMetadata) {
+        observeLiveUsageMetadata(
+          usageAccumulator,
+          parsed.usageMetadata,
+          Date.now(),
+        );
       }
 
       // Extract AI text + detect turn boundaries
-      try {
-        const parsed = JSON.parse(raw);
+      if (parsed) {
         if (hasGeminiSetupComplete(parsed)) {
           console.log("[Telefun] Gemini Setup Complete received, opening gate");
           const resumed = reconnectAttempts > 0;
@@ -274,10 +288,12 @@ wss.on("connection", async (ws, req) => {
         if (parsed.serverContent?.turnComplete) {
           transcriptCollector.completeTurn("consumer");
           turnManager.endAiSpeaking();
+          commitPendingLiveUsageTurn(usageAccumulator, "turnComplete");
         }
         if (parsed.serverContent?.interrupted) {
           transcriptCollector.interruptTurn();
           turnManager.endAiSpeaking();
+          commitPendingLiveUsageTurn(usageAccumulator, "interrupted");
         }
 
         if (drainCoordinator) {
@@ -310,8 +326,6 @@ wss.on("connection", async (ws, req) => {
             scheduleReconnect(250);
           }
         }
-      } catch {
-        /* skip */
       }
 
       if (ws.readyState === WebSocket.OPEN) ws.send(raw);

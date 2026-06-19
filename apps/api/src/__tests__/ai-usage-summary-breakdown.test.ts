@@ -248,4 +248,41 @@ describe("AI Usage Summary — simulation/review breakdown", () => {
       ]),
     );
   });
+
+  it("prefers final Telefun Live cost when present", async () => {
+    const mockLogs = [
+      {
+        action: "voice_live",
+        input_tokens: 100,
+        output_tokens: 100,
+        total_tokens: 200,
+        estimated_cost_usd: 0.0015,
+        estimated_cost_idr: 23,
+        final_cost_usd: 0.046,
+        final_cost_idr: 690,
+      },
+      {
+        action: "voice_live",
+        input_tokens: 2300,
+        output_tokens: 230,
+        total_tokens: 2530,
+        estimated_cost_usd: 0.008625,
+        estimated_cost_idr: 129,
+        final_cost_usd: 0.008625,
+        final_cost_idr: 129,
+      },
+    ];
+
+    mockFrom.mockReturnValue(buildPaginatedQuery(mockLogs));
+
+    const app = buildApp();
+    const res = await app.request("/usage/summary?module=telefun");
+    const body = (await res.json()) as any;
+
+    expect(body.success).toBe(true);
+    expect(body.data.totalCostUsd).toBe(0.054625);
+    expect(body.data.totalCostIdr).toBe(819);
+    expect(body.data.simulationCostIdr).toBe(819);
+    expect(body.data.breakdown.simulation.costIdr).toBe(819);
+  });
 });

@@ -40,7 +40,7 @@ export async function getAiUsageSummary(params: {
       params.admin
         .from("ai_usage_logs")
         .select(
-          "action, input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr",
+          "action, input_tokens, output_tokens, total_tokens, estimated_cost_usd, estimated_cost_idr, final_cost_usd, final_cost_idr",
         )
         .eq("user_id", params.userId)
         .eq("module", params.module)
@@ -70,8 +70,8 @@ export async function getAiUsageSummary(params: {
     const inputTokens = log.input_tokens || 0;
     const outputTokens = log.output_tokens || 0;
     const tokens = log.total_tokens || 0;
-    const costUsd = Number(log.estimated_cost_usd || 0);
-    const costIdr = Number(log.estimated_cost_idr || 0);
+    const costUsd = Number(log.final_cost_usd ?? log.estimated_cost_usd ?? 0);
+    const costIdr = Number(log.final_cost_idr ?? log.estimated_cost_idr ?? 0);
     const definition = getUsageActionDefinition(log.action);
     const bucket = breakdown[definition.category];
 
