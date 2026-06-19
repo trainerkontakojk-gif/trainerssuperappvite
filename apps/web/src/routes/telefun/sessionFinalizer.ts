@@ -1,6 +1,7 @@
 import { supabase } from "../../lib/supabase";
 import { telefunClient, unwrapResponse } from "../../lib/api";
 import { buildTelefunRecordingPath } from "./recordingPath";
+import { remuxRecording } from "./services/telefun-recording-remux-service";
 import type { CallRecord } from "./types";
 import type { TelefunAppSettings } from "./telefunSettings";
 import type {
@@ -218,6 +219,13 @@ export async function finalizeTelefunSession(params: {
     } catch (err) {
       console.error("Failed to patch score and feedback:", err);
     }
+  }
+
+  // 8. Remux recordings for seekable playback (best-effort, non-blocking)
+  if (recordingPath || agentRecordingPath) {
+    remuxRecording(params.sessionId).catch((err) => {
+      console.warn("[Telefun] Background remux failed:", err);
+    });
   }
 
   const record: CallRecord = {

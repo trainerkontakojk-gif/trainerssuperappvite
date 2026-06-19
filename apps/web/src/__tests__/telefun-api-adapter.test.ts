@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   getTelefunSettings,
   saveTelefunSettings,
@@ -9,6 +10,18 @@ import type { TelefunSessionRow } from "../routes/telefun/telefunApi";
 vi.mock("../hooks/useApi", () => ({}));
 
 describe("Telefun API Adapter", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: { selectedModel: "gemini" } }), {
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("fetches settings via getApi", async () => {
     const settings = await getTelefunSettings();
     expect(settings).toBeDefined();

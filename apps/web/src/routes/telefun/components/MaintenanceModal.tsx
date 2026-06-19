@@ -27,6 +27,10 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
   const normalizedRole = role?.toLowerCase().trim();
   const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
 
+  if (isAllowedRole) {
+    return null;
+  }
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -36,7 +40,7 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-background/80 backdrop-blur-md"
-            onClick={isAllowedRole ? undefined : handleRedirect} // Prevent clicking away for disallowed roles unless they use the button, or we can make background non-dismissible
+            onClick={handleRedirect}
           />
           
           <motion.div
@@ -53,46 +57,14 @@ export const MaintenanceModal = ({ isOpen, role }: MaintenanceModalProps) => {
             </div>
             
             <h3 className="text-xl font-black text-foreground mb-4 tracking-tight">
-              {isAllowedRole ? "Modul Dalam Pengembangan" : "Akses Terbatas"}
+              Akses Terbatas
             </h3>
             
-            <div className="text-sm text-muted-foreground leading-relaxed mb-2 font-medium px-4">
-              {isAllowedRole ? (
-                <span>Modul ini masih dalam pengembangan dan mungkin tidak berjalan stabil. Anda dapat melanjutkan atau menggunakan versi Lite yang lebih stabil.</span>
-              ) : (
-                <span>
-                  Modul Telefun hanya dapat diakses oleh Trainer.
-                </span>
-              )}
+            <div className="text-sm text-muted-foreground leading-relaxed mb-6 font-medium px-4">
+              Modul Telefun hanya dapat diakses oleh Trainer.
             </div>
-            
-
-            {isAllowedRole && <div className="mb-6" />}
 
             <div className="flex flex-col gap-3">
-              {isAllowedRole && (
-                <>
-                  <button
-                    onClick={handleEnterTelefun}
-                    className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer"
-                  >
-                    <ArrowRight className="w-5 h-5" />
-                    Lanjut ke Telefun
-                  </button>
-                  <a
-                    href="https://ai.studio/apps/348f1688-2144-42b8-bbd7-656b6e25718e"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-4 bg-secondary text-secondary-foreground rounded-2xl font-bold hover:bg-secondary/80 transition-all border border-border/50 flex items-center justify-center gap-3 cursor-pointer"
-                  >
-                    <div className="w-6 h-6 bg-white/20 rounded-lg flex items-center justify-center">
-                      <span className="text-[10px] font-black">LITE</span>
-                    </div>
-                    Berpindah ke App Lite
-                  </a>
-                </>
-              )}
-              
               <button
                 onClick={handleRedirect}
                 className="w-full py-4 bg-secondary text-secondary-foreground rounded-2xl font-bold hover:bg-secondary/80 transition-all border border-border/50 flex items-center justify-center gap-3 cursor-pointer"

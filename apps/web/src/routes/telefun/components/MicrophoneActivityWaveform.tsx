@@ -14,11 +14,12 @@ const TONE_CLASSES: Record<MicrophoneWaveformTone, string> = {
 };
 
 export function MicrophoneActivityWaveform({
-  bars,
+  bars = [],
   active,
   tone,
 }: MicrophoneActivityWaveformProps) {
-  const visibleBars = bars.length > 0 ? bars : Array.from({ length: 24 }, () => 4);
+  const safeBars = bars || [];
+  const visibleBars = safeBars.length > 0 ? safeBars : Array.from({ length: 24 }, () => 4);
 
   return (
     <div

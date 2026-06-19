@@ -28,6 +28,17 @@ function DashboardLayoutContent() {
   } = useTelefunWarning();
   const prevPathnameRef = useRef(pathname);
 
+  // Auto-grant access to allowed roles immediately on profile load so they can bypass sidebar warning gates
+  useEffect(() => {
+    if (profile) {
+      const normalizedRole = profile.role?.toLowerCase().trim();
+      const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+      if (isAllowedRole && !hasTelefunAccess) {
+        grantTelefunAccess();
+      }
+    }
+  }, [profile, hasTelefunAccess, grantTelefunAccess]);
+
   useEffect(() => {
     if (pathname.startsWith("/telefun") && !hasTelefunAccess && profile) {
       const normalizedRole = profile.role?.toLowerCase().trim();
@@ -44,7 +55,11 @@ function DashboardLayoutContent() {
       prevPathnameRef.current.startsWith("/telefun") &&
       !pathname.startsWith("/telefun")
     ) {
-      revokeTelefunAccess();
+      const normalizedRole = profile?.role?.toLowerCase().trim();
+      const isAllowedRole = ["admin", "trainer", "trainers"].includes(normalizedRole || "");
+      if (!isAllowedRole) {
+        revokeTelefunAccess();
+      }
     }
 
     prevPathnameRef.current = pathname;

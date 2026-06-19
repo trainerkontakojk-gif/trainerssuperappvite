@@ -30,15 +30,11 @@ describe("Telefun MaintenanceModal Component", () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText("Modul Dalam Pengembangan")).toBeDefined();
-    expect(
-      screen.getByText(
-        "Modul ini masih dalam pengembangan dan mungkin tidak berjalan stabil. Anda dapat melanjutkan atau menggunakan versi Lite yang lebih stabil."
-      )
-    ).toBeDefined();
-    expect(screen.getByText("Lanjut ke Telefun")).toBeDefined();
-    expect(screen.getByText("Berpindah ke App Lite")).toBeDefined();
-    expect(screen.getByText("Kembali ke Dashboard")).toBeDefined();
+    expect(screen.queryByText("Modul Dalam Pengembangan")).toBeNull();
+    expect(screen.queryByText("Akses Terbatas")).toBeNull();
+    expect(screen.queryByText("Lanjut ke Telefun")).toBeNull();
+    expect(screen.queryByText("Berpindah ke App Lite")).toBeNull();
+    expect(screen.queryByText("Kembali ke Dashboard")).toBeNull();
   });
 
   it("renders correctly for allowed roles (admin) when modal is explicitly opened", async () => {
@@ -48,8 +44,8 @@ describe("Telefun MaintenanceModal Component", () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText("Modul Dalam Pengembangan")).toBeDefined();
-    expect(screen.getByText("Lanjut ke Telefun")).toBeDefined();
+    expect(screen.queryByText("Modul Dalam Pengembangan")).toBeNull();
+    expect(screen.queryByText("Lanjut ke Telefun")).toBeNull();
   });
 
   it("renders correctly for legacy trainers role alias when modal is explicitly opened", async () => {
@@ -59,8 +55,8 @@ describe("Telefun MaintenanceModal Component", () => {
       </TestWrapper>
     );
 
-    expect(screen.getByText("Modul Dalam Pengembangan")).toBeDefined();
-    expect(screen.getByText("Lanjut ke Telefun")).toBeDefined();
+    expect(screen.queryByText("Modul Dalam Pengembangan")).toBeNull();
+    expect(screen.queryByText("Lanjut ke Telefun")).toBeNull();
   });
 
   it("renders restricted access message for non-allowed roles (agent)", async () => {
@@ -97,7 +93,7 @@ describe("Telefun MaintenanceModal Component", () => {
   it("calls navigate on redirect/back to dashboard", async () => {
     render(
       <TestWrapper>
-        <MaintenanceModal isOpen={true} role="trainer" />
+        <MaintenanceModal isOpen={true} role="agent" />
       </TestWrapper>
     );
 
