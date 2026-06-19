@@ -57,7 +57,7 @@ export const APP_MODULES: AppModuleConfig[] = [
     icon: Mail,
     accentClassName: "text-sky-600",
     accentSoftClassName: "bg-sky-100",
-    allowedRoles: ["trainer", "leader", "admin"],
+    allowedRoles: ["trainer", "leader", "admin", "agent"],
   },
   {
     id: "telefun",
