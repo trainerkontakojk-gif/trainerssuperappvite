@@ -160,7 +160,7 @@ export function PdktIdentityTab({
             <button
               type="button"
               onClick={handleResetDefaults}
-              className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-red-500/20 cursor-pointer shadow-sm"
+              className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg text-xs font-semibold transition-all border border-red-500/20 cursor-pointer"
             >
               Reset Module PDKT
             </button>

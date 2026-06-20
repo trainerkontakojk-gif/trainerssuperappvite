@@ -37,38 +37,42 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-green-500/10 flex items-center justify-center shrink-0">
-            <User className="w-6 h-6 text-green-500" />
+    <div className="space-y-6 mt-4">
+      {/* Header Banner */}
+      <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
+          <User className="w-24 h-24" />
+        </div>
+        <div className="relative z-10 max-w-2xl flex gap-4 items-start">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <User className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-900 dark:text-white text-lg">Atur Identitas Simulasi</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+            <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">Atur Identitas Simulasi</h3>
+            <p className="text-xs text-muted-foreground font-medium leading-relaxed">
               Konfigurasi nama konsumen dan data lainnya.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="p-8 rounded-[2.5rem] border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1C1C1E] shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="col-span-1">
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Nama Konsumen (Lengkap)</label>
+      <div className="p-5 rounded-xl border border-border/40 bg-muted/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Nama Konsumen (Lengkap)</label>
             <input
               type="text"
-              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
               placeholder="Contoh: Agus Setiawan"
               value={identitySettings?.displayName || ''}
               onChange={(e) => handleIdentityChange('displayName', e.target.value)}
             />
           </div>
-          <div className="col-span-1">
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Jenis Kelamin</label>
-            <div className="relative">
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Jenis Kelamin</label>
+            <div className="relative group">
               <select
-                className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors appearance-none cursor-pointer"
                 value={identitySettings?.gender || 'random'}
                 onChange={(e) =>
                   handleIdentityChange(
@@ -81,19 +85,19 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
                 <option value="male">Laki-laki</option>
                 <option value="female">Perempuan</option>
               </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                <svg width="12" height="8" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </div>
             </div>
           </div>
-          <div className="col-span-1">
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Pilihan Suara</label>
-            <div className="relative">
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Pilihan Suara</label>
+            <div className="relative group">
               <select
-                className={`w-full rounded-2xl border-gray-200 dark:border-white/10 p-4 text-base outline-none appearance-none transition-all ${
+                className={`w-full rounded-md border p-2 text-sm outline-none appearance-none transition-colors cursor-pointer ${
                   (!identitySettings?.gender || identitySettings?.gender === 'random')
-                    ? 'bg-gray-100 dark:bg-[#1C1C1E]/50 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                    : 'bg-gray-50 dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500'
+                    ? 'border-border/50 bg-background/50 text-muted-foreground/50 cursor-not-allowed'
+                    : 'border-border bg-background text-foreground focus:border-foreground'
                 }`}
                 value={identitySettings?.voiceName || ''}
                 onChange={(e) => handleIdentityChange('voiceName', e.target.value)}
@@ -104,31 +108,31 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
                   <option key={v} value={v}>{v}</option>
                 ))}
               </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                <svg width="12" height="8" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </div>
             </div>
             {(!identitySettings?.gender || identitySettings?.gender === 'random') && (
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 ml-1">
+              <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
                 Suara akan diacak otomatis sesuai hasil penentuan gender saat simulasi.
               </p>
             )}
           </div>
-          <div className="col-span-1">
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Nomor Telepon Konsumen</label>
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Nomor Telepon Konsumen</label>
             <input
               type="text"
-              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
               placeholder="Contoh: 0812..."
               value={identitySettings?.phoneNumber || ''}
               onChange={(e) => handleIdentityChange('phoneNumber', e.target.value)}
             />
           </div>
-          <div className="col-span-1">
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Kota Konsumen</label>
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Kota Konsumen</label>
             <input
               type="text"
-              className="w-full rounded-2xl border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-[#2C2C2E] p-4 text-base text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
               placeholder="Contoh: Jakarta"
               value={identitySettings?.city || ''}
               onChange={(e) => handleIdentityChange('city', e.target.value)}

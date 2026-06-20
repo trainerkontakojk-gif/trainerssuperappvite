@@ -1,5 +1,4 @@
 import React from "react";
-import { Check } from "lucide-react";
 
 interface SettingsFieldProps {
   label: string;
@@ -12,12 +11,12 @@ interface SettingsFieldProps {
 export function SettingsField({ label, id, helperText, className = "", children }: SettingsFieldProps) {
   return (
     <div className={`space-y-1.5 ${className}`}>
-      <label htmlFor={id} className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">
+      <label htmlFor={id} className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
         {label}
       </label>
       {children}
       {helperText && (
-        <p className="mt-1 ml-1 text-[10px] text-muted-foreground font-medium leading-relaxed">
+        <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
           {helperText}
         </p>
       )}
@@ -32,7 +31,7 @@ interface SettingsInputProps extends React.InputHTMLAttributes<HTMLInputElement>
 export function SettingsInput({ className = "", ...props }: SettingsInputProps) {
   return (
     <input
-      className={`w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium placeholder:text-muted-foreground/30 transition-all ${className}`}
+      className={`w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30 ${className}`}
       {...props}
     />
   );
@@ -46,15 +45,15 @@ export function SettingsSelect({ className = "", children, ...props }: SettingsS
   return (
     <div className="relative group">
       <select
-        className={`w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none font-medium transition-all appearance-none cursor-pointer ${className}`}
+        className={`w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors appearance-none cursor-pointer ${className}`}
         {...props}
       >
         {children}
       </select>
       <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
         <svg
-          width="8"
-          height="5"
+          width="10"
+          height="6"
           viewBox="0 0 10 6"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -62,7 +61,7 @@ export function SettingsSelect({ className = "", children, ...props }: SettingsS
           <path
             d="M1 1L5 5L9 1"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -94,35 +93,32 @@ export function SettingsCardOption({
   return (
     <div
       onClick={onClick}
-      className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
+      className={`group cursor-pointer p-4 rounded-xl border transition-colors flex flex-col justify-between ${
         isSelected
-          ? "bg-card border-primary shadow-sm"
-          : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
+          ? "border-primary bg-primary/5"
+          : "border-border bg-card/45 hover:bg-foreground/[0.02]"
       } ${className}`}
     >
-      {isSelected && (
-        <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-      )}
-      <div className="flex justify-between items-start mb-2.5">
-        <h4 className="font-semibold text-sm tracking-tight flex items-center gap-2 pr-8 text-foreground">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              isSelected ? "bg-primary animate-pulse" : "bg-foreground/20"
-            }`}
-          />
-          {title}
-        </h4>
-        <div className="flex items-center gap-1.5 relative z-10">
-          {isSelected && (
-            <div className="bg-primary/10 text-primary p-1 rounded-md backdrop-blur-md mr-0.5">
-              <Check className="w-3.5 h-3.5 stroke-[3px]" />
+      <div className="flex justify-between items-start mb-2 gap-2">
+        <div className="flex flex-col gap-1 min-w-0">
+          <h4 className="font-semibold text-foreground tracking-tight text-sm truncate">
+            {title}
+          </h4>
+          {badge && <div className="flex gap-2 flex-wrap mt-0.5">{badge}</div>}
+        </div>
+        <div className="flex items-center shrink-0 gap-2">
+          {isSelected ? (
+            <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center shrink-0">
+              <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {actions}
             </div>
           )}
-          {actions}
         </div>
       </div>
-      {badge && <div className="flex gap-2 mb-2.5">{badge}</div>}
-      <div className="text-xs font-medium leading-relaxed text-muted-foreground">
+      <div className="text-sm text-muted-foreground leading-relaxed mt-1.5">
         {children}
       </div>
     </div>

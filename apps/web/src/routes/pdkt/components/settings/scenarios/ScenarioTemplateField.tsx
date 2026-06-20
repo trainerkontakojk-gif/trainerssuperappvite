@@ -15,10 +15,10 @@ export function ScenarioTemplateField({
 }: ScenarioTemplateFieldProps) {
   return (
     <div className="col-span-2 space-y-3 pt-2">
-      <div className="flex items-center justify-between ml-1">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         {children}
-        <label className="flex items-center gap-2 cursor-pointer group">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest group-hover:text-primary transition-colors">
+        <label className="flex items-center gap-2 cursor-pointer group shrink-0">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide group-hover:text-foreground transition-colors">
             Always use this email
           </span>
           <div className="relative inline-flex items-center cursor-pointer">
@@ -30,11 +30,11 @@ export function ScenarioTemplateField({
                 onDraftChange({ alwaysUseSampleEmail: e.target.checked })
               }
             />
-            <div className="w-7 h-4 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+            <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border/45 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
           </div>
         </label>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <SettingsInput
           type="text"
           placeholder="Subjek email template (opsional)..."
@@ -49,8 +49,8 @@ export function ScenarioTemplateField({
           }
         />
         <textarea
-          className="w-full rounded-lg border border-border bg-background p-3 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none font-mono placeholder:text-muted-foreground/30"
-          rows={8}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none font-mono placeholder:text-muted-foreground/30 leading-relaxed font-normal"
+          rows={6}
           placeholder="Tulis isi email template di sini. Gunakan wording netral; nama konsumen akan disisipkan otomatis sesuai pengaturan sistem."
           value={draft.sampleEmailTemplate?.body || ""}
           onChange={(e) =>
@@ -62,7 +62,7 @@ export function ScenarioTemplateField({
             })
           }
         />
-        <p className="text-[10px] text-muted-foreground/80 italic ml-1">
+        <p className="text-xs text-muted-foreground/80 leading-normal">
           * Jika &quot;Always use this email&quot; aktif, AI tidak akan meng-generate email baru melainkan langsung memakai teks di atas.
         </p>
       </div>

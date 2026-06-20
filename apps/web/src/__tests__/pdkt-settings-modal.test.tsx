@@ -76,7 +76,7 @@ describe("PDKT SettingsModal Characterization Tests", () => {
     await user.click(systemTabButton);
 
     // Verify model option is visible
-    expect(screen.getByText("Gemini 2.0 Flash Lite")).toBeDefined();
+    expect(screen.getByText("Gemini 3.1 Flash Lite")).toBeDefined();
     expect(screen.getByText("Gemini 3.5 Flash")).toBeDefined();
     expect(screen.getByText("DeepSeek V4 Pro")).toBeDefined();
   });

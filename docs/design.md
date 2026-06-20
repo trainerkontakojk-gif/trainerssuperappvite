@@ -110,3 +110,12 @@ Kami menggunakan dua font keluarga dari Google Fonts: **Outfit** dan **Inter**.
 ## Kesimpulan
 
 Jika Anda ragu dalam mendesain, pilih jalur yang paling sederhana dan paling bersih. Hapus garis, latar belakang, atau dekorasi yang tidak penting. Biarkan tipografi, jarak (*whitespace*), dan kontras mengambil alih hierarki visual.
+
+---
+
+## 7. Contrast & Readability Rules
+
+Untuk memastikan antarmuka mudah dibaca oleh semua pengguna (aksesibilitas tinggi):
+- **Contrast Ratio:** Teks utama (`var(--fg)`) harus memiliki kontras minimal 7:1 terhadap latar belakang. Teks sekunder/deskripsi (`var(--fg2)`) harus memiliki kontras minimal 4.5:1.
+- **Muted Text:** Gunakan `var(--fg3)` hanya untuk informasi non-kritis/meta-info. Jangan gunakan `opacity` di bawah `0.8` pada teks yang bertumpuk dengan latar belakang terang.
+- **Font Size Minimum:** Hindari teks dengan ukuran di bawah `11px`. Gunakan minimal `12px` (`text-sm` atau `text-xs`) untuk label formulir, dengan berat sedang (`font-medium`) untuk meningkatkan readability.

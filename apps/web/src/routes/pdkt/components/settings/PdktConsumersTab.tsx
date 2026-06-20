@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, Edit2, Trash2, Plus, X } from "lucide-react";
+import { Users, Edit2, Trash2, Plus, X, ArrowLeft } from "lucide-react";
 import { PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
@@ -41,16 +41,10 @@ export function PdktConsumersTab({
 
   const handleAddClick = () => {
     consumerForm.openAdd();
-    setTimeout(() => {
-      document.getElementById("consumer-form")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
   };
 
   const handleEditClick = (consumer: PdktConsumerType) => {
     consumerForm.openEdit(consumer);
-    setTimeout(() => {
-      document.getElementById("consumer-form")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
   };
 
   const handleSaveConsumer = () => {
@@ -73,8 +67,101 @@ export function PdktConsumersTab({
     consumerForm.close();
   };
 
+  if (consumerForm.isOpen) {
+    return (
+      <div className="space-y-6 pb-10 mt-2">
+        <div className="flex items-center gap-2 border-b border-border pb-4">
+          <button
+            onClick={handleCancelConsumerForm}
+            className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Kembali ke Daftar Karakter
+          </button>
+        </div>
+        <div className="bg-card border border-border rounded-xl overflow-hidden relative">
+          <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
+            <h3 className="font-bold text-foreground text-sm tracking-tight">
+              {consumerForm.editingId ? "Edit Karakter" : "Tambah Karakter Baru"}
+            </h3>
+          </div>
+          <div className="p-6 space-y-5">
+            <div>
+              <SettingsField label="Nama Karakter / Tipe" id="consumer-name">
+                <SettingsInput
+                  id="consumer-name"
+                  type="text"
+                  placeholder="Contoh: Konsumen Milenial Galak"
+                  value={consumerForm.draft.name || ""}
+                  onChange={(e) => consumerForm.setDraft({ name: e.target.value })}
+                />
+              </SettingsField>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 md:col-span-1">
+                <SettingsField label="Tingkat Kesulitan" id="consumer-difficulty">
+                  <SettingsSelect
+                    id="consumer-difficulty"
+                    value={consumerForm.draft.difficulty || "Medium"}
+                    onChange={(e) =>
+                      consumerForm.setDraft({
+                        difficulty: e.target.value as PdktConsumerType["difficulty"],
+                      })
+                    }
+                  >
+                    <option value="Easy">Mudah (Sopan)</option>
+                    <option value="Medium">Menengah (Netral)</option>
+                    <option value="Hard">Sulit (Marah/Kritis)</option>
+                  </SettingsSelect>
+                </SettingsField>
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <SettingsField label="Tone Bicara / Keyword" id="consumer-tone">
+                  <SettingsInput
+                    id="consumer-tone"
+                    type="text"
+                    placeholder="Contoh: ketus, menggunakan 'saya', menuntut"
+                    value={consumerForm.draft.tone || ""}
+                    onChange={(e) => consumerForm.setDraft({ tone: e.target.value })}
+                  />
+                </SettingsField>
+              </div>
+            </div>
+            <div>
+              <SettingsField label="Deskripsi Karakteristik" id="consumer-description">
+                <textarea
+                  id="consumer-description"
+                  className="w-full rounded-md border border-border bg-background p-2.5 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors placeholder:text-muted-foreground/30"
+                  rows={4}
+                  placeholder="Jelaskan detail perilaku karakter ini agar AI dapat menirunya..."
+                  value={consumerForm.draft.description || ""}
+                  onChange={(e) => consumerForm.setDraft({ description: e.target.value })}
+                />
+              </SettingsField>
+            </div>
+            <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
+              <button
+                onClick={handleCancelConsumerForm}
+                className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveConsumer}
+                disabled={!consumerForm.draft.name || !consumerForm.draft.description}
+                className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 mt-4">
+    <div className="space-y-6 pb-10 mt-2">
       {/* Tips Banner */}
       <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl flex gap-4 items-start backdrop-blur-sm">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -158,107 +245,13 @@ export function PdktConsumersTab({
         })}
       </div>
 
-      {!consumerForm.isOpen && (
-        <button
-          onClick={handleAddClick}
-          className="w-full py-8 rounded-xl border border-dashed border-border/60 bg-muted/10 text-muted-foreground hover:text-foreground hover:bg-muted/20 hover:border-border transition-all flex flex-col items-center justify-center gap-2.5 group mt-2 shadow-inner cursor-pointer"
-        >
-          <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center group-hover:scale-105 transition-all">
-            <Plus className="w-5 h-5" />
-          </div>
-          <span className="text-xs font-semibold">
-            Tambah Karakter Baru
-          </span>
-        </button>
-      )}
-
-      {consumerForm.isOpen && (
-        <div
-          id="consumer-form"
-          className="bg-card rounded-xl border border-border/80 shadow-md overflow-hidden mt-6 relative"
-        >
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
-          <div className="px-6 py-4 border-b border-border/40 flex justify-between items-center bg-muted/10">
-            <h3 className="font-semibold text-foreground text-sm tracking-tight">
-              {consumerForm.editingId ? "Edit Karakter" : "Tambah Karakter"}
-            </h3>
-            <button
-              onClick={handleCancelConsumerForm}
-              className="w-8 h-8 flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="p-6 grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <SettingsField label="Nama Karakter / Tipe" id="consumer-name">
-                <SettingsInput
-                  id="consumer-name"
-                  type="text"
-                  placeholder="Contoh: Konsumen Milenial Galak"
-                  value={consumerForm.draft.name || ""}
-                  onChange={(e) => consumerForm.setDraft({ name: e.target.value })}
-                />
-              </SettingsField>
-            </div>
-            <div className="col-span-2 md:col-span-1">
-              <SettingsField label="Tingkat Kesulitan" id="consumer-difficulty">
-                <SettingsSelect
-                  id="consumer-difficulty"
-                  value={consumerForm.draft.difficulty || "Medium"}
-                  onChange={(e) =>
-                    consumerForm.setDraft({
-                      difficulty: e.target.value as PdktConsumerType["difficulty"],
-                    })
-                  }
-                >
-                  <option value="Easy">Mudah (Sopan)</option>
-                  <option value="Medium">Menengah (Netral)</option>
-                  <option value="Hard">Sulit (Marah/Kritis)</option>
-                </SettingsSelect>
-              </SettingsField>
-            </div>
-            <div className="col-span-2 md:col-span-1">
-              <SettingsField label="Tone Bicara / Keyword" id="consumer-tone">
-                <SettingsInput
-                  id="consumer-tone"
-                  type="text"
-                  placeholder="Contoh: ketus, menggunakan 'saya', menuntut"
-                  value={consumerForm.draft.tone || ""}
-                  onChange={(e) => consumerForm.setDraft({ tone: e.target.value })}
-                />
-              </SettingsField>
-            </div>
-            <div className="col-span-2">
-              <SettingsField label="Deskripsi Karakteristik" id="consumer-description">
-                <textarea
-                  id="consumer-description"
-                  className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary outline-none resize-none font-medium placeholder:text-muted-foreground/30"
-                  rows={3}
-                  placeholder="Jelaskan detail perilaku karakter ini agar AI dapat menirunya..."
-                  value={consumerForm.draft.description || ""}
-                  onChange={(e) => consumerForm.setDraft({ description: e.target.value })}
-                />
-              </SettingsField>
-            </div>
-            <div className="col-span-2 flex justify-end gap-2 pt-4 border-t border-border/40 mt-2">
-              <button
-                onClick={handleCancelConsumerForm}
-                className="px-4 py-2 rounded-lg text-xs font-semibold text-muted-foreground hover:bg-muted transition-all cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleSaveConsumer}
-                disabled={!consumerForm.draft.name || !consumerForm.draft.description}
-                className="px-5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-semibold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <button
+        onClick={handleAddClick}
+        className="w-full py-5 flex flex-col items-center justify-center gap-2 bg-transparent hover:bg-foreground/[0.02] border border-dashed border-border rounded-xl text-muted-foreground hover:text-foreground transition-colors group cursor-pointer"
+      >
+        <Plus className="w-5 h-5" />
+        <span className="text-sm font-medium">Buat Karakteristik Baru</span>
+      </button>
     </div>
   );
 }

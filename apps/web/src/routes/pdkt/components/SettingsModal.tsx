@@ -6,6 +6,7 @@ import {
   FileText,
   Users,
   Save,
+  RotateCcw,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePdktSettingsDraft } from "./settings/usePdktSettingsDraft";
@@ -90,140 +91,146 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-background/80 backdrop-blur-md"
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 15 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 15 }}
-            className="relative w-full max-w-4xl max-h-[88vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl bg-card border border-border/80"
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border"
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-border/40 flex justify-between items-center shrink-0 bg-muted/20 relative overflow-hidden">
+            <div className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0 bg-card">
               <div>
-                <h2 className="text-xl font-bold text-foreground tracking-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
                   Pengaturan Simulasi
                 </h2>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
-                  Modul PDKT
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Module PDKT
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-primary-foreground rounded-xl font-semibold text-xs transition-all shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/15 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 group cursor-pointer"
-                >
-                  <Save className="w-4 h-4 group-hover:scale-105 transition-transform" />
-                  <span>Simpan Perubahan</span>
-                </button>
-                <button
-                  onClick={onClose}
-                  className="w-9 h-9 flex items-center justify-center hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer border border-border/30 hover:border-border/60"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-muted-foreground hover:text-foreground transition-all border border-border"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Segmented Control Tabs */}
-            <div className="px-6 py-4 border-b border-border/30 bg-muted/5 shrink-0">
-              <div className="flex p-1 rounded-xl bg-muted border border-border/30">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2.5 py-2.5 text-xs font-semibold rounded-lg transition-all relative group cursor-pointer ${
-                      activeTab === tab.id
-                        ? "text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+              {/* Sidebar Navigation */}
+              <div className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-border bg-foreground/[0.01] flex md:flex-col overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3 gap-1 scrollbar-hide">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
+                        isActive
+                          ? "bg-foreground/5 text-foreground border border-border/50"
+                          : "text-muted-foreground hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4 shrink-0" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6 bg-background/20">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
                   >
-                    {activeTab === tab.id && (
-                      <motion.div
-                        layoutId="activeTabPDKT"
-                        className="absolute inset-0 shadow-sm rounded-lg bg-card border border-border/40"
-                        transition={{
-                          type: "spring",
-                          bounce: 0.1,
-                          duration: 0.4,
+                    {activeTab === "scenarios" && (
+                      <PdktScenariosTab
+                        scenarios={localSettings.scenarios}
+                        consumerTypes={localSettings.consumerTypes}
+                        scenarioForm={scenarioForm}
+                        enableImageGeneration={enableImageGeneration}
+                        setEnableImageGeneration={setEnableImageGeneration}
+                        customIdentity={{
+                          name: customSenderName,
+                          bodyName: customBodyName,
+                          email: customEmail,
+                          city: customCity,
                         }}
+                        globalConsumerTypeId={globalConsumerTypeId}
+                        setLocalSettings={setLocalSettings}
                       />
                     )}
-                    <span className="relative z-10 flex items-center gap-2">
-                      <tab.icon
-                        className={`w-4 h-4 transition-transform group-hover:scale-105 ${activeTab === tab.id ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`}
+
+                    {activeTab === "consumers" && (
+                      <PdktConsumersTab
+                        consumerTypes={localSettings.consumerTypes}
+                        globalConsumerTypeId={globalConsumerTypeId}
+                        setGlobalConsumerTypeId={setGlobalConsumerTypeId}
+                        consumerForm={consumerForm}
+                        setLocalSettings={setLocalSettings}
                       />
-                      {tab.label}
-                    </span>
-                  </button>
-                ))}
+                    )}
+
+                    {activeTab === "identity" && (
+                      <PdktIdentityTab
+                        customSenderName={customSenderName}
+                        setCustomSenderName={setCustomSenderName}
+                        customBodyName={customBodyName}
+                        setCustomBodyName={setCustomBodyName}
+                        customEmail={customEmail}
+                        setCustomEmail={setCustomEmail}
+                        customCity={customCity}
+                        setCustomCity={setCustomCity}
+                        consumerNameMentionPattern={consumerNameMentionPattern}
+                        setConsumerNameMentionPattern={setConsumerNameMentionPattern}
+                        handleResetDefaults={handleResetDefaults}
+                      />
+                    )}
+
+                    {activeTab === "system" && (
+                      <PdktSystemTab
+                        writingStyleMode={writingStyleMode}
+                        setWritingStyleMode={setWritingStyleMode}
+                        selectedModel={selectedModel}
+                        setSelectedModel={setSelectedModel}
+                      />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar bg-card">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.15 }}
+            <div className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0">
+              <button
+                onClick={handleResetDefaults}
+                className="flex items-center gap-2 text-[11px] font-medium text-red-500/60 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset Default
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
                 >
-                  {activeTab === "scenarios" && (
-                    <PdktScenariosTab
-                      scenarios={localSettings.scenarios}
-                      consumerTypes={localSettings.consumerTypes}
-                      scenarioForm={scenarioForm}
-                      enableImageGeneration={enableImageGeneration}
-                      setEnableImageGeneration={setEnableImageGeneration}
-                      customIdentity={{
-                        name: customSenderName,
-                        bodyName: customBodyName,
-                        email: customEmail,
-                        city: customCity,
-                      }}
-                      globalConsumerTypeId={globalConsumerTypeId}
-                      setLocalSettings={setLocalSettings}
-                    />
-                  )}
-
-                  {activeTab === "consumers" && (
-                    <PdktConsumersTab
-                      consumerTypes={localSettings.consumerTypes}
-                      globalConsumerTypeId={globalConsumerTypeId}
-                      setGlobalConsumerTypeId={setGlobalConsumerTypeId}
-                      consumerForm={consumerForm}
-                      setLocalSettings={setLocalSettings}
-                    />
-                  )}
-
-                  {activeTab === "identity" && (
-                    <PdktIdentityTab
-                      customSenderName={customSenderName}
-                      setCustomSenderName={setCustomSenderName}
-                      customBodyName={customBodyName}
-                      setCustomBodyName={setCustomBodyName}
-                      customEmail={customEmail}
-                      setCustomEmail={setCustomEmail}
-                      customCity={customCity}
-                      setCustomCity={setCustomCity}
-                      consumerNameMentionPattern={consumerNameMentionPattern}
-                      setConsumerNameMentionPattern={setConsumerNameMentionPattern}
-                      handleResetDefaults={handleResetDefaults}
-                    />
-                  )}
-
-                  {activeTab === "system" && (
-                    <PdktSystemTab
-                      writingStyleMode={writingStyleMode}
-                      setWritingStyleMode={setWritingStyleMode}
-                      selectedModel={selectedModel}
-                      setSelectedModel={setSelectedModel}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
+                  Batal
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Simpan Perubahan
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>

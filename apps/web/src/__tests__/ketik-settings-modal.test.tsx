@@ -80,11 +80,10 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     const systemTabButton = screen.getByText("Sistem");
     await user.click(systemTabButton);
 
-    // Click on Gemini 2.0 Flash Lite card
-    const gemini2Card = screen.getByText("Gemini 2.0 Flash Lite");
-    expect(screen.getByText("Gemini 3.5 Flash")).toBeDefined();
+    // Click on Gemini 3.5 Flash card
+    const gemini35Card = screen.getByText("Gemini 3.5 Flash");
     expect(screen.getByText("DeepSeek V4 Pro")).toBeDefined();
-    await user.click(gemini2Card);
+    await user.click(gemini35Card);
 
     // Click Save Changes (Simpan Perubahan)
     const saveButton = screen.getByRole("button", { name: /simpan perubahan/i });
@@ -92,7 +91,7 @@ describe("KETIK SettingsModal Characterization Tests", () => {
 
     expect(onSaveMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedModel: "gemini-2.0-flash-lite",
+        selectedModel: "gemini-3.5-flash",
       }),
     );
   });

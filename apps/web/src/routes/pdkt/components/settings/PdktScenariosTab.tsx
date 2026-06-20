@@ -5,6 +5,7 @@ import { notify } from "../../../../lib/toast";
 import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { normalizePdktScenarioDraft } from "./pdktDraftNormalizers";
+import { ArrowLeft } from "lucide-react";
 
 // Sub-components
 import { ScenarioList } from "./scenarios/ScenarioList";
@@ -82,9 +83,6 @@ export function PdktScenariosTab({
     setNewScenarioCategory("");
     setIsNewCategoryInput(false);
     setIsGeneratingTemplate(false);
-    setTimeout(() => {
-      document.getElementById("scenario-form")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
   };
 
   const handleEditClick = (scenario: PdktScenario) => {
@@ -92,9 +90,6 @@ export function PdktScenariosTab({
     setNewScenarioCategory(scenario.category);
     setIsNewCategoryInput(!categories.includes(scenario.category));
     setIsGeneratingTemplate(false);
-    setTimeout(() => {
-      document.getElementById("scenario-form")?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,6 +216,50 @@ export function PdktScenariosTab({
     scenarioForm.close();
   };
 
+  if (scenarioForm.isOpen) {
+    return (
+      <div className="space-y-6 pb-10">
+        <div className="flex items-center gap-2 border-b border-border pb-4">
+          <button
+            onClick={handleCancelScenarioForm}
+            className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Kembali ke Daftar Skenario
+          </button>
+        </div>
+        <ScenarioForm
+          scenarioForm={scenarioForm}
+          categories={categories}
+          isNewCategoryInput={isNewCategoryInput}
+          setIsNewCategoryInput={setIsNewCategoryInput}
+          newScenarioCategory={newScenarioCategory}
+          setNewScenarioCategory={setNewScenarioCategory}
+          onSave={handleSaveScenario}
+          onCancel={handleCancelScenarioForm}
+        >
+          <ScenarioTemplateField
+            draft={scenarioForm.draft}
+            onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+          >
+            <ScenarioAIGenerator
+              onGenerate={handleGenerateTemplate}
+              isGenerating={isGeneratingTemplate}
+              canGenerate={!!scenarioForm.draft.title && !!scenarioForm.draft.description}
+            />
+          </ScenarioTemplateField>
+
+          <ScenarioAttachments
+            attachmentImages={scenarioForm.draft.attachmentImages || []}
+            onUpload={handleImageUpload}
+            onRemove={handleRemoveImage}
+            fileInputRef={fileInputRef}
+          />
+        </ScenarioForm>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 mt-4">
       <ScenarioList
@@ -239,35 +278,6 @@ export function PdktScenariosTab({
         onDelete={handleDeleteScenario}
         onAdd={handleAddClick}
       />
-
-      <ScenarioForm
-        scenarioForm={scenarioForm}
-        categories={categories}
-        isNewCategoryInput={isNewCategoryInput}
-        setIsNewCategoryInput={setIsNewCategoryInput}
-        newScenarioCategory={newScenarioCategory}
-        setNewScenarioCategory={setNewScenarioCategory}
-        onSave={handleSaveScenario}
-        onCancel={handleCancelScenarioForm}
-      >
-        <ScenarioTemplateField
-          draft={scenarioForm.draft}
-          onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-        >
-          <ScenarioAIGenerator
-            onGenerate={handleGenerateTemplate}
-            isGenerating={isGeneratingTemplate}
-            canGenerate={!!scenarioForm.draft.title && !!scenarioForm.draft.description}
-          />
-        </ScenarioTemplateField>
-
-        <ScenarioAttachments
-          attachmentImages={scenarioForm.draft.attachmentImages || []}
-          onUpload={handleImageUpload}
-          onRemove={handleRemoveImage}
-          fileInputRef={fileInputRef}
-        />
-      </ScenarioForm>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   classifyDurationMode,
@@ -49,11 +48,9 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
 
   const handleCustomClick = () => {
     setMode('custom');
-    // Reveal input and focus
     setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
-    // If current customInputValue is empty or invalid, validate to trigger inline error if appropriate
     const validated = validateDuration(customInputValue);
     if (!validated.valid) {
       setValidationError(validated.error);
@@ -87,34 +84,40 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
 
   return (
     <div className="space-y-4 w-full">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {presets.map((duration) => {
           const isSelected = mode === 'preset' && value === duration;
           return (
             <div
               key={duration}
               onClick={() => handlePresetClick(duration)}
-              className={`cursor-pointer p-6 sm:p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-2 sm:gap-3 text-center relative group ${
+              className={`cursor-pointer p-5 rounded-xl border transition-colors flex flex-col justify-between h-28 relative group ${
                 isSelected
-                  ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/5'
-                  : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card/45 hover:bg-foreground/[0.02]'
               }`}
             >
-              <span
-                className={`text-3xl sm:text-4xl font-black tracking-tighter ${
-                  isSelected ? 'text-primary' : 'text-foreground/20'
-                }`}
-              >
-                {duration}
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              <div className="flex justify-between items-start w-full">
+                <span
+                  className={`text-3xl font-bold tracking-tight ${
+                    isSelected ? 'text-primary' : 'text-foreground/30'
+                  }`}
+                >
+                  {duration}
+                </span>
+                <div className="flex items-center shrink-0">
+                  {isSelected ? (
+                    <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    </div>
+                  ) : (
+                    <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
+                  )}
+                </div>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Menit
               </span>
-              {isSelected && (
-                <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 z-10">
-                  <Check className="w-4 h-4 text-white" />
-                </div>
-              )}
             </div>
           );
         })}
@@ -122,27 +125,33 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
         {/* Custom Card */}
         <div
           onClick={handleCustomClick}
-          className={`cursor-pointer p-6 sm:p-8 rounded-[2.5rem] border-2 transition-all flex flex-col items-center justify-center gap-2 sm:gap-3 text-center relative group ${
+          className={`cursor-pointer p-5 rounded-xl border transition-colors flex flex-col justify-between h-28 relative group ${
             mode === 'custom'
-              ? 'border-primary bg-primary/5 shadow-2xl shadow-primary/5'
-              : 'border-transparent bg-card border-border/50 hover:bg-foreground/5'
+              ? 'border-primary bg-primary/5'
+              : 'border-border bg-card/45 hover:bg-foreground/[0.02]'
           }`}
         >
-          <span
-            className={`text-3xl sm:text-4xl font-black tracking-tighter ${
-              mode === 'custom' ? 'text-primary' : 'text-foreground/20'
-            }`}
-          >
-            ⚙️
-          </span>
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <div className="flex justify-between items-start w-full">
+            <span
+              className={`text-3xl font-bold ${
+                mode === 'custom' ? 'text-primary' : 'text-foreground/30'
+              }`}
+            >
+              ⚙️
+            </span>
+            <div className="flex items-center shrink-0">
+              {mode === 'custom' ? (
+                <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                </div>
+              ) : (
+                <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
+              )}
+            </div>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Kustom
           </span>
-          {mode === 'custom' && (
-            <div className="absolute -top-3 -right-3 w-8 h-8 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 z-10">
-              <Check className="w-4 h-4 text-white" />
-            </div>
-          )}
         </div>
       </div>
 
@@ -155,9 +164,9 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
             exit={{ opacity: 0, height: 0, y: -10 }}
             className="overflow-hidden pt-2"
           >
-            <div className="p-6 rounded-[2rem] border border-border/50 bg-card/50 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+            <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
               <div>
-                <label className="block text-xs font-black text-foreground uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-foreground uppercase tracking-wide mb-1">
                   Masukkan Durasi Kustom
                 </label>
                 <p className="text-[11px] text-muted-foreground font-medium">
@@ -174,9 +183,9 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
                     value={customInputValue}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                    className="w-full rounded-2xl border border-border/50 bg-foreground/5 p-3.5 pr-12 text-base font-black text-foreground focus:ring-2 focus:ring-primary outline-none transition-all text-right"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors text-right font-medium pr-10"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black uppercase tracking-widest text-muted-foreground pointer-events-none">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold uppercase tracking-wider text-muted-foreground pointer-events-none">
                     Min
                   </span>
                 </div>
@@ -184,7 +193,7 @@ export const DurationSelector: React.FC<DurationSelectorProps> = ({
                   <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-[10px] font-black text-red-500 uppercase tracking-wider mt-1"
+                    className="text-[10px] font-semibold text-red-500 uppercase tracking-wide mt-1"
                   >
                     {validationError}
                   </motion.span>

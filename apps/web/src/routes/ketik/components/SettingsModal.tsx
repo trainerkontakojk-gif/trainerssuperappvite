@@ -79,135 +79,128 @@ export function SettingsModal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[86vh] rounded-[2rem] flex flex-col overflow-hidden shadow-2xl shadow-black/10 bg-card border border-border/50"
+            className="relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border"
           >
-            <div className="px-5 py-4 sm:px-6 sm:py-5 border-b flex justify-between items-center shrink-0 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent pointer-events-none" />
-              <div className="relative z-10">
-                <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+            <div className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
                   Pengaturan Simulasi
                 </h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Module KETIK
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-4 relative z-10">
-                <button
-                  onClick={onClose}
-                  className="w-10 h-10 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-xl text-muted-foreground hover:text-foreground transition-all border border-transparent hover:border-border/50"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-muted-foreground hover:text-foreground transition-all border border-border"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="px-5 sm:px-6 pt-5 pb-3 shrink-0">
-              <div className="flex p-2 rounded-2xl bg-foreground/[0.02] border border-border/50">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex-1 flex items-center justify-center gap-3 py-3.5 text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all relative group ${activeTab === tab.id ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+              {/* Sidebar Navigation */}
+              <div className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-border bg-foreground/[0.01] flex md:flex-col overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3 gap-1 scrollbar-hide">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as any)}
+                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
+                        isActive
+                          ? "bg-foreground/5 text-foreground border border-border/50"
+                          : "text-muted-foreground hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4 shrink-0" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Scrollable Content Area */}
+              <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
                   >
-                    {activeTab === tab.id && (
-                      <motion.div
-                        layoutId="activeTabKetik"
-                        className="absolute inset-0 bg-background shadow-sm rounded-xl"
-                        transition={{
-                          type: "spring",
-                          bounce: 0.15,
-                          duration: 0.6,
-                        }}
+                    {activeTab === "scenarios" && (
+                      <KetikScenariosTab
+                        scenarios={localSettings.scenarios}
+                        scenarioForm={scenarioForm}
+                        setLocalSettings={setLocalSettings}
                       />
                     )}
-                    <span className="relative z-10 flex items-center gap-2.5">
-                      <tab.icon className="w-4 h-4" />
-                      {tab.label}
-                    </span>
-                  </button>
-                ))}
+
+                    {activeTab === "consumers" && (
+                      <KetikConsumersTab
+                        consumerTypes={localSettings.consumerTypes}
+                        activeConsumerTypeId={localSettings.activeConsumerTypeId}
+                        consumerForm={consumerForm}
+                        setLocalSettings={setLocalSettings}
+                      />
+                    )}
+
+                    {activeTab === "identity" && (
+                      <KetikIdentityTab
+                        identitySettings={localSettings.identitySettings}
+                        handleIdentityChange={handleIdentityChange}
+                      />
+                    )}
+
+                    {activeTab === "template" && (
+                      <KetikTemplateTab
+                        quickTemplates={localSettings.quickTemplates || []}
+                        templateForm={templateForm}
+                        setLocalSettings={setLocalSettings}
+                      />
+                    )}
+
+                    {activeTab === "system" && (
+                      <KetikSystemTab
+                        localSettings={localSettings}
+                        setLocalSettings={setLocalSettings}
+                        durationMode={durationMode}
+                        handlePresetClick={handlePresetClick}
+                        handleCustomClick={handleCustomClick}
+                        customInputValue={customInputValue}
+                        handleDurationInputChange={handleDurationInputChange}
+                        handleDurationBlur={handleDurationBlur}
+                        durationValidationError={durationValidationError}
+                        inputRef={inputRef}
+                      />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 sm:px-6 pb-6 sm:pb-8">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  {activeTab === "scenarios" && (
-                    <KetikScenariosTab
-                      scenarios={localSettings.scenarios}
-                      scenarioForm={scenarioForm}
-                      setLocalSettings={setLocalSettings}
-                    />
-                  )}
-
-                  {activeTab === "consumers" && (
-                    <KetikConsumersTab
-                      consumerTypes={localSettings.consumerTypes}
-                      activeConsumerTypeId={localSettings.activeConsumerTypeId}
-                      consumerForm={consumerForm}
-                      setLocalSettings={setLocalSettings}
-                    />
-                  )}
-
-                  {activeTab === "identity" && (
-                    <KetikIdentityTab
-                      identitySettings={localSettings.identitySettings}
-                      handleIdentityChange={handleIdentityChange}
-                    />
-                  )}
-
-                  {activeTab === "template" && (
-                    <KetikTemplateTab
-                      quickTemplates={localSettings.quickTemplates || []}
-                      templateForm={templateForm}
-                      setLocalSettings={setLocalSettings}
-                    />
-                  )}
-
-                  {activeTab === "system" && (
-                    <KetikSystemTab
-                      localSettings={localSettings}
-                      setLocalSettings={setLocalSettings}
-                      durationMode={durationMode}
-                      handlePresetClick={handlePresetClick}
-                      handleCustomClick={handleCustomClick}
-                      customInputValue={customInputValue}
-                      handleDurationInputChange={handleDurationInputChange}
-                      handleDurationBlur={handleDurationBlur}
-                      durationValidationError={durationValidationError}
-                      inputRef={inputRef}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            <div className="px-10 py-8 border-t border-border/50 flex justify-between items-center bg-card/50 backdrop-blur-2xl shrink-0">
+            <div className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0">
               <button
                 onClick={handleResetDefaults}
-                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:text-red-500 transition-all px-6 py-3 rounded-2xl hover:bg-red-500/5 border border-transparent hover:border-red-500/20"
+                className="flex items-center gap-2 text-[11px] font-medium text-red-500/60 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 Reset Default
               </button>
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <button
                   onClick={onClose}
-                  className="px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-foreground/5 transition-all"
+                  className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-10 py-4 bg-foreground text-background rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-foreground/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2"
                 >
                   <Save className="w-4 h-4" />
                   Simpan Perubahan

@@ -53,29 +53,30 @@ export function PdktSystemTab({
             onClick={() => setWritingStyleMode("realistic")}
             className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
               writingStyleMode === "realistic"
-                ? "bg-card border-primary shadow-sm"
+                ? "bg-card border-primary"
                 : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
             }`}
           >
-            {writingStyleMode === "realistic" && (
-              <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-            )}
             <div className="flex justify-between items-start">
               <h4 className="font-semibold text-sm tracking-tight flex items-center gap-2 text-foreground">
                 <div
                   className={`w-2 h-2 rounded-full ${
                     writingStyleMode === "realistic"
-                      ? "bg-primary animate-pulse"
+                      ? "bg-primary"
                       : "bg-foreground/20"
                   }`}
                 />
                 Realistis
               </h4>
-              {writingStyleMode === "realistic" && (
-                <div className="bg-primary/10 text-primary p-1 rounded-md backdrop-blur-md">
-                  <Check className="w-3.5 h-3.5 stroke-[3px]" />
-                </div>
-              )}
+              <div className="flex items-center shrink-0">
+                {writingStyleMode === "realistic" ? (
+                  <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                  </div>
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
+                )}
+              </div>
             </div>
             <p className="text-xs font-medium leading-relaxed text-muted-foreground mt-2">
               Email mengandung typo, capslock, dan bahasa informal/kurang berpendidikan untuk simulasi yang lebih nyata.
@@ -87,13 +88,10 @@ export function PdktSystemTab({
             onClick={() => setWritingStyleMode("training")}
             className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
               writingStyleMode === "training"
-                ? "bg-card border-primary shadow-sm"
+                ? "bg-card border-primary"
                 : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
             }`}
           >
-            {writingStyleMode === "training" && (
-              <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-            )}
             <div className="flex justify-between items-start">
               <h4 className="font-semibold text-sm tracking-tight flex items-center gap-2 text-foreground">
                 <div
@@ -103,11 +101,15 @@ export function PdktSystemTab({
                 />
                 Latihan
               </h4>
-              {writingStyleMode === "training" && (
-                <div className="bg-primary/10 text-primary p-1 rounded-md backdrop-blur-md">
-                  <Check className="w-3.5 h-3.5 stroke-[3px]" />
-                </div>
-              )}
+              <div className="flex items-center shrink-0">
+                {writingStyleMode === "training" ? (
+                  <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                  </div>
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
+                )}
+              </div>
             </div>
             <p className="text-xs font-medium leading-relaxed text-muted-foreground mt-2">
               Email menggunakan bahasa yang rapi, terstruktur, dan formal untuk tahap awal pelatihan.
@@ -137,13 +139,10 @@ export function PdktSystemTab({
                 onClick={() => setSelectedModel(model.id)}
                 className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center justify-between gap-4 group relative overflow-hidden ${
                   isSelected
-                    ? "bg-card border-primary shadow-sm opacity-100"
-                    : "bg-card/30 border-border/40 opacity-60 hover:opacity-100 hover:bg-card/50"
+                    ? "bg-card border-primary opacity-100"
+                    : "bg-card/30 border-border/40 opacity-85 hover:opacity-100 hover:bg-card/50"
                 }`}
               >
-                {isSelected && (
-                  <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <h4 className="text-sm font-bold text-foreground tracking-tight truncate">
@@ -165,11 +164,15 @@ export function PdktSystemTab({
                     {model.description}
                   </p>
                 </div>
-                {isSelected && (
-                  <div className="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center shrink-0 text-primary">
-                    <Check className="w-4 h-4 stroke-[3px]" />
-                  </div>
-                )}
+                <div className="flex items-center shrink-0">
+                  {isSelected ? (
+                    <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    </div>
+                  ) : (
+                    <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
+                  )}
+                </div>
               </div>
             );
           })}

@@ -38,122 +38,145 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
   if (!isOpen) return null;
 
   const tabs = [
-    { id: 'scenarios', label: 'Masalah', icon: FileText },
-    { id: 'consumers', label: 'Karakter', icon: Users },
-    { id: 'identity', label: 'Identitas', icon: User },
-    { id: 'system', label: 'Sistem', icon: Settings },
-  ] as const;
+    { id: 'scenarios' as const, label: 'Masalah', icon: FileText },
+    { id: 'consumers' as const, label: 'Karakter', icon: Users },
+    { id: 'identity' as const, label: 'Identitas', icon: User },
+    { id: 'system' as const, label: 'Sistem', icon: Settings },
+  ];
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-[150] flex items-center justify-center p-4" onClick={handleClose}>
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-card w-full max-w-5xl max-h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-border"
-      >
-        {/* Modal Header */}
-        <div className="px-8 py-6 border-b border-border flex justify-between items-center bg-card/50 backdrop-blur-xl shrink-0">
-          <h2 className="text-2xl font-bold text-foreground tracking-tight">Pengaturan Simulasi</h2>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              Simpan Perubahan
-            </button>
-            <button
-              onClick={handleClose}
-              className="w-9 h-9 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-full text-muted-foreground transition-all"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Segmented Control Tabs */}
-        <div className="px-8 pt-6 pb-2 shrink-0 bg-card">
-          <div className="flex p-1 bg-foreground/5 rounded-xl">
-            {tabs.map((tab) => (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 md:p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleClose}
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border"
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0 bg-card">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+                  Pengaturan Simulasi
+                </h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    Module Telefun
+                  </span>
+                </div>
+              </div>
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-all relative ${
-                  activeTab === tab.id
-                    ? 'text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-muted-foreground'
-                }`}
+                onClick={handleClose}
+                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-muted-foreground hover:text-foreground transition-all border border-border"
               >
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId="activeTabTele"
-                    className="absolute inset-0 bg-card rounded-lg shadow-sm"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-2">
-                  <tab.icon className="w-4 h-4" />
-                  {tab.label}
-                </span>
+                <X className="w-4 h-4" />
               </button>
-            ))}
-          </div>
+            </div>
+
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+              {/* Sidebar Navigation */}
+              <div className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-border bg-foreground/[0.01] flex md:flex-col overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3 gap-1 scrollbar-hide">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
+                        isActive
+                          ? "bg-foreground/5 text-foreground border border-border/50"
+                          : "text-muted-foreground hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4 shrink-0" />
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6 bg-background/20">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {activeTab === 'scenarios' && (
+                      <TelefunScenariosTab
+                        scenarios={localSettings.scenarios}
+                        scenarioForm={scenarioForm}
+                        handleSelectAll={handleSelectAll}
+                        handleUnselectAll={handleUnselectAll}
+                        handleToggleScenario={handleToggleScenario}
+                        handleDeleteScenario={handleDeleteScenario}
+                        setLocalSettings={setLocalSettings}
+                      />
+                    )}
+
+                    {activeTab === 'consumers' && (
+                      <TelefunConsumersTab
+                        consumerTypes={localSettings.consumerTypes}
+                        preferredConsumerTypeId={localSettings.preferredConsumerTypeId}
+                        consumerForm={consumerForm}
+                        handleSelectConsumerType={handleSelectConsumerType}
+                        handleDeleteConsumer={handleDeleteConsumer}
+                        setLocalSettings={setLocalSettings}
+                      />
+                    )}
+
+                    {activeTab === 'identity' && (
+                      <TelefunIdentityTab
+                        identitySettings={localSettings.identitySettings}
+                        setLocalSettings={setLocalSettings}
+                      />
+                    )}
+
+                    {activeTab === 'system' && (
+                      <TelefunSystemTab
+                        localSettings={localSettings}
+                        setLocalSettings={setLocalSettings}
+                        selectedTelefunModel={selectedTelefunModel}
+                        setSelectedTelefunModel={setSelectedTelefunModel}
+                      />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-border flex justify-end items-center bg-card shrink-0">
+              <div className="flex gap-3">
+                <button
+                  onClick={handleClose}
+                  className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          </motion.div>
         </div>
-
-        {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-8 bg-background">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.15 }}
-            >
-              {activeTab === 'scenarios' && (
-                <TelefunScenariosTab
-                  scenarios={localSettings.scenarios}
-                  scenarioForm={scenarioForm}
-                  handleSelectAll={handleSelectAll}
-                  handleUnselectAll={handleUnselectAll}
-                  handleToggleScenario={handleToggleScenario}
-                  handleDeleteScenario={handleDeleteScenario}
-                  setLocalSettings={setLocalSettings}
-                />
-              )}
-
-              {activeTab === 'consumers' && (
-                <TelefunConsumersTab
-                  consumerTypes={localSettings.consumerTypes}
-                  preferredConsumerTypeId={localSettings.preferredConsumerTypeId}
-                  consumerForm={consumerForm}
-                  handleSelectConsumerType={handleSelectConsumerType}
-                  handleDeleteConsumer={handleDeleteConsumer}
-                  setLocalSettings={setLocalSettings}
-                />
-              )}
-
-              {activeTab === 'identity' && (
-                <TelefunIdentityTab
-                  identitySettings={localSettings.identitySettings}
-                  setLocalSettings={setLocalSettings}
-                />
-              )}
-
-              {activeTab === 'system' && (
-                <TelefunSystemTab
-                  localSettings={localSettings}
-                  setLocalSettings={setLocalSettings}
-                  selectedTelefunModel={selectedTelefunModel}
-                  setSelectedTelefunModel={setSelectedTelefunModel}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 };
