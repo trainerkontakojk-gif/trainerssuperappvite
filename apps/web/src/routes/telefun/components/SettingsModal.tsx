@@ -68,14 +68,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                   Pengaturan Simulasi
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <span className="text-xs font-medium text-foreground/75 uppercase tracking-wide">
                     Module Telefun
                   </span>
                 </div>
               </div>
               <button
                 onClick={handleClose}
-                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-muted-foreground hover:text-foreground transition-all border border-border"
+                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -93,7 +93,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                       className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
                         isActive
                           ? "bg-foreground/5 text-foreground border border-border/50"
-                          : "text-muted-foreground hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
+                          : "text-foreground/75 hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
                       }`}
                     >
                       <tab.icon className="w-4 h-4 shrink-0" />
@@ -161,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
+                  className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
                 >
                   Batal
                 </button>
