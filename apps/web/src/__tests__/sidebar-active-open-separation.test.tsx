@@ -58,6 +58,23 @@ function renderSidebar({ pathname, flyoutOpen, flyoutModule }: RenderProps) {
 }
 
 describe("Sidebar Active & Open Decoupling", () => {
+  it("hides the sidebar shell below desktop breakpoints", () => {
+    const { container } = renderSidebar({
+      pathname: "/dashboard",
+      flyoutOpen: false,
+      flyoutModule: null,
+    });
+
+    const sidebarShell = container.firstElementChild;
+
+    expect(sidebarShell).toHaveClass(
+      "hidden",
+      "h-screen",
+      "shrink-0",
+      "lg:flex",
+    );
+  });
+
   it("shows Profiler as data-active, and SIDAK/Management as inactive/closed when on Profiler page and no flyouts open", () => {
     const { container } = renderSidebar({
       pathname: "/profiler",

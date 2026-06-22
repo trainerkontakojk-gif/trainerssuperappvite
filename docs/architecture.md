@@ -164,7 +164,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 
 - `CONTEXT7_API_KEY` — disimpan di `.env.local` untuk context7 MCP server.
 
-File `.env.local` di root diabaikan oleh git, tapi isinya harus disinkronkan ke masing-masing apps jika diperlukan.
+File `.env` dan `.env.local` di root diabaikan oleh git, tapi isinya harus disinkronkan ke masing-masing apps jika diperlukan.
 
 ## Commands & Verification
 

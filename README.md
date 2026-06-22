@@ -61,6 +61,8 @@ pnpm lint
 
 ## Environment Variables
 
+File `.env` dan `.env.local` di root diabaikan oleh git. Untuk kerja lokal, pakai `.env.local` sebagai tempat utama menyimpan rahasia dan override, lalu salin template yang tersedia jika perlu.
+
 ### Frontend (`apps/web`)
 
 Gunakan prefix `VITE_` untuk variabel yang dibaca langsung saat build frontend:

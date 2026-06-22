@@ -128,7 +128,7 @@ export function Sidebar({
   };
 
   return (
-    <div className="flex h-screen shrink-0" ref={sidebarRef}>
+    <div className="hidden h-screen shrink-0 lg:flex" ref={sidebarRef}>
       {/* Desktop Icon Rail */}
       <div className="sidebar-rail hidden lg:flex">
         {/* BrandMark */}
