@@ -7,6 +7,7 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 
 | #  | Rollback Script                                                              | Dependency                                                             |
 | -- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Latest | `rollback_20260622150000_repair_telefun_scoring_lifecycle_contract.sql`  | DATA LOSS: revert API and back up scoring data first                    |
 | 1  | `rollback_20260619090000_telefun_live_per_minute_billing.sql`                | Restores pre-per-minute billing view, then drops nullable Telefun billing columns. |
 | 2  | `rollback_20260612000000_fix_profiles_rls_recursion.sql`                     | Independently reversible                                               |
 | 3  | `rollback_20260611201000_telefun_scoring_retry_queue.sql`                    | Independently reversible                                               |
@@ -54,8 +55,9 @@ The most recently applied migration is rolled back first, and `000_profiles_core
 # Execute a single rollback (example: rollback migration 013)
 psql "$DATABASE_URL" -f supabase/rollbacks/rollback_013_refresh_mv_function.sql
 
-# Execute the 22 latest rollbacks (from 20260619090000 → 20260520054101)
+# Execute the 23 latest rollbacks (from 20260622150000 → 20260520054101)
 for f in \
+  rollback_20260622150000_repair_telefun_scoring_lifecycle_contract.sql \
   rollback_20260619090000_telefun_live_per_minute_billing.sql \
   rollback_20260612000000_fix_profiles_rls_recursion.sql \
   rollback_20260611201000_telefun_scoring_retry_queue.sql \
@@ -83,6 +85,7 @@ done
 
 # Execute ALL rollbacks in order (CAUTION: destroys all application data)
 for f in \
+  rollback_20260622150000_repair_telefun_scoring_lifecycle_contract.sql \
   rollback_20260619090000_telefun_live_per_minute_billing.sql \
   rollback_20260612000000_fix_profiles_rls_recursion.sql \
   rollback_20260611201000_telefun_scoring_retry_queue.sql \

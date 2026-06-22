@@ -2,6 +2,7 @@ import { supabase } from "../../lib/supabase";
 import { telefunClient, unwrapResponse } from "../../lib/api";
 import { buildTelefunRecordingPath } from "./recordingPath";
 import { remuxRecording } from "./services/telefun-recording-remux-service";
+import type { RemuxRecordingResult } from "./services/telefun-recording-remux-service";
 import type { CallRecord } from "./types";
 import type { TelefunAppSettings } from "./telefunSettings";
 import type {
@@ -32,6 +33,11 @@ export interface FinalizerDependencies {
     recordingPath?: string;
     agentRecordingPath?: string;
   }) => Promise<void>;
+  remuxRecording: (sessionId: string) => Promise<{
+    success: boolean;
+    data?: RemuxRecordingResult;
+    error?: string;
+  }>;
   scoreSession: (sessionId: string) => Promise<TelefunScoreResult>;
 }
 
@@ -55,6 +61,7 @@ const defaultDependencies: FinalizerDependencies = {
   finalizeRecording: async (params) => {
     await unwrapResponse(await telefunClient["finalize-recording"].$post({ json: params }));
   },
+  remuxRecording,
   scoreSession: async (sessionId) => {
     const response = await (unwrapResponse(await telefunClient.score[":sessionId"].$post({ param: { sessionId }, json: {} })) as any);
     const result = parseTelefunScoreResult(response);
@@ -69,12 +76,14 @@ interface FinalizerStatus {
   uploadFailed: boolean;
   saveFailed: boolean;
   scoringFailed: boolean;
+  remuxed: boolean;
 }
 
 const createFinalizerStatus = (): FinalizerStatus => ({
   uploadFailed: false,
   saveFailed: false,
   scoringFailed: false,
+  remuxed: false,
 });
 
 const markUploadFailed = (status: FinalizerStatus) => {
@@ -87,6 +96,10 @@ const markSaveFailed = (status: FinalizerStatus) => {
 
 const markScoringFailed = (status: FinalizerStatus) => {
   status.scoringFailed = true;
+};
+
+const markRemuxed = (status: FinalizerStatus) => {
+  status.remuxed = true;
 };
 
 export async function finalizeTelefunSession(params: {
@@ -105,6 +118,7 @@ export async function finalizeTelefunSession(params: {
   scoringFailed: boolean;
   saveFailed: boolean;
   uploadFailed: boolean;
+  remuxed: boolean;
 }> {
   const deps = { ...defaultDependencies, ...params.dependencies };
   const status = createFinalizerStatus();
@@ -166,7 +180,7 @@ export async function finalizeTelefunSession(params: {
     }
   }
 
-  // 4. Patch session status, duration, metrics without score/feedback first
+  // 4. Patch session status, duration, metrics (without score/feedback)
   try {
     await deps.patchSession(params.sessionId, {
       status: "completed",
@@ -178,7 +192,7 @@ export async function finalizeTelefunSession(params: {
     markSaveFailed(status);
   }
 
-  // 5. Call finalize-recording if either path exists
+  // 5. Finalize recording paths in DB
   if (recordingPath || agentRecordingPath) {
     try {
       await deps.finalizeRecording({
@@ -191,7 +205,28 @@ export async function finalizeTelefunSession(params: {
     }
   }
 
-  // 6. Call scoreSession only after agent recording path is persisted in DB
+  // 6. Remux recordings BEFORE scoring (wait for remux to complete)
+  if (recordingPath || agentRecordingPath) {
+    try {
+      const remuxResult = await deps.remuxRecording(params.sessionId);
+      const playbackPath = recordingPath || agentRecordingPath;
+      const playbackRemuxed = playbackPath
+        ? remuxResult.data?.recordings[playbackPath]?.remuxed
+        : false;
+      if (
+        remuxResult.success &&
+        (playbackRemuxed || remuxResult.data?.remuxed)
+      ) {
+        markRemuxed(status);
+      } else {
+        console.warn("[Telefun] Remux not successful, using original recordings:", remuxResult.error);
+      }
+    } catch (err) {
+      console.warn("[Telefun] Remux failed before scoring:", err);
+    }
+  }
+
+  // 7. Score session (only if agent recording existed)
   let score: number | undefined;
   let feedback = "";
   let voiceAssessment: VoiceQualityAssessment | undefined;
@@ -209,7 +244,7 @@ export async function finalizeTelefunSession(params: {
     markScoringFailed(status);
   }
 
-  // 7. Patch score and feedback if scoring succeeds
+  // 8. Patch score and feedback if scoring succeeded
   if (!status.scoringFailed && score !== undefined) {
     try {
       await deps.patchSession(params.sessionId, {
@@ -221,17 +256,14 @@ export async function finalizeTelefunSession(params: {
     }
   }
 
-  // 8. Remux recordings for seekable playback (best-effort, non-blocking)
-  if (recordingPath || agentRecordingPath) {
-    remuxRecording(params.sessionId).catch((err) => {
-      console.warn("[Telefun] Background remux failed:", err);
-    });
-  }
+  // If remux succeeded, use signed URL (empty string — ReviewModal will fetch via API).
+  // If remux failed or wasn't attempted, fall back to blob URL.
+  const playbackUrl = status.remuxed ? "" : (params.localUrl || "");
 
   const record: CallRecord = {
     id: params.sessionId,
     date: new Date().toISOString(),
-    url: params.localUrl || "",
+    url: playbackUrl,
     consumerName: params.sessionConfig?.consumerName || params.consumerName,
     scenarioTitle:
       params.sessionConfig?.scenarioTitle || params.scenarioTitle || "Custom",
@@ -256,5 +288,6 @@ export async function finalizeTelefunSession(params: {
     scoringFailed: status.scoringFailed,
     saveFailed: status.saveFailed,
     uploadFailed: status.uploadFailed,
+    remuxed: status.remuxed,
   };
 }

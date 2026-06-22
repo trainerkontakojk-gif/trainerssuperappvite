@@ -308,6 +308,33 @@ describe("buildTelefunLiveSystemInstruction", () => {
     expect(prompt).not.toContain("SILENT HANDLING");
   });
 
+  it("includes ATURAN KEPATUHAN PROSEDURAL with compliance rules", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: {
+        name: "Budi",
+        gender: "male",
+        phone: "0812",
+        city: "Jakarta",
+        voiceName: "Fenrir",
+        signatureName: "",
+      },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "realistic",
+      maxCallDuration: 0,
+    });
+    expect(prompt).toContain("ATURAN KEPATUHAN PROSEDURAL");
+    expect(prompt).toContain("boleh saya hold?");
+    expect(prompt).toContain("Iya silakan");
+    expect(prompt).toContain("mencatat informasi");
+    expect(prompt).toContain("BUKAN berarti masalah Anda selesai");
+    expect(prompt).toContain("Konsumen NORMAL akan mengikuti");
+    expect(prompt).toContain("SETELAH HOLD");
+    expect(prompt).toContain("Halo? Masih ada?");
+    expect(prompt).toContain("Terima kasih telah menunggu");
+    expect(prompt).toContain("Iya masih ada");
+  });
+
   it("no script produces no script section", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: {

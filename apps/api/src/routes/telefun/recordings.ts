@@ -296,7 +296,7 @@ telefunRecordings.post("/score/:id", async (c) => {
         });
       }
 
-      // Still processing or failed — return conflict
+      // Still processing or failed — return conflict with structured details
       return c.json(
         {
           success: false,
@@ -306,7 +306,7 @@ telefunRecordings.post("/score/:id", async (c) => {
               session.scoring_status === "processing"
                 ? "Scoring sedang diproses."
                 : "Scoring sebelumnya gagal. Coba lagi.",
-            scoringStatus: session.scoring_status,
+            details: { scoringStatus: session.scoring_status },
           },
         },
         409,

@@ -19,6 +19,7 @@ import {
   isTelefunRecordingPathOwnedBySession,
   buildTelefunSessionUpdatePayload,
   buildTelefunFeedbackSummary,
+  buildSeekablePath,
 } from "../routes/telefun";
 
 import { telefunTranscriptSchema, parseTelefunTranscript } from "@trainers/types";
@@ -336,5 +337,32 @@ describe("telefun API payload and security validators", () => {
     expect(parseTelefunTranscript(undefined)).toEqual([]);
     expect(parseTelefunTranscript("string")).toEqual([]);
     expect(parseTelefunTranscript({})).toEqual([]);
+  });
+});
+
+describe("buildSeekablePath", () => {
+  it("converts full_call.webm to full_call.seekable.webm", () => {
+    const result = buildSeekablePath("u1/s1/full_call.webm");
+    expect(result).toBe("u1/s1/full_call.seekable.webm");
+  });
+
+  it("converts agent_only.webm to agent_only.seekable.webm", () => {
+    const result = buildSeekablePath("u1/s1/agent_only.webm");
+    expect(result).toBe("u1/s1/agent_only.seekable.webm");
+  });
+
+  it("handles paths without extension", () => {
+    const result = buildSeekablePath("u1/s1/full_call");
+    expect(result).toBe("u1/s1/full_call.seekable.webm");
+  });
+
+  it("handles paths with multiple dots", () => {
+    const result = buildSeekablePath("u1/s1/full_call.old.webm");
+    expect(result).toBe("u1/s1/full_call.old.seekable.webm");
+  });
+
+  it("keeps an existing seekable path idempotent", () => {
+    const path = "u1/s1/full_call.seekable.webm";
+    expect(buildSeekablePath(path)).toBe(path);
   });
 });

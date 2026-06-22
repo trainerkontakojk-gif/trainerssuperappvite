@@ -142,7 +142,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     setRecordingError(null);
     setRecordingLoading(false);
 
-    if (record.url && retryTrigger === 0) {
+    const hasPersistentRecording = Boolean(
+      record.recordingPath || record.agentRecordingPath,
+    );
+
+    if (record.url && !hasPersistentRecording && retryTrigger === 0) {
       setRecordingUrl(record.url);
       return;
     }

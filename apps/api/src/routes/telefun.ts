@@ -21,3 +21,4 @@ export { telefun };
 export { buildTelefunSessionInsertPayload, buildTelefunSessionUpdatePayload } from "./telefun/sessions";
 export { buildTelefunFeedbackSummary, isTelefunRecordingPathOwnedBySession } from "./telefun/recordings";
 export { buildTelefunSettingsUpsertPayload } from "./telefun/settings";
+export { buildSeekablePath } from "./telefun/remux-recording";

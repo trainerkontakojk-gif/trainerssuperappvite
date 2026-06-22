@@ -6,6 +6,14 @@ import type {
   VoiceQualityAssessment,
 } from "@trainers/types";
 
+// Mock remuxRecording so tests don't hit the actual API
+vi.mock("../routes/telefun/services/telefun-recording-remux-service", () => ({
+  remuxRecording: vi.fn(async () => ({
+    success: true,
+    data: { remuxed: true, recordings: {} },
+  })),
+}));
+
 function baseMetrics(): SessionMetrics {
   return {
     speechSegments: [],
@@ -50,7 +58,7 @@ describe("Telefun Session Finalizer", () => {
     communicationProfile: null,
   };
 
-  it("uploads and finalizes recording before scoring", async () => {
+  it("uploads, finalizes, remuxes then scores in correct order", async () => {
     const calls: string[] = [];
 
     const result = await finalizeTelefunSession({
@@ -75,6 +83,13 @@ describe("Telefun Session Finalizer", () => {
         finalizeRecording: vi.fn(async () => {
           calls.push("finalize");
         }),
+        remuxRecording: vi.fn(async () => {
+          calls.push("remux");
+          return {
+            success: true,
+            data: { remuxed: true, recordings: {} },
+          };
+        }),
         scoreSession: vi.fn(async () => {
           calls.push("score");
           return {
@@ -86,16 +101,131 @@ describe("Telefun Session Finalizer", () => {
       },
     });
 
+    // Order: upload → patch → finalize → remux → score → patch(score)
+    // remux is auto-mocked, not tracked in calls
     expect(calls).toEqual([
       "upload:full_call",
       "upload:agent_only",
       "patch",
       "finalize",
+      "remux",
       "score",
       "patch",
     ]);
     expect(result.record.score).toBe(8);
     expect(result.record.feedback).toBe("Bagus");
+  });
+
+  it("marks remuxed=true when remux succeeds and uses empty url (signed URL fallback)", async () => {
+    const result = await finalizeTelefunSession({
+      sessionId: "session-remuxed",
+      fullBlob: new Blob(["full"]),
+      agentBlob: new Blob(["agent"]),
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: null,
+      scenarioTitle: "Test",
+      consumerName: "Test",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "path"),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => ({
+          score: 8,
+          feedback: "Bagus",
+          assessment: mockAssessment,
+        })),
+      },
+    });
+
+    expect(result.remuxed).toBe(true);
+    // When remuxed, url is empty (ReviewModal will fetch signed URL via API)
+    expect(result.record.url).toBe("");
+  });
+
+  it("falls back to blob url when remux fails", async () => {
+    const remuxMock = (await import("../routes/telefun/services/telefun-recording-remux-service")).remuxRecording as any;
+    remuxMock.mockResolvedValueOnce({
+      success: false,
+      error: "FFmpeg not available",
+    });
+
+    const result = await finalizeTelefunSession({
+      sessionId: "session-remux-fail",
+      fullBlob: new Blob(["full"]),
+      agentBlob: new Blob(["agent"]),
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:fallback",
+      sessionConfig: null,
+      scenarioTitle: "Test",
+      consumerName: "Test",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "path"),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => ({
+          score: 8,
+          feedback: "Bagus",
+          assessment: mockAssessment,
+        })),
+      },
+    });
+
+    expect(result.remuxed).toBe(false);
+    expect(result.record.url).toBe("blob:fallback");
+  });
+
+  it("uses the persistent player URL when full-call remux succeeds partially", async () => {
+    const fullPath = "user-1/session-partial/full_call.webm";
+    const agentPath = "user-1/session-partial/agent_only.webm";
+    const result = await finalizeTelefunSession({
+      sessionId: "session-partial",
+      fullBlob: new Blob(["full"]),
+      agentBlob: new Blob(["agent"]),
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:stale",
+      sessionConfig: null,
+      scenarioTitle: "Test",
+      consumerName: "Test",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async ({ type }) =>
+          type === "full_call" ? fullPath : agentPath,
+        ),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        remuxRecording: vi.fn(async () => ({
+          success: true,
+          data: {
+            remuxed: false,
+            recordings: {
+              [fullPath]: {
+                originalPath: fullPath,
+                seekablePath: "user-1/session-partial/full_call.seekable.webm",
+                remuxed: true,
+              },
+              [agentPath]: {
+                originalPath: agentPath,
+                remuxed: false,
+              },
+            },
+          },
+        })),
+        scoreSession: vi.fn(async () => ({
+          score: 8,
+          feedback: "Bagus",
+          assessment: mockAssessment,
+        })),
+      },
+    });
+
+    expect(result.remuxed).toBe(true);
+    expect(result.record.url).toBe("");
   });
 
   it("includes voiceAssessment in record when scoring provides assessment", async () => {

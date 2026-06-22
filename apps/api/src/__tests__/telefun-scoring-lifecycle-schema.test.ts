@@ -109,10 +109,12 @@ describe("Telefun scoring lifecycle migration contract", () => {
     }
   });
 
-  it("only P1.6 retry queue migration re-defines the lifecycle RPCs", () => {
+  it("only P1.6 retry queue and terminal repair migration re-define the lifecycle RPCs", () => {
     const retryFile = "20260611201000_telefun_scoring_retry_queue.sql";
+    const terminalFile = "20260622150000_repair_telefun_scoring_lifecycle_contract.sql";
+    const allowed = new Set([retryFile, terminalFile]);
     const allFiles = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith(".sql") && f > migrationName && f !== retryFile)
+      .filter((f) => f.endsWith(".sql") && f > migrationName && !allowed.has(f))
       .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
       .join("\n");
     expect(allFiles).not.toMatch(/FUNCTION\s+public\.claim_telefun_scoring/i);

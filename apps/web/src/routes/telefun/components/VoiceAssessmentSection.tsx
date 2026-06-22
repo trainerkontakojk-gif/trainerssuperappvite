@@ -87,7 +87,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         setScoringStatus("failed");
       }
     } catch (e: any) {
-      const scoringStatusRaw = e?.scoringStatus;
+      const scoringStatusRaw = e?.details?.scoringStatus;
       if (scoringStatusRaw === "processing") {
         setScoringStatus("processing");
         setError("Analisis suara sedang diproses otomatis. Silakan tunggu beberapa saat.");

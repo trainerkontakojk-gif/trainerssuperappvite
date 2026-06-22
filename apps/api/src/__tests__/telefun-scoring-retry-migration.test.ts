@@ -84,9 +84,10 @@ describe("Telefun scoring retry migration contract", () => {
     expect(authGrants).toBeNull();
   });
 
-  it("no later migration re-defines the same RPCs", () => {
+  it("no later migration except terminal repair re-defines the same RPCs", () => {
+    const terminalFile = "20260622150000_repair_telefun_scoring_lifecycle_contract.sql";
     const allFiles = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith(".sql") && f > p16Migration)
+      .filter((f) => f.endsWith(".sql") && f > p16Migration && f !== terminalFile)
       .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
       .join("\n");
     expect(allFiles).not.toMatch(/FUNCTION\s+public\.reschedule_telefun_scoring/i);
