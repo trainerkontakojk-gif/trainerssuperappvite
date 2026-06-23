@@ -60,6 +60,10 @@ export class LiveSession {
   private isAiSpeaking: boolean = false;
   private sessionState: TelefunSessionState = "idle";
   private isSetupComplete: boolean = false;
+
+  // Playback source tracking — prevents AI audio overlap
+  private activeSources: Set<AudioBufferSourceNode> = new Set();
+  private pendingTurnCompletion: boolean = false;
   private hasSentFirstUserAudio: boolean = false;
   private hasReceivedFirstModelAudio: boolean = false;
 
@@ -270,6 +274,15 @@ export class LiveSession {
       this.emitTimelineEvent("setup_complete_received");
     }
 
+    if (msg.serverContent?.modelTurn?.parts) {
+      if (this.pendingTurnCompletion) {
+        this.stopActiveSources();
+      }
+      this.lastModelActivityMs = Date.now();
+      this.setIsAiSpeaking(true);
+      this.setSessionState("ai_speaking");
+    }
+
     const chunks = extractGeminiInlineAudioChunks(msg);
     for (const chunk of chunks) {
       this.playPcm(chunk.data, chunk.sampleRate);
@@ -280,19 +293,20 @@ export class LiveSession {
       }
     }
 
-    if (msg.serverContent?.modelTurn?.parts) {
-      this.lastModelActivityMs = Date.now();
-      this.setIsAiSpeaking(true);
-      this.setSessionState("ai_speaking");
-    }
+    // Turn complete → defer isAiSpeaking(false) until queued sources drain
     if (msg.serverContent?.turnComplete) {
-      this.setIsAiSpeaking(false);
-      this.setSessionState("idle");
+      this.pendingTurnCompletion = true;
+      if (this.activeSources.size === 0) {
+        this.setIsAiSpeaking(false);
+        this.setSessionState("idle");
+        this.pendingTurnCompletion = false;
+      }
     }
     if (msg.type === "silence") {
       this.deadAirCount++;
     }
     if (msg.serverContent?.interrupted) {
+      this.clearAiPlayback("server_interrupted");
       this.emitTimelineEvent("interrupted_received");
     }
 
@@ -496,6 +510,32 @@ export class LiveSession {
     }
   }
 
+  /** Stop all active sources without touching isAiSpeaking state. */
+  private stopActiveSources() {
+    for (const source of this.activeSources) {
+      try {
+        source.stop();
+      } catch {
+        /* already stopped */
+      }
+      try {
+        source.disconnect();
+      } catch {
+        /* already disconnected */
+      }
+    }
+    this.activeSources.clear();
+    this.nextStartTime = 0;
+    this.pendingTurnCompletion = false;
+  }
+
+  /** Stop all active sources AND mark AI as not speaking. */
+  private clearAiPlayback(_reason: string) {
+    this.stopActiveSources();
+    this.setIsAiSpeaking(false);
+    this.setSessionState("idle");
+  }
+
   private playPcm(data: Uint8Array, sampleRate = 24000) {
     if (!this.audioContext || !this.recordingDestination || this.isHeld) return;
 
@@ -516,6 +556,15 @@ export class LiveSession {
     source.buffer = buffer;
     source.connect(this.audioContext.destination);
     source.connect(this.recordingDestination);
+    this.activeSources.add(source);
+    source.onended = () => {
+      this.activeSources.delete(source);
+      if (this.activeSources.size === 0 && this.pendingTurnCompletion) {
+        this.pendingTurnCompletion = false;
+        this.setIsAiSpeaking(false);
+        this.setSessionState("idle");
+      }
+    };
 
     const startTime = Math.max(
       this.audioContext.currentTime,
@@ -526,13 +575,7 @@ export class LiveSession {
   }
 
   private cancelAiPlayback() {
-    this.nextStartTime = 0; // Reset scheduling
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      // Send interruption to Gemini if supported by proxy
-      this.ws.send(
-        JSON.stringify({ clientContent: { turns: [], interrupted: true } }),
-      );
-    }
+    this.clearAiPlayback("interruption_guard");
   }
 
   private sendSetup() {
@@ -669,6 +712,9 @@ export class LiveSession {
       ? startHold(this.holdTracker, relativeNow)
       : endHold(this.holdTracker, relativeNow);
     this.isHeld = this.holdTracker.active !== null;
+    if (held) {
+      this.clearAiPlayback("hold_activated");
+    }
     this.emitTimelineEvent("hold_state_changed", {
       held: this.isHeld,
       ...getActiveHoldSnapshot(this.holdTracker, relativeNow),
@@ -836,6 +882,7 @@ export class LiveSession {
   }
 
   private cleanupAudio() {
+    this.clearAiPlayback("cleanup");
     if (this.workletNode) {
       this.workletNode.port.onmessage = null;
       this.workletNode.disconnect();
