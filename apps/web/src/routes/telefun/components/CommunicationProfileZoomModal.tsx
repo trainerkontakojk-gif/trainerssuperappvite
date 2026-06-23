@@ -163,9 +163,9 @@ export const CommunicationProfileZoomModal: React.FC<
                 <div className="flex items-start gap-2">
                   <TrendingDown className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <span>
-                    <strong className="text-foreground">Fillers:</strong> target
-                    QA memang rendah. Semakin dekat hasil Anda ke target rendah
-                    ini, semakin baik.
+                    <strong className="text-foreground">Fillers:</strong> skor
+                    makin tinggi berarti kata pengisi makin sedikit. Detail
+                    tetap menampilkan jumlah filler mentah.
                   </span>
                 </div>
               </div>

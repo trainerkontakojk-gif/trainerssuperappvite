@@ -191,13 +191,14 @@ describe("getCommunicationProfileFromAssessment", () => {
         {
           key: "fillers",
           label: "Fillers",
-          value: 20,
-          benchmarkValue: 20,
+          value: 80,
+          benchmarkValue: 80,
           score: 6,
-          displayScore: 20,
-          targetScore: 20,
+          displayScore: 80,
+          targetScore: 80,
           targetDirection: "lower_raw_is_better",
-          evaluationMode: "lower_better",
+          evaluationMode: "higher_better",
+          goodMin: 80,
           verdict: "Fine",
           status: "good",
           feedback: "Some fillers",
@@ -286,10 +287,12 @@ describe("getCommunicationProfileFromAssessment", () => {
     expect(result!.strengths).toBeDefined();
   });
 
-  it("fillers in fallback uses lower_better mode", () => {
+  it("fillers in fallback uses higher_better quality score mode", () => {
     const result = getCommunicationProfileFromAssessment(valid);
     const fillers = result!.metrics.find((m: any) => m.key === "fillers");
-    expect(fillers!.evaluationMode).toBe("lower_better");
+    expect(fillers!.evaluationMode).toBe("higher_better");
+    expect(fillers!.targetDirection).toBe("lower_raw_is_better");
+    expect(fillers!.displayScore).toBe(60);
   });
 
   it("speakingRate in fallback uses optimal_range mode", () => {

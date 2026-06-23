@@ -26,7 +26,7 @@ const AXIS_META: Record<
   speakingRate: { label: "Speaking Rate", directionHint: "ideal stabil" },
   intonation: { label: "Intonation", directionHint: "semakin tinggi" },
   articulation: { label: "Articulation", directionHint: "semakin tinggi" },
-  fillers: { label: "Fillers", directionHint: "semakin rendah" },
+  fillers: { label: "Fillers", directionHint: "skor semakin tinggi" },
   tone: { label: "Tone", directionHint: "semakin tinggi" },
 };
 
@@ -36,10 +36,7 @@ export function buildVoiceRadarData(
   return profile.metrics.map((metric) => ({
     key: metric.key,
     subject: metric.key,
-    label:
-      metric.key === "fillers"
-        ? "Fillers (↓)"
-        : (AXIS_META[metric.key]?.label ?? metric.label),
+    label: AXIS_META[metric.key]?.label ?? metric.label,
     userValue: metric.displayScore ?? metric.value,
     targetValue: metric.targetScore ?? metric.benchmarkValue,
     fullMark: 100,

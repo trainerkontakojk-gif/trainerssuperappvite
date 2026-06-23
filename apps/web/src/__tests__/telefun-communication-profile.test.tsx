@@ -64,16 +64,16 @@ const mockProfile: TelefunCommunicationProfile = {
     {
       key: "fillers",
       label: "Fillers",
-      value: 15,
-      benchmarkValue: 20,
+      value: 80,
+      benchmarkValue: 80,
       score: 8,
-      displayScore: 15,
-      targetScore: 20,
+      displayScore: 80,
+      targetScore: 80,
       targetDirection: "lower_raw_is_better",
       rawValue: 2,
       rawUnit: "filler_words",
-      evaluationMode: "lower_better",
-      goodMax: 30,
+      evaluationMode: "higher_better",
+      goodMin: 80,
       verdict: "Baik",
       status: "good",
       feedback: "Kata pengisi minim.",
@@ -115,8 +115,8 @@ describe("buildVoiceRadarData", () => {
 
     const fillers = data.find((d) => d.key === "fillers");
     expect(fillers).toBeDefined();
-    expect(fillers!.userValue).toBe(15);
-    expect(fillers!.targetValue).toBe(20);
+    expect(fillers!.userValue).toBe(80);
+    expect(fillers!.targetValue).toBe(80);
   });
 
   it("produces non-zero userValue and targetValue for all metrics", () => {
@@ -141,11 +141,11 @@ describe("buildVoiceRadarData", () => {
     expect(sr.targetValue).toBe(70);
   });
 
-  it("labels fillers with low-target hint", () => {
+  it("labels fillers without implying lower score is better", () => {
     const fillers = buildVoiceRadarData(mockProfile).find(
       (d) => d.key === "fillers",
     )!;
-    expect(fillers.label).toContain("↓");
+    expect(fillers.label).toBe("Fillers");
   });
 });
 
@@ -310,7 +310,7 @@ describe("CommunicationProfileZoomModal", () => {
     }
   });
 
-  it("shows Fillers direction as target QA memang rendah in how-to-read", () => {
+  it("shows Fillers as higher quality score with lower raw count in how-to-read", () => {
     render(
       <CommunicationProfileZoomModal
         isOpen
@@ -322,7 +322,7 @@ describe("CommunicationProfileZoomModal", () => {
     expect(fillersElements.length).toBeGreaterThan(0);
     expect(
       screen.getByText(
-        /target QA memang rendah. Semakin dekat hasil Anda ke target rendah ini, semakin baik./,
+        /skor makin tinggi berarti kata pengisi makin sedikit. Detail tetap menampilkan jumlah filler mentah./,
       ),
     ).toBeTruthy();
   });

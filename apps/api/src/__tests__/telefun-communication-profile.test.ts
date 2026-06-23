@@ -145,8 +145,9 @@ describe("BENCHMARK_DEFAULTS", () => {
     );
   });
 
-  it("fillers uses lower_better mode", () => {
-    expect(BENCHMARK_DEFAULTS.fillers.evaluationMode).toBe("lower_better");
+  it("fillers uses higher_better display score with lower raw count direction", () => {
+    expect(BENCHMARK_DEFAULTS.fillers.evaluationMode).toBe("higher_better");
+    expect(BENCHMARK_DEFAULTS.fillers.benchmarkValue).toBe(80);
   });
 
   it("intonation, articulation, tone use higher_better mode", () => {
@@ -220,8 +221,9 @@ describe("buildCommunicationProfileFromAssessment", () => {
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     const fl = profile!.metrics.find((m) => m.key === "fillers");
-    expect(fl!.value).toBe(20);
-    expect(fl!.evaluationMode).toBe("lower_better");
+    expect(fl!.value).toBe(80);
+    expect(fl!.evaluationMode).toBe("higher_better");
+    expect(fl!.targetDirection).toBe("lower_raw_is_better");
     expect(fl!.status).toBe("good");
   });
 
@@ -237,8 +239,39 @@ describe("buildCommunicationProfileFromAssessment", () => {
     });
     const profile = buildCommunicationProfileFromAssessment(assessment);
     const fl = profile!.metrics.find((m) => m.key === "fillers");
-    expect(fl!.value).toBe(90);
+    expect(fl!.value).toBe(10);
     expect(fl!.status).toBe("poor");
+  });
+
+  it("maps filler count to quality score where fewer fillers are better", () => {
+    const cases = [
+      { count: 0, score: 100, status: "good" },
+      { count: 1, score: 90, status: "good" },
+      { count: 3, score: 80, status: "good" },
+      { count: 5, score: 60, status: "needs_improvement" },
+      { count: 8, score: 40, status: "poor" },
+      { count: 11, score: 20, status: "poor" },
+      { count: 12, score: 10, status: "poor" },
+    ] as const;
+
+    for (const { count, score, status } of cases) {
+      const profile = buildCommunicationProfileFromAssessment(
+        makeLegacyAssessment({
+          fillerWords: {
+            score: 9,
+            count,
+            examples: [],
+            verdict: "Baik",
+            feedback: "Feedback filler.",
+          },
+        }),
+      );
+      const fillers = profile!.metrics.find((m) => m.key === "fillers")!;
+      expect(fillers.rawValue).toBe(count);
+      expect(fillers.displayScore).toBe(score);
+      expect(fillers.targetScore).toBe(80);
+      expect(fillers.status).toBe(status);
+    }
   });
 
   it("maps emotionalTone to tone key", () => {
@@ -309,7 +342,7 @@ describe("buildCommunicationProfileFromAssessment", () => {
     expect(sr.targetScore).toBe(70);
   });
 
-  it("normalizes filler count as low target display value instead of raw count score", () => {
+  it("normalizes filler count as quality display score instead of raw count score", () => {
     const profile = buildCommunicationProfileFromAssessment(
       makeLegacyAssessment({
         fillerWords: {
@@ -323,8 +356,8 @@ describe("buildCommunicationProfileFromAssessment", () => {
     );
     const fillers = profile!.metrics.find((m) => m.key === "fillers")!;
     expect(fillers.rawValue).toBe(3);
-    expect(fillers.displayScore).toBe(20);
-    expect(fillers.targetScore).toBe(20);
+    expect(fillers.displayScore).toBe(80);
+    expect(fillers.targetScore).toBe(80);
     expect(fillers.status).toBe("good");
   });
 
@@ -408,13 +441,13 @@ describe("enrichAssessmentWithCommunicationProfile", () => {
         {
           key: "fillers",
           label: "Fillers",
-          value: 20,
-          benchmarkValue: 20,
+          value: 80,
+          benchmarkValue: 80,
           score: 8,
-          displayScore: 20,
-          targetScore: 20,
+          displayScore: 80,
+          targetScore: 80,
           targetDirection: "lower_raw_is_better",
-          evaluationMode: "lower_better",
+          evaluationMode: "higher_better",
           verdict: "Baik",
           status: "good",
           feedback: "Minim filler.",

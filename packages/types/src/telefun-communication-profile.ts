@@ -43,9 +43,9 @@ export const BENCHMARK_DEFAULTS: Record<
     label: "Articulation",
   },
   fillers: {
-    benchmarkValue: 20,
-    evaluationMode: "lower_better",
-    goodMax: 30,
+    benchmarkValue: 80,
+    evaluationMode: "higher_better",
+    goodMin: 80,
     label: "Fillers",
   },
   tone: {
@@ -60,7 +60,7 @@ export const TELEFUN_QA_TARGETS = {
   speakingRate: { targetScore: 70, idealWpmMin: 130, idealWpmMax: 150 },
   intonation: { targetScore: 80 },
   articulation: { targetScore: 90 },
-  fillers: { targetScore: 20, goodCountMax: 3 },
+  fillers: { targetScore: 80, goodCountMax: 3 },
   tone: { targetScore: 85 },
 } as const;
 
@@ -83,12 +83,13 @@ export function normalizeFillerDisplayScore(
 ): number | null {
   if (typeof count !== "number" || !Number.isFinite(count) || count < 0)
     return null;
-  if (count <= 1) return 10;
-  if (count <= 3) return 20;
-  if (count <= 5) return 35;
-  if (count <= 8) return 55;
-  if (count <= 12) return 75;
-  return 90;
+  if (count === 0) return 100;
+  if (count === 1) return 90;
+  if (count <= 3) return 80;
+  if (count <= 5) return 60;
+  if (count <= 8) return 40;
+  if (count <= 11) return 20;
+  return 10;
 }
 
 export function getMetricStatus(
@@ -174,14 +175,14 @@ export function generateExplanation(
   }
   if (status === "needs_improvement") {
     if (key === "fillers")
-      return `${def.label} Anda cukup terkendali, namun bisa dikurangi lagi.`;
+      return `${def.label} Anda masih ada, namun belum berlebihan. Kurangi lagi agar lebih profesional.`;
     if (key === "speakingRate")
       return `${def.label} Anda mendekati rentang ideal.`;
     return `${def.label} Anda cukup baik, namun masih dapat ditingkatkan.`;
   }
 
   if (key === "fillers")
-    return `${def.label} Anda cukup tinggi, perlu dikurangi secara sadar.`;
+    return `${def.label} Anda terlalu sering muncul, perlu dikurangi secara sadar.`;
   if (key === "speakingRate")
     return `${def.label} Anda di luar rentang ideal, perlu penyesuaian.`;
   return `${def.label} Anda perlu perbaikan signifikan.`;
@@ -307,7 +308,7 @@ export function buildCommunicationProfileFromAssessment(
       );
     }
 
-    const status = getMetricStatus(displayScore, targetScore);
+    const status = evaluateMetricStatus(displayScore, def.evaluationMode, def);
     const explanation = generateExplanation(key, displayScore, status);
     const improvementTip = generateImprovementTip(key, status);
 

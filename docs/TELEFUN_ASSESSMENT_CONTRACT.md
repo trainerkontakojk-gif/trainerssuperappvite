@@ -12,6 +12,9 @@ sama.
 - `fillerWords.count` adalah jumlah kata pengisi mentah.
 - Nilai radar `displayScore` memakai skala `0..100` dan dibangun sistem dari
   assessment yang sudah valid.
+- Untuk metric Fillers, `displayScore` tetap skor kualitas: semakin sedikit
+  `fillerWords.count`, semakin tinggi skor. Count mentah tetap ditampilkan
+  terpisah sebagai detail.
 
 ## Trust Boundary
 
