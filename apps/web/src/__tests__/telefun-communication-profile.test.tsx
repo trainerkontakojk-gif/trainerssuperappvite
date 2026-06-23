@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import {
-  VoiceRadarChart,
-  buildVoiceRadarData,
-} from "../routes/telefun/components/VoiceRadarChart";
+import { buildVoiceRadarData } from "../routes/telefun/components/VoiceRadarChart";
 import VoiceRadarChartInner from "../routes/telefun/components/VoiceRadarChartInner";
 import { CommunicationProfileZoomModal } from "../routes/telefun/components/CommunicationProfileZoomModal";
 import { VoiceMetricCards } from "../routes/telefun/components/VoiceMetricCards";
@@ -116,7 +113,7 @@ describe("buildVoiceRadarData", () => {
     const fillers = data.find((d) => d.key === "fillers");
     expect(fillers).toBeDefined();
     expect(fillers!.userValue).toBe(80);
-    expect(fillers!.targetValue).toBe(80);
+    expect(fillers!.targetValue).toBe(20);
   });
 
   it("produces non-zero userValue and targetValue for all metrics", () => {
@@ -127,7 +124,7 @@ describe("buildVoiceRadarData", () => {
     }
   });
 
-  it("uses displayScore and targetScore for radar values", () => {
+  it("uses displayScore and targetScore for non-filler radar values", () => {
     const data = buildVoiceRadarData({
       ...mockProfile,
       metrics: mockProfile.metrics.map((m) => ({
@@ -141,11 +138,13 @@ describe("buildVoiceRadarData", () => {
     expect(sr.targetValue).toBe(70);
   });
 
-  it("labels fillers without implying lower score is better", () => {
+  it("keeps filler quality score high while rendering the target guide low", () => {
     const fillers = buildVoiceRadarData(mockProfile).find(
       (d) => d.key === "fillers",
     )!;
-    expect(fillers.label).toBe("Fillers");
+    expect(fillers.label).toBe("Fillers (↓)");
+    expect(fillers.userValue).toBe(80);
+    expect(fillers.targetValue).toBe(20);
   });
 });
 
@@ -310,7 +309,7 @@ describe("CommunicationProfileZoomModal", () => {
     }
   });
 
-  it("shows Fillers as higher quality score with lower raw count in how-to-read", () => {
+  it("explains Fillers as a low visual guide with higher quality score", () => {
     render(
       <CommunicationProfileZoomModal
         isOpen
@@ -321,10 +320,10 @@ describe("CommunicationProfileZoomModal", () => {
     const fillersElements = screen.getAllByText(/Fillers/);
     expect(fillersElements.length).toBeGreaterThan(0);
     expect(
-      screen.getByText(
-        /skor makin tinggi berarti kata pengisi makin sedikit. Detail tetap menampilkan jumlah filler mentah./,
-      ),
-    ).toBeTruthy();
+      screen.getAllByText(
+        /panduan target di diagram dibuat rendah, sedangkan skor makin tinggi berarti kata pengisi makin sedikit./,
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it("shows Speaking Rate as rentang ideal in how-to-read", () => {

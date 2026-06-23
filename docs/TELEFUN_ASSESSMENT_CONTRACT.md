@@ -15,6 +15,9 @@ sama.
 - Untuk metric Fillers, `displayScore` tetap skor kualitas: semakin sedikit
   `fillerWords.count`, semakin tinggi skor. Count mentah tetap ditampilkan
   terpisah sebagai detail.
+- Pada radar web, panduan visual `Target QA` untuk Fillers digambar rendah agar
+  sesuai dengan arti jumlah filler ideal yang kecil. Ini tidak mengubah
+  `displayScore` kualitas atau target kanonik di shared contract.
 
 ## Trust Boundary
 

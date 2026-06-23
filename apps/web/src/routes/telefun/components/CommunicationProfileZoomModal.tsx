@@ -1,10 +1,7 @@
 import React, { useEffect, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Maximize2, TrendingUp, TrendingDown, Gauge } from "lucide-react";
-import type {
-  TelefunCommunicationProfile,
-  CommunicationMetric,
-} from "@trainers/types";
+import { X, TrendingUp, TrendingDown, Gauge } from "lucide-react";
+import type { TelefunCommunicationProfile } from "@trainers/types";
 import { VoiceRadarChart } from "./VoiceRadarChart";
 
 interface CommunicationProfileZoomModalProps {
@@ -82,7 +79,7 @@ export const CommunicationProfileZoomModal: React.FC<
                   Profil Komunikasi
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Semakin sesuai dengan area target, semakin baik
+                  Skor kualitas tinggi, panduan Fillers tetap rendah
                 </p>
               </div>
               <button
@@ -163,7 +160,8 @@ export const CommunicationProfileZoomModal: React.FC<
                 <div className="flex items-start gap-2">
                   <TrendingDown className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <span>
-                    <strong className="text-foreground">Fillers:</strong> skor
+                    <strong className="text-foreground">Fillers:</strong>{" "}
+                    panduan target di diagram dibuat rendah, sedangkan skor
                     makin tinggi berarti kata pengisi makin sedikit. Detail
                     tetap menampilkan jumlah filler mentah.
                   </span>

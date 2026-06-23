@@ -153,11 +153,12 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
         <div className="mt-4 px-4 py-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1 w-full text-center">
           <p className="font-semibold text-slate-700 dark:text-slate-300">
             Diagram ini menunjukkan seberapa dekat hasil Anda dengan target QA
-            pada tiap aspek komunikasi.
+            pada tiap aspek komunikasi, dengan pengecualian visual untuk
+            Fillers.
           </p>
           <p>
-            Untuk Fillers, target yang baik memang rendah karena semakin sedikit
-            kata pengisi semakin baik.
+            Untuk Fillers, panduan target di diagram dibuat rendah, sedangkan
+            skor makin tinggi berarti kata pengisi makin sedikit.
           </p>
         </div>
       )}

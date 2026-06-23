@@ -14,6 +14,8 @@ interface VoiceRadarDatum {
   evaluationMode: CommunicationMetric["evaluationMode"];
 }
 
+const FILLERS_RADAR_TARGET_GUIDE_VALUE = 20;
+
 export interface VoiceRadarChartProps {
   profile: TelefunCommunicationProfile;
   compact?: boolean;
@@ -26,7 +28,7 @@ const AXIS_META: Record<
   speakingRate: { label: "Speaking Rate", directionHint: "ideal stabil" },
   intonation: { label: "Intonation", directionHint: "semakin tinggi" },
   articulation: { label: "Articulation", directionHint: "semakin tinggi" },
-  fillers: { label: "Fillers", directionHint: "skor semakin tinggi" },
+  fillers: { label: "Fillers", directionHint: "panduan rendah" },
   tone: { label: "Tone", directionHint: "semakin tinggi" },
 };
 
@@ -36,9 +38,15 @@ export function buildVoiceRadarData(
   return profile.metrics.map((metric) => ({
     key: metric.key,
     subject: metric.key,
-    label: AXIS_META[metric.key]?.label ?? metric.label,
+    label:
+      metric.key === "fillers"
+        ? "Fillers (↓)"
+        : (AXIS_META[metric.key]?.label ?? metric.label),
     userValue: metric.displayScore ?? metric.value,
-    targetValue: metric.targetScore ?? metric.benchmarkValue,
+    targetValue:
+      metric.key === "fillers"
+        ? FILLERS_RADAR_TARGET_GUIDE_VALUE
+        : (metric.targetScore ?? metric.benchmarkValue),
     fullMark: 100,
     evaluationMode: metric.evaluationMode,
   }));
