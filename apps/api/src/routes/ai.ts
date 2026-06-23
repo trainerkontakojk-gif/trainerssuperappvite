@@ -33,6 +33,30 @@ type Variables = { user: User; profile: any };
 const ai = new Hono<{ Variables: Variables }>();
 const monitoringHistoryModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
 const monitoringHistoryIdSchema = z.string().uuid();
+const TELEFUN_RECORDING_SIGNED_URL_TTL_SECONDS = 3600;
+
+function canSignCrossUserRecording(profile: any): boolean {
+  return ["admin", "trainer"].includes(profile?.role);
+}
+
+async function createTelefunRecordingUrl(
+  admin: ReturnType<typeof createAdminClient>,
+  path: string | null | undefined,
+): Promise<string | null> {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const { data, error } = await admin.storage
+    .from("telefun-recordings")
+    .createSignedUrl(path, TELEFUN_RECORDING_SIGNED_URL_TTL_SECONDS);
+
+  if (error || !data?.signedUrl) {
+    console.warn("[monitoring] Failed to sign Telefun recording URL:", error);
+    return null;
+  }
+
+  return data.signedUrl;
+}
 
 ai.get("/models", (c) => {
   const module = c.req.query("module") as AiModelModule | undefined;
@@ -332,7 +356,7 @@ ai.get(
       if (module === "telefun") {
         const { data: history, error: historyError } = await admin
           .from("telefun_history")
-          .select("score, recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus, messages")
+          .select("score, recording_path, agent_recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus, messages")
           .eq("id", id)
           .single();
 
@@ -356,6 +380,13 @@ ai.get(
             : history.score;
 
         const transcript = parseTelefunTranscript(history.messages);
+        const profile = c.get("profile");
+        const recordingUrl = canSignCrossUserRecording(profile)
+          ? await createTelefunRecordingUrl(
+              admin,
+              history.recording_path || history.agent_recording_path,
+            )
+          : null;
 
         return c.json({
           success: true,
@@ -365,6 +396,8 @@ ai.get(
               typeof normalizedScore === "number" ? "completed" : "not_started",
             score: normalizedScore,
             recording_path: history.recording_path,
+            agent_recording_path: history.agent_recording_path,
+            recording_url: recordingUrl,
             scenario_title: history.scenario_title,
             duration_seconds: history.duration_seconds,
             voice_assessment: voiceAssessment || null,

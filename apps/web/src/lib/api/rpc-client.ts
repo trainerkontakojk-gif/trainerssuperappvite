@@ -140,6 +140,8 @@ export type TelefunMonitoringReview = {
   review_status: string;
   score: number | null;
   recording_path: string | null;
+  agent_recording_path: string | null;
+  recording_url: string | null;
   scenario_title: string | null;
   duration_seconds: number | null;
   voice_assessment: unknown;

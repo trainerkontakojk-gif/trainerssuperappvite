@@ -66,7 +66,11 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
 
   const hasVoiceAssessment = va !== null;
   const hasScore = data ? typeof data.score === "number" : false;
-  const hasRecording = data ? !!data.recording_path : false;
+  const recordingUrl = data?.recording_url ?? null;
+  const hasStoredRecording = data
+    ? !!data.recording_path || !!data.agent_recording_path
+    : false;
+  const canPlayRecording = !!recordingUrl;
 
   const fetchReview = async () => {
     setLoading(true);
@@ -174,7 +178,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   return (
     <div className="space-y-6">
       {/* ── Recording Player — Primary ──────────────────────── */}
-      {hasRecording ? (
+      {canPlayRecording ? (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <Phone className="w-4 h-4 text-module-telefun" />
@@ -187,7 +191,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
               <>
                 <audio
                   controls
-                  src={data.recording_path!}
+                  src={recordingUrl}
                   className="w-full h-10 rounded-lg"
                   onError={() => setAudioError(true)}
                 >
@@ -198,7 +202,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                     {data.scenario_title}
                   </span>
                   <a
-                    href={data.recording_path!}
+                    href={recordingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] font-bold text-module-telefun hover:underline cursor-pointer"
@@ -220,6 +224,26 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+      ) : hasStoredRecording ? (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Phone className="w-4 h-4 text-module-telefun" />
+            <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+              Rekaman Sesi
+            </h3>
+          </div>
+          <div className="p-5 rounded-2xl bg-muted border border-border flex flex-col items-center gap-3">
+            <PhoneOff className="w-8 h-8 text-muted-foreground/30" />
+            <div className="text-center">
+              <p className="text-sm font-bold text-muted-foreground">
+                Rekaman tidak dapat diputar
+              </p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">
+                Rekaman hanya dapat diputar oleh admin dan trainer.
+              </p>
+            </div>
           </div>
         </section>
       ) : (

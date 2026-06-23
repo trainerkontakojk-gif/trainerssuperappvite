@@ -151,8 +151,10 @@ telefunRecordings.get("/recording/:id", async (c) => {
         404,
       );
 
-    const isManager = ["admin", "trainer", "qa"].includes(profile?.role);
-    if (!isManager && session.user_id !== user.id) {
+    const canAccessCrossUserRecording = ["admin", "trainer"].includes(
+      profile?.role,
+    );
+    if (!canAccessCrossUserRecording && session.user_id !== user.id) {
       return c.json(
         {
           success: false,
