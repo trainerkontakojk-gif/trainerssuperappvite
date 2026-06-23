@@ -21,6 +21,7 @@ import {
   hasGeminiSetupComplete,
   getGeminiGoAwayTimeLeftSeconds,
   getSessionResumptionHandle,
+  buildGeminiReconnectSetupMessage,
   isCurrentGeminiSocket,
   extractGeminiTranscriptionChunks,
 } from "./server-protocol.js";
@@ -170,18 +171,10 @@ wss.on("connection", async (ws, req) => {
   };
 
   const buildReconnectSetupMessage = () => {
-    if (!cachedSetupMessage) return null;
-    const setupMsg = JSON.parse(cachedSetupMessage);
-    if (latestSessionHandle) {
-      setupMsg.setup = {
-        ...setupMsg.setup,
-        sessionResumption: {
-          ...(setupMsg.setup?.sessionResumption ?? {}),
-          handle: latestSessionHandle,
-        },
-      };
-    }
-    return JSON.stringify(setupMsg);
+    return buildGeminiReconnectSetupMessage(
+      cachedSetupMessage,
+      latestSessionHandle,
+    );
   };
 
   const scheduleReconnect = (delay: number) => {

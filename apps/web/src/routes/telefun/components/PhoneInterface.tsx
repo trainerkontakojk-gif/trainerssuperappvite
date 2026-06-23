@@ -275,24 +275,29 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         session.onVolumeChange = (vol) => {
           if (isActive) setAgentVolume(vol);
         };
-        session.onRecordingComplete = async (
-          url,
-          fullBlob,
-          agentBlob,
-          metrics,
-        ) => {
-          if (onRecordingReadyRef.current) {
-            try {
-              await onRecordingReadyRef.current(
-                url,
-                config.consumerName,
-                callDurationRef.current,
-                fullBlob,
-                agentBlob,
-                metrics,
-              );
-            } catch (err) {
-              console.error("onRecordingReady failed:", err);
+	        session.onRecordingComplete = async (
+	          url,
+	          fullBlob,
+	          agentBlob,
+	          metrics,
+	        ) => {
+	          if (onRecordingReadyRef.current) {
+	            const measuredDuration =
+	              Number.isFinite(metrics.sessionDurationMs) &&
+	              metrics.sessionDurationMs > 0
+	                ? Math.round(metrics.sessionDurationMs / 1000)
+	                : callDurationRef.current;
+	            try {
+	              await onRecordingReadyRef.current(
+	                url,
+	                config.consumerName,
+	                measuredDuration,
+	                fullBlob,
+	                agentBlob,
+	                metrics,
+	              );
+	            } catch (err) {
+	              console.error("onRecordingReady failed:", err);
             }
           }
           // If disconnect (end call) is in progress, handleEndCall will navigate home.

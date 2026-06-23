@@ -238,6 +238,37 @@ describe("buildTelefunLiveSystemInstruction", () => {
     );
   });
 
+  it("prevents self-closing after initial solution or reporting instructions", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: {
+        name: "Budi",
+        gender: "male",
+        phone: "0812",
+        city: "Jakarta",
+        voiceName: "Fenrir",
+        signatureName: "",
+      },
+      scenario: {
+        id: "pinjaman",
+        title: "Pinjaman bermasalah",
+        instruction: "Keluhkan arahan penyelesaian dari agen.",
+        isActive: true,
+      },
+      consumerType: makeConsumerType({ name: "Netral" }),
+      responsePacingMode: "realistic",
+      maxCallDuration: 15,
+    });
+
+    expect(prompt).toContain("ATURAN PENYELESAIAN MASALAH");
+    expect(prompt).toContain("solusi awal");
+    expect(prompt).toContain("website/link/form laporan");
+    expect(prompt).toContain("penjelasan agen terdengar cukup");
+    expect(prompt).toContain("JANGAN mengatakan \"terima kasih, saya tutup dulu\"");
+    expect(prompt).toContain("tunggu sampai aplikasi memberi instruksi penutup");
+    expect(prompt).not.toContain("15 menit");
+    expect(prompt).not.toContain("900 detik");
+  });
+
   it("script instruction handles dialog+alur format guidance", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: {

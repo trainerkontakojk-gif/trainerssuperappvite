@@ -194,6 +194,33 @@ describe("PhoneInterface end-call finalization", () => {
       metrics,
     );
   });
+
+  it("menggunakan sessionDurationMs sebagai durasi final saat counter UI berhenti selama reconnect", async () => {
+    const onRecordingReady = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      React.createElement(PhoneInterface, {
+        config,
+        onEndSession: vi.fn(),
+        onRecordingReady,
+      }),
+    );
+
+    await waitFor(() => expect(liveSessionState.instances).toHaveLength(1));
+    const session = liveSessionState.instances[0];
+    const metrics = { sessionDurationMs: 509_027 } as SessionMetrics;
+
+    await session.onRecordingComplete(null, null, null, metrics);
+
+    expect(onRecordingReady).toHaveBeenCalledWith(
+      null,
+      "Budi",
+      509,
+      null,
+      null,
+      metrics,
+    );
+  });
 });
 
 describe("LiveSession disconnect idempotency", () => {

@@ -5,6 +5,7 @@ import {
   hasGeminiSetupComplete,
   getGeminiGoAwayTimeLeftSeconds,
   getSessionResumptionHandle,
+  buildGeminiReconnectSetupMessage,
   isCurrentGeminiSocket,
   extractGeminiTranscriptionChunks,
   parseControlMessage,
@@ -92,6 +93,33 @@ describe("telefun proxy protocol", () => {
         sessionResumptionUpdate: { resumable: true, newHandle: "" },
       }),
     ).toBeNull();
+  });
+
+  it("builds reconnect setup with latest resumable handle and preserves setup fields", () => {
+    const cachedSetup = JSON.stringify({
+      setup: {
+        model: "models/gemini-3.1-flash-live-preview",
+        generationConfig: { responseModalities: ["AUDIO"] },
+        systemInstruction: { parts: [{ text: "ROLEPLAY" }] },
+        sessionResumption: {},
+        contextWindowCompression: { slidingWindow: {} },
+      },
+    });
+
+    const reconnect = buildGeminiReconnectSetupMessage(
+      cachedSetup,
+      "handle-latest",
+    );
+
+    expect(reconnect).not.toBeNull();
+    const parsed = JSON.parse(reconnect!);
+    expect(parsed.setup.model).toBe("models/gemini-3.1-flash-live-preview");
+    expect(parsed.setup.generationConfig.responseModalities).toEqual(["AUDIO"]);
+    expect(parsed.setup.systemInstruction.parts[0].text).toBe("ROLEPLAY");
+    expect(parsed.setup.contextWindowCompression).toEqual({ slidingWindow: {} });
+    expect(parsed.setup.sessionResumption).toEqual({
+      handle: "handle-latest",
+    });
   });
 
   it("ignores events emitted by a stale Gemini socket after reconnect", () => {

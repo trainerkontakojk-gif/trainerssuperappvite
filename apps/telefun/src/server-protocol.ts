@@ -32,6 +32,26 @@ export function getSessionResumptionHandle(value: unknown): string | null {
   return handle.length > 0 ? handle : null;
 }
 
+export function buildGeminiReconnectSetupMessage(
+  cachedSetupMessage: string | null,
+  latestSessionHandle: string | null,
+): string | null {
+  if (!cachedSetupMessage) return null;
+
+  const setupMsg = JSON.parse(cachedSetupMessage);
+  if (latestSessionHandle) {
+    setupMsg.setup = {
+      ...setupMsg.setup,
+      sessionResumption: {
+        ...(setupMsg.setup?.sessionResumption ?? {}),
+        handle: latestSessionHandle,
+      },
+    };
+  }
+
+  return JSON.stringify(setupMsg);
+}
+
 export function isCurrentGeminiSocket(
   activeSocket: unknown,
   eventSocket: unknown,
