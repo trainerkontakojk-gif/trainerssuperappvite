@@ -22,7 +22,7 @@ ketik.get("/consumer-types", (c) => {
 
 ketik.post(
   "/generate",
-  requireRole("admin", "trainer", "qa", "tl", "spv", "om", "agent"),
+  requireRole("admin", "trainer", "leader", "qa", "tl", "spv", "om", "agent"),
   aiRateLimitMiddleware,
   zValidator("json", generateMessageSchema),
   async (c) => {

@@ -67,8 +67,12 @@ Role enforcement coverage per module (Phase B hardening):
 | **Profiler**      | 23        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
 | **PDKT**          | 16        | admin, trainer, qa                     | admin, trainer, qa (AI)                |
 | **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history) | admin, trainer (pricing)           |
-| **KETIK**         | 4         | admin, trainer, qa, tl, spv, om, agent | admin, trainer, qa, tl, spv, om, agent |
+| **KETIK**         | 4         | admin, trainer, leader, qa, tl, spv, om, agent | admin, trainer, leader, qa, tl, spv, om, agent |
 | **Admin**         | 8         | admin only                             | admin only                             |
+
+Catatan:
+
+- `POST /ketik/generate` dapat dipakai oleh `leader`, sedangkan `POST /ketik/review` tetap dibatasi `admin`, `trainer`, dan `qa`.
 
 ### 3. Profile Read Contract & Recovery
 

@@ -40,6 +40,7 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Riwayat Sesi**: Peserta bisa meninjau kembali percakapan sebelumnya.
   - **AI Review**: Evaluasi AI menggunakan rubrik Bahasa Indonesia dengan skala `0-100`.
   - **Usage Bulanan**: Quick-view `Usage Bulan Ini` dengan indikator kenaikan biaya sesi (`+Rp`).
+- **Akses**: `admin`, `trainer`, `leader`, `qa`, `tl`, `spv`, `om`, dan `agent` dapat memakai simulasi KETIK; analisis AI tetap dibatasi `admin`, `trainer`, dan `qa`.
 - **Catatan Teknis**: KETIK menyimpan history chat di `ketik_history`. Review AI bersifat manual — user memicu review setelah sesi selesai. Backend API di `/api/v1/ketik/` menangani chat, review, dan history.
   - **Manual-only review**: Analisis AI hanya dimulai dari tombol "Mulai Analisis" oleh user, bukan otomatis saat sesi selesai.
   - **Retry after failure**: Jika review gagal, user dapat mengklik "Jalankan Ulang Analisis" untuk retry. Job status di-reset dari `failed` ke `queued`.
