@@ -60,7 +60,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
 
 - **Fungsi**: Simulasi penulisan email balasan untuk keluhan atau pertanyaan pelanggan.
 - **Routes**: `/pdkt`, `/pdkt/simulation`, `/pdkt/history`
-- **Akses**: Trainer, QA, Admin. Agent dan role lain tidak memiliki akses ke modul ini.
+- **Akses**: Trainer, QA, Admin, Leader, dan Agent. Agent dan Leader dapat mengakses simulasi PDKT.
 - **Fitur Utama**:
   - **Durable Mailbox**: Inbound email tersimpan secara persisten di database.
   - **Manual Scenario Selection**: User secara eksplisit memilih skenario untuk menghasilkan email baru.
@@ -68,9 +68,8 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
   - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.
-  - **Filtering & Search**: Memudahkan user mencari email tertentu atau memfilter berdasarkan status.
 - **Catatan Teknis**:
-  - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
+    - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
   - Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Settings response API selalu mengikuti kontrak `{ success, data }`.
   - Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
   - Error database mentah dipetakan ke pesan user-friendly via `pdktErrorMessage()` helper.
@@ -105,6 +104,8 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
   - **WebSocket Close-Code Mapping**: Menampilkan pesan error terperinci untuk error status koneksi (seperti token login kadaluarsa `4001`, origin ditolak `4003`, Gemini API error `1011`, atau network terputus `1006`). Close normal dari user (code `1000`) tidak ditampilkan sebagai error; close tanpa status `1005` dipetakan secara khusus sebagai indikasi proxy/network/upstream.
   - **Auto Hangup & Time Cues**: Durasi panggilan dibatasi sesuai `maxCallDuration` dengan reminder audio/text cue bertahap (2 menit, 1 menit, 30 detik, 20 detik). App timer adalah satu-satunya otoritas timeout; AI tidak diminta mengestimasi waktu sendiri.
   - **Self-Close Guard**: Prompt Telefun melarang konsumen menutup sendiri hanya karena solusi awal, arahan website/link/form laporan, estimasi SLA, nomor referensi, atau penjelasan agen sudah terdengar cukup. Konsumen tetap kooperatif, tetapi harus lanjut bertanya/konfirmasi sampai aplikasi mengirim cue penutup.
+  - **Akses**: Modul Telefun hanya untuk `admin` dan `trainer`. Leader dan Agent tidak diizinkan mengakses modul ini — akan mendapat modal "Akses Terbatas" dan redirect ke dashboard.
+  - **Catatan Teknis**:
   - **Gemini Live Session Management**: Untuk sesi panjang (>5 menit), setup menyertakan `contextWindowCompression` dan `sessionResumption`. Proxy server mendeteksi `goAway.timeLeft` dan `sessionResumptionUpdate.newHandle` untuk reconnect proaktif dengan setup caching.
   - **Server Reconnect Lifecycle**: Saat koneksi Gemini putus non-1000, proxy reconnect dengan backoff, re-send cached setup, menyertakan session handle jika ada, dan hanya flush audio setelah `setupComplete`. Client mendapat status "Menyambung ulang..." dan "Tersambung".
   - **Duration Audit Source**: Durasi final sesi memakai elapsed timestamp dari `session_metrics.sessionDurationMs` saat tersedia, sehingga reconnect status seperti "Menyambung ulang..." tidak membuat durasi audit lebih pendek dari runtime aktual.

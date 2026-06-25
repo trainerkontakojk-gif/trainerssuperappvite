@@ -70,6 +70,7 @@ export const APP_MODULES: AppModuleConfig[] = [
     icon: Phone,
     accentClassName: "text-violet-600",
     accentSoftClassName: "bg-violet-100",
+    allowedRoles: ["admin", "trainer"],
   },
   {
     id: "profiler",
