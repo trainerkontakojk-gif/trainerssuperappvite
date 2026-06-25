@@ -111,7 +111,13 @@ Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi buil
 node scripts/deployment/railway-web-healthcheck-smoke.mjs
 ```
 
-Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`.
+Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`. Smoke ini juga memvalidasi security headers dasar dari static web server.
+
+## Web Security Headers
+
+- Railway Web memakai `apps/web/public/serve.json`. File ini disalin Vite ke `apps/web/dist/serve.json`, lalu dibaca oleh `serve dist` saat `pnpm run start:web`.
+- Vercel Web memakai `headers` di root `vercel.json`.
+- Header yang dijaga: `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `Referrer-Policy`, dan `Permissions-Policy`.
 
 ### Telefun Production Smoke Test
 
@@ -281,7 +287,7 @@ Preview deployment hanya untuk visual/build smoke. Auth, API, dan Telefun tidak 
 
 ### Vercel Configuration
 
-File `vercel.json` di root repository:
+Ringkasan `vercel.json` di root repository:
 
 ```json
 {
@@ -290,12 +296,19 @@ File `vercel.json` di root repository:
   "outputDirectory": "apps/web/dist",
   "installCommand": "CI=true pnpm install",
   "framework": null,
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [{ "key": "...", "value": "..." }]
+    }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
 ```
 
 - `framework: null` mencegah Vercel auto-detect framework lain yang bisa override build settings.
 - `rewrites` diperlukan untuk SPA client-side routing (TanStack Router). Tanpa ini, refresh di `/sidak/dashboard` akan return 404.
+- `headers` menjaga baseline browser hardening untuk Web static assets.
 
 ### OAuth Callback Route
 
@@ -432,6 +445,7 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 - [ ] Set Railway env vars per service (lihat tabel Railway Environment Variables)
 - [ ] Verifikasi koneksi: `VITE_API_URL` suffix `/api/v1`, `NODE_ENV=production`, `ALLOWED_ORIGINS` di-set
 - [ ] Run smoke test: `node scripts/deployment/railway-web-healthcheck-smoke.mjs`
+- [ ] Pastikan smoke header Web lulus dari Railway `serve dist`
 - [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
 - [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
 - [ ] Set up monitoring / alerting

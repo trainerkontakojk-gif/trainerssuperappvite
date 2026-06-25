@@ -17,7 +17,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "@trainers/types": "workspace:*",
-    "ws": "^8.18.0",
+    "ws": "^8.21.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
 import { Context, Next } from "hono";
-import { supabaseAdmin } from "../lib/supabase";
+import { createUserClient, supabaseAdmin } from "../lib/supabase";
 import { normalizeAuthProfileStatus } from "../lib/profile";
 import { User } from "@supabase/supabase-js";
 import type { UserProfile } from "@trainers/types";
@@ -54,7 +54,8 @@ export const authMiddleware = async (
     );
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
+  const userClient = createUserClient(token);
+  const { data: profile, error: profileError } = await userClient
     .from("profiles")
     .select("status, role, full_name, is_deleted")
     .eq("id", user.id)

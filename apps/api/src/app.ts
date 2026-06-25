@@ -9,6 +9,10 @@ import {
 } from "./middleware/auth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
+import {
+  applySecurityHeaders,
+  securityHeadersMiddleware,
+} from "./middleware/securityHeaders";
 import { sidak } from "./routes/sidak";
 import { ketik } from "./routes/ketik";
 import { pdkt } from "./routes/pdkt";
@@ -38,6 +42,7 @@ if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
 
 const app = new Hono().basePath("/api");
 
+app.use("*", securityHeadersMiddleware);
 app.use("*", cors({ origin: allowedOrigins, credentials: true }));
 app.use(requestLogger);
 app.use("/v1/*", rateLimitMiddleware);
@@ -49,10 +54,18 @@ app.onError((err, c) => {
   const matchedOrigin =
     originHeader && allowedOrigins.includes(originHeader)
       ? originHeader
-      : allowedOrigins[0] || "*";
+      : null;
 
-  c.header("Access-Control-Allow-Origin", matchedOrigin);
-  c.header("Access-Control-Allow-Credentials", "true");
+  applySecurityHeaders(c.res.headers);
+
+  if (matchedOrigin) {
+    c.header("Access-Control-Allow-Origin", matchedOrigin);
+    c.header("Access-Control-Allow-Credentials", "true");
+    c.header("Vary", "Origin", { append: true });
+  } else {
+    c.res.headers.delete("Access-Control-Allow-Origin");
+    c.res.headers.delete("Access-Control-Allow-Credentials");
+  }
 
   if (err instanceof HTTPException) {
     return c.json<ApiResponse<never>>(

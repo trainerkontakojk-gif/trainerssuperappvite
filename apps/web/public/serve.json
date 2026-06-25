@@ -1,12 +1,7 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm -w run build:web",
-  "outputDirectory": "apps/web/dist",
-  "installCommand": "CI=true pnpm install",
-  "framework": null,
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "**/*",
       "headers": [
         {
           "key": "Content-Security-Policy",
@@ -34,6 +29,5 @@
         }
       ]
     }
-  ],
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  ]
 }

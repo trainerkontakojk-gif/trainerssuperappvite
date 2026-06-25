@@ -35,6 +35,25 @@ export function buildKetikSettingsForSave(params: {
   };
 }
 
+type DurationMode = "preset" | "custom";
+
+const PRESET_DURATIONS = [5, 10, 15] as const;
+const MIN_DURATION = 1;
+const MAX_DURATION = 60;
+
+const classifyDurationMode = (val: number | undefined): DurationMode => {
+  const duration = Number(val);
+  if (!Number.isFinite(duration)) return "custom";
+  return (PRESET_DURATIONS as readonly number[]).includes(duration)
+    ? "preset"
+    : "custom";
+};
+
+const durationToInputValue = (val: number | undefined): string => {
+  const duration = Number(val);
+  return Number.isFinite(duration) ? String(duration) : "";
+};
+
 export function useKetikSettingsDraft({
   settings,
   isOpen,
@@ -51,6 +70,9 @@ export function useKetikSettingsDraft({
   }));
 
   const [customInputValue, setCustomInputValue] = useState("");
+  const [durationMode, setDurationMode] = useState<DurationMode>(() =>
+    classifyDurationMode(settings.simulationDuration),
+  );
   const [durationValidationError, setDurationValidationError] = useState<
     string | null
   >(null);
@@ -100,21 +122,8 @@ export function useKetikSettingsDraft({
     }),
   });
 
-  const PRESET_DURATIONS = [5, 10, 15];
-  const MIN_DURATION = 1;
-  const MAX_DURATION = 60;
-
-  const classifyDurationMode = (
-    val: number | undefined,
-  ): "preset" | "custom" => {
-    const d = Number(val);
-    if (isNaN(d)) return "custom";
-    return (PRESET_DURATIONS as number[]).includes(d) ? "preset" : "custom";
-  };
-
-  const durationMode = classifyDurationMode(localSettings.simulationDuration);
-
   const handlePresetClick = (d: number) => {
+    setDurationMode("preset");
     setCustomInputValue("");
     setDurationValidationError(null);
     setLocalSettings((prev) => ({ ...prev, simulationDuration: d }));
@@ -122,7 +131,8 @@ export function useKetikSettingsDraft({
 
   const handleCustomClick = () => {
     const current = localSettings.simulationDuration;
-    setCustomInputValue(current ? String(current) : "");
+    setDurationMode("custom");
+    setCustomInputValue(durationToInputValue(current));
     setDurationValidationError(null);
   };
 
@@ -184,6 +194,14 @@ export function useKetikSettingsDraft({
           DEFAULT_KETIK_SETTINGS.quickTemplates ||
           [],
       });
+      const nextDurationMode = classifyDurationMode(settings.simulationDuration);
+      setDurationMode(nextDurationMode);
+      setCustomInputValue(
+        nextDurationMode === "custom"
+          ? durationToInputValue(settings.simulationDuration)
+          : "",
+      );
+      setDurationValidationError(null);
       scenarioForm.close();
       consumerForm.close();
       templateForm.close();

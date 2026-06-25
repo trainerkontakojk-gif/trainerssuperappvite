@@ -134,6 +134,44 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     );
   });
 
+  it("opens custom duration input from a preset value and saves more than fifteen minutes", async () => {
+    const user = userEvent.setup();
+    const onSaveMock = vi.fn();
+    render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
+
+    await user.click(screen.getByText("Sistem"));
+    await user.click(screen.getByRole("button", { name: "Kustom" }));
+
+    const input = screen.getByDisplayValue("5") as HTMLInputElement;
+    expect(input).toBe(document.activeElement);
+
+    await user.clear(input);
+    await user.type(input, "20");
+    await user.tab();
+
+    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+
+    expect(onSaveMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        simulationDuration: 20,
+      }),
+    );
+  });
+
+  it("shows saved custom duration immediately when the system tab is opened", async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsModal
+        {...defaultProps}
+        settings={{ ...initialSettings, simulationDuration: 20 }}
+      />,
+    );
+
+    await user.click(screen.getByText("Sistem"));
+
+    expect(screen.getByDisplayValue("20")).toBeDefined();
+  });
+
   it("closes and reopens with fresh settings from props", () => {
     const { rerender } = render(<SettingsModal {...defaultProps} />);
     expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();

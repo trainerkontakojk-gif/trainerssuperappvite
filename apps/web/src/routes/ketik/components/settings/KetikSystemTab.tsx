@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { KetikAppSettings } from "@trainers/types";
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels"; // Shared model registry
 
@@ -31,6 +32,12 @@ export function KetikSystemTab({
   MAX_DURATION = 60,
 }: KetikSystemTabProps) {
   const PRESET_DURATIONS = [5, 10, 15];
+
+  useEffect(() => {
+    if (durationMode !== "custom") return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [durationMode, inputRef]);
 
   return (
     <div className="space-y-8 pb-10 mt-2">

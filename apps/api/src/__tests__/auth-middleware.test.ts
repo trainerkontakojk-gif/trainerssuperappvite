@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const selectCalls: string[] = [];
 const eqCalls: string[] = [];
 const getUserCallsArr: { token: string }[] = [];
+const adminFromCalls: string[] = [];
+const userFromCalls: string[] = [];
+const userClientTokens: string[] = [];
 
 let pendingGetUserResult: any = () => ({ data: { user: { id: "user-1" } }, error: null });
 let pendingProfileResult: any = () => ({
@@ -38,8 +41,20 @@ vi.mock("../lib/supabase", () => ({
         return pendingGetUserResult();
       }),
     },
-    from: vi.fn(() => makeQuery()),
+    from: vi.fn((table: string) => {
+      adminFromCalls.push(table);
+      return makeQuery();
+    }),
   },
+  createUserClient: vi.fn((token: string) => {
+    userClientTokens.push(token);
+    return {
+      from: vi.fn((table: string) => {
+        userFromCalls.push(table);
+        return makeQuery();
+      }),
+    };
+  }),
 }));
 
 import { authMiddleware } from "../middleware/auth";
@@ -80,6 +95,9 @@ describe("authMiddleware", () => {
     selectCalls.length = 0;
     eqCalls.length = 0;
     getUserCallsArr.length = 0;
+    adminFromCalls.length = 0;
+    userFromCalls.length = 0;
+    userClientTokens.length = 0;
     pendingGetUserResult = () => ({ data: { user: { id: "user-1" } }, error: null });
     pendingProfileResult = () => ({
       data: {
@@ -155,6 +173,16 @@ describe("authMiddleware", () => {
       expect(selectCalls.some((call) => call.includes("status"))).toBe(true);
       expect(selectCalls.some((call) => call.includes("role"))).toBe(true);
       expect(selectCalls.some((call) => call.includes("full_name"))).toBe(true);
+    });
+
+    it("queries profile with the user-scoped client so RLS still applies", async () => {
+      const { c } = mockContext({ Authorization: "Bearer valid-token" });
+      const next = vi.fn();
+      await authMiddleware(c, next);
+
+      expect(userClientTokens).toEqual(["valid-token"]);
+      expect(userFromCalls).toEqual(["profiles"]);
+      expect(adminFromCalls).toEqual([]);
     });
 
     it("returns 403 when profile not found", async () => {
