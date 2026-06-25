@@ -146,6 +146,39 @@ describe("telefun API payload and security validators", () => {
     });
   });
 
+  it("rejects telefun session update recording paths outside the same user session", () => {
+    expect(() =>
+      (buildTelefunSessionUpdatePayload as any)(
+        {
+          recording_path: "other-user/session-1/full_call.webm",
+        },
+        { userId: "user-1", sessionId: "session-1" },
+      ),
+    ).toThrow("Invalid recording path ownership");
+
+    expect(() =>
+      (buildTelefunSessionUpdatePayload as any)(
+        {
+          agent_recording_path: "user-1/session-2/agent_only.webm",
+        },
+        { userId: "user-1", sessionId: "session-1" },
+      ),
+    ).toThrow("Invalid agent recording path ownership");
+
+    expect(
+      (buildTelefunSessionUpdatePayload as any)(
+        {
+          recording_path: "user-1/session-1/full_call.webm",
+          agent_recording_path: "user-1/session-1/agent_only.webm",
+        },
+        { userId: "user-1", sessionId: "session-1" },
+      ),
+    ).toMatchObject({
+      recording_path: "user-1/session-1/full_call.webm",
+      agent_recording_path: "user-1/session-1/agent_only.webm",
+    });
+  });
+
   it("builds an Indonesian feedback summary from voice assessment sections", () => {
     const summary = buildTelefunFeedbackSummary({
       overallScore: 8,

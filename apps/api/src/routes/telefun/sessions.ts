@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
 import type { TelefunTranscriptEntry } from "@trainers/types";
 import { telefunTranscriptSchema } from "@trainers/types";
+import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
 
 type Variables = { user: User; profile: any };
 
@@ -148,7 +149,36 @@ export function buildTelefunSessionUpdatePayload(body: {
   response_pacing_mode?: string;
   telefun_model_id?: string;
   telefun_transport?: string;
+}, ownership?: {
+  userId: string;
+  sessionId: string;
 }) {
+  if (
+    ownership &&
+    body.recording_path !== undefined &&
+    !isTelefunRecordingPathOwnedBySession({
+      path: body.recording_path,
+      userId: ownership.userId,
+      sessionId: ownership.sessionId,
+      type: "full_call",
+    })
+  ) {
+    throw new Error("Invalid recording path ownership");
+  }
+
+  if (
+    ownership &&
+    body.agent_recording_path !== undefined &&
+    !isTelefunRecordingPathOwnedBySession({
+      path: body.agent_recording_path,
+      userId: ownership.userId,
+      sessionId: ownership.sessionId,
+      type: "agent_only",
+    })
+  ) {
+    throw new Error("Invalid agent recording path ownership");
+  }
+
   return {
     ...(body.status !== undefined ? { status: body.status } : {}),
     ...(body.duration_seconds !== undefined ? { duration_seconds: body.duration_seconds } : {}),
@@ -199,7 +229,10 @@ telefunSessions.patch(
     const body = c.req.valid("json");
 
     try {
-      const updatePayload = buildTelefunSessionUpdatePayload(body);
+      const updatePayload = buildTelefunSessionUpdatePayload(body, {
+        userId: user.id,
+        sessionId: id,
+      });
       const { error } = await adminClient
         .from("telefun_history")
         .update(updatePayload)
@@ -209,6 +242,22 @@ telefunSessions.patch(
       if (error) throw error;
       return c.json({ success: true, message: "Sesi diperbarui." });
     } catch (error: any) {
+      if (
+        error?.message === "Invalid recording path ownership" ||
+        error?.message === "Invalid agent recording path ownership"
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "BAD_REQUEST",
+              message: error.message,
+            },
+          },
+          400,
+        );
+      }
+
       return c.json(
         {
           success: false,

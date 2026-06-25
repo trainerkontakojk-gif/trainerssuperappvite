@@ -116,4 +116,15 @@ describe("getDataReportRows pagination", () => {
     expect(capturedRange).not.toBeNull();
     expect(capturedRange!.from).toBeGreaterThanOrEqual(0);
   });
+
+  it("returns empty rows for an explicit empty agent scope", async () => {
+    const rows = await getDataReportRows({
+      serviceType: "call",
+      year: 2026,
+      agent_ids: [],
+    });
+
+    expect(rows).toEqual([]);
+    expect(capturedRange).toBeNull();
+  });
 });

@@ -107,6 +107,22 @@ describe("admin-service", () => {
         "Anda tidak dapat mengubah status akun Anda sendiri dari panel ini",
       );
     });
+
+    it("prevents trainer from changing an admin account status", async () => {
+      pendingResolve = () => ({ data: { role: "admin" }, error: null });
+
+      await expect(
+        (adminService.updateUserStatus as any)(
+          "admin-id",
+          "rejected",
+          "trainer-id",
+          "trainer@example.com",
+          "trainer",
+        ),
+      ).rejects.toThrow("Trainer tidak dapat mengubah akun admin");
+
+      expect(updateCalls.some((call) => call.method === "update")).toBe(false);
+    });
   });
 
   describe("updateUserRole", () => {
@@ -133,6 +149,22 @@ describe("admin-service", () => {
           "trainer",
         ),
       ).rejects.toThrow("Trainer tidak dapat memberikan role admin");
+    });
+
+    it("prevents trainer from changing an existing admin account role", async () => {
+      pendingResolve = () => ({ data: { role: "admin" }, error: null });
+
+      await expect(
+        adminService.updateUserRole(
+          "admin-id",
+          "leader",
+          "trainer-id",
+          "trainer@example.com",
+          "trainer",
+        ),
+      ).rejects.toThrow("Trainer tidak dapat mengubah akun admin");
+
+      expect(updateCalls.some((call) => call.method === "update")).toBe(false);
     });
   });
 

@@ -14,6 +14,10 @@ export async function getDataReportRows(params: {
   agent_ids?: string[];
   showArchived?: boolean;
 }): Promise<any[]> {
+  if (params.agent_ids && params.agent_ids.length === 0) {
+    return [];
+  }
+
   // Get soft-deleted peserta IDs for exclusion (unless showing archived)
   const excludedIds = params.showArchived
     ? []

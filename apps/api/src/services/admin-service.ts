@@ -18,6 +18,17 @@ import type {
 } from "@trainers/types";
 
 // ── User Management ──────────────────────────────────────────
+async function getTargetUserRole(user_id: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", user_id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return typeof data?.role === "string" ? data.role.toLowerCase() : null;
+}
+
 export async function getUsers(): Promise<ManagedUser[]> {
   const PAGE_SIZE = 1000;
   const allData: ManagedUser[] = [];
@@ -48,11 +59,19 @@ export async function updateUserStatus(
   status: "approved" | "pending" | "rejected",
   callerId: string,
   callerEmail: string,
+  callerRole?: string,
 ): Promise<void> {
   if (user_id === callerId) {
     throw new Error(
       "Anda tidak dapat mengubah status akun Anda sendiri dari panel ini",
     );
+  }
+
+  if (callerRole === "trainer") {
+    const targetRole = await getTargetUserRole(user_id);
+    if (targetRole === "admin") {
+      throw new Error("Trainer tidak dapat mengubah akun admin");
+    }
   }
 
   const normalizedStatus = status.toLowerCase();
@@ -91,14 +110,23 @@ export async function updateUserRole(
     );
   }
 
+  const normalizedRole = role.toLowerCase();
+
   // Trainer permissions: can only manage trainer, leader, agent (cannot promote to admin)
-  if (callerRole === "trainer" && role === "admin") {
+  if (callerRole === "trainer" && normalizedRole === "admin") {
     throw new Error("Trainer tidak dapat memberikan role admin");
+  }
+
+  if (callerRole === "trainer") {
+    const targetRole = await getTargetUserRole(user_id);
+    if (targetRole === "admin") {
+      throw new Error("Trainer tidak dapat mengubah akun admin");
+    }
   }
 
   const { error } = await supabaseAdmin
     .from("profiles")
-    .update({ role: role.toLowerCase() })
+    .update({ role: normalizedRole })
     .eq("id", user_id);
 
   if (error) throw new Error(error.message);

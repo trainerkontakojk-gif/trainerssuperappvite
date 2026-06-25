@@ -3,6 +3,18 @@ import { labelJabatan } from "@trainers/types";
 import { getPhotoFrame, getPhotoInlineStyle } from "../../../lib/photo-frame";
 import { formatTanggal, hitungMasaDinas, hitungUsia, labelTim, timTheme } from "./profilerFormatters";
 
+const escapeHtml = (value: string | number | null | undefined): string =>
+  String(value ?? "").replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[char] ?? char;
+  });
+
 export const buildSlideHTML = (
   p: ProfilerPeserta,
   batch: string,
@@ -10,6 +22,15 @@ export const buildSlideHTML = (
 ) => {
   const theme = timTheme(p.tim || "");
   const photoFrame = getPhotoFrame(p.id, p.photo_frame);
+  const photoSrc = p.foto_url ? escapeHtml(p.foto_url) : "";
+  const displayName = escapeHtml(p.nama || "-");
+  const displayInitial = escapeHtml(p.nama?.charAt(0) || "?");
+  const displayJabatan = escapeHtml(
+    labelJabatan[p.jabatan || ""] || p.jabatan || "-"
+  );
+  const displayTim = escapeHtml(labelTim[p.tim || ""] || p.tim || "-");
+  const footerBatch = escapeHtml(batch.toUpperCase());
+  const footerName = escapeHtml(p.nama?.toUpperCase() || "-");
   const fields = (
     items: Array<[string, string | null | undefined, number?]>
   ) =>
@@ -19,8 +40,8 @@ export const buildSlideHTML = (
         ([label, value, span]) =>
           `<div style="${
             span === 2 ? "grid-column:span 2;" : ""
-          }"><div><div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">${label}</div><div style="font-size:11px;font-weight:700;color:#111827;">${
-            value || "-"
+          }"><div><div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">${escapeHtml(label)}</div><div style="font-size:11px;font-weight:700;color:#111827;">${
+            escapeHtml(value || "-")
           }</div></div></div>`
       )
       .join("");
@@ -36,7 +57,7 @@ export const buildSlideHTML = (
       ${
         p.foto_url
           ? `<div style="width:112px;height:112px;border-radius:24px;overflow:hidden;box-shadow:0 6px 15px rgba(0,0,0,0.1);flex-shrink:0;"><img src="${
-              p.foto_url
+              photoSrc
             }" crossorigin="anonymous" style="${getPhotoInlineStyle(
               photoFrame
             )}" /></div>`
@@ -45,21 +66,21 @@ export const buildSlideHTML = (
               ""
             )};display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:bold;color:#${
               theme.accentRaw
-            };flex-shrink:0;">${p.nama?.charAt(0) || "?"}</div>`
+            };flex-shrink:0;">${displayInitial}</div>`
       }
       <div style="display:flex;flex-direction:column;">
         <div style="font-size:24px;font-weight:bold;color:#111827;line-height:1.2;">${
-          p.nama || "-"
+          displayName
         }</div>
         <div style="font-size:12px;font-weight:700;color:#${
           theme.accentRaw
         };margin-top:4px;text-transform:uppercase;letter-spacing:1px;">${
-        labelJabatan[p.jabatan || ""] || p.jabatan || "-"
+        displayJabatan
       }</div>
         <div style="display:inline-block;margin-top:8px;font-size:10px;font-weight:700;color:#${
           theme.accentRaw
         };background:#FFFFFF;border:1px solid #E5E7EB;border-radius:6px;padding:4px 12px;width:fit-content;">${
-        labelTim[p.tim || ""] || p.tim || "-"
+        displayTim
       }</div>
       </div>
     </div>
@@ -69,31 +90,31 @@ export const buildSlideHTML = (
       <div style="background:#F9FAFB;border:1px solid #F3F4F6;border-radius:12px;padding:10px 4px;text-align:center;">
         <div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Masa Dinas</div>
         <div style="font-size:12px;font-weight:900;color:#111827;line-height:1;">${
-          p.bergabung_date ? hitungMasaDinas(p.bergabung_date) : "-"
+          escapeHtml(p.bergabung_date ? hitungMasaDinas(p.bergabung_date) : "-")
         }</div>
       </div>
       <div style="background:#F9FAFB;border:1px solid #F3F4F6;border-radius:12px;padding:10px 4px;text-align:center;">
         <div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Usia</div>
         <div style="font-size:12px;font-weight:900;color:#111827;line-height:1;">${
-          p.tgl_lahir ? `${hitungUsia(p.tgl_lahir)} Thn` : "-"
+          escapeHtml(p.tgl_lahir ? `${hitungUsia(p.tgl_lahir)} Thn` : "-")
         }</div>
       </div>
       <div style="background:#F9FAFB;border:1px solid #F3F4F6;border-radius:12px;padding:10px 4px;text-align:center;">
         <div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Tgl Lahir</div>
         <div style="font-size:10px;font-weight:900;color:#111827;line-height:1.2;">${
-          p.tgl_lahir ? formatTanggal(p.tgl_lahir) : "-"
+          escapeHtml(p.tgl_lahir ? formatTanggal(p.tgl_lahir) : "-")
         }</div>
       </div>
       <div style="background:#F9FAFB;border:1px solid #F3F4F6;border-radius:12px;padding:10px 4px;text-align:center;">
         <div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Agama</div>
         <div style="font-size:12px;font-weight:900;color:#111827;line-height:1.2;">${
-          p.agama || "-"
+          escapeHtml(p.agama || "-")
         }</div>
       </div>
       <div style="background:#F9FAFB;border:1px solid #F3F4F6;border-radius:12px;padding:10px 4px;text-align:center;">
         <div style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Status</div>
         <div style="font-size:11px;font-weight:900;color:#111827;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${
-          p.status_perkawinan || "-"
+          escapeHtml(p.status_perkawinan || "-")
         }</div>
       </div>
     </div>
@@ -168,19 +189,19 @@ export const buildSlideHTML = (
     <div style="display:flex;flex-direction:column;gap:12px;margin-top:auto;flex-shrink:0;">
       ${
         p.catatan_tambahan
-          ? `<div style="width:100%;background:#FFFBEB;border:1px solid #FEF3C7;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#D97706;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">⭐ Catatan</div><div style="font-size:11px;color:#78350F;line-height:1.6;font-weight:500;">${p.catatan_tambahan}</div></div>`
+          ? `<div style="width:100%;background:#FFFBEB;border:1px solid #FEF3C7;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#D97706;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">⭐ Catatan</div><div style="font-size:11px;color:#78350F;line-height:1.6;font-weight:500;">${escapeHtml(p.catatan_tambahan)}</div></div>`
           : ""
       }
       ${
         p.keterangan
-          ? `<div style="width:100%;background:#F9FAFB;border:1px solid #F3F4F6;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Keterangan</div><div style="font-size:11px;color:#4B5563;line-height:1.6;font-weight:500;">${p.keterangan}</div></div>`
+          ? `<div style="width:100%;background:#F9FAFB;border:1px solid #F3F4F6;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;">Keterangan</div><div style="font-size:11px;color:#4B5563;line-height:1.6;font-weight:500;">${escapeHtml(p.keterangan)}</div></div>`
           : ""
       }
     </div>
   </div>
   <div style="height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:#F9FAFB;border-top:1px solid #F3F4F6;flex-shrink:0;box-sizing:border-box;">
     <div style="display:flex;align-items:center;gap:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#D1D5DB;"></div><span style="font-size:10px;font-weight:700;color:#D1D5DB;text-transform:uppercase;letter-spacing:1.5px;">Otoritas Jasa Keuangan — Kontak OJK 157</span></div>
-    <span style="font-size:10px;font-weight:700;color:#D1D5DB;letter-spacing:1px;">${batch.toUpperCase()} · ${p.nama?.toUpperCase()}</span>
+    <span style="font-size:10px;font-weight:700;color:#D1D5DB;letter-spacing:1px;">${footerBatch} · ${footerName}</span>
   </div>
 </div>`;
   }
@@ -194,7 +215,7 @@ export const buildSlideHTML = (
       ${
         p.foto_url
           ? `<div style="width:144px;height:144px;border-radius:24px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,0.1);"><img src="${
-              p.foto_url
+              photoSrc
             }" crossorigin="anonymous" style="${getPhotoInlineStyle(
               photoFrame
             )}" /></div>`
@@ -203,21 +224,21 @@ export const buildSlideHTML = (
               ""
             )};display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:bold;color:#${
               theme.accentRaw
-            };">${p.nama?.charAt(0) || "?"}</div>`
+            };">${displayInitial}</div>`
       }
       <div style="text-align:center;width:100%;">
         <div style="font-size:20px;font-weight:bold;color:#111827;line-height:1.2;">${
-          p.nama || "-"
+          displayName
         }</div>
         <div style="font-size:11px;font-weight:700;color:#${
           theme.accentRaw
         };margin-top:6px;text-transform:uppercase;letter-spacing:1px;">${
-      labelJabatan[p.jabatan || ""] || p.jabatan || "-"
+      displayJabatan
     }</div>
         <div style="display:inline-block;margin-top:12px;font-size:10px;font-weight:700;color:#${
           theme.accentRaw
         };background:#FFFFFF;border:1px solid #E5E7EB;border-radius:6px;padding:4px 12px;">${
-      labelTim[p.tim || ""] || p.tim || "-"
+      displayTim
     }</div>
       </div>
       ${
@@ -250,7 +271,7 @@ export const buildSlideHTML = (
             ([label, value]) => `
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:0 4px;">
             <span style="font-size:8px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px;">${label}</span>
-            <span style="font-size:11px;font-weight:700;color:#374151;text-align:right;">${value}</span>
+            <span style="font-size:11px;font-weight:700;color:#374151;text-align:right;">${escapeHtml(value)}</span>
           </div>`
           )
           .join("")}
@@ -315,12 +336,12 @@ export const buildSlideHTML = (
       <div style="display:flex;gap:16px;margin-top:auto;">
         ${
           p.catatan_tambahan
-            ? `<div style="flex:1;background:#FFFBEB;border:1px solid #FEF3C7;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#D97706;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">⭐ Catatan</div><div style="font-size:11px;color:#78350F;line-height:1.6;font-weight:500;">${p.catatan_tambahan}</div></div>`
+            ? `<div style="flex:1;background:#FFFBEB;border:1px solid #FEF3C7;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#D97706;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">⭐ Catatan</div><div style="font-size:11px;color:#78350F;line-height:1.6;font-weight:500;">${escapeHtml(p.catatan_tambahan)}</div></div>`
             : ""
         }
         ${
           p.keterangan
-            ? `<div style="flex:1;background:#F9FAFB;border:1px solid #F3F4F6;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Keterangan</div><div style="font-size:11px;color:#4B5563;line-height:1.6;font-weight:500;">${p.keterangan}</div></div>`
+            ? `<div style="flex:1;background:#F9FAFB;border:1px solid #F3F4F6;border-radius:16px;padding:16px;box-sizing:border-box;"><div style="font-size:9px;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">Keterangan</div><div style="font-size:11px;color:#4B5563;line-height:1.6;font-weight:500;">${escapeHtml(p.keterangan)}</div></div>`
             : ""
         }
       </div>
@@ -328,7 +349,7 @@ export const buildSlideHTML = (
   </div>
   <div style="height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:#F9FAFB;border-top:1px solid #F3F4F6;flex-shrink:0;box-sizing:border-box;">
     <div style="display:flex;align-items:center;gap:8px;"><div style="width:6px;height:6px;border-radius:50%;background:#D1D5DB;"></div><span style="font-size:9px;font-weight:700;color:#D1D5DB;text-transform:uppercase;letter-spacing:1.5px;">Otoritas Jasa Keuangan — Kontak OJK 157</span></div>
-    <span style="font-size:9px;font-weight:700;color:#D1D5DB;letter-spacing:1px;">${batch.toUpperCase()} · ${p.nama?.toUpperCase()}</span>
+    <span style="font-size:9px;font-weight:700;color:#D1D5DB;letter-spacing:1px;">${footerBatch} · ${footerName}</span>
   </div>
 </div>`;
 };

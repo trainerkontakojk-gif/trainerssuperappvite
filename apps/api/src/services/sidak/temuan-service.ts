@@ -50,6 +50,10 @@ export async function getTemuan(params: {
   offset?: number;
   agent_ids?: string[];
 }): Promise<{ data: QATemuan[]; total: number }> {
+  if (params.agent_ids && params.agent_ids.length === 0) {
+    return { data: [], total: 0 };
+  }
+
   let query = supabaseAdmin.from("qa_temuan").select("*", { count: "exact" });
 
   if (params.peserta_id) query = query.eq("peserta_id", params.peserta_id);

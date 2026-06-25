@@ -51,6 +51,7 @@ admin.put(
     const userId = c.req.param("id");
     const body = c.req.valid("json");
     const user = c.get("user");
+    const profile = c.get("profile");
 
     try {
       await adminService.updateUserStatus(
@@ -58,6 +59,7 @@ admin.put(
         body.status,
         user.id,
         user.email || "System",
+        profile.role,
       );
       return c.json({ success: true, data: null });
     } catch (error: any) {

@@ -218,6 +218,17 @@ describe("sidak-service", () => {
       });
       expect(r.total).toBe(1);
     });
+
+    it("returns empty data for an explicit empty agent scope", async () => {
+      pendingResolve = () => {
+        throw new Error("empty agent scope should not query qa_temuan");
+      };
+
+      await expect(sidakService.getTemuan({ agent_ids: [] })).resolves.toEqual({
+        data: [],
+        total: 0,
+      });
+    });
   });
 
   describe("deleteTemuan", () => {
