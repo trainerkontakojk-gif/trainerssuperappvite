@@ -20,4 +20,18 @@ describe("app RPC route composition", () => {
       },
     });
   });
+
+  it("keeps revoke-sessions behind auth middleware", async () => {
+    const res = await app.request("/api/v1/me/revoke-sessions", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: {
+        code: "UNAUTHORIZED",
+      },
+    });
+  });
 });

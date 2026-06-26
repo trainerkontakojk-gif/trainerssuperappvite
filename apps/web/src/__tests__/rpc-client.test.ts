@@ -71,6 +71,15 @@ describe("rpcFetch", () => {
     );
   });
 
+  it("builds the revoke-sessions route from the API base path", async () => {
+    await rpcClient.v1.me["revoke-sessions"].$post();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/v1/me/revoke-sessions",
+      expect.any(Object),
+    );
+  });
+
   it("preserves existing Content-Type header", async () => {
     await rpcFetch("/api/v1/test", {
       headers: { "Content-Type": "multipart/form-data" },

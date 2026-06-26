@@ -147,6 +147,9 @@ Untuk mencegah masalah auto-login otomatis (di mana user yang baru saja logout k
    - Selama marker guest lock ini aktif, `initAuth` dan `LandingAuthProvider` akan memblokir/mengabaikan pemulihan sesi otomatis dan event `SIGNED_IN` yang berasal dari data cache Supabase.
    - Halaman landing akan tetap berada dalam guest mode dan menampilkan tombol "Masuk" (bukan "Dashboard").
 3. **Pelepasan Lock**: Marker guest lock dilepas secara otomatis (`clearLogoutGuestLock()`) ketika user melakukan aksi login eksplisit (mengirimkan form login/register, melakukan OAuth Google, atau meminta reset password). Hal ini menjamin login baru berjalan normal tanpa hambatan.
+4. **Logout biasa tetap lokal**: Tombol "Keluar" di navigasi aplikasi memakai scope `local`, jadi hanya mengakhiri sesi browser/perangkat saat ini.
+5. **Logout semua perangkat dipisah di `/account`**: Halaman akun menyediakan aksi "Logout dari Semua Perangkat" untuk mencabut refresh session user di server.
+6. **Perangkat lain tidak putus instan**: Karena Supabase masih memakai JWT access token yang sudah terbit, perangkat lain akan dipaksa login ulang saat token mereka diperbarui atau saat sesi itu dipakai kembali.
 
 ## Monitoring Usage & Billing Access
 

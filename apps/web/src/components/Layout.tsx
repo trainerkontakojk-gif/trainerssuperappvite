@@ -2,8 +2,7 @@ import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { Suspense, useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
-import { supabase } from "../lib/supabase";
-import { clearAuthLocalState } from "../lib/authLocalState";
+import { signOutLocalSession } from "../lib/session-logout";
 import { useThemeMode } from "../hooks/useThemeMode";
 import {
   TelefunWarningProvider,
@@ -76,23 +75,6 @@ function DashboardLayoutContent() {
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [flyoutModule, setFlyoutModule] = useState<string | null>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(event.target as Node)
-      ) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
   const isPublicRoute = [
     "/",
     "/auth/callback",
@@ -137,21 +119,8 @@ function DashboardLayoutContent() {
     );
   }
 
-  const userInitial = (profile?.full_name || session?.user?.email || "U")
-    .charAt(0)
-    .toUpperCase();
-
   const handleLogout = async () => {
-    clearAuthLocalState({ markLoggedOut: true });
-    useAuthStore.getState().setSession(null);
-    useAuthStore.getState().setProfile(null);
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn("[Layout] signOut failed during logout:", error);
-    } finally {
-      window.location.href = "/";
-    }
+    await signOutLocalSession({ markLoggedOut: true, redirectTo: "/" });
   };
 
   return (

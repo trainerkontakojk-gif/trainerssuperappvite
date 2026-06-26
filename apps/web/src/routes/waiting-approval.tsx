@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Clock, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { normalizeProfileStatus } from "../lib/profile";
-import { clearAuthLocalState } from "../lib/authLocalState";
+import { signOutLocalSession } from "../lib/session-logout";
 import {
   shouldPollWaitingApproval,
   WAITING_APPROVAL_POLL_INTERVAL_MS,
@@ -19,14 +19,7 @@ export default function WaitingApprovalPage() {
   const [email, setEmail] = useState("");
 
   const handleLogout = async () => {
-    clearAuthLocalState({ markLoggedOut: true });
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.warn("[WaitingApproval] signOut failed during logout:", error);
-    } finally {
-      navigate({ to: "/" });
-    }
+    await signOutLocalSession({ markLoggedOut: true, redirectTo: "/" });
   };
 
   useEffect(() => {
@@ -61,34 +54,14 @@ export default function WaitingApprovalPage() {
       const profileStatus = normalizeProfileStatus(resolvedProfile?.status);
 
       if (resolvedProfile?.is_deleted) {
-        clearAuthLocalState({ markLoggedOut: true });
-        try {
-          await supabase.auth.signOut();
-        } catch (error) {
-          console.warn(
-            "[WaitingApproval] signOut failed during deleted-account cleanup:",
-            error,
-          );
-        } finally {
-          navigate({ to: "/" });
-        }
+        await signOutLocalSession({ markLoggedOut: true, redirectTo: "/" });
         return;
       }
 
       if (profileStatus === "active") {
         navigate({ to: "/dashboard" });
       } else if (profileStatus === "inactive") {
-        clearAuthLocalState({ markLoggedOut: true });
-        try {
-          await supabase.auth.signOut();
-        } catch (error) {
-          console.warn(
-            "[WaitingApproval] signOut failed during inactive-account cleanup:",
-            error,
-          );
-        } finally {
-          navigate({ to: "/" });
-        }
+        await signOutLocalSession({ markLoggedOut: true, redirectTo: "/" });
       }
     };
 

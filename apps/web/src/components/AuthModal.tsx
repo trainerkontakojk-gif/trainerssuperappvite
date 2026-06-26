@@ -4,9 +4,9 @@ import { AlertCircle, ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { fetchAuthProfile } from "../lib/fetchAuthProfile";
 import {
-  clearAuthLocalState,
   clearLogoutGuestLock,
 } from "../lib/authLocalState";
+import { signOutLocalSession } from "../lib/session-logout";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -108,8 +108,7 @@ export default function AuthModal({
     }
 
     if (profile.is_deleted) {
-      await supabase.auth.signOut();
-      clearAuthLocalState();
+      await signOutLocalSession({ markLoggedOut: false, redirectTo: null });
       throw new Error(
         "Akun Anda telah dinonaktifkan. Silakan hubungi administrator.",
       );
@@ -120,8 +119,7 @@ export default function AuthModal({
     }
 
     if (profile.status === "inactive") {
-      await supabase.auth.signOut();
-      clearAuthLocalState();
+      await signOutLocalSession({ markLoggedOut: false, redirectTo: null });
       throw new Error(
         "Akun Anda belum dapat diakses. Silakan hubungi administrator Anda.",
       );

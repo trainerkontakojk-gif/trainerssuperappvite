@@ -21,6 +21,7 @@ import { profiler } from "./routes/profiler";
 import { adminRouter } from "./routes/admin";
 import { telefun } from "./routes/telefun";
 import { getLeaderAccessStatus } from "./services/admin-service";
+import { revokeOwnSessions } from "./services/account-service";
 
 const allowedOrigins =
   env.NODE_ENV === "production"
@@ -145,6 +146,47 @@ const v1Api = new Hono<{ Variables: AuthVariables }>()
     const user = c.get("user");
     const profile = c.get("profile");
     return c.json({ success: true, data: { user, profile } });
+  })
+  .post("/me/revoke-sessions", async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const authHeader = c.req.header("Authorization") ?? "";
+    const accessToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    if (!accessToken) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Unauthorized",
+          },
+        },
+        401,
+      );
+    }
+
+    try {
+      const data = await revokeOwnSessions({
+        accessToken,
+        userId: user.id,
+        actorName: profile.full_name || user.email || "System",
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "SESSION_REVOKE_FAILED",
+            message: "Gagal logout dari semua perangkat. Silakan coba lagi.",
+          },
+        },
+        500,
+      );
+    }
   })
   .route("/sidak", sidak)
   .route("/ketik", ketik)

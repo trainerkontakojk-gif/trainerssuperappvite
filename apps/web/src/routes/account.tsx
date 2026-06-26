@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useAuthStore } from "../store/authStore";
+import { accountApi } from "../lib/accountApi";
+import { signOutLocalSession } from "../lib/session-logout";
+import { getErrorMessage } from "../lib/api";
 
 export default function AccountPage() {
   const profile = useAuthStore((s) => s.profile);
@@ -16,6 +20,8 @@ export default function AccountPage() {
   const [nameMessage, setNameMessage] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [revokingSessions, setRevokingSessions] = useState(false);
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadUser() {
@@ -94,6 +100,30 @@ export default function AccountPage() {
       setConfirmPassword("");
     }
     setSavingPassword(false);
+  }
+
+  async function handleRevokeAllSessions() {
+    if (
+      !window.confirm(
+        "Logout dari semua perangkat? Anda akan diminta masuk kembali di browser ini.",
+      )
+    ) {
+      return;
+    }
+
+    setRevokingSessions(true);
+    setSessionActionError(null);
+
+    try {
+      await accountApi.revokeAllSessions();
+      await signOutLocalSession({ markLoggedOut: true, redirectTo: "/" });
+    } catch (error) {
+      setSessionActionError(
+        getErrorMessage(error, "Gagal logout dari semua perangkat."),
+      );
+    } finally {
+      setRevokingSessions(false);
+    }
   }
 
   return (
@@ -192,6 +222,30 @@ export default function AccountPage() {
             <p className="text-sm text-emerald-600">{passwordMessage}</p>
           )}
         </form>
+      </section>
+
+      <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-gray-900">
+          Keamanan sesi
+        </h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Keluar dari browser ini sekarang. Perangkat lain akan diminta login
+          ulang saat sesi mereka dipakai kembali.
+        </p>
+
+        <button
+          type="button"
+          onClick={handleRevokeAllSessions}
+          disabled={revokingSessions}
+          className="mt-5 inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+        >
+          <LogOut className="h-4 w-4" />
+          {revokingSessions ? "Memproses..." : "Logout dari Semua Perangkat"}
+        </button>
+
+        {sessionActionError ? (
+          <p className="mt-3 text-sm text-red-600">{sessionActionError}</p>
+        ) : null}
       </section>
     </div>
   );

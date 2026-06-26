@@ -24,7 +24,7 @@ Kalau Anda baru pertama kali membuka repo ini, anggap README ini seperti peta si
 | Telefun | Simulasi panggilan suara berbasis WebSocket | `/telefun` |
 | Profiler | Pengelolaan data peserta, impor, ekspor, dan analitik | `/profiler`, `/profiler/*` |
 | Monitoring | Riwayat penggunaan AI, harga, dan kurs | `/monitoring` |
-| Account | Profil akun dan penggantian password | `/account` |
+| Account | Profil akun, penggantian password, dan logout semua perangkat | `/account` |
 
 ## Struktur Proyek
 

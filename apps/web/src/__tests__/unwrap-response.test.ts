@@ -73,6 +73,16 @@ describe("unwrapResponse", () => {
     expectTypeOf<MeData["profile"]>().toHaveProperty("status");
   });
 
+  it("keeps the revoke-sessions response typed", () => {
+    expectTypeOf(rpcClient.v1.me["revoke-sessions"].$post).toBeFunction();
+
+    type RevokeResponse = InferResponseType<
+      typeof rpcClient.v1.me["revoke-sessions"]["$post"]
+    >;
+
+    expectTypeOf<RevokeResponse>().not.toBeAny();
+  });
+
   it("returns data on success envelope", async () => {
     const data = await unwrapResponse(
       makeResponse({
