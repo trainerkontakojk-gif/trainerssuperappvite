@@ -102,7 +102,8 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         totalFindingsByPeriod[pid] = (totalFindingsByPeriod[pid] || 0) + 1;
 
         const indicator = params.indicators.find((i: any) => i.id === row.indicator_id);
-        const paramName = indicator?.name || "Unknown";
+        if (!indicator) continue;
+        const paramName = indicator.name;
         if (!paramCounts[paramName]) paramCounts[paramName] = {};
         paramCounts[paramName][pid] = (paramCounts[paramName][pid] || 0) + 1;
       }

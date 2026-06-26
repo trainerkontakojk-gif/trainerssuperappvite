@@ -76,7 +76,8 @@ export async function calculateTopParameters(temuan: any[]) {
     const id = finding.indicator_id;
     if (!id) continue;
     const indicator = indicators.find((i) => i.id === id);
-    const name = indicator?.name || "Unknown";
+    if (!indicator) continue;
+    const name = indicator.name;
 
     if (!countsPerService[service]) countsPerService[service] = {};
     if (!countsPerService[service][id])

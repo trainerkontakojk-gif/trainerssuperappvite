@@ -182,6 +182,7 @@ export function useAgentDetail(agentId: string) {
         if (selectedService === "all") return true;
         return t.service_type === selectedService;
       })
+      .filter((t: any) => indicators?.some((i) => i.id === t.indicator_id))
       .map((t: any) => {
         const pi = periodMap.get(t.period_id) ?? { month: 0, year: 0 };
         const ind = indicators?.find((i) => i.id === t.indicator_id);
@@ -189,7 +190,7 @@ export function useAgentDetail(agentId: string) {
           id: t.id,
           month: pi.month,
           year: pi.year,
-          indicatorName: ind?.name ?? "Unknown",
+          indicatorName: ind?.name ?? "",
           category: ind?.category ?? "non_critical",
           nilai: t.nilai ?? 0,
           ketidaksesuaian: t.ketidaksesuaian ?? null,
@@ -240,6 +241,7 @@ export function useAgentDetail(agentId: string) {
       const rawTicket = (f.no_tiket ?? "").trim();
       const ticketKey = rawTicket ? rawTicket.toUpperCase() : `audit-${f.id}`;
       const ind = serviceIndicators.find((i) => i.id === f.indicator_id);
+      if (!ind) continue;
       const weight = ind?.bobot ?? 0;
       const nilai = Number.isFinite(f.nilai)
         ? Math.max(0, Math.min(3, Number(f.nilai)))
@@ -318,7 +320,8 @@ export function useAgentDetail(agentId: string) {
     let exampleSebaiknya = "";
     target.forEach((t) => {
       const ind = indicators.find((i) => i.id === t.indicator_id);
-      const name = ind?.name ?? "Unknown";
+      if (!ind) return;
+      const name = ind?.name ?? "";
       counts[name] = (counts[name] || 0) + 1;
       if (t.sebaiknya) exampleSebaiknya = t.sebaiknya;
     });
