@@ -325,7 +325,9 @@ export function useAgentDetail(agentId: string) {
       counts[name] = (counts[name] || 0) + 1;
       if (t.sebaiknya) exampleSebaiknya = t.sebaiknya;
     });
-    const topParam = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return null;
+    const topParam = entries[0];
     return {
       parameter: topParam[0],
       count: topParam[1],
