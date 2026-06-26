@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
-import { getIndicators } from "./period-indicator";
+import { getIndicators, getPeriods } from "./period-indicator";
 
 export async function getDataReportRows(params: {
   serviceType?: string;
@@ -15,6 +15,27 @@ export async function getDataReportRows(params: {
   showArchived?: boolean;
 }): Promise<any[]> {
   if (params.agent_ids && params.agent_ids.length === 0) {
+    return [];
+  }
+
+  const hasMonthRangeFilter =
+    params.year !== undefined &&
+    (params.startMonth !== undefined || params.endMonth !== undefined);
+
+  const periodIdsInRange = hasMonthRangeFilter
+    ? (await getPeriods())
+        .filter((period) => period.year === params.year)
+        .filter(
+          (period) =>
+            params.startMonth === undefined || period.month >= params.startMonth,
+        )
+        .filter(
+          (period) => params.endMonth === undefined || period.month <= params.endMonth,
+        )
+        .map((period) => period.id)
+    : [];
+
+  if (hasMonthRangeFilter && periodIdsInRange.length === 0) {
     return [];
   }
 
@@ -45,24 +66,8 @@ export async function getDataReportRows(params: {
         q = q.not("peserta_id", "in", `(${excludedIds.join(",")})`);
       }
 
-      if (params.startMonth && params.year) {
-        const startPeriod = await supabaseAdmin
-          .from("qa_periods")
-          .select("id")
-          .eq("month", params.startMonth)
-          .eq("year", params.year)
-          .single();
-        if (startPeriod.data) q = q.gte("period_id", startPeriod.data.id);
-      }
-
-      if (params.endMonth && params.year) {
-        const endPeriod = await supabaseAdmin
-          .from("qa_periods")
-          .select("id")
-          .eq("month", params.endMonth)
-          .eq("year", params.year)
-          .single();
-        if (endPeriod.data) q = q.lte("period_id", endPeriod.data.id);
+      if (hasMonthRangeFilter) {
+        q = q.in("period_id", periodIdsInRange);
       }
 
       return q;

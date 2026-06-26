@@ -276,39 +276,37 @@ export async function getAgentDetail(
   if (weightsResult.error) throw new Error(weightsResult.error.message);
 
   const currentYear = year ?? new Date().getFullYear();
+  const hasMonthRangeFilter = startMonth !== undefined || endMonth !== undefined;
+  const periodIdsInRange = periods
+    .filter((period) => period.year === currentYear)
+    .filter((period) => startMonth === undefined || period.month >= startMonth)
+    .filter((period) => endMonth === undefined || period.month <= endMonth)
+    .map((period) => period.id);
 
-  // Resolve startMonth/endMonth to period IDs for query-level filtering
-  let startPeriodId: string | undefined;
-  let endPeriodId: string | undefined;
-  if (startMonth && currentYear) {
-    const sp = periods.find((p) => p.month === startMonth && p.year === currentYear);
-    if (sp) startPeriodId = sp.id;
-  }
-  if (endMonth && currentYear) {
-    const ep = periods.find((p) => p.month === endMonth && p.year === currentYear);
-    if (ep) endPeriodId = ep.id;
-  }
+  const temuan =
+    hasMonthRangeFilter && periodIdsInRange.length === 0
+      ? []
+      : await fetchAllPages<any>({
+          build: ({ from, to }) => {
+            let q = supabaseAdmin
+              .from("qa_temuan")
+              .select("*")
+              .eq("peserta_id", agentId)
+              .eq("tahun", currentYear)
+              .order("created_at", { ascending: false })
+              .order("id", { ascending: false })
+              .range(from, to);
 
-  const temuan = await fetchAllPages<any>({
-    build: ({ from, to }) => {
-      let q = supabaseAdmin
-        .from("qa_temuan")
-        .select("*")
-        .eq("peserta_id", agentId)
-        .eq("tahun", currentYear)
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .range(from, to);
+            if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+              q = q.in("service_type", allowedServiceTypes);
+            }
+            if (hasMonthRangeFilter) {
+              q = q.in("period_id", periodIdsInRange);
+            }
 
-      if (allowedServiceTypes && allowedServiceTypes.length > 0) {
-        q = q.in("service_type", allowedServiceTypes);
-      }
-      if (startPeriodId) q = q.gte("period_id", startPeriodId);
-      if (endPeriodId) q = q.lte("period_id", endPeriodId);
-
-      return q;
-    },
-  });
+            return q;
+          },
+        });
 
   const rows = temuan;
 

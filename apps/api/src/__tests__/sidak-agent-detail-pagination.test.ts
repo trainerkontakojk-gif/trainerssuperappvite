@@ -172,4 +172,43 @@ describe("getAgentDetail pagination", () => {
     expect(totalRowsReturned).toBe(1500);
     expect(result.temuan.length).toBe(1500);
   });
+
+  it("filters month range by selected periods instead of UUID lexicographic order", async () => {
+    const { supabaseAdmin } = await import("../lib/supabase");
+    const { getPeriods } = await import("../services/sidak/period-indicator");
+
+    const uuidPeriods = [
+      { id: "ff000000-0000-0000-0000-000000000001", month: 1, year: 2026, label: "01/2026" },
+      { id: "ee000000-0000-0000-0000-000000000002", month: 2, year: 2026, label: "02/2026" },
+      { id: "dd000000-0000-0000-0000-000000000003", month: 3, year: 2026, label: "03/2026" },
+      { id: "cc000000-0000-0000-0000-000000000004", month: 4, year: 2026, label: "04/2026" },
+      { id: "bb000000-0000-0000-0000-000000000005", month: 5, year: 2026, label: "05/2026" },
+      { id: "11000000-0000-0000-0000-000000000006", month: 6, year: 2026, label: "06/2026" },
+    ];
+
+    vi.mocked(getPeriods).mockResolvedValue(uuidPeriods as any);
+
+    const allRows = uuidPeriods.map((period, index) => ({
+      id: `t-${index + 1}`,
+      peserta_id: "agent-1",
+      service_type: "call",
+      period_id: period.id,
+      tahun: 2026,
+      nilai: 0,
+      indicator_id: "ind-1",
+      no_tiket: `T-${index + 1}`,
+      created_at: `2026-${String(index + 1).padStart(2, "0")}-01`,
+      is_phantom_padding: false,
+    }));
+
+    vi.mocked(supabaseAdmin.from).mockImplementation(makePaginatedMock(allRows));
+
+    const result = await getAgentDetail("agent-1", 2026, "call", 1, 6);
+
+    expect(result.temuan).toHaveLength(6);
+    expect(result.periodSummaries).toHaveLength(6);
+    expect(result.periodSummaries.map((summary) => summary.month)).toEqual([
+      6, 5, 4, 3, 2, 1,
+    ]);
+  });
 });
