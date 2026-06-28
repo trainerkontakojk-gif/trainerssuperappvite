@@ -11,8 +11,8 @@ interface KetikMessageBubbleProps {
 const TickIcon = ({ status }: { status?: string }) => {
   if (!status) return null;
   const color = status === "read" ? "text-primary" : "text-muted-foreground";
-  if (status === "sent") return <Check className={`w-3.5 h-3.5 ${color}`} />;
-  return <CheckCheck className={`w-3.5 h-3.5 ${color}`} />;
+  if (status === "sent") return <Check className={`h-3.5 w-3.5 ${color}`} />;
+  return <CheckCheck className={`h-3.5 w-3.5 ${color}`} />;
 };
 
 export function renderKetikMessageContent(
@@ -30,19 +30,22 @@ export function renderKetikMessageContent(
 
       if (imgSrc) {
         return (
-          <motion.div
+          <motion.button
             key={index}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="my-2"
+            type="button"
+            className="my-2 block w-full overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-module-ketik focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            onClick={() => onImageClick(imgSrc)}
+            aria-label={`Buka lampiran gambar ${imgIndex}`}
           >
             <img
               src={imgSrc}
-              alt={`Attachment ${imgIndex}`}
-              className="rounded-2xl max-h-64 w-full object-cover border border-gray-200 dark:border-white/10 cursor-pointer hover:opacity-90 transition-all"
-              onClick={() => onImageClick(imgSrc)}
+              alt={`Lampiran skenario ${imgIndex}`}
+              className="max-h-64 w-full object-cover"
+              loading="lazy"
             />
-          </motion.div>
+          </motion.button>
         );
       }
       return (
@@ -65,23 +68,28 @@ export function KetikMessageBubble({
   return (
     <motion.div
       key={message.id}
-      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
       className={`flex w-full ${isAgent ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`max-w-[80%] px-6 py-4 relative text-[15px] leading-relaxed shadow-sm
+        className={`relative max-w-[88%] px-4 py-3 text-[15px] leading-7 sm:max-w-[76%] sm:px-5
           ${
             isAgent
-              ? "bg-module-ketik text-white rounded-[2rem] rounded-tr-none shadow-module-ketik/20"
-              : "module-clean-panel text-foreground rounded-[2rem] rounded-tl-none"
+              ? "rounded-2xl rounded-tr-md bg-module-ketik text-white"
+              : "module-clean-panel rounded-2xl rounded-tl-md text-foreground"
           }`}
       >
-        <div className="font-medium whitespace-pre-wrap break-words">
-          {renderKetikMessageContent(message.text, scenarioImages, onImageClick)}
+        <div className="whitespace-pre-wrap break-words font-medium">
+          {renderKetikMessageContent(
+            message.text,
+            scenarioImages,
+            onImageClick,
+          )}
         </div>
         <div
-          className={`text-[9px] font-black uppercase tracking-widest flex items-center justify-end gap-2 mt-2 ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
+          className={`mt-2 flex items-center justify-end gap-2 text-xs font-medium tabular-nums ${isAgent ? "text-white/80" : "text-muted-foreground"}`}
         >
           <span>
             {message.timestamp

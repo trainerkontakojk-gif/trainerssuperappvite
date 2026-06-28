@@ -354,7 +354,9 @@ export function ChatInterface({
         return;
       }
 
-      const responseText = result.text.replace(NO_RESPONSE_PATTERN_GLOBAL, "").trim();
+      const responseText = result.text
+        .replace(NO_RESPONSE_PATTERN_GLOBAL, "")
+        .trim();
       if (responseText) {
         const rawParts = responseText
           .split("[BREAK]")
@@ -534,73 +536,76 @@ export function ChatInterface({
       data-module="ketik"
       className="module-clean-app flex flex-col h-full w-full bg-background overflow-hidden relative"
     >
-      {/* Premium Header */}
-      <div className="module-clean-toolbar px-4 py-4 md:px-8 md:py-6 flex items-center justify-between border-b shrink-0 w-full z-50 relative">
-        <div className="flex items-center gap-4 w-auto md:w-1/4 shrink-0">
+      {/* Header */}
+      <div className="module-clean-toolbar relative z-50 flex w-full shrink-0 items-center justify-between gap-3 border-b px-3 py-3 sm:px-4 md:px-6 md:py-4">
+        <div className="flex w-auto shrink-0 items-center gap-3 md:w-1/4">
           {isReviewMode && (
             <button
+              type="button"
               onClick={() => onEndSession(messages)}
-              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-all group cursor-pointer"
+              className="group flex items-center gap-2 text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="Kembali dari mode review"
             >
-              <div className="module-clean-button-secondary w-10 h-10 rounded-xl flex items-center justify-center transition-all">
-                <ArrowLeft className="w-5 h-5" />
+              <div className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition">
+                <ArrowLeft className="h-5 w-5" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
+              <span className="hidden text-xs font-semibold sm:inline">
                 Kembali
               </span>
             </button>
           )}
           {!isReviewMode && (
-            <div className="module-clean-panel w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl overflow-hidden shrink-0 relative flex items-center justify-center">
-              <div className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-primary/20 text-primary text-base md:text-lg font-black rounded-xl md:rounded-2xl">
+            <div className="module-clean-panel relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl md:h-12 md:w-12">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-module-ketik/15 text-base font-bold text-module-ketik md:h-12 md:w-12 md:text-lg">
                 {config.identity.name.charAt(0).toUpperCase()}
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center flex-1 min-w-0 px-2 md:w-2/4">
-          <h1 className="font-black text-foreground text-base md:text-xl tracking-tighter truncate max-w-full text-center">
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-1 md:w-2/4">
+          <h1 className="max-w-full truncate text-center text-base font-semibold text-foreground md:text-lg">
             {config.identity.name}
           </h1>
-          <div className="flex flex-wrap items-center justify-center gap-1 md:gap-2 mt-1.5 max-w-full">
-            <div className="module-clean-panel flex items-center gap-1 px-2 py-0.5 md:px-3 md:py-1 rounded-full shrink-0">
-              <Phone className="w-2.5 h-2.5 text-primary" />
-              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <div className="mt-1.5 flex max-w-full flex-wrap items-center justify-center gap-1.5 md:gap-2">
+            <div className="module-clean-panel flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 md:px-3">
+              <Phone className="h-3 w-3 text-module-ketik" />
+              <span className="text-xs font-medium text-muted-foreground">
                 {config.identity.phone}
               </span>
             </div>
-            <div className="module-clean-panel flex items-center gap-1 px-2 py-0.5 md:px-3 md:py-1 rounded-full min-w-0">
-              <MapPin className="w-2.5 h-2.5 text-primary shrink-0" />
-              <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground truncate">
+            <div className="module-clean-panel flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 md:px-3">
+              <MapPin className="h-3 w-3 shrink-0 text-module-ketik" />
+              <span className="truncate text-xs font-medium text-muted-foreground">
                 {config.identity.city}
               </span>
             </div>
           </div>
           {!isReviewMode ? (
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-module-ketik">
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-xs font-semibold text-module-ketik">
                 Online
               </span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground tabular-nums">
+              <span className="text-xs font-medium tabular-nums text-muted-foreground">
                 {formatTime(elapsedSeconds)}
               </span>
-              <span className="w-1 h-1 bg-module-ketik rounded-full animate-pulse"></span>
+              <span className="h-1.5 w-1.5 rounded-full bg-module-ketik" />
             </div>
           ) : (
-            <div className="flex items-center gap-2 mt-0.5">
-              <X className="w-3 h-3 text-orange-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-orange-500">
+            <div className="mt-1 flex items-center gap-2">
+              <X className="h-3.5 w-3.5 text-orange-500" />
+              <span className="text-xs font-semibold text-orange-500">
                 Review Mode
               </span>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-3 w-auto md:w-1/4 shrink-0">
+        <div className="flex w-auto shrink-0 items-center justify-end gap-2 md:w-1/4">
           {isReviewMode ? (
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => {
                   const csvContent =
                     "data:text/csv;charset=utf-8,Pengirim,Pesan,Waktu\n" +
@@ -628,21 +633,25 @@ export function ChatInterface({
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="module-clean-button-secondary w-12 h-12 flex items-center justify-center hover:text-foreground rounded-2xl transition-all shadow-sm cursor-pointer"
+                className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 title="Download CSV"
+                aria-label="Download transcript CSV"
               >
-                <Download className="w-5 h-5" />
+                <Download className="h-5 w-5" />
               </button>
               <button
+                type="button"
                 onClick={() => onEndSession([])}
-                className="module-clean-button-secondary w-12 h-12 flex items-center justify-center hover:text-red-500 rounded-2xl transition-all shadow-sm cursor-pointer"
+                className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 title="Tutup Review"
+                aria-label="Tutup mode review"
               >
-                <X className="w-5 h-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => {
                 clearPendingTimeouts();
                 if (!isLoading && !isEnding && authReady) {
@@ -650,16 +659,17 @@ export function ChatInterface({
                 }
               }}
               disabled={isLoading || isEnding || !authReady}
-              className={`px-4 py-2 md:px-6 md:py-2.5 text-white font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all rounded-xl shadow-lg flex items-center gap-2
+              className={`flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition md:px-5 md:py-2.5
                 ${
                   isLoading || isEnding || !authReady
                     ? "bg-red-400 cursor-not-allowed opacity-80"
-                    : "bg-red-500 hover:bg-red-600 shadow-red-500/20 active:scale-95 cursor-pointer"
+                    : "bg-red-500 hover:bg-red-600 active:scale-95 cursor-pointer"
                 }`}
+              aria-label="Akhiri sesi KETIK"
             >
               {isEnding || !authReady ? (
                 <>
-                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   <span>Memproses...</span>
                 </>
               ) : (
@@ -671,7 +681,7 @@ export function ChatInterface({
       </div>
 
       {/* Messages Area */}
-      <div className="module-clean-stage flex-1 overflow-y-auto z-10 scroll-smooth custom-scrollbar flex flex-col p-4 space-y-2">
+      <div className="module-clean-stage custom-scrollbar z-10 flex flex-1 flex-col space-y-2 overflow-y-auto scroll-smooth px-3 py-4 sm:px-4 md:px-6">
         <AnimatePresence initial={false}>
           {messages.map((msg) => {
             if (msg.sender === "system") {
@@ -685,11 +695,12 @@ export function ChatInterface({
                   key={msg.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
                   className="flex justify-center py-4"
                 >
                   <div className="flex flex-col items-center gap-2">
                     {systemTextWithoutTag ? (
-                      <p className="text-[10px] font-medium text-muted-foreground text-center uppercase tracking-wide">
+                      <p className="max-w-[75ch] text-center text-xs font-medium text-muted-foreground">
                         {systemTextWithoutTag}
                       </p>
                     ) : null}
@@ -722,24 +733,26 @@ export function ChatInterface({
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             className="flex justify-start"
+            aria-live="polite"
           >
-            <div className="module-clean-panel rounded-[20px] rounded-bl-sm px-4 py-3">
+            <div className="module-clean-panel rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex space-x-1">
                 <motion.div
                   animate={{ y: [0, -3, 0] }}
                   transition={{ repeat: Infinity, duration: 0.6 }}
-                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                  className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
                 />
                 <motion.div
                   animate={{ y: [0, -3, 0] }}
                   transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
-                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                  className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
                 />
                 <motion.div
                   animate={{ y: [0, -3, 0] }}
                   transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
-                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full"
+                  className="h-1.5 w-1.5 rounded-full bg-muted-foreground"
                 />
               </div>
             </div>
@@ -751,15 +764,16 @@ export function ChatInterface({
       {/* Input Area */}
       {!isReviewMode &&
       (sessionPhase === "active" || sessionPhase === "expired") ? (
-        <div className="module-clean-toolbar p-4 md:p-6 border-t z-40 shrink-0 relative">
+        <div className="module-clean-toolbar relative z-40 shrink-0 border-t p-3 sm:p-4 md:p-5">
           <div className="absolute inset-x-0 -top-12 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
 
-          <div className="flex justify-center mb-4 md:mb-6">
+          <div className="mb-3 flex justify-center md:mb-4">
             <button
+              type="button"
               onClick={isMaintenanceMode ? applyMaintenance : applyTemplate}
-              className="module-clean-button-secondary flex items-center gap-2 px-4 py-2 md:px-6 md:py-2.5 rounded-2xl shadow-sm text-[9px] md:text-[10px] font-black uppercase tracking-widest text-module-ketik transition-all group cursor-pointer"
+              className="module-clean-button-secondary group flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-module-ketik transition hover:text-module-ketik focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background md:px-5"
             >
-              <Sparkles className="w-3 h-3 md:w-3.5 md:h-3.5 group-hover:rotate-12 transition-transform" />
+              <Sparkles className="h-4 w-4 transition-transform group-hover:rotate-12" />
               <span>
                 {isMaintenanceMode
                   ? "Gunakan Maintenance"
@@ -768,19 +782,24 @@ export function ChatInterface({
             </button>
           </div>
 
-          <div className="max-w-4xl mx-auto flex items-end gap-2 md:gap-4">
-            <div className="module-clean-input-shell flex-1 rounded-[2rem] border-2 flex flex-col px-4 py-2 md:px-6 md:py-2.5 focus-within:border-module-ketik transition-all shadow-inner">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/50 mb-1 ml-1 select-none">
+          <div className="mx-auto flex max-w-4xl items-end gap-2 md:gap-3">
+            <div className="module-clean-input-shell relative flex flex-1 flex-col rounded-2xl px-4 py-2.5 transition focus-within:border-module-ketik md:px-5">
+              <label
+                htmlFor="ketik-message-input"
+                className="mb-1 ml-1 select-none text-xs font-semibold text-muted-foreground"
+              >
                 Pesan Baru
-              </span>
+              </label>
               <textarea
+                id="ketik-message-input"
                 ref={textareaRef}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Tulis pesan Anda..."
-                className="w-full bg-transparent border-none outline-none resize-none max-h-48 min-h-[40px] py-1 text-base text-foreground placeholder-foreground/50 font-medium"
+                className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
                 rows={1}
+                aria-label="Tulis pesan KETIK"
               />
 
               {/* Floating Template Popup */}
@@ -791,13 +810,16 @@ export function ChatInterface({
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute bottom-full left-6 mb-4 w-72 max-h-64 overflow-y-auto bg-card border border-border/50 rounded-[2rem] shadow-2xl z-[60] p-3 flex flex-col gap-1 custom-scrollbar"
+                    transition={{ duration: 0.16, ease: "easeOut" }}
+                    className="custom-scrollbar absolute bottom-full left-0 z-[60] mb-3 flex max-h-64 w-[min(22rem,calc(100vw-2rem))] flex-col gap-1 overflow-y-auto rounded-2xl border border-border bg-card p-2"
+                    role="listbox"
+                    aria-label="Pilihan template cepat"
                   >
-                    <div className="px-4 py-2 border-b border-border/10 mb-1 flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                    <div className="mb-1 flex items-center justify-between border-b border-border px-3 py-2">
+                      <span className="text-xs font-semibold text-muted-foreground">
                         Pilih Template
                       </span>
-                      <span className="text-[9px] font-medium text-primary/50">
+                      <span className="text-xs font-medium text-muted-foreground">
                         ↑↓ Navigasi
                       </span>
                     </div>
@@ -805,16 +827,19 @@ export function ChatInterface({
                       filteredTemplates.map((t, i) => (
                         <button
                           key={t.id}
+                          type="button"
                           onClick={() => insertTemplate(t)}
                           onMouseEnter={() => setSelectedTemplateIndex(i)}
-                          className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex flex-col gap-0.5 cursor-pointer ${
+                          className={`flex w-full cursor-pointer flex-col gap-1 rounded-xl border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                             i === selectedTemplateIndex
-                              ? "bg-primary/10 border border-primary/20"
+                              ? "border-module-ketik/30 bg-module-ketik/10"
                               : "hover:bg-foreground/5 border border-transparent"
                           }`}
+                          role="option"
+                          aria-selected={i === selectedTemplateIndex}
                         >
                           <span
-                            className={`text-[10px] font-black uppercase tracking-wider ${i === selectedTemplateIndex ? "text-primary" : "text-muted-foreground"}`}
+                            className={`text-xs font-semibold ${i === selectedTemplateIndex ? "text-module-ketik" : "text-muted-foreground"}`}
                           >
                             /{t.keyword}
                           </span>
@@ -836,31 +861,32 @@ export function ChatInterface({
             </div>
             <motion.button
               whileTap={{ scale: 0.9 }}
-              whileHover={{ scale: 1.05 }}
               onClick={handleSend}
               disabled={!inputText.trim()}
-              className={`w-12 h-12 md:w-14 md:h-14 rounded-[2rem] flex items-center justify-center transition-all shrink-0 ${
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-14 md:w-14 ${
                 inputText.trim()
                   ? "module-clean-button-primary text-white cursor-pointer"
                   : "bg-foreground/5 text-muted-foreground cursor-not-allowed"
               }`}
+              type="button"
+              aria-label="Kirim pesan"
             >
               <Send
-                className={`w-5 h-5 md:w-6 md:h-6 ${inputText.trim() ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+                className={`h-5 w-5 md:h-6 md:w-6 ${inputText.trim() ? "translate-x-0.5 -translate-y-0.5" : ""}`}
               />
             </motion.button>
           </div>
         </div>
       ) : !isReviewMode ? (
-        <div className="module-clean-toolbar p-8 border-t z-40 shrink-0 text-center flex items-center justify-center gap-3">
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-muted-foreground">
+        <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
+          <span className="text-sm font-semibold text-muted-foreground">
             Sesi Telah Berakhir
           </span>
         </div>
       ) : (
-        <div className="module-clean-toolbar p-8 border-t z-40 shrink-0 text-center flex items-center justify-center gap-3">
-          <X className="w-4 h-4 text-orange-500/50" />
-          <span className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-muted-foreground">
+        <div className="module-clean-toolbar z-40 flex shrink-0 items-center justify-center gap-3 border-t p-6 text-center">
+          <X className="h-4 w-4 text-orange-500/70" />
+          <span className="text-sm font-semibold text-muted-foreground">
             Mode Review &bull; Hanya Baca
           </span>
         </div>
