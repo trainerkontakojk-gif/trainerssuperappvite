@@ -47,6 +47,7 @@ export function ScenarioAttachments({
                   className="w-14 h-14 rounded-md object-cover border border-border"
                 />
                 <button
+                  type="button"
                   onClick={() => onRemove(index)}
                   className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center shadow transition-opacity cursor-pointer"
                 >

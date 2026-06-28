@@ -133,6 +133,109 @@ describe("PDKT SettingsModal Characterization Tests", () => {
     );
   });
 
+  it("opens the scenario wizard on step 1 with an optional step 2", async () => {
+    const user = userEvent.setup();
+    render(<SettingsModal {...defaultProps} />);
+
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+
+    expect(screen.getByRole("button", { name: /langkah 1/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /langkah 2/i })).toBeDefined();
+    expect(screen.getAllByText("Detail Lanjutan (Opsional)").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /buka detail/i })).toBeDefined();
+  });
+
+  it("reopens step 2 and surfaces invalid recipient errors on save", async () => {
+    const user = userEvent.setup();
+    const onSaveMock = vi.fn();
+    render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
+
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
+      "Wizard Test",
+    );
+    await user.type(
+      screen.getByPlaceholderText(
+        "Jelaskan konteks masalah yang harus diselesaikan oleh agen...",
+      ),
+      "Deskripsi wizard test",
+    );
+
+    await user.click(screen.getByRole("button", { name: /lanjut ke detail/i }));
+    await user.click(screen.getByRole("button", { name: /tambah alamat/i }));
+
+    const recipientInput = screen.getByPlaceholderText(
+      "alamat.tujuan@domain.com",
+    );
+    await user.type(recipientInput, "not-an-email");
+
+    expect(screen.getByText(/format email tidak valid/i)).toBeDefined();
+
+    await user.click(
+      screen.getAllByRole("button", { name: /kembali ke info dasar/i })[0],
+    );
+    expect(
+      screen.getAllByRole("button", { name: /lanjut ke detail/i }).length,
+    ).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /^simpan$/i }));
+
+    expect(
+      screen.getAllByRole("button", { name: /kembali ke info dasar/i }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText(/format email tidak valid/i)).toBeDefined();
+    expect(onSaveMock).not.toHaveBeenCalled();
+  });
+
+  it("saves a scenario directly from step 1 without opening advanced fields", async () => {
+    const user = userEvent.setup();
+    const onSaveMock = vi.fn();
+    render(<SettingsModal {...defaultProps} onSave={onSaveMock} />);
+
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+
+    await user.type(
+      screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
+      "Step 1 Save Test",
+    );
+    await user.type(
+      screen.getByPlaceholderText(
+        "Jelaskan konteks masalah yang harus diselesaikan oleh agen...",
+      ),
+      "Disimpan langsung dari langkah 1",
+    );
+
+    await user.click(screen.getByRole("button", { name: /^simpan$/i }));
+
+    expect(screen.getByText("Step 1 Save Test")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: /buka detail/i }),
+    ).toBeNull();
+
+    await user.click(
+      screen.getByRole("button", { name: /simpan perubahan/i }),
+    );
+
+    expect(onSaveMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarios: expect.arrayContaining([
+          expect.objectContaining({
+            title: "Step 1 Save Test",
+            description: "Disimpan langsung dari langkah 1",
+          }),
+        ]),
+      }),
+    );
+  });
+
   it("closes and reopens with fresh settings from props", () => {
     const { rerender } = render(<SettingsModal {...defaultProps} />);
     expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();

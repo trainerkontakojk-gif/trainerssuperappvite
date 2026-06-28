@@ -4,7 +4,10 @@ import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
-import { normalizePdktScenarioDraft } from "./pdktDraftNormalizers";
+import {
+  findInvalidPdktRecipientEmails,
+  normalizePdktScenarioDraft,
+} from "./pdktDraftNormalizers";
 import { ArrowLeft } from "lucide-react";
 
 // Sub-components
@@ -13,6 +16,8 @@ import { ScenarioForm } from "./scenarios/ScenarioForm";
 import { ScenarioAttachments } from "./scenarios/ScenarioAttachments";
 import { ScenarioAIGenerator } from "./scenarios/ScenarioAIGenerator";
 import { ScenarioTemplateField } from "./scenarios/ScenarioTemplateField";
+import { ScenarioRecipientsField } from "./scenarios/ScenarioRecipientsField";
+import type { ScenarioWizardStep } from "./scenarios/ScenarioWizardStepHeader";
 
 interface PdktScenariosTabProps {
   scenarios: PdktScenario[];
@@ -38,6 +43,7 @@ export function PdktScenariosTab({
   const [isNewCategoryInput, setIsNewCategoryInput] = useState(false);
   const [newScenarioCategory, setNewScenarioCategory] = useState("");
   const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
+  const [activeScenarioStep, setActiveScenarioStep] = useState<ScenarioWizardStep>("basic");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories = Array.from(new Set(scenarios.map((s) => s.category)));
@@ -79,6 +85,7 @@ export function PdktScenariosTab({
   };
 
   const handleAddClick = () => {
+    setActiveScenarioStep("basic");
     scenarioForm.openAdd();
     setNewScenarioCategory("");
     setIsNewCategoryInput(false);
@@ -86,6 +93,7 @@ export function PdktScenariosTab({
   };
 
   const handleEditClick = (scenario: PdktScenario) => {
+    setActiveScenarioStep("basic");
     scenarioForm.openEdit(scenario);
     setNewScenarioCategory(scenario.category);
     setIsNewCategoryInput(!categories.includes(scenario.category));
@@ -189,7 +197,31 @@ export function PdktScenariosTab({
     const title = scenarioForm.draft.title;
     const desc = scenarioForm.draft.description;
     if (!title || !desc) return;
+    const invalidRecipientEmails =
+      findInvalidPdktRecipientEmails(scenarioForm.draft.recipientEmails);
+    if (invalidRecipientEmails.length > 0) {
+      setActiveScenarioStep("advanced");
+      setTimeout(() => {
+        document
+          .getElementById("scenario-form-advanced")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        (
+          document.querySelector(
+            '#scenario-form-advanced input[aria-invalid="true"]',
+          ) as HTMLInputElement | null
+        )?.focus();
+      }, 0);
+      notify.warning("Perbaiki format alamat email tujuan tambahan sebelum menyimpan skenario.");
+      return;
+    }
     if (scenarioForm.draft.alwaysUseSampleEmail && !scenarioForm.draft.sampleEmailTemplate?.body?.trim()) {
+      setActiveScenarioStep("advanced");
+      setTimeout(() => {
+        document
+          .getElementById("scenario-form-advanced")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("scenario-template-body")?.focus();
+      }, 0);
       notify.warning('Isi body template email jika Anda memilih "Always use this email".');
       return;
     }
@@ -206,6 +238,7 @@ export function PdktScenariosTab({
       scenarios: scenarioForm.save(prev.scenarios, normalizedDraft),
     }));
 
+    setActiveScenarioStep("basic");
     scenarioForm.close();
   };
 
@@ -213,6 +246,7 @@ export function PdktScenariosTab({
     if (scenarioForm.isDirty(scenarios)) {
       if (!window.confirm("Skenario belum disimpan. Buang perubahan?")) return;
     }
+    setActiveScenarioStep("basic");
     scenarioForm.close();
   };
 
@@ -235,9 +269,16 @@ export function PdktScenariosTab({
           setIsNewCategoryInput={setIsNewCategoryInput}
           newScenarioCategory={newScenarioCategory}
           setNewScenarioCategory={setNewScenarioCategory}
+          activeStep={activeScenarioStep}
+          onStepChange={setActiveScenarioStep}
           onSave={handleSaveScenario}
           onCancel={handleCancelScenarioForm}
-        >
+          advancedContent={
+            <>
+          <ScenarioRecipientsField
+            draft={scenarioForm.draft}
+            onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+          />
           <ScenarioTemplateField
             draft={scenarioForm.draft}
             onDraftChange={(updates) => scenarioForm.setDraft(updates)}
@@ -255,7 +296,9 @@ export function PdktScenariosTab({
             onRemove={handleRemoveImage}
             fileInputRef={fileInputRef}
           />
-        </ScenarioForm>
+            </>
+          }
+        />
       </div>
     );
   }

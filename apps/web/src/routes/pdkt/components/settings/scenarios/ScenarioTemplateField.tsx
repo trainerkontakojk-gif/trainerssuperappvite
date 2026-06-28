@@ -18,8 +18,8 @@ export function ScenarioTemplateField({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         {children}
         <label className="flex items-center gap-2 cursor-pointer group shrink-0">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide group-hover:text-foreground transition-colors">
-            Always use this email
+          <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+            Selalu pakai template ini
           </span>
           <div className="relative inline-flex items-center cursor-pointer">
             <input
@@ -36,6 +36,7 @@ export function ScenarioTemplateField({
       </div>
       <div className="space-y-2.5">
         <SettingsInput
+          id="scenario-template-subject"
           type="text"
           placeholder="Subjek email template (opsional)..."
           value={draft.sampleEmailTemplate?.subject || ""}
@@ -49,6 +50,7 @@ export function ScenarioTemplateField({
           }
         />
         <textarea
+          id="scenario-template-body"
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none font-mono placeholder:text-muted-foreground/30 leading-relaxed font-normal"
           rows={6}
           placeholder="Tulis isi email template di sini. Gunakan wording netral; nama konsumen akan disisipkan otomatis sesuai pengaturan sistem."
@@ -63,7 +65,7 @@ export function ScenarioTemplateField({
           }
         />
         <p className="text-xs text-muted-foreground/80 leading-normal">
-          * Jika &quot;Always use this email&quot; aktif, AI tidak akan meng-generate email baru melainkan langsung memakai teks di atas.
+          * Jika opsi ini aktif, AI tidak akan meng-generate email baru dan akan memakai teks di atas hanya saat diperlukan.
         </p>
       </div>
     </div>

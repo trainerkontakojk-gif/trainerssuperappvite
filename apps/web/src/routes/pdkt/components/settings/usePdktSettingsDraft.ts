@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type {
   PdktScenario,
   PdktConsumerType,
@@ -95,12 +95,13 @@ export function usePdktSettingsDraft({
     "realistic" | "training"
   >(localSettings.writingStyleMode || "training");
 
-  const scenarioForm = useCrudForm<PdktScenario>({
-    generateId: () => `s-${Date.now()}`,
-    defaultValues: {
+  const scenarioDefaultValues = useMemo(
+    () => ({
       category: "",
       title: "",
       description: "",
+      recipientMode: "single" as const,
+      recipientEmails: [] as string[],
       sampleEmailTemplate: {
         subject: "",
         body: "",
@@ -109,7 +110,24 @@ export function usePdktSettingsDraft({
       isLicensed: false,
       isActive: true,
       attachmentImages: [],
-    },
+    }),
+    [],
+  );
+
+  const consumerDefaultValues = useMemo(
+    () => ({
+      name: "",
+      description: "",
+      difficulty: "Medium" as const,
+      tone: "",
+      isCustom: true,
+    }),
+    [],
+  );
+
+  const scenarioForm = useCrudForm<PdktScenario>({
+    generateId: () => `s-${Date.now()}`,
+    defaultValues: scenarioDefaultValues,
     validate: (draft) => !!(draft.title && draft.description && draft.category),
     createItem: (id, draft) => ({
       id,
@@ -119,19 +137,15 @@ export function usePdktSettingsDraft({
 
   const consumerForm = useCrudForm<PdktConsumerType>({
     generateId: () => `c-${Date.now()}`,
-    defaultValues: {
-      name: "",
-      description: "",
-      difficulty: "Medium",
-      tone: "",
-      isCustom: true,
-    },
+    defaultValues: consumerDefaultValues,
     validate: (draft) => !!(draft.name && draft.description),
     createItem: (id, draft) => ({
       id,
       ...normalizePdktConsumerDraft(draft),
     }),
   });
+  const closeScenarioForm = scenarioForm.close;
+  const closeConsumerForm = consumerForm.close;
 
   // Sync state when modal opens to ensure fresh data
   useEffect(() => {
@@ -155,10 +169,10 @@ export function usePdktSettingsDraft({
       );
       setWritingStyleMode(settings.writingStyleMode || "training");
 
-      scenarioForm.close();
-      consumerForm.close();
+      closeScenarioForm();
+      closeConsumerForm();
     }
-  }, [isOpen, settings]);
+  }, [isOpen, settings, closeScenarioForm, closeConsumerForm]);
 
   const handleSave = () => {
     const scenarioDirty = scenarioForm.isDirty(localSettings.scenarios);
