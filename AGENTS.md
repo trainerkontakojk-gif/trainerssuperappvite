@@ -15,9 +15,15 @@
 - Untuk task kompleks, kombinasikan dengan ECC specialized agents (planner, architect, dll).
 - Berikan instruksi yang spesifik tentang arsitektur monorepo (apps/web, apps/api, packages/types).
 
-## UI/UX Pro Max Skill
+## UI/UX Skills
 
-**WAJIB** gunakan skill **UI/UX Pro Max** (`ui-ux-pro-max`) untuk semua task yang berhubungan dengan perubahan UI/UX — baik itu build, design, create, implement, review, fix, atau improve tampilan. Skill ini menyediakan:
+Dua skill UI/UX terinstall dan WAJIB digunakan untuk semua task yang berhubungan dengan perubahan tampilan — build, design, implement, review, fix, atau improve UI. Keduanya **saling melengkapi**, bukan pengganti.
+
+### Ensiklopedia: UI/UX Pro Max (Referensi Design)
+
+**WAJIB** gunakan skill **UI/UX Pro Max** (`ui-ux-pro-max`) sebagai sumber referensi design. Skill ini seperti **ensiklopedia** — dipakai saat perlu cari referensi style, palette, font, atau guideline.
+
+Skill ini menyediakan:
 
 - **67 UI Styles** — Glassmorphism, Neumorphism, Bento Grid, dll.
 - **161 Color Palettes** — Industri-specific
@@ -26,7 +32,55 @@
 - **99 UX Guidelines** — Best practices & anti-patterns
 - **Stack-specific guidelines** — React, Tailwind, shadcn/ui, Next.js, dan lainnya
 
-Skill ter-install di `.opencode/skills/ui-ux-pro-max/` dan akan aktif otomatis saat ada permintaan UI/UX.
+**Cara pakai:** search database via script Python-nya. Gunakan saat:
+- Butuh referensi style/palette/font untuk design baru
+- Mau mastiin design sesuai standar industri
+- Butuh UX guidelines untuk fitur tertentu
+
+Skill ter-install di `.opencode/skills/ui-ux-pro-max/`.
+
+### Quality Inspector: Impeccable (Workflow Design)
+
+**WAJIB** gunakan skill **Impeccable** (`impeccable`) sebagai **quality checker & workflow design** — terutama untuk mastiin hasil design gak kelihatan "AI-generated". Skill ini seperti **toolkit + inspector**.
+
+Skill ini menyediakan:
+- **23 commands**: `craft`, `shape`, `init`, `audit`, `critique`, `polish`, `bolder`, `quieter`, `distill`, `harden`, `animate`, `layout`, `typeset`, `colorize`, dll.
+- **44 deterministic detector rules** — Anti-pattern detector yg ngecek UI secara otomatis
+- **PostToolUse hook** — Auto-run detector setiap kali agent selesai edit file UI
+- **Live browser iteration** — `/impeccable live` buat iterasi visual langsung
+- **The AI Slop Test** — Explicit guidance biar hasil gak kelihatan "AI made"
+
+**Cara pakai:**
+```bash
+/impeccable init              # Setup pertama (bikin PRODUCT.md + DESIGN.md)
+/impeccable audit <target>    # Technical quality check
+/impeccable critique <target> # UX design review
+/impeccable polish <target>   # Final pass sebelum shipping
+/impeccable bolder <target>   # Amplify safe/bland designs
+/impeccable harden <target>   # Error handling, edge cases
+```
+
+**Konfigurasi hooks** (auto-detect setelah edit UI):
+```bash
+/impeccable hooks on          # Aktifkan detector hook
+/impeccable hooks status      # Cek status hook
+```
+
+Skill ter-install di `.agents/skills/impeccable/` (Codex) dan `.opencode/skills/impeccable/` (OpenCode).
+
+### Flow Optimal: UI/UX Pro Max + Impeccable
+
+| Step | Skill | Kegunaan |
+|------|-------|----------|
+| 1️⃣ | **UI/UX Pro Max** | Cari referensi: "kasi font pairing buat dashboard fintech" / "cari palette warna buat form" |
+| 2️⃣ | **Coding** | Implementasi UI berdasarkan referensi |
+| 3️⃣ | **Impeccable** | `audit` atau `polish` — deteksi AI slop, quality check |
+| 4️⃣ | **Impeccable** | `critique` — UX review kalo perlu |
+
+**Aturan penting:**
+- Jangan skip **Impeccable audit** sebelum pull request yang ada perubahan UI
+- Jangan skip **UI/UX Pro Max** saat mulai fitur UI baru — ambil referensi dulu
+- Impeccable hooks akan auto-berjalan setelah edit file UI; perhatikan output-nya
 
 ## Superpower Skill + ECC Plugin
 
@@ -54,7 +108,7 @@ Jika task membutuhkan specialized agent, kombinasikan dengan **ECC (Everything C
 - Build error → **build-error-resolver** agent
 - Cek dokumentasi library → **docs-lookup** agent (Context7)
 - Autonomous loop / monitoring → **loop-operator** agent
-- **Perubahan UI/UX** → **ui-ux-pro-max** skill (aktivasi otomatis)
+- **Perubahan UI/UX** → **ui-ux-pro-max** (referensi) + **impeccable** (quality check)
 
 ECC agents bisa dipanggil via `Task` tool dengan `subagent_type` yang sesuai.
 
