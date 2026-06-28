@@ -194,6 +194,7 @@ mailbox.post(
         typos: result.typos,
         clarityIssues: result.clarityIssues,
         contentGaps: result.contentGaps,
+        scoreBreakdown: result.scoreBreakdown,
       },
     });
   },

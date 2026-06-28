@@ -90,12 +90,12 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   };
 
   return (
-    <div className="w-full md:w-80 border-r border-gray-200 flex flex-col h-full bg-white shrink-0">
+    <div className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0">
       {/* Sidebar Header */}
-      <div className="p-4 border-b border-gray-200 space-y-4">
+      <div className="p-4 border-b border-[var(--border)] space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-            <Inbox className="w-4 h-4 text-sky-600" />
+          <h2 className="text-sm font-semibold text-[var(--fg)] flex items-center gap-2">
+            <Inbox className="w-4 h-4 text-[var(--fg2)]" />
             Mailbox
           </h2>
           <div className="flex items-center gap-1">
@@ -104,15 +104,16 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                 {selectedBulkIds.size > 0 && (
                   <button
                     onClick={onBulkDelete}
-                    className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-500 flex items-center justify-center transition-all animate-pulse"
+                    className="min-w-10 min-h-10 rounded-lg border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--destructive)] flex items-center justify-center transition-all"
                     title={`Hapus ${selectedBulkIds.size} email terpilih`}
+                    aria-label={`Hapus ${selectedBulkIds.size} email terpilih`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   onClick={onToggleBulkMode}
-                  className="px-2 py-1 text-[10px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all"
+                  className="min-h-10 px-3 text-xs font-semibold border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--fg)] rounded-lg transition-all"
                 >
                   Batal
                 </button>
@@ -121,44 +122,49 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
               <>
                 <button
                   onClick={onToggleBulkMode}
-                  className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                  className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                   title="Pilih Banyak"
+                  aria-label="Pilih Banyak"
                 >
-                  <CheckSquare className="w-3.5 h-3.5" />
+                  <CheckSquare className="w-4 h-4" />
                 </button>
                 {onSettings && (
                   <button
                     onClick={onSettings}
-                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                    className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                     title="Pengaturan"
+                    aria-label="Pengaturan"
                   >
-                    <Settings className="w-3.5 h-3.5" />
+                    <Settings className="w-4 h-4" />
                   </button>
                 )}
                 {onHistory && (
                   <button
                     onClick={onHistory}
-                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                    className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                     title="Riwayat"
+                    aria-label="Riwayat"
                   >
-                    <History className="w-3.5 h-3.5" />
+                    <History className="w-4 h-4" />
                   </button>
                 )}
                 {onUsage && (
                   <button
                     onClick={onUsage}
-                    className="w-7 h-7 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-all text-gray-500 hover:text-gray-900"
+                    className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                     title="Usage Bulan Ini"
+                    aria-label="Usage Bulan Ini"
                   >
-                    <BarChart3 className="w-3.5 h-3.5" />
+                    <BarChart3 className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   onClick={onNew}
-                  className="w-7 h-7 rounded-lg bg-sky-600 text-white flex items-center justify-center transition-all hover:bg-sky-700 active:scale-95 ml-1"
+                  className="min-w-10 min-h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] flex items-center justify-center transition-all hover:bg-[var(--bg)] active:scale-95 ml-1"
                   title="Buat Simulasi"
+                  aria-label="Buat Simulasi"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-4 h-4" />
                 </button>
               </>
             )}
@@ -166,18 +172,18 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
         </div>
 
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-sky-600 transition-colors" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--fg3)] group-focus-within:text-[var(--fg)] transition-colors" />
           <input
             type="text"
             placeholder="Cari email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-4 text-xs focus:ring-1 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all placeholder:text-gray-400"
+            className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg py-2.5 pl-9 pr-4 text-xs text-[var(--fg)] focus:border-[var(--fg)] outline-none transition-all placeholder:text-[var(--fg3)]"
           />
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex p-1 bg-gray-100 rounded-xl">
+        <div className="flex p-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg">
           {[
             { id: "all", label: "Semua" },
             { id: "open", label: "Belum Dibalas" },
@@ -186,10 +192,10 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
             <button
               key={tab.id}
               onClick={() => onFilterChange(tab.id as any)}
-              className={`flex-1 py-1.5 text-[9px] font-medium uppercase tracking-wide rounded-lg transition-all ${
+              className={`flex-1 py-1.5 text-[11px] font-medium rounded-md transition-all ${
                 filter === tab.id
-                  ? "bg-white text-sky-600 shadow-sm"
-                  : "text-gray-500 hover:text-gray-900"
+                  ? "bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)]"
+                  : "text-[var(--fg2)] hover:text-[var(--fg)]"
               }`}
             >
               {tab.label}
@@ -202,8 +208,8 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-            <Mail className="w-10 h-10 text-gray-300 mb-3" />
-            <p className="text-[11px] font-medium text-gray-500 leading-loose">
+            <Mail className="w-10 h-10 text-[var(--fg3)] mb-3" />
+            <p className="text-xs font-medium text-[var(--fg2)] leading-relaxed">
               {search || filter !== "all"
                 ? "Hasil Tidak Ditemukan"
                 : "Kotak Masuk Kosong"}
@@ -211,14 +217,14 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
             {!(search || filter !== "all") && (
               <button
                 onClick={onNew}
-                className="mt-4 text-[10px] font-medium text-sky-600 hover:underline"
+                className="mt-4 min-h-10 px-3 text-xs font-medium text-[var(--fg)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition-all"
               >
                 Buat Email Pertama
               </button>
             )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border)]">
             {filteredItems.map((item) => {
               const isSelected = selectedBulkIds.has(item.id);
               const canDelete = item.permissions?.can_delete !== false;
@@ -238,11 +244,11 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                   className={`w-full text-left p-4 transition-all relative flex gap-3 cursor-pointer ${
                     isBulkMode
                       ? isSelected
-                        ? "bg-sky-50/40"
-                        : "hover:bg-gray-50"
+                        ? "bg-[var(--bg)]"
+                        : "hover:bg-[var(--bg)]"
                       : selectedId === item.id
-                      ? "bg-sky-50/50 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-sky-600"
-                      : "hover:bg-gray-50"
+                      ? "bg-[var(--bg)] ring-1 ring-inset ring-[var(--border)]"
+                      : "hover:bg-[var(--bg)]"
                   } ${isBulkMode && !canDelete ? "opacity-50" : ""}`}
                   style={{ cursor: isBulkMode && !canDelete ? "not-allowed" : "pointer" }}
                 >
@@ -256,7 +262,7 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                         checked={isSelected}
                         disabled={!canDelete}
                         onChange={() => onToggleBulkId(item.id)}
-                        className="w-4 h-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500 cursor-pointer disabled:cursor-not-allowed"
+                        className="w-4 h-4 text-[var(--module-pdkt)] border-[var(--border)] rounded focus:ring-[var(--fg)] cursor-pointer disabled:cursor-not-allowed"
                         title={!canDelete ? "Anda tidak memiliki izin menghapus email ini" : ""}
                       />
                     </div>
@@ -265,8 +271,8 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                   <div
                     className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                       !isBulkMode && selectedId === item.id
-                        ? "bg-sky-600 text-white shadow-md"
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)]"
+                        : "bg-[var(--bg)] text-[var(--fg2)] border border-[var(--border)]"
                     }`}
                   >
                     {getInitials(item.sender_name)}
@@ -275,38 +281,38 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span
-                        className={`text-xs truncate ${item.status === "open" ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}
+                        className={`text-xs truncate ${item.status === "open" ? "font-semibold text-[var(--fg)]" : "font-medium text-[var(--fg2)]"}`}
                       >
                         {item.sender_name}
                       </span>
-                      <span className="text-[9px] text-gray-500 whitespace-nowrap">
+                      <span className="text-[10px] text-[var(--fg3)] whitespace-nowrap">
                         {formatTime(item.last_activity_at)}
                       </span>
                     </div>
 
                     <div
-                      className={`text-[11px] truncate mb-0.5 ${item.status === "open" ? "font-bold text-gray-900" : "font-medium text-gray-600"}`}
+                      className={`text-xs truncate mb-0.5 ${item.status === "open" ? "font-semibold text-[var(--fg)]" : "font-medium text-[var(--fg2)]"}`}
                     >
                       {item.subject || "(Tanpa Subjek)"}
                     </div>
 
-                    <div className="text-[10px] text-gray-500 line-clamp-1 leading-relaxed opacity-70">
+                    <div className="text-[11px] text-[var(--fg2)] line-clamp-1 leading-relaxed">
                       {item.snippet}
                     </div>
 
-                    <div className="text-[9px] text-gray-400 mt-1 leading-normal">
+                    <div className="text-[10px] text-[var(--fg3)] mt-1 leading-normal">
                       {formatCreatorLabel(item)}
                     </div>
 
                     <div className="mt-2 flex items-center gap-2">
                       {item.status === "open" ? (
-                        <span className="inline-flex items-center gap-1 font-medium text-[9px] text-sky-600">
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-600" />{" "}
+                        <span className="inline-flex items-center gap-1 font-medium text-[10px] text-[var(--fg2)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--module-pdkt)]" />{" "}
                           Menunggu Balasan
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 font-medium text-[9px] text-emerald-500">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{" "}
+                        <span className="inline-flex items-center gap-1 font-medium text-[10px] text-[var(--chart-green)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--chart-green)]" />{" "}
                           Terbalas
                         </span>
                       )}
@@ -320,22 +326,25 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
       </div>
 
       {/* Sidebar Footer */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50 flex items-center justify-around">
+      <div className="p-3 border-t border-[var(--border)] bg-[var(--bg)] flex items-center justify-around">
         <button
-          className="p-2 text-sky-600 hover:bg-sky-100 rounded-xl transition-all"
+          className="min-h-10 min-w-10 text-[var(--fg)] hover:bg-[var(--surface)] rounded-lg transition-all flex items-center justify-center"
           title="Inbox"
+          aria-label="Inbox"
         >
           <Inbox className="w-4 h-4" />
         </button>
         <button
-          className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition-all"
+          className="min-h-10 min-w-10 text-[var(--fg3)] hover:bg-[var(--surface)] hover:text-[var(--fg)] rounded-lg transition-all flex items-center justify-center"
           title="Sent (History)"
+          aria-label="Sent (History)"
         >
           <Send className="w-4 h-4" />
         </button>
         <button
-          className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition-all"
+          className="min-h-10 min-w-10 text-[var(--fg3)] hover:bg-[var(--surface)] hover:text-[var(--fg)] rounded-lg transition-all flex items-center justify-center"
           title="Trash"
+          aria-label="Trash"
         >
           <Trash2 className="w-4 h-4" />
         </button>

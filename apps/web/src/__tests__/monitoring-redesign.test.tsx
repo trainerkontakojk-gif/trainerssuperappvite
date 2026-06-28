@@ -1,8 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { HistoryCard } from "../routes/monitoring/components/HistoryCard";
 import { HistoryTab } from "../routes/monitoring/components/HistoryTab";
+import { PdktEvaluationPanel } from "../routes/monitoring/components/PdktEvaluationPanel";
 import type { UnifiedHistoryEntry } from "../routes/monitoring/utils/formatting";
+
+const mockPdktReviewResponse = vi.hoisted(() => vi.fn());
+
+vi.mock("../lib/api", () => ({
+  aiClient: {
+    "monitoring/history/:module/:id/review": {
+      $get: mockPdktReviewResponse,
+    },
+    "monitoring/history/:module/:id": {
+      $delete: vi.fn(),
+    },
+  },
+  getErrorMessage: (err: unknown, fallback: string) =>
+    err instanceof Error ? err.message : fallback,
+  unwrapResponse: async (response: unknown) => response,
+}));
 
 // ─── Test Fixtures ─────────────────────────────────────────────────────────────
 
@@ -163,6 +180,45 @@ describe("HistoryCard — module-specific assessment previews", () => {
     const button = screen.getByText("Lihat Detail");
     fireEvent.click(button);
     expect(onViewDetail).toHaveBeenCalledWith(ketikEntry);
+  });
+});
+
+describe("PdktEvaluationPanel — score breakdown", () => {
+  beforeEach(() => {
+    mockPdktReviewResponse.mockReset();
+  });
+
+  it("renders PDKT score breakdown when available", async () => {
+    mockPdktReviewResponse.mockResolvedValueOnce({
+      module: "pdkt",
+      review_status: "completed",
+      evaluation_error: null,
+      time_taken: 90,
+      emails: [],
+      evaluation: {
+        score: 88,
+        feedback: "Arah penerima sudah tepat.",
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        scoreBreakdown: {
+          recipientDirectionScore: 92,
+          normativeResponseScore: 87,
+          clarityScore: 90,
+          typoScore: 100,
+          templateComplianceScore: 70,
+        },
+      },
+    });
+
+    render(<PdktEvaluationPanel entryId="pdkt-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Arah Penerima")).toBeTruthy();
+    });
+    expect(screen.getByText("Kualitas OJK")).toBeTruthy();
+    expect(screen.getByText("Template")).toBeTruthy();
+    expect(screen.getByText("92")).toBeTruthy();
   });
 });
 

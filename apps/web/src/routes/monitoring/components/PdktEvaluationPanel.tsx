@@ -81,6 +81,25 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   const emails = data?.emails || [];
   const hasEmails = emails.length > 0;
   const evaluation = data?.evaluation;
+  const scoreBreakdown = evaluation?.scoreBreakdown;
+  const breakdownItems = scoreBreakdown
+    ? [
+        {
+          label: "Arah Penerima",
+          value: scoreBreakdown.recipientDirectionScore,
+        },
+        {
+          label: "Kualitas OJK",
+          value: scoreBreakdown.normativeResponseScore,
+        },
+        { label: "Kejelasan", value: scoreBreakdown.clarityScore },
+        { label: "Typo", value: scoreBreakdown.typoScore },
+        {
+          label: "Template",
+          value: scoreBreakdown.templateComplianceScore,
+        },
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -169,6 +188,24 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               </span>
             </div>
           </div>
+
+          {scoreBreakdown && (
+            <div className="grid gap-2 sm:grid-cols-5">
+              {breakdownItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg border border-border bg-muted/30 px-3 py-2"
+                >
+                  <div className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">
+                    {item.label}
+                  </div>
+                  <div className="mt-1 text-sm font-black text-foreground">
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* 4-Card Evaluation Grid */}
           <div className="grid gap-4 md:grid-cols-2">

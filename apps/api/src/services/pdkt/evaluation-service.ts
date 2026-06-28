@@ -2,11 +2,14 @@ import {
   PdktSessionConfig,
   EmailMessage,
   PdktEvaluationResult,
+  PdktRecipientContext,
+  PdktEvaluationScoreBreakdown,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 import { callAI, isTransientAiError } from "./shared-utils";
+import { buildPdktRecipientConflictHints } from "./evaluation-context";
 
 // ── Prompt Builder ────────────────────────────────────────────────────
 
@@ -23,6 +26,8 @@ export function buildPdktEvaluationPrompt(input: {
   agentReplyBody: string;
   scenarioTitle?: string;
   scenarioCategory?: string;
+  recipientContext?: PdktRecipientContext;
+  conflictHints?: string[];
 }): { systemInstruction: string; prompt: string } {
   const systemInstruction = [
     "Anda adalah supervisor QA untuk pelatihan agent kontak OJK 157.",
@@ -31,12 +36,32 @@ export function buildPdktEvaluationPrompt(input: {
     "Berikan evaluasi objektif dalam JSON berbahasa Indonesia.",
   ].join(" ");
 
+  const recipientContextBlock = input.recipientContext
+    ? [
+        `recipientContext.primaryRecipientType: ${input.recipientContext.primaryRecipientType}`,
+        `recipientContext.primaryRecipientAddress: ${input.recipientContext.primaryRecipientAddress}`,
+        `recipientContext.ccRecipients: ${input.recipientContext.ccRecipients.join(", ") || "(kosong)"}`,
+        `recipientContext.replyIntent: ${input.recipientContext.replyIntent}`,
+      ].join("\n    - ")
+    : [
+        "recipientContext: tidak tersedia",
+        "legacy fallback: anggap mode reply_to_ojk sebagai baseline aman jika metadata belum ada",
+      ].join("\n    - ");
+
+  const conflictHints = input.conflictHints || [];
+  const conflictHintBlock =
+    conflictHints.length > 0
+      ? conflictHints.map((hint) => `- ${hint}`).join("\n    ")
+      : "- tidak ada conflict hints";
+
   const prompt = `
     KONTEKS PELATIHAN:
     - Kanal: Email/contact center OJK 157.
     - Peran trainee: agent kontak OJK 157 yang menerima pengaduan konsumen sektor jasa keuangan.
     - Skenario: ${input.scenarioCategory || "Umum"} - ${input.scenarioTitle || "Tidak disebutkan"}.
     - Catatan penting: perusahaan terlapor dapat berupa bank/asuransi/leasing/pinjol, tetapi agent yang dinilai tetap agent OJK 157.
+    - Metadata penerima eksplisit:
+      - ${recipientContextBlock}
 
     EMAIL KONSUMEN:
     "${input.inboundEmailBody}"
@@ -48,15 +73,93 @@ export function buildPdktEvaluationPrompt(input: {
     Nilai balasan agent OJK 157 di atas terhadap email konsumen yang diterima.
 
     KRITERIA PENILAIAN (Skor Awal 100):
-    1. TYPO: Salah ketik, ejaan, atau format.
-    2. CLARITY: Apakah mudah dimengerti? Struktur logis?
-    3. RELEVANSI: Apakah menjawab masalah inti dan mengarahkan konsumen dengan tepat sebagai OJK 157?
+    1. recipient framing: apakah salam, sapaan, narasi tindakan, dan penutup menjaga primary recipient sebagai lawan bicara utama?
+    2. normative OJK response quality: apakah narasi OJK tetap benar, termasuk ucapan terima kasih, arahan kanal pelaporan, dan tindak lanjut yang sesuai?
+    3. clarityScore: apakah jawaban mudah dimengerti dan terstruktur?
+    4. typoScore: salah ketik, ejaan, atau format.
+    5. templateComplianceScore: hanya compliance kecil, bukan penentu utama skor.
+
+    ATURAN PENTING:
+    - Penyebutan OJK sebagai pihak yang memberi arahan, ucapan terima kasih, atau rujukan kanal pelaporan diperbolehkan saat primary recipient adalah perusahaan dan OJK hanya CC.
+    - Yang dinilai salah adalah pergeseran lawan bicara utama, bukan sekadar penyebutan OJK.
+    - Jika pembuka atau penutup membuat email tampak kembali dialamatkan ke OJK sebagai pihak utama, beri penalti besar pada recipient framing.
+    - Jika metadata recipient tidak tersedia, gunakan legacy fallback reply_to_ojk dan jangan menebak intent dari body terakhir.
+
+    CONFLICT HINTS:
+    ${conflictHintBlock}
 
     OUTPUT JSON:
-    { "score": number, "typos": string[], "clarityIssues": string[], "contentGaps": string[], "feedback": string }
+    {
+      "score": number,
+      "scoreBreakdown": {
+        "recipientDirectionScore": number,
+        "normativeResponseScore": number,
+        "clarityScore": number,
+        "typoScore": number,
+        "templateComplianceScore": number
+      },
+      "typos": string[],
+      "clarityIssues": string[],
+      "contentGaps": string[],
+      "feedback": string
+    }
   `;
 
   return { systemInstruction, prompt };
+}
+
+function clampScore(value: unknown, fallback: number): number {
+  const numeric = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function normalizeScoreBreakdown(value: unknown): PdktEvaluationScoreBreakdown | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  return {
+    recipientDirectionScore: clampScore(raw.recipientDirectionScore, 0),
+    normativeResponseScore: clampScore(raw.normativeResponseScore, 0),
+    clarityScore: clampScore(raw.clarityScore, 0),
+    typoScore: clampScore(raw.typoScore, 0),
+    templateComplianceScore: clampScore(raw.templateComplianceScore, 0),
+  };
+}
+
+function applyRecipientConflictFailsafe(input: {
+  score: number;
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
+  conflictHints: string[];
+}): {
+  score: number;
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
+} {
+  if (input.conflictHints.length === 0) {
+    return {
+      score: input.score,
+      scoreBreakdown: input.scoreBreakdown,
+    };
+  }
+
+  const currentBreakdown =
+    input.scoreBreakdown ||
+    ({
+      recipientDirectionScore: input.score,
+      normativeResponseScore: input.score,
+      clarityScore: input.score,
+      typoScore: input.score,
+      templateComplianceScore: input.score,
+    } satisfies PdktEvaluationScoreBreakdown);
+
+  return {
+    score: Math.min(input.score, 75),
+    scoreBreakdown: {
+      ...currentBreakdown,
+      recipientDirectionScore: Math.min(
+        currentBreakdown.recipientDirectionScore,
+        60,
+      ),
+    },
+  };
 }
 
 export async function evaluateAgentResponse(
@@ -71,6 +174,7 @@ export async function evaluateAgentResponse(
   typos?: string[];
   clarityIssues?: string[];
   contentGaps?: string[];
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
   error?: string;
 }> {
   const modelId = config.selectedModel || "gemini-3.1-flash-lite";
@@ -92,6 +196,14 @@ export async function evaluateAgentResponse(
 
   const inboundEmailBody = inboundEmails[0].body || "(kosong)";
   const agentReplyBody = agentReplies[0].body || "(kosong)";
+  const recipientContext = config.recipientContext;
+  const conflictAnalysis = buildPdktRecipientConflictHints({
+    agentReplyBody,
+    recipientContext,
+  });
+  const conflictHints = Array.from(
+    new Set([...(conflictAnalysis.conflictHints || []), ...(recipientContext ? [] : ["legacy fallback: mode reply_to_ojk"]) ]),
+  );
 
   const scenario = config.scenarios?.[0];
   const { systemInstruction, prompt: evaluationPrompt } =
@@ -100,6 +212,8 @@ export async function evaluateAgentResponse(
       agentReplyBody,
       scenarioTitle: scenario?.title,
       scenarioCategory: scenario?.category,
+      recipientContext,
+      conflictHints,
     });
 
   // Log context for observability (no body content logged)
@@ -130,10 +244,18 @@ export async function evaluateAgentResponse(
 
       const evalText = response.text || "{}";
       const result = parseJsonFromModelText(evalText);
+      const normalizedScore = clampScore(result.score, 0);
+      const scoreBreakdown = normalizeScoreBreakdown(result.scoreBreakdown);
+      const scored = applyRecipientConflictFailsafe({
+        score: normalizedScore,
+        scoreBreakdown,
+        conflictHints: conflictAnalysis.conflictHints,
+      });
 
       return {
         success: true,
-        score: result.score ?? 0,
+        score: scored.score,
+        scoreBreakdown: scored.scoreBreakdown,
         typos: result.typos || [],
         clarityIssues: result.clarityIssues || [],
         contentGaps: result.contentGaps || [],
@@ -241,6 +363,7 @@ export async function processPdktEvaluation(
       typos: result.typos || [],
       clarityIssues: result.clarityIssues || [],
       contentGaps: result.contentGaps || [],
+      scoreBreakdown: result.scoreBreakdown,
     };
 
     const { data: saved, error: updateEndError } = await adminClient
