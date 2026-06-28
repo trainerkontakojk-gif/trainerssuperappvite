@@ -39,6 +39,7 @@ import {
   initializeEmailSession,
   resolvePdktGenerationConfig,
 } from "../services/pdkt/session-service";
+import { resolvePdktRecipientTargets } from "../services/pdkt/recipient-targets";
 import type {
   PdktScenario,
   PdktSessionConfig,
@@ -714,5 +715,144 @@ describe("resolvePdktGenerationConfig", () => {
         identity: mockIdentity,
       }),
     ).toThrow("Scenario atau consumer type tidak ditemukan.");
+  });
+});
+
+describe("resolvePdktRecipientTargets", () => {
+  it("normalizes recipient emails and keeps the fallback address", () => {
+    expect(
+      resolvePdktRecipientTargets({
+        recipientMode: "single",
+        recipientEmails: [" FIRST@test.com ", "first@test.com", "", "bad-email"],
+      }),
+    ).toEqual({
+      mode: "single",
+      recipients: ["konsumen@ojk.go.id", "first@test.com"],
+      to: "first@test.com",
+    });
+  });
+});
+
+describe("initializeEmailSession recipient targets", () => {
+  it("uses the first custom recipient in single mode", async () => {
+    const config = buildConfig({
+      scenarios: [
+        {
+          ...mockPinjolScenario,
+          recipientMode: "single",
+          recipientEmails: ["alpha@test.com", "beta@test.com"],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Subjek",
+            body: "Isi template " + buildBody(600),
+          },
+        },
+      ],
+    });
+
+    const result = await initializeEmailSession(config);
+    expect(result.success).toBe(true);
+    expect(result.message?.to).toBe("alpha@test.com");
+  });
+
+  it("joins fallback and custom recipients in multiple mode", async () => {
+    const config = buildConfig({
+      scenarios: [
+        {
+          ...mockPinjolScenario,
+          recipientMode: "multiple",
+          recipientEmails: ["alpha@test.com", "beta@test.com"],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Subjek",
+            body: "Isi template " + buildBody(600),
+          },
+        },
+      ],
+    });
+
+    const result = await initializeEmailSession(config);
+    expect(result.success).toBe(true);
+    expect(result.message?.to).toBe(
+      "konsumen@ojk.go.id, alpha@test.com, beta@test.com",
+    );
+  });
+
+  it("attaches explicit recipient metadata for company-plus-CC sessions", async () => {
+    const config = buildConfig({
+      scenarios: [
+        {
+          ...mockPinjolScenario,
+          recipientMode: "multiple",
+          recipientEmails: ["company@test.com"],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Subjek",
+            body: "Isi template " + buildBody(600),
+          },
+        },
+      ],
+    });
+
+    const result = await initializeEmailSession(config);
+
+    expect(result.success).toBe(true);
+    expect(result.message?.recipientContext).toEqual({
+      primaryRecipientType: "reported_company",
+      primaryRecipientAddress: "company@test.com",
+      ccRecipients: ["konsumen@ojk.go.id"],
+      replyIntent: "reply_to_company_with_ojk_cc",
+    });
+  });
+
+  it("keeps OJK as primary recipient when scenario explicitly sets OJK primary with company CC", async () => {
+    const config = buildConfig({
+      scenarios: [
+        {
+          ...mockPinjolScenario,
+          primaryRecipientType: "ojk",
+          recipientMode: "multiple",
+          recipientEmails: ["company@test.com"],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Subjek",
+            body: "Isi template " + buildBody(600),
+          },
+        },
+      ],
+    });
+
+    const result = await initializeEmailSession(config);
+
+    expect(result.success).toBe(true);
+    expect(result.message?.recipientContext).toEqual({
+      primaryRecipientType: "ojk",
+      primaryRecipientAddress: "konsumen@ojk.go.id",
+      ccRecipients: ["company@test.com"],
+      replyIntent: "reply_to_ojk",
+    });
+  });
+
+  it("falls back to OJK intent when no company recipient exists", async () => {
+    const config = buildConfig({
+      scenarios: [
+        {
+          ...mockPinjolScenario,
+          recipientMode: "single",
+          recipientEmails: [],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Subjek",
+            body: "Isi template " + buildBody(600),
+          },
+        },
+      ],
+    });
+
+    const result = await initializeEmailSession(config);
+
+    expect(result.success).toBe(true);
+    expect(result.message?.recipientContext?.primaryRecipientType).toBe("ojk");
+    expect(result.message?.recipientContext?.replyIntent).toBe("reply_to_ojk");
   });
 });

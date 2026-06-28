@@ -122,6 +122,13 @@ export type PdktMonitoringReview = {
     typos: string[];
     clarityIssues: string[];
     contentGaps: string[];
+    scoreBreakdown?: {
+      recipientDirectionScore: number;
+      normativeResponseScore: number;
+      clarityScore: number;
+      typoScore: number;
+      templateComplianceScore: number;
+    };
   } | null;
   evaluation_error: string | null;
   time_taken: number | null;

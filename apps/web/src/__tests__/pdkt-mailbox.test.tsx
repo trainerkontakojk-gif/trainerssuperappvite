@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import {
   RouterProvider,
@@ -174,6 +174,29 @@ describe("EmailDetailPane Component", () => {
     expect(screen.getByText("Jane Doe")).toBeDefined();
     expect(screen.getByText("Refund request")).toBeDefined();
     expect(screen.getByText("I want a refund")).toBeDefined();
+  });
+
+  it("renders the actual recipient string from the inbound email payload", () => {
+    render(
+      <EmailDetailPane
+        item={{
+          ...mockItem,
+          inbound_email: {
+            ...(mockItem.inbound_email as any),
+            to: "alpha@test.com, beta@test.com",
+          },
+        }}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("Kepada:")).toBeDefined();
+    expect(screen.getByText("alpha@test.com, beta@test.com")).toBeDefined();
   });
 
   it("shows loader when evaluation is processing", () => {

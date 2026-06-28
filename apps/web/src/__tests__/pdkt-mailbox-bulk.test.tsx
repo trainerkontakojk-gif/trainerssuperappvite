@@ -27,7 +27,7 @@ vi.mock("../lib/toast", () => ({
   notify: mockNotify,
 }));
 
-vi.mock("../../lib/api", () => ({
+vi.mock("../lib/api", () => ({
   pdktClient: {
     settings: { $get: vi.fn().mockResolvedValue(null) },
     history: { $get: vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) }) },

@@ -3,6 +3,27 @@ import { z } from "zod";
 // ── PDKT Types ────────────────────────────────────────
 export type WritingStyleMode = "realistic" | "training";
 
+export type PdktPrimaryRecipientType = "ojk" | "reported_company";
+
+export type PdktReplyIntent =
+  | "reply_to_company_with_ojk_cc"
+  | "reply_to_ojk";
+
+export interface PdktRecipientContext {
+  primaryRecipientType: PdktPrimaryRecipientType;
+  primaryRecipientAddress: string;
+  ccRecipients: string[];
+  replyIntent: PdktReplyIntent;
+}
+
+export interface PdktEvaluationScoreBreakdown {
+  recipientDirectionScore: number;
+  normativeResponseScore: number;
+  clarityScore: number;
+  typoScore: number;
+  templateComplianceScore: number;
+}
+
 export type ConsumerNameMentionPattern =
   | "random"
   | "upfront"
@@ -32,6 +53,9 @@ export const pdktScenarioSchema = z.object({
   title: z.string(),
   description: z.string(),
   isActive: z.boolean(),
+  primaryRecipientType: z.enum(["ojk", "reported_company"]).optional(),
+  recipientMode: z.enum(["single", "multiple"]).optional(),
+  recipientEmails: z.array(z.string()).optional(),
   script: z.string().optional(),
   sampleEmailTemplate: z
     .object({
@@ -57,6 +81,17 @@ export const pdktSessionConfigSchema = z.object({
   scenarios: z.array(pdktScenarioSchema),
   consumerType: pdktConsumerTypeSchema,
   identity: pdktIdentitySchema,
+  recipientContext: z
+    .object({
+      primaryRecipientType: z.enum(["ojk", "reported_company"]),
+      primaryRecipientAddress: z.string(),
+      ccRecipients: z.array(z.string()),
+      replyIntent: z.enum([
+        "reply_to_company_with_ojk_cc",
+        "reply_to_ojk",
+      ]),
+    })
+    .optional(),
   enableImageGeneration: z.boolean().default(true),
   selectedModel: z.string().default("gemini-3.1-flash-lite"),
   resolvedConsumerNameMentionPattern: z
@@ -72,6 +107,7 @@ export interface PdktEvaluationResult {
   typos: string[];
   clarityIssues: string[];
   contentGaps: string[];
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
 }
 
 export type MailboxStatus = "open" | "replied" | "deleted";
@@ -105,6 +141,17 @@ export const emailMessageSchema = z.object({
   body: z.string(),
   timestamp: z.string(),
   isAgent: z.boolean(),
+  recipientContext: z
+    .object({
+      primaryRecipientType: z.enum(["ojk", "reported_company"]),
+      primaryRecipientAddress: z.string(),
+      ccRecipients: z.array(z.string()),
+      replyIntent: z.enum([
+        "reply_to_company_with_ojk_cc",
+        "reply_to_ojk",
+      ]),
+    })
+    .optional(),
   attachments: z.array(z.string()).optional(),
   attachmentSource: z.enum(["manual", "ai", "none"]).optional(),
   attachmentWarning: z.string().optional(),

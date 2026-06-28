@@ -27,14 +27,6 @@ interface EmailDetailPaneProps {
   onBackToList?: () => void;
 }
 
-interface EvaluationData {
-  score: number;
-  feedback: string;
-  typos: string[];
-  clarityIssues: string[];
-  contentGaps: string[];
-}
-
 export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   item,
   onReply,
@@ -52,6 +44,25 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   const evalStatus = evaluationStatus;
   const evalData = evaluation;
   const evalError = evaluationError;
+  const scoreBreakdown = evalData?.scoreBreakdown;
+  const breakdownItems = scoreBreakdown
+    ? [
+        {
+          label: "Arah Penerima",
+          value: scoreBreakdown.recipientDirectionScore,
+        },
+        {
+          label: "Kualitas OJK",
+          value: scoreBreakdown.normativeResponseScore,
+        },
+        { label: "Kejelasan", value: scoreBreakdown.clarityScore },
+        { label: "Typo", value: scoreBreakdown.typoScore },
+        {
+          label: "Template",
+          value: scoreBreakdown.templateComplianceScore,
+        },
+      ]
+    : [];
   const handleRetryEval = onRetryEval;
 
   const formatEmailDate = (dateStr: string) => {
@@ -103,9 +114,20 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   const inboundAttachments = Array.isArray(inboundEmail.attachments)
     ? inboundEmail.attachments
     : [];
+  const recipientText = (() => {
+    const toValue = inboundEmail.to;
+    if (typeof toValue !== "string" || !toValue.trim()) {
+      return "konsumen@ojk.go.id";
+    }
+    return toValue
+      .split(",")
+      .map((value: string) => value.trim())
+      .filter(Boolean)
+      .join(", ");
+  })();
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-white relative h-full">
+    <div className="flex-1 flex flex-col min-w-0 bg-[var(--surface)] text-[var(--fg)] relative h-full">
       {/* Zoomed Image Modal */}
       {zoomedImage && (
         <div
@@ -115,7 +137,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
           <img
             src={zoomedImage}
             alt="Zoomed Attachment"
-            className="max-w-full max-h-full rounded-2xl shadow-2xl object-contain ring-1 ring-white/10"
+            className="max-w-full max-h-full rounded-xl object-contain ring-1 ring-white/10"
           />
           <button className="absolute top-6 right-6 text-white/80 hover:text-white transition-colors">
             <X className="w-8 h-8" />
@@ -124,25 +146,26 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       )}
 
       {/* Pane Header */}
-      <div className="px-6 py-3 border-b border-gray-200 flex items-center justify-between shrink-0">
+      <div className="px-6 py-3 border-b border-[var(--border)] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           {onBackToList && (
             <button
               onClick={onBackToList}
-              className="w-10 h-10 -ml-2 flex items-center justify-center hover:bg-slate-100 rounded-xl transition-colors md:hidden mr-1"
+              className="min-w-10 min-h-10 -ml-2 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-colors md:hidden mr-1"
               title="Kembali ke Daftar Email"
+              aria-label="Kembali ke Daftar Email"
             >
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
+              <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
             </button>
           )}
           <div className="flex flex-col">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-[var(--fg3)]">
               Detail Email
             </span>
             {item.status === "replied" && (
               <div className="flex items-center gap-1.5 mt-0.5">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                <span className="font-semibold text-xs text-emerald-500">
+                <div className="w-1.5 h-1.5 bg-[var(--chart-green)] rounded-full" />
+                <span className="font-semibold text-xs text-[var(--chart-green)]">
                   Telah Dibalas
                 </span>
               </div>
@@ -154,8 +177,9 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
           {item.status === "open" && (
             <button
               onClick={onReply}
-              className="p-2 text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
+              className="min-w-10 min-h-10 text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--bg)] rounded-lg transition-all flex items-center justify-center"
               title="Balas"
+              aria-label="Balas"
             >
               <Reply className="w-4 h-4" />
             </button>
@@ -165,8 +189,8 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
             disabled={item.permissions?.can_delete === false}
             className={`p-2 rounded-xl transition-all ${
               item.permissions?.can_delete === false
-                ? "text-gray-200 cursor-not-allowed"
-                : "text-gray-400 hover:bg-red-50 hover:text-red-600"
+                ? "text-[var(--fg3)] opacity-40 cursor-not-allowed"
+                : "text-[var(--fg2)] hover:bg-[var(--bg)] hover:text-[var(--destructive)]"
             }`}
             title={
               item.permissions?.can_delete === false
@@ -183,44 +207,44 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Subject */}
         <h2
-          className={`text-lg md:text-xl leading-snug ${item.subject ? "font-semibold text-gray-900" : "font-medium text-gray-400 italic"}`}
+          className={`text-lg md:text-xl leading-snug ${item.subject ? "font-semibold text-[var(--fg)]" : "font-medium text-[var(--fg3)] italic"}`}
         >
           {item.subject || "(Tanpa Subjek)"}
         </h2>
 
         {/* Sender Info */}
-        <div className="flex items-start gap-3 border-b border-gray-100 pb-4">
-          <div className="shrink-0 w-9 h-9 rounded-full bg-sky-50 border border-sky-100 flex items-center justify-center text-xs font-semibold text-sky-600">
+        <div className="flex items-start gap-3 border-b border-[var(--border)] pb-4">
+          <div className="shrink-0 w-9 h-9 rounded-full bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center text-xs font-semibold text-[var(--fg2)]">
             {getInitials(item.sender_name)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-4 mb-1">
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-gray-900 truncate">
+                <div className="text-sm font-semibold text-[var(--fg)] truncate">
                   {item.sender_name}
                 </div>
-                <div className="text-xs text-gray-500 truncate">
+                <div className="text-xs text-[var(--fg2)] truncate">
                   {item.sender_email}
                 </div>
-                <div className="text-[10px] text-gray-400 mt-1">
+                <div className="text-[11px] text-[var(--fg3)] mt-1">
                   {formatCreatorLabel(item)}
                 </div>
               </div>
-              <div className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
+              <div className="text-[11px] font-medium text-[var(--fg2)] bg-[var(--bg)] border border-[var(--border)] px-2 py-1 rounded-md whitespace-nowrap">
                 {formatEmailDate(item.created_at)}
               </div>
             </div>
-            <div className="text-[10px] text-gray-400">
+            <div className="text-[11px] text-[var(--fg3)]">
               Kepada:{" "}
-              <span className="text-gray-700 font-medium">
-                konsumen@ojk.go.id
+              <span className="text-[var(--fg2)] font-medium">
+                {recipientText}
               </span>
             </div>
           </div>
         </div>
 
         {/* Email Body */}
-        <div className="text-[13px] text-gray-800 leading-relaxed space-y-3">
+        <div className="text-sm text-[var(--fg)] leading-7 space-y-3 text-justify">
           {inboundBody
             .split(/\n\s*\n/)
             .map((paragraph: string, idx: number) => (
@@ -232,10 +256,10 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
         {/* Attachments */}
         {inboundAttachments.length > 0 && (
-          <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/50">
+          <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
             <div className="flex items-center gap-2 mb-3">
-              <Paperclip className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              <Paperclip className="w-3.5 h-3.5 text-[var(--fg2)]" />
+              <span className="text-xs font-semibold text-[var(--fg2)]">
                 Lampiran ({inboundAttachments.length})
               </span>
             </div>
@@ -258,32 +282,32 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
         {/* Evaluation Results (if replied) */}
         {item.status === "replied" && (
-          <div className="mt-8 pt-6 border-t border-gray-100">
+          <div className="mt-8 pt-6 border-t border-[var(--border)]">
             {isEvaluationProcessing ? (
-              <div className="flex flex-col items-center justify-center p-8 bg-sky-50/30 rounded-xl border border-sky-100/50">
-                <Loader2 className="w-8 h-8 text-sky-600 animate-spin mb-3" />
-                <p className="text-xs font-bold text-sky-600 uppercase tracking-widest animate-pulse">
+              <div className="flex flex-col items-center justify-center p-8 bg-[var(--bg)] rounded-xl border border-[var(--border)]">
+                <Loader2 className="w-8 h-8 text-[var(--module-pdkt)] animate-spin mb-3" />
+                <p className="text-xs font-semibold text-[var(--module-pdkt)] animate-pulse">
                   Menganalisis Jawaban...
                 </p>
               </div>
             ) : isEvaluationFailed ? (
-              <div className="p-6 rounded-xl border border-red-200 bg-red-50/50">
+              <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
                 <div className="flex items-center justify-between gap-4 mb-2">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-red-600" />
-                    <h3 className="text-xs font-semibold text-red-700 uppercase tracking-wide">
+                    <AlertCircle className="w-4 h-4 text-[var(--destructive)]" />
+                    <h3 className="text-xs font-semibold text-[var(--fg)]">
                       Evaluasi Gagal
                     </h3>
                   </div>
                   <button
                     onClick={handleRetryEval}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-[10px] font-medium hover:bg-red-200 transition-all"
+                    className="flex items-center gap-1.5 min-h-9 px-3 rounded-lg border border-[var(--border)] text-[var(--fg)] text-xs font-medium hover:bg-[var(--surface)] transition-all"
                   >
                     <RotateCcw className="w-3 h-3" />
                     Coba Lagi
                   </button>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                <p className="text-xs text-[var(--fg2)] leading-relaxed font-medium">
                   {evalError || "Terjadi gangguan saat memproses evaluasi AI."}
                 </p>
               </div>
@@ -291,31 +315,49 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900">
+                    <h3 className="text-sm font-bold text-[var(--fg)]">
                       Hasil Evaluasi
                     </h3>
                     {item.time_taken && (
-                      <p className="text-[10px] text-gray-500 font-bold mt-1">
+                      <p className="text-[11px] text-[var(--fg2)] font-medium mt-1">
                         Selesai dikerjakan dalam{" "}
-                        <span className="text-gray-900">
+                        <span className="text-[var(--fg)]">
                           {formatTime(item.time_taken)}
                         </span>
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-50 border border-sky-100">
-                    <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
+                    <span className="text-xs font-semibold text-[var(--fg2)]">
                       Skor
                     </span>
-                    <span className="text-2xl font-black text-sky-600">
+                    <span className="text-2xl font-black text-[var(--module-pdkt)]">
                       {evalData.score}%
                     </span>
                   </div>
                 </div>
 
+                {scoreBreakdown && (
+                  <div className="grid gap-2 sm:grid-cols-5">
+                    {breakdownItems.map((item) => (
+                      <div
+                        key={item.label}
+                        className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2"
+                      >
+                        <div className="text-[9px] font-bold uppercase text-[var(--fg3)]">
+                          {item.label}
+                        </div>
+                        <div className="mt-1 text-sm font-black text-[var(--fg)]">
+                          {item.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="p-4 rounded-xl border border-red-100 bg-red-50/30">
-                    <h4 className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-3">
+                  <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                    <h4 className="text-xs font-bold text-[var(--fg)] mb-3">
                       Typo / Salah Ketik
                     </h4>
                     {evalData.typos && evalData.typos.length > 0 ? (
@@ -323,21 +365,21 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                         {evalData.typos.map((typo: string, idx: number) => (
                           <li
                             key={idx}
-                            className="text-xs text-gray-700 leading-relaxed font-medium"
+                            className="text-xs text-[var(--fg2)] leading-relaxed font-medium"
                           >
                             {typo}
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-xs text-gray-500 italic font-medium">
+                      <p className="text-xs text-[var(--fg2)] italic font-medium">
                         Tidak ditemukan typo.
                       </p>
                     )}
                   </div>
 
-                  <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/30">
-                    <h4 className="text-[10px] font-bold text-gray-600 uppercase tracking-wide mb-3">
+                  <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                    <h4 className="text-xs font-bold text-[var(--fg)] mb-3">
                       Kejelasan Kalimat
                     </h4>
                     {evalData.clarityIssues &&
@@ -347,7 +389,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                           (issue: string, idx: number) => (
                             <li
                               key={idx}
-                              className="text-xs text-gray-700 leading-relaxed font-medium"
+                              className="text-xs text-[var(--fg2)] leading-relaxed font-medium"
                             >
                               {issue}
                             </li>
@@ -355,14 +397,14 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                         )}
                       </ul>
                     ) : (
-                      <p className="text-xs text-gray-500 italic font-medium">
+                      <p className="text-xs text-[var(--fg2)] italic font-medium">
                         Kalimat sudah jelas.
                       </p>
                     )}
                   </div>
 
-                  <div className="p-4 rounded-xl border border-sky-100 bg-sky-50/30">
-                    <h4 className="text-[10px] font-bold text-sky-700 uppercase tracking-wide mb-3">
+                  <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                    <h4 className="text-xs font-bold text-[var(--fg)] mb-3">
                       Relevansi Solusi
                     </h4>
                     {evalData.contentGaps && evalData.contentGaps.length > 0 ? (
@@ -371,7 +413,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                           (gap: string, idx: number) => (
                             <li
                               key={idx}
-                              className="text-xs text-gray-700 leading-relaxed font-medium"
+                              className="text-xs text-[var(--fg2)] leading-relaxed font-medium"
                             >
                               {gap}
                             </li>
@@ -379,17 +421,17 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                         )}
                       </ul>
                     ) : (
-                      <p className="text-xs text-gray-500 italic font-medium">
+                      <p className="text-xs text-[var(--fg2)] italic font-medium">
                         Jawaban relevan.
                       </p>
                     )}
                   </div>
 
-                  <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/30">
-                    <h4 className="text-[10px] font-bold text-gray-600 uppercase tracking-wide mb-3">
+                  <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                    <h4 className="text-xs font-bold text-[var(--fg)] mb-3">
                       Masukan
                     </h4>
-                    <p className="text-xs text-gray-600 font-medium leading-relaxed italic">
+                    <p className="text-xs text-[var(--fg2)] font-medium leading-relaxed italic">
                       &quot;{evalData.feedback}&quot;
                     </p>
                   </div>
@@ -399,10 +441,10 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
             {/* Thread History */}
             {historyEmails.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-gray-100">
+              <div className="mt-8 pt-6 border-t border-[var(--border)]">
                 <button
                   onClick={() => setShowHistory(!showHistory)}
-                  className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider hover:text-gray-900 transition-colors mb-4"
+                  className="flex items-center gap-2 text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] transition-colors mb-4"
                 >
                   Riwayat Percakapan ({historyEmails.length})
                   {showHistory ? (
@@ -417,21 +459,21 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                     {historyEmails.map((email: any, idx: number) => (
                       <div
                         key={idx}
-                        className="pl-6 border-l-2 border-gray-200 py-2"
+                        className="pl-6 border-l border-[var(--border)] py-2"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-bold text-gray-800 uppercase tracking-wider">
+                          <span className="text-xs font-bold text-[var(--fg)]">
                             {email.isAgent ? "Balasan Anda" : email.from}
                           </span>
-                          <span className="text-[9px] text-gray-400 font-bold">
+                          <span className="text-[11px] text-[var(--fg3)] font-medium">
                             {formatEmailDate(email.timestamp.toString())}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-600 leading-relaxed space-y-2 font-medium">
+                        <div className="text-xs text-[var(--fg2)] leading-relaxed space-y-2 font-medium text-justify">
                           {email.body
                             .split(/\n\s*\n/)
                             .map((paragraph: string, pIdx: number) => (
-                              <p key={pIdx} className="whitespace-pre-wrap">
+                              <p key={pIdx} className="whitespace-pre-wrap text-justify">
                                 {paragraph.trim()}
                               </p>
                             ))}
@@ -448,10 +490,10 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 
       {/* Reply Button */}
       {item.status === "open" && !isComposerOpen && (
-        <div className="px-6 py-3 border-t border-gray-200 shrink-0 bg-gray-50/50">
+        <div className="px-6 py-3 border-t border-[var(--border)] shrink-0 bg-[var(--bg)]">
           <button
             onClick={onReply}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 text-white font-bold text-xs hover:bg-sky-700 active:scale-95 transition-all shadow-sm"
+            className="flex items-center gap-2 min-h-10 px-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] font-semibold text-xs hover:bg-[var(--bg)] active:scale-95 transition-all"
           >
             <Reply className="w-3.5 h-3.5" />
             Balas

@@ -67,6 +67,9 @@ describe("settings draft normalizers", () => {
         category: "",
         title: "Refund",
         description: "Email refund",
+        primaryRecipientType: "ojk",
+        recipientMode: undefined,
+        recipientEmails: [" FIRST@test.com ", "first@test.com", "", "bad-email"],
         script: undefined,
         sampleEmailTemplate: undefined,
         alwaysUseSampleEmail: undefined,
@@ -81,6 +84,9 @@ describe("settings draft normalizers", () => {
       isLicensed: false,
       isActive: true,
       attachmentImages: [],
+      primaryRecipientType: "ojk",
+      recipientMode: "single",
+      recipientEmails: ["first@test.com"],
     });
 
     expect(

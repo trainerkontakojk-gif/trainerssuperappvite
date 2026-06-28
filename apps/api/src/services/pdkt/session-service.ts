@@ -25,6 +25,10 @@ import {
 } from "../pdkt-email-policy";
 import { callAI, normalizeSubject } from "./shared-utils";
 import { getScenarios, getConsumerTypes } from "./catalog-service";
+import {
+  resolvePdktRecipientTargets,
+  resolvePdktRecipientContext,
+} from "./recipient-targets";
 
 const PDKT_MIN_WORD_COUNT = 500;
 
@@ -199,6 +203,17 @@ export async function initializeEmailSession(
 ): Promise<{ success: boolean; message?: EmailMessage; error?: string }> {
   const scenario = config.scenarios[0];
   if (!scenario) return { success: false, error: "Skenario tidak ditemukan." };
+  const recipientTargets = resolvePdktRecipientTargets({
+    primaryRecipientType: scenario.primaryRecipientType,
+    recipientMode: scenario.recipientMode,
+    recipientEmails: scenario.recipientEmails,
+  });
+  const recipientContext =
+    config.recipientContext ||
+    resolvePdktRecipientContext({
+      recipients: recipientTargets.recipients,
+      primaryRecipientType: scenario.primaryRecipientType,
+    });
 
   // Handle Forced Template
   if (scenario.alwaysUseSampleEmail && scenario.sampleEmailTemplate?.body) {
@@ -223,11 +238,12 @@ export async function initializeEmailSession(
       message: {
         id: Date.now().toString(),
         from: config.identity.email,
-        to: "konsumen@ojk.go.id",
+        to: recipientTargets.to,
         subject: rendered.subject,
         body: rendered.body,
         timestamp: new Date().toISOString(),
         isAgent: false,
+        recipientContext,
         attachments,
         attachmentSource: attachments.length > 0 ? "manual" : "none",
       },
@@ -377,11 +393,12 @@ export async function initializeEmailSession(
       message: {
         id: Date.now().toString(),
         from: config.identity.email,
-        to: "konsumen@ojk.go.id",
+        to: recipientTargets.to,
         subject: result.subject,
         body: result.body,
         timestamp: new Date().toISOString(),
         isAgent: false,
+        recipientContext,
         attachments,
         attachmentSource,
         attachmentDiagnostics,
@@ -435,6 +452,14 @@ export function resolvePdktGenerationConfig(body: {
     scenarios: [scenario],
     consumerType,
     identity: body.identity,
+    recipientContext: resolvePdktRecipientContext({
+      recipients: resolvePdktRecipientTargets({
+        primaryRecipientType: scenario.primaryRecipientType,
+        recipientMode: scenario.recipientMode,
+        recipientEmails: scenario.recipientEmails,
+      }).recipients,
+      primaryRecipientType: scenario.primaryRecipientType,
+    }),
     enableImageGeneration: body.enableImageGeneration ?? true,
     selectedModel: body.selectedModel || "gemini-3.1-flash-lite",
     resolvedConsumerNameMentionPattern: body.resolvedConsumerNameMentionPattern || "none",

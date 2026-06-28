@@ -28,7 +28,15 @@ describe("settings draft commit helpers", () => {
 
   it("buildPdktSettingsForSave preserves system fields while replacing collections immutably", () => {
     const original: PdktAppSettings = {
-      scenarios: [{ id: "s1", category: "A", title: "Old", description: "D", isActive: true }],
+      scenarios: [{
+        id: "s1",
+        category: "A",
+        title: "Old",
+        description: "D",
+        isActive: true,
+        recipientMode: "multiple",
+        recipientEmails: ["alpha@test.com"],
+      }],
       consumerTypes: [{ id: "c1", name: "Old", description: "D", difficulty: "Medium", tone: "", isCustom: true }],
       enableImageGeneration: true,
       globalConsumerTypeId: "random",
@@ -54,6 +62,8 @@ describe("settings draft commit helpers", () => {
 
     expect(result).not.toBe(original);
     expect(result.scenarios[0].title).toBe("New");
+    expect(result.scenarios[0].recipientMode).toBe("multiple");
+    expect(result.scenarios[0].recipientEmails).toEqual(["alpha@test.com"]);
     expect(result.enableImageGeneration).toBe(false);
     expect(original.scenarios[0].title).toBe("Old");
     expect(original.enableImageGeneration).toBe(true);

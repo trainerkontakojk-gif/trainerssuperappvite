@@ -205,4 +205,68 @@ describe("PDKT Unified Session Create Route", () => {
     expect(json.data.message.body).toContain("Susanto");
     expect(json.data.message.body).not.toContain("Black Cat");
   });
+
+  it("propagates per-scenario recipient targets into the created mailbox message", async () => {
+    await createAuthenticatedApp("trainer");
+    const res = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scenarioDraft: {
+          id: "pinjol",
+          category: "Pinjol",
+          title: "Pinjol Ilegal",
+          description: "Konsumen diteror pinjol ilegal.",
+          isActive: true,
+          isLicensed: false,
+          recipientMode: "multiple",
+          recipientEmails: ["alpha@test.com", "beta@test.com"],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Template",
+            body: "Template body " + "kata ".repeat(600),
+          },
+        },
+        consumerTypeId: "marah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+        enableImageGeneration: false,
+        selectedModel: "gemini-3.1-flash-lite",
+        resolvedConsumerNameMentionPattern: "none",
+        writingStyleMode: "training",
+        client_request_id: "req-xyz-999",
+      }),
+    });
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data.message.to).toBe(
+      "konsumen@ojk.go.id, alpha@test.com, beta@test.com",
+    );
+    expect(json.data.message.recipientContext).toEqual({
+      primaryRecipientType: "reported_company",
+      primaryRecipientAddress: "alpha@test.com",
+      ccRecipients: ["konsumen@ojk.go.id", "beta@test.com"],
+      replyIntent: "reply_to_company_with_ojk_cc",
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      "submit_pdkt_mailbox_batch",
+      expect.objectContaining({
+        p_config_snapshot: expect.objectContaining({
+          recipientContext: expect.objectContaining({
+            primaryRecipientType: "reported_company",
+            replyIntent: "reply_to_company_with_ojk_cc",
+          }),
+        }),
+      }),
+    );
+  });
 });
