@@ -3,6 +3,15 @@ import type { AccessScopeOptions } from "@trainers/types";
 
 type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
 
+interface TeamRuleOptionGroup {
+  team: string;
+  options: {
+    value: string;
+    label: string;
+    kind: "team" | "batch";
+  }[];
+}
+
 interface RuleBuilderFormProps {
   scopeOptions: AccessScopeOptions | null;
   ruleType: RuleType;
@@ -11,6 +20,7 @@ interface RuleBuilderFormProps {
   onRuleValueChange: (val: string) => void;
   filterTeam: string;
   onFilterTeamChange: (val: string) => void;
+  teamRuleOptionGroups: TeamRuleOptionGroup[];
   addingRule: boolean;
   onSubmit: (e: React.FormEvent) => void;
   getRuleValueLabel: (type: string, val: string) => string;
@@ -25,6 +35,7 @@ export function RuleBuilderForm({
   onRuleValueChange,
   filterTeam,
   onFilterTeamChange,
+  teamRuleOptionGroups,
   addingRule,
   onSubmit,
   getRuleValueLabel,
@@ -64,7 +75,11 @@ export function RuleBuilderForm({
 
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">
-            {ruleType === "tim" ? "Pilih Team" : ruleType === "service_type" ? "Pilih Service" : "Pilih Name"}
+            {ruleType === "tim"
+              ? "Pilih Team"
+              : ruleType === "service_type"
+                ? "Pilih Service"
+                : "Pilih Name"}
           </label>
           {ruleType === "peserta_id" ? (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -85,9 +100,7 @@ export function RuleBuilderForm({
                 className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">
-                  {filterTeam
-                    ? "Pilih Name"
-                    : "Pilih Team terlebih dahulu"}
+                  {filterTeam ? "Pilih Name" : "Pilih Team terlebih dahulu"}
                 </option>
                 {ruleValueOptions.map((id) => (
                   <option key={id} value={id}>
@@ -104,8 +117,16 @@ export function RuleBuilderForm({
             >
               <option value="">Pilih nilai...</option>
               {ruleType === "tim"
-                ? (scopeOptions?.teams || []).map((v) => (
-                    <option key={v} value={v}>{v}</option>
+                ? teamRuleOptionGroups.map((group) => (
+                    <optgroup key={group.team} label={group.team}>
+                      {group.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.kind === "batch"
+                            ? `  ${option.label}`
+                            : option.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))
                 : (scopeOptions?.services || []).map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
@@ -132,8 +153,10 @@ export function RuleBuilderForm({
       
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 font-medium ml-1 italic">
         <div className="h-1 w-1 rounded-full bg-primary/40" />
-        {ruleType === "peserta_id"
-          ? "Aturan 'Specific Agent' memerlukan pemilihan Team untuk membatasi daftar nama yang ditampilkan."
+        {ruleType === "tim"
+          ? "Pilih parent team untuk semua subfolder, atau pilih subfolder di bawah parent untuk scope satu batch leader."
+          : ruleType === "peserta_id"
+            ? "Aturan 'Specific Agent' memerlukan pemilihan Team untuk menampilkan daftar nama yang ditampilkan."
           : "Pilih salah satu kriteria di atas untuk membatasi akses data Leader."}
       </div>
     </form>

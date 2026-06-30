@@ -12,6 +12,17 @@ import type {
 const TRAINER_ROLES = ["admin", "trainer"] as const;
 const LEADER_ROLES = ["leader"] as const;
 
+type ScopedFolderReference = Pick<
+  ProfilerFolder,
+  "id" | "name" | "parent_id" | "year_id"
+>;
+
+function getUniqueScopedBatches(rows: { batch_name: string | null }[]) {
+  return [
+    ...new Set(rows.map((r) => r.batch_name).filter(Boolean)),
+  ] as string[];
+}
+
 export async function getAccessiblePesertaIds(
   userId: string,
   role: string,
@@ -51,22 +62,40 @@ export async function getYears(
           .order("id", { ascending: true })
           .range(from, to),
     });
-    const scopedBatches = [
-      ...new Set(scopedBatchRows.map((r) => r.batch_name).filter(Boolean)),
-    ] as string[];
+    const scopedBatches = getUniqueScopedBatches(scopedBatchRows);
     if (scopedBatches.length === 0) return [];
-    const scopedFolders = await fetchAllPages<{ year_id: string | null }>({
+    const scopedFolders = await fetchAllPages<ScopedFolderReference>({
       build: ({ from, to }) =>
         supabaseAdmin
           .from("profiler_folders")
-          .select("year_id")
+          .select("id,name,parent_id,year_id")
           .in("name", scopedBatches)
           .order("year_id", { ascending: true })
           .order("id", { ascending: true })
           .range(from, to),
     });
+    const parentIds = [
+      ...new Set(scopedFolders.map((f) => f.parent_id).filter(Boolean)),
+    ] as string[];
+    const parentFolders =
+      parentIds.length > 0
+        ? await fetchAllPages<ScopedFolderReference>({
+            build: ({ from, to }) =>
+              supabaseAdmin
+                .from("profiler_folders")
+                .select("id,name,parent_id,year_id")
+                .in("id", parentIds)
+                .order("year_id", { ascending: true })
+                .order("id", { ascending: true })
+                .range(from, to),
+          })
+        : [];
     const scopedYearIds = [
-      ...new Set(scopedFolders.map((f) => f.year_id).filter(Boolean)),
+      ...new Set(
+        [...scopedFolders, ...parentFolders]
+          .map((f) => f.year_id)
+          .filter(Boolean),
+      ),
     ] as string[];
     if (scopedYearIds.length === 0) return [];
     const { data, error } = await supabaseAdmin
@@ -121,9 +150,7 @@ export async function getFolders(
           .order("id", { ascending: true })
           .range(from, to),
     });
-    const scopedBatches = [
-      ...new Set(scopedBatchRows.map((r) => r.batch_name).filter(Boolean)),
-    ] as string[];
+    const scopedBatches = getUniqueScopedBatches(scopedBatchRows);
     if (scopedBatches.length === 0) return [];
     const data = await fetchAllPages<ProfilerFolder>({
       build: ({ from, to }) =>
@@ -135,7 +162,27 @@ export async function getFolders(
           .order("id", { ascending: true })
           .range(from, to),
     });
-    return data ?? [];
+    const parentIds = [
+      ...new Set(data.map((folder) => folder.parent_id).filter(Boolean)),
+    ] as string[];
+    const parentFolders =
+      parentIds.length > 0
+        ? await fetchAllPages<ProfilerFolder>({
+            build: ({ from, to }) =>
+              supabaseAdmin
+                .from("profiler_folders")
+                .select("*")
+                .in("id", parentIds)
+                .order("name")
+                .order("id", { ascending: true })
+                .range(from, to),
+          })
+        : [];
+    const foldersById = new Map<string, ProfilerFolder>();
+    for (const folder of [...parentFolders, ...data]) {
+      foldersById.set(folder.id, folder);
+    }
+    return [...foldersById.values()];
   }
 
   const data = await fetchAllPages<ProfilerFolder>({

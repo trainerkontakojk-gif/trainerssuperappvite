@@ -34,7 +34,7 @@ Builder menyediakan 3 jalur:
 
 | Mode       | UI Flow                                                   | Stored Item                                                    |
 | ---------- | --------------------------------------------------------- | -------------------------------------------------------------- |
-| By Team    | Pilih team dari data `profiler_peserta.tim` yang tersedia | `field_name = tim`, `field_value = selected team`              |
+| By Team    | Pilih parent team untuk semua subfolder, atau pilih subfolder/batch di bawah parent team | Parent: `field_name = tim`; subfolder: `field_name = batch_name` |
 | By Service | Pilih service dari daftar SIDAK valid                     | `field_name = service_type`, `field_value = selected service`  |
 | By Name    | Pilih Team dulu, lalu pilih Name/agent dari team tersebut | `field_name = peserta_id`, `field_value = selected peserta id` |
 
@@ -98,8 +98,8 @@ Starting from this hardening, **metadata endpoints are scoped** for leaders:
 
 | Endpoint | Leader Behavior | Admin/Trainer |
 |----------|----------------|---------------|
-| `GET /profiler/years` | Only years containing folders with scoped participants | All years |
-| `GET /profiler/folders` | Only folders containing scoped participants | All folders |
+| `GET /profiler/years` | Only years containing folders with scoped participants; subfolder scope also resolves parent year | All years |
+| `GET /profiler/folders` | Only folders containing scoped participants plus their parent folder so the KTP workspace tree can render | All folders |
 | `GET /profiler/teams` | Only teams appearing in scoped participants | All teams |
 | `GET /profiler/counts` | Already scoped (was scoped before) | All counts |
 | `GET /sidak/folders` | Only folders containing scoped agents | All folders |
@@ -237,7 +237,7 @@ Leader submits request via Supabase client RLS INSERT into `leader_access_reques
 13. Leader with `module = "all"` approval → has access to both KTP and SIDAK, scope resolver works for both.
 14. Leader non-approved deep-links to `/sidak/dashboard` or `/profiler/table` → redirected to landing page.
 15. Leader re-opens blocked tab → status refetches and reflects latest approval/revoke.
-16. **Leader KTP metadata**: Year/folder/team dropdowns only show options with participants in scope.
+16. **Leader KTP metadata**: Year/folder/team dropdowns only show options with participants in scope, including the parent team row when the approval targets a specific subfolder/batch.
 17. **Leader SIDAK folders**: Dashboard and ranking folder selector only shows folders with scoped agents.
 18. **Leader SIDAK service_type**: If approved for only `chat`, dashboard/ranking only shows `chat` option, not `call`/`email`/etc.
 19. **Leader SIDAK agent detail**: Trend and temuan only reflect allowed service types (no `call` data when leader only allowed `chat`).

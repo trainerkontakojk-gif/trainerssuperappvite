@@ -21,6 +21,48 @@ import { RuleBuilderForm } from "./components/access-groups/RuleBuilderForm";
 
 type RuleType = "tim" | "service_type" | "batch_name" | "peserta_id";
 
+type RuleFieldName = AccessGroupItemRow["field_name"];
+
+interface TeamRuleOption {
+  value: string;
+  label: string;
+  kind: "team" | "batch";
+}
+
+interface TeamRuleOptionGroup {
+  team: string;
+  options: TeamRuleOption[];
+}
+
+const TEAM_RULE_PREFIX = "tim:";
+const BATCH_RULE_PREFIX = "batch_name:";
+
+function encodeTeamRuleOption(fieldName: "tim" | "batch_name", value: string) {
+  const prefix = fieldName === "tim" ? TEAM_RULE_PREFIX : BATCH_RULE_PREFIX;
+  return `${prefix}${encodeURIComponent(value)}`;
+}
+
+function decodeTeamRuleOption(value: string): {
+  fieldName: "tim" | "batch_name";
+  fieldValue: string;
+} {
+  if (value.startsWith(BATCH_RULE_PREFIX)) {
+    return {
+      fieldName: "batch_name",
+      fieldValue: decodeURIComponent(value.slice(BATCH_RULE_PREFIX.length)),
+    };
+  }
+
+  if (value.startsWith(TEAM_RULE_PREFIX)) {
+    return {
+      fieldName: "tim",
+      fieldValue: decodeURIComponent(value.slice(TEAM_RULE_PREFIX.length)),
+    };
+  }
+
+  return { fieldName: "tim", fieldValue: value };
+}
+
 export default function AccessGroupsPage() {
   const {
     data: groups,
@@ -120,12 +162,17 @@ export default function AccessGroupsPage() {
     e.preventDefault();
     if (!selectedGroupId || !ruleType || !ruleValue) return;
 
+    const resolvedRule: { fieldName: RuleFieldName; fieldValue: string } =
+      ruleType === "tim"
+        ? decodeTeamRuleOption(ruleValue)
+        : { fieldName: ruleType, fieldValue: ruleValue };
+
     setAddingRule(true);
     try {
       await unwrapResponse(
         await adminClient["access-groups"][":id"].items.$post({
           param: { id: selectedGroupId },
-          json: { fieldName: ruleType, fieldValue: ruleValue },
+          json: resolvedRule,
         }),
       );
       setRuleValue("");
@@ -164,9 +211,52 @@ export default function AccessGroupsPage() {
   const selectedGroup = (groups || []).find((g) => g.id === selectedGroupId);
 
   const agentList = scopeOptions?.agentsByTeam[filterTeam] || [];
+  const teamRuleOptionGroups: TeamRuleOptionGroup[] = useMemo(() => {
+    const teams = scopeOptions?.teams || [];
+    const agentsByTeam = scopeOptions?.agentsByTeam || {};
+
+    return teams.map((team) => {
+      const batchNames = new Set<string>();
+      for (const agent of agentsByTeam[team] || []) {
+        const batchName = agent.batch_name?.trim();
+        if (batchName) batchNames.add(batchName);
+      }
+
+      return {
+        team,
+        options: [
+          {
+            value: encodeTeamRuleOption("tim", team),
+            label: `${team} — Semua subfolder`,
+            kind: "team",
+          },
+          ...[...batchNames]
+            .sort((left, right) => left.localeCompare(right))
+            .map((batchName) => ({
+              value: encodeTeamRuleOption("batch_name", batchName),
+              label: batchName,
+              kind: "batch" as const,
+            })),
+        ],
+      };
+    });
+  }, [scopeOptions]);
+
+  const teamRuleValueLabels = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const group of teamRuleOptionGroups) {
+      for (const option of group.options) {
+        labels.set(option.value, option.label);
+      }
+    }
+    return labels;
+  }, [teamRuleOptionGroups]);
 
   const ruleValueOptions: string[] = useMemo(() => {
-    if (ruleType === "tim") return scopeOptions?.teams || [];
+    if (ruleType === "tim")
+      return teamRuleOptionGroups.flatMap((group) =>
+        group.options.map((option) => option.value),
+      );
     if (ruleType === "service_type")
       return (scopeOptions?.services || []).map((s) => s.value);
     if (ruleType === "peserta_id") {
@@ -174,9 +264,12 @@ export default function AccessGroupsPage() {
       return [];
     }
     return [];
-  }, [ruleType, filterTeam, scopeOptions, agentList]);
+  }, [ruleType, filterTeam, scopeOptions, agentList, teamRuleOptionGroups]);
 
   const getRuleValueLabel = (type: string, val: string): string => {
+    if (type === "tim") {
+      return teamRuleValueLabels.get(val) || val;
+    }
     if (type === "peserta_id") {
       for (const agents of Object.values(scopeOptions?.agentsByTeam || {})) {
         const found = agents.find((a) => a.id === val);
@@ -184,6 +277,7 @@ export default function AccessGroupsPage() {
       }
       return val;
     }
+    if (type === "batch_name") return val;
     if (type === "service_type") {
       const svc = (scopeOptions?.services || []).find((s) => s.value === val);
       return svc?.label || val;
@@ -269,11 +363,16 @@ export default function AccessGroupsPage() {
                 onRuleTypeChange={(val) => {
                   setRuleType(val);
                   setRuleValue("");
+                  setFilterTeam("");
                 }}
                 ruleValue={ruleValue}
                 onRuleValueChange={setRuleValue}
                 filterTeam={filterTeam}
-                onFilterTeamChange={setFilterTeam}
+                onFilterTeamChange={(val) => {
+                  setFilterTeam(val);
+                  setRuleValue("");
+                }}
+                teamRuleOptionGroups={teamRuleOptionGroups}
                 addingRule={addingRule}
                 onSubmit={handleAddRule}
                 getRuleValueLabel={getRuleValueLabel}

@@ -41,6 +41,43 @@ describe("profiler-service", () => {
       const r = await profilerService.getYears();
       expect(r).toHaveLength(1);
     });
+
+    it("includes parent folder year when scoped access points to a subfolder", async () => {
+      const responses = [
+        { data: [{ batch_name: "Batch Fahmi" }], error: null },
+        {
+          data: [
+            {
+              id: "batch-fahmi",
+              name: "Batch Fahmi",
+              parent_id: "team-call",
+              year_id: null,
+            },
+          ],
+          error: null,
+        },
+        {
+          data: [
+            {
+              id: "team-call",
+              name: "Tim Call Fahmi",
+              parent_id: null,
+              year_id: "year-2026",
+            },
+          ],
+          error: null,
+        },
+        {
+          data: [{ id: "year-2026", year: 2026, label: "Tahun 2026" }],
+          error: null,
+        },
+      ];
+      pendingResolve = () => responses.shift() ?? { data: [], error: null };
+
+      await expect(profilerService.getYears(["peserta-1"])).resolves.toEqual([
+        { id: "year-2026", year: 2026, label: "Tahun 2026" },
+      ]);
+    });
   });
 
   describe("createYear", () => {
@@ -67,6 +104,31 @@ describe("profiler-service", () => {
       });
       const r = await profilerService.getFolders();
       expect(r).toHaveLength(1);
+    });
+
+    it("returns parent folder with scoped subfolder so KTP can render the tree", async () => {
+      const childFolder = {
+        id: "batch-fahmi",
+        name: "Batch Fahmi",
+        parent_id: "team-call",
+        year_id: "year-2026",
+      };
+      const parentFolder = {
+        id: "team-call",
+        name: "Tim Call Fahmi",
+        parent_id: null,
+        year_id: "year-2026",
+      };
+      const responses = [
+        { data: [{ batch_name: "Batch Fahmi" }], error: null },
+        { data: [childFolder], error: null },
+        { data: [parentFolder], error: null },
+      ];
+      pendingResolve = () => responses.shift() ?? { data: [], error: null };
+
+      await expect(profilerService.getFolders(["peserta-1"])).resolves.toEqual(
+        [parentFolder, childFolder],
+      );
     });
   });
 
