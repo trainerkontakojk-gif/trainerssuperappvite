@@ -1,5 +1,9 @@
 import { Filter, Layers, Users, Calendar, ChevronRight } from "lucide-react";
 import { MonthRangePicker } from "../ui/MonthRangePicker";
+import {
+  buildSidakFolderSelectGroups,
+  type NormalizedSidakFolderOption,
+} from "../../lib/sidak-folder-options";
 
 const SERVICE_LABELS: Record<string, string> = {
   call: "Call",
@@ -21,7 +25,7 @@ interface Props {
   startMonth: number | null;
   endMonth: number | null;
   onMonthRangeChange: (start: number | null, end: number | null) => void;
-  folders: { id: string; nama: string }[];
+  folders: NormalizedSidakFolderOption[];
   availableYears: number[];
   leaderLockedService?: string | null;
   availableServices?: string[];
@@ -48,12 +52,12 @@ export default function DashboardFilters({
 
   const serviceLabels: Record<string, string> = availableServices?.length
     ? Object.fromEntries(
-        availableServices.map((svc) => [
-          svc,
-          SERVICE_LABELS[svc] || svc,
-        ]),
+        availableServices.map((svc) => [svc, SERVICE_LABELS[svc] || svc]),
       )
     : SERVICE_LABELS;
+
+  const { groupedFolders, standaloneFolders } =
+    buildSidakFolderSelectGroups(folders);
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface px-3 py-3 lg:flex-row lg:items-center lg:gap-4">
@@ -110,10 +114,25 @@ export default function DashboardFilters({
               className="h-10 w-full appearance-none rounded-lg border border-border bg-background px-4 pl-11 pr-10 text-[13px] font-medium text-foreground transition-all focus:border-foreground focus:outline-none"
             >
               <option value="ALL">Semua Tim</option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nama}
+              {standaloneFolders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.nama}
                 </option>
+              ))}
+              {groupedFolders.map((group) => (
+                <optgroup
+                  key={group.parent.id}
+                  label={`${group.parent.nama} (gabungan + batch)`}
+                >
+                  <option value={group.parent.id}>
+                    {group.parent.nama} — Semua batch
+                  </option>
+                  {group.children.map((child) => (
+                    <option key={child.id} value={child.id}>
+                      ↳ {child.nama}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground">

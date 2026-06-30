@@ -5,7 +5,6 @@ import type {
 } from "./dashboard-types";
 import {
   getDashboardServiceLabel,
-  toDashboardFolderRows,
   toDashboardServiceSet,
   toDashboardTemuanRows,
   toDashboardWeightMap,
@@ -29,7 +28,7 @@ import type {
 } from "@trainers/types";
 import { isCountableFinding, emptyDashboardResponse } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
-import { getFolderNamesByIds, getFoldersByIds } from "./access-scope";
+import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
 import {
@@ -200,10 +199,12 @@ export async function getDashboardData(params: {
       ? params.allowedServiceTypes
       : null;
 
-  const folderNames =
+  const folderFilter =
     params.folder_ids && params.folder_ids.length > 0
-      ? await getFolderNamesByIds(params.folder_ids)
+      ? await resolveFolderFiltersByIds(params.folder_ids)
       : null;
+
+  const folderNames = folderFilter?.filterNames ?? null;
 
   if (params.service_type && params.service_type !== "all") {
     if (
@@ -228,6 +229,7 @@ export async function getDashboardData(params: {
     fetchDistinctServiceTypes({
       period_ids: params.period_ids,
       year: params.year,
+      folderNames,
       excludedIds,
       allowedSvcs,
     }),
@@ -517,16 +519,11 @@ export async function getDashboardData(params: {
     p.cumulative = cumulative;
   }
 
-  let folderIds: { id: string; name: string }[];
+  let folderIds;
   if (params.folder_ids && params.folder_ids.length > 0) {
-    const matchedFolders = await getFoldersByIds(params.folder_ids);
-    folderIds = matchedFolders;
+    folderIds = folderFilter?.selectedFolders ?? [];
   } else {
-    const { data: allFolders } = await supabaseAdmin
-      .from("profiler_folders")
-      .select("id, name")
-      .order("name");
-    folderIds = toDashboardFolderRows(allFolders);
+    folderIds = await getAllFolders();
   }
 
   const availableYears = [

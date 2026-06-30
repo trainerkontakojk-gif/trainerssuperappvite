@@ -16,7 +16,7 @@ export type GetRankingDataParams = {
 export type RankingData = {
   rankings: TopAgentData[];
   periods: any[];
-  folders: Array<{ id: string; name: string }>;
+  folders: Array<{ id: string; name: string; parent_id: string | null }>;
   availableYears: number[];
   availableServices: string[];
 };
@@ -38,7 +38,10 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
         limit: 0,
       }),
       sidakService.getPeriods(),
-      supabaseAdmin.from("profiler_folders").select("id, name").order("name"),
+      supabaseAdmin
+        .from("profiler_folders")
+        .select("id, name, parent_id")
+        .order("name"),
       sidakService.getAvailableYears(accessibleIds ?? undefined),
     ]);
 
@@ -46,7 +49,11 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
 
   const scopedFolders = filterScope
     ? filterScope.allowedFolders
-    : (folders?.data ?? []).map((f: any) => ({ id: f.id, name: f.name }));
+    : (folders?.data ?? []).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        parent_id: f.parent_id ?? null,
+      }));
 
   const availableServices = filterScope && filterScope.serviceTypeLocked
     ? filterScope.allowedServices.filter((svc) =>

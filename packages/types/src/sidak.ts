@@ -246,7 +246,7 @@ export interface DashboardSparklinePoint {
 
 export interface DashboardData {
   periods: QAPeriod[];
-  folders: { id: string; name: string }[];
+  folders: { id: string; name: string; parent_id?: string | null }[];
   summary: DashboardSummary | null;
   serviceData: {
     name: string;

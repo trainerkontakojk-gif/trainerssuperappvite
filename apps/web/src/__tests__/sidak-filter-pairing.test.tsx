@@ -40,11 +40,34 @@ import SidakDashboardPage from "../routes/sidak/dashboard";
 import SidakRankingPage from "../routes/sidak/ranking";
 
 const mockFolders = [
-  { id: "team-call-id", nama: "Tim Call", name: "Tim Call" },
-  { id: "team-whatsapp-id", nama: "Tim Whatsapp", name: "Tim Whatsapp" },
-  { id: "team-email-id", nama: "Tim Email", name: "Tim Email" },
-  { id: "team-mix-id", nama: "Tim Mix", name: "Tim Mix" },
-  { id: "team-bko-id", nama: "Tim BKO", name: "Tim BKO" },
+  { id: "team-call-id", nama: "Tim Call", name: "Tim Call", parent_id: null },
+  {
+    id: "team-whatsapp-id",
+    nama: "Tim Whatsapp",
+    name: "Tim Whatsapp",
+    parent_id: null,
+  },
+  { id: "team-email-id", nama: "Tim Email", name: "Tim Email", parent_id: null },
+  { id: "team-mix-id", nama: "Tim Mix", name: "Tim Mix", parent_id: null },
+  { id: "team-bko-id", nama: "Tim BKO", name: "Tim BKO", parent_id: null },
+  {
+    id: "batch-anis-id",
+    nama: "Siti Nur Anisa",
+    name: "Siti Nur Anisa",
+    parent_id: "team-call-id",
+  },
+  {
+    id: "batch-fahmi-id",
+    nama: "Muhammad Fahmi Nasrulloh",
+    name: "Muhammad Fahmi Nasrulloh",
+    parent_id: "team-call-id",
+  },
+  {
+    id: "batch-dwiana-id",
+    nama: "Dwiana Amelia",
+    name: "Dwiana Amelia",
+    parent_id: "team-whatsapp-id",
+  },
 ];
 
 const mockDashboardData = {
@@ -82,12 +105,12 @@ const mockRankingData = {
 
 const filteredFolderData = {
   ...mockDashboardData,
-  folders: [mockFolders[0]],
+  folders: [mockFolders[0], mockFolders[5], mockFolders[6]],
 };
 
 const filteredRankingData = {
   ...mockRankingData,
-  folders: [mockFolders[0]],
+  folders: [mockFolders[0], mockFolders[5], mockFolders[6]],
 };
 
 describe("SIDAK default filter pairing", () => {
@@ -101,7 +124,7 @@ describe("SIDAK default filter pairing", () => {
     vi.clearAllMocks();
   });
 
-  it("Dashboard: keeps full folder options after API shrinks to the selected folder, then switches to the paired folder", async () => {
+  it("Dashboard: keeps grouped folder options after API shrinks to the selected folder, then switches to the paired root folder", async () => {
     useApiMock.mockImplementation((path: string) => ({
       data: path.includes("folder_ids=team-call-id")
         ? filteredFolderData
@@ -114,21 +137,33 @@ describe("SIDAK default filter pairing", () => {
     render(<SidakDashboardPage />);
 
     const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    const serviceSelect = selects[0];
+    const folderSelect = selects[1];
 
-    expect(selects[0]).toHaveValue("call");
-    expect(selects[1]).toHaveValue("team-call-id");
+    expect(serviceSelect).toHaveValue("call");
+    expect(folderSelect).toHaveValue("team-call-id");
     expect(
-      Array.from(selects[1].options).some(
+      Array.from(folderSelect.options).find(
+        (option) => option.value === "team-call-id",
+      )?.text,
+    ).toBe("Tim Call — Semua batch");
+    expect(
+      Array.from(folderSelect.options).find(
+        (option) => option.value === "batch-anis-id",
+      )?.text,
+    ).toBe("↳ Siti Nur Anisa");
+    expect(
+      Array.from(folderSelect.options).find(
         (option) => option.value === "team-whatsapp-id",
-      ),
-    ).toBe(true);
+      )?.text,
+    ).toBe("Tim Whatsapp — Semua batch");
 
-    fireEvent.change(selects[0], { target: { value: "chat" } });
-    expect(selects[0]).toHaveValue("chat");
-    expect(selects[1]).toHaveValue("team-whatsapp-id");
+    fireEvent.change(serviceSelect, { target: { value: "chat" } });
+    expect(serviceSelect).toHaveValue("chat");
+    expect(folderSelect).toHaveValue("team-whatsapp-id");
   });
 
-  it("Ranking: keeps full folder options after API shrinks to the selected folder, then switches to the paired folder", async () => {
+  it("Ranking: keeps grouped folder options after API shrinks to the selected folder, then switches to the paired root folder", async () => {
     useApiMock.mockImplementation((path: string) => ({
       data: path.includes("folder=team-call-id")
         ? filteredRankingData
@@ -141,11 +176,13 @@ describe("SIDAK default filter pairing", () => {
     render(<SidakRankingPage />);
 
     const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
-    const serviceSelect = selects.find((s) =>
-      Array.from(s.options).some((o) => o.value === "call"),
+    const serviceSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === "call"),
     )!;
-    const folderSelect = selects.find((s) =>
-      Array.from(s.options).some((o) => o.value === "team-call-id"),
+    const folderSelect = selects.find((select) =>
+      Array.from(select.options).some(
+        (option) => option.value === "team-call-id",
+      ),
     )!;
 
     expect(serviceSelect).toBeDefined();
@@ -153,10 +190,20 @@ describe("SIDAK default filter pairing", () => {
     expect(serviceSelect).toHaveValue("call");
     expect(folderSelect).toHaveValue("team-call-id");
     expect(
-      Array.from(folderSelect.options).some(
+      Array.from(folderSelect.options).find(
+        (option) => option.value === "team-call-id",
+      )?.text,
+    ).toBe("Tim Call — Semua batch");
+    expect(
+      Array.from(folderSelect.options).find(
+        (option) => option.value === "batch-fahmi-id",
+      )?.text,
+    ).toBe("↳ Muhammad Fahmi Nasrulloh");
+    expect(
+      Array.from(folderSelect.options).find(
         (option) => option.value === "team-whatsapp-id",
-      ),
-    ).toBe(true);
+      )?.text,
+    ).toBe("Tim Whatsapp — Semua batch");
 
     fireEvent.change(serviceSelect, { target: { value: "chat" } });
     expect(serviceSelect).toHaveValue("chat");

@@ -2,6 +2,12 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useApi } from "../../hooks/useApi";
 import { DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
 import type { TopAgentData, QAPeriod } from "@trainers/types";
+import {
+  buildSidakFolderSelectGroups,
+  findPrimarySidakFolderByName,
+  normalizeSidakFolderOptions,
+  type NormalizedSidakFolderOption,
+} from "../../lib/sidak-folder-options";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
@@ -33,7 +39,7 @@ const MONTHS = [
 interface RankingResponse {
   rankings: TopAgentData[];
   periods: QAPeriod[];
-  folders: { id: string; name: string }[];
+  folders: { id: string; name: string; parent_id?: string | null }[];
   availableYears: number[];
   availableServices?: string[];
 }
@@ -63,17 +69,29 @@ export default function SidakRankingPage() {
     `/sidak/ranking?${queryParams}`,
   );
 
-  const [allFolders, setAllFolders] = useState<{ id: string; name: string }[]>([]);
+  const [allFolders, setAllFolders] = useState<NormalizedSidakFolderOption[]>([]);
 
   useEffect(() => {
     if (data?.folders) {
-      if (selectedFolder === "ALL" || data.folders.length > allFolders.length) {
-        setAllFolders(data.folders);
+      const normalizedFolders = normalizeSidakFolderOptions(data.folders);
+      if (
+        selectedFolder === "ALL" ||
+        normalizedFolders.length > allFolders.length
+      ) {
+        setAllFolders(normalizedFolders);
       }
     }
   }, [data?.folders, selectedFolder, allFolders.length]);
 
-  const availableServices = data?.availableServices ?? [];
+  const availableServices = useMemo(
+    () => data?.availableServices ?? [],
+    [data?.availableServices],
+  );
+
+  const { groupedFolders, standaloneFolders } = useMemo(
+    () => buildSidakFolderSelectGroups(allFolders),
+    [allFolders],
+  );
 
   // Normalize invalid selections
   useEffect(() => {
@@ -94,15 +112,13 @@ export default function SidakRankingPage() {
 
       // Default folder pairing on initial load/mount when data is fetched
       if (!initialFolderSetRef.current && selectedFolder === "ALL") {
-        const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[selectedService];
-        if (targetFolderName) {
-          const matchedFolder = folders.find(
-            (f) => f.name.toLowerCase() === targetFolderName.toLowerCase()
-          );
-          if (matchedFolder) {
-            setSelectedFolder(matchedFolder.id);
-            initialFolderSetRef.current = true;
-          }
+        const matchedFolder = findPrimarySidakFolderByName(
+          folders,
+          DEFAULT_SERVICE_FOLDER_MAP[selectedService],
+        );
+        if (matchedFolder) {
+          setSelectedFolder(matchedFolder.id);
+          initialFolderSetRef.current = true;
         }
       }
     }
@@ -286,10 +302,25 @@ export default function SidakRankingPage() {
                   className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
                   <option value="ALL">Semua Tim</option>
-                  {allFolders.map((f) => (
+                  {standaloneFolders.map((f) => (
                     <option key={f.id} value={f.id}>
-                      {f.name}
+                      {f.nama}
                     </option>
+                  ))}
+                  {groupedFolders.map((group) => (
+                    <optgroup
+                      key={group.parent.id}
+                      label={`${group.parent.nama} (gabungan + batch)`}
+                    >
+                      <option value={group.parent.id}>
+                        {group.parent.nama} — Semua batch
+                      </option>
+                      {group.children.map((child) => (
+                        <option key={child.id} value={child.id}>
+                          ↳ {child.nama}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>

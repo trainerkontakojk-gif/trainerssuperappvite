@@ -26,6 +26,11 @@ import { ForecastActionButton } from "../../components/sidak/ForecastActionButto
 import KpiCard from "../../components/sidak/KpiCard";
 import { buildKpiDelta } from "../../lib/sidak-kpi-delta";
 import { SERVICE_LABELS, DEFAULT_SERVICE_FOLDER_MAP } from "../../lib/scoring";
+import {
+  findPrimarySidakFolderByName,
+  normalizeSidakFolderOptions,
+  type NormalizedSidakFolderOption,
+} from "../../lib/sidak-folder-options";
 import { buildParetoViewModel } from "../../components/sidak/pareto-view-model";
 import ParamTrendChart from "../../components/sidak/ParamTrendChart";
 import ForecastInsightPanel from "../../components/sidak/ForecastInsightPanel";
@@ -112,14 +117,11 @@ export default function SidakDashboardPage() {
     `/sidak/dashboard?${queryParams}`,
   );
 
-  const [allFolders, setAllFolders] = useState<{ id: string; nama: string }[]>([]);
+  const [allFolders, setAllFolders] = useState<NormalizedSidakFolderOption[]>([]);
 
   useEffect(() => {
     if (data?.folders) {
-      const mapped = data.folders.map((f: any) => ({
-        id: f.id ?? "",
-        nama: f.name ?? f.nama ?? "",
-      }));
+      const mapped = normalizeSidakFolderOptions(data.folders as any[]);
       if (selectedFolder === "ALL" || mapped.length > allFolders.length) {
         setAllFolders(mapped);
       }
@@ -308,14 +310,13 @@ export default function SidakDashboardPage() {
       // Default folder pairing on initial load when folders are fetched
       if (!initialFolderSetRef.current && selectedFolder === "ALL") {
         const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[selectedService];
-        if (targetFolderName) {
-          const matchedFolder = folders.find(
-            (f) => f.nama.toLowerCase() === targetFolderName.toLowerCase()
-          );
-          if (matchedFolder) {
-            setSelectedFolder(matchedFolder.id);
-            initialFolderSetRef.current = true;
-          }
+        const matchedFolder = findPrimarySidakFolderByName(
+          folders,
+          targetFolderName,
+        );
+        if (matchedFolder) {
+          setSelectedFolder(matchedFolder.id);
+          initialFolderSetRef.current = true;
         }
       }
     }
@@ -431,16 +432,12 @@ export default function SidakDashboardPage() {
           selectedService={selectedService}
           onServiceChange={(svc) => {
             setSelectedService(svc);
-            const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
-            if (targetFolderName && folders.length > 0) {
-              const matchedFolder = folders.find(
-                (f) => f.nama.toLowerCase() === targetFolderName.toLowerCase()
-              );
-              if (matchedFolder) {
-                setSelectedFolder(matchedFolder.id);
-              } else {
-                setSelectedFolder("ALL");
-              }
+            const matchedFolder = findPrimarySidakFolderByName(
+              folders,
+              DEFAULT_SERVICE_FOLDER_MAP[svc],
+            );
+            if (matchedFolder) {
+              setSelectedFolder(matchedFolder.id);
             } else {
               setSelectedFolder("ALL");
             }

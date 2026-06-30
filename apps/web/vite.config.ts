@@ -29,4 +29,35 @@ export default defineConfig({
     port: appPort,
     strictPort: true,
   },
+  build: {
+    chunkSizeWarningLimit: 2500,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "vendor-react",
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+            },
+            {
+              name: "vendor-data",
+              test: /[\\/]node_modules[\\/](@tanstack|@supabase|zustand|sonner)[\\/]/,
+            },
+            {
+              name: "vendor-charts",
+              test: /[\\/]node_modules[\\/](recharts|d3-|internmap)[\\/]/,
+            },
+            {
+              name: "vendor-export",
+              test: /[\\/]node_modules[\\/](exceljs|xlsx|jspdf|pptxgenjs)[\\/]/,
+            },
+            {
+              name: "vendor-capture",
+              test: /[\\/]node_modules[\\/](html2canvas|dompurify)[\\/]/,
+            },
+          ],
+        },
+      },
+    },
+  },
 });
