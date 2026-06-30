@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   BarChart3,
   LayoutDashboard,
+  LineChart,
   Users,
   Trophy,
   FileText,
@@ -17,6 +18,12 @@ const CARDS = [
     desc: "Pusat kendali utama menampilkan ringkasan metrik secara real-time dan tren kinerja operasional.",
     icon: LayoutDashboard,
     href: "/sidak/dashboard",
+  },
+  {
+    title: "Forecast",
+    desc: "Proyeksi tren temuan dan sinyal agent untuk membaca arah perbaikan lebih awal.",
+    icon: LineChart,
+    href: "/sidak/forecast",
   },
   {
     title: "Analisis Individu",
@@ -44,9 +51,7 @@ export default function SidakLanding() {
   const role = profile?.role ?? "";
   const isManager = ["trainer", "admin"].includes(role?.toLowerCase());
 
-  const visibleCards = CARDS.filter(
-    (c) => !c.managerOnly || isManager,
-  );
+  const visibleCards = CARDS.filter((c) => !c.managerOnly || isManager);
 
   return (
     <LeaderAccessGate module="sidak" moduleLabel="SIDAK">
@@ -64,7 +69,10 @@ export default function SidakLanding() {
                   Selamat Datang di SIDAK
                 </h2>
                 <p className="text-base leading-relaxed text-muted-foreground lg:text-lg">
-                  Pusat kendali analisis kualitas. Pantau performa agen, identifikasi area perbaikan, dan hasilkan laporan komprehensif untuk mendorong pertumbuhan dan kualitas layanan yang lebih baik.
+                  Pusat kendali analisis kualitas. Pantau performa agen,
+                  identifikasi area perbaikan, dan hasilkan laporan komprehensif
+                  untuk mendorong pertumbuhan dan kualitas layanan yang lebih
+                  baik.
                 </p>
               </div>
             </div>
@@ -72,16 +80,24 @@ export default function SidakLanding() {
             {/* Module Cards */}
             <div>
               <div className="mb-6">
-                <h3 className="font-outfit text-xl font-bold tracking-tight text-foreground">Pilih Modul</h3>
+                <h3 className="font-outfit text-xl font-bold tracking-tight text-foreground">
+                  Pilih Modul
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Akses fitur analitik dan laporan SIDAK.
+                  Akses fitur analitik, prediksi, dan laporan SIDAK.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div
+                className={`grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 ${visibleCards.length >= 5 ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}
+              >
                 {visibleCards.map((card) => {
                   return (
-                    <Link key={card.href} to={card.href} className="block h-full">
+                    <Link
+                      key={card.href}
+                      to={card.href}
+                      className="block h-full"
+                    >
                       <motion.div
                         whileHover={{ y: -2 }}
                         className="group flex h-full flex-col rounded-2xl border border-border bg-surface p-6 transition-all hover:border-foreground/20"
