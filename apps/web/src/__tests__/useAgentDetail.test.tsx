@@ -180,4 +180,26 @@ describe("useAgentDetail", () => {
       findingCount: 1,
     });
   });
+
+  it("does not reset the selected service while a stale previous-service response is still loading", async () => {
+    useApiMock.mockImplementation((path: string | null) => {
+      const serviceType = path ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type") : null;
+      const isSwitchingToCall = serviceType === "call";
+
+      return {
+        data: buildAgentDetailData(isSwitchingToCall ? "email" : serviceType),
+        loading: isSwitchingToCall,
+        error: null,
+        refetch: vi.fn(),
+      };
+    });
+
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+
+    result.current.handleServiceChange("call");
+
+    await waitFor(() => expect(result.current.selectedService).toBe("call"));
+  });
 });

@@ -107,6 +107,7 @@ export function useAgentDetail(agentId: string) {
   // Init selectedService to first available service once data loads
   useEffect(() => {
     if (!data || !data.periodSummaries) return;
+    if (selectedService && data.initialService !== selectedService) return;
     const svcs = [...new Set((data.periodSummaries ?? []).map((s) => s.serviceType))];
     if (svcs.length === 0) return;
     if (selectedService && (svcs as string[]).includes(selectedService)) return;
