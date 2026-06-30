@@ -194,7 +194,15 @@ export async function getAgentDirectorySummary(
       }
 
       const sortedKeys = [...pSvcMap.keys()].sort((a, b) => b.localeCompare(a));
-      const latestKey = sortedKeys[0];
+      const latestPeriodPrefix = sortedKeys[0]?.slice(0, 7);
+      const primaryService = resolveServiceTypeFromTeam(agent.tim);
+      const latestKey =
+        sortedKeys.find(
+          (key) =>
+            latestPeriodPrefix &&
+            key.startsWith(latestPeriodPrefix) &&
+            key.endsWith(`-${primaryService}`),
+        ) ?? sortedKeys[0];
       if (!latestKey) continue;
 
       const latestTemuan = pSvcMap.get(latestKey)!;
@@ -229,8 +237,9 @@ export async function getAgentDirectorySummary(
         agent.periodMonth = latestPeriod.month;
       }
 
-      const prevKey =
-        sortedKeys.find((k, i) => i > 0 && k.endsWith(st)) || sortedKeys[1];
+      const prevKey = sortedKeys.find(
+        (k) => k !== latestKey && k.endsWith(`-${st}`),
+      );
       if (prevKey && prevKey !== latestKey) {
         const prevTemuan = pSvcMap.get(prevKey)!;
         const prevIndicators = indicatorCache.get(st) || [];
