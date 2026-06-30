@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { SidakBatchForecastSnapshot, SidakForecastLookupStatus, SidakForecastLookupResult } from "@trainers/types";
+import type {
+  SidakBatchForecastSnapshot,
+  SidakForecastLookupStatus,
+  SidakForecastLookupResult,
+} from "@trainers/types";
 import {
   TrendingUp,
   TrendingDown,
@@ -8,6 +12,8 @@ import {
   Target,
   AlertCircle,
   Loader2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   Area,
@@ -106,6 +112,7 @@ export default function DashboardTrendPanel({
     useState<SidakForecastLookupStatus>("missing");
   const [forecastResult, setForecastResult] =
     useState<SidakBatchForecastSnapshot | null>(null);
+  const [showForecastPrediction, setShowForecastPrediction] = useState(true);
   const forecastRequestId = useRef(0);
 
   const emptyTrend: TrendData = {
@@ -175,7 +182,7 @@ export default function DashboardTrendPanel({
         data:
           selectedService === "all"
             ? activeTrend.totalData
-            : activeTrend.serviceData[selectedService] ?? [],
+            : (activeTrend.serviceData[selectedService] ?? []),
       }),
     [forecastFilters, activeTrend, selectedService],
   );
@@ -196,6 +203,13 @@ export default function DashboardTrendPanel({
   }, [forecastLookupKey]);
 
   const totalForecast = forecastResult?.series.total ?? null;
+  const visibleTotalForecast = showForecastPrediction ? totalForecast : null;
+
+  useEffect(() => {
+    if (!forecastResult) {
+      setShowForecastPrediction(true);
+    }
+  }, [forecastResult]);
 
   const qaTrendPoints = useMemo(() => {
     const points = activeTrend.labels.map((label: string, i: number) => {
@@ -217,7 +231,7 @@ export default function DashboardTrendPanel({
       return point;
     });
 
-    if (totalForecast && points.length > 0) {
+    if (visibleTotalForecast && points.length > 0) {
       const dataKey =
         selectedService === "all"
           ? "Total"
@@ -226,8 +240,11 @@ export default function DashboardTrendPanel({
       lastHistoricalPoint[`forecast_${dataKey}`] =
         lastHistoricalPoint[`actual_${dataKey}`];
 
-      const forecastPoints = totalForecast.forecast.map((f) => {
-        const p: Record<string, string | number | null> = { name: f.label, isForecast: 1 };
+      const forecastPoints = visibleTotalForecast.forecast.map((f) => {
+        const p: Record<string, string | number | null> = {
+          name: f.label,
+          isForecast: 1,
+        };
         p[`actual_${dataKey}`] = null;
         p[`forecast_${dataKey}`] = f.value;
         return p;
@@ -236,7 +253,7 @@ export default function DashboardTrendPanel({
     }
 
     return points;
-  }, [activeTrend, selectedService, totalForecast]);
+  }, [activeTrend, selectedService, visibleTotalForecast]);
 
   const totalFindings =
     selectedService === "all"
@@ -332,9 +349,7 @@ export default function DashboardTrendPanel({
                 <button
                   key={svc}
                   onClick={() =>
-                    setSelectedService(
-                      selectedService === svc ? "all" : svc,
-                    )
+                    setSelectedService(selectedService === svc ? "all" : svc)
                   }
                   className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
                     selectedService === svc
@@ -359,9 +374,7 @@ export default function DashboardTrendPanel({
               </span>
               <select
                 value={selectedYear}
-                onChange={(event) =>
-                  onYearChange(Number(event.target.value))
-                }
+                onChange={(event) => onYearChange(Number(event.target.value))}
                 className="bg-transparent text-[9px] font-black uppercase tracking-widest focus:outline-none cursor-pointer"
               >
                 {availableYears.length > 0 ? (
@@ -395,6 +408,29 @@ export default function DashboardTrendPanel({
               className="mb-0 !gap-0"
             />
 
+            {forecastResult && (
+              <button
+                type="button"
+                aria-pressed={showForecastPrediction}
+                aria-label={
+                  showForecastPrediction
+                    ? "Sembunyikan Prediksi"
+                    : "Tampilkan Prediksi"
+                }
+                onClick={() => setShowForecastPrediction((prev) => !prev)}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-transparent px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {showForecastPrediction ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                {showForecastPrediction
+                  ? "Sembunyikan Prediksi"
+                  : "Tampilkan Prediksi"}
+              </button>
+            )}
+
             <ForecastActionButton
               status={forecastStatus}
               loading={forecastLoading}
@@ -427,11 +463,7 @@ export default function DashboardTrendPanel({
                       stopColor={chartColor}
                       stopOpacity={0.3}
                     />
-                    <stop
-                      offset="95%"
-                      stopColor={chartColor}
-                      stopOpacity={0}
-                    />
+                    <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -474,20 +506,27 @@ export default function DashboardTrendPanel({
                     color: "var(--foreground)",
                   }}
                   formatter={(value: any, name: any, props: any) => {
-                    const isForecastSeries = String(props.dataKey).startsWith("forecast_");
+                    const isForecastSeries = String(props.dataKey).startsWith(
+                      "forecast_",
+                    );
                     const isForecast = props.payload.isForecast === 1;
                     if (isForecastSeries && !isForecast) return null;
                     return [
                       <span key="val" className="flex items-center gap-1.5">
-                        {value} {isForecast && <span className="text-[9px] px-1 py-0.5 bg-primary/20 text-primary rounded">Prediksi</span>}
+                        {value}{" "}
+                        {isForecast && (
+                          <span className="text-[9px] px-1 py-0.5 bg-primary/20 text-primary rounded">
+                            Prediksi
+                          </span>
+                        )}
                       </span>,
-                      name
+                      name,
                     ];
                   }}
                 />
 
                 {/* Transition line between Actual and Forecast */}
-                {totalForecast && (
+                {visibleTotalForecast && (
                   <ReferenceLine
                     x={activeTrend.labels[activeTrend.labels.length - 1]}
                     stroke="var(--border)"
@@ -521,7 +560,7 @@ export default function DashboardTrendPanel({
                       }}
                       activeDot={{ r: 6, fill: chartColor, strokeWidth: 0 }}
                     />
-                    {totalForecast && (
+                    {visibleTotalForecast && (
                       <Area
                         type="monotone"
                         dataKey="forecast_Total"
@@ -546,11 +585,9 @@ export default function DashboardTrendPanel({
                 {Object.entries(SERVICE_COLORS).map(([svc, color]) => {
                   const label = SERVICE_LABELS[svc] || svc;
                   const isSelected = selectedService === svc;
-                  const shouldShow =
-                    selectedService === "all" || isSelected;
+                  const shouldShow = selectedService === "all" || isSelected;
 
-                  if (!shouldShow || !activeTrend.serviceData[svc])
-                    return null;
+                  if (!shouldShow || !activeTrend.serviceData[svc]) return null;
 
                   return (
                     <g key={svc}>
@@ -575,7 +612,7 @@ export default function DashboardTrendPanel({
                         activeDot={{ r: 6, fill: color, strokeWidth: 0 }}
                         animationDuration={900}
                       />
-                      {isSelected && totalForecast && (
+                      {isSelected && visibleTotalForecast && (
                         <Area
                           type="monotone"
                           dataKey={`forecast_${label}`}
@@ -605,7 +642,7 @@ export default function DashboardTrendPanel({
           )}
         </div>
 
-        {forecastResult && totalForecast && (
+        {showForecastPrediction && forecastResult && totalForecast && (
           <ForecastInsightPanel
             forecastResult={forecastResult}
             summary={totalForecast.summary}

@@ -21,6 +21,8 @@ import {
   Target,
   Sparkles,
   ArrowUp,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { ForecastActionButton } from "../../components/sidak/ForecastActionButton";
 import KpiCard from "../../components/sidak/KpiCard";
@@ -100,6 +102,7 @@ export default function SidakDashboardPage() {
     useState<SidakForecastLookupStatus>("missing");
   const [forecastResult, setForecastResult] =
     useState<SidakBatchForecastSnapshot | null>(null);
+  const [showForecastPrediction, setShowForecastPrediction] = useState(true);
   const forecastRequestId = useRef(0);
   const initialFolderSetRef = useRef(false);
 
@@ -117,7 +120,9 @@ export default function SidakDashboardPage() {
     `/sidak/dashboard?${queryParams}`,
   );
 
-  const [allFolders, setAllFolders] = useState<NormalizedSidakFolderOption[]>([]);
+  const [allFolders, setAllFolders] = useState<NormalizedSidakFolderOption[]>(
+    [],
+  );
 
   useEffect(() => {
     if (data?.folders) {
@@ -129,7 +134,6 @@ export default function SidakDashboardPage() {
   }, [data?.folders, selectedFolder, allFolders.length]);
 
   const folders = allFolders;
-
 
   const paramTrendDatasets = data?.paramTrend?.datasets;
   const defaultHiddenParams = useMemo(() => {
@@ -240,8 +244,7 @@ export default function SidakDashboardPage() {
   const visibleForecastParameters = useMemo(
     () =>
       (data?.paramTrend.datasets ?? []).filter(
-        (dataset) =>
-          !dataset.isTotal && !activeHiddenParams.has(dataset.label),
+        (dataset) => !dataset.isTotal && !activeHiddenParams.has(dataset.label),
       ),
     [data?.paramTrend.datasets, activeHiddenParams],
   );
@@ -254,20 +257,22 @@ export default function SidakDashboardPage() {
   const visibleParamCount = visibleForecastParameters.length;
   const visibleSeriesCount = visibleParamCount + (showTotalTrend ? 1 : 0);
   const canActivateMoreParams = visibleSeriesCount < maxVisibleParameters;
-  const canShowTotalTrend = showTotalTrend || visibleSeriesCount < maxVisibleParameters;
+  const canShowTotalTrend =
+    showTotalTrend || visibleSeriesCount < maxVisibleParameters;
 
   const selectedForecastSeries: SidakForecastSeries | null = useMemo(() => {
+    if (!showForecastPrediction) return null;
     if (!forecastResult) return null;
     if (visibleForecastParameters.length === 1) {
       return (
-        forecastResult.series.parameters[
-          visibleForecastParameters[0].label
-        ] ?? null
+        forecastResult.series.parameters[visibleForecastParameters[0].label] ??
+        null
       );
     }
     return forecastResult.series.total;
-  }, [forecastResult, visibleForecastParameters]);
+  }, [forecastResult, showForecastPrediction, visibleForecastParameters]);
   const selectedForecastSeriesList = useMemo(() => {
+    if (!showForecastPrediction) return [];
     if (!forecastResult) return [];
     if (visibleForecastParameters.length === 0 && showTotalTrend) {
       return [forecastResult.series.total];
@@ -279,8 +284,14 @@ export default function SidakDashboardPage() {
     return showTotalTrend
       ? [forecastResult.series.total, ...parameterSeries]
       : parameterSeries;
-  }, [forecastResult, showTotalTrend, visibleForecastParameters]);
+  }, [
+    forecastResult,
+    showForecastPrediction,
+    showTotalTrend,
+    visibleForecastParameters,
+  ]);
   const totalForecastSummary = forecastResult?.series.total.summary;
+  const hasForecastPrediction = Boolean(forecastResult);
 
   const availableServices = useMemo(
     () => data?.availableServices ?? [],
@@ -334,6 +345,12 @@ export default function SidakDashboardPage() {
     setHiddenParams(null);
     setShowTotalTrend(true);
   }, [queryParams]);
+
+  useEffect(() => {
+    if (!forecastResult) {
+      setShowForecastPrediction(true);
+    }
+  }, [forecastResult]);
 
   const handleReset = useCallback(() => {
     initialFolderSetRef.current = false;
@@ -467,7 +484,9 @@ export default function SidakDashboardPage() {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h2 className="font-outfit text-lg font-bold mb-2">Gagal memuat data</h2>
+            <h2 className="font-outfit text-lg font-bold mb-2">
+              Gagal memuat data
+            </h2>
             <p className="text-muted-foreground text-sm max-w-sm text-center px-6">
               Terjadi kesalahan. Silakan coba lagi.
             </p>
@@ -486,7 +505,9 @@ export default function SidakDashboardPage() {
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h2 className="font-outfit text-lg font-bold mb-2">Data Tidak Ditemukan</h2>
+            <h2 className="font-outfit text-lg font-bold mb-2">
+              Data Tidak Ditemukan
+            </h2>
             <p className="text-muted-foreground text-sm max-w-sm text-center px-6">
               Tidak ada rekaman QA untuk filter yang Anda pilih.
             </p>
@@ -588,14 +609,42 @@ export default function SidakDashboardPage() {
                     </div>
                   </div>
 
-                  <ForecastActionButton
-                    status={forecastStatus}
-                    loading={forecastLoading}
-                    disabled={
-                      forecastLoading || !data || data.paramTrend.labels.length < 2
-                    }
-                    onClick={handleUpdateForecast}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    {hasForecastPrediction && (
+                      <button
+                        type="button"
+                        aria-pressed={showForecastPrediction}
+                        aria-label={
+                          showForecastPrediction
+                            ? "Sembunyikan Prediksi"
+                            : "Tampilkan Prediksi"
+                        }
+                        onClick={() =>
+                          setShowForecastPrediction((prev) => !prev)
+                        }
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-transparent px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        {showForecastPrediction ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        {showForecastPrediction
+                          ? "Sembunyikan Prediksi"
+                          : "Tampilkan Prediksi"}
+                      </button>
+                    )}
+                    <ForecastActionButton
+                      status={forecastStatus}
+                      loading={forecastLoading}
+                      disabled={
+                        forecastLoading ||
+                        !data ||
+                        data.paramTrend.labels.length < 2
+                      }
+                      onClick={handleUpdateForecast}
+                    />
+                  </div>
                 </div>
 
                 {!data.paramTrend || !data.paramTrend.labels?.length ? (
@@ -652,11 +701,10 @@ export default function SidakDashboardPage() {
                                   const next = new Set(
                                     prev ?? defaultHiddenParams,
                                   );
-                                  if (next.has(ds.label))
-                                    next.delete(ds.label);
+                                  if (next.has(ds.label)) next.delete(ds.label);
                                   else next.add(ds.label);
                                   return next;
-                                  });
+                                });
                               }}
                               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold border transition-all ${
                                 isHidden
@@ -734,13 +782,17 @@ export default function SidakDashboardPage() {
                       />
                     </div>
 
-                    {forecastResult && totalForecastSummary && (
-                      <ForecastInsightPanel
-                        forecastResult={forecastResult}
-                        summary={totalForecastSummary}
-                        horizonMonths={forecastResult.series.total.forecast.length}
-                      />
-                    )}
+                    {showForecastPrediction &&
+                      forecastResult &&
+                      totalForecastSummary && (
+                        <ForecastInsightPanel
+                          forecastResult={forecastResult}
+                          summary={totalForecastSummary}
+                          horizonMonths={
+                            forecastResult.series.total.forecast.length
+                          }
+                        />
+                      )}
                   </>
                 )}
               </div>
@@ -750,7 +802,9 @@ export default function SidakDashboardPage() {
                 <div className="flex items-center gap-3 mb-6">
                   <BarChart3 className="w-5 h-5 shrink-0 text-muted-foreground" />
                   <div>
-                    <h2 className="font-outfit text-lg font-bold text-foreground">Root Cause Analysis</h2>
+                    <h2 className="font-outfit text-lg font-bold text-foreground">
+                      Root Cause Analysis
+                    </h2>
                     <p className="text-sm text-muted-foreground">
                       Prinsip Pareto: 80% temuan biasanya berasal dari 20%
                       kategori utama

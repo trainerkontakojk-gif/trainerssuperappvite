@@ -218,6 +218,43 @@ describe("SidakDashboardPage forecast state", () => {
     ).toBeInTheDocument();
   });
 
+  it("toggles an existing forecast without clearing the snapshot", async () => {
+    vi.mocked(unwrapResponse).mockResolvedValue({
+      status: "fresh",
+      snapshot: mockForecastResult,
+    });
+
+    await act(async () => {
+      render(<SidakDashboardPage />);
+    });
+
+    expect(await screen.findByText("Insight lama.")).toBeInTheDocument();
+    expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+      '"type":"total"',
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Sembunyikan Prediksi" }),
+    );
+
+    expect(screen.queryByText("Insight lama.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+      '"forecastScopes":[]',
+    );
+    expect(
+      screen.getByRole("button", { name: "Tampilkan Prediksi" }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Tampilkan Prediksi" }),
+    );
+
+    expect(await screen.findByText("Insight lama.")).toBeInTheDocument();
+    expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
+      '"type":"total"',
+    );
+  });
+
   it("clears an old forecast immediately while changed data is being checked", async () => {
     let resolveLookup:
       | ((value: { status: "stale"; snapshot: null }) => void)
@@ -324,7 +361,9 @@ describe("SidakDashboardPage forecast state", () => {
       render(<SidakDashboardPage />);
     });
 
-    await userEvent.click(screen.getByRole("button", { name: /Total Temuan/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /Total Temuan/i }),
+    );
     await userEvent.click(screen.getByRole("button", { name: /Critical/i }));
     await userEvent.click(screen.getByRole("button", { name: /Greeting/i }));
 
@@ -338,9 +377,9 @@ describe("SidakDashboardPage forecast state", () => {
       expect(screen.getByTestId("param-trend-chart-props")).toHaveTextContent(
         '"hideTotal":true',
       );
-      expect(screen.getByTestId("param-trend-chart-props")).not.toHaveTextContent(
-        '"type":"total"',
-      );
+      expect(
+        screen.getByTestId("param-trend-chart-props"),
+      ).not.toHaveTextContent('"type":"total"');
     });
   });
 

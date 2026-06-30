@@ -177,6 +177,19 @@ Fitur forecasting SIDAK Dashboard memproyeksikan tren temuan dan parameter untuk
 | `fresh`   | Snapshot ada dan data masih sama        | Insight panel tampil, button tersedia |
 | `stale`   | Snapshot ada tapi data historis berubah | Button pulse animasi, insight hidden  |
 
+### Visibility Toggle
+
+Saat snapshot forecast sudah ada, user dapat menyembunyikan atau menampilkan
+kembali forecast yang sedang aktif tanpa menghapus snapshot dari state.
+
+- Toggle hanya memengaruhi rendering chart forecast dan insight panel.
+- Data snapshot tetap tersimpan sehingga user bisa menampilkan kembali forecast
+  tanpa request ulang selama state masih valid.
+- Saat snapshot hilang karena filter berubah atau data di-reset, toggle kembali
+  ke kondisi tampil default.
+- Kontrol UI harus tetap bisa diakses lewat keyboard, memakai label yang jelas,
+  dan menampilkan `Sembunyikan Prediksi` / `Tampilkan Prediksi` secara eksplisit.
+
 ### Confidence Forecast
 
 Label `Confidence` pada forecast SIDAK menunjukkan tingkat keyakinan hasil regresi linear, bukan confidence statistik formal.

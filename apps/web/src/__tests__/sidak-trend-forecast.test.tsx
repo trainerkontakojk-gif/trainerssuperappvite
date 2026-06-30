@@ -119,7 +119,7 @@ describe("DashboardTrendPanel Forecast", () => {
         localTrendData={null}
         onYearChange={() => {}}
         onRangeChange={() => {}}
-      />
+      />,
     );
 
     expect(screen.getByText(/Update Prediksi/i)).toBeInTheDocument();
@@ -141,7 +141,7 @@ describe("DashboardTrendPanel Forecast", () => {
         localTrendData={null}
         onYearChange={() => {}}
         onRangeChange={() => {}}
-      />
+      />,
     );
 
     const button = screen.getByText(/Update Prediksi/i);
@@ -181,6 +181,58 @@ describe("DashboardTrendPanel Forecast", () => {
     });
   });
 
+  it("toggles an existing dashboard trend forecast without refreshing it", async () => {
+    vi.mocked(unwrapResponse).mockResolvedValue({
+      status: "fresh",
+      snapshot: mockForecastResult,
+    });
+
+    render(
+      <DashboardTrendPanel
+        serviceTrendMap={{ all: mockTrendData } as any}
+        availableYears={[2026]}
+        selectedYear={2026}
+        trendStartMonth={1}
+        trendEndMonth={2}
+        trendLoading={false}
+        localTrendData={null}
+        onYearChange={() => {}}
+        onRangeChange={() => {}}
+      />,
+    );
+
+    expect(await screen.findByText(/Tren meningkat./i)).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        screen.getByTestId("area-chart").getAttribute("data-chart") || "[]",
+      ),
+    ).toHaveLength(3);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sembunyikan Prediksi" }),
+    );
+
+    expect(screen.queryByText(/Tren meningkat./i)).not.toBeInTheDocument();
+    expect(
+      JSON.parse(
+        screen.getByTestId("area-chart").getAttribute("data-chart") || "[]",
+      ),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Tampilkan Prediksi" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tampilkan Prediksi" }));
+
+    expect(await screen.findByText(/Tren meningkat./i)).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        screen.getByTestId("area-chart").getAttribute("data-chart") || "[]",
+      ),
+    ).toHaveLength(3);
+    expect(sidakClient.dashboard.forecast.$post).toHaveBeenCalledTimes(1);
+  });
+
   it("shows stale attention when cache lookup reports changed data", async () => {
     vi.mocked(unwrapResponse).mockResolvedValueOnce({
       status: "stale",
@@ -198,7 +250,7 @@ describe("DashboardTrendPanel Forecast", () => {
         localTrendData={null}
         onYearChange={() => {}}
         onRangeChange={() => {}}
-      />
+      />,
     );
 
     expect(
@@ -225,7 +277,7 @@ describe("DashboardTrendPanel Forecast", () => {
         localTrendData={null}
         onYearChange={() => {}}
         onRangeChange={() => {}}
-      />
+      />,
     );
 
     const button = await screen.findByRole("button", {
@@ -236,12 +288,18 @@ describe("DashboardTrendPanel Forecast", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Data baru — Perbarui Prediksi" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Data baru — Perbarui Prediksi" }),
+      ).toBeInTheDocument();
     });
   });
 
   it("disables button if data is insufficient", () => {
-    const limitedData = { ...mockTrendData, labels: ["Jan 26"], totalData: [10] };
+    const limitedData = {
+      ...mockTrendData,
+      labels: ["Jan 26"],
+      totalData: [10],
+    };
     render(
       <DashboardTrendPanel
         serviceTrendMap={{ all: limitedData } as any}
@@ -253,7 +311,7 @@ describe("DashboardTrendPanel Forecast", () => {
         localTrendData={null}
         onYearChange={() => {}}
         onRangeChange={() => {}}
-      />
+      />,
     );
 
     const button = screen.getByText(/Update Prediksi/i);
@@ -272,23 +330,25 @@ describe("DashboardTrendPanel Forecast", () => {
           },
         ]}
         showParameters
-        forecastResult={{
-          scope: { type: "total" },
-          historical: [
-            { label: "Jan 26", value: 164 },
-            { label: "Feb 26", value: 129 },
-            { label: "Mar 26", value: 130 },
-            { label: "Apr 26", value: 122 },
-            { label: "Mei 26", value: 80 },
-          ],
-          forecast: [
-            { label: "Jun 26", value: 65.8 },
-            { label: "Jul 26", value: 51.7 },
-            { label: "Agt 26", value: 37.5 },
-          ],
-          summary: {},
-          status: "ready",
-        } as any}
+        forecastResult={
+          {
+            scope: { type: "total" },
+            historical: [
+              { label: "Jan 26", value: 164 },
+              { label: "Feb 26", value: 129 },
+              { label: "Mar 26", value: 130 },
+              { label: "Apr 26", value: 122 },
+              { label: "Mei 26", value: 80 },
+            ],
+            forecast: [
+              { label: "Jun 26", value: 65.8 },
+              { label: "Jul 26", value: 51.7 },
+              { label: "Agt 26", value: 37.5 },
+            ],
+            summary: {},
+            status: "ready",
+          } as any
+        }
       />,
     );
 
@@ -342,36 +402,38 @@ describe("DashboardTrendPanel Forecast", () => {
           },
         ]}
         showParameters
-        forecastResults={[
-          {
-            scope: {
-              type: "parameter",
-              parameterId: "Critical",
-              label: "Critical",
+        forecastResults={
+          [
+            {
+              scope: {
+                type: "parameter",
+                parameterId: "Critical",
+                label: "Critical",
+              },
+              historical: [],
+              forecast: [
+                { label: "Apr 26", value: 35 },
+                { label: "Mei 26", value: 40 },
+              ],
+              summary: {},
+              status: "ready",
             },
-            historical: [],
-            forecast: [
-              { label: "Apr 26", value: 35 },
-              { label: "Mei 26", value: 40 },
-            ],
-            summary: {},
-            status: "ready",
-          },
-          {
-            scope: {
-              type: "parameter",
-              parameterId: "Greeting",
-              label: "Greeting",
+            {
+              scope: {
+                type: "parameter",
+                parameterId: "Greeting",
+                label: "Greeting",
+              },
+              historical: [],
+              forecast: [
+                { label: "Apr 26", value: 8 },
+                { label: "Mei 26", value: 9 },
+              ],
+              summary: {},
+              status: "ready",
             },
-            historical: [],
-            forecast: [
-              { label: "Apr 26", value: 8 },
-              { label: "Mei 26", value: 9 },
-            ],
-            summary: {},
-            status: "ready",
-          },
-        ] as any}
+          ] as any
+        }
       />,
     );
 
