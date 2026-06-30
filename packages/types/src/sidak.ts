@@ -333,6 +333,64 @@ export interface SidakForecastLookupResult {
   snapshot: SidakBatchForecastSnapshot | null;
 }
 
+export interface SidakAgentForecastRequest {
+  year?: number;
+  serviceType?: ServiceType;
+  folderIds?: string[];
+  startMonth?: number;
+  endMonth?: number;
+  horizonMonths?: number;
+}
+
+export interface SidakAgentForecastHistoricalPoint {
+  periodId: string;
+  label: string;
+  date: string;
+  score: number;
+  findingsCount: number;
+  criticalFindingsCount: number;
+}
+
+export interface SidakAgentForecastEntry {
+  agentId: string;
+  nama: string;
+  tim: string;
+  batchName: string;
+  jabatan: string | null;
+  foto_url: string | null;
+  latestPeriodLabel: string;
+  latestScore: number;
+  latestFindingsCount: number;
+  latestCriticalFindingsCount: number;
+  projectedScore: number;
+  projectedScoreChange: number;
+  projectedFindings: number;
+  projectedFindingsChange: number;
+  projectedCriticalFindings: number;
+  projectedCriticalFindingsChange: number;
+  sourcePointCount: number;
+  forecastStatus: "improving" | "declining" | "stable" | "insufficient_data";
+  confidence: "low" | "medium" | "high";
+  historical: SidakAgentForecastHistoricalPoint[];
+}
+
+export interface SidakAgentForecastSummary {
+  totalEligible: number;
+  improvingCount: number;
+  decliningCount: number;
+  stableCount: number;
+  watchlistCount: number;
+  latestPeriodLabel: string;
+}
+
+export interface SidakAgentForecastResponse {
+  improvingAgents: SidakAgentForecastEntry[];
+  decliningAgents: SidakAgentForecastEntry[];
+  stableAgents: SidakAgentForecastEntry[];
+  watchlistAgents: SidakAgentForecastEntry[];
+  summary: SidakAgentForecastSummary;
+}
+
 export interface AgentDetailData {
   indicators: QAIndicator[];
   periodSummaries: AgentPeriodSummary[];

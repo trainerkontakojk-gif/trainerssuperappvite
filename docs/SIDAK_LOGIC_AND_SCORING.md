@@ -246,6 +246,51 @@ insight tetap mudah dibaca oleh orang awam.
 - **ForecastInsightPanel**: Panel insight naratif dengan 3 metric cards (arah tren, proyeksi perubahan, metode) + parsed narrative body.
 - **ParamTrendChart**: Dashed forecast line (`strokeDasharray="5 5"`) untuk parameter visible atau Total Temuan, anchor point di bulan aktual terakhir.
 
+## Forecast Agent Submodule
+
+Submodul baru `/sidak/forecast` memakai service forecast dashboard yang sama untuk bagian layanan, lalu menambahkan forecast agent deterministic untuk prioritas coaching.
+
+### Arsitektur
+
+1. **Service Reuse**: Page tetap memanggil `POST /api/v1/sidak/dashboard/forecast` untuk trend layanan dan snapshot cache `missing/fresh/stale`.
+2. **Deterministic Agent Forecast**: Endpoint `POST /api/v1/sidak/forecast/agents` menghitung proyeksi skor, temuan, dan critical findings per agent dengan regresi linear.
+3. **Klasifikasi Lane**:
+   - `improving`: skor naik atau temuan turun, tanpa sinyal buruk dominan.
+   - `declining`: skor turun atau temuan naik, terutama bila critical findings ikut naik.
+   - `stable`: sinyal campuran atau perubahan tidak signifikan.
+   - `insufficient_data`: kurang dari 2 periode historis.
+4. **Scope Guard**: Leader harus lolos `getAccessibleAgentIds()` dan scope layanan dari `getAccessibleSidakFilters()`; kalau scope kosong, request gagal closed.
+
+### Endpoint
+
+`POST /api/v1/sidak/forecast/agents`
+
+| Parameter       | Type    | Default  | Deskripsi                                          |
+| --------------- | ------- | -------- | -------------------------------------------------- |
+| `year`          | number  | current  | Tahun filter                                       |
+| `serviceType`   | string  | `call`   | Layanan SIDAK yang dianalisis                      |
+| `folderIds`     | string[]| `[]`     | Scope folder/batch yang dipilih                    |
+| `startMonth`    | number  | `null`   | Batas awal bulan                                    |
+| `endMonth`      | number  | `null`   | Batas akhir bulan                                   |
+| `horizonMonths` | number  | `3`      | Horizon proyeksi agent (1–6)                        |
+
+### Output
+
+- `improvingAgents[]`
+- `decliningAgents[]`
+- `stableAgents[]`
+- `watchlistAgents[]`
+- `summary.totalEligible`
+- `summary.improvingCount`
+- `summary.decliningCount`
+- `summary.latestPeriodLabel`
+
+### UI Notes
+
+- Service chart harus menjaga token warna aplikasi dan tidak hardcode hex.
+- State membaik/memburuk wajib punya label, ikon, dan delta, bukan warna saja.
+- Filter berubah harus menghapus hasil lama sebelum lookup baru berjalan agar data lama tidak tampak seperti hasil baru.
+
 ## Catatan Praktis
 
 - `weighted`, `flat`, dan `no_category` punya rumus dasar yang berbeda pada level sesi.

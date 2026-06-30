@@ -10,6 +10,7 @@ import { APP_MODULES } from "../../lib/app-config";
 export const SIDAK_CHILDREN = [
   { to: "/sidak", label: "Beranda SIDAK", exactMatch: true },
   { to: "/sidak/dashboard", label: "Dashboard QA" },
+  { to: "/sidak/forecast", label: "Forecast" },
   { to: "/sidak/agents", label: "Analisis Individu", startsWith: true },
   { to: "/sidak/ranking", label: "Ranking Agen" },
   {
@@ -98,6 +99,7 @@ export function buildBreadcrumb(pathname: string): BreadcrumbSegment[] {
     crumbs.push({ label: "SIDAK", href: "/sidak" });
     if (pathname === "/sidak") return crumbs.map((c, i) => i === crumbs.length-1 ? {...c, href: undefined} : c);
     if (pathname === "/sidak/dashboard") { crumbs.push({ label: "Dashboard QA" }); return crumbs; }
+    if (pathname === "/sidak/forecast") { crumbs.push({ label: "Forecast" }); return crumbs; }
     if (pathname === "/sidak/input") { crumbs.push({ label: "Input Temuan" }); return crumbs; }
     if (pathname === "/sidak/ranking") { crumbs.push({ label: "Ranking" }); return crumbs; }
     if (pathname === "/sidak/settings") { crumbs.push({ label: "Parameter" }); return crumbs; }

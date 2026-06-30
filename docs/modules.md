@@ -138,8 +138,9 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 - **Fungsi**: Mengolah data temuan QA menjadi wawasan yang dapat ditindaklanjuti melalui dashboard, ranking, input manual, dan laporan otomatis.
 - **Routes**:
   - **Landing** (`/sidak`): 6 card links ke sub-modul.
-  - **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, dan top agents.
-  - **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload.
+- **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, dan top agents.
+- **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent membaik/memburuk.
+- **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload.
   - **Ranking** (`/sidak/ranking`): Ranking agent berdasarkan skor dan defect.
   - **Settings** (`/sidak/settings`): Service weights configuration.
   - **Periods** (`/sidak/periods`): Manajemen periode audit.

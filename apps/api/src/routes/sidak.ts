@@ -3,6 +3,7 @@ import { User } from "@supabase/supabase-js";
 import { sidakCore } from "./sidak/core";
 import { sidakTemuan } from "./sidak/temuan";
 import { sidakDashboard } from "./sidak/dashboard";
+import { sidakForecast } from "./sidak/forecast";
 import { sidakRuleVersions } from "./sidak/rule-versions";
 import { sidakReports } from "./sidak/reports";
 
@@ -13,6 +14,7 @@ const sidak = new Hono<{ Variables: Variables }>();
 sidak.route("/", sidakCore);
 sidak.route("/", sidakTemuan);
 sidak.route("/", sidakDashboard);
+sidak.route("/", sidakForecast);
 sidak.route("/", sidakRuleVersions);
 sidak.route("/", sidakReports);
 

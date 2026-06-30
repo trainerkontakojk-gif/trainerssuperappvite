@@ -23,6 +23,7 @@ const DashboardAccessApproval = lazy(
 const DashboardActivities = lazy(() => import("./routes/dashboard/activities"));
 const SidakLanding = lazy(() => import("./routes/sidak/index"));
 const SidakDashboard = lazy(() => import("./routes/sidak/dashboard"));
+const SidakForecast = lazy(() => import("./routes/sidak/forecast"));
 const SidakInput = lazy(() => import("./routes/sidak/input"));
 const SidakRanking = lazy(() => import("./routes/sidak/ranking"));
 const SidakSettings = lazy(() => import("./routes/sidak/settings"));
@@ -193,6 +194,17 @@ const sidakDashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sidak/dashboard",
   component: SidakDashboard,
+  beforeLoad: requireLeaderModuleApproval(
+    ["trainer", "leader", "admin"],
+    "sidak",
+    "/sidak",
+  ),
+});
+
+const sidakForecastRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sidak/forecast",
+  component: SidakForecast,
   beforeLoad: requireLeaderModuleApproval(
     ["trainer", "leader", "admin"],
     "sidak",
@@ -557,6 +569,7 @@ const routeTree = rootRoute.addChildren([
   profilerTeamsRoute,
   sidakRoute,
   sidakDashboardRoute,
+  sidakForecastRoute,
   sidakInputRoute,
   sidakRankingRoute,
   sidakSettingsRoute,
