@@ -137,10 +137,10 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 
 - **Fungsi**: Mengolah data temuan QA menjadi wawasan yang dapat ditindaklanjuti melalui dashboard, ranking, input manual, dan laporan otomatis.
 - **Routes**:
-  - **Landing** (`/sidak`): 6 card links ke sub-modul.
-- **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, dan top agents.
-- **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent membaik/memburuk.
-- **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload.
+  - **Landing** (`/sidak`): 5 card links ke sub-modul.
+  - **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, dan top agents.
+  - **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent membaik/memburuk.
+  - **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload.
   - **Ranking** (`/sidak/ranking`): Ranking agent berdasarkan skor dan defect.
   - **Settings** (`/sidak/settings`): Service weights configuration.
   - **Periods** (`/sidak/periods`): Manajemen periode audit.
@@ -153,7 +153,9 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Versioned Rules**: Parameter penilaian per service+periode dengan versioning.
   - **Scoring Engine**: Perhitungan skor agent dengan weighted/counting mode, clean-session handling, phantom padding exclusion.
   - **Dashboard Summary Rollup**: Cache KPI per periode untuk performa dashboard.
+  - **Forecast Agent**: Proyeksi skor, temuan, dan critical findings per agent dengan regresi linear; klasifikasi lane (improving/declining/stable).
+  - **Folder-Aware Filters**: Dashboard dan ranking dapat difilter berdasarkan folder/batch audit untuk scope yang lebih presisi, termasuk untuk leader scope.
   - **Phantom Padding**: Clean session (audit tanpa temuan real) tetap dihitung sebagai valid audit.
   - **Sesi Tanpa Temuan**: Trainer/admin dapat membuat 5 sesi phantom (nilai=3) ketika agent belum memiliki temuan buruk, memastikan scoring adil dengan padding 5 sesi.
   - **Excel Upload**: Template generation, parsing, dan validasi untuk bulk input temuan.
-- **Catatan Teknis**: Backend API di `/api/v1/sidak/` (16 endpoints) di-dekomposisi ke 5 sub-module route handler (`apps/api/src/routes/sidak/{core,dashboard,temuan,rule-versions,reports}.ts`). Business logic di `apps/api/src/services/sidak-service.ts` — barrel dari 13 sub-modules di `apps/api/src/services/sidak/`. Scoring engine di `apps/api/src/lib/scoring.ts`.
+- **Catatan Teknis**: Backend API di `/api/v1/sidak/` (~19 endpoints) di-dekomposisi ke 6 sub-module route handler (`apps/api/src/routes/sidak/{core,dashboard,forecast,temuan,rule-versions,reports}.ts`). Business logic di `apps/api/src/services/sidak-service.ts` — barrel dari 14 sub-modules di `apps/api/src/services/sidak/`. Scoring engine di `apps/api/src/lib/scoring.ts`.

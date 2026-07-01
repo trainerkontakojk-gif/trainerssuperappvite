@@ -723,53 +723,56 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 - `apps/api/src/services/sidak/ai-report-service.ts` — **Phase 203**: Import adjustments for type compatibility.
 - `docs/modules.md` — **Phase 203**: Added "DeepSeek direct" notes for KETIK and PDKT modules.
 - `docs/rebuild-logs/phase-203-deepseek-direct-provider.md` — **NEW Phase 203**: Rebuild log for DeepSeek direct provider integration.
+204.  **SIDAK Forecast Submodule & Folder-Aware Filters** — Added SIDAK Forecast module (`/sidak/forecast`) with agent-level projection, lane classification (improving/declining/stable/insufficient_data), linear regression scoring, scope guard for leader roles, and forecast visibility toggle on dashboard. Added folder-aware filters across SIDAK dashboard, ranking, and forecast pages — filtering by batch/folder for more precise scope, including leader scope integration. Enhanced access-groups with subfolder support in team rule selection. Added folder ID resolution via `sidak-folder-options.ts` and `findPrimarySidakFolderByName()`. Normalized SIDAK service scope to allowed leader service. Fixed agent directory latest period selection and stale agent detail service reset. Redesigned SIDAK index page (5 cards instead of 6, added forecast card). (DONE)
+- `docs/rebuild-logs/phase-204-sidak-forecast-folder-filters.md` — **NEW Phase 204**: Rebuild log for SIDAK forecast submodule & folder-aware filters.
 
 | #   | Route                        | Page Type    | Notes                                                                               |
 | --- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------- |
 | 1   | `/`                          | Landing      | Hero, stats, modules showcase, benefits                                             |
 | 2   | `/dashboard`                 | Overview     | Recharts charts, KPI cards, module grid                                             |
-| 3   | `/sidak`                     | Landing      | 6 card links                                                                        |
+| 3   | `/sidak`                     | Landing      | 5 card links                                                                        |
 | 4   | `/sidak/dashboard`           | QA Dashboard | 4 metric cards, bar charts, top agents                                              |
-| 5   | `/sidak/input`               | Form         | Multi-step audit input + Excel                                                      |
-| 6   | `/sidak/ranking`             | Table        | Agent ranking sorted by defects                                                     |
-| 7   | `/sidak/settings`            | CRUD         | Service weights configuration                                                       |
-| 8   | `/sidak/periods`             | Manager      | Create/view audit periods                                                           |
-| 9   | `/sidak/agents`              | Directory    | Searchable agent list                                                               |
-| 10  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service, score badges in temuan history |
-| 11  | `/ketik`                     | Landing      | Chat simulation intro                                                               |
-| 12  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                                                 |
-| 13  | `/ketik/history`             | Placeholder  | Session history                                                                     |
-| 14  | `/pdkt`                      | Landing      | Email simulation intro                                                              |
-| 15  | `/pdkt/simulation`           | Email UI     | Scenario + inbound email + evaluate                                                 |
-| 16  | `/pdkt/history`              | Placeholder  | Session history                                                                     |
-| 17  | `/telefun`                   | Voice UI     | WebSocket-based call simulation                                                     |
-| 18  | `/monitoring`                | Dashboard    | AI usage + pricing management                                                       |
-| 19  | `/account`                   | Settings     | Edit name + change password                                                         |
-| 20  | `/profiler`                  | Landing      | Year/folder sidebar + action tiles                                                  |
-| 21  | `/profiler/table`            | Table        | Search/filter/edit participant data                                                 |
-| 22  | `/profiler/slides`           | Slides       | Slide view per participant                                                          |
-| 23  | `/profiler/analytics`        | Charts       | Recharts analytics (4 charts)                                                       |
-| 24  | `/profiler/export`           | Export       | Excel/CSV export                                                                    |
-| 25  | `/profiler/add`              | Form         | Manual participant input                                                            |
-| 26  | `/profiler/import`           | Import       | Excel template + upload + results                                                   |
-| 27  | `/profiler/teams`            | CRUD         | Custom team management                                                              |
-| 28  | `/sidak/reports`             | Landing      | Data vs AI report selection                                                         |
-| 29  | `/sidak/reports-data`        | Table        | Filter form + temuan table + Excel export                                           |
-| 30  | `/sidak/reports-ai`          | Form         | AI-powered report generation                                                        |
-| 31  | `/waiting-approval`          | Auth         | Status polling page                                                                 |
-| 32  | `/reset-password`            | Auth         | Password recovery form                                                              |
-| 33  | `/dashboard/users`           | Table        | User status/role management, password reset, soft delete                            |
-| 34  | `/dashboard/access-groups`   | Builder      | Dynamic access data rule scopes builder for leaders                                 |
-| 35  | `/dashboard/access-approval` | Action       | Assign access groups and approve leader requests                                    |
-| 36  | `/dashboard/activities`      | Table        | System-wide audit logs with CSV export                                              |
-| 37  | `/unauthorized`              | Error        | 403 role-denied page                                                                |
-| 38  | 404                          | Catch-all    | Custom not-found page                                                               |
+| 5   | `/sidak/forecast`            | Workbench    | Proyeksi tren layanan & lane agent (improving/declining/stable)                     |
+| 6   | `/sidak/input`               | Form         | Multi-step audit input + Excel                                                      |
+| 7   | `/sidak/ranking`             | Table        | Agent ranking sorted by defects                                                     |
+| 8   | `/sidak/settings`            | CRUD         | Service weights configuration                                                       |
+| 9   | `/sidak/periods`             | Manager      | Create/view audit periods                                                           |
+| 10  | `/sidak/agents`              | Directory    | Searchable agent list                                                               |
+| 11  | `/sidak/agents/$id`          | Detail       | Per-service pills, separate trend chart per service, score badges in temuan history |
+| 12  | `/ketik`                     | Landing      | Chat simulation intro                                                               |
+| 13  | `/ketik/simulation`          | Chat UI      | Scenario selection + chat interface                                                 |
+| 14  | `/ketik/history`             | Placeholder  | Session history                                                                     |
+| 15  | `/pdkt`                      | Landing      | Email simulation intro                                                              |
+| 16  | `/pdkt/simulation`           | Email UI     | Scenario + inbound email + evaluate                                                 |
+| 17  | `/pdkt/history`              | Placeholder  | Session history                                                                     |
+| 18  | `/telefun`                   | Voice UI     | WebSocket-based call simulation                                                     |
+| 19  | `/monitoring`                | Dashboard    | AI usage + pricing management                                                       |
+| 20  | `/account`                   | Settings     | Edit name + change password                                                         |
+| 21  | `/profiler`                  | Landing      | Year/folder sidebar + action tiles                                                  |
+| 22  | `/profiler/table`            | Table        | Search/filter/edit participant data                                                 |
+| 23  | `/profiler/slides`           | Slides       | Slide view per participant                                                          |
+| 24  | `/profiler/analytics`        | Charts       | Recharts analytics (4 charts)                                                       |
+| 25  | `/profiler/export`           | Export       | Excel/CSV export                                                                    |
+| 26  | `/profiler/add`              | Form         | Manual participant input                                                            |
+| 27  | `/profiler/import`           | Import       | Excel template + upload + results                                                   |
+| 28  | `/profiler/teams`            | CRUD         | Custom team management                                                              |
+| 29  | `/sidak/reports`             | Landing      | Data vs AI report selection                                                         |
+| 30  | `/sidak/reports-data`        | Table        | Filter form + temuan table + Excel export                                           |
+| 31  | `/sidak/reports-ai`          | Form         | AI-powered report generation                                                        |
+| 32  | `/waiting-approval`          | Auth         | Status polling page                                                                 |
+| 33  | `/reset-password`            | Auth         | Password recovery form                                                              |
+| 34  | `/dashboard/users`           | Table        | User status/role management, password reset, soft delete                            |
+| 35  | `/dashboard/access-groups`   | Builder      | Dynamic access data rule scopes builder for leaders                                 |
+| 36  | `/dashboard/access-approval` | Action       | Assign access groups and approve leader requests                                    |
+| 37  | `/dashboard/activities`      | Table        | System-wide audit logs with CSV export                                              |
+| 38  | `/unauthorized`              | Error        | 403 role-denied page                                                                |
+| 39  | 404                          | Catch-all    | Custom not-found page                                                               |
 
 ## API Endpoints Reference (apps/api)
 
 | Prefix             | Endpoints    | Service                                                                                                                                                                                                                     |
 | ------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/v1/sidak`    | 17 endpoints | `routes/sidak/` — 5 sub-modules (core, dashboard, temuan, rule-versions, reports)                                                                                                                                           |
+| `/api/v1/sidak`    | 19 endpoints | `routes/sidak/` — 6 sub-modules (core, dashboard, forecast, temuan, rule-versions, reports)                                                                                                                                  |
 | `/api/v1/ketik`    | 4 endpoints  | `services/ketik/` — 5 sub-modules (shared-utils, consumer-response, review-lifecycle, review-processor, settings-history)                                                                                                   |
 | `/api/v1/pdkt`     | 16 endpoints | `routes/pdkt/` — 6 sub-modules (index, simulation, mailbox, history, settings, route-utils) + `services/pdkt/` — 7 service modules (catalog, session, evaluation, mailbox, shared-utils, image-generation, mailbox-session) |
 | `/api/v1/ai`       | 7 endpoints  | —                                                                                                                                                                                                                           |
