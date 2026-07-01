@@ -116,10 +116,14 @@ sidakDashboard.get(
       profile?.role ?? "",
     );
     const filterScope = await resolveSidakFilterScope(c);
+    const effectiveServiceType = sidakService.resolveScopedServiceType(
+      service_type,
+      filterScope,
+    );
 
     const data = await sidakService.getDashboardData({
       period_ids,
-      service_type,
+      service_type: effectiveServiceType,
       folder_ids,
       year,
       startMonth,
@@ -221,6 +225,10 @@ sidakDashboard.post(
       );
     }
     const filterScope = await resolveSidakFilterScope(c);
+    const effectiveServiceType = sidakService.resolveScopedServiceType(
+      parsed.data.filters.serviceType,
+      filterScope,
+    );
 
     try {
       const result = await sidakService.generateSidakTrendForecast({
@@ -229,6 +237,7 @@ sidakDashboard.post(
         cacheOnly: parsed.data.cacheOnly ?? false,
         filters: {
           ...parsed.data.filters,
+          serviceType: effectiveServiceType,
           agentIds: accessibleIds ?? undefined,
           allowedServiceTypes: filterScope?.allowedServices ?? undefined,
         },

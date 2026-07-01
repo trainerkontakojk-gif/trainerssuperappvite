@@ -85,7 +85,7 @@ describe("Sidak Forecast Route", () => {
     expect(sidakService.generateSidakAgentForecast).not.toHaveBeenCalled();
   });
 
-  it("rejects a service outside the allowed leader scope", async () => {
+  it("coerces a first-load call service to the scoped leader service", async () => {
     vi.mocked(sidakService.getAccessibleSidakFilters).mockResolvedValueOnce({
       allowedServices: ["chat"],
     } as any);
@@ -96,8 +96,15 @@ describe("Sidak Forecast Route", () => {
       headers: { "Content-Type": "application/json" },
     });
 
-    expect(res.status).toBe(403);
-    expect(sidakService.generateSidakAgentForecast).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(sidakService.generateSidakAgentForecast).toHaveBeenCalledWith({
+      request: {
+        year: 2026,
+        serviceType: "chat",
+      },
+      accessibleAgentIds: ["agent-1"],
+      allowedServiceTypes: ["chat"],
+    });
   });
 
   it("returns 400 for invalid month ranges", async () => {

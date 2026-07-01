@@ -110,10 +110,11 @@ Starting from this hardening, **metadata endpoints are scoped** for leaders:
 `service_type` items from access groups are now **first-class enforcement**, not just UI labels:
 
 1. **Dashboard**: `availableServices` field in response, data filtered by allowed services
-2. **Ranking**: `availableServices` in response, folders scoped by leader's allowed agents
-3. **Agent Directory (`getAgentDirectorySummary`)**: Only loads temuan and indicators for allowed services
-4. **Agent Detail (`getAgentDetail`)**: Only queries temuan in allowed service types
-5. **Request validation**: If a leader requests a service outside their allowed set, the backend returns empty results with the correct allowed services in metadata
+2. **Ranking**: `availableServices` in response, folders scoped by leader's allowed agents, and stale defaults like `call` are coerced to the first allowed service before current/previous ranking queries run
+3. **Forecast**: `POST /forecast/agents` and `POST /dashboard/forecast` both normalize the requested service to the leader's scoped service before lookup
+4. **Agent Directory (`getAgentDirectorySummary`)**: Only loads temuan and indicators for allowed services
+5. **Agent Detail (`getAgentDetail`)**: Only queries temuan in allowed service types
+6. **Request validation**: If a leader requests a service outside their allowed set, the backend normalizes to the allowed service instead of leaking an empty first-load state
 
 ### SIDAK Folder Filter Enforcement
 
@@ -126,7 +127,8 @@ Starting from this hardening, **metadata endpoints are scoped** for leaders:
 To prevent stale/confusing state when a leader's scope changes:
 
 - **Dashboard**: Invalid `selectedService` auto-resets to first available; invalid folder resets to ALL
-- **Ranking**: Same normalization for service and folder selections
+- **Ranking**: Same normalization for service and folder selections; the service selector locks to a single allowed service when scope returns only one option
+- **Forecast**: The service selector also locks to the scoped service and forecast requests reuse that scoped value for both service and agent projections
 - **Agent Detail**: Service list derived from actual agent data; team switcher uses scoped `/sidak/folders`
 - **KTP Table/Slides/Analytics/Export**: If the batch query param is not in scoped folder results, auto-redirect to first valid batch or back to workspace
 - **KTP Landing**: If selected batch disappears from folder list, selection auto-clears

@@ -354,14 +354,14 @@ export default function SidakDashboardPage() {
 
   const handleReset = useCallback(() => {
     initialFolderSetRef.current = false;
-    setSelectedService("call");
+    setSelectedService(leaderLockedService ?? "call");
     setSelectedFolder("ALL");
     setSelectedYear(new Date().getFullYear());
     setStartMonth(1);
     setEndMonth(new Date().getMonth() + 1);
     setHiddenParams(null);
     setShowTotalTrend(true);
-  }, []);
+  }, [leaderLockedService]);
 
   const summary = data?.summary;
   const hasSummary = summary && summary.totalAgents > 0;

@@ -39,6 +39,10 @@ describe("Sidak Dashboard Forecast Route", () => {
   });
 
   it("requests a batch snapshot and injects leader authorization scope", async () => {
+    vi.mocked(sidakService.getAccessibleSidakFilters).mockResolvedValueOnce({
+      allowedServices: ["chat"],
+    } as any);
+
     const res = await app.request("/dashboard/forecast", {
       method: "POST",
       body: JSON.stringify({
@@ -54,9 +58,9 @@ describe("Sidak Dashboard Forecast Route", () => {
     expect(sidakService.generateSidakTrendForecast).toHaveBeenCalledWith({
       filters: {
         year: 2026,
-        serviceType: "call",
+        serviceType: "chat",
         agentIds: ["agent-1"],
-        allowedServiceTypes: ["call", "chat"],
+        allowedServiceTypes: ["chat"],
       },
       horizonMonths: 3,
       forceRefresh: false,

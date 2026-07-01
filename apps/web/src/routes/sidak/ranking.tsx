@@ -55,7 +55,6 @@ export default function SidakRankingPage() {
   const [sortKey, setSortKey] = useState<SortKey>("defects");
   const initialFolderSetRef = useRef(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
     p.set("period", selectedPeriod);
@@ -87,6 +86,9 @@ export default function SidakRankingPage() {
     () => data?.availableServices ?? [],
     [data?.availableServices],
   );
+  const leaderLockedService =
+    availableServices.length === 1 ? availableServices[0] : undefined;
+  const effectiveService = leaderLockedService ?? selectedService;
 
   const { groupedFolders, standaloneFolders } = useMemo(
     () => buildSidakFolderSelectGroups(allFolders),
@@ -114,7 +116,7 @@ export default function SidakRankingPage() {
       if (!initialFolderSetRef.current && selectedFolder === "ALL") {
         const matchedFolder = findPrimarySidakFolderByName(
           folders,
-          DEFAULT_SERVICE_FOLDER_MAP[selectedService],
+          DEFAULT_SERVICE_FOLDER_MAP[effectiveService],
         );
         if (matchedFolder) {
           setSelectedFolder(matchedFolder.id);
@@ -122,7 +124,7 @@ export default function SidakRankingPage() {
         }
       }
     }
-  }, [allFolders, selectedFolder, loading, selectedService]);
+  }, [allFolders, selectedFolder, loading, effectiveService]);
 
   const rankings = data?.rankings;
   const sortedRankings = useMemo(() => {
@@ -219,8 +221,9 @@ export default function SidakRankingPage() {
                   <LayoutGrid className="w-3.5 h-3.5" /> Layanan
                 </label>
                 <select
-                  value={selectedService}
+                  value={leaderLockedService ?? selectedService}
                   onChange={(e) => {
+                    if (leaderLockedService) return;
                     const svc = e.target.value;
                     setSelectedService(svc);
                     const targetFolderName = DEFAULT_SERVICE_FOLDER_MAP[svc];
@@ -238,11 +241,14 @@ export default function SidakRankingPage() {
                       setSelectedFolder("ALL");
                     }
                   }}
+                  disabled={!!leaderLockedService}
                   className="w-full h-10 bg-transparent border border-border rounded-lg px-3 appearance-none focus:outline-none focus:border-foreground transition-all text-sm cursor-pointer"
                 >
-                  {(availableServices.length > 0
-                    ? availableServices
-                    : Object.keys(SERVICE_LABELS)
+                  {(leaderLockedService
+                    ? [leaderLockedService]
+                    : availableServices.length > 0
+                      ? availableServices
+                      : Object.keys(SERVICE_LABELS)
                   ).map((st) => (
                     <option key={st} value={st}>
                       {SERVICE_LABELS[st] || st}

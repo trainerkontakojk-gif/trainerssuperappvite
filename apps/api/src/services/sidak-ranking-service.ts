@@ -23,6 +23,10 @@ export type RankingData = {
 
 export async function getRankingData(params: GetRankingDataParams): Promise<RankingData> {
   const { period, service_type, year, folder, accessibleIds, filterScope } = params;
+  const effectiveServiceType = sidakService.resolveScopedServiceType(
+    service_type,
+    filterScope,
+  );
 
   const isPeriodUuid = period && period !== "ytd" && period !== "alltime";
 
@@ -30,7 +34,7 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
     await Promise.all([
       sidakService.getDashboardData({
         period_ids: isPeriodUuid ? [period] : undefined,
-        service_type,
+        service_type: effectiveServiceType,
         folder_ids: folder !== "ALL" ? [folder] : undefined,
         year: period === "alltime" ? undefined : year,
         agent_ids: accessibleIds ?? undefined,
@@ -83,8 +87,8 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
           .order("period_id", { ascending: true })
           .order("id", { ascending: true })
           .range(from, from + PAGE_SIZE - 1);
-        if (service_type && service_type !== "all") {
-          temuanQuery = temuanQuery.eq("service_type", service_type);
+        if (effectiveServiceType && effectiveServiceType !== "all") {
+          temuanQuery = temuanQuery.eq("service_type", effectiveServiceType);
         }
         if (accessibleIds && accessibleIds.length > 0) {
           temuanQuery = temuanQuery.in("peserta_id", accessibleIds);
@@ -122,7 +126,7 @@ export async function getRankingData(params: GetRankingDataParams): Promise<Rank
     if (prevPeriodIds && prevPeriodIds.length > 0) {
       const prevDashboardData = await sidakService.getDashboardData({
         period_ids: prevPeriodIds,
-        service_type,
+        service_type: effectiveServiceType,
         folder_ids: folder !== "ALL" ? [folder] : undefined,
         year,
         agent_ids: accessibleIds ?? undefined,

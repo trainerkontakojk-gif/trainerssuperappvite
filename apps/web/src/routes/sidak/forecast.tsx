@@ -415,9 +415,12 @@ export default function SidakForecastPage() {
   const availableServices = data?.availableServices?.length
     ? data.availableServices
     : (Object.keys(SERVICE_LABELS) as string[]);
+  const leaderLockedService =
+    availableServices.length === 1 ? String(availableServices[0]) : undefined;
+  const effectiveService = leaderLockedService ?? selectedService;
   const selectedServiceLabel =
-    SERVICE_LABELS[selectedService as keyof typeof SERVICE_LABELS] ??
-    selectedService;
+    SERVICE_LABELS[effectiveService as keyof typeof SERVICE_LABELS] ??
+    effectiveService;
   const activeTotalDataset = useMemo(
     () => data?.paramTrend.datasets.find((dataset) => dataset.isTotal) ?? null,
     [data?.paramTrend.datasets],
@@ -454,36 +457,36 @@ export default function SidakForecastPage() {
     if (!initialFolderSetRef.current && selectedFolder === "ALL") {
       const matchedFolder = findPrimarySidakFolderByName(
         folders,
-        DEFAULT_SERVICE_FOLDER_MAP[selectedService] ?? null,
+        DEFAULT_SERVICE_FOLDER_MAP[effectiveService] ?? null,
       );
       if (matchedFolder) {
         setSelectedFolder(matchedFolder.id);
         initialFolderSetRef.current = true;
       }
     }
-  }, [folders, selectedFolder, selectedService]);
+  }, [folders, selectedFolder, effectiveService]);
 
   const serviceForecastFilters = useMemo(
     () => ({
       year: selectedYear,
-      serviceType: selectedService as any,
+      serviceType: effectiveService as any,
       folderIds: selectedFolder === "ALL" ? undefined : [selectedFolder],
       startMonth: startMonth ?? undefined,
       endMonth: endMonth ?? undefined,
     }),
-    [selectedYear, selectedService, selectedFolder, startMonth, endMonth],
+    [selectedYear, effectiveService, selectedFolder, startMonth, endMonth],
   );
 
   const agentForecastBody = useMemo(
     () => ({
       year: selectedYear,
-      serviceType: selectedService as any,
+      serviceType: effectiveService as any,
       folderIds: selectedFolder === "ALL" ? undefined : [selectedFolder],
       startMonth: startMonth ?? undefined,
       endMonth: endMonth ?? undefined,
       horizonMonths: selectedHorizon,
     }),
-    [selectedYear, selectedService, selectedFolder, startMonth, endMonth, selectedHorizon],
+    [selectedYear, effectiveService, selectedFolder, startMonth, endMonth, selectedHorizon],
   );
 
   const serviceLookupKey = useMemo(
@@ -642,9 +645,6 @@ export default function SidakForecastPage() {
       (agentForecastResult?.summary.stableCount ?? 0) ===
       0 &&
     (agentForecastResult?.summary.watchlistCount ?? 0) > 0;
-
-  const leaderLockedService =
-    availableServices.length === 1 ? String(availableServices[0]) : undefined;
 
   return (
     <main className="min-h-dvh bg-background">

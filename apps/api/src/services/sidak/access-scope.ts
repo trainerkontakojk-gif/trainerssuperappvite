@@ -17,6 +17,25 @@ export interface SidakFilterScope {
   serviceTypeLocked: boolean;
 }
 
+export function resolveScopedServiceType(
+  requestedServiceType: string | undefined,
+  filterScope: SidakFilterScope | null,
+): string | undefined {
+  if (!filterScope || filterScope.allowedServices.length === 0) {
+    return requestedServiceType;
+  }
+
+  if (!requestedServiceType || requestedServiceType === "all") {
+    return filterScope.allowedServices[0];
+  }
+
+  return filterScope.allowedServices.includes(
+    requestedServiceType as ServiceType,
+  )
+    ? requestedServiceType
+    : filterScope.allowedServices[0];
+}
+
 function dedupeFolderRows(folders: SidakFolderRow[]): SidakFolderRow[] {
   const deduped = new Map<string, SidakFolderRow>();
 

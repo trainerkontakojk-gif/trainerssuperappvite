@@ -69,6 +69,11 @@ describe("SidakForecastPage", () => {
     availableServices: ["call"],
   };
 
+  const chatOnlyDashboardData = {
+    ...dashboardData,
+    availableServices: ["chat"],
+  };
+
   const serviceForecast = {
     status: "fresh",
     snapshot: {
@@ -305,5 +310,42 @@ describe("SidakForecastPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Pantauan", { selector: "span" })).toBeInTheDocument();
     document.documentElement.classList.remove("dark");
+  });
+
+  it("locks leader forecast requests to Chat when only Chat is available", async () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: chatOnlyDashboardData,
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+
+    render(<SidakForecastPage />);
+
+    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    const serviceSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === "chat"),
+    )!;
+
+    expect(serviceSelect).toBeDefined();
+    expect(serviceSelect).toBeDisabled();
+    expect(serviceSelect.options).toHaveLength(1);
+    expect(serviceSelect.options[0].value).toBe("chat");
+    expect(serviceSelect.options[0].text).toBe("Chat");
+
+    await waitFor(() => {
+      expect(sidakClient.dashboard.forecast.$post).toHaveBeenCalled();
+      expect(sidakClient.forecast.agents.$post).toHaveBeenCalled();
+    });
+
+    const serviceForecastCall = vi.mocked(
+      sidakClient.dashboard.forecast.$post,
+    ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+    const agentForecastCall = vi.mocked(
+      sidakClient.forecast.agents.$post,
+    ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+
+    expect(serviceForecastCall?.json?.filters?.serviceType).toBe("chat");
+    expect(agentForecastCall?.json?.serviceType).toBe("chat");
   });
 });

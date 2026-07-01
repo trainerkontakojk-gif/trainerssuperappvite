@@ -3,7 +3,7 @@ import { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import { requireRole } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
-import { serviceTypeSchema } from "@trainers/types";
+import { serviceTypeSchema, type ServiceType } from "@trainers/types";
 
 type Variables = { user: User; profile: any };
 
@@ -65,29 +65,16 @@ sidakForecast.post(
     }
 
     const filterScope = await resolveSidakFilterScope(c);
-    const serviceType = parsed.data.serviceType ?? "call";
-    if (
-      filterScope?.allowedServices &&
-      filterScope.allowedServices.length > 0 &&
-      !filterScope.allowedServices.includes(serviceType)
-    ) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "FORBIDDEN",
-            message: "Layanan SIDAK tidak tersedia untuk scope Anda.",
-          },
-        },
-        403,
-      );
-    }
+    const serviceType = sidakService.resolveScopedServiceType(
+      parsed.data.serviceType ?? "call",
+      filterScope,
+    );
 
     try {
       const result = await sidakService.generateSidakAgentForecast({
         request: {
           ...parsed.data,
-          serviceType,
+          serviceType: serviceType as ServiceType,
         },
         accessibleAgentIds: accessibleIds ?? undefined,
         allowedServiceTypes: filterScope?.allowedServices ?? undefined,
