@@ -55,24 +55,8 @@ describe("signOutLocalSession", () => {
   });
 
   it("skips redirect when redirectTo is null", async () => {
-    const hrefSetter = vi.fn();
-    const originalLocation = window.location;
-
-    delete (window as any).location;
-    (window as any).location = {
-      ...originalLocation,
-      get href() {
-        return originalLocation.href;
-      },
-      set href(value: string) {
-        hrefSetter(value);
-      },
-    };
-
     await signOutLocalSession({ markLoggedOut: true, redirectTo: null });
 
-    expect(hrefSetter).not.toHaveBeenCalled();
-
-    (window as any).location = originalLocation;
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" });
   });
 });

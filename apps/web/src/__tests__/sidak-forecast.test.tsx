@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SidakForecastPage from "../routes/sidak/forecast";
 import { sidakClient, unwrapResponse } from "../lib/api";
 import { useApi } from "../hooks/useApi";
+
+const paramTrendChartMock = vi.hoisted(() =>
+  vi.fn(() => <div data-testid="service-forecast-chart" />),
+);
 
 vi.mock("../lib/api", () => ({
   sidakClient: {
@@ -25,19 +29,7 @@ vi.mock("../hooks/useApi", () => ({
 }));
 
 vi.mock("../components/sidak/ParamTrendChart", () => ({
-  default: () => <div data-testid="service-forecast-chart" />,
-}));
-
-vi.mock("../components/sidak/ForecastActionButton", () => ({
-  ForecastActionButton: (props: any) => (
-    <button type="button" onClick={props.onClick}>
-      {props.status === "stale"
-        ? "Data baru — Perbarui Prediksi"
-        : props.status === "fresh"
-          ? "Perbarui Prediksi"
-          : "Update Prediksi"}
-    </button>
-  ),
+  default: paramTrendChartMock,
 }));
 
 describe("SidakForecastPage", () => {
@@ -60,6 +52,8 @@ describe("SidakForecastPage", () => {
       labels: ["Jan 26", "Feb 26", "Mar 26"],
       datasets: [
         { label: "Total Temuan", data: [12, 10, 8], isTotal: true },
+        { label: "Greeting", data: [4, 4, 3] },
+        { label: "Critical", data: [2, 1, 1] },
       ],
     },
     periodMetrics: [],
@@ -100,7 +94,114 @@ describe("SidakForecastPage", () => {
           },
           status: "ready",
         },
-        parameters: {},
+        parameters: {
+          Greeting: {
+            scope: {
+              type: "parameter",
+              parameterId: "Greeting",
+              label: "Greeting",
+            },
+            historical: [
+              {
+                periodId: "p1",
+                label: "Jan 26",
+                date: "2026-01-01T00:00:00.000Z",
+                value: 4,
+              },
+              {
+                periodId: "p2",
+                label: "Feb 26",
+                date: "2026-02-01T00:00:00.000Z",
+                value: 4,
+              },
+              {
+                periodId: "p3",
+                label: "Mar 26",
+                date: "2026-03-01T00:00:00.000Z",
+                value: 3,
+              },
+            ],
+            forecast: [
+              {
+                label: "Apr 26",
+                date: "2026-04-01T00:00:00.000Z",
+                value: 3,
+              },
+              {
+                label: "Mei 26",
+                date: "2026-05-01T00:00:00.000Z",
+                value: 2,
+              },
+              {
+                label: "Jun 26",
+                date: "2026-06-01T00:00:00.000Z",
+                value: 2,
+              },
+            ],
+            summary: {
+              direction: "down",
+              projectedChange: -1,
+              projectedChangePercent: -33.3,
+              confidence: "medium",
+              method: "linear-regression",
+              sourcePointCount: 3,
+            },
+            status: "ready",
+          },
+          Critical: {
+            scope: {
+              type: "parameter",
+              parameterId: "Critical",
+              label: "Critical",
+            },
+            historical: [
+              {
+                periodId: "p1",
+                label: "Jan 26",
+                date: "2026-01-01T00:00:00.000Z",
+                value: 2,
+              },
+              {
+                periodId: "p2",
+                label: "Feb 26",
+                date: "2026-02-01T00:00:00.000Z",
+                value: 1,
+              },
+              {
+                periodId: "p3",
+                label: "Mar 26",
+                date: "2026-03-01T00:00:00.000Z",
+                value: 1,
+              },
+            ],
+            forecast: [
+              {
+                label: "Apr 26",
+                date: "2026-04-01T00:00:00.000Z",
+                value: 1,
+              },
+              {
+                label: "Mei 26",
+                date: "2026-05-01T00:00:00.000Z",
+                value: 1,
+              },
+              {
+                label: "Jun 26",
+                date: "2026-06-01T00:00:00.000Z",
+                value: 0,
+              },
+            ],
+            summary: {
+              direction: "down",
+              projectedChange: -1,
+              projectedChangePercent: -50,
+              confidence: "high",
+              method: "linear-regression",
+              sourcePointCount: 3,
+            },
+            status: "ready",
+          },
+        },
       },
       insight: {
         text: "Insight snapshot.",
@@ -249,9 +350,91 @@ describe("SidakForecastPage", () => {
 
     expect(screen.getByText("Forecast")).toBeInTheDocument();
     expect(screen.getByText("Horizon", { selector: "label" })).toBeInTheDocument();
+    expect(screen.getByText("Keputusan Cepat")).toBeInTheDocument();
+    expect(screen.getByText("Confidence & Coverage")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByTestId("service-forecast-chart")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("forecast-insight-panel")).toBeInTheDocument();
+
+    const chartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+    const chartProps = chartCall?.[0] as
+      | {
+          labels?: string[];
+          datasets?: Array<{ label: string; isTotal?: boolean }>;
+          showParameters?: boolean;
+          hiddenKeys?: Set<string>;
+          hideTotal?: boolean;
+          forecastResults?: Array<{
+            scope?: { type: string; parameterId?: string };
+          }>;
+        }
+      | undefined;
+
+    expect(chartProps?.labels).toEqual(dashboardData.paramTrend.labels);
+    expect(chartProps?.datasets).toHaveLength(3);
+    expect(chartProps?.showParameters).toBe(true);
+    expect(Array.from(chartProps?.hiddenKeys ?? [])).toEqual([
+      "Greeting",
+      "Critical",
+    ]);
+    expect(chartProps?.hideTotal).toBe(false);
+    expect(chartProps?.forecastResults).toHaveLength(1);
+    expect(
+      chartProps?.forecastResults?.map((series) => series.scope?.type),
+    ).toEqual(["total"]);
+    expect(
+      chartProps?.forecastResults?.map((series) => series.scope?.parameterId ?? null),
+    ).toEqual([null]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Greeting" }));
+
+    await waitFor(() => {
+      const nextChartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+      const nextChartProps = nextChartCall?.[0] as
+        | {
+            hiddenKeys?: Set<string>;
+            forecastResults?: Array<{
+              scope?: { type: string; parameterId?: string };
+            }>;
+          }
+        | undefined;
+
+      expect(Array.from(nextChartProps?.hiddenKeys ?? [])).toEqual(["Critical"]);
+      expect(nextChartProps?.forecastResults).toHaveLength(2);
+      expect(
+        nextChartProps?.forecastResults?.map(
+          (series) => series.scope?.parameterId ?? null,
+        ),
+      ).toEqual([null, "Greeting"]);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Total Temuan" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Critical" }));
+
+    await waitFor(() => {
+      const nextChartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+      const nextChartProps = nextChartCall?.[0] as
+        | {
+            hiddenKeys?: Set<string>;
+            hideTotal?: boolean;
+            forecastResults?: Array<{
+              scope?: { type: string; parameterId?: string };
+            }>;
+          }
+        | undefined;
+
+      expect(nextChartProps?.hideTotal).toBe(true);
+      expect(Array.from(nextChartProps?.hiddenKeys ?? [])).toEqual([]);
+      expect(nextChartProps?.forecastResults).toHaveLength(2);
+      expect(
+        nextChartProps?.forecastResults?.map(
+          (series) => series.scope?.parameterId ?? null,
+        ),
+      ).toEqual(["Greeting", "Critical"]);
     });
 
     expect(
@@ -262,6 +445,20 @@ describe("SidakForecastPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Agent A")).toBeInTheDocument();
     expect(screen.getByText("Agent B")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sembunyikan Prediksi" }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("forecast-insight-panel")).not.toBeInTheDocument();
+    });
+
+    const toggledChartCall = paramTrendChartMock.mock.lastCall as [unknown] | undefined;
+    const toggledChartProps = toggledChartCall?.[0] as
+      | {
+          forecastResults?: unknown[];
+        }
+      | undefined;
+    expect(toggledChartProps?.forecastResults).toEqual([]);
   });
 
   it("keeps fresh forecast data visible across idle rerenders", async () => {

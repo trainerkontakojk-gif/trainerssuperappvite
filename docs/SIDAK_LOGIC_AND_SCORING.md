@@ -189,6 +189,10 @@ kembali forecast yang sedang aktif tanpa menghapus snapshot dari state.
   ke kondisi tampil default.
 - Kontrol UI harus tetap bisa diakses lewat keyboard, memakai label yang jelas,
   dan menampilkan `Sembunyikan Prediksi` / `Tampilkan Prediksi` secara eksplisit.
+- Pada `/sidak/forecast`, chip parameter menambah opsi fokus satu atau beberapa
+  parameter tanpa mengubah snapshot. Saat total temuan aktif, halaman menjaga
+  chart tetap ringkas dengan maksimal 2 seri terlihat; mematikan total memberi
+  ruang untuk membandingkan dua parameter sekaligus.
 
 ### Confidence Forecast
 
