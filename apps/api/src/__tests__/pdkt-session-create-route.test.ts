@@ -269,4 +269,55 @@ describe("PDKT Unified Session Create Route", () => {
       }),
     );
   });
+
+  it("keeps OJK as primary while preserving custom recipients as CC", async () => {
+    await createAuthenticatedApp("trainer");
+    const res = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scenarioDraft: {
+          id: "pinjol",
+          category: "Pinjol",
+          title: "Pinjol Ilegal",
+          description: "Konsumen diteror pinjol ilegal.",
+          isActive: true,
+          isLicensed: false,
+          primaryRecipientType: "ojk",
+          recipientMode: "single",
+          recipientEmails: ["company@test.com"],
+          alwaysUseSampleEmail: true,
+          sampleEmailTemplate: {
+            subject: "Template",
+            body: "Template body " + "kata ".repeat(600),
+          },
+        },
+        consumerTypeId: "marah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+        enableImageGeneration: false,
+        selectedModel: "gemini-3.1-flash-lite",
+        resolvedConsumerNameMentionPattern: "none",
+        writingStyleMode: "training",
+        client_request_id: "req-ojk-primary-001",
+      }),
+    });
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+    expect(json.data.message.to).toContain("konsumen@ojk.go.id");
+    expect(json.data.message.recipientContext.primaryRecipientAddress).toBe(
+      "konsumen@ojk.go.id",
+    );
+    expect(json.data.message.recipientContext.ccRecipients).toContain(
+      "company@test.com",
+    );
+  });
 });

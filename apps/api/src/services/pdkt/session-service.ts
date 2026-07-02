@@ -214,6 +214,10 @@ export async function initializeEmailSession(
       recipients: recipientTargets.recipients,
       primaryRecipientType: scenario.primaryRecipientType,
     });
+  const configWithRecipientContext: PdktSessionConfig = {
+    ...config,
+    recipientContext,
+  };
 
   // Handle Forced Template
   if (scenario.alwaysUseSampleEmail && scenario.sampleEmailTemplate?.body) {
@@ -255,7 +259,11 @@ export async function initializeEmailSession(
   const hasCustomImages = customAttachments.length > 0;
   const model = config.selectedModel || "gemini-3.1-flash-lite";
   const wordCountPolicy = getPdktWordCountPolicy(model);
-  const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
+  const policy = buildPdktEmailGenerationPolicy(
+    configWithRecipientContext,
+    scenario,
+    "initial_email",
+  );
   const systemInstruction = buildPdktSystemInstruction(policy, hasCustomImages);
 
   const prompt = `Tulis email pengaduan pertama Anda sekarang. Masalah: ${scenario.title}. Karakter: ${config.consumerType.name}. PENTING: Email harus 500-1000 kata, terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;

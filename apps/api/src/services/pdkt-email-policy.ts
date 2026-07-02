@@ -1,5 +1,6 @@
 import type {
   PdktIdentity,
+  PdktRecipientContext,
   PdktScenario,
   ResolvedConsumerNameMentionPattern,
   WritingStyleMode,
@@ -14,12 +15,14 @@ export interface PdktEmailPolicy {
   mentionPattern: ResolvedConsumerNameMentionPattern;
   identity: PdktIdentity;
   scenario: PdktScenario;
+  recipientContext?: PdktRecipientContext;
   mode: "template" | "initial_email" | "reply";
 }
 
 export function buildPdktEmailGenerationPolicy(
   config: {
     identity: PdktIdentity;
+    recipientContext?: PdktRecipientContext;
     resolvedConsumerNameMentionPattern?: ResolvedConsumerNameMentionPattern;
     writingStyleMode?: WritingStyleMode;
   },
@@ -31,6 +34,7 @@ export function buildPdktEmailGenerationPolicy(
     mentionPattern: config.resolvedConsumerNameMentionPattern || "none",
     identity: config.identity,
     scenario,
+    recipientContext: config.recipientContext,
     mode,
   };
 }
@@ -77,6 +81,28 @@ export function getRealisticWritingInstruction(mode: WritingStyleMode): string {
     - Jangan menjelaskan bahwa ini simulasi, skenario, atau tugas.
     - Jangan menulis analisis atau instruksi untuk user.
   `;
+}
+
+export function getRecipientDirectionInstruction(
+  recipientContext?: PdktRecipientContext,
+): string {
+  if (!recipientContext || recipientContext.primaryRecipientType === "ojk") {
+    return `
+    ARAH PENERIMA EMAIL:
+    - PENERIMA UTAMA: OJK 157.
+    - Tulis narasi seperti pengaduan konsumen kepada OJK/contact center OJK 157.
+    - Perusahaan terlapor boleh disebut sebagai objek keluhan, bukan lawan bicara utama.
+    `;
+  }
+
+  return `
+    ARAH PENERIMA EMAIL:
+    - PENERIMA UTAMA: perusahaan terlapor (${recipientContext.primaryRecipientAddress}).
+    - Tulis salam pembuka, isi, permintaan tindakan, dan penutup kepada pihak perusahaan terlapor.
+    - JANGAN menjadikan OJK sebagai lawan bicara utama.
+    - OJK hanya boleh disebut sebagai tembusan, arsip pengaduan, rujukan kanal pelaporan, atau pihak yang ikut mengetahui.
+    - Jika menyebut konsumen@ojk.go.id atau OJK, pastikan kalimatnya jelas sebagai CC/tembusan, bukan tujuan utama permohonan.
+    `;
 }
 
 export function buildPdktSystemInstruction(
@@ -150,6 +176,7 @@ export function buildPdktSystemInstruction(
     ${templateGuidance}
     ${imageInstruction}
     ${getRealisticWritingInstruction(writingStyleMode)}
+    ${getRecipientDirectionInstruction(policy.recipientContext)}
     
     ATURAN WAJIB:
     ${getCompanyNameInstruction(scenario)}
@@ -483,6 +510,51 @@ export function renderPdktIdentityByMentionPattern(
   return { subject: resolvedSubject, body: resolvedBody };
 }
 
+const COMPANY_PRIMARY_OJK_DIRECTION_VIOLATION =
+  "Narasi email masih menjadikan OJK sebagai penerima utama, padahal penerima utama adalah perusahaan terlapor";
+
+function normalizeDirectionText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function hasOjkMainAddresseeLanguage(value: string): boolean {
+  const text = normalizeDirectionText(value);
+  if (!text) return false;
+
+  return [
+    /\byth\.?\s+(?:bapak\/ibu\s+)?(?:petugas\s+)?ojk\b/,
+    /\bkepada\s+(?:yth\.?\s+)?(?:bapak\/ibu\s+)?(?:petugas\s+)?ojk\b/,
+    /\b(?:bapak|ibu|petugas)\s+ojk\s+yang\s+saya\s+hormati\b/,
+    /\bmohon\s+(?:pihak\s+)?ojk\s+(?:untuk\s+)?(?:membantu|menindaklanjuti|memproses|memberikan)\b/,
+    /\bdisampaikan\s+kepada\s+(?:pihak\s+)?ojk\b/,
+    /\bsaya\s+(?:menghubungi|menulis|mengadu|melapor)\s+(?:ke|kepada)\s+(?:pihak\s+)?ojk\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function hasCompanyPrimaryRecipientDirectionViolation(
+  body: string,
+  recipientContext?: PdktRecipientContext,
+): boolean {
+  if (recipientContext?.primaryRecipientType !== "reported_company") {
+    return false;
+  }
+
+  const paragraphs = body
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const openingSegment = paragraphs[0] || body.slice(0, 360);
+  const closingSegment =
+    paragraphs.length > 1
+      ? paragraphs[paragraphs.length - 1] || ""
+      : body.slice(Math.max(0, body.length - 360));
+
+  return (
+    hasOjkMainAddresseeLanguage(openingSegment) ||
+    hasOjkMainAddresseeLanguage(closingSegment)
+  );
+}
+
 export function validatePdktEmailPolicyCompliance(
   email: { subject: string; body: string },
   policy: PdktEmailPolicy,
@@ -526,6 +598,15 @@ export function validatePdktEmailPolicyCompliance(
     violations.push(
       "Masih mengandung placeholder unresolved (seperti {{...}} atau [...])",
     );
+  }
+
+  if (
+    hasCompanyPrimaryRecipientDirectionViolation(
+      email.body,
+      policy.recipientContext,
+    )
+  ) {
+    violations.push(COMPANY_PRIMARY_OJK_DIRECTION_VIOLATION);
   }
 
   // Check forbidden name leakage
@@ -650,6 +731,7 @@ export function buildPdktRetryHint(
     1. ${getConsumerNameMentionInstruction(policy.mentionPattern)}
     2. Jika nama harus muncul, sebutkan sebagai clue natural dalam konteks dokumen, tagihan, data klaim, data SLIK, administrasi, atau penagihan. Jangan memakai frasa "Perkenalkan, nama saya..." kecuali pattern awal secara eksplisit membutuhkan gaya formal.
     3. Jangan menulis bahasa meta seperti "sebagai AI", "simulasi ini", atau menjelaskan instruksi.
-    4. Kembalikan HANYA format JSON valid tanpa penjelasan tambahan.
+    4. Ikuti ARAH PENERIMA EMAIL: jika penerima utama adalah perusahaan terlapor, sapaan, isi, dan penutup harus ditujukan ke perusahaan; OJK hanya boleh menjadi tembusan/referensi.
+    5. Kembalikan HANYA format JSON valid tanpa penjelasan tambahan.
   `;
 }

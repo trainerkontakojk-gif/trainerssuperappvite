@@ -585,6 +585,37 @@ describe("initializeEmailSession", () => {
       expect(result.message?.attachmentSource).toBe("none");
     });
 
+    it("passes company-directed recipient instruction into the initial email AI call", async () => {
+      const body = buildBody(600);
+      mockGeminiContent.mockReset().mockResolvedValue({
+        success: true,
+        text: JSON.stringify({ subject: "AI Subject", body }),
+      });
+      mockParseJson.mockReset().mockReturnValue({ subject: "AI Subject", body });
+      mockValidateCompliance.mockReset().mockReturnValue([]);
+
+      const result = await initializeEmailSession(
+        buildConfig({
+          scenarios: [
+            {
+              ...mockPinjolScenario,
+              primaryRecipientType: "reported_company",
+              recipientMode: "single",
+              recipientEmails: ["company@test.com"],
+            },
+          ],
+        }),
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockGeminiContent.mock.calls[0][0].systemInstruction).toContain(
+        "PENERIMA UTAMA: perusahaan terlapor",
+      );
+      expect(mockGeminiContent.mock.calls[0][0].systemInstruction).toContain(
+        "JANGAN menjadikan OJK sebagai lawan bicara utama",
+      );
+    });
+
     it("retries when violations exist and fails closed on second violation", async () => {
       const body = buildBody(600);
       mockGeminiContent
@@ -611,6 +642,49 @@ describe("initializeEmailSession", () => {
       const result = await initializeEmailSession(buildConfig());
       expect(result.success).toBe(false);
       expect(result.error).toContain("melanggar aturan");
+    });
+
+    it("includes recipient-direction violation in retry prompt", async () => {
+      const body = buildBody(600);
+      const violation =
+        "Narasi email masih menjadikan OJK sebagai penerima utama, padahal penerima utama adalah perusahaan terlapor";
+      mockGeminiContent
+        .mockReset()
+        .mockResolvedValueOnce({
+          success: true,
+          text: JSON.stringify({ subject: "V1", body }),
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          text: JSON.stringify({ subject: "V2", body }),
+        });
+      mockParseJson
+        .mockReset()
+        .mockReturnValueOnce({ subject: "V1", body })
+        .mockReturnValueOnce({ subject: "V2", body });
+      mockValidateCompliance
+        .mockReset()
+        .mockReturnValueOnce([violation])
+        .mockReturnValueOnce([]);
+
+      const result = await initializeEmailSession(
+        buildConfig({
+          scenarios: [
+            {
+              ...mockPinjolScenario,
+              primaryRecipientType: "reported_company",
+              recipientMode: "single",
+              recipientEmails: ["company@test.com"],
+            },
+          ],
+        }),
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockGeminiContent).toHaveBeenCalledTimes(2);
+      expect(
+        mockGeminiContent.mock.calls[1][0].contents?.[0]?.parts?.[0]?.text,
+      ).toContain(violation);
     });
 
     it("fails closed when a short first response cannot be repaired by retry", async () => {
@@ -719,7 +793,7 @@ describe("resolvePdktGenerationConfig", () => {
 });
 
 describe("resolvePdktRecipientTargets", () => {
-  it("normalizes recipient emails and keeps the fallback address", () => {
+  it("normalizes recipient emails and keeps the fallback address in single mode", () => {
     expect(
       resolvePdktRecipientTargets({
         recipientMode: "single",
@@ -728,19 +802,19 @@ describe("resolvePdktRecipientTargets", () => {
     ).toEqual({
       mode: "single",
       recipients: ["konsumen@ojk.go.id", "first@test.com"],
-      to: "first@test.com",
+      to: "konsumen@ojk.go.id, first@test.com",
     });
   });
 });
 
 describe("initializeEmailSession recipient targets", () => {
-  it("uses the first custom recipient in single mode", async () => {
+  it("persists fallback and custom recipients in single mode", async () => {
     const config = buildConfig({
       scenarios: [
         {
           ...mockPinjolScenario,
           recipientMode: "single",
-          recipientEmails: ["alpha@test.com", "beta@test.com"],
+          recipientEmails: ["alpha@test.com"],
           alwaysUseSampleEmail: true,
           sampleEmailTemplate: {
             subject: "Subjek",
@@ -752,7 +826,7 @@ describe("initializeEmailSession recipient targets", () => {
 
     const result = await initializeEmailSession(config);
     expect(result.success).toBe(true);
-    expect(result.message?.to).toBe("alpha@test.com");
+    expect(result.message?.to).toBe("konsumen@ojk.go.id, alpha@test.com");
   });
 
   it("joins fallback and custom recipients in multiple mode", async () => {

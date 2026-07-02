@@ -1,5 +1,5 @@
 import React from "react";
-import { Image as ImageIcon, X } from "lucide-react";
+import { FileUp, X } from "lucide-react";
 import ScenarioImage from "../../ScenarioImage";
 
 interface ScenarioAttachmentsProps {
@@ -23,14 +23,14 @@ export function ScenarioAttachments({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col items-center justify-center w-full h-28 border border-dashed border-border rounded-md cursor-pointer hover:bg-foreground/[0.02] hover:border-foreground/30 transition-colors group">
           <div className="flex flex-col items-center justify-center py-4">
-            <ImageIcon className="w-5 h-5 mb-1.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <FileUp className="w-5 h-5 mb-1.5 text-muted-foreground group-hover:text-foreground transition-colors" />
             <p className="text-xs font-medium text-foreground">
-              Pilih Gambar
+              Pilih Gambar / PDF
             </p>
           </div>
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.pdf,application/pdf"
             ref={fileInputRef}
             onChange={onUpload}
             className="hidden"

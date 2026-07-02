@@ -285,6 +285,68 @@ describe("pdkt-email-policy", () => {
       expect(violations[0]).toContain("Mengandung bahasa meta/AI");
     });
 
+    it("returns violation when company-primary email is addressed to OJK", () => {
+      const companyPrimaryConfig: any = {
+        ...config,
+        recipientContext: {
+          primaryRecipientType: "reported_company",
+          primaryRecipientAddress: "pinjol@example.com",
+          ccRecipients: ["konsumen@ojk.go.id"],
+          replyIntent: "reply_to_company_with_ojk_cc",
+        },
+      };
+      const policy = buildPdktEmailGenerationPolicy(
+        companyPrimaryConfig,
+        scenario,
+        "initial_email",
+      );
+      const email = {
+        subject: "Subjek",
+        body: [
+          "Yth. Bapak/Ibu petugas OJK, saya ingin menyampaikan keluhan terkait perusahaan terlapor.",
+          "Saya berharap perusahaan segera menindaklanjuti masalah ini.",
+          "Demikian laporan ini saya sampaikan kepada OJK agar bisa segera diproses.",
+        ].join("\n\n"),
+      };
+
+      const violations = validatePdktEmailPolicyCompliance(email, policy);
+
+      expect(violations).toContain(
+        "Narasi email masih menjadikan OJK sebagai penerima utama, padahal penerima utama adalah perusahaan terlapor",
+      );
+    });
+
+    it("allows company-primary email to mention OJK as CC/reference only", () => {
+      const companyPrimaryConfig: any = {
+        ...config,
+        recipientContext: {
+          primaryRecipientType: "reported_company",
+          primaryRecipientAddress: "pinjol@example.com",
+          ccRecipients: ["konsumen@ojk.go.id"],
+          replyIntent: "reply_to_company_with_ojk_cc",
+        },
+      };
+      const policy = buildPdktEmailGenerationPolicy(
+        companyPrimaryConfig,
+        scenario,
+        "initial_email",
+      );
+      const email = {
+        subject: "Subjek",
+        body: [
+          "Yth. pihak perusahaan terlapor, saya meminta penjelasan atas masalah yang saya alami.",
+          "Saya menyertakan OJK sebagai tembusan karena saya membutuhkan arsip pengaduan yang jelas.",
+          "Mohon perusahaan memberikan jawaban tertulis dan solusi konkret atas keluhan ini.",
+        ].join("\n\n"),
+      };
+
+      const violations = validatePdktEmailPolicyCompliance(email, policy);
+
+      expect(violations).not.toContain(
+        "Narasi email masih menjadikan OJK sebagai penerima utama, padahal penerima utama adalah perusahaan terlapor",
+      );
+    });
+
     it("returns violation when middle pattern introduces the consumer by name in the closing paragraph", () => {
       const middleConfig: any = {
         ...config,
@@ -405,6 +467,29 @@ describe("pdkt-email-policy", () => {
       const instruction = buildPdktSystemInstruction(policy);
 
       expect(instruction).not.toContain("GAYA PENULISAN REALISTIS");
+    });
+
+    it("includes company-directed recipient instructions when primary recipient is reported company", () => {
+      const config: any = {
+        scenarios: [scenario],
+        consumerType: { id: "marah", name: "Marah", description: "Sangat marah" },
+        identity,
+        enableImageGeneration: false,
+        resolvedConsumerNameMentionPattern: "none",
+        writingStyleMode: "training",
+        recipientContext: {
+          primaryRecipientType: "reported_company",
+          primaryRecipientAddress: "pinjol@example.com",
+          ccRecipients: ["konsumen@ojk.go.id"],
+          replyIntent: "reply_to_company_with_ojk_cc",
+        },
+      };
+      const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
+      const instruction = buildPdktSystemInstruction(policy);
+
+      expect(instruction).toContain("PENERIMA UTAMA: perusahaan terlapor");
+      expect(instruction).toContain("JANGAN menjadikan OJK sebagai lawan bicara utama");
+      expect(instruction).toContain("OJK hanya boleh disebut sebagai tembusan");
     });
   });
 });

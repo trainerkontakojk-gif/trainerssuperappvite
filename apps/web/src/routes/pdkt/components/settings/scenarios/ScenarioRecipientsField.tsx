@@ -69,7 +69,7 @@ export function ScenarioRecipientsField({
           <SettingsField
             label="Penerima Utama"
             id="pdkt-primary-recipient-type"
-            helperText="Kunci siapa lawan bicara utama saat sesi dibuat."
+            helperText="Kunci lawan bicara utama dan arah narasi saat sesi dibuat."
           >
             <SettingsSelect
               id="pdkt-primary-recipient-type"
@@ -89,7 +89,7 @@ export function ScenarioRecipientsField({
           <SettingsField
             label="Mode Penerima"
             id="pdkt-recipient-mode"
-            helperText="Pilih satu alamat atau kirim ke semua alamat yang aktif."
+            helperText="Fallback OJK tetap ikut; mode ini hanya mengatur alamat tambahan."
           >
             <SettingsSelect
               id="pdkt-recipient-mode"
@@ -177,7 +177,7 @@ export function ScenarioRecipientsField({
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Mode <span className="font-medium text-foreground">single</span> memilih satu alamat dari daftar efektif. Mode <span className="font-medium text-foreground">multiple</span> memakai semua alamat efektif sekaligus.
+              Mode <span className="font-medium text-foreground">single</span> membatasi alamat tambahan aktif. Mode <span className="font-medium text-foreground">multiple</span> memakai semua alamat tambahan sekaligus.
             </p>
           </div>
         </div>

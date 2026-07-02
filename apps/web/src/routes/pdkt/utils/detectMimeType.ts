@@ -1,9 +1,9 @@
 /**
- * Utility untuk mendeteksi MIME type dari base64 string gambar.
+ * Utility untuk mendeteksi MIME type dari base64 string lampiran.
  */
 
-export function getImageDataUri(base64: string): string {
-  if (base64.startsWith("data:image/")) {
+export function getAttachmentDataUri(base64: string): string {
+  if (base64.startsWith("data:")) {
     return base64;
   }
 
@@ -11,11 +11,32 @@ export function getImageDataUri(base64: string): string {
   return `data:${mimeType};base64,${base64}`;
 }
 
+export function isPdfAttachment(base64: string): boolean {
+  return getAttachmentDataUri(base64).startsWith("data:application/pdf");
+}
+
+export function getImageDataUri(base64: string): string {
+  return getAttachmentDataUri(base64);
+}
+
 function detectMimeFromBytes(base64: string): string {
   try {
+    if (base64.startsWith("data:application/pdf")) {
+      return "application/pdf";
+    }
+
     const raw = atob(base64.slice(0, 16));
     const bytes = Array.from(raw, (c) => c.charCodeAt(0));
 
+    // PDF: 25 50 44 46 (%PDF)
+    if (
+      bytes[0] === 0x25 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x44 &&
+      bytes[3] === 0x46
+    ) {
+      return "application/pdf";
+    }
     // JPEG: FF D8 FF
     if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
       return "image/jpeg";

@@ -43,7 +43,8 @@ export function PdktScenariosTab({
   const [isNewCategoryInput, setIsNewCategoryInput] = useState(false);
   const [newScenarioCategory, setNewScenarioCategory] = useState("");
   const [isGeneratingTemplate, setIsGeneratingTemplate] = useState(false);
-  const [activeScenarioStep, setActiveScenarioStep] = useState<ScenarioWizardStep>("basic");
+  const [activeScenarioStep, setActiveScenarioStep] =
+    useState<ScenarioWizardStep>("basic");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories = Array.from(new Set(scenarios.map((s) => s.category)));
@@ -70,7 +71,7 @@ export function PdktScenariosTab({
     setLocalSettings((prev) => ({
       ...prev,
       scenarios: prev.scenarios.map((s) =>
-        s.id === id ? { ...s, isActive: !s.isActive } : s
+        s.id === id ? { ...s, isActive: !s.isActive } : s,
       ),
     }));
   };
@@ -100,22 +101,40 @@ export function PdktScenariosTab({
     setIsGeneratingTemplate(false);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachmentUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
-      if (file.size > 500 * 1024) {
-        notify.error("Ukuran gambar terlalu besar! Maksimal 500KB per gambar agar pengaturan dapat disimpan.");
+      const isPdf =
+        file.type === "application/pdf" ||
+        file.name.toLowerCase().endsWith(".pdf");
+      const isImage = file.type.startsWith("image/");
+      if (!isImage && !isPdf) {
+        notify.error(
+          "Format lampiran belum didukung. Gunakan gambar atau PDF.",
+        );
+        return;
+      }
+
+      const maxSize = isPdf ? 2 * 1024 * 1024 : 500 * 1024;
+      if (file.size > maxSize) {
+        notify.error(
+          isPdf
+            ? "Ukuran PDF terlalu besar! Maksimal 2MB per PDF agar pengaturan dapat disimpan."
+            : "Ukuran gambar terlalu besar! Maksimal 500KB per gambar agar pengaturan dapat disimpan.",
+        );
         return;
       }
       const currentImages = scenarioForm.draft.attachmentImages || [];
       if (currentImages.length >= 5) {
-        notify.warning("Maksimal 5 gambar per skenario.");
+        notify.warning("Maksimal 5 lampiran per skenario.");
         return;
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        scenarioForm.setDraft({ attachmentImages: [...currentImages, reader.result as string] });
+        scenarioForm.setDraft({
+          attachmentImages: [...currentImages, reader.result as string],
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -133,13 +152,17 @@ export function PdktScenariosTab({
     const title = scenarioForm.draft.title;
     const desc = scenarioForm.draft.description;
     if (!title || !desc) {
-      notify.warning("Isi judul dan deskripsi masalah terlebih dahulu untuk generate template.");
+      notify.warning(
+        "Isi judul dan deskripsi masalah terlebih dahulu untuk generate template.",
+      );
       return;
     }
 
     setIsGeneratingTemplate(true);
     try {
-      const category = isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category || "Umum";
+      const category = isNewCategoryInput
+        ? newScenarioCategory
+        : scenarioForm.draft.category || "Umum";
       const draft: PdktScenario = {
         id: scenarioForm.editingId || "draft",
         category,
@@ -161,10 +184,13 @@ export function PdktScenariosTab({
         bodyName: customIdentity.bodyName || "Budi",
       };
 
-      const targetConsumerTypeId = globalConsumerTypeId === "random" ? "ramah" : globalConsumerTypeId;
-      const activeConsumerType = consumerTypes.find((ct) => ct.id === targetConsumerTypeId);
+      const targetConsumerTypeId =
+        globalConsumerTypeId === "random" ? "ramah" : globalConsumerTypeId;
+      const activeConsumerType = consumerTypes.find(
+        (ct) => ct.id === targetConsumerTypeId,
+      );
 
-      const result = await unwrapResponse(
+      const result = (await unwrapResponse(
         await pdktClient["generate-template"].$post({
           json: {
             scenarioDraft: {
@@ -175,8 +201,8 @@ export function PdktScenariosTab({
             consumerTypeDraft: activeConsumerType,
             identity,
           },
-        })
-      ) as { subject: string; body: string };
+        }),
+      )) as { subject: string; body: string };
 
       scenarioForm.setDraft({
         sampleEmailTemplate: {
@@ -185,9 +211,7 @@ export function PdktScenariosTab({
         },
       });
     } catch (e: unknown) {
-      notify.error(
-        e instanceof Error ? e.message : "Gagal generate template.",
-      );
+      notify.error(e instanceof Error ? e.message : "Gagal generate template.");
     } finally {
       setIsGeneratingTemplate(false);
     }
@@ -197,8 +221,9 @@ export function PdktScenariosTab({
     const title = scenarioForm.draft.title;
     const desc = scenarioForm.draft.description;
     if (!title || !desc) return;
-    const invalidRecipientEmails =
-      findInvalidPdktRecipientEmails(scenarioForm.draft.recipientEmails);
+    const invalidRecipientEmails = findInvalidPdktRecipientEmails(
+      scenarioForm.draft.recipientEmails,
+    );
     if (invalidRecipientEmails.length > 0) {
       setActiveScenarioStep("advanced");
       setTimeout(() => {
@@ -211,10 +236,15 @@ export function PdktScenariosTab({
           ) as HTMLInputElement | null
         )?.focus();
       }, 0);
-      notify.warning("Perbaiki format alamat email tujuan tambahan sebelum menyimpan skenario.");
+      notify.warning(
+        "Perbaiki format alamat email tujuan tambahan sebelum menyimpan skenario.",
+      );
       return;
     }
-    if (scenarioForm.draft.alwaysUseSampleEmail && !scenarioForm.draft.sampleEmailTemplate?.body?.trim()) {
+    if (
+      scenarioForm.draft.alwaysUseSampleEmail &&
+      !scenarioForm.draft.sampleEmailTemplate?.body?.trim()
+    ) {
       setActiveScenarioStep("advanced");
       setTimeout(() => {
         document
@@ -222,11 +252,15 @@ export function PdktScenariosTab({
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
         document.getElementById("scenario-template-body")?.focus();
       }, 0);
-      notify.warning('Isi body template email jika Anda memilih "Always use this email".');
+      notify.warning(
+        'Isi body template email jika Anda memilih "Always use this email".',
+      );
       return;
     }
 
-    const category = isNewCategoryInput ? newScenarioCategory : scenarioForm.draft.category || "Umum";
+    const category = isNewCategoryInput
+      ? newScenarioCategory
+      : scenarioForm.draft.category || "Umum";
 
     const normalizedDraft = normalizePdktScenarioDraft({
       ...scenarioForm.draft,
@@ -275,27 +309,30 @@ export function PdktScenariosTab({
           onCancel={handleCancelScenarioForm}
           advancedContent={
             <>
-          <ScenarioRecipientsField
-            draft={scenarioForm.draft}
-            onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-          />
-          <ScenarioTemplateField
-            draft={scenarioForm.draft}
-            onDraftChange={(updates) => scenarioForm.setDraft(updates)}
-          >
-            <ScenarioAIGenerator
-              onGenerate={handleGenerateTemplate}
-              isGenerating={isGeneratingTemplate}
-              canGenerate={!!scenarioForm.draft.title && !!scenarioForm.draft.description}
-            />
-          </ScenarioTemplateField>
+              <ScenarioRecipientsField
+                draft={scenarioForm.draft}
+                onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+              />
+              <ScenarioTemplateField
+                draft={scenarioForm.draft}
+                onDraftChange={(updates) => scenarioForm.setDraft(updates)}
+              >
+                <ScenarioAIGenerator
+                  onGenerate={handleGenerateTemplate}
+                  isGenerating={isGeneratingTemplate}
+                  canGenerate={
+                    !!scenarioForm.draft.title &&
+                    !!scenarioForm.draft.description
+                  }
+                />
+              </ScenarioTemplateField>
 
-          <ScenarioAttachments
-            attachmentImages={scenarioForm.draft.attachmentImages || []}
-            onUpload={handleImageUpload}
-            onRemove={handleRemoveImage}
-            fileInputRef={fileInputRef}
-          />
+              <ScenarioAttachments
+                attachmentImages={scenarioForm.draft.attachmentImages || []}
+                onUpload={handleAttachmentUpload}
+                onRemove={handleRemoveImage}
+                fileInputRef={fileInputRef}
+              />
             </>
           }
         />
@@ -313,7 +350,9 @@ export function PdktScenariosTab({
         allSelected={allSelected}
         noneSelected={noneSelected}
         enableImageGeneration={enableImageGeneration}
-        onToggleImageGeneration={() => setEnableImageGeneration(!enableImageGeneration)}
+        onToggleImageGeneration={() =>
+          setEnableImageGeneration(!enableImageGeneration)
+        }
         onSelectAll={handleSelectAll}
         onUnselectAll={handleUnselectAll}
         onToggleScenario={handleToggleScenario}

@@ -57,10 +57,7 @@ export function resolvePdktRecipientTargets(
   return {
     mode,
     recipients,
-    to:
-      mode === "multiple"
-        ? recipients.join(", ")
-      : recipientEmails[0] || PDKT_FALLBACK_RECIPIENT,
+    to: recipients.join(", "),
   };
 }
 

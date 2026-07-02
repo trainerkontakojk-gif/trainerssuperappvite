@@ -72,6 +72,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
     - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
   - Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Settings response API selalu mengikuti kontrak `{ success, data }`.
   - Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`; `konsumen@ojk.go.id` tetap menjadi fallback bawaan.
+  - Field **Penerima Utama** mengatur arah narasi email awal: jika dipilih perusahaan terlapor, sapaan/isi/penutup ditujukan ke perusahaan dan OJK hanya boleh muncul sebagai fallback, tembusan, atau referensi.
   - Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.
   - Error database mentah dipetakan ke pesan user-friendly via `pdktErrorMessage()` helper.
   - Migrasi field legacy `script` → `sampleEmailTemplate` dijalankan saat settings dibaca.

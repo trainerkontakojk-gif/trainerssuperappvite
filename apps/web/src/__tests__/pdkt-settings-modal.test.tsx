@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsModal } from "../routes/pdkt/components/SettingsModal";
 import type { PdktAppSettings as AppSettings } from "../routes/pdkt/pdktSettings";
@@ -33,7 +33,8 @@ describe("PDKT SettingsModal Characterization Tests", () => {
         id: "s-1",
         category: "Kepatuhan",
         title: "Kepatuhan SOP Pembukaan Akun",
-        description: "Agen tidak menjelaskan syarat pembukaan akun secara runtut.",
+        description:
+          "Agen tidak menjelaskan syarat pembukaan akun secara runtut.",
         isActive: true,
       },
     ],
@@ -95,7 +96,9 @@ describe("PDKT SettingsModal Characterization Tests", () => {
     await user.click(realisticCard);
 
     // Click Simpan Perubahan
-    const saveButton = screen.getByRole("button", { name: /simpan perubahan/i });
+    const saveButton = screen.getByRole("button", {
+      name: /simpan perubahan/i,
+    });
     await user.click(saveButton);
 
     expect(onSaveMock).toHaveBeenCalledWith(
@@ -115,12 +118,16 @@ describe("PDKT SettingsModal Characterization Tests", () => {
     await user.click(identityTabButton);
 
     // Edit sender name
-    const senderNameInput = screen.getByPlaceholderText("Contoh: Ahmad Fauzi") as HTMLInputElement;
+    const senderNameInput = screen.getByPlaceholderText(
+      "Contoh: Ahmad Fauzi",
+    ) as HTMLInputElement;
     await user.clear(senderNameInput);
     await user.type(senderNameInput, "Alice Smith");
 
     // Click Simpan Perubahan
-    const saveButton = screen.getByRole("button", { name: /simpan perubahan/i });
+    const saveButton = screen.getByRole("button", {
+      name: /simpan perubahan/i,
+    });
     await user.click(saveButton);
 
     expect(onSaveMock).toHaveBeenCalledWith(
@@ -143,7 +150,9 @@ describe("PDKT SettingsModal Characterization Tests", () => {
 
     expect(screen.getByRole("button", { name: /langkah 1/i })).toBeDefined();
     expect(screen.getByRole("button", { name: /langkah 2/i })).toBeDefined();
-    expect(screen.getAllByText("Detail Lanjutan (Opsional)").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Detail Lanjutan (Opsional)").length,
+    ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /buka detail/i })).toBeDefined();
   });
 
@@ -216,13 +225,9 @@ describe("PDKT SettingsModal Characterization Tests", () => {
     await user.click(screen.getByRole("button", { name: /^simpan$/i }));
 
     expect(screen.getByText("Step 1 Save Test")).toBeDefined();
-    expect(
-      screen.queryByRole("button", { name: /buka detail/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /buka detail/i })).toBeNull();
 
-    await user.click(
-      screen.getByRole("button", { name: /simpan perubahan/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
 
     expect(onSaveMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -234,7 +239,62 @@ describe("PDKT SettingsModal Characterization Tests", () => {
         ]),
       }),
     );
-  });
+  }, 15000);
+
+  it("accepts PDF evidence attachments in the scenario wizard", async () => {
+    const user = userEvent.setup();
+    const onSaveMock = vi.fn();
+    const { container } = render(
+      <SettingsModal {...defaultProps} onSave={onSaveMock} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await user.type(
+      screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
+      "PDF Evidence Test",
+    );
+    await user.type(
+      screen.getByPlaceholderText(
+        "Jelaskan konteks masalah yang harus diselesaikan oleh agen...",
+      ),
+      "Skenario dengan lampiran bukti PDF.",
+    );
+
+    await user.click(screen.getByRole("button", { name: /lanjut ke detail/i }));
+
+    const fileInput = container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+    expect(fileInput?.getAttribute("accept")).toContain("application/pdf");
+
+    const pdf = new File(["%PDF-1.4 evidence"], "bukti.pdf", {
+      type: "application/pdf",
+    });
+    await user.upload(fileInput!, pdf);
+
+    await waitFor(() => {
+      expect(screen.getByText("PDF")).toBeDefined();
+    });
+
+    await user.click(screen.getByRole("button", { name: /^simpan$/i }));
+    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+
+    expect(onSaveMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarios: expect.arrayContaining([
+          expect.objectContaining({
+            title: "PDF Evidence Test",
+            attachmentImages: [
+              expect.stringMatching(/^data:application\/pdf;base64,/),
+            ],
+          }),
+        ]),
+      }),
+    );
+  }, 15000);
 
   it("closes and reopens with fresh settings from props", () => {
     const { rerender } = render(<SettingsModal {...defaultProps} />);

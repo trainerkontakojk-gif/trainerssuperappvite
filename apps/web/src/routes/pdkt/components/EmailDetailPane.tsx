@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { PdktMailboxItem } from "@trainers/types";
 import ScenarioImage from "./ScenarioImage";
-import { getImageDataUri } from "../utils/detectMimeType";
+import { getAttachmentDataUri, isPdfAttachment } from "../utils/detectMimeType";
 
 interface EmailDetailPaneProps {
   item: PdktMailboxItem;
@@ -114,6 +114,15 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   const inboundAttachments = Array.isArray(inboundEmail.attachments)
     ? inboundEmail.attachments
     : [];
+  const handleAttachmentClick = (base64: string) => {
+    const attachmentUri = getAttachmentDataUri(base64);
+    if (isPdfAttachment(base64)) {
+      window.open(attachmentUri, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    setZoomedImage(attachmentUri);
+  };
   const recipientText = (() => {
     const toValue = inboundEmail.to;
     if (typeof toValue !== "string" || !toValue.trim()) {
@@ -270,15 +279,13 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                   base64={base64}
                   alt={`Attachment ${i + 1}`}
                   variant="grid"
-                  onClick={() => setZoomedImage(getImageDataUri(base64))}
+                  onClick={() => handleAttachmentClick(base64)}
                   className="cursor-pointer hover:opacity-95 transition-opacity"
                 />
               ))}
             </div>
           </div>
         )}
-
-
 
         {/* Evaluation Results (if replied) */}
         {item.status === "replied" && (
@@ -473,7 +480,10 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                           {email.body
                             .split(/\n\s*\n/)
                             .map((paragraph: string, pIdx: number) => (
-                              <p key={pIdx} className="whitespace-pre-wrap text-justify">
+                              <p
+                                key={pIdx}
+                                className="whitespace-pre-wrap text-justify"
+                              >
                                 {paragraph.trim()}
                               </p>
                             ))}
