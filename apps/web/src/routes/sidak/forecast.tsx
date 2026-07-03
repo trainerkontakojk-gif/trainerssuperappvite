@@ -109,7 +109,7 @@ function forecastDirectionMeta(direction: "up" | "down" | "stable") {
     };
   }
   return {
-    label: "Stabil",
+    label: "Stabil/Stagnan",
     hint: "Perubahan belum signifikan",
     icon: Minus,
     tone: "text-foreground",
@@ -134,7 +134,7 @@ function statusMeta(status: SidakAgentForecastEntry["forecastStatus"]) {
   }
   if (status === "stable") {
     return {
-      label: "Stabil",
+      label: "Stabil/Stagnan",
       icon: Minus,
       tone: "border-border bg-muted/40 text-foreground",
     };
@@ -928,7 +928,7 @@ export default function SidakForecastPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <ForecastMetric
-                    label="Stabil"
+                    label="Stabil/Stagnan"
                     value={String(agentForecastResult?.summary.stableCount ?? 0)}
                   />
                   <ForecastMetric
@@ -1230,10 +1230,10 @@ export default function SidakForecastPage() {
 
               <div className="grid gap-6 xl:grid-cols-2">
                 <ForecastLane
-                  title="Stabil"
+                  title="Stabil/Stagnan"
                   description="Perubahan belum cukup kuat untuk masuk lane prioritas."
                   entries={stableLane}
-                  emptyMessage="Belum ada agent yang stabil pada filter ini."
+                  emptyMessage="Belum ada agent yang stabil/stagnan pada filter ini."
                   tone="slate"
                   compact
                 />
