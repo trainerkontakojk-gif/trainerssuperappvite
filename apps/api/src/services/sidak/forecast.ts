@@ -59,6 +59,10 @@ const MONTHS_SHORT = [
   "Des",
 ];
 
+/** Slope ambang batas untuk klasifikasi status forecast agent.
+ *  ±0.5 temuan per periode — perubahan di bawah ini dianggap stabil. */
+const FINDINGS_SLOPE_STATUS_THRESHOLD = 0.5;
+
 export async function generateSidakAgentForecast(
   context: ForecastContext,
 ): Promise<SidakAgentForecastResponse> {
@@ -155,9 +159,15 @@ export async function generateSidakAgentForecast(
     }
 
     const historical: SidakAgentForecastHistoricalPoint[] = [];
+    const findingsTrendValues: number[] = [];
+
     for (const period of filteredPeriods) {
       const periodRows = rowsByPeriod.get(period.id) ?? [];
       if (periodRows.length === 0) continue;
+
+      // Findings count — dihitung SEBELUM score check, independen!
+      const findingRows = periodRows.filter((row) => isCountableFinding(row));
+      findingsTrendValues.push(findingRows.length);
 
       const scoreRows = getScoreRows(periodRows as any);
       const scoreResult = calculateQAScoreFromTemuan(
@@ -167,7 +177,6 @@ export async function generateSidakAgentForecast(
       );
       if (!scoreResult) continue;
 
-      const findingRows = periodRows.filter((row) => isCountableFinding(row));
       const criticalFindingsCount = findingRows.filter((row) => {
         const indicator = indicators.find((item) => item.id === row.indicator_id);
         return indicator?.category === "critical";
@@ -191,7 +200,7 @@ export async function generateSidakAgentForecast(
       horizonMonths,
     );
     const findingsProjection = buildProjection(
-      historical.map((point) => point.findingsCount),
+      findingsTrendValues,
       horizonMonths,
     );
     const criticalProjection = buildProjection(
@@ -212,16 +221,10 @@ export async function generateSidakAgentForecast(
       2,
     );
 
-    const confidence = lowerConfidence(
-      scoreProjection.confidence,
-      findingsProjection.confidence,
-      criticalProjection.confidence,
-    );
+    const confidence = findingsProjection.confidence;
 
     const forecastStatus = classifyStatus({
-      projectedScoreChange,
-      projectedFindingsChange,
-      projectedCriticalFindingsChange,
+      findingsSlope: findingsProjection.slope,
       historicalCount: historical.length,
     });
 
@@ -240,6 +243,7 @@ export async function generateSidakAgentForecast(
       projectedScoreChange,
       projectedFindings,
       projectedFindingsChange,
+      findingsSlope: findingsProjection.slope,
       projectedCriticalFindings,
       projectedCriticalFindingsChange,
       sourcePointCount: historical.length,
@@ -251,13 +255,16 @@ export async function generateSidakAgentForecast(
 
   const improvingAgents = entries
     .filter((entry) => entry.forecastStatus === "improving")
-    .sort((left, right) => right.projectedScoreChange - left.projectedScoreChange);
+    .sort((left, right) => left.findingsSlope - right.findingsSlope);
   const decliningAgents = entries
     .filter((entry) => entry.forecastStatus === "declining")
-    .sort((left, right) => left.projectedScoreChange - right.projectedScoreChange);
+    .sort((left, right) => right.findingsSlope - left.findingsSlope);
   const stableAgents = entries
     .filter((entry) => entry.forecastStatus === "stable")
-    .sort((left, right) => Math.abs(left.projectedScoreChange) - Math.abs(right.projectedScoreChange));
+    .sort(
+      (left, right) =>
+        Math.abs(left.findingsSlope) - Math.abs(right.findingsSlope),
+    );
   const watchlistAgents = entries
     .filter((entry) => entry.forecastStatus === "insufficient_data")
     .sort((left, right) => right.sourcePointCount - left.sourcePointCount);
@@ -279,31 +286,19 @@ export async function generateSidakAgentForecast(
 }
 
 function classifyStatus(params: {
-  projectedScoreChange: number;
-  projectedFindingsChange: number;
-  projectedCriticalFindingsChange: number;
+  findingsSlope: number;
   historicalCount: number;
 }): SidakAgentForecastEntry["forecastStatus"] {
   if (params.historicalCount < 2) {
     return "insufficient_data";
   }
 
-  const goodSignals = [
-    params.projectedScoreChange > 0.1,
-    params.projectedFindingsChange < -0.1,
-  ].filter(Boolean).length;
-  const badSignals = [
-    params.projectedScoreChange < -0.1,
-    params.projectedFindingsChange > 0.1,
-    params.projectedCriticalFindingsChange > 0.1,
-  ].filter(Boolean).length;
-
-  if (goodSignals > badSignals && badSignals === 0) {
-    return "improving";
+  if (params.findingsSlope > FINDINGS_SLOPE_STATUS_THRESHOLD) {
+    return "declining";
   }
 
-  if (badSignals > goodSignals || params.projectedCriticalFindingsChange > 0.1) {
-    return "declining";
+  if (params.findingsSlope < -FINDINGS_SLOPE_STATUS_THRESHOLD) {
+    return "improving";
   }
 
   return "stable";
@@ -312,10 +307,11 @@ function classifyStatus(params: {
 function buildProjection(values: number[], horizonMonths: number): {
   value: number;
   confidence: SidakAgentForecastEntry["confidence"];
+  slope: number;
 } {
   const n = values.length;
   if (n === 0) {
-    return { value: 0, confidence: "low" };
+    return { value: 0, confidence: "low", slope: 0 };
   }
 
   const x = Array.from({ length: n }, (_, index) => index);
@@ -343,15 +339,8 @@ function buildProjection(values: number[], horizonMonths: number): {
   return {
     value: roundTo(projected, 2),
     confidence,
+    slope: roundTo(slope, 4),
   };
-}
-
-function lowerConfidence(
-  ...confidence: SidakAgentForecastEntry["confidence"][]
-): SidakAgentForecastEntry["confidence"] {
-  if (confidence.includes("low")) return "low";
-  if (confidence.includes("medium")) return "medium";
-  return "high";
 }
 
 function clampScore(value: number): number {

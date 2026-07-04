@@ -65,6 +65,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Durable Mailbox**: Inbound email tersimpan secara persisten di database.
   - **Manual Scenario Selection**: User secara eksplisit memilih skenario untuk menghasilkan email baru.
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.
+  - **PDF Attachments**: Scenario setup menerima lampiran PDF sebagai bukti. Preview dirender sebagai file tile; gambar tetap di-zoom, PDF dibuka di tab baru.
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
   - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.

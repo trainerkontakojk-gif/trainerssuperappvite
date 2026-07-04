@@ -366,6 +366,7 @@ export interface SidakAgentForecastEntry {
   projectedScoreChange: number;
   projectedFindings: number;
   projectedFindingsChange: number;
+  findingsSlope: number;
   projectedCriticalFindings: number;
   projectedCriticalFindingsChange: number;
   sourcePointCount: number;

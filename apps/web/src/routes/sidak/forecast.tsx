@@ -316,10 +316,10 @@ function AgentRow({
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Temuan
+              Tren Temuan
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">
-              {formatSigned(entry.projectedFindingsChange, 1)}
+              {formatSigned(entry.findingsSlope, 2)}/periode
             </p>
           </div>
           <div>
@@ -343,10 +343,13 @@ function AgentRow({
             Skor akhir {formatNumber(entry.latestScore, 1)}
           </span>
           <span className="rounded-full border border-border bg-bg px-2 py-1">
-            {formatSigned(entry.projectedScoreChange, 1)} skor
+            Temuan akhir {formatNumber(entry.latestFindingsCount, 0)}
           </span>
           <span className="rounded-full border border-border bg-bg px-2 py-1">
-            {formatSigned(entry.projectedCriticalFindingsChange, 1)} critical
+            Tren temuan {formatSigned(entry.findingsSlope, 2)}/periode
+          </span>
+          <span className="rounded-full border border-border bg-bg px-2 py-1">
+            Prediksi temuan {formatNumber(entry.projectedFindings, 1)}
           </span>
         </div>
       </div>

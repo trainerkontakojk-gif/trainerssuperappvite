@@ -205,7 +205,7 @@ describe("sidak agent forecast service", () => {
     });
   });
 
-  it("classifies score increase and lower findings as improving", async () => {
+  it("classifies agents by findings slope only", async () => {
     const result = await generateSidakAgentForecast({
       request: {
         year: 2026,
@@ -215,17 +215,20 @@ describe("sidak agent forecast service", () => {
       accessibleAgentIds: ["agent-a", "agent-b", "agent-c"],
     });
 
-    expect(result.improvingAgents.map((entry) => entry.nama)).toContain(
-      "Agent A",
+    const improving = result.improvingAgents.find(
+      (entry) => entry.nama === "Agent A",
     );
-    expect(result.decliningAgents.map((entry) => entry.nama)).toContain(
-      "Agent B",
+    const declining = result.decliningAgents.find(
+      (entry) => entry.nama === "Agent B",
     );
+
+    expect(improving?.findingsSlope).toBeLessThan(-0.5);
+    expect(declining?.findingsSlope).toBeGreaterThan(0.5);
+    expect(improving?.forecastStatus).toBe("improving");
+    expect(declining?.forecastStatus).toBe("declining");
     expect(result.watchlistAgents.map((entry) => entry.nama)).toContain(
       "Agent C",
     );
-    expect(result.improvingAgents[0]?.forecastStatus).toBe("improving");
-    expect(result.decliningAgents[0]?.forecastStatus).toBe("declining");
   });
 
   it("marks a one-period agent as insufficient_data", async () => {
