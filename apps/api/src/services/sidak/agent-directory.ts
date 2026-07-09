@@ -6,6 +6,7 @@ import {
   EXCLUDED_JABATAN,
   isCountableFinding,
 } from "./shared-constants";
+import { deriveAgentRootCauses } from "./agent-root-causes";
 import { getPeriods, getIndicators } from "./period-indicator";
 import { getScoreRows } from "./dashboard-aggregation";
 import {
@@ -341,6 +342,14 @@ export async function getAgentDetail(
 
   const periodById = new Map(periods.map((p) => [p.id, p]));
 
+  // Derive root causes from raw temuan rows (before phantom padding filtering)
+  const rootCauses = deriveAgentRootCauses({
+    temuan: rows,
+    indicators,
+    periodById,
+    serviceType: serviceType && isServiceType(serviceType) ? (serviceType as ServiceType) : undefined,
+  });
+
   // Resolve summaries concurrently
   const summaries: AgentPeriodSummary[] = await Promise.all(
     [...periodServiceRows.entries()].map(async ([key, periodRows]) => {
@@ -492,6 +501,7 @@ export async function getAgentDetail(
     periodSummaries: sortedSummaries,
     temuan: rows.filter((r) => !r.is_phantom_padding),
     weights: resolvedWeights as Record<ServiceType, ServiceWeight>,
+    rootCauses,
     personalTrend,
     scoreHistory,
     initialYear: currentYear,

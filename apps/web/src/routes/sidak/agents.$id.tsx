@@ -9,7 +9,8 @@ import ContextControlBar from "../../components/sidak/ContextControlBar";
 import MonthRail from "../../components/sidak/MonthRail";
 import ScoreDetailCard from "../../components/sidak/ScoreDetailCard";
 import TopTicketsCard from "../../components/sidak/TopTicketsCard";
-import AiInsightCard from "../../components/sidak/AiInsightCard";
+
+import RootCauseCard from "../../components/sidak/RootCauseCard";
 import AgentTrendTab from "../../components/sidak/AgentTrendTab";
 import AgentTemuanTab from "../../components/sidak/AgentTemuanTab";
 import EditTemuanModal from "../../components/sidak/EditTemuanModal";
@@ -32,7 +33,8 @@ export default function SidakAgentDetailPage() {
     activeSection, trendMounted, temuanMounted,
     monthlySummaries, latestPeriod, previousPeriod,
     temuanDisplayItems, topTickets,
-    automatedCoaching, masaKerja,
+    activeRootCauses,
+    masaKerja: _masaKerja,
     availableServiceTypes, monthsFull,
     editingTemuan, editForm, isSubmitting, deletingId,
     setEditForm, setEditingTemuan,
@@ -98,6 +100,11 @@ export default function SidakAgentDetailPage() {
 
   const activeLabel = latestPeriod && selectedMonth
     ? `${monthsFull[selectedMonth - 1]?.slice(0, 3) ?? ""} ${selectedYear}`
+    : undefined;
+  const rootCauseScopeLabel = latestPeriod && selectedMonth
+    ? selectedMonth === 1
+      ? activeLabel
+      : `Jan-${monthsFull[selectedMonth - 1]?.slice(0, 3) ?? ""} ${selectedYear}`
     : undefined;
 
   return (
@@ -223,10 +230,10 @@ export default function SidakAgentDetailPage() {
                     />
                   </div>
 
-                  {/* Top Tickets + AI Insight — 8 cols */}
+                  {/* Top Tickets + Root Cause — 8 cols */}
                   <div className="space-y-5 xl:col-span-8">
                     <TopTicketsCard tickets={topTickets} />
-                    <AiInsightCard insight={automatedCoaching} />
+                    <RootCauseCard causes={activeRootCauses} monthLabel={rootCauseScopeLabel} />
                   </div>
                 </div>
               )}

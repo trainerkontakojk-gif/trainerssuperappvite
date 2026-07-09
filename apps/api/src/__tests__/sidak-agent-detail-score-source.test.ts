@@ -80,7 +80,7 @@ const temuanRows = [
     is_phantom_padding: false,
     created_at: `2026-01-${String(i + 1).padStart(2, "0")}T10:00:00Z`,
   })),
-  // February — 8 tickets
+  // February — 8 tickets, some with ketidaksesuaian for root cause matching
   ...Array.from({ length: 8 }, (_, i) => ({
     id: `t-feb-${i}`,
     peserta_id: AGENT_ID,
@@ -91,6 +91,8 @@ const temuanRows = [
     nilai: i < 4 ? 1 : 2,
     tahun: 2026,
     is_phantom_padding: false,
+    ketidaksesuaian: i < 2 ? "Salah jawaban pada saat konfirmasi" : null,
+    sebaiknya: i < 2 ? "Sebaiknya verifikasi data nasabah lebih teliti" : null,
     created_at: `2026-02-${String(i + 1).padStart(2, "0")}T10:00:00Z`,
   })),
   // March — 7 tickets
@@ -235,6 +237,17 @@ describe("getAgentDetail — score source regression", () => {
     expect(march).toBeDefined();
     expect(march?.finalScore).toBeGreaterThan(0);
     expect(march?.finalScore).not.toBe(0);
+
+    // Root causes must be present and stable
+    expect(result.rootCauses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          clusterId: expect.any(String),
+          findingsCount: expect.any(Number),
+          periods: expect.any(Array),
+        }),
+      ]),
+    );
 
     // Response contract remains stable
     expect(result).toMatchObject({

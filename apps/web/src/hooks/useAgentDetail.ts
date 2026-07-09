@@ -2,9 +2,16 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useApi } from "./useApi";
 import { sidakClient, unwrapResponse } from "../lib/api";
 import { VALID_SERVICE_TYPES } from "@trainers/types";
-import type { AgentDetailData, ServiceType } from "@trainers/types";
+import type {
+  AgentDetailData,
+  ServiceType,
+  RootCauseResult,
+} from "@trainers/types";
 import { useAuthStore } from "../store/authStore";
-import { calculateSessionScoreFromTemuan, DEFAULT_SERVICE_WEIGHTS } from "../lib/scoring";
+import {
+  calculateSessionScoreFromTemuan,
+  DEFAULT_SERVICE_WEIGHTS,
+} from "../lib/scoring";
 
 interface TicketScore {
   no_tiket: string;
@@ -13,13 +20,6 @@ interface TicketScore {
   heaviestParam: string;
   totalPenaltyWeight: number;
   isSamplingQa: boolean;
-}
-
-interface CoachingInsight {
-  parameter: string;
-  count: number;
-  recommendation: string;
-  isCritical: boolean;
 }
 
 export interface TemuanDisplayItem {
@@ -40,13 +40,28 @@ export interface EditFormState {
   sebaiknya: string;
 }
 
-const MONTHS_FULL = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const MONTHS_FULL = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
 function computeTenure(bergabungDate: string | null): string {
   if (!bergabungDate) return "-";
   const start = new Date(bergabungDate);
   const now = new Date();
-  const months = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+  const months =
+    (now.getFullYear() - start.getFullYear()) * 12 +
+    (now.getMonth() - start.getMonth());
   if (months < 12) return `${months} bln`;
   const years = Math.floor(months / 12);
   const rem = months % 12;
@@ -67,24 +82,43 @@ export function useAgentDetail(agentId: string) {
   const [activeSection, setActiveSection] = useState("summary");
   const [trendMounted, setTrendMounted] = useState(false);
   const [temuanMounted, setTemuanMounted] = useState(false);
-  const [editingTemuan, setEditingTemuan] = useState<TemuanDisplayItem | null>(null);
-  const [editForm, setEditForm] = useState<EditFormState>({ nilai: 3, ketidaksesuaian: "", sebaiknya: "" });
+  const [editingTemuan, setEditingTemuan] = useState<TemuanDisplayItem | null>(
+    null,
+  );
+  const [editForm, setEditForm] = useState<EditFormState>({
+    nilai: 3,
+    ketidaksesuaian: "",
+    sebaiknya: "",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
-  const [agentsInTeam, setAgentsInTeam] = useState<{ id: string; nama: string }[]>([]);
+  const [agentsInTeam, setAgentsInTeam] = useState<
+    { id: string; nama: string }[]
+  >([]);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [loadingAgents, setLoadingAgents] = useState(false);
 
-  const isStaffRole = role === "trainer" || role === "admin" || role === "leader";
+  const isStaffRole =
+    role === "trainer" || role === "admin" || role === "leader";
 
   // Fetch folders on mount
   const [foldersLoaded, setFoldersLoaded] = useState(false);
   useEffect(() => {
-    if (!isStaffRole) { setFoldersLoaded(true); return; }
-    (unwrapResponse(sidakClient.folders.$get()) as Promise<{ id: string; name: string }[]> as any)
-      .then((res: any) => { setTeams(res ?? []); setFoldersLoaded(true); })
+    if (!isStaffRole) {
+      setFoldersLoaded(true);
+      return;
+    }
+    (
+      unwrapResponse(sidakClient.folders.$get()) as Promise<
+        { id: string; name: string }[]
+      > as any
+    )
+      .then((res: any) => {
+        setTeams(res ?? []);
+        setFoldersLoaded(true);
+      })
       .catch(() => setFoldersLoaded(true));
   }, [isStaffRole]);
 
@@ -108,7 +142,9 @@ export function useAgentDetail(agentId: string) {
   useEffect(() => {
     if (!data || !data.periodSummaries) return;
     if (selectedService && data.initialService !== selectedService) return;
-    const svcs = [...new Set((data.periodSummaries ?? []).map((s) => s.serviceType))];
+    const svcs = [
+      ...new Set((data.periodSummaries ?? []).map((s) => s.serviceType)),
+    ];
     if (svcs.length === 0) return;
     if (selectedService && (svcs as string[]).includes(selectedService)) return;
     setSelectedService(svcs[0]);
@@ -123,12 +159,19 @@ export function useAgentDetail(agentId: string) {
 
   // Fetch agents when selectedTeam changes
   useEffect(() => {
-    if (!selectedTeam || !isStaffRole) { setAgentsInTeam([]); return; }
+    if (!selectedTeam || !isStaffRole) {
+      setAgentsInTeam([]);
+      return;
+    }
     setLoadingAgents(true);
     const encoded = encodeURIComponent(selectedTeam);
-    (unwrapResponse(
-      sidakClient.folders[":folder"].agents.$get({ param: { folder: encoded } }),
-    ) as Promise<any>)
+    (
+      unwrapResponse(
+        sidakClient.folders[":folder"].agents.$get({
+          param: { folder: encoded },
+        }),
+      ) as Promise<any>
+    )
       .then((res) => setAgentsInTeam(res ?? []))
       .catch(() => setAgentsInTeam([]))
       .finally(() => setLoadingAgents(false));
@@ -137,7 +180,9 @@ export function useAgentDetail(agentId: string) {
   const monthlySummaries = useMemo(() => {
     if (!periodSummaries) return [];
     return periodSummaries
-      .filter((s) => selectedService === "all" || s.serviceType === selectedService)
+      .filter(
+        (s) => selectedService === "all" || s.serviceType === selectedService,
+      )
       .sort((a, b) => a.month - b.month);
   }, [periodSummaries, selectedService]);
 
@@ -160,14 +205,19 @@ export function useAgentDetail(agentId: string) {
 
   const latestPeriod = useMemo(() => {
     if (selectedMonth !== null) {
-      return monthlySummaries.find((s) => s.month === selectedMonth) ?? monthlySummaries[monthlySummaries.length - 1];
+      return (
+        monthlySummaries.find((s) => s.month === selectedMonth) ??
+        monthlySummaries[monthlySummaries.length - 1]
+      );
     }
     return monthlySummaries[monthlySummaries.length - 1];
   }, [monthlySummaries, selectedMonth]);
 
   const previousPeriod = useMemo(() => {
     if (!latestPeriod || monthlySummaries.length < 2) return null;
-    const idx = monthlySummaries.findIndex((s) => s.month === latestPeriod.month);
+    const idx = monthlySummaries.findIndex(
+      (s) => s.month === latestPeriod.month,
+    );
     if (idx > 0) return monthlySummaries[idx - 1];
     return null;
   }, [monthlySummaries, latestPeriod]);
@@ -175,7 +225,10 @@ export function useAgentDetail(agentId: string) {
   const temuanDisplayItems = useMemo((): TemuanDisplayItem[] => {
     if (!temuan) return [];
     const periodMap = new Map(
-      (periodSummaries ?? []).map((s) => [s.id, { month: s.month, year: s.year }])
+      (periodSummaries ?? []).map((s) => [
+        s.id,
+        { month: s.month, year: s.year },
+      ]),
     );
 
     return temuan
@@ -221,7 +274,8 @@ export function useAgentDetail(agentId: string) {
     );
 
     const monthFindings = temuan.filter((t) => {
-      if (selectedService !== "all" && t.service_type !== selectedService) return false;
+      if (selectedService !== "all" && t.service_type !== selectedService)
+        return false;
       return periodMonthMap.get(t.period_id) === selectedMonth;
     });
 
@@ -312,30 +366,64 @@ export function useAgentDetail(agentId: string) {
       .slice(0, 5);
   }, [data, temuan, indicators, selectedService, selectedMonth]);
 
-  const automatedCoaching = useMemo((): CoachingInsight | null => {
-    if (!temuan || !indicators || temuan.length === 0) return null;
-    const criticals = temuan.filter((t) => t.nilai === 0);
-    const target = criticals.length > 0 ? criticals : temuan.filter((t) => t.nilai === 1);
-    if (target.length === 0) return null;
-    const counts: Record<string, number> = {};
-    let exampleSebaiknya = "";
-    target.forEach((t) => {
-      const ind = indicators.find((i) => i.id === t.indicator_id);
-      if (!ind) return;
-      const name = ind?.name ?? "";
-      counts[name] = (counts[name] || 0) + 1;
-      if (t.sebaiknya) exampleSebaiknya = t.sebaiknya;
-    });
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    if (entries.length === 0) return null;
-    const topParam = entries[0];
-    return {
-      parameter: topParam[0],
-      count: topParam[1],
-      recommendation: exampleSebaiknya || "Tingkatkan kualitas pada parameter ini.",
-      isCritical: criticals.length > 0,
-    };
-  }, [temuan, indicators]);
+  const activeRootCauses = useMemo((): RootCauseResult[] => {
+    const rootCauses = data?.rootCauses;
+    if (!rootCauses || !latestPeriod) return [];
+    const ytdPeriodIds = new Set(
+      monthlySummaries
+        .filter((summary) => summary.year === latestPeriod.year)
+        .filter((summary) => summary.month <= latestPeriod.month)
+        .filter(
+          (summary) =>
+            selectedService === "all" || summary.serviceType === selectedService,
+        )
+        .map((summary) => summary.id),
+    );
+
+    return rootCauses
+      .map((cause) => {
+        const activePeriods = cause.periods.filter(
+          (period) =>
+            ytdPeriodIds.has(period.periodId) &&
+            (selectedService === "all" ||
+              period.serviceType === selectedService),
+        );
+        if (activePeriods.length === 0) return null;
+        const findingsCount = activePeriods.reduce(
+          (sum, period) => sum + period.findingsCount,
+          0,
+        );
+        const affectedTickets = activePeriods.reduce(
+          (sum, period) => sum + period.affectedTickets,
+          0,
+        );
+        const criticalFindingsCount = activePeriods.reduce(
+          (sum, period) => sum + period.criticalFindingsCount,
+          0,
+        );
+        const activePeriodIds = new Set(
+          activePeriods.map((period) => period.periodId),
+        );
+        return {
+          ...cause,
+          findingsCount,
+          affectedTickets,
+          criticalFindingsCount,
+          evidence: cause.evidence.filter(
+            (item) =>
+              item.periodId !== null && activePeriodIds.has(item.periodId),
+          ),
+          periods: activePeriods,
+        };
+      })
+      .filter((cause): cause is NonNullable<typeof cause> => cause !== null)
+      .sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        if (b.findingsCount !== a.findingsCount)
+          return b.findingsCount - a.findingsCount;
+        return a.label.localeCompare(b.label);
+      });
+  }, [data, latestPeriod, monthlySummaries, selectedService]);
 
   const masaKerja = useMemo(() => {
     return computeTenure(data?.peserta?.bergabung_date ?? null);
@@ -361,19 +449,29 @@ export function useAgentDetail(agentId: string) {
         ["Tahun", String(selectedYear)],
         [""],
         ["Bulan", "Skor Final", "NC Score", "CR Score", "Sesi", "Temuan"],
-        ...monthlySummaries.map((s) => [s.label, s.finalScore, s.nonCriticalScore, s.criticalScore, s.sessionCount, s.findingsCount]),
+        ...monthlySummaries.map((s) => [
+          s.label,
+          s.finalScore,
+          s.nonCriticalScore,
+          s.criticalScore,
+          s.sessionCount,
+          s.findingsCount,
+        ]),
       ];
       const ws = xlsx.utils.aoa_to_sheet(summaryData);
       xlsx.utils.book_append_sheet(wb, ws, "Ringkasan");
 
-      xlsx.writeFile(wb, `Laporan_Audit_${data?.peserta.nama ?? agentId}_${selectedYear}.xlsx`);
+      xlsx.writeFile(
+        wb,
+        `Laporan_Audit_${data?.peserta.nama ?? agentId}_${selectedYear}.xlsx`,
+      );
     } catch {
       // silent
     }
   }, [data, selectedYear, monthlySummaries, agentId]);
 
   const handleInputAudit = useCallback(() => {
-    const folder = data?.peserta?.batch_name || data?.peserta?.tim || '';
+    const folder = data?.peserta?.batch_name || data?.peserta?.tim || "";
     const params = new URLSearchParams({ folder, agent_id: agentId });
     window.location.assign(`/sidak/input?${params.toString()}`);
   }, [agentId, data]);
@@ -406,19 +504,22 @@ export function useAgentDetail(agentId: string) {
     }
   }, [editingTemuan, editForm, refetch]);
 
-  const handleDelete = useCallback(async (id: string) => {
-    setDeletingId(id);
-    try {
-      await unwrapResponse(
-        sidakClient.temuan[":id"].$delete({ param: { id } }),
-      );
-      refetch();
-    } catch {
-      // silent
-    } finally {
-      setDeletingId(null);
-    }
-  }, [refetch]);
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setDeletingId(id);
+      try {
+        await unwrapResponse(
+          sidakClient.temuan[":id"].$delete({ param: { id } }),
+        );
+        refetch();
+      } catch {
+        // silent
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [refetch],
+  );
 
   const handleYearChange = useCallback((year: number) => {
     setSelectedYear(year);
@@ -476,7 +577,7 @@ export function useAgentDetail(agentId: string) {
     previousPeriod,
     temuanDisplayItems,
     topTickets,
-    automatedCoaching,
+    activeRootCauses,
     masaKerja,
     availableServiceTypes,
     monthsFull: MONTHS_FULL,

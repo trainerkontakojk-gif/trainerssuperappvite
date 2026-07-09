@@ -309,6 +309,68 @@ Skor bulanan halaman agent detail (`GET /sidak/agents/:id`) dihitung dari `qa_te
 
 Lihat `apps/api/src/services/sidak/period-scoring-context.ts` untuk implementasi canonical rule/indicator/weight resolver.
 
+## Agent Detail Root Cause Diagnosis
+
+Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan dari data temuan SIDAK. Proses ini **tidak memakai AI** dan tidak mengubah skor. Backend mengelompokkan temuan dari `ketidaksesuaian` dan `sebaiknya` ke registry klaster yang terurut berdasarkan prioritas bisnis.
+
+### Klaster
+
+1. `salah_nama_perusahaan_produk` (prioritas 10)
+2. `kelebihan_standar_jawaban` (prioritas 9)
+3. `salah_penggunaan_sistem` (prioritas 9) — ditambahkan Phase 3 untuk error sistem/APPK
+4. `salah_jawaban` (prioritas 8)
+5. `kurang_teliti_verifikasi_data` (prioritas 7)
+6. `kurang_paham_standar_jawaban` (prioritas 6)
+7. `kurang_menggali` (prioritas 5)
+8. `lainnya` (prioritas 0 — fallback)
+
+### Aturan
+
+- Temuan `is_phantom_padding=true` tidak dipakai untuk diagnosis.
+- Temuan `nilai` 0–3 dipakai selama memiliki evidence teks (`ketidaksesuaian`, `sebaiknya`).
+- `nilai = 3` (rekomendasi) tetap dipertimbangkan untuk diagnosis coaching.
+- Jika satu temuan cocok beberapa keyword, sistem memilih klaster dengan prioritas tertinggi.
+- Jika tidak ada keyword yang cocok, temuan masuk ke `lainnya`.
+- Klaster diurutkan berdasarkan prioritas, jumlah temuan, jumlah critical, dan jumlah tiket.
+- Evidence teks diambil dari `ketidaksesuaian`, lalu `sebaiknya`, lalu fallback ke nama parameter.
+
+### Coverage Target
+
+- Root cause clustering bersifat **deterministic** (rule-based), bukan formula skor.
+- Persentase `lainnya` adalah target **operasional coverage** — bukan metrik kualitas AI.
+- Target coverage: **lainnya < 20%** dari temuan countable dengan evidence.
+- Audit coverage dilakukan via `scripts/sidak/audit-root-cause-coverage.mjs` terhadap data real `qa_temuan`.
+- Baseline (sebelum ekspansi): 84.5% fallback.
+- Setelah ekspansi keyword Phase 2: ~47% fallback.
+- Setelah cluster baru `salah_penggunaan_sistem` (Phase 3): ~31% fallback.
+- Final setelah semua ekspansi: **17.49% fallback** — target tercapai.
+
+### Ekspansi Registry (Phase 2)
+
+Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Penambahan terbaru:
+
+**`salah_jawaban`:** `tidak sesuai dalam memilih`, `tidak sesuai memilih`, `salah memilih`, `tidak sesuai dalam memberikan`, `tidak sesuai dalam menuliskan`, `tidak sesuai menuliskan`, `tidak sesuai dalam menyampaikan`, `tidak sesuai dalam melakukan`, `salah menulis`, `tidak memberikan jawaban`, `belum memperbaiki`.
+
+**`kurang_teliti_verifikasi_data`:** `tidak sesuai mencatat`, `tidak mencatat`, `tidak menuliskan`, `tidak melampirkan`.
+
+**`kurang_menggali`:** `tidak menanyakan`, `tidak melakukan probing`.
+
+### Batasan AI
+
+- AI tidak dipanggil di request path `GET /sidak/agents/:id` atau `deriveAgentRootCauses()`.
+- AI suggestion, jika ditambahkan nanti, hanya dipakai untuk batch/offline analysis dan menghasilkan rekomendasi yang ditinjau manual.
+- Feature flag: `SIDAK_ROOT_CAUSE_AI_SUGGESTIONS=true` (default: disabled).
+
+### Arsitektur
+
+| Lapisan | File | Tanggung Jawab |
+|---------|------|----------------|
+| Tipe | `packages/types/src/sidak.ts` | `RootCauseResult`, `RootCauseEvidence`, `RootCausePeriodBreakdown` |
+| Service | `apps/api/src/services/sidak/agent-root-causes.ts` | Registry, matching, grouping, sorting |
+| Integrasi | `apps/api/src/services/sidak/agent-directory.ts` | Panggil `deriveAgentRootCauses()` di `getAgentDetail()` |
+| Hook | `apps/web/src/hooks/useAgentDetail.ts` | Filter `activeRootCauses` per bulan/layanan aktif |
+| Komponen | `apps/web/src/components/sidak/RootCauseCard.tsx` | Render utama + secondary causes + empty state |
+
 ## BKO Parameter and Weights Resolver
 
 Halaman Input Temuan (`/sidak/input`) menggunakan backend resolver khusus (`GET /resolved-input-config`) untuk memuat konfigurasi parameter aktif dan bobot per `(service_type, period_id)`. Hal ini menjamin parity dengan legacy:

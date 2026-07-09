@@ -392,6 +392,50 @@ export interface SidakAgentForecastResponse {
   summary: SidakAgentForecastSummary;
 }
 
+export type RootCauseClusterId =
+  | "salah_nama_perusahaan_produk"
+  | "kelebihan_standar_jawaban"
+  | "salah_jawaban"
+  | "kurang_teliti_verifikasi_data"
+  | "kurang_paham_standar_jawaban"
+  | "kurang_menggali"
+  | "salah_penggunaan_sistem"
+  | "lainnya";
+
+export interface RootCauseEvidence {
+  id: string;
+  no_tiket: string | null;
+  periodId: string | null;
+  indicatorName: string;
+  nilai: number;
+  text: string;
+}
+
+export interface RootCausePeriodBreakdown {
+  periodId: string;
+  month: number;
+  year: number;
+  label: string;
+  serviceType: ServiceType;
+  findingsCount: number;
+  criticalFindingsCount: number;
+  affectedTickets: number;
+}
+
+export interface RootCauseResult {
+  clusterId: RootCauseClusterId;
+  label: string;
+  priority: number;
+  findingsCount: number;
+  affectedTickets: number;
+  criticalFindingsCount: number;
+  averageNilai: number;
+  matchedKeywords: string[];
+  recommendation: string;
+  evidence: RootCauseEvidence[];
+  periods: RootCausePeriodBreakdown[];
+}
+
 export interface AgentDetailData {
   indicators: QAIndicator[];
   periodSummaries: AgentPeriodSummary[];
@@ -412,6 +456,7 @@ export interface AgentDetailData {
     sessionCount: number;
     service_type: ServiceType;
   }[];
+  rootCauses: RootCauseResult[];
   initialYear: number;
   initialService: ServiceType;
   initialTrendRange: { start: number; end: number };
@@ -450,4 +495,6 @@ export const resolvedSidakInputConfigSchema = z.object({
   hasDraftVersion: z.boolean(),
 });
 
-export type ResolvedSidakInputConfig = z.infer<typeof resolvedSidakInputConfigSchema>;
+export type ResolvedSidakInputConfig = z.infer<
+  typeof resolvedSidakInputConfigSchema
+>;

@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { useAgentDetail } from "../hooks/useAgentDetail";
 import { useAuthStore } from "../store/authStore";
@@ -21,6 +21,19 @@ function buildAgentDetailData(selectedService: string | null) {
     criticalScore: 94,
     sessionCount: 3,
     findingsCount: 7,
+  };
+
+  const callPeriodJanuary = {
+    id: "period-call-jan",
+    month: 1,
+    year: 2026,
+    label: "01/2026",
+    serviceType: "call",
+    finalScore: 90,
+    nonCriticalScore: 88,
+    criticalScore: 92,
+    sessionCount: 2,
+    findingsCount: 3,
   };
 
   const emailPeriod = {
@@ -51,6 +64,19 @@ function buildAgentDetailData(selectedService: string | null) {
       created_at: "2026-05-10T00:00:00Z",
     },
     {
+      id: "temuan-call-jan-1",
+      peserta_id: "agent-1",
+      period_id: "period-call-jan",
+      indicator_id: "indicator-call",
+      service_type: "call",
+      no_tiket: "T-JAN-001",
+      nilai: 1,
+      ketidaksesuaian: "Call issue from January",
+      sebaiknya: "Improve January call handling",
+      tahun: 2026,
+      created_at: "2026-01-10T00:00:00Z",
+    },
+    {
       id: "temuan-email-1",
       peserta_id: "agent-1",
       period_id: "period-email",
@@ -69,10 +95,212 @@ function buildAgentDetailData(selectedService: string | null) {
     selectedService === "email"
       ? [emailPeriod]
       : selectedService === "call"
-        ? [callPeriod]
+        ? [callPeriodJanuary, callPeriod]
         : [emailPeriod, callPeriod];
 
   return {
+    ...(selectedService === "call"
+      ? {
+          rootCauses: [
+            {
+              clusterId: "salah_jawaban",
+              label: "Jawaban salah/tidak akurat",
+              priority: 8,
+              findingsCount: 2,
+              affectedTickets: 2,
+              criticalFindingsCount: 1,
+              averageNilai: 0.5,
+              matchedKeywords: ["salah jawaban"],
+              recommendation:
+                "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
+              evidence: [
+                {
+                  id: "e-call-jan",
+                  no_tiket: "T-JAN-001",
+                  periodId: "period-call-jan",
+                  indicatorName: "Call Indicator",
+                  nilai: 1,
+                  text: "Call January evidence",
+                },
+                {
+                  id: "e-call",
+                  no_tiket: "T-001",
+                  periodId: "period-call",
+                  indicatorName: "Call Indicator",
+                  nilai: 0,
+                  text: "Call active evidence",
+                },
+                {
+                  id: "e-old",
+                  no_tiket: "OLD-001",
+                  periodId: "period-old",
+                  indicatorName: "Call Indicator",
+                  nilai: 0,
+                  text: "Old stale evidence",
+                },
+              ],
+              periods: [
+                {
+                  periodId: "period-call-jan",
+                  month: 1,
+                  year: 2026,
+                  label: "01/2026",
+                  serviceType: "call",
+                  findingsCount: 1,
+                  criticalFindingsCount: 0,
+                  affectedTickets: 1,
+                },
+                {
+                  periodId: "period-call",
+                  month: 5,
+                  year: 2026,
+                  label: "05/2026",
+                  serviceType: "call",
+                  findingsCount: 2,
+                  criticalFindingsCount: 1,
+                  affectedTickets: 2,
+                },
+              ],
+            },
+          ],
+        }
+      : selectedService === "email"
+        ? {
+            rootCauses: [
+              {
+                clusterId: "kurang_menggali",
+                label: "Kurang menggali kebutuhan",
+                priority: 5,
+                findingsCount: 1,
+                affectedTickets: 1,
+                criticalFindingsCount: 0,
+                averageNilai: 2,
+                matchedKeywords: ["kurang menggali"],
+                recommendation:
+                  "Latih pertanyaan klarifikasi agar kebutuhan, kronologi, dan konteks pelanggan tergali tuntas.",
+                evidence: [
+                  {
+                    id: "e-email",
+                    no_tiket: "E-001",
+                    periodId: "period-email",
+                    indicatorName: "Email Indicator",
+                    nilai: 1,
+                    text: "Email active evidence",
+                  },
+                ],
+                periods: [
+                  {
+                    periodId: "period-email",
+                    month: 4,
+                    year: 2026,
+                    label: "04/2026",
+                    serviceType: "email",
+                    findingsCount: 1,
+                    criticalFindingsCount: 0,
+                    affectedTickets: 1,
+                  },
+                ],
+              },
+            ],
+          }
+        : {
+            rootCauses: [
+              {
+                clusterId: "salah_jawaban",
+                label: "Jawaban salah/tidak akurat",
+                priority: 8,
+                findingsCount: 2,
+                affectedTickets: 2,
+                criticalFindingsCount: 1,
+                averageNilai: 0.5,
+                matchedKeywords: ["salah jawaban"],
+                recommendation:
+                  "Fokuskan coaching pada validasi aturan dan akurasi informasi sebelum jawaban final.",
+                evidence: [
+                {
+                  id: "e-call-jan",
+                  no_tiket: "T-JAN-001",
+                  periodId: "period-call-jan",
+                  indicatorName: "Call Indicator",
+                  nilai: 1,
+                  text: "Call January evidence",
+                },
+                {
+                  id: "e-call",
+                  no_tiket: "T-001",
+                  periodId: "period-call",
+                    indicatorName: "Call Indicator",
+                    nilai: 0,
+                    text: "Call active evidence",
+                  },
+                  {
+                    id: "e-old",
+                    no_tiket: "OLD-001",
+                    periodId: "period-old",
+                    indicatorName: "Call Indicator",
+                    nilai: 0,
+                    text: "Old stale evidence",
+                  },
+                ],
+              periods: [
+                {
+                  periodId: "period-call-jan",
+                  month: 1,
+                  year: 2026,
+                  label: "01/2026",
+                  serviceType: "call",
+                  findingsCount: 1,
+                  criticalFindingsCount: 0,
+                  affectedTickets: 1,
+                },
+                {
+                  periodId: "period-call",
+                  month: 5,
+                    year: 2026,
+                    label: "05/2026",
+                    serviceType: "call",
+                    findingsCount: 2,
+                    criticalFindingsCount: 1,
+                    affectedTickets: 2,
+                  },
+                ],
+              },
+              {
+                clusterId: "kurang_menggali",
+                label: "Kurang menggali kebutuhan",
+                priority: 5,
+                findingsCount: 1,
+                affectedTickets: 1,
+                criticalFindingsCount: 0,
+                averageNilai: 2,
+                matchedKeywords: ["kurang menggali"],
+                recommendation:
+                  "Latih pertanyaan klarifikasi agar kebutuhan, kronologi, dan konteks pelanggan tergali tuntas.",
+                evidence: [
+                  {
+                    id: "e-email",
+                    no_tiket: "E-001",
+                    periodId: "period-email",
+                    indicatorName: "Email Indicator",
+                    nilai: 1,
+                    text: "Email active evidence",
+                  },
+                ],
+                periods: [
+                  {
+                    periodId: "period-email",
+                    month: 4,
+                    year: 2026,
+                    label: "04/2026",
+                    serviceType: "email",
+                    findingsCount: 1,
+                    criticalFindingsCount: 0,
+                    affectedTickets: 1,
+                  },
+                ],
+              },
+            ],
+          }),
     indicators: [
       {
         id: "indicator-call",
@@ -118,7 +346,9 @@ describe("useAgentDetail", () => {
   beforeEach(() => {
     useAuthStore.setState({ session: null, profile: null });
     useApiMock.mockImplementation((path: string | null) => {
-      const serviceType = path ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type") : null;
+      const serviceType = path
+        ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type")
+        : null;
       return {
         data: buildAgentDetailData(serviceType),
         loading: false,
@@ -181,9 +411,69 @@ describe("useAgentDetail", () => {
     });
   });
 
+  it("returns root causes year-to-date through the active selected month and service", async () => {
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+    await waitFor(() => expect(result.current.selectedMonth).toBe(4));
+    expect(
+      result.current.activeRootCauses.map((cause) => cause.clusterId),
+    ).toEqual(["kurang_menggali"]);
+
+    result.current.handleServiceChange("call");
+
+    await waitFor(() => expect(result.current.selectedService).toBe("call"));
+    await waitFor(() => expect(result.current.selectedMonth).toBe(5));
+    expect(
+      result.current.activeRootCauses.map((cause) => cause.clusterId),
+    ).toEqual(["salah_jawaban"]);
+    expect(result.current.activeRootCauses[0]).toMatchObject({
+      findingsCount: 3,
+      affectedTickets: 3,
+      criticalFindingsCount: 1,
+    });
+    expect(
+      result.current.activeRootCauses[0].evidence.map((item) => item.id),
+    ).toEqual(["e-call-jan", "e-call"]);
+
+    act(() => {
+      result.current.handleMonthSelect(1);
+    });
+
+    await waitFor(() => expect(result.current.selectedMonth).toBe(1));
+    expect(result.current.activeRootCauses[0]).toMatchObject({
+      findingsCount: 1,
+      affectedTickets: 1,
+      criticalFindingsCount: 0,
+    });
+    expect(
+      result.current.activeRootCauses[0].evidence.map((item) => item.id),
+    ).toEqual(["e-call-jan"]);
+  });
+
+  it("returns empty root causes when data has no rootCauses", async () => {
+    useApiMock.mockImplementation((_path: string | null) => {
+      const data = buildAgentDetailData("email");
+      const { rootCauses: _rootCauses, ...rest } = data as any;
+      return {
+        data: { ...rest, rootCauses: undefined },
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      };
+    });
+
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+    expect(result.current.activeRootCauses).toEqual([]);
+  });
+
   it("does not reset the selected service while a stale previous-service response is still loading", async () => {
     useApiMock.mockImplementation((path: string | null) => {
-      const serviceType = path ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type") : null;
+      const serviceType = path
+        ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type")
+        : null;
       const isSwitchingToCall = serviceType === "call";
 
       return {
