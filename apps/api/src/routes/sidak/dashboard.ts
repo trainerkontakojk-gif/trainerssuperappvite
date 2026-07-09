@@ -79,6 +79,7 @@ sidakDashboard.get(
         startMonth,
         endMonth,
         filterScope?.allowedServices ?? undefined,
+        accessibleIds,
       );
       return c.json({ success: true, data: detail });
     } catch (e: any) {

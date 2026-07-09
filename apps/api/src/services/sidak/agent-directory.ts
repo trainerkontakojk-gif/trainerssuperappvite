@@ -24,11 +24,24 @@ import {
 import type {
   AgentDetailData,
   AgentDirectoryEntry,
+  AgentComparisonTable,
+  AgentComparisonScope,
+  AgentComparisonRow,
   ServiceType,
   AgentPeriodSummary,
   ServiceWeight,
 } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
+
+const SERVICE_LABELS: Record<ServiceType, string> = {
+  call: "Call",
+  chat: "Chat",
+  email: "Email",
+  cso: "CSO",
+  pencatatan: "Pencatatan",
+  bko: "BKO",
+  slik: "SLIK",
+};
 
 export function isAgentExcluded(
   tim?: string | null,
@@ -270,6 +283,7 @@ export async function getAgentDetail(
   startMonth?: number,
   endMonth?: number,
   allowedServiceTypes?: ServiceType[],
+  accessibleAgentIds?: string[] | null,
 ): Promise<AgentDetailData> {
   const [peserta, indicators, periods, weightsResult] = await Promise.all([
     supabaseAdmin
@@ -496,11 +510,25 @@ export async function getAgentDetail(
   ].sort((a, b) => b - a) as number[];
   if (availableYears.length === 0) availableYears.push(currentYear);
 
+  const comparisonTable = await buildAgentComparisonTable({
+    agentId,
+    year: currentYear,
+    serviceType,
+    startMonth,
+    endMonth,
+    periodIdsInRange,
+    indicators,
+    peserta,
+    allowedServiceTypes,
+    accessibleAgentIds,
+  });
+
   return {
     indicators,
     periodSummaries: sortedSummaries,
     temuan: rows.filter((r) => !r.is_phantom_padding),
     weights: resolvedWeights as Record<ServiceType, ServiceWeight>,
+    comparisonTable,
     rootCauses,
     personalTrend,
     scoreHistory,
@@ -518,4 +546,219 @@ export async function getAgentDetail(
       bergabung_date: peserta.data.bergabung_date ?? null,
     },
   };
+}
+
+interface BuildComparisonArgs {
+  agentId: string;
+  year: number;
+  serviceType?: string;
+  startMonth?: number;
+  endMonth?: number;
+  periodIdsInRange: string[];
+  indicators: any[];
+  peserta: any;
+  allowedServiceTypes?: ServiceType[];
+  accessibleAgentIds?: string[] | null;
+}
+
+/**
+ * Builds the benchmark comparison table for an agent's cumulative findings
+ * across the trend period range. Cohorts:
+ *  - agent:   rows belonging to the viewed agent
+ *  - team:    audited agents sharing the viewed agent's batch_name (fallback tim)
+ *  - service: all accessible audited agents for the selected service/range
+ * Only "countable" findings (per isCountableFinding) are tallied.
+ */
+async function buildAgentComparisonTable({
+  agentId,
+  year,
+  serviceType,
+  startMonth,
+  endMonth,
+  periodIdsInRange,
+  indicators,
+  peserta,
+  allowedServiceTypes,
+  accessibleAgentIds,
+}: BuildComparisonArgs): Promise<AgentComparisonTable> {
+  const effectiveServiceType: ServiceType = isServiceType(serviceType)
+    ? serviceType
+    : allowedServiceTypes?.length === 1
+      ? allowedServiceTypes[0]
+      : "call";
+  const scope: AgentComparisonScope = {
+    year,
+    serviceType: effectiveServiceType,
+    startMonth: startMonth ?? 1,
+    endMonth: endMonth ?? 12,
+    teamLabel: peserta.data.batch_name || peserta.data.tim || "—",
+    serviceLabel: SERVICE_LABELS[effectiveServiceType],
+  };
+
+  const emptyTable: AgentComparisonTable = { scope, rows: [] };
+  if (periodIdsInRange.length === 0) return emptyTable;
+
+  // 1. Fetch all temuan rows in the range, joined to the participant for
+  //    cohorting (batch_name / tim).
+  let temuanRows = await fetchAllPages<any>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("qa_temuan")
+        .select(
+          "id, peserta_id, indicator_id, nilai, no_tiket, sebaiknya, ketidaksesuaian, is_phantom_padding, service_type, period_id, tahun, profiler_peserta!inner(id, batch_name, tim)",
+        )
+        .eq("tahun", year)
+        .in("period_id", periodIdsInRange)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to);
+
+      if (serviceType) q = q.eq("service_type", serviceType);
+      if (allowedServiceTypes && allowedServiceTypes.length > 0) {
+        q = q.in("service_type", allowedServiceTypes);
+      }
+      if (accessibleAgentIds && accessibleAgentIds.length > 0) {
+        q = q.in("peserta_id", accessibleAgentIds);
+      }
+
+      return q;
+    },
+  });
+
+  if (temuanRows.length === 0) return emptyTable;
+
+  // Defense-in-depth: ensure only accessible agents are included in the
+  // cohort even if the underlying query is not fully scoped.
+  if (accessibleAgentIds && accessibleAgentIds.length > 0) {
+    const allowed = new Set(accessibleAgentIds);
+    temuanRows = temuanRows.filter((r: any) => allowed.has(r.peserta_id));
+  }
+
+  // 2. Map each agent to its cohort keys (batch_name/tim) from the join.
+  const participantMap = new Map<string, { batch: string; tim: string }>();
+  for (const row of temuanRows) {
+    const pid = row.peserta_id;
+    if (!pid || participantMap.has(pid)) continue;
+    const p = row.profiler_peserta;
+    participantMap.set(pid, {
+      batch: p?.batch_name ?? "",
+      tim: p?.tim ?? "",
+    });
+  }
+  // Ensure the viewed agent is present even if not in the temuan result.
+  if (!participantMap.has(agentId)) {
+    participantMap.set(agentId, {
+      batch: peserta.data.batch_name ?? "",
+      tim: peserta.data.tim ?? "",
+    });
+  }
+
+  // 3. Tally cumulative countable findings per agent, per indicator, and total.
+  interface AgentTally {
+    total: number;
+    byIndicator: Map<string, number>;
+  }
+  const tallies = new Map<string, AgentTally>();
+
+  for (const row of temuanRows) {
+    if (!isCountableFinding(row)) continue;
+    const pid = row.peserta_id;
+    if (!tallies.has(pid)) {
+      tallies.set(pid, { total: 0, byIndicator: new Map() });
+    }
+    const tally = tallies.get(pid)!;
+    tally.total += 1;
+    if (row.indicator_id) {
+      tally.byIndicator.set(
+        row.indicator_id,
+        (tally.byIndicator.get(row.indicator_id) ?? 0) + 1,
+      );
+    }
+  }
+
+  // 4. Determine cohorts.
+  const viewedBatch = peserta.data.batch_name ?? "";
+  const viewedTim = peserta.data.tim ?? "";
+  const teamKeyOf = (pid: string): string => {
+    const p = participantMap.get(pid);
+    const batch = p?.batch ?? "";
+    return batch || p?.tim || "";
+  };
+  const viewedTeamKey = viewedBatch || viewedTim || "";
+
+  const teamAgentIds: string[] = [];
+  const serviceAgentIds: string[] = [];
+  for (const pid of tallies.keys()) {
+    serviceAgentIds.push(pid);
+    if (viewedTeamKey && teamKeyOf(pid) === viewedTeamKey) {
+      teamAgentIds.push(pid);
+    }
+  }
+
+  // 5. Compute rows.
+  const agentTally = tallies.get(agentId);
+
+  const computeAverage = (
+    cohortIds: string[],
+    selector: (t: AgentTally) => number,
+  ): { average: number; count: number } => {
+    if (cohortIds.length === 0) return { average: 0, count: 0 };
+    const sum = cohortIds.reduce((acc, pid) => {
+      const t = tallies.get(pid);
+      return acc + (t ? selector(t) : 0);
+    }, 0);
+    return {
+      average: roundTo(sum / cohortIds.length, 2),
+      count: cohortIds.length,
+    };
+  };
+
+  const rows: AgentComparisonRow[] = [];
+
+  // Total row (pinned first).
+  const totalTeam = computeAverage(teamAgentIds, (t) => t.total);
+  const totalService = computeAverage(serviceAgentIds, (t) => t.total);
+  rows.push({
+    key: "total",
+    label: "Total Temuan",
+    agentCount: agentTally?.total ?? 0,
+    teamAverage: totalTeam.average,
+    serviceAverage: totalService.average,
+    teamAgentCount: totalTeam.count,
+    serviceAgentCount: totalService.count,
+  });
+
+  // Parameter rows (one per service indicator that has any countable finding).
+  const paramRows: AgentComparisonRow[] = [];
+  for (const ind of indicators) {
+    const anyFindings = serviceAgentIds.some((pid) => {
+      const t = tallies.get(pid);
+      return t ? (t.byIndicator.get(ind.id) ?? 0) > 0 : false;
+    });
+    if (!anyFindings) continue;
+
+    const agentCount = agentTally?.byIndicator.get(ind.id) ?? 0;
+    const team = computeAverage(teamAgentIds, (t) => t.byIndicator.get(ind.id) ?? 0);
+    const service = computeAverage(serviceAgentIds, (t) => t.byIndicator.get(ind.id) ?? 0);
+
+    paramRows.push({
+      key: ind.id,
+      label: ind.name,
+      agentCount,
+      teamAverage: team.average,
+      serviceAverage: service.average,
+      teamAgentCount: team.count,
+      serviceAgentCount: service.count,
+    });
+  }
+
+  // Sort param rows by highest agent count, then highest team average.
+  paramRows.sort((a, b) => {
+    if (b.agentCount !== a.agentCount) return b.agentCount - a.agentCount;
+    return b.teamAverage - a.teamAverage;
+  });
+
+  rows.push(...paramRows);
+
+  return { scope, rows };
 }

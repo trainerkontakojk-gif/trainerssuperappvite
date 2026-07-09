@@ -9,6 +9,7 @@ import ContextControlBar from "../../components/sidak/ContextControlBar";
 import MonthRail from "../../components/sidak/MonthRail";
 import AgentAuditDossier from "../../components/sidak/AgentAuditDossier";
 import AgentTrendTab from "../../components/sidak/AgentTrendTab";
+import AgentComparisonTable from "../../components/sidak/AgentComparisonTable";
 import AgentTemuanTab from "../../components/sidak/AgentTemuanTab";
 import EditTemuanModal from "../../components/sidak/EditTemuanModal";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
@@ -254,6 +255,8 @@ export default function SidakAgentDetailPage() {
               <TabSkeleton />
             )}
           </div>
+
+          <AgentComparisonTable comparisonTable={data.comparisonTable} />
         </div>
 
         {/* ── SECTION: DAFTAR TEMUAN ── */}

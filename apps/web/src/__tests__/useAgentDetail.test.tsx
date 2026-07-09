@@ -330,6 +330,36 @@ function buildAgentDetailData(selectedService: string | null) {
     initialYear: 2026,
     initialService: "email",
     initialTrendRange: { start: 1, end: 5 },
+    comparisonTable: {
+      scope: {
+        year: 2026,
+        serviceType: "email",
+        startMonth: 1,
+        endMonth: 5,
+        teamLabel: "Tim Email",
+        serviceLabel: "Email",
+      },
+      rows: [
+        {
+          key: "total",
+          label: "Total Temuan",
+          agentCount: 6,
+          teamAverage: 4,
+          serviceAverage: 5,
+          teamAgentCount: 3,
+          serviceAgentCount: 10,
+        },
+        {
+          key: "indicator-email",
+          label: "Email Indicator",
+          agentCount: 3,
+          teamAverage: 2,
+          serviceAverage: 2.5,
+          teamAgentCount: 3,
+          serviceAgentCount: 10,
+        },
+      ],
+    },
     peserta: {
       id: "agent-1",
       nama: "Noor Qodiri Mobarok",

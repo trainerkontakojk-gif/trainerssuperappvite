@@ -367,10 +367,37 @@ Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Pena
 |---------|------|----------------|
 | Tipe | `packages/types/src/sidak.ts` | `RootCauseResult`, `RootCauseEvidence`, `RootCausePeriodBreakdown` |
 | Service | `apps/api/src/services/sidak/agent-root-causes.ts` | Registry, matching, grouping, sorting |
-| Integrasi | `apps/api/src/services/sidak/agent-directory.ts` | Panggil `deriveAgentRootCauses()` di `getAgentDetail()` |
-| Hook | `apps/web/src/hooks/useAgentDetail.ts` | Filter `activeRootCauses` per bulan/layanan aktif |
+| Integrasi | `apps/api/src/services/sidak/agent-directory.ts` | Panggil `deriveAgentRootCauses()` di `getAgentDetail()`; bangun `comparisonTable` (benchmark tim/service) via `buildAgentComparisonTable()` |
+| Hook | `apps/web/src/hooks/useAgentDetail.ts` | Filter `activeRootCauses` per bulan/layanan aktif; teruskan `data.comparisonTable` ke komponen |
 | Komponen (container) | `apps/web/src/components/sidak/AgentAuditDossier.tsx` | Full-width audit dossier: score strip + ticket impact + root-cause coaching; membungkus `RootCauseCard` & `TopTicketsCard` yang kini thin presentational blocks (tanpa outer `rounded-2xl bg-surface`) |
 | Komponen (thin) | `apps/web/src/components/sidak/RootCauseCard.tsx` | Render utama + secondary causes + empty state (di-embed dalam dossier) |
+
+### Trend Benchmark Comparison Table
+
+Tepat di bawah trend chart (`AgentTrendTab`) pada `/sidak/agents/:id`, terdapat tabel perbandingan (`AgentComparisonTable`) yang membandingkan temuan kumulatif agent yang dilihat terhadap dua baseline:
+
+- **Rata-rata tim:** rata-rata jumlah temuan kumulatif per agent audited dalam tim/folder yang sama (cocok `batch_name`, fallback `tim` bila `batch_name` kosong).
+- **Rata-rata service:** rata-rata jumlah temuan kumulatif per agent audited di layanan terpilih (semua agent yang accessible).
+
+**Scope** terkunci pada rentang trend chart: `trendStartMonth`–`trendEndMonth` di tahun terpilih (`startMonth`/`endMonth` dari URL query, bukan bulan aktif MonthRail).
+
+**Aturan cohort & perhitungan (backend `buildAgentComparisonTable`):**
+
+1. Query `qa_temuan` **joined** ke `profiler_peserta!inner(id, batch_name, tim)` untuk `tahun`, `service_type`, dan `period_id` dalam rentang. Mendukung `allowedServiceTypes` (guard leader) dan `accessibleAgentIds` (defense-in-depth).
+2. Hanya temuan **countable** (`isCountableFinding()`) yang dihitung — phantom padding dan `nilai=3` tanpa catatan dikecualikan.
+3. Tally kumulatif per agent: total + per `indicator_id`.
+4. Cohort tim = agent dengan `teamKey` (`batch_name` || `tim`) sama dengan agent yang dilihat; cohort service = seluruh agent audited yang accessible.
+5. Rata-rata = `Σ(count agent dalam cohort) / |cohort|`, dibulatkan 2 desimal (`roundTo`). Agent yang dilihat **termasuk** dalam denominator cohort-nya.
+6. Baris: `Total Temuan` dipaku pertama, lalu satu baris per parameter (indicator layanan yang punya ≥1 temuan countable di cohort service), diurutkan berdasarkan `agentCount` tertinggi lalu `teamAverage` tertinggi.
+
+**Frontend:** `AgentComparisonTable` merender kolom Parameter · Agent ini · Rata-rata tim · Rata-rata service · Selisih vs tim · Selisih vs service, plus baris scope (`Jan-Mei 2026 • CALL • <tim> • N agent tim / N agent service`). Empty state: `Belum ada data pembanding untuk range ini` bila tidak ada baris perbandingan di luar Total.
+
+| Lapisan | File | Tanggung Jawab |
+|---------|------|----------------|
+| Tipe | `packages/types/src/sidak.ts` | `AgentComparisonTable`, `AgentComparisonRow`, `AgentComparisonScope` |
+| Service | `apps/api/src/services/sidak/agent-directory.ts` | `buildAgentComparisonTable()` — query join, tally, cohort, sorting |
+| Route | `apps/api/src/routes/sidak/dashboard.ts` | `GET /agents/:id` teruskan `accessibleIds` ke `getAgentDetail()` |
+| Komponen | `apps/web/src/components/sidak/AgentComparisonTable.tsx` | Render tabel + scope line + empty state |
 
 ## BKO Parameter and Weights Resolver
 

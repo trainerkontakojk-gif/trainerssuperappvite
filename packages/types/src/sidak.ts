@@ -436,12 +436,37 @@ export interface RootCauseResult {
   periods: RootCausePeriodBreakdown[];
 }
 
+export interface AgentComparisonRow {
+  key: string;
+  label: string;
+  agentCount: number;
+  teamAverage: number;
+  serviceAverage: number;
+  teamAgentCount: number;
+  serviceAgentCount: number;
+}
+
+export interface AgentComparisonScope {
+  year: number;
+  serviceType: ServiceType;
+  startMonth: number;
+  endMonth: number;
+  teamLabel: string;
+  serviceLabel: string;
+}
+
+export interface AgentComparisonTable {
+  scope: AgentComparisonScope;
+  rows: AgentComparisonRow[];
+}
+
 export interface AgentDetailData {
   indicators: QAIndicator[];
   periodSummaries: AgentPeriodSummary[];
   selectedPeriod?: AgentPeriodSummary | null;
   temuan: QATemuan[];
   weights: Record<ServiceType, ServiceWeight>;
+  comparisonTable?: AgentComparisonTable;
   personalTrend: {
     labels: string[];
     datasets: { label: string; data: number[]; isTotal: boolean }[];

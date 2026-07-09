@@ -169,7 +169,8 @@ describe("getAgentDetail pagination", () => {
     vi.mocked(supabaseAdmin.from).mockImplementation(makePaginatedMock(allRows));
 
     const result = await getAgentDetail("agent-1", 2026, "call");
-    expect(totalRowsReturned).toBe(1500);
+    // Per-agent temuan (1500) + comparison-table cohort fetch (1500).
+    expect(totalRowsReturned).toBe(3000);
     expect(result.temuan.length).toBe(1500);
   });
 
