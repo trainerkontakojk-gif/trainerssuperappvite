@@ -49,16 +49,16 @@ describe("AgentComparisonTable", () => {
 
     // Scope line
     expect(
-      screen.getByText(/Jan-Mei 2026 • Layanan Call • Tim Siti Nur Anisa • 4 agent tim \/ 20 agent layanan/),
+      screen.getByText(/Jan-Mei 2026 • Layanan Call • Tim Siti Nur Anisa • 4 agent tim \/ 20 agent service sama/),
     ).toBeInTheDocument();
 
     // Column headers
     expect(screen.getByText("Parameter")).toBeInTheDocument();
     expect(screen.getByText("Agent ini")).toBeInTheDocument();
     expect(screen.getByText("Rata-rata tim")).toBeInTheDocument();
-    expect(screen.getByText("Rata-rata layanan")).toBeInTheDocument();
+    expect(screen.getByText("Rata-rata service sama")).toBeInTheDocument();
     expect(screen.getByText("% vs tim")).toBeInTheDocument();
-    expect(screen.getByText("% vs layanan")).toBeInTheDocument();
+    expect(screen.getByText("% vs service sama")).toBeInTheDocument();
 
     // Total row
     expect(screen.getByText("Total Temuan")).toBeInTheDocument();

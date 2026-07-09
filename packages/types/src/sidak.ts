@@ -422,6 +422,14 @@ export interface RootCausePeriodBreakdown {
   affectedTickets: number;
 }
 
+export interface RootCauseTicketReference {
+  no_tiket: string;
+  periodId: string;
+  periodLabel: string;
+  findingsCount: number;
+  criticalFindingsCount: number;
+}
+
 export interface RootCauseResult {
   clusterId: RootCauseClusterId;
   label: string;
@@ -434,6 +442,7 @@ export interface RootCauseResult {
   recommendation: string;
   evidence: RootCauseEvidence[];
   periods: RootCausePeriodBreakdown[];
+  ticketReferences?: RootCauseTicketReference[];
 }
 
 export interface AgentComparisonRow {

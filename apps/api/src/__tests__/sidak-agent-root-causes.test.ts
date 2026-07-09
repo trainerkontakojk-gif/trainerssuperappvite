@@ -593,4 +593,129 @@ describe("deriveAgentRootCauses", () => {
 
     expect(result[0].clusterId).toBe("lainnya");
   });
+
+  it("builds ticketReferences unique by no_tiket + period with month label and per-ticket counts", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        // Same ticket in same period, 3 findings → 1 reference with count 3
+        row({ id: "a1", no_tiket: "T-100", ketidaksesuaian: "salah jawaban" }),
+        row({ id: "a2", no_tiket: "t-100", ketidaksesuaian: "salah jawaban" }),
+        row({ id: "a3", no_tiket: "T-100", ketidaksesuaian: "salah jawaban" }),
+        // Different ticket in same period
+        row({ id: "b1", no_tiket: "T-200", ketidaksesuaian: "salah jawaban" }),
+        // Same ticket in a different period → separate reference
+        row({
+          id: "c1",
+          no_tiket: "T-100",
+          period_id: "p-jun",
+          ketidaksesuaian: "salah jawaban",
+        }),
+      ],
+    });
+
+    const primary = result[0];
+    const refs = primary.ticketReferences ?? [];
+    // T-100 appears in 2 periods → 2 references; T-200 in 1 period → 1 reference
+    expect(refs).toHaveLength(3);
+
+    const julRef = refs.find((r) => r.periodId === "p-jul" && r.no_tiket === "T-100");
+    expect(julRef).toBeDefined();
+    expect(julRef?.findingsCount).toBe(3);
+    expect(julRef?.periodLabel).toBe("07/2026");
+    expect(julRef?.criticalFindingsCount).toBe(3); // all nilai=0
+
+    const junRef = refs.find((r) => r.periodId === "p-jun" && r.no_tiket === "T-100");
+    expect(junRef).toBeDefined();
+    expect(junRef?.findingsCount).toBe(1);
+    expect(junRef?.periodLabel).toBe("06/2026");
+
+    const t200 = refs.find((r) => r.no_tiket === "T-200");
+    expect(t200?.findingsCount).toBe(1);
+  });
+
+  it("excludes missing no_tiket so no blank ticket chip appears", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        // raw objects bypass row()'s `no_tiket ?? "T-001"` default
+        {
+          id: "missing1",
+          peserta_id: "agent-1",
+          period_id: "p-jul",
+          indicator_id: "i-accuracy",
+          service_type: "call",
+          no_tiket: null,
+          nilai: 0,
+          ketidaksesuaian: "salah jawaban",
+          sebaiknya: null,
+          tahun: 2026,
+          is_phantom_padding: false,
+        } as QATemuan,
+        {
+          id: "missing2",
+          peserta_id: "agent-1",
+          period_id: "p-jul",
+          indicator_id: "i-accuracy",
+          service_type: "call",
+          no_tiket: "   ",
+          nilai: 0,
+          ketidaksesuaian: "salah jawaban",
+          sebaiknya: null,
+          tahun: 2026,
+          is_phantom_padding: false,
+        } as QATemuan,
+        row({ id: "valid", no_tiket: "T-999", ketidaksesuaian: "salah jawaban" }),
+      ],
+    });
+
+    const refs = result[0].ticketReferences ?? [];
+    expect(refs).toHaveLength(1);
+    expect(refs[0].no_tiket).toBe("T-999");
+    expect(refs.every((r) => r.no_tiket.trim().length > 0)).toBe(true);
+    // affectedTickets count behavior unchanged: missing tickets fall back to
+    // `audit-<id>` keys in the global ticket set, so 3 distinct entries (2 audit- + T-999)
+    expect(result[0].affectedTickets).toBe(3);
+  });
+
+  it("sorts ticketReferences by periodLabel then no_tiket", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        row({ id: "r1", no_tiket: "T-300", period_id: "p-jul", ketidaksesuaian: "salah jawaban" }),
+        row({ id: "r2", no_tiket: "T-100", period_id: "p-jun", ketidaksesuaian: "salah jawaban" }),
+        row({ id: "r3", no_tiket: "T-200", period_id: "p-jul", ketidaksesuaian: "salah jawaban" }),
+      ],
+    });
+
+    const refs = result[0].ticketReferences ?? [];
+    expect(refs.map((r) => `${r.periodLabel}:${r.no_tiket}`)).toEqual([
+      "06/2026:T-100",
+      "07/2026:T-200",
+      "07/2026:T-300",
+    ]);
+  });
+
+  it("limits visible ticketReferences to 12 per cluster", () => {
+    const manyTickets = Array.from({ length: 20 }, (_, i) =>
+      row({
+        id: `r${i}`,
+        no_tiket: `T-${String(i + 1).padStart(4, "0")}`,
+        ketidaksesuaian: "salah jawaban",
+      }),
+    );
+
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: manyTickets,
+    });
+
+    const refs = result[0].ticketReferences ?? [];
+    expect(refs.length).toBe(12);
+    expect(result[0].affectedTickets).toBe(20); // global count unaffected
+  });
 });

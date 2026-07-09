@@ -6,6 +6,7 @@ import type {
   RootCauseResult,
   RootCauseEvidence,
   RootCausePeriodBreakdown,
+  RootCauseTicketReference,
   ServiceType,
 } from "@trainers/types";
 
@@ -210,6 +211,14 @@ interface PeriodAccumulator {
   ticketSet: Set<string>;
 }
 
+interface TicketRefAcc {
+  no_tiket: string;
+  periodId: string;
+  serviceType: ServiceType;
+  findingsCount: number;
+  criticalFindingsCount: number;
+}
+
 interface ClusterAccumulator {
   entry: RegistryEntry;
   matchedKeywords: Set<string>;
@@ -219,6 +228,7 @@ interface ClusterAccumulator {
   ticketSet: Set<string>;
   evidence: RootCauseEvidence[];
   periodMap: Map<string, PeriodAccumulator>; // key = periodId:serviceType
+  ticketRefs: Map<string, TicketRefAcc>; // key = NO_TIKET::periodId:serviceType
 }
 
 // ─── Main function ──────────────────────────────────────────────────────────
@@ -294,6 +304,7 @@ export function deriveAgentRootCauses(
         ticketSet: new Set(),
         evidence: [],
         periodMap: new Map(),
+        ticketRefs: new Map(),
       };
       groups.set(entry.clusterId, accumulator);
     }
@@ -326,6 +337,25 @@ export function deriveAgentRootCauses(
     periodAcc.findingsCount += 1;
     if (nilai === 0) periodAcc.criticalFindingsCount += 1;
     periodAcc.ticketSet.add(ticketKey);
+
+    // Track unique ticket references (exclude missing ticket numbers)
+    const rawNoTiket = (row.no_tiket ?? "").trim();
+    if (rawNoTiket) {
+      const ticketRefKey = `${rawNoTiket.toUpperCase()}::${periodKey}`;
+      let ticketRef = accumulator.ticketRefs.get(ticketRefKey);
+      if (!ticketRef) {
+        ticketRef = {
+          no_tiket: rawNoTiket.toUpperCase(),
+          periodId: row.period_id,
+          serviceType: row.service_type,
+          findingsCount: 0,
+          criticalFindingsCount: 0,
+        };
+        accumulator.ticketRefs.set(ticketRefKey, ticketRef);
+      }
+      ticketRef.findingsCount += 1;
+      if (nilai === 0) ticketRef.criticalFindingsCount += 1;
+    }
 
     // Accumulate evidence (limited)
     if (accumulator.evidence.length < maxEvidencePerCluster) {
@@ -371,6 +401,24 @@ export function deriveAgentRootCauses(
           ) / 100
         : 0;
 
+    const MAX_TICKET_REFERENCES = 12;
+    const ticketReferences: RootCauseTicketReference[] = [];
+    for (const ref of accumulator.ticketRefs.values()) {
+      const refPeriod = periodById.get(ref.periodId);
+      ticketReferences.push({
+        no_tiket: ref.no_tiket,
+        periodId: ref.periodId,
+        periodLabel: refPeriod?.label ?? `${ref.periodId.slice(0, 8)}...`,
+        findingsCount: ref.findingsCount,
+        criticalFindingsCount: ref.criticalFindingsCount,
+      });
+    }
+    ticketReferences.sort((a, b) => {
+      if (a.periodLabel !== b.periodLabel)
+        return a.periodLabel.localeCompare(b.periodLabel);
+      return a.no_tiket.localeCompare(b.no_tiket);
+    });
+
     results.push({
       clusterId: accumulator.entry.clusterId,
       label: accumulator.entry.label,
@@ -383,6 +431,7 @@ export function deriveAgentRootCauses(
       recommendation: accumulator.entry.recommendation,
       evidence: accumulator.evidence,
       periods: periodsBreakdown,
+      ticketReferences: ticketReferences.slice(0, MAX_TICKET_REFERENCES),
     });
   }
 

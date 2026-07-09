@@ -613,7 +613,7 @@ async function buildAgentComparisonTable({
         .order("id", { ascending: false })
         .range(from, to);
 
-      if (serviceType) q = q.eq("service_type", serviceType);
+      q = q.eq("service_type", effectiveServiceType);
       if (allowedServiceTypes && allowedServiceTypes.length > 0) {
         q = q.in("service_type", allowedServiceTypes);
       }

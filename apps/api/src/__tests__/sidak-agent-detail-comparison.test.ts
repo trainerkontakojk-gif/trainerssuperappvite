@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-function buildQuery(onAwait: () => any) {
+const queryCalls: { table?: string; method: string; args: any[] }[] = [];
+
+function buildQuery(table: string | undefined, onAwait: () => any) {
   const q = new Proxy(
     {},
     {
@@ -8,7 +10,10 @@ function buildQuery(onAwait: () => any) {
         if (prop === "then") {
           return (resolve: any) => resolve(onAwait());
         }
-        return () => q;
+        return (...args: any[]) => {
+          queryCalls.push({ table, method: String(prop), args });
+          return q;
+        };
       },
     },
   );
@@ -19,7 +24,7 @@ let pendingResolve: (table?: string) => any = () => ({ data: [], error: null });
 
 vi.mock("../lib/supabase", () => ({
   supabaseAdmin: {
-    from: vi.fn((table) => buildQuery(() => pendingResolve(table))),
+    from: vi.fn((table) => buildQuery(table, () => pendingResolve(table))),
   },
   createAdminClient: vi.fn(),
 }));
@@ -133,6 +138,7 @@ function mockResolve() {
 
 describe("getAgentDetail — comparison benchmark table", () => {
   beforeEach(() => {
+    queryCalls.length = 0;
     mockResolve();
   });
 
@@ -212,6 +218,29 @@ describe("getAgentDetail — comparison benchmark table", () => {
       (r) => r.key === "call-greeting",
     );
     expect(greeting!.serviceAverage).toBe(2.5); // (3 + 2) / 2
+  });
+
+  it("filters the comparison cohort by the effective service when service_type is omitted", async () => {
+    await getAgentDetail(AGENT_A, 2026, undefined, 1, 2, ["call"]);
+
+    const comparisonSelectIndex = queryCalls.findIndex(
+      (call) =>
+        call.table === "qa_temuan" &&
+        call.method === "select" &&
+        String(call.args[0]).includes("profiler_peserta!inner"),
+    );
+    expect(comparisonSelectIndex).toBeGreaterThanOrEqual(0);
+
+    const comparisonCalls = queryCalls.slice(comparisonSelectIndex);
+    expect(
+      comparisonCalls.some(
+        (call) =>
+          call.table === "qa_temuan" &&
+          call.method === "eq" &&
+          call.args[0] === "service_type" &&
+          call.args[1] === "call",
+      ),
+    ).toBe(true);
   });
 
   it("returns empty rows when no temuan exist in the range", async () => {

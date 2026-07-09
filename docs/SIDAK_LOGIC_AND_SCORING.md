@@ -333,6 +333,7 @@ Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan d
 - Jika tidak ada keyword yang cocok, temuan masuk ke `lainnya`.
 - Klaster diurutkan berdasarkan prioritas, jumlah temuan, jumlah critical, dan jumlah tiket.
 - Evidence teks diambil dari `ketidaksesuaian`, lalu `sebaiknya`, lalu fallback ke nama parameter.
+- Setiap klaster juga mengekspos `ticketReferences` (nomor tiket unik per `no_tiket + periodId`, dengan `periodLabel` dan jumlah temuan per tiket) untuk keperluan audit checking di UI. Field ini **opsional** dan tidak mengubah `affectedTickets` maupun clustering (tetap deterministic, non-AI). Tiket tanpa `no_tiket` dikecualikan dari daftar, dan jumlah reference per klaster dibatasi ke 12 agar payload/UI tetap ringan.
 
 ### Coverage Target
 

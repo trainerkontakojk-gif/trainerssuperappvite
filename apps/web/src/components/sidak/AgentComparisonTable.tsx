@@ -76,7 +76,7 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
     scope.serviceLabel || scope.serviceType
   } • ${scope.teamLabel} • ${
     totalRow?.teamAgentCount ?? 0
-  } agent tim / ${totalRow?.serviceAgentCount ?? 0} agent layanan`;
+  } agent tim / ${totalRow?.serviceAgentCount ?? 0} agent service sama`;
 
   return (
     <div className="rounded-2xl border border-border bg-surface">
@@ -100,13 +100,13 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
                 Rata-rata tim
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
-                Rata-rata layanan
+                Rata-rata service sama
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
                 % vs tim
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
-                % vs layanan
+                % vs service sama
               </th>
             </tr>
           </thead>
