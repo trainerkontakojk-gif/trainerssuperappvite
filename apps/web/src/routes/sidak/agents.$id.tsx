@@ -7,10 +7,7 @@ import {
 import AgentProfileBar from "../../components/sidak/AgentProfileBar";
 import ContextControlBar from "../../components/sidak/ContextControlBar";
 import MonthRail from "../../components/sidak/MonthRail";
-import ScoreDetailCard from "../../components/sidak/ScoreDetailCard";
-import TopTicketsCard from "../../components/sidak/TopTicketsCard";
-
-import RootCauseCard from "../../components/sidak/RootCauseCard";
+import AgentAuditDossier from "../../components/sidak/AgentAuditDossier";
 import AgentTrendTab from "../../components/sidak/AgentTrendTab";
 import AgentTemuanTab from "../../components/sidak/AgentTemuanTab";
 import EditTemuanModal from "../../components/sidak/EditTemuanModal";
@@ -189,7 +186,7 @@ export default function SidakAgentDetailPage() {
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8 space-y-12">
         {/* ── SECTION: RINGKASAN SKOR ── */}
-        <div ref={summaryRef} data-section="summary" id="section-summary" className="scroll-mt-24 space-y-8">
+        <div ref={summaryRef} data-section="summary" id="section-summary" className="scroll-mt-24 space-y-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <ShieldCheck className="h-5 w-5" />
@@ -216,26 +213,18 @@ export default function SidakAgentDetailPage() {
               {/* Month Rail */}
               <MonthRail summaries={monthlySummaries} selectedMonth={selectedMonth} onMonthSelect={handleMonthSelect} />
 
-              {/* Active Detail Panel */}
+              {/* Active Detail Panel — Audit Dossier */}
               {latestPeriod && (
-                <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12 xl:gap-6">
-                  {/* Score Card — 4 cols */}
-                  <div className="xl:col-span-4">
-                    <ScoreDetailCard
-                      finalScore={latestPeriod.finalScore}
-                      sessionCount={latestPeriod.sessionCount}
-                      previousScore={previousPeriod?.finalScore ?? null}
-                      findingsCount={latestPeriod.findingsCount}
-                      monthLabel={activeLabel}
-                    />
-                  </div>
-
-                  {/* Top Tickets + Root Cause — 8 cols */}
-                  <div className="space-y-5 xl:col-span-8">
-                    <TopTicketsCard tickets={topTickets} />
-                    <RootCauseCard causes={activeRootCauses} monthLabel={rootCauseScopeLabel} />
-                  </div>
-                </div>
+                <AgentAuditDossier
+                  finalScore={latestPeriod.finalScore}
+                  sessionCount={latestPeriod.sessionCount}
+                  findingsCount={latestPeriod.findingsCount}
+                  previousScore={previousPeriod?.finalScore ?? null}
+                  monthLabel={activeLabel}
+                  tickets={topTickets}
+                  causes={activeRootCauses}
+                  rootCauseMonthLabel={rootCauseScopeLabel}
+                />
               )}
             </div>
           )}

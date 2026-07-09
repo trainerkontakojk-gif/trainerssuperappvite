@@ -369,7 +369,8 @@ Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Pena
 | Service | `apps/api/src/services/sidak/agent-root-causes.ts` | Registry, matching, grouping, sorting |
 | Integrasi | `apps/api/src/services/sidak/agent-directory.ts` | Panggil `deriveAgentRootCauses()` di `getAgentDetail()` |
 | Hook | `apps/web/src/hooks/useAgentDetail.ts` | Filter `activeRootCauses` per bulan/layanan aktif |
-| Komponen | `apps/web/src/components/sidak/RootCauseCard.tsx` | Render utama + secondary causes + empty state |
+| Komponen (container) | `apps/web/src/components/sidak/AgentAuditDossier.tsx` | Full-width audit dossier: score strip + ticket impact + root-cause coaching; membungkus `RootCauseCard` & `TopTicketsCard` yang kini thin presentational blocks (tanpa outer `rounded-2xl bg-surface`) |
+| Komponen (thin) | `apps/web/src/components/sidak/RootCauseCard.tsx` | Render utama + secondary causes + empty state (di-embed dalam dossier) |
 
 ## BKO Parameter and Weights Resolver
 

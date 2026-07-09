@@ -33,12 +33,14 @@ export default function MonthRail({ summaries, selectedMonth, onMonthSelect }: P
       <div className="flex min-w-max items-end gap-1.5 border-b border-border/50 pb-1">
         {sorted.map((p) => {
           const isActive = selectedMonth === p.month;
-          return (
+           return (
             <button
               key={`${p.month}-${p.year}`}
               onClick={() => onMonthSelect(p.month)}
-              className={`group relative min-w-[112px] px-2.5 pb-3 pt-2 text-left transition-colors ${
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
+              className={`group relative min-w-[84px] rounded-lg border px-2 pb-2.5 pt-1.5 text-left transition-colors ${
+                isActive
+                  ? "border-border bg-muted/50 text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground/80"
               }`}
             >
               <div className={`text-[10px] font-black uppercase tracking-[0.18em] mb-1 ${isActive ? "text-primary" : "text-muted-foreground"}`}>
@@ -46,18 +48,14 @@ export default function MonthRail({ summaries, selectedMonth, onMonthSelect }: P
               </div>
 
               <div className="flex items-end gap-0.5 leading-none">
-                <span className={`text-[2rem] font-black tracking-tight ${isActive ? "text-foreground" : "text-muted-foreground/80"}`}>
+                <span className={`text-base font-black tracking-tight ${isActive ? "text-foreground" : "text-muted-foreground/80"}`}>
                   {p.finalScore.toFixed(1)}
                 </span>
-                <span className="pb-0.5 text-sm font-black text-muted-foreground/40">%</span>
+                <span className="pb-0.5 text-[10px] font-black text-muted-foreground/40">%</span>
               </div>
 
               {p.finalScore < 95 && (
                 <div className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
-              )}
-
-              {isActive && (
-                <div className="absolute inset-0 -z-10 rounded-lg bg-muted/40" />
               )}
 
               <div className="absolute bottom-0 left-2.5 right-2.5 h-[3px] overflow-hidden rounded-full bg-muted">
