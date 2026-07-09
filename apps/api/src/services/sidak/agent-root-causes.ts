@@ -203,6 +203,26 @@ function matchCluster(searchText: string): {
   return { entry: FALLBACK_ROOT_CAUSE, matchedKeywords: [] };
 }
 
+function buildPeriodLabelFromTicketNumber(noTiket: string): string | null {
+  const match = noTiket.trim().toUpperCase().match(/^[A-Z](\d{2})(\d{2})/);
+  if (!match) return null;
+
+  const year = 2000 + Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+
+  return `${String(month).padStart(2, "0")}/${year}`;
+}
+
+function fallbackPeriodLabel(noTiket?: string): string {
+  if (noTiket) {
+    const ticketPeriodLabel = buildPeriodLabelFromTicketNumber(noTiket);
+    if (ticketPeriodLabel) return ticketPeriodLabel;
+  }
+
+  return "Periode tidak dikenal";
+}
+
 // ─── Internal accumulator types ─────────────────────────────────────────────
 
 interface PeriodAccumulator {
@@ -243,6 +263,7 @@ export interface DeriveAgentRootCausesInput {
       | "service_type"
       | "no_tiket"
       | "nilai"
+      | "tahun"
       | "ketidaksesuaian"
       | "sebaiknya"
       | "is_phantom_padding"
@@ -386,7 +407,7 @@ export function deriveAgentRootCauses(
         periodId,
         month: period?.month ?? 0,
         year: period?.year ?? 0,
-        label: period?.label ?? `${periodId.slice(0, 8)}...`,
+        label: period?.label ?? fallbackPeriodLabel(),
         serviceType: rawService as ServiceType,
         findingsCount: periodAcc.findingsCount,
         criticalFindingsCount: periodAcc.criticalFindingsCount,
@@ -408,7 +429,7 @@ export function deriveAgentRootCauses(
       ticketReferences.push({
         no_tiket: ref.no_tiket,
         periodId: ref.periodId,
-        periodLabel: refPeriod?.label ?? `${ref.periodId.slice(0, 8)}...`,
+        periodLabel: refPeriod?.label ?? fallbackPeriodLabel(ref.no_tiket),
         findingsCount: ref.findingsCount,
         criticalFindingsCount: ref.criticalFindingsCount,
       });

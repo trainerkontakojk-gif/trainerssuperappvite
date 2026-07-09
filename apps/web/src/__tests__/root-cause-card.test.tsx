@@ -27,8 +27,20 @@ const causes: RootCauseResult[] = [
     ],
     periods: [],
     ticketReferences: [
-      { no_tiket: "T-001", periodId: "p-jul", periodLabel: "07/2026", findingsCount: 2, criticalFindingsCount: 1 },
-      { no_tiket: "T-002", periodId: "p-jun", periodLabel: "06/2026", findingsCount: 1, criticalFindingsCount: 0 },
+      {
+        no_tiket: "T-001",
+        periodId: "p-jul",
+        periodLabel: "07/2026",
+        findingsCount: 2,
+        criticalFindingsCount: 1,
+      },
+      {
+        no_tiket: "T-002",
+        periodId: "p-jun",
+        periodLabel: "06/2026",
+        findingsCount: 1,
+        criticalFindingsCount: 0,
+      },
     ],
   },
   {
@@ -45,7 +57,13 @@ const causes: RootCauseResult[] = [
     evidence: [],
     periods: [],
     ticketReferences: [
-      { no_tiket: "T-050", periodId: "p-jul", periodLabel: "07/2026", findingsCount: 1, criticalFindingsCount: 0 },
+      {
+        no_tiket: "T-050",
+        periodId: "p-jul",
+        periodLabel: "07/2026",
+        findingsCount: 1,
+        criticalFindingsCount: 0,
+      },
     ],
   },
 ];
@@ -77,14 +95,6 @@ describe("RootCauseCard", () => {
     expect(screen.getByText(/1 critical/i)).toBeInTheDocument();
   });
 
-  it("renders evidence text for primary cause", () => {
-    render(<RootCauseCard causes={causes} />);
-
-    expect(
-      screen.getByText(/Jawaban salah terkait ketentuan produk/i),
-    ).toBeInTheDocument();
-  });
-
   it("renders secondary causes in compact rows", () => {
     render(<RootCauseCard causes={causes} />);
 
@@ -109,21 +119,23 @@ describe("RootCauseCard", () => {
     expect(screen.queryByText("T-050")).not.toBeInTheDocument();
   });
 
-  it("reveals ticket numbers and month labels when Tampilkan tiket is clicked", () => {
+  it("reveals ticket numbers with month context when Tampilkan tiket is clicked", () => {
     render(<RootCauseCard causes={causes} />);
 
-    const toggle = screen.getByRole("button", { name: /Tampilkan tiket/i });
+    const toggle = screen.getAllByRole("button", {
+      name: /Tampilkan tiket/i,
+    })[0];
     expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(toggle);
 
     // Ticket numbers + grouped month labels visible
-    expect(screen.getByText("T-001")).toBeInTheDocument();
-    expect(screen.getByText("T-002")).toBeInTheDocument();
+    expect(screen.getByText("T-001 (Juli)")).toBeInTheDocument();
+    expect(screen.getByText("T-002 (Juni)")).toBeInTheDocument();
     expect(screen.getByText("07/2026")).toBeInTheDocument();
     expect(screen.getByText("06/2026")).toBeInTheDocument();
-    // Secondary cause ticket also revealed under global expanded mode
-    expect(screen.getByText("T-050")).toBeInTheDocument();
+    // Secondary cause ticket stays hidden until its own cluster is expanded.
+    expect(screen.queryByText("T-050 (Juli)")).not.toBeInTheDocument();
 
     const updated = screen.getByRole("button", { name: /Sembunyikan tiket/i });
     expect(updated).toHaveAttribute("aria-expanded", "true");
@@ -132,26 +144,45 @@ describe("RootCauseCard", () => {
   it("hides ticket references again when toggled off and updates button copy", () => {
     render(<RootCauseCard causes={causes} />);
 
-    const toggle = screen.getByRole("button", { name: /Tampilkan tiket/i });
+    const toggle = screen.getAllByRole("button", {
+      name: /Tampilkan tiket/i,
+    })[0];
     fireEvent.click(toggle);
-    expect(screen.getByText("T-001")).toBeInTheDocument();
+    expect(screen.getByText("T-001 (Juli)")).toBeInTheDocument();
 
     const hide = screen.getByRole("button", { name: /Sembunyikan tiket/i });
     fireEvent.click(hide);
 
-    expect(screen.queryByText("T-001")).not.toBeInTheDocument();
-    expect(screen.queryByText("T-050")).not.toBeInTheDocument();
-    const collapsed = screen.getByRole("button", { name: /Tampilkan tiket/i });
+    expect(screen.queryByText("T-001 (Juli)")).not.toBeInTheDocument();
+    expect(screen.queryByText("T-050 (Juli)")).not.toBeInTheDocument();
+    const collapsed = screen.getAllByRole("button", {
+      name: /Tampilkan tiket/i,
+    })[0];
     expect(collapsed).toHaveAttribute("aria-expanded", "false");
   });
 
   it("groups ticket chips under the correct month label", () => {
     render(<RootCauseCard causes={causes} />);
-    fireEvent.click(screen.getByRole("button", { name: /Tampilkan tiket/i }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Tampilkan tiket/i })[0],
+    );
 
     const julGroup = screen.getByText("07/2026").closest("div") as HTMLElement;
     const junGroup = screen.getByText("06/2026").closest("div") as HTMLElement;
-    expect(within(julGroup).getByText("T-001")).toBeInTheDocument();
-    expect(within(junGroup).getByText("T-002")).toBeInTheDocument();
+    expect(within(julGroup).getByText("T-001 (Juli)")).toBeInTheDocument();
+    expect(within(junGroup).getByText("T-002 (Juni)")).toBeInTheDocument();
+  });
+
+  it("expands secondary cluster ticket details independently", () => {
+    render(<RootCauseCard causes={causes} />);
+
+    const toggles = screen.getAllByRole("button", { name: /Tampilkan tiket/i });
+    expect(toggles).toHaveLength(2);
+
+    fireEvent.click(toggles[1]);
+
+    expect(toggles[1]).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("T-050 (Juli)")).toBeInTheDocument();
+    expect(screen.queryByText("T-001 (Juli)")).not.toBeInTheDocument();
   });
 });

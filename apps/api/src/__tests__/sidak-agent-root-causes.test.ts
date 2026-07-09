@@ -635,6 +635,29 @@ describe("deriveAgentRootCauses", () => {
     expect(t200?.findingsCount).toBe(1);
   });
 
+  it("derives ticket reference month from L ticket number when period metadata is missing", () => {
+    const missingPeriodId = "e24a28b2-0000-4000-9000-000000000000";
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById: new Map(),
+      temuan: [
+        row({
+          id: "missing-period",
+          no_tiket: "L2607007211",
+          period_id: missingPeriodId,
+          ketidaksesuaian: "salah jawaban",
+        }),
+      ],
+    });
+
+    const refs = result[0].ticketReferences ?? [];
+    expect(refs[0]).toMatchObject({
+      no_tiket: "L2607007211",
+      periodId: missingPeriodId,
+      periodLabel: "07/2026",
+    });
+  });
+
   it("excludes missing no_tiket so no blank ticket chip appears", () => {
     const result = deriveAgentRootCauses({
       indicators,

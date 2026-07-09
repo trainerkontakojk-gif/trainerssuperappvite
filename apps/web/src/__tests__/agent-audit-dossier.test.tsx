@@ -148,6 +148,7 @@ describe("AgentAuditDossier", () => {
     expect(
       screen.getByText(/Berdasarkan temuan Jan-Mei 2026/i),
     ).toBeInTheDocument();
+    expect(screen.getByText("Pola Lanjutan")).toBeInTheDocument();
     expect(screen.getByText("Jawaban salah/tidak akurat")).toBeInTheDocument();
     expect(screen.getByText("Kurang menggali kebutuhan")).toBeInTheDocument();
   });

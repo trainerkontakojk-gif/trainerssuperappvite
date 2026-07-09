@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, TrendingUp, TrendingDown } from "lucide-react";
+import { Activity, TrendingUp, TrendingDown, ListChecks } from "lucide-react";
 import TopTicketsCard from "./TopTicketsCard";
 import RootCauseCard from "./RootCauseCard";
 import type { RootCauseResult } from "@trainers/types";
@@ -127,16 +127,63 @@ export default function AgentAuditDossier({
       {/* Internal divider between strip and working sections */}
       <div className="border-t border-border" />
 
-      {/* Bottom row — ticket impact + root-cause coaching, shared rhythm */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,0.42fr)_minmax(420px,0.58fr)]">
+      {/* Bottom row — ticket impact + primary diagnosis, then full-width patterns */}
+      <div className="grid grid-cols-1 items-start lg:grid-cols-[minmax(320px,0.42fr)_minmax(420px,0.58fr)]">
         <div className="p-5 lg:border-r lg:border-border">
           <TopTicketsCard tickets={tickets} />
         </div>
         <div className="p-5">
-          <RootCauseCard causes={causes} monthLabel={rootCauseMonthLabel} />
+          <RootCauseCard
+            causes={causes}
+            monthLabel={rootCauseMonthLabel}
+            showSecondary={false}
+          />
         </div>
+        {causes.length > 1 && (
+          <div className="border-t border-border p-5 lg:col-span-2">
+            <RootCausePatternBand causes={causes.slice(1, 4)} />
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function RootCausePatternBand({ causes }: { causes: RootCauseResult[] }) {
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h4 className="flex items-center gap-2 text-sm font-black tracking-tight text-foreground">
+          <ListChecks className="h-4 w-4 text-muted-foreground" />
+          Pola Lanjutan
+        </h4>
+        <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          {causes.length} pola
+        </span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {causes.map((cause) => (
+          <div
+            key={cause.clusterId}
+            className="rounded-xl border border-border bg-background/60 p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="break-words text-sm font-bold leading-snug text-foreground">
+                  {cause.label}
+                </p>
+                <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground">
+                  {cause.recommendation}
+                </p>
+              </div>
+              <span className="inline-flex min-w-9 shrink-0 justify-center rounded-full border border-border bg-surface px-2 py-1 text-xs font-black tabular-nums text-foreground">
+                {cause.findingsCount}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
