@@ -74,6 +74,22 @@ describe("buildTelefunLiveSystemInstruction", () => {
     });
 
     expect(prompt).not.toContain("TANTANGAN PERCAKAPAN");
+    expect(prompt).toContain("JANGAN MENYELA AGEN");
+    expect(prompt).not.toContain("MENYELA KONDISIONAL");
+  });
+
+  it("allows contextual interruption only when that challenge is selected", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: { name: "Budi", gender: "male", phone: "0811", city: "Jakarta", voiceName: "Fenrir", signatureName: "" },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "realistic",
+      maxCallDuration: 0,
+      simulationChallengeTypes: ["interruption"],
+    });
+
+    expect(prompt).toContain("MENYELA KONDISIONAL");
+    expect(prompt).not.toContain("JANGAN MENYELA AGEN");
   });
 
   it("includes KONSISTENSI SUARA section", () => {
@@ -135,7 +151,7 @@ describe("buildTelefunLiveSystemInstruction", () => {
     });
     expect(prompt).toContain("JANGAN PERNAH BERHENTI MENDADAK");
     expect(prompt).toContain("Abaikan suara bising kecil");
-    expect(prompt).toContain("MENYELA KONDISIONAL");
+    expect(prompt).toContain("JANGAN MENYELA AGEN");
     expect(prompt).toContain("JANGAN MENGAKHIRI PERCAKAPAN HANYA KARENA");
   });
 

@@ -520,10 +520,6 @@ export class LiveSession {
     this.nextStartTime = startTime + buffer.duration;
   }
 
-  private cancelAiPlayback() {
-    this.clearAiPlayback("interruption_guard");
-  }
-
   private sendSetup() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 

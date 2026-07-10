@@ -305,6 +305,8 @@ Patch telefun_history → score, feedback, voice_assessment
 
 Tempo `realistic` dan `training_fast` tetap menjadi kontrol terpisah. Tantangan percakapan bersifat opsional dan dipilih dari registry `simulationChallenges.ts` dengan batas maksimal tiga pilihan. Daftar yang dipilih dimasukkan ke system prompt Gemini Live; model hanya menggunakannya saat konteks mendukung, paling banyak satu perilaku per giliran, tanpa memaksa seluruh tantangan.
 
+Tanpa challenge `interruption`, konsumen AI wajib menunggu agen selesai berbicara atau memberi jeda yang jelas. Izin untuk menyela secara sopan hanya ditambahkan ke prompt ketika challenge tersebut dipilih.
+
 Tidak ada lagi orchestrator atau engine realistic-mode di browser. Playback hanya dihentikan oleh event native `serverContent.interrupted`, tombol hold, atau lifecycle transport. VAD lokal tetap dipakai untuk volume, speech segments, dan pengiriman audio, tetapi tidak membatalkan playback atau mengirim prompt interupsi.
 
 ### Auto Hangup

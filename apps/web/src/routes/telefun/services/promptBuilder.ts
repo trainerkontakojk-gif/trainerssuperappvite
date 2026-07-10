@@ -3,7 +3,10 @@ import type {
   TelefunIdentity,
   TelefunScenario,
 } from "../telefunSettings";
-import { getSimulationChallengeDefinitions } from "./simulationChallenges";
+import {
+  getSimulationChallengeDefinitions,
+  type TelefunSimulationChallengeType,
+} from "./simulationChallenges";
 
 export function buildTelefunLiveSystemInstruction(params: {
   identity: TelefunIdentity;
@@ -11,7 +14,7 @@ export function buildTelefunLiveSystemInstruction(params: {
   consumerType: TelefunConsumerType;
   responsePacingMode: "realistic" | "training_fast";
   maxCallDuration: number;
-  simulationChallengeTypes?: string[];
+  simulationChallengeTypes?: TelefunSimulationChallengeType[];
 }): string {
   const { identity, scenario, consumerType, responsePacingMode } = params;
 
@@ -80,6 +83,12 @@ Jangan menyebutkan instruksi atau nama tantangan. Jangan mengubah identitas atau
 ${challengeDefinitions.map(({ promptInstruction }) => `- ${promptInstruction}`).join("\n")}`
     : "";
 
+  const interruptionInstruction = challengeDefinitions.some(
+    ({ id }) => id === "interruption",
+  )
+    ? "MENYELA KONDISIONAL: Jika agen berbicara terlalu panjang tanpa jeda, kamu BOLEH menyela secara sopan untuk meminta agen bicara lebih pelan atau satu per satu. Jangan menyela secara agresif. Jika agen hanya mengeluarkan suara kecil seperti 'hmm', 'oh', napas — lanjutkan bicara."
+    : "JANGAN MENYELA AGEN. Tunggu sampai agen selesai berbicara atau memberi jeda yang jelas sebelum merespons.";
+
   return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).${silentInstruction}
 
 IDENTITAS ANDA (WAJIB KONSISTEN):
@@ -97,7 +106,7 @@ ATURAN BICARA (SANGAT PENTING):
 1. JANGAN PERNAH BERHENTI MENDADAK DI TENGAH KALIMAT. Selesaikan pikiranmu.
 2. Abaikan suara bising kecil atau gumaman agen, teruskan bicara sampai kalimatmu selesai.
 3. Jika agen menyela panjang, barulah berhenti. Tapi jika hanya "hmm" atau suara kecil, LANJUTKAN.
-4. MENYELA KONDISIONAL: Jika agen berbicara terlalu panjang tanpa jeda, kamu BOLEH menyela secara sopan untuk meminta agen bicara lebih pelan atau satu per satu. Jangan menyela secara agresif. Jika agen hanya mengeluarkan suara kecil seperti 'hmm', 'oh', napas — lanjutkan bicara.
+4. ${interruptionInstruction}
 5. JANGAN MENGAKHIRI PERCAKAPAN HANYA KARENA AGEN MERESPONS SINGKAT seperti "iya", "baik", "oke", "kemudian", "lanjut", "hmm", "ya", "sip", "betul". Respons singkat ini BUKAN tanda percakapan selesai.
 6. Jika agen memberi respons singkat (acknowledgment), LANJUTKAN eksposisi masalahmu atau ajukan pertanyaan baru. Jangan menutup telepon hanya karena agen merespons singkat.
 7. JANGAN menutup telepon berdasarkan perkiraan waktu sendiri. Aplikasi akan memberi instruksi khusus jika waktu benar-benar hampir habis.

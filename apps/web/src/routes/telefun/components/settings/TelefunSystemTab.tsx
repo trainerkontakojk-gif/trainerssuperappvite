@@ -24,7 +24,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
     <div className="space-y-8 mt-4">
       {/* AI Model Selection for Telefun */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl">
           <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
             <Zap className="w-24 h-24" />
           </div>
@@ -93,7 +93,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
 
       {/* Simulation Duration Selection */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl">
           <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
             <Clock className="w-24 h-24" />
           </div>
@@ -118,7 +118,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
 
       {/* Tempo Respons Konsumen */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl">
           <div className="relative z-10 max-w-2xl flex gap-4 items-start">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Zap className="w-5 h-5 text-primary" />
@@ -191,7 +191,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
 
       {/* Conversation Challenges */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl">
           <div className="relative z-10 max-w-2xl flex gap-4 items-start">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Zap className="w-5 h-5 text-primary" />

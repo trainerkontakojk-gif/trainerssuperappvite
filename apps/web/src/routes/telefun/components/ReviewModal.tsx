@@ -98,9 +98,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   const [retryTrigger, setRetryTrigger] = useState(0);
 
   const summaryPath =
-    isOpen && record ? `/telefun/coaching-summary/${record.id}` : null;
+    isOpen && record && activeTab === "replay"
+      ? `/telefun/coaching-summary/${record.id}`
+      : null;
   const annotationsPath =
-    isOpen && record ? `/telefun/annotations/${record.id}` : null;
+    isOpen && record && activeTab === "replay"
+      ? `/telefun/annotations/${record.id}`
+      : null;
 
   const {
     data: coachingSummary,
@@ -200,14 +204,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     [coachingSummary],
   );
 
-  const effectiveAssessment = assessment ?? record?.voiceAssessment ?? null;
   const effectiveVoiceMetrics =
     voiceDashboardMetrics ??
     (record?.voiceDashboardMetrics
       ? (record.voiceDashboardMetrics as VoiceDashboardMetrics)
       : null);
-  const sessionDurationMs = (record?.duration ?? 0) * 1000;
-
   const handleAssessmentUpdate = useCallback(
     (nextAssessment: VoiceQualityAssessment) => {
       setAssessment(nextAssessment);
@@ -516,9 +517,16 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                         sessionId={record.id}
                         annotations={mappedAnnotations}
                         recommendations={recommendations}
-                        isLoading={annotationsLoading}
-                        error={annotationsError ? String(annotationsError) : undefined}
-                        onRetry={() => {}}
+                        isLoading={annotationsLoading || summaryLoading}
+                        error={
+                          annotationsError || summaryError
+                            ? String(annotationsError || summaryError)
+                            : undefined
+                        }
+                        onRetry={() => {
+                          void refetchAnnotations();
+                          void refetchSummary();
+                        }}
                         onAddAnnotation={handleAddAnnotation}
                         onDeleteAnnotation={handleDeleteAnnotation}
                         sessionDurationMs={record.duration * 1000}

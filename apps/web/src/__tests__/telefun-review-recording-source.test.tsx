@@ -1,19 +1,23 @@
 import React from "react";
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getRecording: vi.fn(),
   unwrapResponse: vi.fn(),
+  useApi: vi.fn(),
 }));
 
 vi.mock("../hooks/useApi", () => ({
-  useApi: () => ({
-    data: null,
-    loading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  useApi: (path: string | null) => {
+    mocks.useApi(path);
+    return {
+      data: null,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  },
 }));
 
 vi.mock("../lib/api", () => ({
@@ -65,5 +69,28 @@ describe("ReviewModal recording source", () => {
     );
 
     await waitFor(() => expect(mocks.getRecording).not.toHaveBeenCalled());
+  });
+
+  it("loads replay data only after the replay tab is opened", async () => {
+    render(<ReviewModal isOpen onClose={vi.fn()} record={baseRecord} />);
+
+    expect(mocks.useApi).toHaveBeenCalledWith(null);
+    expect(mocks.useApi).not.toHaveBeenCalledWith(
+      "/telefun/coaching-summary/session-1",
+    );
+    expect(mocks.useApi).not.toHaveBeenCalledWith(
+      "/telefun/annotations/session-1",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Anotasi Replay" }));
+
+    await waitFor(() => {
+      expect(mocks.useApi).toHaveBeenCalledWith(
+        "/telefun/coaching-summary/session-1",
+      );
+      expect(mocks.useApi).toHaveBeenCalledWith(
+        "/telefun/annotations/session-1",
+      );
+    });
   });
 });

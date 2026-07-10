@@ -10,10 +10,18 @@
 
 ## Verification
 
-- Focused web tests: 77 passing.
-- Focused API tests: 20 passing.
+- Focused web tests: 93 passing.
+- Focused API tests: 21 passing.
 - Web/API TypeScript checks passing.
-- Impeccable hook finding side-stripe pada panel settings diperbaiki dengan border surface standar.
+- `pnpm lint`, `pnpm build`, dan `pnpm test:core` passing; lint hanya melaporkan warning existing.
+- Impeccable hook finding side-stripe dan decorative blur pada panel settings diperbaiki dengan border surface standar.
+
+## Post-execution audit fixes
+
+- Challenge `interruption` sekarang benar-benar opt-in; tanpa pilihan tersebut prompt melarang AI menyela agen.
+- Coaching summary dan replay annotations baru di-fetch ketika tab Anotasi Replay dibuka.
+- Boundary API menolak challenge ID di luar tujuh ID resmi dan tetap membatasi maksimal tiga.
+- Sisa helper, timeline event, review load helper, dan realistic-mode metrics type yang tidak punya runtime consumer dihapus.
 
 ## Compatibility
 

@@ -23,8 +23,18 @@ import {
 } from "../routes/telefun";
 
 import { telefunTranscriptSchema, parseTelefunTranscript } from "@trainers/types";
+import { telefunSimulationChallengeTypesSchema } from "../routes/telefun/settings";
 
 describe("telefun API payload and security validators", () => {
+  it("rejects unknown simulation challenge IDs at the settings boundary", () => {
+    expect(
+      telefunSimulationChallengeTypesSchema.safeParse([
+        "interruption",
+        "unknown_challenge",
+      ]).success,
+    ).toBe(false);
+  });
+
   it("merges telefun settings without wiping other keys like ketik", () => {
     const existingSettings = {
       ketik: { selectedModel: "gemini-2.0-flash-exp" },

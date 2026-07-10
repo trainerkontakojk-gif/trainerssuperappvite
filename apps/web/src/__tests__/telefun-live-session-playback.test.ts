@@ -79,36 +79,6 @@ beforeEach(() => {
 });
 
 describe("LiveSession AI playback lifecycle", () => {
-  it("cancelAiPlayback stops already scheduled PCM sources", () => {
-    const session = new LiveSession(createMockConfig()) as unknown as Record<
-      string,
-      unknown
-    >;
-    const { ctx } = createMockAudio();
-
-    session.audioContext = ctx;
-    session.recordingDestination = {};
-    (session as unknown as { activeSources: Set<unknown> }).activeSources =
-      new Set();
-
-    (session as unknown as { playPcm: (d: Uint8Array, r: number) => void }).playPcm(
-      makePcmData([10000, -10000]),
-      24000,
-    );
-
-    const activeSources = session.activeSources as Set<MockSource>;
-    expect(activeSources.size).toBe(1);
-
-    const source = activeSources.values().next().value as MockSource;
-    (session as unknown as { cancelAiPlayback: () => void }).cancelAiPlayback();
-
-    expect(source.stop).toHaveBeenCalled();
-    expect(source.disconnect).toHaveBeenCalled();
-    expect(activeSources.size).toBe(0);
-    expect(session.isAiSpeaking).toBe(false);
-    expect(session.nextStartTime).toBe(0);
-  });
-
   it("serverContent.interrupted clears queued playback and marks AI as not speaking", () => {
     const session = new LiveSession(createMockConfig()) as unknown as Record<
       string,

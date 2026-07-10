@@ -8,6 +8,20 @@ type Variables = { user: User; profile: any };
 
 const telefunSettings = new Hono<{ Variables: Variables }>();
 
+const TELEFUN_SIMULATION_CHALLENGE_IDS = [
+  "technical_term_confusion",
+  "repeated_question",
+  "misunderstanding",
+  "interruption",
+  "incomplete_data",
+  "unclear_voice",
+  "emotional_escalation",
+] as const;
+
+export const telefunSimulationChallengeTypesSchema = z
+  .array(z.enum(TELEFUN_SIMULATION_CHALLENGE_IDS))
+  .max(3);
+
 telefunSettings.get("/settings", async (c) => {
   const user = c.get("user");
   const adminClient = createAdminClient();
@@ -89,7 +103,8 @@ telefunSettings.put(
           .optional(),
         maxCallDuration: z.number().optional(),
         responsePacingMode: z.enum(["realistic", "training_fast"]).optional(),
-        simulationChallengeTypes: z.array(z.string()).max(3).optional(),
+        simulationChallengeTypes:
+          telefunSimulationChallengeTypesSchema.optional(),
         realisticModeEnabled: z.boolean().optional(),
         realisticModeDisruptionTypes: z.array(z.string()).optional(),
         preferredConsumerTypeId: z.string().optional(),
