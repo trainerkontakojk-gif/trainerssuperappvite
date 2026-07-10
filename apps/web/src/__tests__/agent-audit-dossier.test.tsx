@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import AgentAuditDossier from "../components/sidak/AgentAuditDossier";
 import type { RootCauseResult } from "@trainers/types";
@@ -26,6 +26,15 @@ const causes: RootCauseResult[] = [
       },
     ],
     periods: [],
+    ticketReferences: [
+      {
+        no_tiket: "T-ADV-1",
+        periodId: "p-jun",
+        periodLabel: "06/2026",
+        findingsCount: 1,
+        criticalFindingsCount: 0,
+      },
+    ],
   },
   {
     clusterId: "kurang_menggali",
@@ -40,6 +49,15 @@ const causes: RootCauseResult[] = [
       "Latih pertanyaan klarifikasi agar kebutuhan, kronologi, dan konteks pelanggan tergali tuntas.",
     evidence: [],
     periods: [],
+    ticketReferences: [
+      {
+        no_tiket: "T-ADV-2",
+        periodId: "p-jul",
+        periodLabel: "07/2026",
+        findingsCount: 1,
+        criticalFindingsCount: 0,
+      },
+    ],
   },
 ];
 
@@ -151,6 +169,12 @@ describe("AgentAuditDossier", () => {
     expect(screen.getByText("Pola Lanjutan")).toBeInTheDocument();
     expect(screen.getByText("Jawaban salah/tidak akurat")).toBeInTheDocument();
     expect(screen.getByText("Kurang menggali kebutuhan")).toBeInTheDocument();
+    expect(screen.getByText("1 temuan")).toBeInTheDocument();
+    expect(screen.getAllByText("1 tiket")).toHaveLength(1);
+    expect(screen.queryByText("T-ADV-2 (Juli)")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Tampilkan tiket" })[1]);
+    expect(screen.getByText("T-ADV-2 (Juli)")).toBeInTheDocument();
+    expect(screen.queryByText("07/2026")).not.toBeInTheDocument();
   });
 
   it("renders the root-cause empty state when no causes", () => {

@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Activity, TrendingUp, TrendingDown, ListChecks } from "lucide-react";
 import TopTicketsCard from "./TopTicketsCard";
 import RootCauseCard from "./RootCauseCard";
+import TicketEvidenceGroups from "./RootCauseTicketEvidence";
 import type { RootCauseResult } from "@trainers/types";
 
 interface TicketItem {
@@ -150,6 +151,19 @@ export default function AgentAuditDossier({
 }
 
 function RootCausePatternBand({ causes }: { causes: RootCauseResult[] }) {
+  const [expandedCauseIds, setExpandedCauseIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const toggleCause = (clusterId: string) => {
+    setExpandedCauseIds((current) => {
+      const next = new Set(current);
+      if (next.has(clusterId)) next.delete(clusterId);
+      else next.add(clusterId);
+      return next;
+    });
+  };
+
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-4">
@@ -172,6 +186,10 @@ function RootCausePatternBand({ causes }: { causes: RootCauseResult[] }) {
                 <p className="break-words text-sm font-bold leading-snug text-foreground">
                   {cause.label}
                 </p>
+                <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
+                  <span>{cause.findingsCount} temuan</span>
+                  <span>{cause.affectedTickets} tiket</span>
+                </div>
                 <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground">
                   {cause.recommendation}
                 </p>
@@ -180,6 +198,28 @@ function RootCausePatternBand({ causes }: { causes: RootCauseResult[] }) {
                 {cause.findingsCount}
               </span>
             </div>
+            {cause.ticketReferences && cause.ticketReferences.length > 0 && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => toggleCause(cause.clusterId)}
+                  aria-expanded={expandedCauseIds.has(cause.clusterId)}
+                  className="inline-flex min-h-11 items-center rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
+                >
+                  {expandedCauseIds.has(cause.clusterId)
+                    ? "Sembunyikan tiket"
+                    : "Tampilkan tiket"}
+                </button>
+                {expandedCauseIds.has(cause.clusterId) && (
+                  <div className="mt-3">
+                    <TicketEvidenceGroups
+                      references={cause.ticketReferences}
+                      className="rounded-lg border border-border bg-muted/20 p-3"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>

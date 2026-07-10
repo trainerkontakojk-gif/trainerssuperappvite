@@ -1,15 +1,10 @@
-import { useState } from "react";
 import {
   AlertCircle,
-  Eye,
-  EyeOff,
   ListChecks,
   SearchCheck,
 } from "lucide-react";
-import type {
-  RootCauseResult,
-  RootCauseTicketReference,
-} from "@trainers/types";
+import type { RootCauseResult } from "@trainers/types";
+import TicketEvidenceGroups from "./RootCauseTicketEvidence";
 
 interface RootCauseCardProps {
   causes: RootCauseResult[];
@@ -17,127 +12,6 @@ interface RootCauseCardProps {
   showSecondary?: boolean;
 }
 
-function groupTicketReferencesByMonth(
-  references: RootCauseTicketReference[] = [],
-): Array<{ periodLabel: string; items: RootCauseTicketReference[] }> {
-  const byLabel = new Map<string, RootCauseTicketReference[]>();
-  for (const ref of references) {
-    const list = byLabel.get(ref.periodLabel) ?? [];
-    list.push(ref);
-    byLabel.set(ref.periodLabel, list);
-  }
-  return [...byLabel.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([periodLabel, items]) => ({ periodLabel, items }));
-}
-
-const MONTH_NAMES = [
-  "Januari",
-  "Februari",
-  "Maret",
-  "April",
-  "Mei",
-  "Juni",
-  "Juli",
-  "Agustus",
-  "September",
-  "Oktober",
-  "November",
-  "Desember",
-];
-
-const MONTH_ALIASES = new Map<string, string>([
-  ["jan", "Januari"],
-  ["januari", "Januari"],
-  ["january", "Januari"],
-  ["feb", "Februari"],
-  ["februari", "Februari"],
-  ["february", "Februari"],
-  ["mar", "Maret"],
-  ["maret", "Maret"],
-  ["march", "Maret"],
-  ["apr", "April"],
-  ["april", "April"],
-  ["mei", "Mei"],
-  ["may", "Mei"],
-  ["jun", "Juni"],
-  ["juni", "Juni"],
-  ["june", "Juni"],
-  ["jul", "Juli"],
-  ["juli", "Juli"],
-  ["july", "Juli"],
-  ["agu", "Agustus"],
-  ["agt", "Agustus"],
-  ["agustus", "Agustus"],
-  ["aug", "Agustus"],
-  ["august", "Agustus"],
-  ["sep", "September"],
-  ["sept", "September"],
-  ["september", "September"],
-  ["okt", "Oktober"],
-  ["oct", "Oktober"],
-  ["oktober", "Oktober"],
-  ["october", "Oktober"],
-  ["nov", "November"],
-  ["november", "November"],
-  ["des", "Desember"],
-  ["dec", "Desember"],
-  ["desember", "Desember"],
-  ["december", "Desember"],
-]);
-
-function formatTicketMonth(periodLabel: string): string {
-  const numericMonth = periodLabel.match(/^(\d{1,2})[/-]\d{4}$/);
-  if (numericMonth) {
-    const monthIndex = Number(numericMonth[1]) - 1;
-    return MONTH_NAMES[monthIndex] ?? periodLabel;
-  }
-
-  const isoMonth = periodLabel.match(/^\d{4}-(\d{1,2})/);
-  if (isoMonth) {
-    const monthIndex = Number(isoMonth[1]) - 1;
-    return MONTH_NAMES[monthIndex] ?? periodLabel;
-  }
-
-  const firstWord = periodLabel.trim().split(/\s+/)[0]?.toLowerCase();
-  return (firstWord && MONTH_ALIASES.get(firstWord)) || periodLabel;
-}
-
-function formatTicketLabel(ref: RootCauseTicketReference): string {
-  return `${ref.no_tiket} (${formatTicketMonth(ref.periodLabel)})`;
-}
-
-function TicketEvidenceGroups({
-  groups,
-  className = "space-y-2 rounded-md border border-border bg-background/50 p-3",
-}: {
-  groups: Array<{ periodLabel: string; items: RootCauseTicketReference[] }>;
-  className?: string;
-}) {
-  if (groups.length === 0) return null;
-
-  return (
-    <div className={className}>
-      {groups.map((group) => (
-        <div key={group.periodLabel}>
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            {group.periodLabel}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {group.items.map((ref) => (
-              <span
-                key={`${ref.no_tiket}-${ref.periodId}`}
-                className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-semibold text-foreground"
-              >
-                {formatTicketLabel(ref)}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function RootCauseCard({
   causes,
@@ -149,20 +23,11 @@ export default function RootCauseCard({
   );
   const primary = causes[0];
   const secondary = causes.slice(1, 4);
-  const primaryExpanded = primary
-    ? expandedCauseIds.has(primary.clusterId)
-    : false;
-  const primaryTicketGroups = primary
-    ? groupTicketReferencesByMonth(primary.ticketReferences)
-    : [];
   const toggleCause = (clusterId: string) => {
     setExpandedCauseIds((current) => {
       const next = new Set(current);
-      if (next.has(clusterId)) {
-        next.delete(clusterId);
-      } else {
-        next.add(clusterId);
-      }
+      if (next.has(clusterId)) next.delete(clusterId);
+      else next.add(clusterId);
       return next;
     });
   };
@@ -203,9 +68,6 @@ export default function RootCauseCard({
               <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-foreground">
                 Utama
               </span>
-              <span className="rounded-full border border-border bg-muted/30 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                Prioritas {primary.priority}
-              </span>
               {primary.criticalFindingsCount > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-600">
                   <AlertCircle className="h-3 w-3" />
@@ -229,28 +91,13 @@ export default function RootCauseCard({
               {primary.recommendation}
             </p>
 
-            {/* Ticket evidence toggle — default collapsed */}
-            {primary.ticketReferences &&
-              primary.ticketReferences.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => toggleCause(primary.clusterId)}
-                  aria-expanded={primaryExpanded}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
-                >
-                  {primaryExpanded ? (
-                    <EyeOff className="h-3.5 w-3.5" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                  )}
-                  {primaryExpanded ? "Sembunyikan tiket" : "Tampilkan tiket"}
-                </button>
-              )}
-
-            {/* Collapsed evidence strip — ticket numbers grouped by month */}
-            {primaryExpanded && (
+            {primary.ticketReferences && primary.ticketReferences.length > 0 && (
               <div className="mt-3">
-                <TicketEvidenceGroups groups={primaryTicketGroups} />
+                <TicketToggle
+                  expanded={expandedCauseIds.has(primary.clusterId)}
+                  onToggle={() => toggleCause(primary.clusterId)}
+                  references={primary.ticketReferences}
+                />
               </div>
             )}
           </div>
@@ -261,11 +108,8 @@ export default function RootCauseCard({
               <div className="divide-y divide-border">
                 {secondary.map((cause) =>
                   (() => {
-                    const causeExpanded = expandedCauseIds.has(cause.clusterId);
-                    const ticketGroups = groupTicketReferencesByMonth(
-                      cause.ticketReferences,
-                    );
-                    const hasTicketReferences = ticketGroups.length > 0;
+                    const hasTicketReferences =
+                      (cause.ticketReferences?.length ?? 0) > 0;
 
                     return (
                       <div
@@ -277,31 +121,20 @@ export default function RootCauseCard({
                           <p className="break-words text-sm font-bold leading-snug text-foreground">
                             {cause.label}
                           </p>
+                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-semibold text-muted-foreground">
+                            <span>{cause.findingsCount} temuan</span>
+                            <span>{cause.affectedTickets} tiket</span>
+                          </div>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                             {cause.recommendation}
                           </p>
                           {hasTicketReferences && (
-                            <button
-                              type="button"
-                              onClick={() => toggleCause(cause.clusterId)}
-                              aria-expanded={causeExpanded}
-                              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
-                            >
-                              {causeExpanded ? (
-                                <EyeOff className="h-3.5 w-3.5" />
-                              ) : (
-                                <Eye className="h-3.5 w-3.5" />
-                              )}
-                              {causeExpanded
-                                ? "Sembunyikan tiket"
-                                : "Tampilkan tiket"}
-                            </button>
-                          )}
-                          {causeExpanded && (
                             <div className="mt-3">
-                              <TicketEvidenceGroups
-                                groups={ticketGroups}
-                                className="space-y-2 rounded-lg border border-border bg-muted/20 p-3"
+                              <TicketToggle
+                                expanded={expandedCauseIds.has(cause.clusterId)}
+                                onToggle={() => toggleCause(cause.clusterId)}
+                                references={cause.ticketReferences ?? []}
+                                className="rounded-lg border border-border bg-muted/20 p-3"
                               />
                             </div>
                           )}
@@ -323,3 +156,34 @@ export default function RootCauseCard({
     </section>
   );
 }
+
+function TicketToggle({
+  expanded,
+  onToggle,
+  references,
+  className,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  references: RootCauseResult["ticketReferences"];
+  className?: string;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="inline-flex min-h-11 items-center rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
+      >
+        {expanded ? "Sembunyikan tiket" : "Tampilkan tiket"}
+      </button>
+      {expanded && references && references.length > 0 && (
+        <div className="mt-3">
+          <TicketEvidenceGroups references={references} className={className} />
+        </div>
+      )}
+    </>
+  );
+}
+import { useState } from "react";
