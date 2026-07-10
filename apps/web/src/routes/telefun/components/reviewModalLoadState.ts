@@ -3,25 +3,22 @@ import type {
   ReplayAnnotation,
   CoachingRecommendation,
   VoiceDashboardMetrics,
-} from "../services/realisticMode/types";
+} from "../services/reviewTypes";
 
 export function shouldAutoLoadReviewPanel({
   activeTab,
   panelTab,
-  realisticModeEnabled,
   loaded,
   loading,
   error,
 }: {
   activeTab: ReviewModalTab;
   panelTab: Extract<ReviewModalTab, "voice_dashboard" | "replay">;
-  realisticModeEnabled: boolean;
   loaded: boolean;
   loading: boolean;
   error?: string;
 }): boolean {
   return (
-    realisticModeEnabled &&
     activeTab === panelTab &&
     !loaded &&
     !loading &&

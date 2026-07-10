@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -10,10 +10,6 @@ import {
   Download,
   User,
   Mic2,
-  BarChart3,
-  FileText,
-  Sparkles,
-  RefreshCw,
 } from "lucide-react";
 import type { CallRecord } from "../types";
 import type {
@@ -21,17 +17,18 @@ import type {
   TelefunCoachingSummary,
   TelefunReplayAnnotation,
 } from "@trainers/types";
-import type { VoiceDashboardMetrics } from "../services/realisticMode/types";
+import type { VoiceDashboardMetrics } from "../services/reviewTypes";
 import { VoiceAssessmentSection } from "./VoiceAssessmentSection";
-import { VoiceEvaluationDashboard } from "./VoiceEvaluationDashboard";
-import {
-  ReplayAnnotator,
-  type ReplayAnnotationItem,
-  type CoachingRecommendationItem,
+import type {
+  ReplayAnnotationItem,
+  CoachingRecommendationItem,
 } from "./ReplayAnnotator";
 import { useApi } from "../../../hooks/useApi";
 import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
+
+const VoiceEvaluationDashboard = lazy(() => import("./VoiceEvaluationDashboard").then((module) => ({ default: module.VoiceEvaluationDashboard })));
+const ReplayAnnotator = lazy(() => import("./ReplayAnnotator").then((module) => ({ default: module.ReplayAnnotator })));
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -48,8 +45,6 @@ export type ReviewModalTab =
   | "assessment"
   | "voice_dashboard"
   | "replay";
-
-const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -276,8 +271,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     link.click();
   };
 
-  const showRealisticTabs = record?.realisticModeEnabled;
-
   if (!isOpen || !record) return null;
 
   return (
@@ -336,8 +329,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 Kualitas Suara Agen
                 {activeTab === 'assessment' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
               </button>
-              {showRealisticTabs && (
-                <>
+              <>
                   <button
                     onClick={() => setActiveTab('voice_dashboard')}
                     className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'voice_dashboard' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
@@ -352,8 +344,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     Anotasi Replay
                     {activeTab === 'replay' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
                   </button>
-                </>
-              )}
+              </>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
@@ -493,42 +484,46 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                   </motion.div>
                 )}
 
-                {activeTab === 'voice_dashboard' && showRealisticTabs && (
+                {activeTab === 'voice_dashboard' && (
                   <motion.div
                     key="voice_dashboard"
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                   >
-                    <VoiceEvaluationDashboard
-                      sessionId={record.id}
-                      metrics={effectiveVoiceMetrics}
-                      isLoading={false}
-                      error={undefined}
-                      notice={undefined}
-                      onRetry={() => {}}
-                    />
+                    <Suspense fallback={<div className="text-sm text-muted-foreground">Memuat evaluasi suara...</div>}>
+                      <VoiceEvaluationDashboard
+                        sessionId={record.id}
+                        metrics={effectiveVoiceMetrics}
+                        isLoading={false}
+                        error={undefined}
+                        notice={undefined}
+                        onRetry={() => {}}
+                      />
+                    </Suspense>
                   </motion.div>
                 )}
 
-                {activeTab === 'replay' && showRealisticTabs && (
+                {activeTab === 'replay' && (
                   <motion.div
                     key="replay"
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                   >
-                    <ReplayAnnotator
-                      sessionId={record.id}
-                      annotations={mappedAnnotations}
-                       recommendations={recommendations}
-                      isLoading={annotationsLoading}
-                      error={annotationsError ? String(annotationsError) : undefined}
-                      onRetry={() => {}}
-                      onAddAnnotation={handleAddAnnotation}
-                      onDeleteAnnotation={handleDeleteAnnotation}
-                      sessionDurationMs={record.duration * 1000}
-                    />
+                    <Suspense fallback={<div className="text-sm text-muted-foreground">Memuat anotasi replay...</div>}>
+                      <ReplayAnnotator
+                        sessionId={record.id}
+                        annotations={mappedAnnotations}
+                        recommendations={recommendations}
+                        isLoading={annotationsLoading}
+                        error={annotationsError ? String(annotationsError) : undefined}
+                        onRetry={() => {}}
+                        onAddAnnotation={handleAddAnnotation}
+                        onDeleteAnnotation={handleDeleteAnnotation}
+                        sessionDurationMs={record.duration * 1000}
+                      />
+                    </Suspense>
                   </motion.div>
                 )}
               </AnimatePresence>

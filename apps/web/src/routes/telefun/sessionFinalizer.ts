@@ -274,7 +274,6 @@ export async function finalizeTelefunSession(params: {
     feedback,
     voiceAssessment,
     sessionMetrics: params.metrics,
-    realisticModeEnabled: params.sessionConfig?.realisticModeEnabled || false,
     responsePacingMode: params.sessionConfig?.responsePacingMode,
     telefunModelId: params.sessionConfig?.telefunModelId,
     telefunTransport: params.sessionConfig?.telefunTransport,

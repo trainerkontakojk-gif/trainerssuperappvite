@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTelefunLiveSystemInstruction,
-  getConsumerTypeHint,
   getTimeCueInstruction,
 } from "../routes/telefun/services/promptBuilder";
 import type { TelefunConsumerType } from "../routes/telefun/telefunSettings";
@@ -45,6 +44,36 @@ describe("buildTelefunLiveSystemInstruction", () => {
     expect(prompt).toContain("Siti Rahayu");
     expect(prompt).toContain("Bandung");
     expect(prompt).toContain("Pinjol Ilegal");
+  });
+
+  it("includes only selected contextual challenges", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: { name: "Siti", gender: "female", phone: "0812", city: "Bandung", voiceName: "Kore", signatureName: "" },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "realistic",
+      maxCallDuration: 5,
+      simulationChallengeTypes: ["interruption", "misunderstanding"],
+    });
+
+    expect(prompt).toContain("TANTANGAN PERCAKAPAN");
+    expect(prompt).toContain("terlalu mendominasi");
+    expect(prompt).toContain("pernyataan ambigu");
+    expect(prompt).not.toContain("detail non-identitas");
+    expect(prompt).toContain("Tidak wajib menggunakan seluruh tantangan");
+  });
+
+  it("omits the challenge section when no challenge is selected", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: { name: "Budi", gender: "male", phone: "0811", city: "Jakarta", voiceName: "Fenrir", signatureName: "" },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "training_fast",
+      maxCallDuration: 0,
+      simulationChallengeTypes: [],
+    });
+
+    expect(prompt).not.toContain("TANTANGAN PERCAKAPAN");
   });
 
   it("includes KONSISTENSI SUARA section", () => {
@@ -413,36 +442,6 @@ describe("duration and time cue prompt", () => {
     expect(text).toContain(
       "JANGAN menutup telepon berdasarkan perkiraan waktu sendiri",
     );
-  });
-});
-
-describe("getConsumerTypeHint", () => {
-  it("returns marah tone for angry consumers", () => {
-    const hint = getConsumerTypeHint(
-      makeConsumerType({ name: "Marah & Emosional" }),
-    );
-    expect(hint.tone).toContain("kesal");
-    expect(hint.examples).toContain("Halo? Masih ada?");
-  });
-
-  it("returns bingung tone for gaptek", () => {
-    const hint = getConsumerTypeHint(
-      makeConsumerType({ name: "Bingung & Gaptek" }),
-    );
-    expect(hint.tone).toContain("ragu");
-    expect(hint.examples).toContain("ada yang bisa bantu?");
-  });
-
-  it("returns lemah tone for sedih", () => {
-    const hint = getConsumerTypeHint(
-      makeConsumerType({ name: "Pasrah & Sedih" }),
-    );
-    expect(hint.tone).toContain("lemah");
-  });
-
-  it("returns netral tone for others", () => {
-    const hint = getConsumerTypeHint(makeConsumerType({ name: "Netral" }));
-    expect(hint.tone).toContain("netral");
   });
 });
 

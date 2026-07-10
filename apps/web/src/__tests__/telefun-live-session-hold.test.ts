@@ -16,7 +16,7 @@ function createMockConfig(): TelefunAppSettings {
     telefunTransport: "gemini-live",
     maxCallDuration: 0,
     responsePacingMode: "realistic",
-    realisticModeEnabled: false,
+    simulationChallengeTypes: [],
     activeScenario: undefined,
     activeConsumerType: undefined,
     resolvedIdentity: undefined,

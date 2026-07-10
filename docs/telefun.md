@@ -95,17 +95,8 @@ routes/telefun/
 │   ├── promptBuilder.ts         # ★ Build system instruction prompt untuk Gemini
 │   ├── liveProtocol.ts          # Format setup message Gemini Live JSON
 │   ├── telefun-recording-remux-service.ts  # Client-side recording remux (dipanggil sessionFinalizer)
-│   └── realisticMode/
-│       ├── RealisticModeOrchestrator.ts      # Orchestrator — koordinasi semua engine
-│       ├── backchannelController.ts          # Backchannel (gumaman) controller
-│       ├── disruptionScenarioEngine.ts       # Simulasi gangguan teknis
-│       ├── fallbackResponseManager.ts        # Response fallback jika AI macet
-│       ├── holdStateManager.ts               # Hold consent + rude hold detection
-│       ├── personaStateMachine.ts            # State machine persona — intensity berubah
-│       ├── prolongedSilenceHandler.ts        # Penanganan agen diam terlalu lama
-│       ├── shortResponseClassifier.ts        # Klasifikasi respons singkat agen
-│       ├── turnTakingEngine.ts               # Mesin turn-taking
-│       └── types.ts                          # Tipe shared
+│   ├── simulationChallenges.ts              # Registry ID, label, dan instruksi prompt
+│   └── reviewTypes.ts                       # Tipe aktif voice dashboard dan replay
 │
 ├── hooks/
 │   └── useTelefunHoldClock.ts   # Hook timer untuk hold
@@ -310,24 +301,11 @@ Patch telefun_history → score, feedback, voice_assessment
 | Penilaian | **Deterministik** (bukan AI): Baik (score **10**, semua ≤ batas) atau Kurang (score **4**, ada yang melebihi). Final score: `(aiScore × 5 + holdScore) / 6` |
 | Saat hold | Mikrofon user dimute **+ audio AI diblokir** (`suppressGeminiAudio: true`) |
 
-### Realistic Mode
+### Prompt-first conversation challenges
 
-Mode Realistic mengaktifkan **8 engine** yang dikoordinasi oleh `RealisticModeOrchestrator`:
+Tempo `realistic` dan `training_fast` tetap menjadi kontrol terpisah. Tantangan percakapan bersifat opsional dan dipilih dari registry `simulationChallenges.ts` dengan batas maksimal tiga pilihan. Daftar yang dipilih dimasukkan ke system prompt Gemini Live; model hanya menggunakannya saat konteks mendukung, paling banyak satu perilaku per giliran, tanpa memaksa seluruh tantangan.
 
-| Engine (file) | Fungsi |
-|---------------|--------|
-| `turnTakingEngine.ts` | Mesin turn-taking — sinyal konteks, interupsi |
-| `fallbackResponseManager.ts` | Response fallback jika AI tidak merespons |
-| `prolongedSilenceHandler.ts` | Penanganan agen diam terlalu lama |
-| `personaStateMachine.ts` | State machine persona — intensity berubah selama panggilan |
-| `holdStateManager.ts` | **Hold consent + rude hold detection** (`CONSENT_REQUEST_TTL_MS = 15000`) |
-| `backchannelController.ts` | Gumaman natural ("hmm", "oh") saat agen bicara |
-| `disruptionScenarioEngine.ts` | Simulasi gangguan teknis (suara putus, delay) |
-| `shortResponseClassifier.ts` | Klasifikasi respons singkat agen (acknowledgement, instruction, question, greeting, closing) |
-
-**Rude Hold Detection:** Via `validateHoldConsent()` — melacak apakah agen minta izin sebelum hold (`lastHoldRequestAt`) dan konsumen merespons (`lastConsumerResponseAt`). Jika tidak ada consent dalam 15 detik → `isRudeHold: true`.
-
-File-file ini ada di `apps/web/src/routes/telefun/services/realisticMode/` — total **10 file** (8 engine + orchestrator + types).
+Tidak ada lagi orchestrator atau engine realistic-mode di browser. Playback hanya dihentikan oleh event native `serverContent.interrupted`, tombol hold, atau lifecycle transport. VAD lokal tetap dipakai untuk volume, speech segments, dan pengiriman audio, tetapi tidak membatalkan playback atau mengirim prompt interupsi.
 
 ### Auto Hangup
 
@@ -361,7 +339,7 @@ Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertaha
    - Pilih model (default: `gemini-3.1-flash-live-preview`)
    - Atur durasi maksimal panggilan
    - Mode: **Realistis** (natural) atau **Latihan Cepat** (lebih efisien)
-   - Aktifkan **Realistic Mode** untuk simulasi lebih hidup
+   - Pilih maksimal 3 **Tantangan Percakapan (Opsional)** bila ingin latihan dengan variasi konteks
 
 ### Saat Panggilan
 
@@ -387,7 +365,7 @@ Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertaha
 
 - **Default scenarios** bisa diubah permanen via UI (tersimpan di Supabase per user)
 - **Consumer types** (emosi) juga bisa ditambah/edit di settings
-- **Mode realistis** bisa di-toggle, termasuk jenis gangguan yang disimulasikan
+- **Tantangan percakapan** tersimpan sebagai daftar ID baru; settings legacy tetap dibaca in-memory agar kompatibel
 
 ---
 
@@ -413,6 +391,7 @@ buildTelefunLiveSystemInstruction({
   consumerType,       → tipe konsumen (mementukan emosi)
   responsePacingMode, → "realistic" | "training_fast"
   maxCallDuration     → durasi maksimal
+  simulationChallengeTypes → maksimal tiga tantangan opsional
 })
 ```
 
@@ -436,7 +415,8 @@ buildTelefunLiveSystemInstruction({
 | `getEmotionInstruction()` | Mapping nama tipe konsumen → instruksi emosi |
 | `pacingInstruction` (variable) | Tempo bicara: `realistic` vs `training_fast` |
 | `genderInnerText` (variable) | Instruksi gender suara konsumen |
-| `silentInstruction` (variable) | Cara menangani agen diam (realistic mode only) |
+| `silentInstruction` (variable) | Cara menangani agen diam pada tempo natural |
+| `simulationChallengeTypes` | Tantangan kontekstual dari registry prompt-first |
 | `scriptInstruction` (variable) | Cara menggunakan skrip percakapan (opsional) |
 | `buildTelefunLiveSystemInstruction()` return value | **Prompt utama** — seluruh `systemInstruction` yang dikirim ke Gemini |
 

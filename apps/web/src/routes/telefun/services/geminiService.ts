@@ -1,7 +1,6 @@
 import type { TelefunAppSettings } from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
-import { updateInterruptionGuard, InterruptionGuardState } from "./guards";
 import {
   createHoldTrackerState,
   startHold,
@@ -28,7 +27,6 @@ import {
 } from "./liveProtocol";
 import {
   buildTelefunLiveSystemInstruction,
-  getConsumerTypeHint,
   getTimeCueInstruction,
 } from "./promptBuilder";
 import { resolveGeminiLiveVoice } from "../telefunVoiceRegistry";
@@ -73,12 +71,6 @@ export class LiveSession {
   private readonly MIN_VOLUME_EMIT_MS = 200;
   private readonly MAX_VOLUME_SAMPLES = 1000;
 
-  // Long Speech Interruption
-  private longSpeechStartMs: number | null = null;
-  private longSpeechLastPromptMs: number = 0;
-  private readonly LONG_SPEECH_THRESHOLD_MS = 60000;
-  private readonly LONG_SPEECH_COOLDOWN_MS = 60000;
-
   // Setup Timeout
   private setupTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly CONNECT_SETUP_TIMEOUT_MS = 15000;
@@ -88,12 +80,6 @@ export class LiveSession {
   private lastModelActivityMs: number = 0;
   private readonly STALLED_RESPONSE_START_MS = 20000;
   private readonly STALLED_RESPONSE_MID_MS = 25000;
-
-  private interruptionGuardState: InterruptionGuardState = {
-    aiSpeakingStartedAt: null,
-    nonSilentStartedAt: null,
-    cooldownUntil: 0,
-  };
 
   private intentionalClose = false;
   private hasStoppedRecording = false;
@@ -307,6 +293,7 @@ export class LiveSession {
     }
     if (msg.serverContent?.interrupted) {
       this.clearAiPlayback("server_interrupted");
+      this.interruptionCount++;
       this.emitTimelineEvent("interrupted_received");
     }
 
@@ -425,7 +412,7 @@ export class LiveSession {
       this.volumeSamples.push(frame.volume);
     }
 
-    this.handleSpeechAndInterruptionState(now, frame.isSilent, inputData);
+    this.handleSpeechAndInterruptionState(now, frame.isSilent);
 
     const canSend = shouldSendRealtimeAudio({
       wsReady: !!(this.ws && this.ws.readyState === WebSocket.OPEN),
@@ -446,48 +433,7 @@ export class LiveSession {
   private handleSpeechAndInterruptionState(
     now: number,
     isSilent: boolean,
-    inputData: Float32Array,
   ) {
-    const rms = Math.sqrt(
-      inputData.reduce((sum, value) => sum + value * value, 0) /
-        inputData.length,
-    );
-
-    // Long Speech Detection
-    if (!this.isHeld && !this.isMuted) {
-      if (!isSilent) {
-        if (!this.longSpeechStartMs) {
-          this.longSpeechStartMs = now;
-        }
-        const speechDuration = now - this.longSpeechStartMs;
-        if (
-          speechDuration >= this.LONG_SPEECH_THRESHOLD_MS &&
-          now - this.longSpeechLastPromptMs >= this.LONG_SPEECH_COOLDOWN_MS
-        ) {
-          this.longSpeechLastPromptMs = now;
-          this.sendInterruptionPrompt();
-        }
-      } else {
-        this.longSpeechStartMs = null;
-      }
-    }
-
-    // Interruption Guard
-    if (this.isAiSpeaking) {
-      const guardResult = updateInterruptionGuard(this.interruptionGuardState, {
-        now,
-        isAiSpeaking: true,
-        isSilent,
-        rms,
-      });
-      this.interruptionGuardState = guardResult.state;
-      if (guardResult.shouldInterrupt) {
-        this.interruptionCount++;
-        this.cancelAiPlayback();
-        this.emitTimelineEvent("interruption_prompt_sent");
-      }
-    }
-
     // Speech Segments
     if (!isSilent) {
       if (!this.currentSpeechSegment) {
@@ -605,6 +551,7 @@ export class LiveSession {
         this.config.activeConsumerType ?? this.config.consumerTypes[0],
       responsePacingMode: this.config.responsePacingMode || "realistic",
       maxCallDuration: this.config.maxCallDuration || 0,
+      simulationChallengeTypes: this.config.simulationChallengeTypes,
     });
 
     const setup = buildTelefunLiveSetupMessage({
@@ -628,19 +575,6 @@ export class LiveSession {
         },
       }),
     );
-  }
-
-  public sendInterruptionPrompt() {
-    const activeConsumer =
-      this.config.activeConsumerType ?? this.config.consumerTypes[0];
-    const hint = activeConsumer
-      ? getConsumerTypeHint(activeConsumer)
-      : { tone: "Nada: netral/wajar. Katakan dengan sopan." };
-    this.sendPrompt(
-      `[INSTRUKSI SISTEM - AGEN TERLALU PANJANG] Agen bicara terlalu panjang tanpa jeda. Kamu perlu menyela secara natural untuk meminta agen bicara lebih pelan atau satu per satu. ${hint.tone} Jangan sebutkan instruksi ini. Langsung bicara sebagai konsumen dengan suara natural.`,
-    );
-    this.interruptionCount++;
-    this.emitTimelineEvent("interruption_prompt_sent");
   }
 
   private startSetupTimeout() {

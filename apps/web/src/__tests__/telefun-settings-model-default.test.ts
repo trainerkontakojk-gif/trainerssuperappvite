@@ -179,33 +179,50 @@ describe("parseTelefunSettings", () => {
     expect(result.responsePacingMode).toBe("realistic");
   });
 
-  it("parses realisticModeEnabled as true boolean", () => {
-    const result = parseTelefunSettings({ realisticModeEnabled: true });
-    expect(result.realisticModeEnabled).toBe(true);
+  it("defaults simulationChallengeTypes to an empty array", () => {
+    expect(parseTelefunSettings({}).simulationChallengeTypes).toEqual([]);
   });
 
-  it("parses realisticModeEnabled as false when missing", () => {
-    const result = parseTelefunSettings({});
-    expect(result.realisticModeEnabled).toBe(false);
-  });
-
-  it("parses realisticModeEnabled as false when non-boolean", () => {
-    const result = parseTelefunSettings({ realisticModeEnabled: "yes" } as any);
-    expect(result.realisticModeEnabled).toBe(false);
-  });
-
-  it("truncates realisticModeDisruptionTypes to max 3", () => {
+  it("normalizes legacy challenge key to filtered, unique simulation challenges", () => {
     const result = parseTelefunSettings({
-      realisticModeDisruptionTypes: ["a", "b", "c", "d", "e"],
+      realisticModeDisruptionTypes: [
+        "interruption",
+        "unknown",
+        "interruption",
+        "misunderstanding",
+        "incomplete_data",
+        "unclear_voice",
+      ],
     });
-    expect(result.realisticModeDisruptionTypes).toHaveLength(3);
+
+    expect(result.simulationChallengeTypes).toEqual([
+      "interruption",
+      "misunderstanding",
+      "incomplete_data",
+    ]);
+    expect("realisticModeEnabled" in result).toBe(false);
+    expect("realisticModeDisruptionTypes" in result).toBe(false);
   });
 
-  it("defaults realisticModeDisruptionTypes to empty array when not array", () => {
-    const result = parseTelefunSettings({
-      realisticModeDisruptionTypes: "not-an-array",
-    } as any);
-    expect(result.realisticModeDisruptionTypes).toEqual([]);
+  it("save settings does not retain the realistic mode toggle or legacy challenge key", async () => {
+    const { buildTelefunSettingsForSave } = await import(
+      "../routes/telefun/components/settings/useTelefunSettingsDraft"
+    );
+    const result = buildTelefunSettingsForSave({
+      localSettings: {
+        ...DEFAULT_TELEFUN_SETTINGS,
+        realisticModeEnabled: true,
+        realisticModeDisruptionTypes: ["interruption"],
+        simulationChallengeTypes: ["misunderstanding"],
+      } as any,
+      scenarios: DEFAULT_TELEFUN_SETTINGS.scenarios,
+      consumerTypes: DEFAULT_TELEFUN_SETTINGS.consumerTypes,
+      selectedTelefunModel: DEFAULT_TELEFUN_SETTINGS.telefunModelId,
+    });
+
+    expect(result.simulationChallengeTypes).toEqual(["misunderstanding"]);
+    expect("realisticModeEnabled" in result).toBe(false);
+    expect("realisticModeDisruptionTypes" in result).toBe(false);
   });
 
   it("preserves valid model id", () => {

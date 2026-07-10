@@ -11,7 +11,7 @@ import {
 import type {
   ReplayAnnotation,
   CoachingRecommendation,
-} from "../routes/telefun/services/realisticMode/types";
+} from "../routes/telefun/services/reviewTypes";
 
 function makeAnnotation(
   overrides: Partial<ReplayAnnotation> & { timestampMs: number },

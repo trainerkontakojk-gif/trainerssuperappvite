@@ -109,7 +109,7 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
     feedback: row.feedback ?? undefined,
     voiceAssessment,
     sessionMetrics: row.session_metrics ?? null,
-    realisticModeEnabled: row.realistic_mode_enabled,
+    legacyRealisticModeEnabled: row.realistic_mode_enabled,
     voiceDashboardMetrics: row.voice_dashboard_metrics,
     personaConfig: row.persona_config,
     disruptionConfig: row.disruption_config,

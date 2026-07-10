@@ -16,8 +16,8 @@ export interface CallRecord {
   feedback?: string;
   voiceAssessment?: VoiceQualityAssessment | null;
   sessionMetrics?: SessionMetrics | null;
-  /** Realistic mode fields */
-  realisticModeEnabled?: boolean;
+  /** Legacy metadata retained so historical sessions remain readable. */
+  legacyRealisticModeEnabled?: boolean;
   voiceDashboardMetrics?: any | null;
   personaConfig?: any | null;
   disruptionConfig?: string[] | null;

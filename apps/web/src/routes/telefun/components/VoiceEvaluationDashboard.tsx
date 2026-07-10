@@ -10,7 +10,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import type { VoiceDashboardMetrics } from "../services/realisticMode/types";
+import type { VoiceDashboardMetrics } from "../services/reviewTypes";
 
 export interface VoiceDashboardProps {
   sessionId: string;

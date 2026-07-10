@@ -3,7 +3,7 @@ import type {
   AnnotationMoment,
   ReplayAnnotation,
   CoachingRecommendation,
-} from "../routes/telefun/services/realisticMode/types";
+} from "../routes/telefun/services/reviewTypes";
 
 export const MAX_ANNOTATIONS = 30;
 export const MAX_RECOMMENDATIONS = 5;

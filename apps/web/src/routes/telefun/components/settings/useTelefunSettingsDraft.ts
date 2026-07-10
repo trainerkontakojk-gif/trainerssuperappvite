@@ -11,6 +11,7 @@ import {
   normalizeTelefunConsumerDraft,
   normalizeTelefunScenarioDraft,
 } from "./telefunDraftNormalizers";
+import { normalizeSimulationChallengeTypes } from "../../services/simulationChallenges";
 
 interface UseTelefunSettingsDraftProps {
   settings: AppSettings;
@@ -29,13 +30,19 @@ export function buildTelefunSettingsForSave(params: {
     (model) => model.id === params.selectedTelefunModel,
   );
 
-  return {
+  const settingsToSave = {
     ...params.localSettings,
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes,
     telefunTransport: selectedModel?.telefunTransport ?? "gemini-live",
     telefunModelId: params.selectedTelefunModel,
   };
+  settingsToSave.simulationChallengeTypes = normalizeSimulationChallengeTypes(
+    settingsToSave.simulationChallengeTypes,
+  );
+  delete (settingsToSave as unknown as Record<string, unknown>).realisticModeEnabled;
+  delete (settingsToSave as unknown as Record<string, unknown>).realisticModeDisruptionTypes;
+  return settingsToSave;
 }
 
 export function useTelefunSettingsDraft({

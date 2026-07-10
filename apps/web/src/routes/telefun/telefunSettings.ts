@@ -1,4 +1,6 @@
 import { GEMINI_LIVE_VOICES_BY_GENDER, isGeminiLiveVoiceName, resolveGeminiLiveVoice } from "./telefunVoiceRegistry";
+import type { TelefunSimulationChallengeType } from "./services/simulationChallenges";
+import { normalizeSimulationChallengeTypes } from "./services/simulationChallenges";
 
 export enum ConsumerDifficulty {
   Easy = "Easy",
@@ -62,8 +64,7 @@ export interface TelefunSessionConfig {
   responsePacingMode: "realistic" | "training_fast";
   telefunTransport?: TelefunTransport;
   telefunModelId: string;
-  realisticModeEnabled: boolean;
-  realisticModeDisruptionTypes?: string[];
+  simulationChallengeTypes: TelefunSimulationChallengeType[];
 }
 
 export type TelefunAppSettings = {
@@ -77,8 +78,7 @@ export type TelefunAppSettings = {
   consumerTypes: TelefunConsumerType[];
   maxCallDuration: number; // in minutes, 0 means unlimited
   responsePacingMode: "realistic" | "training_fast";
-  realisticModeEnabled: boolean;
-  realisticModeDisruptionTypes: string[];
+  simulationChallengeTypes: TelefunSimulationChallengeType[];
   preferredConsumerTypeId: string;
   identitySettings: TelefunIdentitySettings;
   telefunModelId: string;
@@ -408,7 +408,11 @@ export function parseTelefunSettings(
     };
   }
 
-  return {
+  const rawChallengeTypes = parsed.simulationChallengeTypes ??
+    // Deprecated compatibility read for settings saved before prompt-first runtime.
+    parsed.realisticModeDisruptionTypes;
+
+  const normalized: TelefunAppSettings = {
     ...DEFAULT_TELEFUN_SETTINGS,
     ...parsed,
     scenarios: coerceTelefunScenarios(parsed.scenarios),
@@ -419,14 +423,12 @@ export function parseTelefunSettings(
         ? parsed.maxCallDuration
         : DEFAULT_TELEFUN_SETTINGS.maxCallDuration,
     responsePacingMode: coerceResponsePacingMode(parsed.responsePacingMode),
-    realisticModeEnabled: parsed.realisticModeEnabled === true,
-    realisticModeDisruptionTypes: Array.isArray(
-      parsed.realisticModeDisruptionTypes,
-    )
-      ? parsed.realisticModeDisruptionTypes.slice(0, 3)
-      : [],
+    simulationChallengeTypes: normalizeSimulationChallengeTypes(rawChallengeTypes),
     telefunTransport: coerceTelefunTransport(parsed.telefunTransport),
   };
+  delete (normalized as unknown as Record<string, unknown>).realisticModeEnabled;
+  delete (normalized as unknown as Record<string, unknown>).realisticModeDisruptionTypes;
+  return normalized;
 }
 
 export const VOICE_OPTIONS = [
@@ -442,16 +444,6 @@ export const VOICE_OPTIONS = [
 export const CONSUMER_GENDERS = [
   { id: "male", name: "Laki-laki" },
   { id: "female", name: "Perempuan" },
-];
-
-export const DISRUPTION_TYPES = [
-  { id: "technical_term_confusion", name: "Bingung Istilah Teknis" },
-  { id: "repeated_question", name: "Pertanyaan Berulang" },
-  { id: "misunderstanding", name: "Salah Paham" },
-  { id: "interruption", name: "Interupsi" },
-  { id: "incomplete_data", name: "Data Tidak Lengkap" },
-  { id: "unclear_voice", name: "Suara Tidak Jelas" },
-  { id: "emotional_escalation", name: "Eskalasi Emosional" },
 ];
 
 export const DEFAULT_CONSUMER_TYPES: TelefunConsumerType[] = [
@@ -557,8 +549,7 @@ export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
   consumerTypes: DEFAULT_CONSUMER_TYPES,
   maxCallDuration: 5,
   responsePacingMode: "realistic",
-  realisticModeEnabled: false,
-  realisticModeDisruptionTypes: [],
+  simulationChallengeTypes: [],
   preferredConsumerTypeId: "marah",
   identitySettings: {
     displayName: "",

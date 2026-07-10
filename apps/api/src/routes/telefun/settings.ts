@@ -89,6 +89,7 @@ telefunSettings.put(
           .optional(),
         maxCallDuration: z.number().optional(),
         responsePacingMode: z.enum(["realistic", "training_fast"]).optional(),
+        simulationChallengeTypes: z.array(z.string()).max(3).optional(),
         realisticModeEnabled: z.boolean().optional(),
         realisticModeDisruptionTypes: z.array(z.string()).optional(),
         preferredConsumerTypeId: z.string().optional(),
@@ -110,10 +111,11 @@ telefunSettings.put(
         .eq("user_id", user.id)
         .maybeSingle();
 
+      const { realisticModeEnabled: _legacyEnabled, realisticModeDisruptionTypes: _legacyTypes, ...settingsToSave } = body;
       const upsertPayload = buildTelefunSettingsUpsertPayload({
         userId: user.id,
         existingSettings: existing?.settings,
-        telefunSettings: body,
+        telefunSettings: settingsToSave,
         now: new Date().toISOString(),
       });
 

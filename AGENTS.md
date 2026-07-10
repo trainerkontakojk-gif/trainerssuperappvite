@@ -367,6 +367,8 @@ Sub-agent ini bisa dipanggil via Superpower Skill (`general`) dengan instruksi s
 
 ## Phase Progress
 
+121. **Telefun Prompt-First Runtime Cleanup** — Replaced the realistic-mode toggle with optional `simulationChallengeTypes` (max 3), moved challenge behavior into the Gemini Live system prompt, removed local VAD/long-speech interruption and the unused realistic-mode orchestrator/engines, kept native interruption/hold/transport guards deterministic, and preserved legacy history/settings compatibility. (DONE)
+
 66. **KETIK Review Progress & Scoring Fix** — Fixed 2 critical UX bugs: (1) progress bar stuck at 5% during AI review — added auto-transition timer (starting→processing after 2s), improved non-linear progress curve, standalone progress bar with visible ETA; (2) all scores displayed as 0 — backend now returns scores in `POST /ketik/review` response, frontend maps `detail.scores` to session object in `handleViewReview` as fallback. Also enhanced score card UI: grade-based color coding, mini progress bars, category descriptions, "Tata Tulis" label rename, rubric legend with collapsible details, improved text contrast per UX guidelines. 6 files modified, 17 frontend + 22 API regression tests passing. (DONE)
 67. Auth & Layout (DONE)
 68. SIDAK Core (DONE)

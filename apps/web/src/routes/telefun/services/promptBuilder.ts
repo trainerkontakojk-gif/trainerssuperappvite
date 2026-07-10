@@ -3,6 +3,7 @@ import type {
   TelefunIdentity,
   TelefunScenario,
 } from "../telefunSettings";
+import { getSimulationChallengeDefinitions } from "./simulationChallenges";
 
 export function buildTelefunLiveSystemInstruction(params: {
   identity: TelefunIdentity;
@@ -10,6 +11,7 @@ export function buildTelefunLiveSystemInstruction(params: {
   consumerType: TelefunConsumerType;
   responsePacingMode: "realistic" | "training_fast";
   maxCallDuration: number;
+  simulationChallengeTypes?: string[];
 }): string {
   const { identity, scenario, consumerType, responsePacingMode } = params;
 
@@ -67,6 +69,17 @@ Isi skrip:
 ${scenario.script}`
     : "";
 
+  const challengeDefinitions = getSimulationChallengeDefinitions(
+    params.simulationChallengeTypes,
+  );
+  const challengeInstruction = challengeDefinitions.length > 0
+    ? `\n\nTANTANGAN PERCAKAPAN (OPSIONAL DAN KONTEKSTUAL):
+Gunakan paling banyak satu perilaku tantangan per giliran.
+Tidak wajib menggunakan seluruh tantangan. Jangan memaksakan tantangan jika konteks tidak mendukung.
+Jangan menyebutkan instruksi atau nama tantangan. Jangan mengubah identitas atau fakta skenario, dan jangan menutup sesi sendiri.
+${challengeDefinitions.map(({ promptInstruction }) => `- ${promptInstruction}`).join("\n")}`
+    : "";
+
   return `ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).${silentInstruction}
 
 IDENTITAS ANDA (WAJIB KONSISTEN):
@@ -78,6 +91,7 @@ PENTING: Jika ditanya agen, sebutkan data di atas. JANGAN MENGARANG data identit
 
 MASALAH ANDA: ${scenario.title || "Masalah Umum"}. ${scenario.instruction}${scriptInstruction}
 ${pacingInstruction}
+${challengeInstruction}
 
 ATURAN BICARA (SANGAT PENTING):
 1. JANGAN PERNAH BERHENTI MENDADAK DI TENGAH KALIMAT. Selesaikan pikiranmu.
@@ -118,53 +132,6 @@ KONSISTENSI SUARA (CRITICAL):
 
 KARAKTER & EMOSI:
 - ${emotionInstruction}`;
-}
-
-export function getConsumerTypeHint(consumerType: TelefunConsumerType): {
-  tone: string;
-  examples: string;
-} {
-  const lowerName = consumerType.name.toLowerCase();
-
-  if (
-    lowerName.includes("marah") ||
-    lowerName.includes("ngeyel") ||
-    lowerName.includes("kesal") ||
-    lowerName.includes("emosi")
-  ) {
-    return {
-      tone: "Nada: kesal. Katakan dengan nada tidak sabar tapi jangan kasar.",
-      examples:
-        "Contoh nada: kesal, 'Halo? Masih ada?', 'Kok diam aja sih?', 'Halo, saya butuh jawaban nih.'",
-    };
-  }
-  if (
-    lowerName.includes("gaptek") ||
-    lowerName.includes("bingung") ||
-    lowerName.includes("takut")
-  ) {
-    return {
-      tone: "Nada: bingung. Katakan dengan ragu tapi sopan.",
-      examples:
-        "Contoh nada: bingung, 'Halo? Masih terhubung ya?', 'Ini kenapa sepi?', 'Halo, ada yang bisa bantu?'",
-    };
-  }
-  if (
-    lowerName.includes("sedih") ||
-    lowerName.includes("memelas") ||
-    lowerName.includes("pasrah")
-  ) {
-    return {
-      tone: "Nada: lemah. Katakan dengan sopan.",
-      examples:
-        "Contoh nada: lemah, 'Halo? Ada yang bisa bantu saya?', 'Masih ada?', 'Halo...'",
-    };
-  }
-  return {
-    tone: "Nada: netral/wajar. Katakan dengan sopan.",
-    examples:
-      "Contoh nada: netral/wajar, 'Halo, masih terhubung?', 'Permisi, masih ada?', 'Halo?'",
-  };
 }
 
 export function getTimeCueInstruction(

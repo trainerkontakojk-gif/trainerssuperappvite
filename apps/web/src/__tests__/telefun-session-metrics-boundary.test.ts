@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SessionMetricsExtended } from "../routes/telefun/services/realisticMode/types";
+import type { SessionMetricsExtended } from "../routes/telefun/services/reviewTypes";
 
 describe("Telefun session metrics boundary", () => {
   it("allows realisticModeMetrics without casting base SessionMetrics to any", () => {

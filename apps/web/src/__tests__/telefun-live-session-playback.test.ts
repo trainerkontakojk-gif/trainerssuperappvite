@@ -15,7 +15,7 @@ function createMockConfig(): TelefunAppSettings {
     telefunTransport: "gemini-live",
     maxCallDuration: 0,
     responsePacingMode: "realistic",
-    realisticModeEnabled: false,
+    simulationChallengeTypes: [],
     activeScenario: undefined,
     activeConsumerType: undefined,
     resolvedIdentity: undefined,
@@ -144,6 +144,34 @@ describe("LiveSession AI playback lifecycle", () => {
     expect(activeSources.size).toBe(0);
     expect(session.isAiSpeaking).toBe(false);
     expect(session.nextStartTime).toBe(0);
+    expect(session.interruptionCount).toBe(1);
+  });
+
+  it("microphone VAD does not cancel AI playback or send a local interruption prompt", () => {
+    const session = new LiveSession(createMockConfig()) as unknown as Record<
+      string,
+      unknown
+    >;
+    const { ctx } = createMockAudio();
+
+    session.audioContext = ctx;
+    session.recordingDestination = {};
+    session.activeSources = new Set();
+    session.isAiSpeaking = true;
+
+    (session as unknown as { playPcm: (d: Uint8Array, r: number) => void }).playPcm(
+      makePcmData([10000, -10000]),
+      24000,
+    );
+
+    const source = (session.activeSources as Set<MockSource>).values().next().value as MockSource;
+    (session as unknown as { handleInputAudioFrame: (data: Float32Array) => void }).handleInputAudioFrame(
+      new Float32Array([0.4, 0.4, 0.4, 0.4]),
+    );
+
+    expect(source.stop).not.toHaveBeenCalled();
+    expect(Object.prototype.hasOwnProperty.call(session, "send" + "InterruptionPrompt")).toBe(false);
+    expect(session.interruptionCount).toBe(0);
   });
 
   it("turnComplete does not end local isAiSpeaking until queued audio sources finish", () => {

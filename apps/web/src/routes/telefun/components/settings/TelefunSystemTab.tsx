@@ -5,6 +5,7 @@ import {
   TelefunAppSettings as AppSettings,
   VOICE_MODELS as TELEFUN_AUDIO_MODELS
 } from '../../telefunSettings';
+import { SIMULATION_CHALLENGES } from '../../services/simulationChallenges';
 
 interface TelefunSystemTabProps {
   localSettings: AppSettings;
@@ -23,7 +24,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
     <div className="space-y-8 mt-4">
       {/* AI Model Selection for Telefun */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
           <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
             <Zap className="w-24 h-24" />
           </div>
@@ -92,7 +93,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
 
       {/* Simulation Duration Selection */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
           <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
             <Clock className="w-24 h-24" />
           </div>
@@ -117,7 +118,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
 
       {/* Tempo Respons Konsumen */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
           <div className="relative z-10 max-w-2xl flex gap-4 items-start">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Zap className="w-5 h-5 text-primary" />
@@ -188,73 +189,43 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
         </div>
       </section>
 
-      {/* Realistic Mode */}
+      {/* Conversation Challenges */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+        <div className="bg-primary/5 border border-border p-4 rounded-xl relative overflow-hidden group backdrop-blur-sm">
           <div className="relative z-10 max-w-2xl flex gap-4 items-start">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Zap className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">Mode Simulasi Realistis</h3>
+              <h3 className="font-bold text-foreground text-sm tracking-tight mb-0.5">Tantangan Percakapan (Opsional)</h3>
               <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                Aktifkan simulasi percakapan tingkat lanjut: turn-taking kontekstual, backchannel alami, gangguan, dan fitur hold.
+                Pilih maksimal 3 tantangan. AI akan menggunakannya hanya saat sesuai konteks, sehingga kemunculannya tidak selalu dijamin.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setLocalSettings((prev: AppSettings) => ({ ...prev, realisticModeEnabled: !prev.realisticModeEnabled }))}
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                localSettings.realisticModeEnabled ? 'bg-primary' : 'bg-border'
-              }`}
-              role="switch"
-              aria-checked={localSettings.realisticModeEnabled || false}
-              aria-label="Toggle mode simulasi realistis"
-            >
-              <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-card shadow-sm ring-0 transition duration-200 ease-in-out ${
-                  localSettings.realisticModeEnabled ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
           </div>
         </div>
 
-        {/* Disruption Type Configuration */}
-        {localSettings.realisticModeEnabled && (
-          <div className="bg-card/45 p-5 rounded-xl border border-border mt-2">
-            <h4 className="font-bold text-foreground text-sm tracking-tight mb-1">Skenario Gangguan</h4>
-            <p className="text-xs text-muted-foreground font-medium mb-3">
-              Pilih 1-3 tipe gangguan yang akan muncul selama simulasi.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[
-                { id: 'technical_term_confusion', label: 'Bingung Istilah Teknis' },
-                { id: 'repeated_question', label: 'Pertanyaan Berulang' },
-                { id: 'misunderstanding', label: 'Salah Paham' },
-                { id: 'interruption', label: 'Interupsi' },
-                { id: 'incomplete_data', label: 'Data Tidak Lengkap' },
-                { id: 'unclear_voice', label: 'Suara Tidak Jelas' },
-                { id: 'emotional_escalation', label: 'Eskalasi Emosional' },
-              ].map(disruption => {
-                const currentTypes = localSettings.realisticModeDisruptionTypes || [];
-                const isSelected = currentTypes.includes(disruption.id);
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {SIMULATION_CHALLENGES.map(challenge => {
+                const currentTypes = localSettings.simulationChallengeTypes || [];
+                const isSelected = currentTypes.includes(challenge.id);
                 const isDisabled = !isSelected && currentTypes.length >= 3;
                 return (
                   <button
-                    key={disruption.id}
+                    key={challenge.id}
                     type="button"
                     disabled={isDisabled}
+                    aria-pressed={isSelected}
                     onClick={() => {
                       setLocalSettings((prev: AppSettings) => {
-                        const current = prev.realisticModeDisruptionTypes || [];
+                        const current = prev.simulationChallengeTypes || [];
                         const updated = isSelected
-                          ? current.filter((t: string) => t !== disruption.id)
-                          : [...current, disruption.id];
-                        return { ...prev, realisticModeDisruptionTypes: updated };
+                          ? current.filter((t) => t !== challenge.id)
+                          : [...current, challenge.id];
+                        return { ...prev, simulationChallengeTypes: updated.slice(0, 3) };
                       });
                     }}
-                    className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-xs font-semibold transition-all text-left ${
+                    className={`flex items-center gap-2 px-3 py-2.5 min-h-11 rounded-lg border text-xs font-semibold transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       isSelected
                         ? 'border-primary bg-primary/5 text-primary'
                         : isDisabled
@@ -271,16 +242,14 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                     >
                       {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                     </span>
-                    {disruption.label}
+                    {challenge.label}
                   </button>
                 );
               })}
-            </div>
-            <p className="mt-2.5 text-xs text-muted-foreground font-medium">
-              {(localSettings.realisticModeDisruptionTypes || []).length}/3 tipe dipilih
-            </p>
-          </div>
-        )}
+        </div>
+        <p className="mt-2.5 text-xs text-muted-foreground font-medium">
+          {(localSettings.simulationChallengeTypes || []).length}/3 tantangan dipilih
+        </p>
       </section>
     </div>
   );
