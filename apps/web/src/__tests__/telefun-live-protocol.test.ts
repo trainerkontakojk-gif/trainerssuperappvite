@@ -13,6 +13,7 @@ import {
   shouldSendRealtimeAudio,
   shouldReportTelefunCloseError,
   processInputAudioFrame,
+  buildTelefunAuthMessage,
 } from "../routes/telefun/services/liveProtocol";
 import { resolveFinalIdentity } from "../routes/telefun/telefunSettings";
 import {
@@ -21,6 +22,18 @@ import {
 } from "../routes/telefun/telefunVoiceRegistry";
 
 describe("telefun live protocol", () => {
+  it("builds the first-message authentication frame without query concerns", () => {
+    expect(buildTelefunAuthMessage("token-1", "session-1")).toEqual({
+      type: "authenticate",
+      token: "token-1",
+      sessionId: "session-1",
+    });
+    expect(buildTelefunAuthMessage("token-1")).toEqual({
+      type: "authenticate",
+      token: "token-1",
+    });
+  });
+
   it("builds and validates graceful drain messages", () => {
     expect(buildAudioStreamEndMessage()).toEqual({
       realtimeInput: { audioStreamEnd: true },

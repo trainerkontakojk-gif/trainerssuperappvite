@@ -114,6 +114,7 @@ describe("Telefun Session Finalizer", () => {
     ]);
     expect(result.record.score).toBe(8);
     expect(result.record.feedback).toBe("Bagus");
+    expect(result.scoringStatus).toBe("succeeded");
   });
 
   it("marks remuxed=true when remux succeeds and uses empty url (signed URL fallback)", async () => {
@@ -146,7 +147,9 @@ describe("Telefun Session Finalizer", () => {
   });
 
   it("falls back to blob url when remux fails", async () => {
-    const remuxMock = (await import("../routes/telefun/services/telefun-recording-remux-service")).remuxRecording as any;
+    const remuxMock = (
+      await import("../routes/telefun/services/telefun-recording-remux-service")
+    ).remuxRecording as any;
     remuxMock.mockResolvedValueOnce({
       success: false,
       error: "FFmpeg not available",
@@ -297,9 +300,42 @@ describe("Telefun Session Finalizer", () => {
 
     expect(calls).toContain("patch:score:0");
     expect(result.record.score).toBe(0);
+    expect(result.scoringStatus).toBe("succeeded");
   });
 
-  it("marks scoringFailed when the score boundary rejects a response", async () => {
+  it("skips scoring when an agent recording path is unavailable", async () => {
+    const scoreSession = vi.fn(
+      async (): Promise<TelefunScoreResult> => ({
+        score: 8,
+        feedback: "Tidak dipakai",
+        assessment: mockAssessment,
+      }),
+    );
+
+    const result = await finalizeTelefunSession({
+      sessionId: "session-no-agent-recording",
+      fullBlob: null,
+      agentBlob: null,
+      duration: 15,
+      metrics: baseMetrics(),
+      localUrl: null,
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "unused"),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession,
+      },
+    });
+
+    expect(result.scoringStatus).toBe("skipped");
+    expect(scoreSession).not.toHaveBeenCalled();
+  });
+
+  it("marks scoring failed only when the score boundary rejects an attempted response", async () => {
     const result = await finalizeTelefunSession({
       sessionId: "session-invalid-score",
       fullBlob: null,
@@ -321,12 +357,12 @@ describe("Telefun Session Finalizer", () => {
       },
     });
 
-    expect(result.scoringFailed).toBe(true);
+    expect(result.scoringStatus).toBe("failed");
     expect(result.record.voiceAssessment).toBeUndefined();
     expect(result.record.score).toBe(0);
   });
 
-  it("marks upload and scoring failures when recordings exist but user id is unavailable", async () => {
+  it("marks upload failure and skips scoring when user id is unavailable", async () => {
     const result = await finalizeTelefunSession({
       sessionId: "session-no-user",
       fullBlob: new Blob(["full"]),
@@ -351,13 +387,13 @@ describe("Telefun Session Finalizer", () => {
     });
 
     expect(result.uploadFailed).toBe(true);
-    expect(result.scoringFailed).toBe(true);
+    expect(result.scoringStatus).toBe("skipped");
     expect(result.saveFailed).toBe(false);
     expect(result.record.recordingPath).toBeUndefined();
     expect(result.record.agentRecordingPath).toBeUndefined();
   });
 
-  it("keeps saveFailed in the public return contract when base patch fails", async () => {
+  it("keeps saveFailed and skipped scoring in the public return contract when base patch fails", async () => {
     const result = await finalizeTelefunSession({
       sessionId: "session-save-fails",
       fullBlob: null,
@@ -383,7 +419,7 @@ describe("Telefun Session Finalizer", () => {
 
     expect(result.saveFailed).toBe(true);
     expect(result.uploadFailed).toBe(false);
-    expect(result.scoringFailed).toBe(true);
+    expect(result.scoringStatus).toBe("skipped");
   });
 
   it("patches session metrics before scoring (ordering)", async () => {

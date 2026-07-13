@@ -28,6 +28,7 @@ import { HoldStatusDisplay } from "./HoldStatusDisplay";
 
 interface PhoneInterfaceProps {
   config: TelefunAppSettings;
+  accessToken: string;
   onEndSession: (reason?: string) => void;
   onRecordingReady?: (
     url: string | null,
@@ -57,6 +58,7 @@ function getInitials(name: string): string {
 
 export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   config,
+  accessToken,
   onEndSession,
   onRecordingReady,
   onSessionCreated,
@@ -275,29 +277,29 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         session.onVolumeChange = (vol) => {
           if (isActive) setAgentVolume(vol);
         };
-	        session.onRecordingComplete = async (
-	          url,
-	          fullBlob,
-	          agentBlob,
-	          metrics,
-	        ) => {
-	          if (onRecordingReadyRef.current) {
-	            const measuredDuration =
-	              Number.isFinite(metrics.sessionDurationMs) &&
-	              metrics.sessionDurationMs > 0
-	                ? Math.round(metrics.sessionDurationMs / 1000)
-	                : callDurationRef.current;
-	            try {
-	              await onRecordingReadyRef.current(
-	                url,
-	                config.consumerName,
-	                measuredDuration,
-	                fullBlob,
-	                agentBlob,
-	                metrics,
-	              );
-	            } catch (err) {
-	              console.error("onRecordingReady failed:", err);
+        session.onRecordingComplete = async (
+          url,
+          fullBlob,
+          agentBlob,
+          metrics,
+        ) => {
+          if (onRecordingReadyRef.current) {
+            const measuredDuration =
+              Number.isFinite(metrics.sessionDurationMs) &&
+              metrics.sessionDurationMs > 0
+                ? Math.round(metrics.sessionDurationMs / 1000)
+                : callDurationRef.current;
+            try {
+              await onRecordingReadyRef.current(
+                url,
+                config.consumerName,
+                measuredDuration,
+                fullBlob,
+                agentBlob,
+                metrics,
+              );
+            } catch (err) {
+              console.error("onRecordingReady failed:", err);
             }
           }
           // If disconnect (end call) is in progress, handleEndCall will navigate home.
@@ -307,7 +309,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           }
         };
 
-        session.connect();
+        session.connect(accessToken);
       } catch (err: unknown) {
         console.error("[Telefun] Failed to initialize session:", err);
         if (isActive)
@@ -325,7 +327,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       mountedRef.current = false;
       stopHoldMusic();
       if (!endCallStartedRef.current) {
-        (async () => { await sessionRef.current?.disconnect("cleanup"); })();
+        (async () => {
+          await sessionRef.current?.disconnect("cleanup");
+        })();
       }
       if (
         uiAudioContextRef.current &&
@@ -335,7 +339,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         uiAudioContextRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Hanya jalankan sekali saat mount — config object reference berubah tiap render parent
 
   useEffect(() => {
@@ -410,7 +414,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       }
 
       try {
-        await sessionRef.current?.disconnect(reason === "timeout" ? "timeout" : "user");
+        await sessionRef.current?.disconnect(
+          reason === "timeout" ? "timeout" : "user",
+        );
       } catch (err) {
         console.error("[Telefun] disconnect error:", err);
       }
@@ -719,13 +725,19 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                 : "border-red-500 bg-red-600 hover:scale-105 hover:bg-red-700"
             }`}
             title={isDisconnecting ? "Mengakhiri panggilan..." : "End Call"}
-            aria-label={isDisconnecting ? "Mengakhiri panggilan, harap tunggu" : "Akhiri panggilan"}
+            aria-label={
+              isDisconnecting
+                ? "Mengakhiri panggilan, harap tunggu"
+                : "Akhiri panggilan"
+            }
           >
             <PhoneOff className="h-8 w-8 md:h-9 md:w-9" />
           </button>
-          <span className={`text-[10px] uppercase font-bold tracking-wider hidden md:block ${
-            isDisconnecting ? "text-red-400" : "text-red-500/70"
-          }`}>
+          <span
+            className={`text-[10px] uppercase font-bold tracking-wider hidden md:block ${
+              isDisconnecting ? "text-red-400" : "text-red-500/70"
+            }`}
+          >
             {isDisconnecting ? "Mengakhiri..." : "Hangup"}
           </span>
         </div>

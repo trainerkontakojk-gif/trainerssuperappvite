@@ -11,9 +11,39 @@ import {
   parseControlMessage,
   isSessionEndRequest,
   isSessionEndComplete,
+  parseTelefunAuthMessage,
 } from "./server-protocol.js";
 
 describe("telefun proxy protocol", () => {
+  it("parses a valid first-message authentication frame", () => {
+    expect(
+      parseTelefunAuthMessage({
+        type: "authenticate",
+        token: "token-1",
+        sessionId: "session-1",
+      }),
+    ).toEqual({
+      type: "authenticate",
+      token: "token-1",
+      sessionId: "session-1",
+    });
+  });
+
+  it("rejects malformed, empty, or non-authentication frames", () => {
+    expect(
+      parseTelefunAuthMessage({ type: "authenticate", token: "" }),
+    ).toBeNull();
+    expect(
+      parseTelefunAuthMessage({
+        type: "authenticate",
+        token: "token-1",
+        sessionId: "",
+      }),
+    ).toBeNull();
+    expect(parseTelefunAuthMessage({ setup: {} })).toBeNull();
+    expect(parseTelefunAuthMessage(null)).toBeNull();
+  });
+
   it("accepts setup, realtimeInput, and clientContent messages only", () => {
     expect(isGeminiForwardableMessage({ setup: { model: "models/x" } })).toBe(
       true,
@@ -116,7 +146,9 @@ describe("telefun proxy protocol", () => {
     expect(parsed.setup.model).toBe("models/gemini-3.1-flash-live-preview");
     expect(parsed.setup.generationConfig.responseModalities).toEqual(["AUDIO"]);
     expect(parsed.setup.systemInstruction.parts[0].text).toBe("ROLEPLAY");
-    expect(parsed.setup.contextWindowCompression).toEqual({ slidingWindow: {} });
+    expect(parsed.setup.contextWindowCompression).toEqual({
+      slidingWindow: {},
+    });
     expect(parsed.setup.sessionResumption).toEqual({
       handle: "handle-latest",
     });
@@ -145,7 +177,9 @@ describe("telefun proxy protocol", () => {
   it("extracts output transcription as consumer speaker", () => {
     const chunks = extractGeminiTranscriptionChunks({
       serverContent: {
-        outputTranscription: { text: "Selamat pagi mas, ada yang bisa dibantu?" },
+        outputTranscription: {
+          text: "Selamat pagi mas, ada yang bisa dibantu?",
+        },
         turnComplete: true,
       },
     });
@@ -291,7 +325,10 @@ describe("telefun proxy protocol", () => {
 
     it("accepts all valid reasons for session_end_request", () => {
       for (const reason of ["user", "timeout", "cleanup"] as const) {
-        const msg = parseControlMessage({ type: "session_end_request", reason });
+        const msg = parseControlMessage({
+          type: "session_end_request",
+          reason,
+        });
         expect(msg).not.toBeNull();
         if (msg) {
           expect(isSessionEndRequest(msg)).toBe(true);

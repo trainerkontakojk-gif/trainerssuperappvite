@@ -18,6 +18,7 @@ import {
   buildRealtimeAudioMessage,
   buildSessionEndRequest,
   buildAudioStreamEndMessage,
+  buildTelefunAuthMessage,
   shouldSendRealtimeAudio,
   extractGeminiInlineAudioChunks,
   processInputAudioFrame,
@@ -58,6 +59,7 @@ export class LiveSession {
   private isAiSpeaking: boolean = false;
   private sessionState: TelefunSessionState = "idle";
   private isSetupComplete: boolean = false;
+  private hasAuthenticated: boolean = false;
 
   // Playback source tracking — prevents AI audio overlap
   private activeSources: Set<AudioBufferSourceNode> = new Set();
@@ -83,6 +85,7 @@ export class LiveSession {
 
   private intentionalClose = false;
   private hasStoppedRecording = false;
+  private hasCleanedUpAudio = false;
   private lastLocalError: Error | null = null;
   private disconnectPromise: Promise<void> | null = null;
 
@@ -117,10 +120,14 @@ export class LiveSession {
 
   constructor(private config: TelefunAppSettings) {}
 
-  public async connect() {
+  public async connect(accessToken: string) {
     try {
       this.setSessionState("connecting");
       this.onStatusChange("Menghubungkan...");
+
+      if (!accessToken.trim()) {
+        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
+      }
 
       // 1. Get User Media
       this.stream = await navigator.mediaDevices.getUserMedia({
@@ -149,13 +156,6 @@ export class LiveSession {
       await this.setupInputProcessing();
 
       // 5. Connect WebSocket
-      const token =
-        localStorage.getItem("supabase-auth-token") ||
-        localStorage.getItem("auth_token") ||
-        localStorage.getItem("supabase-token");
-      if (!token) {
-        throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
-      }
       if (this.config.telefunTransport === "openai-audio") {
         throw new Error(
           "OpenAI Audio transport belum diimplementasi. Gunakan Gemini Live.",
@@ -166,13 +166,10 @@ export class LiveSession {
       );
       const wsUrl = new URL(wsBase);
       wsUrl.pathname = wsUrl.pathname.endsWith("/ws") ? wsUrl.pathname : "/ws";
-      wsUrl.searchParams.set("token", token);
-      if (this.config.sessionId) {
-        wsUrl.searchParams.set("sessionId", this.config.sessionId);
-      }
+      wsUrl.searchParams.delete("token");
+      wsUrl.searchParams.delete("sessionId");
       console.log("[Telefun] WebSocket target:", {
-        base: wsBase,
-        url: wsUrl.toString().replace(/token=[^&]+/, "token=[REDACTED]"),
+        url: wsUrl.toString(),
         hasSessionId: Boolean(this.config.sessionId),
         transport: this.config.telefunTransport,
       });
@@ -182,13 +179,17 @@ export class LiveSession {
 
       this.ws.onopen = () => {
         this.isSetupComplete = false;
+        this.hasAuthenticated = false;
         this.hasSentFirstUserAudio = false;
         this.hasReceivedFirstModelAudio = false;
         this.lastModelActivityMs = Date.now();
         this.setSessionState("connecting");
-        this.onStatusChange("Menyiapkan sesi suara...");
-        this.sendSetup();
-        this.sessionStartTime = Date.now();
+        this.onStatusChange("Mengautentikasi sesi...");
+        this.ws?.send(
+          JSON.stringify(
+            buildTelefunAuthMessage(accessToken, this.config.sessionId),
+          ),
+        );
         this.emitTimelineEvent("ws_open");
         this.startSetupTimeout();
         this.startStalledWatchdog();
@@ -212,6 +213,8 @@ export class LiveSession {
       };
 
       this.ws.onclose = (event) => {
+        this.clearSetupTimeout();
+        this.stopStalledWatchdog();
         const mapped = mapTelefunCloseEvent(event);
         console.log("[Telefun] WebSocket closed:", {
           code: event.code,
@@ -233,6 +236,7 @@ export class LiveSession {
         }
 
         this.stopRecordingOnce();
+        this.cleanupAudio();
         this.emitTimelineEvent("ws_close", {
           code: event.code,
           reason: event.reason,
@@ -245,6 +249,35 @@ export class LiveSession {
   }
 
   private handleJsonMessage(msg: any) {
+    if (msg.type === "auth_ok") {
+      if (this.hasAuthenticated) return;
+      if (
+        typeof msg.sessionId !== "string" ||
+        msg.sessionId.trim().length === 0
+      ) {
+        this.lastLocalError = new Error(
+          "Server Telefun tidak mengembalikan session yang valid.",
+        );
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.close(4001, "Invalid Authentication Response");
+        } else {
+          this.onError(this.lastLocalError);
+        }
+        return;
+      }
+
+      this.hasAuthenticated = true;
+      this.config.sessionId = msg.sessionId;
+      this.onSessionCreated(msg.sessionId);
+      this.onStatusChange("Menyiapkan sesi suara...");
+      this.sessionStartTime = Date.now();
+      this.sendSetup();
+      this.emitTimelineEvent("auth_complete");
+      return;
+    }
+
+    if (!this.hasAuthenticated) return;
+
     if (msg.type === "session_created" && msg.sessionId) {
       this.config.sessionId = msg.sessionId;
       this.onSessionCreated(msg.sessionId);
@@ -430,10 +463,7 @@ export class LiveSession {
     }
   }
 
-  private handleSpeechAndInterruptionState(
-    now: number,
-    isSilent: boolean,
-  ) {
+  private handleSpeechAndInterruptionState(now: number, isSilent: boolean) {
     // Speech Segments
     if (!isSilent) {
       if (!this.currentSpeechSegment) {
@@ -703,14 +733,20 @@ export class LiveSession {
       this.ws.send(JSON.stringify(buildSessionEndRequest(reason)));
 
       const drain = new LiveSessionDrain(5000);
-      this.ws.addEventListener('message', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'session_end_complete') {
-            drain.complete();
+      this.ws.addEventListener(
+        "message",
+        (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "session_end_complete") {
+              drain.complete();
+            }
+          } catch {
+            /* skip */
           }
-        } catch { /* skip */ }
-      }, { once: true });
+        },
+        { once: true },
+      );
 
       await drain.start();
     }
@@ -812,6 +848,8 @@ export class LiveSession {
   }
 
   private cleanupAudio() {
+    if (this.hasCleanedUpAudio) return;
+    this.hasCleanedUpAudio = true;
     this.clearAiPlayback("cleanup");
     if (this.workletNode) {
       this.workletNode.port.onmessage = null;
@@ -820,7 +858,7 @@ export class LiveSession {
     if (this.processor) this.processor.disconnect();
     if (this.analyser) this.analyser.disconnect();
     if (this.inputSource) this.inputSource.disconnect();
-    if (this.audioContext) this.audioContext.close();
+    if (this.audioContext) void this.audioContext.close().catch(() => {});
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
   }
 

@@ -19,6 +19,23 @@ export function normalizeTelefunWebSocketUrl(
   }
 }
 
+export interface TelefunAuthMessage {
+  type: "authenticate";
+  token: string;
+  sessionId?: string;
+}
+
+export function buildTelefunAuthMessage(
+  token: string,
+  sessionId?: string,
+): TelefunAuthMessage {
+  return {
+    type: "authenticate",
+    token,
+    ...(sessionId ? { sessionId } : {}),
+  };
+}
+
 export const TELEFUN_CLIENT_CLOSE_CODE = 1000;
 export const TELEFUN_CLIENT_CLOSE_REASON = "Client ended Telefun session";
 

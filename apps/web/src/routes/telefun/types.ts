@@ -1,4 +1,8 @@
-import type { SessionMetrics, VoiceQualityAssessment, TelefunTranscriptEntry } from "@trainers/types";
+import type {
+  SessionMetrics,
+  VoiceQualityAssessment,
+  TelefunTranscriptEntry,
+} from "@trainers/types";
 
 export interface CallRecord {
   id: string;
@@ -41,6 +45,7 @@ export type TelefunTimelineEventName =
   | "connect_start"
   | "mic_ready"
   | "ws_open"
+  | "auth_complete"
   | "ws_close"
   | "setup_sent"
   | "setup_complete"

@@ -24,9 +24,11 @@ import {
   buildGeminiReconnectSetupMessage,
   isCurrentGeminiSocket,
   extractGeminiTranscriptionChunks,
+  parseTelefunAuthMessage,
 } from "./server-protocol.js";
 import { DrainCoordinator, type DrainOutcome } from "./session-drain.js";
 import { buildSafeCloseMetadata } from "./server-close.js";
+import { TelefunAuthGate } from "./server-auth.js";
 
 process.on("uncaughtException", (err) =>
   console.error("[Telefun] Uncaught:", err),
@@ -82,6 +84,7 @@ wss.on("connection", async (ws, req) => {
   let geminiWs: WebSocket | null = null;
   let isGeminiOpen = false;
   let authed = false;
+  let authTimeout: ReturnType<typeof setTimeout> | null = null;
   let userId = "";
   let sessionId = "";
   const requestId = `telefun-live-${randomUUID()}`;
@@ -114,6 +117,19 @@ wss.on("connection", async (ws, req) => {
 
   const turnManager = new TurnManager();
 
+  const clearAuthTimeout = () => {
+    if (authTimeout) {
+      clearTimeout(authTimeout);
+      authTimeout = null;
+    }
+  };
+
+  const authGate = new TelefunAuthGate({
+    verifyToken,
+    getOwnedSessionId,
+    createSession,
+  });
+
   const flushUsage = async (sessionDurationMs?: number) => {
     if (usageFlushed || !authed) return;
     commitPendingLiveUsageTurn(usageAccumulator, "session_flush");
@@ -129,7 +145,10 @@ wss.on("connection", async (ws, req) => {
     );
   };
 
-  const finalizeSessionOnce = async (status: string, outcome?: DrainOutcome) => {
+  const finalizeSessionOnce = async (
+    status: string,
+    outcome?: DrainOutcome,
+  ) => {
     if (finalized) return;
     finalized = true;
     drainTimers.forEach(clearTimeout);
@@ -367,6 +386,33 @@ wss.on("connection", async (ws, req) => {
     });
   };
 
+  const authenticateClient = async (
+    message: ReturnType<typeof parseTelefunAuthMessage>,
+  ) => {
+    if (!message) {
+      ws.close(4001, "Authentication Required");
+      return;
+    }
+
+    const authResult = await authGate.authenticate(message);
+    if (!authResult.ok) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(authResult.closeCode, authResult.reason);
+      }
+      return;
+    }
+
+    if (ws.readyState !== WebSocket.OPEN) return;
+
+    userId = authResult.userId;
+    sessionId = authResult.sessionId;
+    authed = true;
+    clearAuthTimeout();
+    console.log("[Telefun] User connected:", authResult.userEmail);
+    ws.send(JSON.stringify({ type: "auth_ok", sessionId }));
+    setupGeminiWs();
+  };
+
   // Message handler: validate and forward structured JSON to Gemini Live
   ws.on("message", (data) => {
     if (typeof data !== "string" && !Buffer.isBuffer(data)) {
@@ -380,6 +426,21 @@ wss.on("connection", async (ws, req) => {
       parsed = JSON.parse(raw);
     } catch {
       console.warn("[Telefun] Dropping non-JSON client message");
+      return;
+    }
+
+    if (!authed) {
+      const authMessage = parseTelefunAuthMessage(parsed);
+      if (!authMessage) {
+        ws.close(4001, "Authentication Required");
+        return;
+      }
+      void authenticateClient(authMessage);
+      return;
+    }
+
+    if (parseTelefunAuthMessage(parsed)) {
+      ws.close(4001, "Duplicate Authentication");
       return;
     }
 
@@ -424,6 +485,7 @@ wss.on("connection", async (ws, req) => {
       `[Telefun] Client closed: ${code} ${reason.toString() || "(no reason)"}`,
     );
     clientClosed = true;
+    clearAuthTimeout();
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -442,6 +504,7 @@ wss.on("connection", async (ws, req) => {
 
   ws.on("error", async () => {
     clientClosed = true;
+    clearAuthTimeout();
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -474,53 +537,11 @@ wss.on("connection", async (ws, req) => {
     return;
   }
 
-  const token = url.searchParams.get("token");
-  if (!token) {
-    ws.close(4001, "Missing Token");
-    return;
-  }
-
-  const authResult = await verifyToken(token);
-  if (!authResult.success) {
-    ws.close(4001, "Unauthorized");
-    return;
-  }
-  if (ws.readyState !== WebSocket.OPEN) return;
-
-  userId = authResult.user!.id;
-  authed = true;
-  console.log("[Telefun] User connected:", authResult.user?.email);
-
-  // Create or attach session record
-  const requestedSessionId = url.searchParams.get("sessionId");
-  if (requestedSessionId) {
-    try {
-      const owned = await getOwnedSessionId(requestedSessionId, userId);
-      if (!owned) {
-        ws.close(4001, "Invalid Session");
-        return;
-      }
-      sessionId = owned;
-      console.log("[Telefun] Session attached:", sessionId);
-    } catch (err) {
-      console.error("[Telefun] Failed to attach session:", err);
-      ws.close(4001, "Invalid Session Check");
-      return;
+  authTimeout = setTimeout(() => {
+    if (!authed && ws.readyState === WebSocket.OPEN) {
+      ws.close(4001, "Authentication Timeout");
     }
-  } else {
-    try {
-      sessionId = await createSession(userId);
-      console.log("[Telefun] Session created:", sessionId);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "session_created", sessionId }));
-      }
-    } catch (err) {
-      console.error("[Telefun] Failed to create session:", err);
-    }
-  }
-
-  // Connect to Gemini Live API
-  setupGeminiWs();
+  }, 10_000);
 });
 
 server.listen(env.PORT, "0.0.0.0", () => {

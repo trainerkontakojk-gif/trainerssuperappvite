@@ -56,14 +56,26 @@ const defaultDependencies: FinalizerDependencies = {
     return data?.path;
   },
   patchSession: async (sessionId, body) => {
-    await unwrapResponse(await telefunClient.sessions[":sessionId"].$patch({ param: { sessionId }, json: body }));
+    await unwrapResponse(
+      await telefunClient.sessions[":sessionId"].$patch({
+        param: { sessionId },
+        json: body,
+      }),
+    );
   },
   finalizeRecording: async (params) => {
-    await unwrapResponse(await telefunClient["finalize-recording"].$post({ json: params }));
+    await unwrapResponse(
+      await telefunClient["finalize-recording"].$post({ json: params }),
+    );
   },
   remuxRecording,
   scoreSession: async (sessionId) => {
-    const response = await (unwrapResponse(await telefunClient.score[":sessionId"].$post({ param: { sessionId }, json: {} })) as any);
+    const response = await (unwrapResponse(
+      await telefunClient.score[":sessionId"].$post({
+        param: { sessionId },
+        json: {},
+      }),
+    ) as any);
     const result = parseTelefunScoreResult(response);
     if (!result) {
       throw new Error("Format hasil penilaian Telefun tidak valid.");
@@ -72,17 +84,19 @@ const defaultDependencies: FinalizerDependencies = {
   },
 };
 
+export type TelefunScoringStatus = "succeeded" | "failed" | "skipped";
+
 interface FinalizerStatus {
   uploadFailed: boolean;
   saveFailed: boolean;
-  scoringFailed: boolean;
+  scoringStatus: TelefunScoringStatus;
   remuxed: boolean;
 }
 
 const createFinalizerStatus = (): FinalizerStatus => ({
   uploadFailed: false,
   saveFailed: false,
-  scoringFailed: false,
+  scoringStatus: "skipped",
   remuxed: false,
 });
 
@@ -92,10 +106,6 @@ const markUploadFailed = (status: FinalizerStatus) => {
 
 const markSaveFailed = (status: FinalizerStatus) => {
   status.saveFailed = true;
-};
-
-const markScoringFailed = (status: FinalizerStatus) => {
-  status.scoringFailed = true;
 };
 
 const markRemuxed = (status: FinalizerStatus) => {
@@ -115,7 +125,7 @@ export async function finalizeTelefunSession(params: {
   dependencies?: Partial<FinalizerDependencies>;
 }): Promise<{
   record: CallRecord;
-  scoringFailed: boolean;
+  scoringStatus: TelefunScoringStatus;
   saveFailed: boolean;
   uploadFailed: boolean;
   remuxed: boolean;
@@ -219,7 +229,10 @@ export async function finalizeTelefunSession(params: {
       ) {
         markRemuxed(status);
       } else {
-        console.warn("[Telefun] Remux not successful, using original recordings:", remuxResult.error);
+        console.warn(
+          "[Telefun] Remux not successful, using original recordings:",
+          remuxResult.error,
+        );
       }
     } catch (err) {
       console.warn("[Telefun] Remux failed before scoring:", err);
@@ -236,16 +249,15 @@ export async function finalizeTelefunSession(params: {
       score = scoring.score;
       feedback = scoring.feedback;
       voiceAssessment = scoring.assessment;
+      status.scoringStatus = "succeeded";
     } catch (err) {
       console.error("Scoring failed:", err);
-      markScoringFailed(status);
+      status.scoringStatus = "failed";
     }
-  } else {
-    markScoringFailed(status);
   }
 
   // 8. Patch score and feedback if scoring succeeded
-  if (!status.scoringFailed && score !== undefined) {
+  if (status.scoringStatus === "succeeded" && score !== undefined) {
     try {
       await deps.patchSession(params.sessionId, {
         score,
@@ -258,7 +270,7 @@ export async function finalizeTelefunSession(params: {
 
   // If remux succeeded, use signed URL (empty string — ReviewModal will fetch via API).
   // If remux failed or wasn't attempted, fall back to blob URL.
-  const playbackUrl = status.remuxed ? "" : (params.localUrl || "");
+  const playbackUrl = status.remuxed ? "" : params.localUrl || "";
 
   const record: CallRecord = {
     id: params.sessionId,
@@ -284,7 +296,7 @@ export async function finalizeTelefunSession(params: {
 
   return {
     record,
-    scoringFailed: status.scoringFailed,
+    scoringStatus: status.scoringStatus,
     saveFailed: status.saveFailed,
     uploadFailed: status.uploadFailed,
     remuxed: status.remuxed,

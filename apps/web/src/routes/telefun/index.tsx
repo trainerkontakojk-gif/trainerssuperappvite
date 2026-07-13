@@ -13,9 +13,18 @@ import { HistoryModal } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
 import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
+import {
+  parseTelefunLocalHistory,
+  shouldPersistTelefunLocalHistory,
+} from "./telefunLocalHistory";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import { finalizeTelefunSession } from "./sessionFinalizer";
-import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
+import {
+  pollUsageDelta,
+  formatUsageDeltaLabel,
+  type UsageDelta,
+  type UsageSnapshot,
+} from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
 import {
   getTelefunSettings,
@@ -44,11 +53,8 @@ function TelefunReviewModalFallback() {
   );
 }
 
-
 function getToken(): string | null {
-  return (
-    localStorage.getItem("auth_token") ?? localStorage.getItem("supabase_token")
-  );
+  return localStorage.getItem("auth_token");
 }
 
 export default function TelefunLanding() {
@@ -66,6 +72,9 @@ export default function TelefunLanding() {
 
   const [activeSessionConfig, setActiveSessionConfig] =
     useState<TelefunAppSettings | null>(null);
+  const [activeAccessToken, setActiveAccessToken] = useState<string | null>(
+    null,
+  );
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeScenario, setActiveScenario] = useState<{
     title: string;
@@ -121,15 +130,9 @@ export default function TelefunLanding() {
         const dbRecords = rows.map(mapTelefunSessionRow);
         const dbRecordIds = new Set(dbRecords.map((r) => r.id));
 
-        let localRecords: CallRecord[] = [];
         const savedHistory = localStorage.getItem("telefun_history");
-        if (savedHistory) {
-          try {
-            localRecords = JSON.parse(savedHistory) as CallRecord[];
-          } catch {
-            // ignore
-          }
-        }
+        const { records: localRecords, isCorrupt: localHistoryIsCorrupt } =
+          parseTelefunLocalHistory(savedHistory, notify.warning);
 
         const merged = [
           ...dbRecords,
@@ -139,7 +142,7 @@ export default function TelefunLanding() {
         );
 
         setHistory(merged);
-        if (merged.length > 0) {
+        if (shouldPersistTelefunLocalHistory(merged, localHistoryIsCorrupt)) {
           localStorage.setItem("telefun_history", JSON.stringify(merged));
         }
       } catch {
@@ -211,11 +214,13 @@ export default function TelefunLanding() {
     setSessionDelta(null);
     sessionBaselineRef.current = null;
 
-    fetchUsageSummary("telefun").then((data) => {
-      if (data && runId === sessionRunIdRef.current) {
-        sessionBaselineRef.current = data;
-      }
-    }).catch(() => {});
+    fetchUsageSummary("telefun")
+      .then((data) => {
+        if (data && runId === sessionRunIdRef.current) {
+          sessionBaselineRef.current = data;
+        }
+      })
+      .catch(() => {});
 
     try {
       const res = await createTelefunSession({
@@ -242,12 +247,14 @@ export default function TelefunLanding() {
     }
 
     setActiveSessionConfig(sessionConfig);
+    setActiveAccessToken(token);
     setView("chat");
   };
 
   const handleEndCall = () => {
     setView("home");
     setActiveSessionConfig(null);
+    setActiveAccessToken(null);
   };
 
   const handleRecordingReady = async (
@@ -263,16 +270,23 @@ export default function TelefunLanding() {
     const sessionConfig = activeSessionConfig;
 
     if (!sessionId) {
-      console.warn("No activeSessionId found during finalization. Attempting fallback session creation.");
+      console.warn(
+        "No activeSessionId found during finalization. Attempting fallback session creation.",
+      );
       try {
         const res = await createTelefunSession({
-          scenario_title: finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
-          consumer_name: sessionConfig?.consumerName || consumerName || "Konsumen",
+          scenario_title:
+            finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
+          consumer_name:
+            sessionConfig?.consumerName || consumerName || "Konsumen",
           consumer_gender: sessionConfig?.consumerGender || "female",
-          consumer_phone: sessionConfig?.resolvedIdentity?.phone || "08123456789",
+          consumer_phone:
+            sessionConfig?.resolvedIdentity?.phone || "08123456789",
           consumer_city: sessionConfig?.resolvedIdentity?.city || "Jakarta",
           persona_config: {
-            consumerType: sessionConfig?.activeConsumerType?.name || sessionConfig?.activeConsumerType?.id,
+            consumerType:
+              sessionConfig?.activeConsumerType?.name ||
+              sessionConfig?.activeConsumerType?.id,
           },
           disruption_config: sessionConfig?.simulationChallengeTypes || [],
           configured_duration: (sessionConfig?.maxCallDuration || 0) * 60,
@@ -293,20 +307,23 @@ export default function TelefunLanding() {
     optimisticRecordIdRef.current = optimisticId;
 
     try {
-      const { record, scoringFailed, saveFailed, uploadFailed } = await finalizeTelefunSession({
-        sessionId: finalSessionId,
-        fullBlob,
-        agentBlob,
-        duration,
-        metrics,
-        localUrl: url,
-        sessionConfig,
-        scenarioTitle: finalScenario?.title || "Custom",
-        consumerName,
-      });
+      const { record, scoringStatus, saveFailed, uploadFailed } =
+        await finalizeTelefunSession({
+          sessionId: finalSessionId,
+          fullBlob,
+          agentBlob,
+          duration,
+          metrics,
+          localUrl: url,
+          sessionConfig,
+          scenarioTitle: finalScenario?.title || "Custom",
+          consumerName,
+        });
 
       if (saveFailed) {
-        notify.error("Gagal menyimpan sesi. Coba ulangi dari riwayat atau hubungi admin.");
+        notify.error(
+          "Gagal menyimpan sesi. Coba ulangi dari riwayat atau hubungi admin.",
+        );
         throw new Error("Save session failed");
       }
 
@@ -314,13 +331,15 @@ export default function TelefunLanding() {
         notify.warning("Rekaman gagal diunggah, tetapi sesi tetap tersimpan.");
       }
 
-      if (scoringFailed) {
+      if (scoringStatus === "failed") {
         notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
       }
 
       setHistory((prev) => {
         const withoutOptimistic = prev.filter((r) => r.id !== optimisticId);
-        const alreadyExists = withoutOptimistic.some((r) => r.id === finalSessionId);
+        const alreadyExists = withoutOptimistic.some(
+          (r) => r.id === finalSessionId,
+        );
         const merged = alreadyExists
           ? withoutOptimistic
           : [record, ...withoutOptimistic];
@@ -355,6 +374,7 @@ export default function TelefunLanding() {
       setActiveScenario(null);
       setView("home");
       setActiveSessionConfig(null);
+      setActiveAccessToken(null);
     }
 
     const runId = sessionRunIdRef.current;
@@ -506,7 +526,9 @@ export default function TelefunLanding() {
                     ) : (
                       <Play className="h-4 w-4 fill-current" />
                     )}
-                    <span>{settingsLoading ? "Memulai..." : "Mulai Panggilan"}</span>
+                    <span>
+                      {settingsLoading ? "Memulai..." : "Mulai Panggilan"}
+                    </span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.01, y: -1 }}
@@ -550,7 +572,7 @@ export default function TelefunLanding() {
           </motion.div>
         )}
 
-        {view === "chat" && activeSessionConfig && (
+        {view === "chat" && activeSessionConfig && activeAccessToken && (
           <motion.div
             key="chat"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -560,6 +582,7 @@ export default function TelefunLanding() {
           >
             <PhoneInterface
               config={activeSessionConfig}
+              accessToken={activeAccessToken}
               onEndSession={handleEndCall}
               onRecordingReady={handleRecordingReady}
               onSessionCreated={(id) => {

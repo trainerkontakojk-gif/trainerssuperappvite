@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionMetrics } from "@trainers/types";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
@@ -84,6 +90,7 @@ describe("PhoneInterface end-call finalization", () => {
     render(
       React.createElement(PhoneInterface, {
         config,
+        accessToken: "test-access-token",
         onEndSession,
         onRecordingReady: vi.fn(),
       }),
@@ -91,6 +98,7 @@ describe("PhoneInterface end-call finalization", () => {
 
     await waitFor(() => expect(liveSessionState.instances).toHaveLength(1));
     const session = liveSessionState.instances[0];
+    expect(session.connect).toHaveBeenCalledWith("test-access-token");
     session.disconnect.mockReturnValue(finalization.promise);
 
     const endButton = screen.getByRole("button", {
@@ -123,6 +131,7 @@ describe("PhoneInterface end-call finalization", () => {
     render(
       React.createElement(PhoneInterface, {
         config: { ...config, maxCallDuration: 1 / 60 },
+        accessToken: "test-access-token",
         onEndSession,
         onRecordingReady: vi.fn(),
       }),
@@ -137,8 +146,9 @@ describe("PhoneInterface end-call finalization", () => {
     const session = liveSessionState.instances[0];
     session.disconnect.mockReturnValue(finalization.promise);
     act(() => {
-      (session as typeof session & { onStatusChange: (status: string) => void })
-        .onStatusChange("Tersambung");
+      (
+        session as typeof session & { onStatusChange: (status: string) => void }
+      ).onStatusChange("Tersambung");
     });
 
     await act(async () => {
@@ -167,6 +177,7 @@ describe("PhoneInterface end-call finalization", () => {
     render(
       React.createElement(PhoneInterface, {
         config,
+        accessToken: "test-access-token",
         onEndSession: vi.fn(),
         onRecordingReady,
       }),
@@ -201,6 +212,7 @@ describe("PhoneInterface end-call finalization", () => {
     render(
       React.createElement(PhoneInterface, {
         config,
+        accessToken: "test-access-token",
         onEndSession: vi.fn(),
         onRecordingReady,
       }),

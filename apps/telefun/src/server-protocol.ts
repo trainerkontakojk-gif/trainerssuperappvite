@@ -128,19 +128,48 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
-export function parseControlMessage(value: unknown): TelefunControlMessage | null {
+export interface TelefunAuthMessage {
+  type: "authenticate";
+  token: string;
+  sessionId?: string;
+}
+
+export function parseTelefunAuthMessage(
+  value: unknown,
+): TelefunAuthMessage | null {
+  if (!isRecord(value) || value.type !== "authenticate") return null;
+  if (!isString(value.token) || value.token.trim().length === 0) return null;
+  if (
+    value.sessionId !== undefined &&
+    (!isString(value.sessionId) || value.sessionId.trim().length === 0)
+  ) {
+    return null;
+  }
+
+  return {
+    type: "authenticate",
+    token: value.token,
+    ...(isString(value.sessionId) ? { sessionId: value.sessionId } : {}),
+  };
+}
+
+export function parseControlMessage(
+  value: unknown,
+): TelefunControlMessage | null {
   if (!isRecord(value)) return null;
   if (!isString(value.type)) return null;
 
   if (value.type === "session_end_request") {
     const reason = value.reason;
-    if (!isString(reason) || !VALID_SESSION_END_REASONS.has(reason)) return null;
+    if (!isString(reason) || !VALID_SESSION_END_REASONS.has(reason))
+      return null;
     return { type: "session_end_request", reason } as SessionEndRequest;
   }
 
   if (value.type === "session_end_complete") {
     const outcome = value.outcome;
-    if (!isString(outcome) || !VALID_SESSION_END_OUTCOMES.has(outcome)) return null;
+    if (!isString(outcome) || !VALID_SESSION_END_OUTCOMES.has(outcome))
+      return null;
     return { type: "session_end_complete", outcome } as SessionEndComplete;
   }
 
