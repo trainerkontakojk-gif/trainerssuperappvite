@@ -445,9 +445,8 @@ export function resolvePdktGenerationConfig(body: {
 } {
   const scenarios = getScenarios();
   const consumerTypes = getConsumerTypes();
-  const scenario = body.scenarioDraft
-    ? body.scenarioDraft
-    : body.scenarioId ? scenarios.find((s) => s.id === body.scenarioId) : body.scenarioDraft;
+  const scenario =
+    body.scenarioDraft ?? scenarios.find((s) => s.id === body.scenarioId);
   const consumerType = body.consumerTypeDraft
     ? body.consumerTypeDraft
     : consumerTypes.find((ct) => ct.id === body.consumerTypeId);

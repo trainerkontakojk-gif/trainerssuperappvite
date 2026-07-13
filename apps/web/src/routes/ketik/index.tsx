@@ -12,7 +12,6 @@ import type {
   KetikSessionHistoryItem,
   KetikSessionConfig,
   KetikScenario,
-  KetikConsumerType,
   ChatMessage,
   KetikSessionReview,
   KetikTypoFinding,
@@ -243,18 +242,26 @@ export default function KetikLanding() {
     const scenario =
       activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
 
-    let consumerType: KetikConsumerType;
-    if (settings.activeConsumerTypeId === "random") {
-      consumerType =
-        settings.consumerTypes[
-          Math.floor(Math.random() * settings.consumerTypes.length)
-        ];
-    } else {
-      consumerType =
-        settings.consumerTypes.find(
-          (c) => c.id === settings.activeConsumerTypeId,
-        ) || settings.consumerTypes[0];
+    const availableConsumerTypes = Array.isArray(settings.consumerTypes)
+      ? settings.consumerTypes
+      : [];
+
+    if (availableConsumerTypes.length === 0) {
+      notify.warning(
+        "Tambahkan minimal satu karakter pelanggan di Pengaturan.",
+      );
+      setIsSettingsOpen(true);
+      return;
     }
+
+    const consumerType =
+      settings.activeConsumerTypeId === "random"
+        ? availableConsumerTypes[
+            Math.floor(Math.random() * availableConsumerTypes.length)
+          ]
+        : (availableConsumerTypes.find(
+            (item) => item.id === settings.activeConsumerTypeId,
+          ) ?? availableConsumerTypes[0]);
 
     const identity = resolveKetikSessionIdentity(settings.identitySettings);
 

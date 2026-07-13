@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Send, X, Loader2, Reply } from "lucide-react";
 
 interface ReplyComposerProps {
+  mailboxId: string;
   recipient: string;
   subject: string;
   onSend: (text: string) => void;
@@ -10,13 +11,14 @@ interface ReplyComposerProps {
 }
 
 export const ReplyComposer: React.FC<ReplyComposerProps> = ({
+  mailboxId,
   recipient,
   subject,
   onSend,
   onClose,
   isLoading,
 }) => {
-  const draftKey = `pdkt_draft_${recipient}_${subject}`;
+  const draftKey = `pdkt_draft_${mailboxId}`;
   const [replyText, setReplyText] = useState(() => {
     try {
       return localStorage.getItem(draftKey) || "";
@@ -75,9 +77,7 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
       <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[var(--border)] bg-[var(--bg)]">
         <div className="flex items-center gap-2">
           <Reply className="w-4 h-4 text-[var(--module-pdkt)]" />
-          <span className="text-xs font-semibold text-[var(--fg)]">
-            Balas
-          </span>
+          <span className="text-xs font-semibold text-[var(--fg)]">Balas</span>
         </div>
         <button
           onClick={handleClose}
@@ -98,7 +98,9 @@ export const ReplyComposer: React.FC<ReplyComposerProps> = ({
           </span>
         </div>
         <div className="flex items-center">
-          <span className="text-[var(--fg3)] w-14 shrink-0 font-medium">Cc</span>
+          <span className="text-[var(--fg3)] w-14 shrink-0 font-medium">
+            Cc
+          </span>
           <span className="text-[var(--fg3)] truncate">-</span>
         </div>
         <div className="flex items-center">

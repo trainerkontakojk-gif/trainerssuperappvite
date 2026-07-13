@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
-import { generateMessageSchema } from "@trainers/types";
+import {
+  chatMessageSchema,
+  generateMessageSchema,
+  ketikAppSettingsSchema,
+} from "@trainers/types";
 import * as ketikService from "../services/ketik-service";
 import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
@@ -108,22 +112,29 @@ ketik.get("/settings", async (c) => {
   }
 });
 
-ketik.put("/settings", zValidator("json", z.any()), async (c) => {
-  const user = c.get("user");
-  const body = c.req.valid("json");
-  try {
-    await ketikService.saveSettings(user.id, body);
-    return c.json({ success: true, message: "Pengaturan berhasil disimpan." });
-  } catch (err: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: err.message },
-      },
-      500,
-    );
-  }
-});
+ketik.put(
+  "/settings",
+  zValidator("json", ketikAppSettingsSchema),
+  async (c) => {
+    const user = c.get("user");
+    const body = c.req.valid("json");
+    try {
+      await ketikService.saveSettings(user.id, body);
+      return c.json({
+        success: true,
+        message: "Pengaturan berhasil disimpan.",
+      });
+    } catch (err: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: err.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 ketik.get("/history", async (c) => {
   const user = c.get("user");
@@ -150,8 +161,8 @@ ketik.post(
       consumerName: z.string(),
       consumerPhone: z.string(),
       consumerCity: z.string(),
-      messages: z.array(z.any()),
-      simulationDuration: z.number().optional(),
+      messages: z.array(chatMessageSchema),
+      simulationDuration: z.number().finite().min(1).max(60).optional(),
     }),
   ),
   async (c) => {

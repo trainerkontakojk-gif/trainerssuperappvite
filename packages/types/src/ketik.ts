@@ -315,6 +315,30 @@ export const ketikConsumerTypeSchema = z.object({
   isCustom: z.boolean().optional(),
 });
 
+export const ketikQuickTemplateSchema = z.object({
+  id: z.string(),
+  keyword: z.string(),
+  content: z.string(),
+});
+
+export const ketikIdentitySettingsSchema = z.object({
+  displayName: z.string(),
+  signatureName: z.string(),
+  phoneNumber: z.string(),
+  city: z.string(),
+});
+
+export const ketikAppSettingsSchema: z.ZodType<KetikAppSettings> = z.object({
+  scenarios: z.array(ketikScenarioSchema).min(1),
+  consumerTypes: z.array(ketikConsumerTypeSchema).min(1),
+  quickTemplates: z.array(ketikQuickTemplateSchema),
+  activeConsumerTypeId: z.string(),
+  identitySettings: ketikIdentitySettingsSchema,
+  selectedModel: z.string().min(1),
+  simulationDuration: z.number().finite().min(1).max(60),
+  responsePacingMode: z.enum(["realistic", "training_fast"]),
+});
+
 export const ketikIdentitySchema = z.object({
   name: z.string(),
   city: z.string(),
@@ -340,4 +364,3 @@ export const generateMessageSchema = z.object({
   remainingSeconds: z.number().optional(),
   elapsedSeconds: z.number().optional(),
 });
-

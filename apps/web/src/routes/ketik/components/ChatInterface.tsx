@@ -79,8 +79,9 @@ export function ChatInterface({
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>(
     isReviewMode ? "closed" : "active",
   );
-  const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
+  const totalDurationSeconds = durationMinutes * 60;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timeLeft = Math.max(0, totalDurationSeconds - elapsedSeconds);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -250,14 +251,6 @@ export function ChatInterface({
       return normalizeMessagesForDisplay([...prev, closingMessage]);
     });
   }, [clearPendingTimeouts]);
-
-  useEffect(() => {
-    if (isReviewMode || sessionPhase !== "active") return;
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isReviewMode, sessionPhase]);
 
   useEffect(() => {
     if (isReviewMode || sessionPhase !== "active" || timeLeft > 0) return;
@@ -607,31 +600,36 @@ export function ChatInterface({
               <button
                 type="button"
                 onClick={() => {
-                  const csvContent =
-                    "data:text/csv;charset=utf-8,Pengirim,Pesan,Waktu\n" +
-                    messages
-                      .map((m) => {
-                        const sender =
-                          m.sender === "agent"
-                            ? "Agen"
-                            : m.sender === "consumer"
-                              ? "Konsumen"
-                              : "Sistem";
-                        const text = m.text.replace(/"/g, '""');
-                        const time = new Date(m.timestamp).toLocaleString();
-                        return `"${sender}","${text}","${time}"`;
-                      })
-                      .join("\n");
-                  const encodedUri = encodeURI(csvContent);
+                  const csvContent = [
+                    "Pengirim,Pesan,Waktu",
+                    ...messages.map((message) => {
+                      const sender =
+                        message.sender === "agent"
+                          ? "Agen"
+                          : message.sender === "consumer"
+                            ? "Konsumen"
+                            : "Sistem";
+                      const text = message.text.replace(/"/g, '""');
+                      const time = new Date(message.timestamp).toLocaleString();
+
+                      return `"${sender}","${text}","${time}"`;
+                    }),
+                  ].join("\r\n");
+                  const blob = new Blob(["\uFEFF", csvContent], {
+                    type: "text/csv;charset=utf-8",
+                  });
+                  const url = URL.createObjectURL(blob);
                   const link = document.createElement("a");
-                  link.setAttribute("href", encodedUri);
-                  link.setAttribute(
-                    "download",
-                    `chat_review_${Date.now()}.csv`,
-                  );
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
+
+                  try {
+                    link.href = url;
+                    link.download = `chat_review_${Date.now()}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                  } finally {
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                  }
                 }}
                 className="module-clean-button-secondary flex h-11 w-11 items-center justify-center rounded-xl transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 title="Download CSV"

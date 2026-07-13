@@ -307,7 +307,48 @@ describe("generateConsumerResponse", () => {
       );
       expect(result.success).toBe(true);
       const callArgs = mockOpenRouterContent.mock.calls[0][0];
-      expect(callArgs.temperature).toBeLessThan(0.6);
+      expect(callArgs.temperature).toBe(0.55);
+    });
+
+    it("uses 0.55 for OpenRouter without a script", async () => {
+      setupOpenRouterProvider();
+      mockOpenRouterSuccess("OK tanpa script.");
+      await generateConsumerResponse(
+        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        testScenario,
+        testHistory,
+      );
+      expect(mockOpenRouterContent.mock.calls[0][0].temperature).toBe(0.55);
+      expect(mockOpenRouterContent.mock.calls[0][0].systemInstruction).not.toContain(
+        "MODEL SCRIPT MODE",
+      );
+    });
+
+    it("uses 0.55 for DeepSeek with and without a script", async () => {
+      setupDeepSeekProvider();
+      mockDeepSeekSuccess("OK tanpa script.");
+      await generateConsumerResponse(
+        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        testScenario,
+        testHistory,
+      );
+      expect(mockDeepSeekContent.mock.calls[0][0].temperature).toBe(0.55);
+      expect(mockDeepSeekContent.mock.calls[0][0].systemInstruction).not.toContain(
+        "MODEL SCRIPT MODE",
+      );
+
+      vi.clearAllMocks();
+      setupDeepSeekProvider();
+      mockDeepSeekSuccess("OK dengan script.");
+      await generateConsumerResponse(
+        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        { ...testScenario, script: "Consumer: Saya ingin melapor." },
+        testHistory,
+      );
+      expect(mockDeepSeekContent.mock.calls[0][0].temperature).toBe(0.55);
+      expect(mockDeepSeekContent.mock.calls[0][0].systemInstruction).toContain(
+        "MODEL SCRIPT MODE",
+      );
     });
 
     it("does not apply strict mode for Gemini even with script", async () => {
@@ -324,7 +365,10 @@ describe("generateConsumerResponse", () => {
       );
       expect(result.success).toBe(true);
       const callArgs = mockGeminiContent.mock.calls[0][0];
-      expect(callArgs.systemInstruction).not.toContain("OPENROUTER SCRIPT MODE");
+      expect(callArgs.systemInstruction).not.toContain(
+        "MODEL SCRIPT MODE",
+      );
+      expect(callArgs.temperature).toBe(0.82);
     });
   });
 
@@ -457,7 +501,10 @@ describe("generateConsumerResponse", () => {
     it("passes usageContext and userId to Gemini call", async () => {
       setupGeminiProvider();
       mockGeminiSuccess("OK.");
-      const usageContext = { module: "ketik" as const, action: "simulasi" as const };
+      const usageContext = {
+        module: "ketik" as const,
+        action: "simulasi" as const,
+      };
       await generateConsumerResponse(
         buildConfig(),
         testScenario,
@@ -473,7 +520,10 @@ describe("generateConsumerResponse", () => {
     it("passes usageContext and userId to OpenRouter call", async () => {
       setupOpenRouterProvider();
       mockOpenRouterSuccess("OK.");
-      const usageContext = { module: "ketik" as const, action: "simulasi" as const };
+      const usageContext = {
+        module: "ketik" as const,
+        action: "simulasi" as const,
+      };
       await generateConsumerResponse(
         buildConfig({ selectedModel: "openrouter/deepseek" }),
         testScenario,

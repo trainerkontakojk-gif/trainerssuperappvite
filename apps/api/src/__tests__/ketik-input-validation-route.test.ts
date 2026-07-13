@@ -1,0 +1,146 @@
+import { Hono } from "hono";
+import type { User } from "@supabase/supabase-js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+
+const { mockPersistSession, mockSaveSettings } = vi.hoisted(() => ({
+  mockPersistSession: vi.fn(),
+  mockSaveSettings: vi.fn(),
+}));
+
+vi.mock("../services/ketik-service", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../services/ketik-service")>();
+  return {
+    ...actual,
+    persistSession: mockPersistSession,
+    saveSettings: mockSaveSettings,
+  };
+});
+
+import { ketik } from "../routes/ketik";
+
+type Variables = { user: User; profile: { role: string } };
+
+const validMessage = {
+  id: "message-1",
+  sender: "agent" as const,
+  text: "Halo, ada yang bisa saya bantu?",
+  timestamp: "2026-07-11T00:00:00.000Z",
+  status: "sent" as const,
+  pacingMeta: {
+    mode: "realistic" as const,
+    band: "normal" as const,
+    plannedDelayMs: 1000,
+    timerClamped: false,
+  },
+};
+
+const validHistory = {
+  scenarioTitle: "Pinjol Ilegal",
+  consumerName: "Budi",
+  consumerPhone: "08123456789",
+  consumerCity: "Jakarta",
+  messages: [validMessage],
+  simulationDuration: 5,
+};
+
+function buildApp() {
+  const app = new Hono<{ Variables: Variables }>();
+  app.use("*", async (c, next) => {
+    c.set("user", { id: "user-1" } as User);
+    c.set("profile", { role: "agent" });
+    await next();
+  });
+  app.route("/", ketik);
+  return app;
+}
+
+async function requestJson(
+  app: Hono<{ Variables: Variables }>,
+  path: string,
+  method: "PUT" | "POST",
+  body: unknown,
+) {
+  return app.request(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("KETIK settings and history input validation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSaveSettings.mockResolvedValue(undefined);
+    mockPersistSession.mockResolvedValue({ id: "session-1" });
+  });
+
+  it("accepts the default settings and persists the validated payload", async () => {
+    const response = await requestJson(
+      buildApp(),
+      "/settings",
+      "PUT",
+      DEFAULT_KETIK_SETTINGS,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      "user-1",
+      DEFAULT_KETIK_SETTINGS,
+    );
+  });
+
+  it.each([
+    ["primitive payload", "settings"],
+    ["empty object", {}],
+    ["empty consumer types", { ...DEFAULT_KETIK_SETTINGS, consumerTypes: [] }],
+    [
+      "duration below minimum",
+      { ...DEFAULT_KETIK_SETTINGS, simulationDuration: 0 },
+    ],
+    [
+      "duration above maximum",
+      { ...DEFAULT_KETIK_SETTINGS, simulationDuration: 61 },
+    ],
+    [
+      "invalid pacing mode",
+      { ...DEFAULT_KETIK_SETTINGS, responsePacingMode: "instant" },
+    ],
+  ])("rejects %s without saving", async (_label, payload) => {
+    const response = await requestJson(buildApp(), "/settings", "PUT", payload);
+
+    expect(response.status).toBe(400);
+    expect(mockSaveSettings).not.toHaveBeenCalled();
+  });
+
+  it("accepts a valid history message and persists the session", async () => {
+    const response = await requestJson(
+      buildApp(),
+      "/history",
+      "POST",
+      validHistory,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPersistSession).toHaveBeenCalledWith("user-1", validHistory);
+  });
+
+  it.each([
+    ["message without text", { ...validMessage, text: undefined }],
+    ["invalid sender", { ...validMessage, sender: "customer" }],
+    ["non-string timestamp", { ...validMessage, timestamp: 123 }],
+    [
+      "invalid pacing metadata",
+      { ...validMessage, pacingMeta: { mode: "unknown" } },
+    ],
+  ])("rejects %s without persisting history", async (_label, message) => {
+    const response = await requestJson(buildApp(), "/history", "POST", {
+      ...validHistory,
+      messages: [message],
+    });
+
+    expect(response.status).toBe(400);
+    expect(mockPersistSession).not.toHaveBeenCalled();
+  });
+});

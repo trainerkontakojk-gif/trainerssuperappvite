@@ -315,20 +315,18 @@ ATURAN BALASAN:
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
   const isOpenRouter = provider === "openrouter";
   const isDeepSeek = provider === "deepseek";
+  const usesConservativeTemperature = isOpenRouter || isDeepSeek;
 
-  const providerSystemInstruction = (isOpenRouter || isDeepSeek) && hasScript
-    ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
-    : systemInstruction;
+  const providerSystemInstruction =
+    usesConservativeTemperature && hasScript
+      ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
+      : systemInstruction;
 
   const callPayload = {
     model: modelId,
     systemInstruction: providerSystemInstruction,
     contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
-    temperature: (isOpenRouter || isDeepSeek) && hasScript
-      ? Math.min(0.82, 0.55)
-      : isOpenRouter || isDeepSeek
-        ? 0.55
-        : 0.82,
+    temperature: usesConservativeTemperature ? 0.55 : 0.82,
     usageContext,
     userId,
   };

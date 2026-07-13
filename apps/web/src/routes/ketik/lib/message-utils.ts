@@ -93,17 +93,7 @@ export function isImageOnlyText(text: string): boolean {
 
 export function stripNarrationFromImagePart(text: string): string {
   const match = text.match(IMAGE_TAG_PATTERN);
-  if (match) {
-    const stripped = text.replace(IMAGE_TAG_PATTERN_GLOBAL, "").trim();
-    if (stripped) {
-      console.warn(
-        "[ketik][stripNarration] Stripped narration from image part:",
-        { stripped, kept: match[0] },
-      );
-    }
-    return match[0];
-  }
-  return text;
+  return match ? match[0] : text;
 }
 
 export function normalizeGeneratedParts(

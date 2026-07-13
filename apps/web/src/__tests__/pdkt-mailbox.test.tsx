@@ -12,6 +12,17 @@ import { EmailDetailPane } from "../routes/pdkt/components/EmailDetailPane";
 import type { PdktMailboxItem } from "@trainers/types";
 
 const useApiMock = vi.hoisted(() => vi.fn());
+const historyGetMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../lib/api", () => ({
+  pdktClient: {
+    settings: { $get: vi.fn().mockResolvedValue(null) },
+    history: { $get: historyGetMock },
+  },
+  unwrapResponse: (value: unknown) => value,
+}));
+
+let mailboxResponse: PdktMailboxItem[];
 
 // Mock the API hooks
 vi.mock("../hooks/useApi", () => ({
@@ -22,23 +33,24 @@ describe("PDKT Mailbox UX", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default mocks
-    useApiMock.mockReturnValue({
-      data: [
-        {
-          id: "m1",
-          status: "open",
-          sender_name: "Sender One",
-          sender_email: "sender1@test.com",
-          subject: "Subject One",
-          created_at: new Date().toISOString(),
-          inbound_email: { body: "Inbound body text" },
-          emails_thread: [{ body: "Inbound body text", isAgent: false }],
-        },
-      ],
+    mailboxResponse = [
+      {
+        id: "m1",
+        status: "open",
+        sender_name: "Sender One",
+        sender_email: "sender1@test.com",
+        subject: "Subject One",
+        created_at: new Date().toISOString(),
+        inbound_email: { body: "Inbound body text" },
+        emails_thread: [{ body: "Inbound body text", isAgent: false }],
+      },
+    ];
+    historyGetMock.mockResolvedValue([]);
+    useApiMock.mockImplementation((path: string) => ({
+      data: path === "/pdkt/mailbox" ? mailboxResponse : [],
       loading: false,
       refetch: vi.fn(),
-    });
+    }));
   });
 
   it("renders mailbox list items", async () => {
@@ -128,6 +140,165 @@ describe("PDKT Mailbox UX", () => {
     expect(await screen.findByText("Simulasi PDKT")).toBeDefined();
     expect(document.querySelector(".animate-pulse")).toBeDefined();
     expect(document.querySelector(".animate-spin")).toBeNull();
+  });
+
+  it("keeps archived replay local and does not mutate or lose it after mailbox refetch", async () => {
+    const serverMailbox = Object.freeze([...mailboxResponse]);
+    mailboxResponse = serverMailbox as unknown as PdktMailboxItem[];
+    historyGetMock.mockResolvedValue([
+      {
+        id: "history-1",
+        timestamp: new Date().toISOString(),
+        config: {
+          scenarios: [{ id: "scenario-1", title: "Scenario" }],
+          consumerType: { name: "Consumer" },
+        },
+        emails: [
+          {
+            id: "inbound-1",
+            from: "consumer@example.com",
+            to: "agent@example.com",
+            subject: "Archived subject",
+            body: "Archived body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
+          {
+            id: "reply-1",
+            from: "agent@example.com",
+            to: "consumer@example.com",
+            subject: "Re: Archived subject",
+            body: "Archived reply",
+            timestamp: new Date().toISOString(),
+            isAgent: true,
+          },
+        ],
+        evaluation: { score: 88 },
+        evaluation_status: "completed",
+        time_taken: 42,
+      },
+    ]);
+
+    const rootRoute = createRootRoute();
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: PdktSimulation,
+    });
+    const routeTree = rootRoute.addChildren([indexRoute]);
+    const router = createRouter({ routeTree });
+    const { rerender } = render(<RouterProvider router={router} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Riwayat" }));
+    expect(await screen.findByText("Riwayat Simulasi PDKT")).toBeDefined();
+    fireEvent.click(await screen.findByText("Re: Archived subject"));
+
+    expect(mailboxResponse).toHaveLength(1);
+    expect(
+      (await screen.findAllByText("Archived body")).length,
+    ).toBeGreaterThan(0);
+
+    mailboxResponse = [...mailboxResponse];
+    rerender(<RouterProvider router={router} />);
+    expect(
+      (await screen.findAllByText("Archived body")).length,
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Semua" }));
+    fireEvent.click(screen.getAllByText("Subject One")[0]);
+    expect(screen.queryByText("Archived body")).toBeNull();
+  });
+
+  it("clears archived replay when history selects a real mailbox item", async () => {
+    mailboxResponse = [
+      {
+        ...mailboxResponse[0],
+        history_id: "history-real",
+      },
+    ];
+    historyGetMock.mockResolvedValue([
+      {
+        id: "history-archived",
+        timestamp: new Date().toISOString(),
+        config: {
+          scenarios: [{ id: "scenario-1", title: "Scenario" }],
+          consumerType: { name: "Consumer" },
+        },
+        emails: [
+          {
+            id: "archived-inbound",
+            from: "archived@example.com",
+            to: "agent@example.com",
+            subject: "Archived subject",
+            body: "Archived body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
+          {
+            id: "archived-reply",
+            from: "agent@example.com",
+            to: "archived@example.com",
+            subject: "Re: Archived subject",
+            body: "Archived reply",
+            timestamp: new Date().toISOString(),
+            isAgent: true,
+          },
+        ],
+        evaluation: { score: 88 },
+        evaluation_status: "completed",
+      },
+      {
+        id: "history-real",
+        timestamp: new Date().toISOString(),
+        config: {
+          scenarios: [{ id: "scenario-1", title: "Scenario" }],
+          consumerType: { name: "Consumer" },
+        },
+        emails: [
+          {
+            id: "real-inbound",
+            from: "sender1@test.com",
+            to: "agent@example.com",
+            subject: "Subject One",
+            body: "Inbound body text",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
+          {
+            id: "real-reply",
+            from: "agent@example.com",
+            to: "sender1@test.com",
+            subject: "Re: Subject One",
+            body: "Real reply",
+            timestamp: new Date().toISOString(),
+            isAgent: true,
+          },
+        ],
+        evaluation: { score: 90 },
+        evaluation_status: "completed",
+      },
+    ]);
+
+    const rootRoute = createRootRoute();
+    const indexRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: "/",
+      component: PdktSimulation,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([indexRoute]),
+    });
+    render(<RouterProvider router={router} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Riwayat" }));
+    fireEvent.click(await screen.findByText("Re: Archived subject"));
+    expect(await screen.findAllByText("Archived body")).not.toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Riwayat" }));
+    fireEvent.click(await screen.findByText("Re: Subject One"));
+    fireEvent.click(screen.getByRole("button", { name: "Semua" }));
+
+    expect(screen.queryByText("Archived subject")).toBeNull();
   });
 });
 
@@ -308,7 +479,9 @@ describe("EmailDetailPane Component", () => {
         onRetryEval={() => {}}
       />,
     );
-    const deleteBtn = screen.getByTitle("Hanya pembuat email, admin, atau trainer yang bisa menghapus");
+    const deleteBtn = screen.getByTitle(
+      "Hanya pembuat email, admin, atau trainer yang bisa menghapus",
+    );
     expect(deleteBtn).toBeDefined();
     expect((deleteBtn as HTMLButtonElement).disabled).toBe(true);
   });

@@ -1,41 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useAuthStore } from "../store/authStore";
+
+const { mockGetSettings, mockGenerate, mockWarning } = vi.hoisted(() => ({
+  mockGetSettings: vi.fn(),
+  mockGenerate: vi.fn(),
+  mockWarning: vi.fn(),
+}));
 
 // Mock modules before imports
 vi.mock("../routes/ketik/ketikApi", () => ({
   ketikApi: {
-    getSettings: vi.fn().mockResolvedValue({
-      scenarios: [
-        {
-          id: "s1",
-          title: "Test Scenario",
-          description: "Test",
-          category: "General",
-          isActive: true,
-        },
-      ],
-      consumerTypes: [
-        {
-          id: "ct1",
-          name: "Test Consumer",
-          description: "",
-          difficulty: "Mudah",
-        },
-      ],
-      quickTemplates: [],
-      activeConsumerTypeId: "random",
-      identitySettings: {
-        displayName: "",
-        signatureName: "",
-        phoneNumber: "",
-        city: "",
-      },
-      selectedModel: "gemini-3.1-flash-lite",
-      simulationDuration: 5,
-      responsePacingMode: "realistic",
-    }),
+    getSettings: mockGetSettings,
     getHistory: vi.fn().mockResolvedValue([]),
     saveSettings: vi.fn().mockResolvedValue(undefined),
     clearHistory: vi.fn().mockResolvedValue(undefined),
@@ -67,9 +44,49 @@ vi.mock("../routes/ketik/ketikApi", () => ({
       total_cost_idr: 5000,
       periodLabel: "Januari 2025",
     }),
-    generate: vi.fn().mockResolvedValue({ text: "Test response" }),
+    generate: mockGenerate,
   },
 }));
+
+vi.mock("../lib/toast", () => ({
+  notify: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: mockWarning,
+  },
+}));
+
+const defaultSettings = {
+  scenarios: [
+    {
+      id: "s1",
+      title: "Test Scenario",
+      description: "Test",
+      category: "General",
+      isActive: true,
+    },
+  ],
+  consumerTypes: [
+    {
+      id: "ct1",
+      name: "Test Consumer",
+      description: "",
+      difficulty: "Mudah",
+    },
+  ],
+  quickTemplates: [],
+  activeConsumerTypeId: "random",
+  identitySettings: {
+    displayName: "",
+    signatureName: "",
+    phoneNumber: "",
+    city: "",
+  },
+  selectedModel: "gemini-3.1-flash-lite",
+  simulationDuration: 5,
+  responsePacingMode: "realistic",
+};
 
 vi.mock("../lib/usage-summary", () => ({
   fetchUsageSummary: vi.fn().mockResolvedValue({
@@ -88,6 +105,9 @@ import KetikLanding from "../routes/ketik/index";
 
 describe("KETIK Landing Page", () => {
   beforeEach(() => {
+    mockGetSettings.mockReset().mockResolvedValue(defaultSettings);
+    mockGenerate.mockReset().mockResolvedValue({ text: "Test response" });
+    mockWarning.mockReset();
     // Mock localStorage
     const store: Record<string, string> = { auth_token: "test-token" };
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(
@@ -154,5 +174,26 @@ describe("KETIK Landing Page", () => {
 
     // Should transition to chat view - check for elapsed timer display (0:00 at start)
     await screen.findByText(/0:00/);
+  });
+
+  it("opens settings and warns when no consumer types are available", async () => {
+    const user = userEvent.setup();
+    mockGetSettings.mockResolvedValueOnce({
+      ...defaultSettings,
+      consumerTypes: [],
+    });
+    render(<KetikLanding />);
+
+    await screen.findByText("Mulai Simulasi");
+    await user.click(screen.getByText("Mulai Simulasi"));
+
+    await waitFor(() => {
+      expect(mockWarning).toHaveBeenCalledWith(
+        "Tambahkan minimal satu karakter pelanggan di Pengaturan.",
+      );
+    });
+    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+    expect(screen.queryByText(/0:00/)).toBeNull();
+    expect(mockGenerate).not.toHaveBeenCalled();
   });
 });
