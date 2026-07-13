@@ -12,10 +12,11 @@ Perubahan ini menerapkan hasil validasi commit `728c31c2679268234e4b10908bef2e0a
 - Local history memvalidasi hasil parse sebagai array. JSON malformed/non-array memicu warning aman, tidak menghapus storage, dan tidak menghentikan merge history dari server.
 - Audit pasca-implementasi menutup tiga gap: URL env legacy tidak lagi tercetak mentah, close saat auth gagal langsung membersihkan timer/audio secara idempotent, dan payload local history corrupt tidak ditimpa saat history server dimuat.
 - Pre-auth state dipisahkan ke `TelefunAuthGate` agar invalid token, foreign session, auth paralel/duplikat, dan initialization error dapat diuji tanpa membuka Gemini.
+- Final review memperketat recovery history: guard corrupt diinisialisasi sebelum request history server, dipertahankan selama component lifecycle sehingga finalization/delete/assessment otomatis tidak menimpa payload, clear-history eksplisit mereset guard, dan setiap elemen array divalidasi sebagai `CallRecord` sebelum merge.
 
 ## Verification
 
-- Web focused Telefun suite: 45/45 passing.
+- Web focused Telefun suite: 51/51 passing.
 - Standalone Telefun auth/protocol/close suite: 36/36 passing.
 - Context7 lookup: `ws` `/websockets/ws/8_18_3`, untuk authentication boundary, connection/message lifecycle, dan heartbeat cleanup.
 - Final gates selesai: `pnpm lint` exit 0 dengan 0 error (warning existing), `pnpm build` exit 0, `pnpm test:core` exit 0, dan `git diff --check` bersih.

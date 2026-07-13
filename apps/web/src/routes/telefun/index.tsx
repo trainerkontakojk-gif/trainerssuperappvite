@@ -14,6 +14,7 @@ import { UsageModal } from "../../components/UsageModal";
 import { notify } from "../../lib/toast";
 import type { CallRecord } from "./types";
 import {
+  canOverwriteTelefunLocalHistory,
   parseTelefunLocalHistory,
   shouldPersistTelefunLocalHistory,
 } from "./telefunLocalHistory";
@@ -87,6 +88,7 @@ export default function TelefunLanding() {
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const optimisticRecordIdRef = useRef<string | null>(null);
+  const localHistoryIsCorruptRef = useRef(false);
 
   // Auto-sync reviewRecord when history updates
   useEffect(() => {
@@ -123,16 +125,17 @@ export default function TelefunLanding() {
     };
 
     const loadHistory = async () => {
+      const savedHistory = localStorage.getItem("telefun_history");
+      const { records: localRecords, isCorrupt: localHistoryIsCorrupt } =
+        parseTelefunLocalHistory(savedHistory, notify.warning);
+      localHistoryIsCorruptRef.current = localHistoryIsCorrupt;
+
       try {
         const rows = await getTelefunSessions();
         if (cancelled) return;
 
         const dbRecords = rows.map(mapTelefunSessionRow);
         const dbRecordIds = new Set(dbRecords.map((r) => r.id));
-
-        const savedHistory = localStorage.getItem("telefun_history");
-        const { records: localRecords, isCorrupt: localHistoryIsCorrupt } =
-          parseTelefunLocalHistory(savedHistory, notify.warning);
 
         const merged = [
           ...dbRecords,
@@ -343,7 +346,9 @@ export default function TelefunLanding() {
         const merged = alreadyExists
           ? withoutOptimistic
           : [record, ...withoutOptimistic];
-        localStorage.setItem("telefun_history", JSON.stringify(merged));
+        if (canOverwriteTelefunLocalHistory(localHistoryIsCorruptRef.current)) {
+          localStorage.setItem("telefun_history", JSON.stringify(merged));
+        }
         return merged;
       });
 
@@ -421,7 +426,9 @@ export default function TelefunLanding() {
       await deleteTelefunSession(id);
       setHistory((prev) => {
         const updated = prev.filter((h) => h.id !== id);
-        localStorage.setItem("telefun_history", JSON.stringify(updated));
+        if (canOverwriteTelefunLocalHistory(localHistoryIsCorruptRef.current)) {
+          localStorage.setItem("telefun_history", JSON.stringify(updated));
+        }
         return updated;
       });
       notify.success("Sesi dihapus");
@@ -435,6 +442,7 @@ export default function TelefunLanding() {
       await clearTelefunHistory();
       setHistory([]);
       localStorage.removeItem("telefun_history");
+      localHistoryIsCorruptRef.current = false;
       notify.success("Riwayat dibersihkan");
     } catch {
       notify.error("Gagal membersihkan riwayat");
@@ -451,7 +459,9 @@ export default function TelefunLanding() {
       const updated = prev.map((r) =>
         r.id === sessionId ? { ...r, voiceAssessment: assessment } : r,
       );
-      localStorage.setItem("telefun_history", JSON.stringify(updated));
+      if (canOverwriteTelefunLocalHistory(localHistoryIsCorruptRef.current)) {
+        localStorage.setItem("telefun_history", JSON.stringify(updated));
+      }
       return updated;
     });
     if (reviewRecord?.id === sessionId) {
