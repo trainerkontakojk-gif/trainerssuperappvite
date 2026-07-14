@@ -7,6 +7,7 @@ import type {
   ProfilerFolder,
   ProfilerPeserta,
   ProfilerTim,
+  ProfilerUpcomingBirthday,
 } from "@trainers/types";
 
 const TRAINER_ROLES = ["admin", "trainer"] as const;
@@ -395,6 +396,73 @@ export async function getPeserta(
   const { data, count, error } = await query;
   if (error) throw new Error(error.message);
   return { data: data ?? [], total: count ?? 0 };
+}
+
+export async function getUpcomingBirthdays(
+  limit = 5,
+  accessibleIds?: string[] | null,
+): Promise<ProfilerUpcomingBirthday[]> {
+  const rows = await fetchAllPages<{
+    id: string;
+    nama: string;
+    tgl_lahir: string | null;
+    batch_name: string;
+  }>({
+    build: ({ from, to }) => {
+      let q = supabaseAdmin
+        .from("profiler_peserta")
+        .select("id, nama, tgl_lahir, batch_name")
+        .not("tgl_lahir", "is", null)
+        .order("batch_name")
+        .order("nama")
+        .order("id", { ascending: true })
+        .range(from, to);
+
+      if (accessibleIds !== null && accessibleIds !== undefined) {
+        if (accessibleIds.length === 0) {
+          return Promise.resolve({ data: [], error: null });
+        }
+        q = q.in("id", accessibleIds);
+      }
+
+      return q;
+    },
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const enriched = rows
+    .filter((r) => r.tgl_lahir)
+    .map((r) => {
+      const dob = new Date(r.tgl_lahir!);
+      const next = new Date(
+        today.getFullYear(),
+        dob.getMonth(),
+        dob.getDate(),
+      );
+      if (next < today) next.setFullYear(today.getFullYear() + 1);
+      const daysUntil = Math.round(
+        (next.getTime() - today.getTime()) / 86400000,
+      );
+      const nextYear =
+        today.getMonth() > dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() &&
+          today.getDate() > dob.getDate())
+          ? today.getFullYear() + 1
+          : today.getFullYear();
+      const age = nextYear - dob.getFullYear();
+      return {
+        id: r.id,
+        nama: r.nama || "Unknown",
+        tgl_lahir: r.tgl_lahir!,
+        batch_name: r.batch_name,
+        daysUntil,
+        age,
+      };
+    });
+
+  return enriched.sort((a, b) => a.daysUntil - b.daysUntil).slice(0, limit);
 }
 
 export async function getPesertaById(

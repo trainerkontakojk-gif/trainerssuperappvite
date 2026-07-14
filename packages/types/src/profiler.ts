@@ -65,6 +65,15 @@ export interface ProfilerTim {
   created_at?: string;
 }
 
+export interface ProfilerUpcomingBirthday {
+  id: string;
+  nama: string;
+  tgl_lahir: string;
+  batch_name: string;
+  daysUntil: number;
+  age: number;
+}
+
 export type JabatanKey =
   | "operation_manager"
   | "spv"

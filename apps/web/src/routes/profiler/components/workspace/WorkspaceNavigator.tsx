@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getDynamicIcon, cleanYearLabel } from "./workspace-utils";
+import GlobalBirthdaysWidget from "./GlobalBirthdaysWidget";
 
 interface WorkspaceNavigatorProps {
   years: ProfilerYear[];
@@ -112,18 +113,23 @@ export default function WorkspaceNavigator({
     <div className="relative z-10 h-full overflow-y-auto p-6 custom-scrollbar md:p-8">
       <div className="mx-auto max-w-5xl space-y-8">
         {/* Intro */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-fg">
-              <Sparkles size={14} className="text-fg2" />
+        <section className="flex items-start justify-between gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-fg">
+                <Sparkles size={14} className="text-fg2" />
+              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-fg2">
+                Operational Studio
+              </span>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg2">
-              Operational Studio
-            </span>
+            <h1 className="font-outfit text-3xl font-bold leading-tight tracking-tight text-fg md:text-4xl">
+              Profiler <span className="font-light text-fg3">Workspace</span>
+            </h1>
           </div>
-          <h1 className="font-outfit text-3xl font-bold leading-tight tracking-tight text-fg md:text-4xl">
-            Profiler <span className="font-light text-fg3">Workspace</span>
-          </h1>
+          <div className="hidden shrink-0 lg:block w-64 pt-1">
+            <GlobalBirthdaysWidget />
+          </div>
         </section>
 
         {/* Year Selection */}

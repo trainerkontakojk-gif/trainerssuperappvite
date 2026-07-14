@@ -240,6 +240,19 @@ profiler.get(
 );
 
 profiler.get(
+  "/peserta/upcoming-birthdays",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const limit = c.req.query("limit")
+      ? parseInt(c.req.query("limit")!)
+      : 5;
+    const scope = await resolveKtpScope(c);
+    const data = await profilerService.getUpcomingBirthdays(limit, scope);
+    return c.json({ success: true, data });
+  },
+);
+
+profiler.get(
   "/peserta/batch/:batchName",
   requireRole("admin", "trainer", "leader"),
   async (c) => {

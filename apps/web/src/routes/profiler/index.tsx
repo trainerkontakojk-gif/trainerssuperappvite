@@ -12,39 +12,7 @@ import AddMemberPicker from "./components/AddMemberPicker";
 import { Cake, Trash2 } from "lucide-react";
 import { useProfilerAccess } from "../../hooks/useProfilerAccess";
 import LeaderAccessGate from "../../components/LeaderAccessGate";
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long' });
-}
-
-function getDaysUntilBirthday(tglLahir: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dob = new Date(tglLahir);
-  const next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-  if (next < today) next.setFullYear(today.getFullYear() + 1);
-  return Math.round((next.getTime() - today.getTime()) / 86400000);
-}
-
-function getUpcomingBirthdays(pesertaList: ProfilerPeserta[]): { nama: string; tglLahir: string; days: number; age: number }[] {
-  const today = new Date();
-  return pesertaList
-    .filter(p => p.tgl_lahir)
-    .map(p => {
-      const days = getDaysUntilBirthday(p.tgl_lahir!);
-      const dob = new Date(p.tgl_lahir!);
-      const nextYear =
-        today.getMonth() > dob.getMonth() ||
-        (today.getMonth() === dob.getMonth() && today.getDate() > dob.getDate())
-          ? today.getFullYear() + 1
-          : today.getFullYear();
-      const age = nextYear - dob.getFullYear();
-      return { nama: p.nama || 'Unknown', tglLahir: p.tgl_lahir!, days, age };
-    })
-    .sort((a, b) => a.days - b.days)
-    .slice(0, 5);
-}
+import { formatDate, getUpcomingBirthdays } from "./utils/birthday";
 
 export default function ProfilerLanding() {
   const { isReadOnly, role } = useProfilerAccess();

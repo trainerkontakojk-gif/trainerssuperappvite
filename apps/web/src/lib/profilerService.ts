@@ -5,6 +5,7 @@ import type {
   ProfilerFolder,
   ProfilerPeserta,
   ProfilerTim,
+  ProfilerUpcomingBirthday,
 } from "@trainers/types";
 
 export const profilerApi = {
@@ -105,6 +106,10 @@ export const profilerApi = {
     const query = excludeBatch ? { exclude_batch: excludeBatch } : {};
     return unwrapResponse(profilerClient.peserta["global-pool"].$get({ query })) as Promise<ProfilerPeserta[]>;
   },
+  getUpcomingBirthdays: (limit = 5): Promise<ProfilerUpcomingBirthday[]> =>
+    unwrapResponse(
+      profilerClient.peserta["upcoming-birthdays"].$get({ query: { limit: String(limit) } }),
+    ) as Promise<ProfilerUpcomingBirthday[]>,
 
   // Teams
   getTeams: (): Promise<ProfilerTim[]> =>
