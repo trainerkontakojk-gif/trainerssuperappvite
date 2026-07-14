@@ -38,8 +38,9 @@ erDiagram
 
 ## Tabel Utama
 
-**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (14 files, fully idempotent):
+**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (44 files, fully idempotent):
 
+**Core Migrations (000–017):**
 - `000_profiles_core.sql` — Profiles & auth tables
 - `001_sidak_core.sql` — SIDAK core + Profiler tables (12 tables, all RLS-enabled)
 - `002_ketik_pdkt_core.sql` — KETIK, PDKT, AI usage tables
@@ -54,14 +55,47 @@ erDiagram
 - `011_materialized_view_dashboard.sql` — Materialized view `mv_qa_period_summary`
 - `012_ai_usage_status_error.sql` — AI usage status/error columns
 - `013_refresh_mv_function.sql` — RPC `refresh_mv_qa_period_summary()`
-- `20260525000100_sidak_dashboard_summary_vite_schema_refresh.sql` — Target-schema-compatible `refresh_qa_dashboard_summary_for_period`
-- `20260525000200_restore_mv_qa_period_summary_contract.sql` — Idempotent MV + refresh function contract repair
-- `20260525000300_telefun_history_add_consumer_contact_columns.sql` — Add consumer_phone and consumer_city columns to telefun_history
-- `20260525000400_telefun_history_add_feedback.sql` — Add feedback column to telefun_history for API patch compatibility
-- `20260525000500_telefun_history_add_metadata_columns.sql` — Add metadata columns to telefun_history
-- `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` — Terminal re-hardening: revoke all non-service_role access after contract restore
-- `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql` — Add unique index on qa_temuan to prevent duplicate input at database level (peserta + period + service + trimmed lowercased no_tiket + indicator)
-- `20260527000001_add_simulation_duration_to_ketik_history.sql` — Add `simulation_duration INTEGER` column to `ketik_history` (fixes KETIK session save failure)
+- `014_storage_buckets.sql` — Storage bucket policies
+- `015_tighten_sidak_rls.sql` — SIDAK RLS tightening
+- `016_harden_profiles_rls.sql` — Profiles RLS hardening
+- `017_harden_mv_qa_period_summary.sql` — MV hardening (revokes from non-service_role)
+
+**Timestamp Migrations (20260520–20260630):**
+
+| Migration | Purpose |
+|-----------|---------|
+| `20260520054101_add_is_deleted_to_profiles.sql` | Add `is_deleted` column to profiles |
+| `20260522093000_profiler_unique_constraints.sql` | Profiler unique constraints |
+| `20260523000000_telefun_parity_extensions.sql` | Telefun parity extensions |
+| `20260525000100_sidak_dashboard_summary_vite_schema_refresh.sql` | Target-schema-compatible `refresh_qa_dashboard_summary_for_period` |
+| `20260525000200_restore_mv_qa_period_summary_contract.sql` | Idempotent MV + refresh function contract repair |
+| `20260525000300_telefun_history_add_consumer_contact_columns.sql` | Add consumer_phone and consumer_city to telefun_history |
+| `20260525000400_telefun_history_add_feedback.sql` | Add feedback column to telefun_history |
+| `20260525000500_telefun_history_add_metadata_columns.sql` | Add metadata columns to telefun_history |
+| `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` | Terminal re-hardening: revoke all non-service_role access |
+| `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql` | Unique index on qa_temuan for duplicate prevention |
+| `20260527000001_add_simulation_duration_to_ketik_history.sql` | Add `simulation_duration` to ketik_history |
+| `20260527000002_add_unique_index_ketik_review_jobs_session_id.sql` | Unique index on ketik_review_jobs |
+| `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` | Fix profiler reorder authorization |
+| `20260603090000_pdkt_shared_mailbox_policy.sql` | PDKT shared mailbox RLS + soft-delete RPC |
+| `20260603100000_pdkt_fix_soft_delete_rpc.sql` | Fix soft_delete_pdkt_mailbox_item RPC |
+| `20260604100000_restore_profiler_foto_bucket.sql` | Restore profiler-foto storage bucket |
+| `20260605100000_atomic_monitoring_history_delete.sql` | Atomic monitoring history delete RPC |
+| `20260611100000_fix_telefun_coaching_summary_rpc_contract.sql` | Fix telefun coaching summary RPC |
+| `20260611200000_telefun_scoring_lifecycle.sql` | Telefun scoring lifecycle contract |
+| `20260611201000_telefun_scoring_retry_queue.sql` | Telefun scoring retry queue |
+| `20260612000000_fix_profiles_rls_recursion.sql` | Fix profiles RLS recursion |
+| `20260614090000_sidak_dashboard_forecast_snapshots.sql` | SIDAK dashboard forecast snapshots table |
+| `20260618100000_add_get_profiler_folder_counts_rpc.sql` | RPC `get_profiler_folder_counts(uuid[])` |
+| `20260618101000_add_access_groups_count_view.sql` | View `v_access_groups_with_item_counts` |
+| `20260618102000_add_get_leader_scope_snapshot_rpc.sql` | RPC `get_leader_scope_snapshot(uuid, text)` |
+| `20260618110000_add_mimo_model_pricing.sql` | Add MiMo model pricing |
+| `20260618200000_fix_billing_singleton_upsert.sql` | Fix billing singleton upsert |
+| `20260618210000_ai_usage_modality_tokens.sql` | AI usage modality token columns |
+| `20260618220000_ai_usage_reconciliation_view.sql` | AI usage reconciliation view |
+| `20260619090000_telefun_live_per_minute_billing.sql` | Telefun live per-minute billing columns |
+| `20260622150000_repair_telefun_scoring_lifecycle_contract.sql` | Repair telefun scoring lifecycle contract |
+| `20260630003553_add_current_sidak_profiler_lookup_indexes.sql` | SIDAK profiler lookup indexes |
 
 ### 1. `public.profiles`
 

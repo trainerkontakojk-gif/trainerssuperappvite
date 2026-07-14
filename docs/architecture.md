@@ -39,7 +39,7 @@ graph TD
 4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage.
 5. **RLS (Row Level Security)**: Memastikan keamanan data di tingkat database berdasarkan role user (Admin, Trainer, Leader, Agent).
 6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio ke Gemini Live API.
-7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang saat ini mendukung Gemini dan OpenRouter. Semua AI calls dicatat ke `ai_usage_logs`.
+7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang saat ini mendukung Gemini, OpenRouter, dan DeepSeek (native client). Semua AI calls dicatat ke `ai_usage_logs`.
 8. **Shared Types (`packages/types`)**: Zod schemas dan TypeScript interfaces yang dipakai bersama oleh frontend dan backend.
 
 ## Directory Structure
@@ -150,8 +150,10 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_ANON_KEY`
 - `GEMINI_API_KEY`
 - `OPENROUTER_API_KEY`
+- `DEEPSEEK_API_KEY` (opsional — untuk model DeepSeek native)
 
 ### Telefun Server (`apps/telefun`) — variabel langsung:
 
@@ -181,7 +183,7 @@ pnpm build
 # Lint seluruh workspace
 pnpm lint
 
-# Test seluruh workspace (504 API + 485 web = 989 tests)
+# Test seluruh workspace (1056+ API + 500+ web tests)
 pnpm test
 
 # Test API only

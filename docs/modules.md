@@ -66,6 +66,8 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Manual Scenario Selection**: User secara eksplisit memilih skenario untuk menghasilkan email baru.
   - **Composer Reply**: Balasan memakai panel composer-style dengan field read-only.
   - **PDF Attachments**: Scenario setup menerima lampiran PDF sebagai bukti. Preview dirender sebagai file tile; gambar tetap di-zoom, PDF dibuka di tab baru.
+  - **Multi-Recipient Email Targets**: Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`. Field Penerima Utama mengatur arah narasi email awal.
+  - **Scenario Editor Wizard**: Wizard terstruktur untuk membuat dan mengedit skenario PDKT dengan langkah-langkah terpandu.
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
   - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.
@@ -99,6 +101,7 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
   - **Recording & History**: Rekaman browser disimpan ke local history dan `telefun_history`.
   - **Voice Assessment**: Analisis otomatis kualitas suara agen.
   - **Realistic Mode**: Mode realistik dengan hold consent, rude hold penalty, dan WPM analysis.
+  - **Simulation Challenges**: Skenario tantangan simulasi (max 3) yang diintegrasikan ke dalam Gemini Live system prompt. Tantangan didefinisikan di settings dan diterapkan secara dinamis selama sesi.
   - **Expanded Voices**: Opsi suara Gemini Live dinamis dengan gender consistency guards.
   - **Maintenance Warning Gate**: Entry to Telefun dari sidebar, dashboard card, atau URL direct `/telefun` dilindungi oleh role-based access gate. User dengan role admin/trainer di-auto-grant akses langsung tanpa modal warning. User dengan role lain (leader, agent) melihat modal "Akses Terbatas" dengan pesan "Modul Telefun hanya dapat diakses oleh Trainer" dan hanya bisa kembali ke dashboard. Status akses di-reset otomatis saat meninggalkan modul Telefun.
   - **Gemini Live JSON Protocol**: Menggunakan format JSON terstruktur untuk setup dan pengiriman chunk audio base64 (MIME `audio/pcm;rate=16000`), menggantikan transfer data binary mentah yang rentan force close. Output suara dari Gemini Live didecode dari JSON inline base64 PCM secara real-time pada sample rate output (default 24 kHz).
@@ -129,12 +132,13 @@ Sistem manajemen database terstruktur untuk peserta training dan agen aktif.
 - **Fungsi**: Penyimpanan terpusat data diri, riwayat training, dan penugasan tim.
 - **Routes**: `/profiler`, `/profiler/table`, `/profiler/slides`, `/profiler/analytics`, `/profiler/export`, `/profiler/add`, `/profiler/import`, `/profiler/teams`
 - **Fitur Utama**:
-  - **Table View**: Search, filter, dan edit data peserta.
+  - **Table View**: Search, filter, dan edit data peserta dengan responsive grid layout (1-4 kolom) dan glassmorphism cards.
   - **Analytics**: Recharts analytics dengan 4 chart.
   - **Export**: Excel/CSV export.
   - **Import**: Excel template generation dan upload.
   - **Teams**: Custom team management.
-- **Catatan Teknis**: File peserta/foto memakai Supabase Storage bucket `profiler-foto`. Backend API di `/api/v1/profiler/` (18 endpoints) menangani semua operasi CRUD.
+  - **Upcoming Birthdays**: Endpoint untuk menampilkan peserta yang berulang tahun dalam rentang waktu tertentu.
+- **Catatan Teknis**: File peserta/foto memakai Supabase Storage bucket `profiler-foto`. Backend API di `/api/v1/profiler/` (18+ endpoints) menangani semua operasi CRUD. Reorder authorization dilindungi oleh service_role bypass dengan dedup/validity checks.
 
 ## 6. SIDAK (Sistem Informasi Data Analisis Kualitas)
 
@@ -142,25 +146,30 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
 
 - **Fungsi**: Mengolah data temuan QA menjadi wawasan yang dapat ditindaklanjuti melalui dashboard, ranking, input manual, dan laporan otomatis.
 - **Routes**:
-  - **Landing** (`/sidak`): 5 card links ke sub-modul.
-  - **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, dan top agents.
-  - **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent membaik/memburuk.
-  - **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload.
-  - **Ranking** (`/sidak/ranking`): Ranking agent berdasarkan skor dan defect.
-  - **Settings** (`/sidak/settings`): Service weights configuration.
+  - **Landing** (`/sidak`): 5 card links ke sub-modul (termasuk Forecast).
+  - **Dashboard** (`/sidak/dashboard`): KPI ringkasan, tren kualitas, bar charts, top agents, Pareto chart, dan forecast visibility toggle.
+  - **Forecast** (`/sidak/forecast`): Workbench analitik untuk proyeksi layanan dan lane agent (improving/declining/stable/insufficient_data). Service chart dengan filter parameter, agent-level projection dengan regresi linear.
+  - **Input Audit** (`/sidak/input`): Entry temuan manual multi-step + Excel upload. Live score card dengan radial progress ring, konfigurasi audit card, dan show all data toggle.
+  - **Ranking** (`/sidak/ranking`): Ranking agent berdasarkan skor dan defect, dengan rank change indicator (▲/▼) dan dynamic context subtitle.
+  - **Settings** (`/sidak/settings`): Service weights configuration dengan versioned rules per service+periode.
   - **Periods** (`/sidak/periods`): Manajemen periode audit.
-  - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian.
-  - **Agent Detail** (`/sidak/agents/$id`): Score history + findings table.
+  - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian dan dynamic load-more copy.
+  - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
   - **Reports** (`/sidak/reports`): Data vs AI report selection.
   - **Reports Data** (`/sidak/reports-data`): Filter form + temuan table + Excel export.
   - **Reports AI** (`/sidak/reports-ai`): AI-powered report generation.
 - **Fitur Utama**:
   - **Versioned Rules**: Parameter penilaian per service+periode dengan versioning.
   - **Scoring Engine**: Perhitungan skor agent dengan weighted/counting mode, clean-session handling, phantom padding exclusion.
-  - **Dashboard Summary Rollup**: Cache KPI per periode untuk performa dashboard.
-  - **Forecast Agent**: Proyeksi skor, temuan, dan critical findings per agent dengan regresi linear; klasifikasi lane (improving/declining/stable).
+  - **Dashboard Summary Rollup**: Real-time computation dari data temuan mentah via scoring engine aplikasi.
+  - **Forecast Agent**: Proyeksi skor, temuan, dan critical findings per agent dengan regresi linear; klasifikasi lane (improving/declining/stable). Snapshot persistence dengan SHA-256 fingerprinting dan 3-state lifecycle (missing/fresh/stale).
+  - **Agent Audit Dossier**: Full-width audit surface dengan compact score strip (month/status/final score/progress bar/Sesi/Temuan/Delta), ticket impact table, dan root-cause coaching panel.
+  - **Agent Comparison Table**: Benchmark temuan kumulatif agent terhadap rata-rata tim dan rata-rata service.
+  - **Root Cause Diagnosis**: Rule-based clustering (8 klaster) dengan keyword matching dan ticket references. Target coverage: lainnya < 20%.
   - **Folder-Aware Filters**: Dashboard dan ranking dapat difilter berdasarkan folder/batch audit untuk scope yang lebih presisi, termasuk untuk leader scope.
   - **Phantom Padding**: Clean session (audit tanpa temuan real) tetap dihitung sebagai valid audit.
-  - **Sesi Tanpa Temuan**: Trainer/admin dapat membuat 5 sesi phantom (nilai=3) ketika agent belum memiliki temuan buruk, memastikan scoring adil dengan padding 5 sesi.
+  - **Sesi Tanpa Temuan**: Trainer/admin dapat membuat 5 sesi phantom (nilai=3) ketika agent belum memiliki temuan buruk.
   - **Excel Upload**: Template generation, parsing, dan validasi untuk bulk input temuan.
+  - **Rank Change Indicator**: Perubahan posisi ranking (▲ +X / ▼ -X) dengan dynamic context subtitle "Sebelumnya Posisi X".
+  - **KPI Delta**: Persentase kenaikan/penurunan di KPI Dashboard dengan unit yang disesuaikan (persentase relatif untuk count/ratio, poin persentase untuk metrik persen).
 - **Catatan Teknis**: Backend API di `/api/v1/sidak/` (~19 endpoints) di-dekomposisi ke 6 sub-module route handler (`apps/api/src/routes/sidak/{core,dashboard,forecast,temuan,rule-versions,reports}.ts`). Business logic di `apps/api/src/services/sidak-service.ts` — barrel dari 14 sub-modules di `apps/api/src/services/sidak/`. Scoring engine di `apps/api/src/lib/scoring.ts`.

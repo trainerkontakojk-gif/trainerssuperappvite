@@ -259,7 +259,7 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 - `apps/api/src/lib/ai-usage.ts` — Usage logging
 - `apps/web/src/hooks/useApi.ts` — Authenticated API helper (inject bearer token)
 - `apps/web/src/routes/monitoring.tsx` — Monitoring page (3 tab, legacy visual parity)
-- `apps/web/src/__tests__/monitoring-unauthorized-parity.test.tsx` — Regression tests (20 tests)
+- `apps/web/src/__tests__/monitoring-unauthorized-parity.test.tsx` — Regression tests
 - `docs/modules.md`
 - `docs/database.md`
 - `docs/auth-rbac.md`

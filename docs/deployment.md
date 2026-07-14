@@ -69,6 +69,7 @@ Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi buil
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key                                                                         |
 | `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key                                                                    |
 | `OPENROUTER_API_KEY`        | `sk-or...`                         | OpenRouter API key                                                                       |
+| `DEEPSEEK_API_KEY`          | `sk-...`                           | DeepSeek API key (opsional — untuk model DeepSeek native)                                |
 | `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
 
 ### Telefun Service
@@ -169,6 +170,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 # AI
 GEMINI_API_KEY=your_gemini_key
 OPENROUTER_API_KEY=your_openrouter_key
+DEEPSEEK_API_KEY=your_deepseek_key  # Optional
 
 # Telefun
 VITE_TELEFUN_WS_URL=ws://localhost:3002
