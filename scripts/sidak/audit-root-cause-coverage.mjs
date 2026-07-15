@@ -201,18 +201,32 @@ function buildSearchText(row) {
 }
 
 function matchCluster(searchText) {
+  let bestMatch = null;
+
   for (const entry of ROOT_CAUSE_REGISTRY) {
-    const matched = entry.keywords.filter((kw) =>
+    const matchedKeywords = entry.keywords.filter((kw) =>
       searchText.includes(normalizeText(kw)),
     );
-    if (matched.length > 0) {
-      return {
-        clusterId: entry.clusterId,
-        label: entry.label,
-        matchedKeywords: matched,
-      };
+    if (matchedKeywords.length === 0) continue;
+
+    if (
+      !bestMatch ||
+      matchedKeywords.length > bestMatch.matchedKeywords.length ||
+      (matchedKeywords.length === bestMatch.matchedKeywords.length &&
+        entry.priority > bestMatch.entry.priority)
+    ) {
+      bestMatch = { entry, matchedKeywords };
     }
   }
+
+  if (bestMatch) {
+    return {
+      clusterId: bestMatch.entry.clusterId,
+      label: bestMatch.entry.label,
+      matchedKeywords: bestMatch.matchedKeywords,
+    };
+  }
+
   return {
     clusterId: FALLBACK_CLUSTER_ID,
     label: "Lainnya",
@@ -329,7 +343,7 @@ function getDryRunFixture() {
       ketidaksesuaian: "Sebaiknya melakukan verifikasi data lebih teliti",
       sebaiknya: "Verifikasi data nasabah sebelum closing",
     },
-    // Multiple clusters match — priority test
+    // Multiple clusters match — best-match tie uses priority
     {
       id: "dr-11",
       nilai: 0,

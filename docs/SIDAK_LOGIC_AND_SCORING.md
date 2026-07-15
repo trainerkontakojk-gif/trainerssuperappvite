@@ -311,7 +311,7 @@ Lihat `apps/api/src/services/sidak/period-scoring-context.ts` untuk implementasi
 
 ## Agent Detail Root Cause Diagnosis
 
-Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan dari data temuan SIDAK. Proses ini **tidak memakai AI** dan tidak mengubah skor. Backend mengelompokkan temuan dari `ketidaksesuaian` dan `sebaiknya` ke registry klaster yang terurut berdasarkan prioritas bisnis.
+Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan dari data temuan SIDAK. Proses ini **tidak memakai AI** dan tidak mengubah skor. Backend mengevaluasi seluruh keyword registry untuk setiap temuan dan memilih klaster dengan jumlah keyword match terbanyak. Priority registry hanya menjadi tie-breaker ketika jumlah match sama.
 
 ### Klaster
 
@@ -329,11 +329,15 @@ Halaman `/sidak/agents/$id` menampilkan diagnosis akar masalah berbasis aturan d
 - Temuan `is_phantom_padding=true` tidak dipakai untuk diagnosis.
 - Temuan `nilai` 0–3 dipakai selama memiliki evidence teks (`ketidaksesuaian`, `sebaiknya`).
 - `nilai = 3` (rekomendasi) tetap dipertimbangkan untuk diagnosis coaching.
-- Jika satu temuan cocok beberapa keyword, sistem memilih klaster dengan prioritas tertinggi.
+- Jika satu temuan cocok beberapa klaster, sistem memilih klaster dengan jumlah keyword match terbanyak; jika jumlahnya sama, priority lebih tinggi menang, lalu urutan registry menjadi tie-break terakhir.
 - Jika tidak ada keyword yang cocok, temuan masuk ke `lainnya`.
-- Klaster diurutkan berdasarkan prioritas, jumlah temuan, jumlah critical, dan jumlah tiket.
+- Klaster diurutkan berdasarkan jumlah temuan, jumlah tiket terdampak, jumlah temuan critical, priority, lalu label secara alfabetis.
 - Evidence teks diambil dari `ketidaksesuaian`, lalu `sebaiknya`, lalu fallback ke nama parameter.
 - Setiap klaster juga mengekspos `ticketReferences` (nomor tiket unik per `no_tiket + periodId`, dengan `periodLabel` dan jumlah temuan per tiket) untuk keperluan audit checking di UI. Field ini **opsional** dan tidak mengubah `affectedTickets` maupun clustering (tetap deterministic, non-AI). Tiket tanpa `no_tiket` dikecualikan dari daftar, dan jumlah reference per klaster dibatasi ke 12 agar payload/UI tetap ringan.
+
+> Keyword yang saling mengandung tetap dihitung sebagai match terpisah. Contoh:
+> `pada appk` dapat cocok dengan `appk` dan `pada appk`. Perubahan ke weighted
+> phrase specificity berada di luar kontrak matcher saat ini.
 
 ### Coverage Target
 

@@ -418,9 +418,13 @@ export function useAgentDetail(agentId: string) {
       })
       .filter((cause): cause is NonNullable<typeof cause> => cause !== null)
       .sort((a, b) => {
-        if (b.priority !== a.priority) return b.priority - a.priority;
         if (b.findingsCount !== a.findingsCount)
           return b.findingsCount - a.findingsCount;
+        if (b.affectedTickets !== a.affectedTickets)
+          return b.affectedTickets - a.affectedTickets;
+        if (b.criticalFindingsCount !== a.criticalFindingsCount)
+          return b.criticalFindingsCount - a.criticalFindingsCount;
+        if (b.priority !== a.priority) return b.priority - a.priority;
         return a.label.localeCompare(b.label);
       });
   }, [data, latestPeriod, monthlySummaries, selectedService]);

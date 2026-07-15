@@ -499,6 +499,57 @@ describe("useAgentDetail", () => {
     expect(result.current.activeRootCauses).toEqual([]);
   });
 
+  it("re-sorts active root causes by impact after YTD aggregation", async () => {
+    useApiMock.mockImplementation((path: string | null) => {
+      const serviceType = path
+        ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type")
+        : null;
+      const data = buildAgentDetailData(serviceType) as any;
+
+      if (serviceType === "call") {
+        const salahJawaban = data.rootCauses[0];
+        data.rootCauses = [
+          {
+            ...salahJawaban,
+            clusterId: "salah_penggunaan_sistem",
+            label: "Kesalahan penggunaan sistem/APPK",
+            priority: 9,
+            findingsCount: 1,
+            affectedTickets: 1,
+            criticalFindingsCount: 0,
+            matchedKeywords: ["appk"],
+            evidence: [],
+            periods: [
+              {
+                periodId: "period-call",
+                month: 5,
+                year: 2026,
+                label: "05/2026",
+                serviceType: "call",
+                findingsCount: 1,
+                criticalFindingsCount: 0,
+                affectedTickets: 1,
+              },
+            ],
+          },
+          salahJawaban,
+        ];
+      }
+
+      return { data, loading: false, error: null, refetch: vi.fn() };
+    });
+
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+    result.current.handleServiceChange("call");
+    await waitFor(() => expect(result.current.selectedService).toBe("call"));
+
+    expect(result.current.activeRootCauses.map((cause) => cause.clusterId)).toEqual([
+      "salah_jawaban",
+      "salah_penggunaan_sistem",
+    ]);
+  });
+
   it("does not reset the selected service while a stale previous-service response is still loading", async () => {
     useApiMock.mockImplementation((path: string | null) => {
       const serviceType = path

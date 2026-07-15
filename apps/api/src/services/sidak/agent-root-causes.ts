@@ -192,15 +192,37 @@ function matchCluster(searchText: string): {
   entry: RegistryEntry;
   matchedKeywords: string[];
 } {
+  let bestMatch: {
+    entry: RegistryEntry;
+    matchedKeywords: string[];
+  } | null = null;
+
   for (const entry of ROOT_CAUSE_REGISTRY) {
-    const matched = entry.keywords.filter((keyword) =>
+    const matchedKeywords = entry.keywords.filter((keyword) =>
       searchText.includes(normalizeText(keyword)),
     );
-    if (matched.length > 0) {
-      return { entry, matchedKeywords: matched };
+
+    if (matchedKeywords.length === 0) continue;
+
+    const hasMoreKeywordMatches =
+      !bestMatch ||
+      matchedKeywords.length > bestMatch.matchedKeywords.length;
+    const winsPriorityTie =
+      bestMatch !== null &&
+      matchedKeywords.length === bestMatch.matchedKeywords.length &&
+      entry.priority > bestMatch.entry.priority;
+
+    if (hasMoreKeywordMatches || winsPriorityTie) {
+      bestMatch = { entry, matchedKeywords };
     }
   }
-  return { entry: FALLBACK_ROOT_CAUSE, matchedKeywords: [] };
+
+  return (
+    bestMatch ?? {
+      entry: FALLBACK_ROOT_CAUSE,
+      matchedKeywords: [],
+    }
+  );
 }
 
 function buildPeriodLabelFromTicketNumber(noTiket: string): string | null {
@@ -456,15 +478,16 @@ export function deriveAgentRootCauses(
     });
   }
 
-  // Sort: priority desc, findingsCount desc, criticalFindingsCount desc, affectedTickets desc, label asc
+  // Sort: findingsCount desc, affectedTickets desc, criticalFindingsCount desc,
+  // priority desc, label asc
   results.sort((a, b) => {
-    if (b.priority !== a.priority) return b.priority - a.priority;
     if (b.findingsCount !== a.findingsCount)
       return b.findingsCount - a.findingsCount;
-    if (b.criticalFindingsCount !== a.criticalFindingsCount)
-      return b.criticalFindingsCount - a.criticalFindingsCount;
     if (b.affectedTickets !== a.affectedTickets)
       return b.affectedTickets - a.affectedTickets;
+    if (b.criticalFindingsCount !== a.criticalFindingsCount)
+      return b.criticalFindingsCount - a.criticalFindingsCount;
+    if (b.priority !== a.priority) return b.priority - a.priority;
     return a.label.localeCompare(b.label);
   });
 

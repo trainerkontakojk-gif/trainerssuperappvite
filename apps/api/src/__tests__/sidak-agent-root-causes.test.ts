@@ -45,14 +45,36 @@ function row(overrides: Partial<QATemuan>): QATemuan {
 }
 
 describe("deriveAgentRootCauses", () => {
-  it("chooses the highest-priority matching cluster when text matches multiple clusters", () => {
+  it("chooses the cluster with the most matched keywords before priority", () => {
     const result = deriveAgentRootCauses({
       indicators,
       periodById,
       serviceType: "call",
       temuan: [
         row({
-          id: "r1",
+          id: "best-match",
+          no_tiket: "T-BEST",
+          ketidaksesuaian:
+            "Agent memberi salah jawaban dan tidak sesuai dalam memilih data kontak lewat APPK.",
+        }),
+      ],
+    });
+
+    expect(result[0]).toMatchObject({
+      clusterId: "salah_jawaban",
+      priority: 8,
+      matchedKeywords: ["salah jawaban", "tidak sesuai dalam memilih"],
+    });
+  });
+
+  it("uses priority when multiple clusters match the same number of keywords", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        row({
+          id: "priority-tie",
+          no_tiket: "T-TIE",
           ketidaksesuaian:
             "Salah jawaban dan nama perusahaan salah pada penjelasan.",
         }),
@@ -62,8 +84,6 @@ describe("deriveAgentRootCauses", () => {
     expect(result[0]).toMatchObject({
       clusterId: "salah_nama_perusahaan_produk",
       priority: 10,
-      findingsCount: 1,
-      affectedTickets: 1,
     });
   });
 
@@ -185,37 +205,89 @@ describe("deriveAgentRootCauses", () => {
     ]);
   });
 
-  it("sorts by priority, findingsCount, and criticalFindingsCount", () => {
+  it("sorts higher findingsCount before higher priority", () => {
     const result = deriveAgentRootCauses({
       indicators,
       periodById,
       temuan: [
+        row({ id: "appk-1", no_tiket: "A-1", ketidaksesuaian: "Data dicatat di APPK" }),
+        row({ id: "answer-1", no_tiket: "S-1", ketidaksesuaian: "salah jawaban" }),
+        row({ id: "answer-2", no_tiket: "S-2", ketidaksesuaian: "jawaban salah" }),
+      ],
+    });
+
+    expect(result.map((cause) => cause.clusterId)).toEqual([
+      "salah_jawaban",
+      "salah_penggunaan_sistem",
+    ]);
+  });
+
+  it("uses affectedTickets after findingsCount", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        row({ id: "appk-1", no_tiket: "A-1", ketidaksesuaian: "APPK" }),
+        row({ id: "appk-2", no_tiket: "A-1", ketidaksesuaian: "APPK" }),
+        row({ id: "answer-1", no_tiket: "S-1", ketidaksesuaian: "salah jawaban" }),
+        row({ id: "answer-2", no_tiket: "S-2", ketidaksesuaian: "salah jawaban" }),
+      ],
+    });
+
+    expect(result[0].clusterId).toBe("salah_jawaban");
+    expect(result[0].affectedTickets).toBe(2);
+  });
+
+  it("uses criticalFindingsCount after findingsCount and affectedTickets", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        row({ id: "appk-1", no_tiket: "A-1", nilai: 1, ketidaksesuaian: "APPK" }),
+        row({ id: "appk-2", no_tiket: "A-2", nilai: 1, ketidaksesuaian: "APPK" }),
+        row({ id: "answer-1", no_tiket: "S-1", nilai: 0, ketidaksesuaian: "salah jawaban" }),
+        row({ id: "answer-2", no_tiket: "S-2", nilai: 1, ketidaksesuaian: "salah jawaban" }),
+      ],
+    });
+
+    expect(result[0]).toMatchObject({
+      clusterId: "salah_jawaban",
+      criticalFindingsCount: 1,
+    });
+  });
+
+  it("uses priority after all impact metrics tie", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        row({ id: "appk", no_tiket: "A-1", nilai: 1, ketidaksesuaian: "APPK" }),
+        row({ id: "answer", no_tiket: "S-1", nilai: 1, ketidaksesuaian: "salah jawaban" }),
+      ],
+    });
+
+    expect(result[0].clusterId).toBe("salah_penggunaan_sistem");
+  });
+
+  it("uses label ascending after metrics and priority tie", () => {
+    const result = deriveAgentRootCauses({
+      indicators,
+      periodById,
+      temuan: [
+        row({ id: "appk", no_tiket: "A-1", nilai: 1, ketidaksesuaian: "APPK" }),
         row({
-          id: "r1",
-          ketidaksesuaian: "kurang menggali",
+          id: "excess",
+          no_tiket: "E-1",
           nilai: 1,
-        }),
-        row({
-          id: "r2",
-          ketidaksesuaian: "salah jawaban",
-          nilai: 0,
-        }),
-        row({
-          id: "r3",
-          ketidaksesuaian: "salah jawaban",
-          nilai: 1,
+          ketidaksesuaian: "informasi berlebihan",
         }),
       ],
     });
 
-    // highest priority (8) with 2 findings, 1 critical should be first
-    expect(result[0].clusterId).toBe("salah_jawaban");
-    expect(result[0].findingsCount).toBe(2);
-    expect(result[0].criticalFindingsCount).toBe(1);
-
-    // lower priority (5) with 1 finding should be second
-    expect(result[1].clusterId).toBe("kurang_menggali");
-    expect(result[1].findingsCount).toBe(1);
+    expect(result.map((cause) => cause.label)).toEqual([
+      "Jawaban melebihi standar",
+      "Kesalahan penggunaan sistem/APPK",
+    ]);
   });
 
   it("returns fallback cluster when only row is phantom padding or nilai 3 with null evidence", () => {
@@ -452,7 +524,9 @@ describe("deriveAgentRootCauses", () => {
     expect(result[0].clusterId).toBe("salah_penggunaan_sistem");
   });
 
-  it("keeps kelebihan_standar_jawaban ahead of APPK when both priority-9 clusters match", () => {
+  it("gives APPK priority-9 cluster the win over kelebihan_standar_jawaban when both match and APPK has more keyword hits (raw overlap)", () => {
+    // "pada appk" matches both "pada appk" and "appk" → 2 hits for APPK
+    // "standar jawaban tidak diperlukan" → 1 hit for kelebihan_standar_jawaban
     const result = deriveAgentRootCauses({
       indicators,
       periodById,
@@ -466,7 +540,7 @@ describe("deriveAgentRootCauses", () => {
     });
 
     expect(result[0]).toMatchObject({
-      clusterId: "kelebihan_standar_jawaban",
+      clusterId: "salah_penggunaan_sistem",
       priority: 9,
     });
   });
