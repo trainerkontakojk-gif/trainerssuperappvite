@@ -156,7 +156,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian dan dynamic load-more copy.
   - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
   - **Reports** (`/sidak/reports`): Data vs AI report selection.
-  - **Reports Data** (`/sidak/reports-data`): Filter form + temuan table + Excel export.
+  - **Reports Data** (`/sidak/reports-data`): Filter form + tabel temuan dengan kolom Layanan, Periode, Agen, Nomor Tiket, Parameter, Temuan, dan Skor + Excel export. Nomor tiket dinormalisasi dan ditampilkan dengan format monospace; isi Temuan dibungkus utuh tanpa truncation agar tetap terbaca.
   - **Reports AI** (`/sidak/reports-ai`): AI-powered report generation.
 - **Fitur Utama**:
   - **Versioned Rules**: Parameter penilaian per service+periode dengan versioning.

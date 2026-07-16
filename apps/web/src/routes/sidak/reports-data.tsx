@@ -8,6 +8,13 @@ import {
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { Pagination } from "../../components/ui/Pagination";
+import type { AgentDirectoryResponse } from "@trainers/types";
+import {
+  getReportFindingText,
+  getReportTicketText,
+  normalizeReportAgents,
+  validateReportFilters,
+} from "./reports-data-utils";
 
 const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"] as const;
 const SERVICE_LABELS: Record<string, string> = {
@@ -17,11 +24,13 @@ const SERVICE_LABELS: Record<string, string> = {
 
 export default function SidakReportsData() {
   const { data: periods } = useApi<any[]>("/sidak/periods");
-  const { data: agents } = useApi<any[]>("/sidak/agents");
 
   const [mode, setMode] = useState<"layanan" | "individu">("layanan");
   const [serviceType, setServiceType] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
+  const { data: agentDirectory, loading: agentsLoading } =
+    useApi<AgentDirectoryResponse>(`/sidak/agents?year=${year}`);
+  const agents = normalizeReportAgents(agentDirectory);
   const [startMonth, setStartMonth] = useState(1);
   const [endMonth, setEndMonth] = useState(12);
   const [pesertaId, setPesertaId] = useState("");
@@ -38,6 +47,17 @@ export default function SidakReportsData() {
     : [new Date().getFullYear()];
 
   const fetchReport = async () => {
+    const validationError = validateReportFilters({
+      mode,
+      pesertaId,
+      startMonth,
+      endMonth,
+    });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -133,9 +153,13 @@ export default function SidakReportsData() {
                   <select value={pesertaId} onChange={(e) => setPesertaId(e.target.value)}
                     className="w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-card outline-none focus:border-primary"
                   >
-                    <option value="">Pilih Agen</option>
-                    {(agents || []).map((a: any) => (
-                      <option key={a.id} value={a.id}>{a.nama} ({a.batch_name || "-"})</option>
+                    <option value="">
+                      {agentsLoading ? "Memuat agen..." : "Pilih Agen"}
+                    </option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.nama}{a.batch_name ? ` — ${a.batch_name}` : ""}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -167,7 +191,7 @@ export default function SidakReportsData() {
             </div>
 
             <div className="flex items-center gap-3 pt-2">
-              <button onClick={fetchReport} disabled={loading}
+              <button onClick={fetchReport} disabled={loading || (mode === "individu" && (!pesertaId || agentsLoading))}
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground hover:opacity-90 transition disabled:opacity-60"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -214,8 +238,9 @@ export default function SidakReportsData() {
                           <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Layanan</th>
                           <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Periode</th>
                           <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Agen</th>
+                          <th className="min-w-[160px] text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nomor Tiket</th>
                           <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Parameter</th>
-                          <th className="text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temuan</th>
+                          <th className="w-[32%] min-w-[320px] text-left px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-foreground">Temuan</th>
                           <th className="text-center px-6 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Skor</th>
                         </tr>
                       </thead>
@@ -230,8 +255,13 @@ export default function SidakReportsData() {
                               <span className="font-semibold text-foreground/80">{r.profiler_peserta?.nama || "-"}</span>
                               <span className="text-xs text-muted-foreground ml-1">({r.profiler_peserta?.batch_name || ""})</span>
                             </td>
+                            <td className="min-w-[160px] px-6 py-4 font-mono text-xs font-semibold text-foreground whitespace-nowrap">
+                              {getReportTicketText(r)}
+                            </td>
                             <td className="px-6 py-4 text-foreground/80">{r.qa_indicators?.name || "-"}</td>
-                            <td className="px-6 py-4 text-destructive italic text-xs max-w-[200px] truncate">{r.ketidaksesuaian || "-"}</td>
+                            <td className="min-w-[320px] max-w-[520px] px-6 py-4 align-top text-xs leading-relaxed text-foreground whitespace-normal break-words">
+                              {getReportFindingText(r)}
+                            </td>
                             <td className="px-6 py-4 text-center">
                               <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
                                 (r.nilai ?? 3) >= 3 ? "bg-emerald-500/10 text-emerald-600" : "bg-destructive/10 text-destructive"
