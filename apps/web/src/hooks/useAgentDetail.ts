@@ -12,6 +12,7 @@ import {
   calculateSessionScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
 } from "../lib/scoring";
+import type { AgentReportFormat } from "../utils/exportAgentReport";
 
 interface TicketScore {
   no_tiket: string;
@@ -440,39 +441,86 @@ export function useAgentDetail(agentId: string) {
     );
   }, [temuan]);
 
-  const handleExport = useCallback(async () => {
-    try {
-      const xlsx = await import("xlsx");
-      const wb = xlsx.utils.book_new();
+  const handleExport = useCallback(
+    async (format: AgentReportFormat) => {
+      try {
+        const {
+          generateCSV,
+          generateMD,
+          generateHTML,
+        } = await import("../utils/exportAgentReport");
 
-      const summaryData: any[][] = [
-        ["Nama", data?.peserta.nama ?? ""],
-        ["Tim", data?.peserta.tim ?? ""],
-        ["Batch", data?.peserta.batch_name ?? ""],
-        ["Jabatan", data?.peserta.jabatan ?? ""],
-        ["Tahun", String(selectedYear)],
-        [""],
-        ["Bulan", "Skor Final", "NC Score", "CR Score", "Sesi", "Temuan"],
-        ...monthlySummaries.map((s) => [
-          s.label,
-          s.finalScore,
-          s.nonCriticalScore,
-          s.criticalScore,
-          s.sessionCount,
-          s.findingsCount,
-        ]),
-      ];
-      const ws = xlsx.utils.aoa_to_sheet(summaryData);
-      xlsx.utils.book_append_sheet(wb, ws, "Ringkasan");
+        const fileName = `Laporan_Audit_${
+          data?.peserta.nama ?? agentId
+        }_${selectedYear}`;
+        let content: string;
+        let mimeType: string;
+        let extension: string;
 
-      xlsx.writeFile(
-        wb,
-        `Laporan_Audit_${data?.peserta.nama ?? agentId}_${selectedYear}.xlsx`,
-      );
-    } catch {
-      // silent
-    }
-  }, [data, selectedYear, monthlySummaries, agentId]);
+        if (format === "csv") {
+          content = generateCSV(
+            data!,
+            monthlySummaries,
+            temuanDisplayItems,
+            topTickets,
+            activeRootCauses,
+            selectedYear,
+          );
+          mimeType = "text/csv;charset=utf-8;";
+          extension = "csv";
+        } else if (format === "md") {
+          content = generateMD(
+            data!,
+            monthlySummaries,
+            temuanDisplayItems,
+            topTickets,
+            activeRootCauses,
+            selectedYear,
+          );
+          mimeType = "text/markdown;charset=utf-8;";
+          extension = "md";
+        } else {
+          const variant =
+            format === "html-interactive" ? "interactive" : "static";
+          content = generateHTML(
+            data!,
+            monthlySummaries,
+            temuanDisplayItems,
+            topTickets,
+            activeRootCauses,
+            selectedYear,
+            selectedService,
+            variant,
+          );
+          mimeType = "text/html;charset=utf-8;";
+          extension = `${variant === "interactive" ? "interaktif" : "statis"}.html`;
+        }
+
+        const bom = "\uFEFF";
+        const blob = new Blob([bom + content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${fileName}.${extension}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch {
+        // silent
+      }
+    },
+    [
+      data,
+      selectedYear,
+      monthlySummaries,
+      temuanDisplayItems,
+      topTickets,
+      activeRootCauses,
+      selectedService,
+      agentId,
+    ],
+  );
 
   const handleInputAudit = useCallback(() => {
     const folder = data?.peserta?.batch_name || data?.peserta?.tim || "";
