@@ -5,9 +5,11 @@ export interface SidakRuleIndicatorRow {
   ruleIndicatorId: string;
   legacyIndicatorId?: string;
   name: string;
+  parameter_group?: string | null;
   category: QAIndicator["category"];
   bobot: number;
   has_na: boolean;
+  sort_order?: number;
 }
 
 export interface SidakInputRuleModel {
@@ -27,16 +29,20 @@ export function buildSidakInputRuleModel(params: {
     };
   }
 
-  const activeIndicators: QAIndicator[] = params.ruleIndicatorsRaw.map((ri) => ({
-    id: ri.legacyIndicatorId || ri.ruleIndicatorId,
-    service_type: params.selectedService,
-    name: ri.name,
-    category: ri.category,
-    bobot: ri.bobot,
-    has_na: ri.has_na,
-    ruleIndicatorId: ri.ruleIndicatorId,
-    legacyIndicatorId: ri.legacyIndicatorId,
-  }));
+  const activeIndicators: QAIndicator[] = params.ruleIndicatorsRaw.map(
+    (ri) => ({
+      id: ri.legacyIndicatorId || ri.ruleIndicatorId,
+      service_type: params.selectedService,
+      name: ri.name,
+      parameter_group: ri.parameter_group ?? null,
+      category: ri.category,
+      bobot: ri.bobot,
+      has_na: ri.has_na,
+      ruleIndicatorId: ri.ruleIndicatorId,
+      legacyIndicatorId: ri.legacyIndicatorId,
+      sort_order: ri.sort_order ?? 0,
+    }),
+  );
 
   const unlinkedIndicatorIds = new Set(
     params.ruleIndicatorsRaw
@@ -57,7 +63,12 @@ export function useSidakInputRuleModel({
   selectedService: QAIndicator["service_type"];
 }): SidakInputRuleModel {
   return useMemo(
-    () => buildSidakInputRuleModel({ ruleIndicatorsRaw, globalIndicators, selectedService }),
+    () =>
+      buildSidakInputRuleModel({
+        ruleIndicatorsRaw,
+        globalIndicators,
+        selectedService,
+      }),
     [ruleIndicatorsRaw, globalIndicators, selectedService],
   );
 }

@@ -5,7 +5,14 @@ import { buildSidakInputRuleModel } from "../routes/sidak/hooks/useSidakInputRul
 describe("buildSidakInputRuleModel", () => {
   it("uses global indicators when no rule version indicators are loaded", () => {
     const globalIndicators: QAIndicator[] = [
-      { id: "i1", service_type: "call", name: "Salam", category: "none", bobot: 1, has_na: false },
+      {
+        id: "i1",
+        service_type: "call",
+        name: "Salam",
+        category: "none",
+        bobot: 1,
+        has_na: false,
+      },
     ];
 
     const result = buildSidakInputRuleModel({
@@ -27,6 +34,7 @@ describe("buildSidakInputRuleModel", () => {
           ruleIndicatorId: "r1",
           legacyIndicatorId: "i1",
           name: "Parameter Linked",
+          parameter_group: "Parameter Utama",
           category: "critical" as const,
           bobot: 2,
           has_na: false,
@@ -42,8 +50,12 @@ describe("buildSidakInputRuleModel", () => {
       ],
     });
 
-    expect(result.activeIndicators.map((item) => item.id)).toEqual(["i1", "r2"]);
+    expect(result.activeIndicators.map((item) => item.id)).toEqual([
+      "i1",
+      "r2",
+    ]);
     expect(result.activeIndicators[0].service_type).toBe("email");
+    expect(result.activeIndicators[0].parameter_group).toBe("Parameter Utama");
     expect([...result.unlinkedIndicatorIds]).toEqual(["r2"]);
   });
 });

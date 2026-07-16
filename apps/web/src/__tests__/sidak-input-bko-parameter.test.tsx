@@ -28,6 +28,7 @@ describe("Sidak BKO Parameter resolver frontend UX", () => {
         onCancel={vi.fn()}
         activeIndicators={[]}
         scoringMode="no_category"
+        serviceType="bko"
         saving={false}
         previewing={false}
       />,
@@ -70,6 +71,7 @@ describe("Sidak BKO Parameter resolver frontend UX", () => {
         onCancel={vi.fn()}
         activeIndicators={activeIndicators}
         scoringMode="no_category"
+        serviceType="bko"
         saving={false}
         previewing={false}
       />,

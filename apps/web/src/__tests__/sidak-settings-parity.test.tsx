@@ -2,9 +2,46 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 const useApiMock = vi.hoisted(() => vi.fn());
+const apiMocks = vi.hoisted(() => ({
+  getMeta: vi.fn(),
+  getIndicators: vi.fn(),
+  createDraft: vi.fn(),
+  deleteDraft: vi.fn(),
+  publishDraft: vi.fn(),
+  addIndicator: vi.fn(),
+  updateIndicator: vi.fn(),
+  deleteIndicator: vi.fn(),
+  unwrapResponse: vi.fn(),
+}));
 
 vi.mock("../hooks/useApi", () => ({
   useApi: (...args: unknown[]) => useApiMock(...args),
+}));
+
+vi.mock("../lib/api", () => ({
+  sidakClient: {
+    "rule-versions": {
+      meta: { $get: apiMocks.getMeta },
+      $post: apiMocks.createDraft,
+      ":id": {
+        indicators: {
+          $get: apiMocks.getIndicators,
+          $post: apiMocks.addIndicator,
+        },
+        $delete: apiMocks.deleteDraft,
+        publish: { $post: apiMocks.publishDraft },
+      },
+      ":versionId": {
+        indicators: {
+          ":indicatorId": {
+            $put: apiMocks.updateIndicator,
+            $delete: apiMocks.deleteIndicator,
+          },
+        },
+      },
+    },
+  },
+  unwrapResponse: (...args: unknown[]) => apiMocks.unwrapResponse(...args),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -85,6 +122,16 @@ describe("Sidak settings page legacy parity", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-24T00:00:00Z"));
     window.scrollTo = vi.fn() as any;
+    apiMocks.unwrapResponse.mockImplementation(async (response) => response);
+    apiMocks.getIndicators.mockResolvedValue([]);
+    apiMocks.getMeta.mockResolvedValue({
+      service_type: "call",
+      indicator_count: 0,
+      has_weight: false,
+      draft_count: 0,
+      published_count: 0,
+    });
+    apiMocks.deleteDraft.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -143,21 +190,9 @@ describe("Sidak settings page legacy parity", () => {
 
   it("renders legacy parity fields (threshold, sort_order, linked) in indicator list", async () => {
     vi.useRealTimers();
+    apiMocks.getIndicators.mockResolvedValue(mockRuleIndicators);
 
     useApiMock.mockImplementation((path: string) => {
-      if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
-      }
-      if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
-      }
-      return { data: [], loading: false, error: null, refetch: vi.fn() };
-    });
-
-    useApiMock.mockImplementation((path: string) => {
-      if (path.includes("/indicators")) {
-        return { data: mockRuleIndicators, loading: false, error: null, refetch: vi.fn() };
-      }
       if (path.includes("/sidak/periods")) {
         return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
       }
@@ -189,21 +224,9 @@ describe("Sidak settings page legacy parity", () => {
 
   it("shows CTA Create Revision from Published when draft is empty but published has indicators", async () => {
     vi.useRealTimers();
+    apiMocks.getIndicators.mockResolvedValue([]);
 
     useApiMock.mockImplementation((path: string) => {
-      if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
-      }
-      if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
-      }
-      return { data: [], loading: false, error: null, refetch: vi.fn() };
-    });
-
-    useApiMock.mockImplementation((path: string) => {
-      if (path.includes("/indicators")) {
-        return { data: [], loading: false, error: null, refetch: vi.fn() };
-      }
       if (path.includes("/sidak/periods")) {
         return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
       }
@@ -227,6 +250,13 @@ describe("Sidak settings page legacy parity", () => {
 
   it("shows baseline-aware empty state when no rule version exists", async () => {
     vi.useRealTimers();
+    apiMocks.getMeta.mockResolvedValue({
+      service_type: "call",
+      indicator_count: 12,
+      has_weight: true,
+      draft_count: 0,
+      published_count: 0,
+    });
 
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
@@ -234,30 +264,6 @@ describe("Sidak settings page legacy parity", () => {
       }
       if (path.includes("/sidak/rule-versions")) {
         return { data: [], loading: false, error: null, refetch: vi.fn() };
-      }
-      return { data: [], loading: false, error: null, refetch: vi.fn() };
-    });
-
-    useApiMock.mockImplementation((path: string) => {
-      if (path.includes("/rule-versions/meta")) {
-        return {
-          data: {
-            service_type: "call",
-            indicator_count: 12,
-            has_weight: true,
-            draft_count: 0,
-            published_count: 0,
-          },
-          loading: false,
-          error: null,
-          refetch: vi.fn(),
-        };
-      }
-      if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
-      }
-      if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
@@ -272,22 +278,15 @@ describe("Sidak settings page legacy parity", () => {
 
   it("shows no-baseline empty state when meta has zero indicators", async () => {
     vi.useRealTimers();
+    apiMocks.getMeta.mockResolvedValue({
+      service_type: "call",
+      indicator_count: 0,
+      has_weight: false,
+      draft_count: 0,
+      published_count: 0,
+    });
 
     useApiMock.mockImplementation((path: string) => {
-      if (path.includes("/rule-versions/meta")) {
-        return {
-          data: {
-            service_type: "call",
-            indicator_count: 0,
-            has_weight: false,
-            draft_count: 0,
-            published_count: 0,
-          },
-          loading: false,
-          error: null,
-          refetch: vi.fn(),
-        };
-      }
       if (path.includes("/sidak/periods")) {
         return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
       }
@@ -305,7 +304,7 @@ describe("Sidak settings page legacy parity", () => {
     vi.useFakeTimers();
   });
 
-  it("calls delete draft via useApi when clicking Hapus Draft", async () => {
+  it("calls delete draft via RPC when clicking Hapus Draft", async () => {
     vi.useRealTimers();
     const refetchVersionsMock = vi.fn();
     useApiMock.mockImplementation((path: string) => {

@@ -31,6 +31,7 @@ import type {
   AgentPeriodSummary,
   ServiceWeight,
 } from "@trainers/types";
+import { formatQAIndicatorName } from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
 
 const SERVICE_LABELS: Record<ServiceType, string> = {
@@ -65,7 +66,6 @@ export async function getSoftDeletedPesertaIds(): Promise<string[]> {
   // whose trainer is inactive/deleted.
   // TODO: Implement proper soft-delete check if needed.
   return [];
-
 }
 
 export async function getAgents(params: {
@@ -169,8 +169,8 @@ export async function getAgentDirectorySummary(
   const indicatorCache = new Map<string, any[]>();
   const svcsToLoad =
     allowedServiceTypes && allowedServiceTypes.length > 0
-    ? allowedServiceTypes
-    : VALID_SERVICE_TYPES;
+      ? allowedServiceTypes
+      : VALID_SERVICE_TYPES;
   for (const st of svcsToLoad) {
     indicatorCache.set(st, await getIndicators(st));
   }
@@ -300,7 +300,8 @@ export async function getAgentDetail(
   if (weightsResult.error) throw new Error(weightsResult.error.message);
 
   const currentYear = year ?? new Date().getFullYear();
-  const hasMonthRangeFilter = startMonth !== undefined || endMonth !== undefined;
+  const hasMonthRangeFilter =
+    startMonth !== undefined || endMonth !== undefined;
   const periodIdsInRange = periods
     .filter((period) => period.year === currentYear)
     .filter((period) => startMonth === undefined || period.month >= startMonth)
@@ -339,7 +340,7 @@ export async function getAgentDetail(
   const resolvedWeights = mergeServiceWeights(
     DEFAULT_SERVICE_WEIGHTS,
     rawWeights,
-    );
+  );
 
   // Partition rows by period:service
   const periodServiceRows = new Map<string, DashboardTemuanRow[]>();
@@ -361,7 +362,10 @@ export async function getAgentDetail(
     temuan: rows,
     indicators,
     periodById,
-    serviceType: serviceType && isServiceType(serviceType) ? (serviceType as ServiceType) : undefined,
+    serviceType:
+      serviceType && isServiceType(serviceType)
+        ? (serviceType as ServiceType)
+        : undefined,
   });
 
   // Resolve summaries concurrently
@@ -372,7 +376,7 @@ export async function getAgentDetail(
       const rawService = key.slice(separator + 1);
       if (!isServiceType(rawService)) {
         throw new Error(`Layanan SIDAK tidak valid: ${rawService}`);
-        }
+      }
 
       const period = periodById.get(periodId);
       if (!period) {
@@ -401,11 +405,11 @@ export async function getAgentDetail(
       const findingRows = periodRows.filter((r) => isCountableFinding(r));
 
       return {
-      id: period.id,
-      month: period.month,
-      year: period.year,
-      label: `${String(period.month).padStart(2, "0")}/${period.year}`,
-      serviceType: activeSvc,
+        id: period.id,
+        month: period.month,
+        year: period.year,
+        label: `${String(period.month).padStart(2, "0")}/${period.year}`,
+        serviceType: activeSvc,
         finalScore: roundTo(score.finalScore, 2),
         nonCriticalScore: roundTo(score.nonCriticalScore, 2),
         criticalScore: roundTo(score.criticalScore, 2),
@@ -467,7 +471,7 @@ export async function getAgentDetail(
       totalFindingsByPeriod[pid] = (totalFindingsByPeriod[pid] || 0) + 1;
       const indicator = indicators.find((i: any) => i.id === row.indicator_id);
       if (!indicator) continue;
-      const paramName = indicator.name;
+      const paramName = formatQAIndicatorName(indicator);
       if (!paramCounts[paramName]) paramCounts[paramName] = {};
       paramCounts[paramName][pid] = (paramCounts[paramName][pid] || 0) + 1;
     }
@@ -738,12 +742,18 @@ async function buildAgentComparisonTable({
     if (!anyFindings) continue;
 
     const agentCount = agentTally?.byIndicator.get(ind.id) ?? 0;
-    const team = computeAverage(teamAgentIds, (t) => t.byIndicator.get(ind.id) ?? 0);
-    const service = computeAverage(serviceAgentIds, (t) => t.byIndicator.get(ind.id) ?? 0);
+    const team = computeAverage(
+      teamAgentIds,
+      (t) => t.byIndicator.get(ind.id) ?? 0,
+    );
+    const service = computeAverage(
+      serviceAgentIds,
+      (t) => t.byIndicator.get(ind.id) ?? 0,
+    );
 
     paramRows.push({
       key: ind.id,
-      label: ind.name,
+      label: formatQAIndicatorName(ind),
       agentCount,
       teamAverage: team.average,
       serviceAverage: service.average,

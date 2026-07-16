@@ -10,17 +10,23 @@ type Variables = { user: User; profile: any };
 
 const sidakCore = new Hono<{ Variables: Variables }>();
 
-async function resolveSidakFilterScope(c: any): Promise<sidakService.SidakFilterScope | null> {
+async function resolveSidakFilterScope(
+  c: any,
+): Promise<sidakService.SidakFilterScope | null> {
   const user = c.get("user");
   const profile = c.get("profile");
   return sidakService.getAccessibleSidakFilters(user.id, profile?.role ?? "");
 }
 
 // ── Periods ────────────────────────────────────────────
-sidakCore.get("/periods", requireRole("admin", "trainer", "leader"), async (c) => {
-  const periods = await sidakService.getPeriods();
-  return c.json({ success: true, data: periods });
-});
+sidakCore.get(
+  "/periods",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const periods = await sidakService.getPeriods();
+    return c.json({ success: true, data: periods });
+  },
+);
 
 sidakCore.post("/periods", requireRole("admin", "trainer"), async (c) => {
   const body = await c.req.json();
@@ -161,9 +167,11 @@ sidakCore.post("/indicators", requireRole("admin", "trainer"), async (c) => {
         "slik",
       ]),
       name: z.string().min(1),
+      parameter_group: z.string().trim().min(1).nullable().optional(),
       category: z.enum(["critical", "non_critical", "none"]),
       bobot: z.number().positive(),
       has_na: z.boolean().optional().default(false),
+      sort_order: z.number().int().optional().default(0),
     })
     .safeParse(body);
   if (!parsed.success) {
@@ -184,14 +192,18 @@ sidakCore.post("/indicators", requireRole("admin", "trainer"), async (c) => {
 });
 
 // ── Folders ────────────────────────────────────────────
-sidakCore.get("/folders", requireRole("admin", "trainer", "leader"), async (c) => {
-  const filterScope = await resolveSidakFilterScope(c);
-  if (filterScope) {
-    return c.json({ success: true, data: filterScope.allowedFolders });
-  }
-  const folders = await sidakService.getAllFolders();
-  return c.json({ success: true, data: folders });
-});
+sidakCore.get(
+  "/folders",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const filterScope = await resolveSidakFilterScope(c);
+    if (filterScope) {
+      return c.json({ success: true, data: filterScope.allowedFolders });
+    }
+    const folders = await sidakService.getAllFolders();
+    return c.json({ success: true, data: folders });
+  },
+);
 
 // ── Agents by Folder ────────────────────────────────────
 sidakCore.get(

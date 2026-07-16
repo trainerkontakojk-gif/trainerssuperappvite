@@ -2,12 +2,30 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
 import { useAuthStore } from "../../store/authStore";
-import type { QAIndicator, QAPeriod, QATemuan, ServiceWeight, RuleVersion, AgentDirectoryResponse, ResolvedSidakInputConfig } from "@trainers/types";
+import {
+  formatQAIndicatorName,
+  type QAIndicator,
+  type QAPeriod,
+  type QATemuan,
+  type ServiceWeight,
+  type RuleVersion,
+  type AgentDirectoryResponse,
+  type ResolvedSidakInputConfig,
+} from "@trainers/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, FolderOpen, User as UserIcon, CalendarDays, Plus,
-  Upload, Check, ChevronRight, AlertCircle,
-  AlertTriangle, Eye, EyeOff,
+  ArrowLeft,
+  FolderOpen,
+  User as UserIcon,
+  CalendarDays,
+  Plus,
+  Upload,
+  Check,
+  ChevronRight,
+  AlertCircle,
+  AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
 import TemuanGroupGrid from "../../components/sidak/TemuanGroupGrid";
@@ -17,24 +35,47 @@ import SidakSelectionGrid from "../../components/sidak/SidakSelectionGrid";
 import SidakInputManualForm from "../../components/sidak/SidakInputManualForm";
 import SidakInputImportPanel from "../../components/sidak/SidakInputImportPanel";
 import {
-  resolveServiceTypeFromTeam, calculateQAScoreFromTemuan,
+  resolveServiceTypeFromTeam,
+  calculateQAScoreFromTemuan,
 } from "../../lib/scoring";
 import { useTemuanEdit } from "./hooks/useTemuanEdit";
 import { useTemuanForm, newEntry } from "./hooks/useTemuanForm";
 import { useTemuanImport } from "./hooks/useTemuanImport";
 
 const MONTHS = [
-  "Januari", "Februari", "Maret", "April",
-  "Mei", "Juni", "Juli", "Agustus",
-  "September", "Oktober", "November", "Desember",
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
 ];
 
 type Step = "folder" | "agent" | "period" | "list";
 
-const SERVICE_TYPES = ["call", "chat", "email", "cso", "pencatatan", "bko", "slik"];
+const SERVICE_TYPES = [
+  "call",
+  "chat",
+  "email",
+  "cso",
+  "pencatatan",
+  "bko",
+  "slik",
+];
 const SERVICE_LABELS: Record<string, string> = {
-  call: "Call", chat: "Chat", email: "Email", cso: "CSO",
-  pencatatan: "Pencatatan", bko: "BKO", slik: "SLIK",
+  call: "Call",
+  chat: "Chat",
+  email: "Email",
+  cso: "CSO",
+  pencatatan: "Pencatatan",
+  bko: "BKO",
+  slik: "SLIK",
 };
 
 interface AgentEntry {
@@ -59,13 +100,15 @@ export default function SidakInputPage() {
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentEntry | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<QAPeriod | null>(null);
-  const [selectedService, setSelectedService] = useState<QAIndicator["service_type"]>("call");
+  const [selectedService, setSelectedService] =
+    useState<QAIndicator["service_type"]>("call");
   const [activeWeight, setActiveWeight] = useState<ServiceWeight | null>(null);
 
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role ?? "trainer";
 
-  const { data: folders } = useApi<{ id: string; name: string }[]>("/sidak/folders");
+  const { data: folders } =
+    useApi<{ id: string; name: string }[]>("/sidak/folders");
   const { data: periods } = useApi<QAPeriod[]>("/sidak/periods");
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [temuan, setTemuan] = useState<QATemuan[]>([]);
@@ -74,7 +117,9 @@ export default function SidakInputPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Resolved Config State
-  const [resolvedIndicators, setResolvedIndicators] = useState<QAIndicator[]>([]);
+  const [resolvedIndicators, setResolvedIndicators] = useState<QAIndicator[]>(
+    [],
+  );
   const [ruleVersionId, setRuleVersionId] = useState<string | null>(null);
   const [hasDraftVersion, setHasDraftVersion] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -91,28 +136,38 @@ export default function SidakInputPage() {
     return set;
   }, [resolvedIndicators]);
 
-  const loadResolvedConfig = useCallback(async (service: QAIndicator["service_type"], periodId?: string) => {
-    setLoadingConfig(true);
-    setResolvedIndicators([]);
-    setActiveWeight(null);
-    setRuleVersionId(null);
-    setHasDraftVersion(false);
-    try {
-      const response = await sidakClient["resolved-input-config"].$get({ query: { service_type: service, ...(periodId ? { period_id: periodId } : {}) } });
-      const res = (await unwrapResponse(response)) as ResolvedSidakInputConfig;
-      if (res) {
-        setResolvedIndicators(res.indicators || []);
-        setActiveWeight(res.weight || null);
-        setRuleVersionId(res.ruleVersionId || null);
-        setHasDraftVersion(!!res.hasDraftVersion);
+  const loadResolvedConfig = useCallback(
+    async (service: QAIndicator["service_type"], periodId?: string) => {
+      setLoadingConfig(true);
+      setResolvedIndicators([]);
+      setActiveWeight(null);
+      setRuleVersionId(null);
+      setHasDraftVersion(false);
+      try {
+        const response = await sidakClient["resolved-input-config"].$get({
+          query: {
+            service_type: service,
+            ...(periodId ? { period_id: periodId } : {}),
+          },
+        });
+        const res = (await unwrapResponse(
+          response,
+        )) as ResolvedSidakInputConfig;
+        if (res) {
+          setResolvedIndicators(res.indicators || []);
+          setActiveWeight(res.weight || null);
+          setRuleVersionId(res.ruleVersionId || null);
+          setHasDraftVersion(!!res.hasDraftVersion);
+        }
+      } catch (err) {
+        console.error("Gagal memuat konfigurasi input SIDAK:", err);
+        setErrorMsg("Gagal memuat parameter");
+      } finally {
+        setLoadingConfig(false);
       }
-    } catch (err) {
-      console.error("Gagal memuat konfigurasi input SIDAK:", err);
-      setErrorMsg("Gagal memuat parameter");
-    } finally {
-      setLoadingConfig(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Initialize Hooks
   const editHook = useTemuanEdit({
@@ -156,7 +211,7 @@ export default function SidakInputPage() {
 
   const indicatorLabelMap = useMemo(() => {
     const map = new Map<string, string>();
-    activeIndicators.forEach((i) => map.set(i.id, i.name));
+    activeIndicators.forEach((i) => map.set(i.id, formatQAIndicatorName(i)));
     return map;
   }, [activeIndicators]);
 
@@ -170,7 +225,9 @@ export default function SidakInputPage() {
     setErrorMsg(null);
 
     try {
-      const agentService = resolveServiceTypeFromTeam(agent.tim) as QAIndicator["service_type"];
+      const agentService = resolveServiceTypeFromTeam(
+        agent.tim,
+      ) as QAIndicator["service_type"];
       setSelectedService(agentService);
       await loadResolvedConfig(agentService);
       setStep("period");
@@ -191,7 +248,16 @@ export default function SidakInputPage() {
       const svc = selectedService;
       const [_, result] = await Promise.all([
         loadResolvedConfig(svc, period.id),
-        unwrapResponse(await sidakClient.temuan.$get({ query: { peserta_id: selectedAgent.id, period_id: period.id, service_type: svc, limit: "200" } })),
+        unwrapResponse(
+          await sidakClient.temuan.$get({
+            query: {
+              peserta_id: selectedAgent.id,
+              period_id: period.id,
+              service_type: svc,
+              limit: "200",
+            },
+          }),
+        ),
       ]);
       setTemuan((result as { items: QATemuan[] }).items ?? []);
       setStep("list");
@@ -202,26 +268,38 @@ export default function SidakInputPage() {
     }
   };
 
-  const handleServiceChange = useCallback(async (newService: QAIndicator["service_type"]) => {
-    setSelectedService(newService);
-    setLoading(true);
-    setErrorMsg(null);
-    setTemuan([]);
-    setEntries([newEntry()]);
-    importHook.setImportRows([]);
-    importHook.setImportFile(null);
-    try {
-      await loadResolvedConfig(newService, selectedPeriod?.id);
-      if (selectedAgent && selectedPeriod) {
-        const result = await unwrapResponse(await sidakClient.temuan.$get({ query: { peserta_id: selectedAgent.id, period_id: selectedPeriod.id, service_type: newService, limit: "200" } }));
-      setTemuan((result as { items: QATemuan[] }).items ?? []);
+  const handleServiceChange = useCallback(
+    async (newService: QAIndicator["service_type"]) => {
+      setSelectedService(newService);
+      setLoading(true);
+      setErrorMsg(null);
+      setTemuan([]);
+      setEntries([newEntry()]);
+      importHook.setImportRows([]);
+      importHook.setImportFile(null);
+      try {
+        await loadResolvedConfig(newService, selectedPeriod?.id);
+        if (selectedAgent && selectedPeriod) {
+          const result = await unwrapResponse(
+            await sidakClient.temuan.$get({
+              query: {
+                peserta_id: selectedAgent.id,
+                period_id: selectedPeriod.id,
+                service_type: newService,
+                limit: "200",
+              },
+            }),
+          );
+          setTemuan((result as { items: QATemuan[] }).items ?? []);
+        }
+      } catch {
+        setErrorMsg("Gagal memuat data untuk layanan baru");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setErrorMsg("Gagal memuat data untuk layanan baru");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedAgent, selectedPeriod, loadResolvedConfig, setEntries, importHook]);
+    },
+    [selectedAgent, selectedPeriod, loadResolvedConfig, setEntries, importHook],
+  );
 
   const handleFolderClick = async (folder: string) => {
     setSelectedFolder(folder);
@@ -232,7 +310,9 @@ export default function SidakInputPage() {
 
     try {
       const year = new Date().getFullYear();
-      const result = await unwrapResponse(await sidakClient.agents.$get({ query: { year: String(year) } }));
+      const result = await unwrapResponse(
+        await sidakClient.agents.$get({ query: { year: String(year) } }),
+      );
       const allAgents = normalizeAgentsResponse(result);
       const folderAgents = allAgents.filter(
         (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
@@ -246,35 +326,42 @@ export default function SidakInputPage() {
     }
   };
 
-  const loadFolderAndPreSelectAgent = useCallback(async (folder: string, agentId: string) => {
-    setErrorMsg(null);
-    try {
-      const year = new Date().getFullYear();
-      const result = await unwrapResponse(await sidakClient.agents.$get({ query: { year: String(year) } }));
-      const allAgents = normalizeAgentsResponse(result);
-      const folderAgents = allAgents.filter(
-        (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
-      );
-      const found = folderAgents.find((a) => a.id === agentId);
-      if (!found) {
-        setErrorMsg("Agen tidak ditemukan. Silakan pilih manual.");
+  const loadFolderAndPreSelectAgent = useCallback(
+    async (folder: string, agentId: string) => {
+      setErrorMsg(null);
+      try {
+        const year = new Date().getFullYear();
+        const result = await unwrapResponse(
+          await sidakClient.agents.$get({ query: { year: String(year) } }),
+        );
+        const allAgents = normalizeAgentsResponse(result);
+        const folderAgents = allAgents.filter(
+          (a) => (a.batch_name ?? "").toLowerCase() === folder.toLowerCase(),
+        );
+        const found = folderAgents.find((a) => a.id === agentId);
+        if (!found) {
+          setErrorMsg("Agen tidak ditemukan. Silakan pilih manual.");
+          setAgents(folderAgents);
+          setSelectedFolder(folder);
+          setStep("agent");
+          return;
+        }
         setAgents(folderAgents);
         setSelectedFolder(folder);
-        setStep("agent");
-        return;
+        setSelectedAgent(found);
+        const agentService = resolveServiceTypeFromTeam(
+          found.tim,
+        ) as QAIndicator["service_type"];
+        setSelectedService(agentService);
+        await loadResolvedConfig(agentService);
+        setStep("period");
+        window.history.replaceState({}, "", window.location.pathname);
+      } catch {
+        setErrorMsg("Gagal memuat data. Silakan pilih manual.");
       }
-      setAgents(folderAgents);
-      setSelectedFolder(folder);
-      setSelectedAgent(found);
-      const agentService = resolveServiceTypeFromTeam(found.tim) as QAIndicator["service_type"];
-      setSelectedService(agentService);
-      await loadResolvedConfig(agentService);
-      setStep("period");
-      window.history.replaceState({}, "", window.location.pathname);
-    } catch {
-      setErrorMsg("Gagal memuat data. Silakan pilih manual.");
-    }
-  }, [loadResolvedConfig]);
+    },
+    [loadResolvedConfig],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -286,7 +373,8 @@ export default function SidakInputPage() {
   }, [loadFolderAndPreSelectAgent]);
 
   const groupedTemuan = useMemo(() => {
-    const groups: { key: string; label: string | null; items: QATemuan[] }[] = [];
+    const groups: { key: string; label: string | null; items: QATemuan[] }[] =
+      [];
     const keyToGroup = new Map<string, number>();
     temuan.forEach((t) => {
       const key = t.no_tiket?.trim() || `__solo_${t.id}`;
@@ -303,7 +391,11 @@ export default function SidakInputPage() {
     if (!activeIndicators.length || !activeWeight) return null;
     return calculateQAScoreFromTemuan(
       activeIndicators,
-      temuan.map((t) => ({ indicator_id: t.indicator_id, nilai: t.nilai, no_tiket: t.no_tiket })),
+      temuan.map((t) => ({
+        indicator_id: t.indicator_id,
+        nilai: t.nilai,
+        no_tiket: t.no_tiket,
+      })),
       activeWeight,
     );
   }, [temuan, activeIndicators, activeWeight]);
@@ -378,8 +470,12 @@ export default function SidakInputPage() {
             {selectedAgent && (
               <>
                 <ChevronRight className="w-3 h-3 text-muted-foreground/30 shrink-0" />
-                <span className={`truncate max-w-[120px] ${step === "list" ? "text-foreground" : "text-muted-foreground/60"}`}>
-                  {selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : "Periode"}
+                <span
+                  className={`truncate max-w-[120px] ${step === "list" ? "text-foreground" : "text-muted-foreground/60"}`}
+                >
+                  {selectedPeriod
+                    ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`
+                    : "Periode"}
                 </span>
               </>
             )}
@@ -442,7 +538,11 @@ export default function SidakInputPage() {
                       : "bg-background text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  {showAllData ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  {showAllData ? (
+                    <EyeOff className="w-3.5 h-3.5" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
                   {showAllData ? "Data Terfilter" : "Tampilkan Semua"}
                 </button>
               </div>
@@ -489,7 +589,10 @@ export default function SidakInputPage() {
               {loading ? (
                 <SidakSelectionGrid testId="agent-selection-skeleton">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse">
+                    <div
+                      key={i}
+                      className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse"
+                    >
                       <div className="h-11 w-11 rounded bg-foreground/10" />
                       <div className="mt-5 h-3 w-28 rounded bg-foreground/10" />
                       <div className="mt-2 h-2.5 w-20 rounded bg-foreground/10" />
@@ -508,7 +611,11 @@ export default function SidakInputPage() {
                     <SidakSelectionCard
                       key={agent.id}
                       delay={i * 0.02}
-                      icon={<span className="text-sm font-black">{agent.nama.charAt(0).toUpperCase()}</span>}
+                      icon={
+                        <span className="text-sm font-black">
+                          {agent.nama.charAt(0).toUpperCase()}
+                        </span>
+                      }
                       title={agent.nama}
                       subtitle={agent.batch_name || agent.tim || "-"}
                       onClick={() => handleAgentClick(agent)}
@@ -539,7 +646,10 @@ export default function SidakInputPage() {
               {loading ? (
                 <SidakSelectionGrid testId="period-selection-skeleton">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse">
+                    <div
+                      key={i}
+                      className="min-h-32 rounded-xl border border-border bg-surface/50 p-5 animate-pulse"
+                    >
                       <div className="h-11 w-11 rounded bg-foreground/10" />
                       <div className="mt-5 h-3 w-24 rounded bg-foreground/10" />
                       <div className="mt-2 h-2.5 w-16 rounded bg-foreground/10" />
@@ -558,7 +668,11 @@ export default function SidakInputPage() {
                     <SidakSelectionCard
                       key={p.id}
                       delay={i * 0.02}
-                      icon={<span className="text-sm font-black text-indigo-500">{String(p.month).padStart(2, "0")}</span>}
+                      icon={
+                        <span className="text-sm font-black text-indigo-500">
+                          {String(p.month).padStart(2, "0")}
+                        </span>
+                      }
                       title={MONTHS[p.month - 1]}
                       subtitle={String(p.year)}
                       onClick={() => handlePeriodClick(p)}
@@ -595,7 +709,8 @@ export default function SidakInputPage() {
                   <p className="text-muted-foreground text-sm mt-1 ml-9">
                     {selectedAgent?.nama}
                     {" · "}
-                    {selectedPeriod && `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`}
+                    {selectedPeriod &&
+                      `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`}
                     {" · "}
                     {SERVICE_LABELS[selectedService]}
                   </p>
@@ -632,7 +747,9 @@ export default function SidakInputPage() {
                           }
                         >
                           <Check className="w-3.5 h-3.5" />
-                          {formHook.hasBadFindings ? "Sudah Ada Temuan" : "Sesi Tanpa Temuan"}
+                          {formHook.hasBadFindings
+                            ? "Sudah Ada Temuan"
+                            : "Sesi Tanpa Temuan"}
                         </button>
                       )}
                       <button
@@ -659,7 +776,11 @@ export default function SidakInputPage() {
                     </label>
                     <select
                       value={selectedService}
-                      onChange={(e) => handleServiceChange(e.target.value as QAIndicator["service_type"])}
+                      onChange={(e) =>
+                        handleServiceChange(
+                          e.target.value as QAIndicator["service_type"],
+                        )
+                      }
                       className="w-full h-10 bg-transparent border border-border rounded-lg px-3 text-sm outline-none focus:border-foreground text-foreground cursor-pointer"
                     >
                       {SERVICE_TYPES.map((st) => (
@@ -674,7 +795,7 @@ export default function SidakInputPage() {
                       Tim Agent
                     </label>
                     <div className="flex items-center h-10 px-3 rounded-lg border border-border bg-background text-sm text-muted-foreground">
-                      {selectedAgent?.tim || selectedAgent?.batch_name || '-'}
+                      {selectedAgent?.tim || selectedAgent?.batch_name || "-"}
                     </div>
                   </div>
                 </div>
@@ -685,7 +806,11 @@ export default function SidakInputPage() {
                 liveScore={liveScore}
                 activeWeight={activeWeight}
                 agentName={selectedAgent?.nama ?? ""}
-                periodLabel={selectedPeriod ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}` : ""}
+                periodLabel={
+                  selectedPeriod
+                    ? `${MONTHS[selectedPeriod.month - 1]} ${selectedPeriod.year}`
+                    : ""
+                }
               />
 
               {/* Draft warning banner */}
@@ -696,7 +821,8 @@ export default function SidakInputPage() {
                   className="p-3.5 rounded-lg bg-amber-500/5 border border-amber-500/25 text-amber-600 font-medium text-sm flex items-center gap-2"
                 >
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Ada draft parameter yang belum dipublikasikan. Input temuan saat ini menggunakan parameter versi terakhir yang published.
+                  Ada draft parameter yang belum dipublikasikan. Input temuan
+                  saat ini menggunakan parameter versi terakhir yang published.
                 </motion.div>
               )}
 
@@ -707,15 +833,25 @@ export default function SidakInputPage() {
                   className="p-3.5 rounded-lg bg-amber-500/5 border border-amber-500/25 text-amber-600 font-medium text-sm flex items-center gap-2"
                 >
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Belum ada parameter yang berlaku untuk {SERVICE_LABELS[selectedService]} pada periode ini. Cek Settings QA untuk mempublish parameter yang sesuai.
+                  Belum ada parameter yang berlaku untuk{" "}
+                  {SERVICE_LABELS[selectedService]} pada periode ini. Cek
+                  Settings QA untuk mempublish parameter yang sesuai.
                 </motion.div>
               )}
 
               {/* Info bar */}
               <div className="p-3 rounded-lg bg-surface border border-border text-sm text-muted-foreground flex items-center gap-3">
-                <span>Total temuan: <strong className="text-foreground">{temuan.length}</strong></span>
+                <span>
+                  Total temuan:{" "}
+                  <strong className="text-foreground">{temuan.length}</strong>
+                </span>
                 <span className="text-muted-foreground/30">|</span>
-                <span>Group: <strong className="text-foreground">{groupedTemuan.length}</strong></span>
+                <span>
+                  Group:{" "}
+                  <strong className="text-foreground">
+                    {groupedTemuan.length}
+                  </strong>
+                </span>
               </div>
 
               {/* ADD FORM */}
@@ -732,12 +868,19 @@ export default function SidakInputPage() {
                       noTiket={formHook.noTiket}
                       onSetNoTiket={formHook.setNoTiket}
                       onUpdateEntry={formHook.updateEntry}
-                      onAddEntry={() => formHook.setEntries((prev) => [...prev, newEntry()])}
-                      onRemoveEntry={(uid) => formHook.setEntries((prev) => prev.filter((e) => e.uid !== uid))}
+                      onAddEntry={() =>
+                        formHook.setEntries((prev) => [...prev, newEntry()])
+                      }
+                      onRemoveEntry={(uid) =>
+                        formHook.setEntries((prev) =>
+                          prev.filter((e) => e.uid !== uid),
+                        )
+                      }
                       onSave={formHook.handleSave}
                       onCancel={formHook.resetForm}
                       activeIndicators={activeIndicators}
                       scoringMode={scoringMode}
+                      serviceType={selectedService}
                       saving={formHook.saving}
                       previewing={formHook.previewing}
                     />
@@ -768,6 +911,7 @@ export default function SidakInputPage() {
                       onFileUpload={importHook.handleFileUpload}
                       onImportSave={importHook.handleImportSave}
                       disabled={activeIndicators.length === 0}
+                      serviceType={selectedService}
                     />
                   </motion.div>
                 )}

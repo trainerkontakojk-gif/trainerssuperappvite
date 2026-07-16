@@ -15,4 +15,4 @@ VALUES
   ('11000000-0000-0000-0000-000000000008', 'chat', 'Akurasi Informasi', 'critical', 0.30, false, '2024-01-01 08:00:00+07'),
   ('11000000-0000-0000-0000-000000000009', 'chat', 'Tata Bahasa & Ejaan', 'non_critical', 0.20, false, '2024-01-01 08:00:00+07'),
   ('11000000-0000-0000-0000-000000000010', 'chat', 'Closing & Follow-up', 'non_critical', 0.20, false, '2024-01-01 08:00:00+07')
-ON CONFLICT (service_type, name) DO NOTHING;
+ON CONFLICT DO NOTHING;

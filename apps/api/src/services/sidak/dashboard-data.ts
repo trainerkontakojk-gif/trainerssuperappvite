@@ -26,6 +26,7 @@ import type {
   TopAgentData,
   ParetoData,
 } from "@trainers/types";
+import { formatQAIndicatorName } from "@trainers/types";
 import { isCountableFinding, emptyDashboardResponse } from "./shared-constants";
 import { roundTo } from "../../lib/math-utils";
 import { getAllFolders, resolveFolderFiltersByIds } from "./access-scope";
@@ -87,11 +88,7 @@ async function fetchAllTemuan(opts: {
       query = query.in("profiler_peserta.batch_name", opts.folderNames);
     }
     if (opts.excludedIds.length > 0) {
-      query = query.not(
-        "peserta_id",
-        "in",
-        `(${opts.excludedIds.join(",")})`,
-      );
+      query = query.not("peserta_id", "in", `(${opts.excludedIds.join(",")})`);
     }
 
     const { data, error } = await query;
@@ -149,11 +146,7 @@ async function fetchDistinctServiceTypes(opts: {
       query = query.in("profiler_peserta.batch_name", opts.folderNames);
     }
     if (opts.excludedIds.length > 0) {
-      query = query.not(
-        "peserta_id",
-        "in",
-        `(${opts.excludedIds.join(",")})`,
-      );
+      query = query.not("peserta_id", "in", `(${opts.excludedIds.join(",")})`);
     }
 
     const { data, error } = await query;
@@ -255,7 +248,7 @@ export async function getDashboardData(params: {
       const periodId = combo.slice(separator + 1);
       if (!isServiceType(rawService)) {
         throw new Error(`Layanan SIDAK tidak valid: ${rawService}`);
-        }
+      }
       const fallbackWeight =
         weightMap[rawService] ?? DEFAULT_SERVICE_WEIGHTS[rawService];
       const context = await loadPeriodScoringContext(
@@ -280,7 +273,7 @@ export async function getDashboardData(params: {
       throw new Error(
         `Konteks scoring SIDAK tidak ditemukan: ${serviceType}:${periodId}`,
       );
-      }
+    }
     return context;
   };
 
@@ -292,7 +285,7 @@ export async function getDashboardData(params: {
     if (!normalized) return undefined;
     return context.indicators.find(
       (indicator) => indicator.id === normalized.indicator_id,
-  );
+    );
   };
 
   const auditedAgents = groupTemuanByAgent(rows);
@@ -365,7 +358,7 @@ export async function getDashboardData(params: {
           findIndicatorForRow(row, context) ??
           indicators.find((i) => i.id === row.indicator_id);
         if (ind) {
-          const key = ind.name;
+          const key = formatQAIndicatorName(ind);
           paretoMap.set(key, {
             name: key,
             count: (paretoMap.get(key)?.count ?? 0) + 1,

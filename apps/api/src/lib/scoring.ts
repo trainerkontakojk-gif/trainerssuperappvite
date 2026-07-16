@@ -4,6 +4,7 @@ import {
   QAIndicator,
   QAScore,
   ScoreDetail,
+  formatQAIndicatorName,
 } from "@trainers/types";
 
 export const VALID_SERVICE_TYPES: ServiceType[] = [
@@ -239,7 +240,7 @@ export function calculateQAScoreFromTemuan(
           : 3;
       return {
         indicatorId: ind.id,
-        name: ind.name,
+        name: formatQAIndicatorName(ind),
         bobot: ind.bobot,
         nilai: avgNilai,
         temuanCount: matchingTemuan.length,

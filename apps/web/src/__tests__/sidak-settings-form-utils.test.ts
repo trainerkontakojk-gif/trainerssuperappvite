@@ -3,6 +3,8 @@ import {
   createEmptyIndicatorForm,
   indicatorFormToPayload,
   indicatorToFormState,
+  getIndicatorCategoryTotals,
+  hasValidWeightedCategoryTotals,
   normalizeIndicatorCategory,
   parseIndicatorCategory,
 } from "../routes/sidak/settings/utils";
@@ -11,6 +13,7 @@ import type { QARuleIndicator } from "@trainers/types";
 describe("sidak settings form utils", () => {
   it("creates default add form values matching current UI defaults", () => {
     expect(createEmptyIndicatorForm()).toEqual({
+      parameter_group: "",
       name: "",
       category: "non_critical",
       bobot: "10",
@@ -22,7 +25,9 @@ describe("sidak settings form utils", () => {
 
   it("forces category none for no_category scoring mode", () => {
     expect(normalizeIndicatorCategory("critical", "no_category")).toBe("none");
-    expect(normalizeIndicatorCategory("non_critical", "weighted")).toBe("non_critical");
+    expect(normalizeIndicatorCategory("non_critical", "weighted")).toBe(
+      "non_critical",
+    );
   });
 
   it("parses select values into typed indicator categories", () => {
@@ -36,6 +41,7 @@ describe("sidak settings form utils", () => {
     expect(
       indicatorFormToPayload(
         {
+          parameter_group: "Verifikasi Tim",
           name: "Greeting sesuai skrip",
           category: "critical",
           bobot: "25",
@@ -46,6 +52,7 @@ describe("sidak settings form utils", () => {
         "weighted",
       ),
     ).toEqual({
+      parameter_group: "Verifikasi Tim",
       name: "Greeting sesuai skrip",
       category: "critical",
       bobot: 0.25,
@@ -59,6 +66,7 @@ describe("sidak settings form utils", () => {
     expect(
       indicatorFormToPayload(
         {
+          parameter_group: "",
           name: "Blank threshold",
           category: "non_critical",
           bobot: "10",
@@ -69,6 +77,7 @@ describe("sidak settings form utils", () => {
         "weighted",
       ),
     ).toEqual({
+      parameter_group: null,
       name: "Blank threshold",
       category: "non_critical",
       bobot: 0.1,
@@ -84,6 +93,7 @@ describe("sidak settings form utils", () => {
       rule_version_id: "22222222-2222-4222-8222-222222222222",
       service_type: "call",
       name: "Product knowledge",
+      parameter_group: "Kesesuaian verifikasi",
       category: "non_critical",
       bobot: 0.35,
       has_na: true,
@@ -92,6 +102,7 @@ describe("sidak settings form utils", () => {
     };
 
     expect(indicatorToFormState(indicator)).toEqual({
+      parameter_group: "Kesesuaian verifikasi",
       name: "Product knowledge",
       category: "non_critical",
       bobot: "35",
@@ -99,5 +110,21 @@ describe("sidak settings form utils", () => {
       threshold: "",
       sort_order: "3",
     });
+  });
+
+  it("validates SLIK category totals independently", () => {
+    const indicators = [
+      { category: "non_critical" as const, bobot: 0.4 },
+      { category: "non_critical" as const, bobot: 0.6 },
+      { category: "critical" as const, bobot: 0.15 },
+      { category: "critical" as const, bobot: 0.85 },
+    ];
+
+    expect(getIndicatorCategoryTotals(indicators)).toEqual({
+      critical: 1,
+      nonCritical: 1,
+    });
+    expect(hasValidWeightedCategoryTotals(indicators)).toBe(true);
+    expect(hasValidWeightedCategoryTotals(indicators.slice(0, -1))).toBe(false);
   });
 });

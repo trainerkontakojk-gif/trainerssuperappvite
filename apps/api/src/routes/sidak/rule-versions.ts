@@ -37,11 +37,19 @@ sidakRuleVersions.get(
   requireRole("admin", "trainer", "leader"),
   async (c) => {
     const serviceType = c.req.query("service_type");
-    if (!serviceType || !["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(serviceType)) {
+    if (
+      !serviceType ||
+      !["call", "chat", "email", "cso", "pencatatan", "bko", "slik"].includes(
+        serviceType,
+      )
+    ) {
       return c.json(
         {
           success: false,
-          error: { code: "VALIDATION_ERROR", message: "Service type tidak valid" },
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Service type tidak valid",
+          },
         },
         400,
       );
@@ -51,99 +59,108 @@ sidakRuleVersions.get(
   },
 );
 
-sidakRuleVersions.post("/rule-versions", requireRole("admin", "trainer"), async (c) => {
-  const user = c.get("user");
-  const body = await c.req.json();
-  const parsed = z
-    .object({
-      service_type: z.enum([
-        "call",
-        "chat",
-        "email",
-        "cso",
-        "pencatatan",
-        "bko",
-        "slik",
-      ]),
-      effective_period_id: z.string().uuid().optional(),
-      critical_weight: z.number().min(0).max(1).optional(),
-      non_critical_weight: z.number().min(0).max(1).optional(),
-      scoring_mode: z
-        .enum(["weighted", "flat", "no_category"])
-        .optional(),
-      change_reason: z.string().optional(),
-      source_version_id: z.string().uuid().optional(),
-    })
-    .safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Data versi aturan tidak valid",
-          details: parsed.error,
+sidakRuleVersions.post(
+  "/rule-versions",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const user = c.get("user");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        service_type: z.enum([
+          "call",
+          "chat",
+          "email",
+          "cso",
+          "pencatatan",
+          "bko",
+          "slik",
+        ]),
+        effective_period_id: z.string().uuid().optional(),
+        critical_weight: z.number().min(0).max(1).optional(),
+        non_critical_weight: z.number().min(0).max(1).optional(),
+        scoring_mode: z.enum(["weighted", "flat", "no_category"]).optional(),
+        change_reason: z.string().optional(),
+        source_version_id: z.string().uuid().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data versi aturan tidak valid",
+            details: parsed.error,
+          },
         },
-      },
-      400,
-    );
-  }
-  try {
-    const version = await sidakService.createRuleVersion(parsed.data, user.id);
-    return c.json({ success: true, data: version }, 201);
-  } catch (error: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: error.message },
-      },
-      500,
-    );
-  }
-});
+        400,
+      );
+    }
+    try {
+      const version = await sidakService.createRuleVersion(
+        parsed.data,
+        user.id,
+      );
+      return c.json({ success: true, data: version }, 201);
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
-sidakRuleVersions.put("/rule-versions/:id", requireRole("admin", "trainer"), async (c) => {
-  const user = c.get("user");
-  const id = c.req.param("id");
-  const body = await c.req.json();
-  const parsed = z
-    .object({
-      critical_weight: z.number().min(0).max(1).optional(),
-      non_critical_weight: z.number().min(0).max(1).optional(),
-      scoring_mode: z.enum(["weighted", "flat", "no_category"]).optional(),
-      change_reason: z.string().optional(),
-    })
-    .safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      {
-        success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Data tidak valid",
-          details: parsed.error,
+sidakRuleVersions.put(
+  "/rule-versions/:id",
+  requireRole("admin", "trainer"),
+  async (c) => {
+    const user = c.get("user");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const parsed = z
+      .object({
+        critical_weight: z.number().min(0).max(1).optional(),
+        non_critical_weight: z.number().min(0).max(1).optional(),
+        scoring_mode: z.enum(["weighted", "flat", "no_category"]).optional(),
+        change_reason: z.string().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Data tidak valid",
+            details: parsed.error,
+          },
         },
-      },
-      400,
-    );
-  }
-  try {
-    const version = await sidakService.updateRuleVersion(
-      id,
-      parsed.data,
-      user.id,
-    );
-    return c.json({ success: true, data: version });
-  } catch (error: any) {
-    return c.json(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message: error.message },
-      },
-      500,
-    );
-  }
-});
+        400,
+      );
+    }
+    try {
+      const version = await sidakService.updateRuleVersion(
+        id,
+        parsed.data,
+        user.id,
+      );
+      return c.json({ success: true, data: version });
+    } catch (error: any) {
+      return c.json(
+        {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: error.message },
+        },
+        500,
+      );
+    }
+  },
+);
 
 sidakRuleVersions.delete(
   "/rule-versions/:id",
@@ -166,7 +183,10 @@ sidakRuleVersions.delete(
       return c.json(
         {
           success: false,
-          error: { code: isNotFound ? "NOT_FOUND" : "INTERNAL_ERROR", message: error.message },
+          error: {
+            code: isNotFound ? "NOT_FOUND" : "INTERNAL_ERROR",
+            message: error.message,
+          },
         },
         isNotFound ? 404 : 400,
       );
@@ -175,7 +195,6 @@ sidakRuleVersions.delete(
 );
 
 sidakRuleVersions.post(
-
   "/rule-versions/:id/publish",
   requireRole("admin", "trainer"),
   async (c) => {
@@ -318,6 +337,7 @@ sidakRuleVersions.post(
           "slik",
         ]),
         name: z.string().min(1),
+        parameter_group: z.string().trim().min(1).nullable().optional(),
         category: z.enum(["critical", "non_critical", "none"]),
         bobot: z.number().positive(),
         has_na: z.boolean().optional().default(false),
@@ -394,6 +414,7 @@ sidakRuleVersions.put(
     const parsed = z
       .object({
         name: z.string().min(1).optional(),
+        parameter_group: z.string().trim().min(1).nullable().optional(),
         category: z.enum(["critical", "non_critical", "none"]).optional(),
         bobot: z.number().positive().optional(),
         has_na: z.boolean().optional(),

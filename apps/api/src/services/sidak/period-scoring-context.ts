@@ -29,9 +29,11 @@ type RuleIndicatorSnapshotRow = {
   legacy_indicator_id?: string | null;
   service_type?: string | null;
   name: string;
+  parameter_group?: string | null;
   category?: string | null;
   bobot: number | string;
   has_na?: boolean | null;
+  sort_order?: number | null;
 };
 
 export type ServiceWeightOverride = {
@@ -73,9 +75,11 @@ export async function loadPeriodScoringContext(
           ? ri.service_type
           : serviceType,
         name: ri.name,
+        parameter_group: ri.parameter_group ?? null,
         category: (ri.category as QAIndicator["category"]) || "none",
         bobot: Number(ri.bobot),
         has_na: ri.has_na ?? false,
+        sort_order: ri.sort_order ?? 0,
       }));
 
       const scoreIdByAnyId = new Map<string, string>();

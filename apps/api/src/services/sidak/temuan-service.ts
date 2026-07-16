@@ -14,7 +14,12 @@ import {
   loadPeriodScoringContext,
   normalizePeriodScoringRows,
 } from "./period-scoring-context";
-import type { QATemuan, ServiceType, ServiceWeight } from "@trainers/types";
+import {
+  formatQAIndicatorName,
+  type QATemuan,
+  type ServiceType,
+  type ServiceWeight,
+} from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
 
 export interface ValidationError {
@@ -124,7 +129,8 @@ export async function createPerfectScoreSession(
       const { data: inds } = await supabaseAdmin
         .from("qa_indicators")
         .select("id")
-        .eq("service_type", service_type);
+        .eq("service_type", service_type)
+        .eq("is_active", true);
       if (!inds || inds.length === 0)
         throw new Error("Tidak ada parameter untuk tim agent ini");
       indicators = inds.map((i: any) => ({
@@ -136,7 +142,8 @@ export async function createPerfectScoreSession(
     const { data: inds } = await supabaseAdmin
       .from("qa_indicators")
       .select("id")
-      .eq("service_type", service_type);
+      .eq("service_type", service_type)
+      .eq("is_active", true);
     if (!inds || inds.length === 0)
       throw new Error("Tidak ada parameter untuk tim agent ini");
     indicators = inds.map((i: any) => ({ id: i.id, rule_indicator_id: null }));
@@ -198,7 +205,7 @@ export async function validateTemuanBatch(items: {
 
     supabaseAdmin
       .from("qa_indicators")
-      .select("id, name, service_type")
+      .select("id, name, parameter_group, service_type")
       .in(
         "id",
         items.items.map((i) => i.indicator_id),
@@ -257,14 +264,14 @@ export async function validateTemuanBatch(items: {
     if (ind.service_type !== items.service_type) {
       invalid.push({
         indicator_id: item.indicator_id,
-        error: `Indikator "${ind.name}" milik layanan ${ind.service_type}, bukan ${items.service_type}`,
+        error: `Indikator "${formatQAIndicatorName(ind)}" milik layanan ${ind.service_type}, bukan ${items.service_type}`,
       });
       continue;
     }
     if (validLegacyIds && !validLegacyIds.has(item.indicator_id)) {
       invalid.push({
         indicator_id: item.indicator_id,
-        error: `Indikator "${ind.name}" tidak termasuk dalam versi aturan QA yang sedang aktif. Periksa parameter di halaman Settings QA.`,
+        error: `Indikator "${formatQAIndicatorName(ind)}" tidak termasuk dalam versi aturan QA yang sedang aktif. Periksa parameter di halaman Settings QA.`,
       });
       continue;
     }
@@ -516,9 +523,9 @@ export async function refreshDashboardSummary(
 
     if (!contextCache.has(comboKey)) {
       const fallbackWeight =
-      weightMap[agentSvc] ??
+        weightMap[agentSvc] ??
         DEFAULT_SERVICE_WEIGHTS[agentSvc] ??
-      DEFAULT_SERVICE_WEIGHTS.call;
+        DEFAULT_SERVICE_WEIGHTS.call;
       const ctx = await loadPeriodScoringContext(
         agentSvc,
         periodId,

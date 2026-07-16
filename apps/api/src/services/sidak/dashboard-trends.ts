@@ -1,22 +1,46 @@
 import { roundTo } from "../../lib/math-utils";
-import type { QAPeriod, ServiceWeight, DashboardSparklinePoint } from "@trainers/types";
+import {
+  formatQAIndicatorName,
+  type QAPeriod,
+  type ServiceWeight,
+  type DashboardSparklinePoint,
+} from "@trainers/types";
 import type { DashboardTemuanRow } from "./dashboard-types";
 import { getScoreRows } from "./dashboard-aggregation";
 
-
-
-export const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agt", "Sep", "Okt", "Nov", "Des"];
+export const MONTHS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agt",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
 
 export type BuildDashboardTrendsParams = {
   periods: QAPeriod[];
   rows: DashboardTemuanRow[];
-  indicators: Array<{ id: string; name: string }>;
+  indicators: Array<{
+    id: string;
+    name: string;
+    parameter_group?: string | null;
+  }>;
   weightMap: Record<string, ServiceWeight>;
   year: number;
   startMonth?: number;
   endMonth?: number;
   isCountableFinding: (row: DashboardTemuanRow) => boolean;
-  calculateScore: (rows: DashboardTemuanRow[], serviceType: string, periodId: string) => number;
+  calculateScore: (
+    rows: DashboardTemuanRow[],
+    serviceType: string,
+    periodId: string,
+  ) => number;
 };
 
 export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
@@ -35,12 +59,15 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
     const rowsByPeriod = new Map<string, DashboardTemuanRow[]>();
     for (const row of rows) {
       if (validPeriodIds.has(row.period_id)) {
-        if (!rowsByPeriod.has(row.period_id)) rowsByPeriod.set(row.period_id, []);
+        if (!rowsByPeriod.has(row.period_id))
+          rowsByPeriod.set(row.period_id, []);
         rowsByPeriod.get(row.period_id)!.push(row);
       }
     }
 
-    filteredPeriods = filteredPeriods.filter((p: any) => rowsByPeriod.has(p.id));
+    filteredPeriods = filteredPeriods.filter((p: any) =>
+      rowsByPeriod.has(p.id),
+    );
 
     const agentPeriodGroups = new Map<string, DashboardTemuanRow[]>();
     for (const [pid, periodRows] of rowsByPeriod) {
@@ -58,11 +85,13 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
     const periodMetrics = filteredPeriods.map((period: any) => {
       const periodRows = rowsByPeriod.get(period.id) ?? [];
       const periodAgentKeys = [...agentPeriodGroups.keys()].filter(
-        (k: string) => k.startsWith(period.id + ":")
+        (k: string) => k.startsWith(period.id + ":"),
       );
 
       const totalAudited = periodAgentKeys.length;
-      const totalFindings = periodRows.filter((r: any) => params.isCountableFinding(r)).length;
+      const totalFindings = periodRows.filter((r: any) =>
+        params.isCountableFinding(r),
+      ).length;
 
       let zeroCount = 0;
       let complianceCount = 0;
@@ -74,7 +103,9 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         const scoreRows = getScoreRows(agentRows);
         const finalScore = params.calculateScore(scoreRows, svc, period.id);
 
-        const findingRows = agentRows.filter((r: any) => params.isCountableFinding(r));
+        const findingRows = agentRows.filter((r: any) =>
+          params.isCountableFinding(r),
+        );
         if (findingRows.length === 0) zeroCount++;
         if (finalScore >= 95) complianceCount++;
         totalScore += finalScore;
@@ -85,10 +116,15 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         label: `${MONTHS_SHORT[period.month - 1]} ${String(period.year).slice(-2)}`,
         total: totalFindings,
         avg: totalAudited > 0 ? roundTo(totalFindings / totalAudited, 1) : 0,
-        zero: totalAudited > 0 ? roundTo((zeroCount / totalAudited) * 100, 1) : 0,
+        zero:
+          totalAudited > 0 ? roundTo((zeroCount / totalAudited) * 100, 1) : 0,
         compliance: complianceCount,
-        complianceRate: totalAudited > 0 ? roundTo((complianceCount / totalAudited) * 100, 1) : 0,
-        avgAgentScore: totalAudited > 0 ? roundTo(totalScore / totalAudited, 1) : 0,
+        complianceRate:
+          totalAudited > 0
+            ? roundTo((complianceCount / totalAudited) * 100, 1)
+            : 0,
+        avgAgentScore:
+          totalAudited > 0 ? roundTo(totalScore / totalAudited, 1) : 0,
         totalAudited,
       };
     });
@@ -101,9 +137,11 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
         if (!params.isCountableFinding(row)) continue;
         totalFindingsByPeriod[pid] = (totalFindingsByPeriod[pid] || 0) + 1;
 
-        const indicator = params.indicators.find((i: any) => i.id === row.indicator_id);
+        const indicator = params.indicators.find(
+          (i: any) => i.id === row.indicator_id,
+        );
         if (!indicator) continue;
-        const paramName = indicator.name;
+        const paramName = formatQAIndicatorName(indicator);
         if (!paramCounts[paramName]) paramCounts[paramName] = {};
         paramCounts[paramName][pid] = (paramCounts[paramName][pid] || 0) + 1;
       }
@@ -112,13 +150,16 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
     const topParams = Object.entries(paramCounts)
       .map(([name, periodCounts]) => ({
         name,
-        total: Object.values(periodCounts).reduce((a: number, b: number) => a + b, 0),
+        total: Object.values(periodCounts).reduce(
+          (a: number, b: number) => a + b,
+          0,
+        ),
       }))
       .sort((a, b) => b.total - a.total)
       .map((p) => p.name);
 
-    const labels = filteredPeriods.map((p: any) =>
-      `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`
+    const labels = filteredPeriods.map(
+      (p: any) => `${MONTHS_SHORT[p.month - 1]} ${String(p.year).slice(-2)}`,
     );
 
     const datasets = [
@@ -135,10 +176,19 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
     ];
 
     const sparklines = {
-      "total-defects": periodMetrics.map((m) => ({ label: m.label, value: m.total })),
-      "avg-defects": periodMetrics.map((m) => ({ label: m.label, value: m.avg })),
-      "avg-score": periodMetrics.map((m) => ({ label: m.label, value: m.avgAgentScore })),
-      "compliance": periodMetrics.map((m) => ({
+      "total-defects": periodMetrics.map((m) => ({
+        label: m.label,
+        value: m.total,
+      })),
+      "avg-defects": periodMetrics.map((m) => ({
+        label: m.label,
+        value: m.avg,
+      })),
+      "avg-score": periodMetrics.map((m) => ({
+        label: m.label,
+        value: m.avgAgentScore,
+      })),
+      compliance: periodMetrics.map((m) => ({
         label: m.label,
         value: m.complianceRate,
         count: m.compliance,
@@ -149,5 +199,9 @@ export function buildDashboardTrends(params: BuildDashboardTrendsParams) {
     return { paramTrend: { labels, datasets }, sparklines, periodMetrics };
   }
 
-  return { paramTrend: { labels: [], datasets: [] }, sparklines: {} as Record<string, DashboardSparklinePoint[]>, periodMetrics: [] };
+  return {
+    paramTrend: { labels: [], datasets: [] },
+    sparklines: {} as Record<string, DashboardSparklinePoint[]>,
+    periodMetrics: [],
+  };
 }

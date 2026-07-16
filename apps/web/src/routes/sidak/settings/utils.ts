@@ -10,6 +10,7 @@ export function parseIndicatorCategory(value: string): Category {
 
 export function createEmptyIndicatorForm(): IndicatorFormState {
   return {
+    parameter_group: "",
     name: "",
     category: "non_critical",
     bobot: "10",
@@ -26,8 +27,11 @@ export function normalizeIndicatorCategory(
   return scoringMode === "no_category" ? "none" : category;
 }
 
-export function indicatorToFormState(indicator: QARuleIndicator): IndicatorFormState {
+export function indicatorToFormState(
+  indicator: QARuleIndicator,
+): IndicatorFormState {
   return {
+    parameter_group: indicator.parameter_group ?? "",
     name: indicator.name,
     category: indicator.category,
     bobot: String(Math.round(indicator.bobot * 100)),
@@ -42,6 +46,7 @@ export function indicatorFormToPayload(
   scoringMode: ScoringMode,
 ): IndicatorPayload {
   return {
+    parameter_group: form.parameter_group.trim() || null,
     name: form.name,
     category: normalizeIndicatorCategory(form.category, scoringMode),
     bobot: parseFloat(form.bobot) / 100,
@@ -49,4 +54,30 @@ export function indicatorFormToPayload(
     threshold: form.threshold ? parseFloat(form.threshold) : undefined,
     sort_order: parseInt(form.sort_order) || 0,
   };
+}
+
+export function getIndicatorCategoryTotals(
+  indicators: Pick<QARuleIndicator, "category" | "bobot">[],
+): { critical: number; nonCritical: number } {
+  return indicators.reduce(
+    (totals, indicator) => {
+      if (indicator.category === "critical") {
+        totals.critical += indicator.bobot;
+      } else if (indicator.category === "non_critical") {
+        totals.nonCritical += indicator.bobot;
+      }
+      return totals;
+    },
+    { critical: 0, nonCritical: 0 },
+  );
+}
+
+export function hasValidWeightedCategoryTotals(
+  indicators: Pick<QARuleIndicator, "category" | "bobot">[],
+): boolean {
+  const totals = getIndicatorCategoryTotals(indicators);
+  return (
+    Math.abs(totals.critical - 1) < 0.001 &&
+    Math.abs(totals.nonCritical - 1) < 0.001
+  );
 }

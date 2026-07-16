@@ -51,6 +51,35 @@ finalSessionScore = (nonCriticalScore * non_critical_weight) + (criticalScore * 
 
 Jika satu kategori tidak punya indikator, skor kategori itu dianggap `100`.
 
+### Struktur dan Bobot SLIK
+
+SLIK memakai mode `weighted` dengan porsi:
+
+- Non Critical Error: `40%`
+- Critical Error: `60%`
+
+Setiap sub-parameter disimpan sebagai item penilaian mandiri. Field
+`parameter_group` menyimpan parameter utama, sedangkan `name` menyimpan nama
+sub-parameter. Parameter tanpa sub-parameter tetap memakai `name` dan
+`parameter_group = null`.
+
+Bobot item SLIK adalah bobot relatif di dalam kategorinya. Contoh:
+
+- `Kesesuaian Data` berbobot `15%` di Non Critical.
+- Bobot akhirnya adalah `15% × 40% = 6%`.
+
+Nilai SLIK tetap mengikuti skala SIDAK `0–3`. Nilai rekomendasi `1` pada
+matriks referensi diperlakukan sebagai nilai `3` (Sesuai) di SIDAK. Data input
+dan template Excel tidak memakai skala biner terpisah.
+
+Contoh satu sesi: jika item Critical berbobot `15%` mendapat nilai `0` dan
+semua item lain mendapat nilai `3`, maka:
+
+- Critical Score = `85`
+- Non Critical Score = `100`
+- Skor sesi = `(85 × 60%) + (100 × 40%) = 91`
+- Dengan empat slot padding bernilai `100`, skor agent = `98.2`
+
 ## Rumus Skor Agent
 
 Skor agent tidak langsung mengambil satu sesi, tetapi merata-ratakan sesi yang paling buruk dulu.
@@ -269,14 +298,14 @@ Submodul baru `/sidak/forecast` memakai service forecast dashboard yang sama unt
 
 `POST /api/v1/sidak/forecast/agents`
 
-| Parameter       | Type    | Default  | Deskripsi                                          |
-| --------------- | ------- | -------- | -------------------------------------------------- |
-| `year`          | number  | current  | Tahun filter                                       |
-| `serviceType`   | string  | `call`   | Layanan SIDAK yang dianalisis                      |
-| `folderIds`     | string[]| `[]`     | Scope folder/batch yang dipilih                    |
-| `startMonth`    | number  | `null`   | Batas awal bulan                                    |
-| `endMonth`      | number  | `null`   | Batas akhir bulan                                   |
-| `horizonMonths` | number  | `3`      | Horizon proyeksi agent (1–6)                        |
+| Parameter       | Type     | Default | Deskripsi                       |
+| --------------- | -------- | ------- | ------------------------------- |
+| `year`          | number   | current | Tahun filter                    |
+| `serviceType`   | string   | `call`  | Layanan SIDAK yang dianalisis   |
+| `folderIds`     | string[] | `[]`    | Scope folder/batch yang dipilih |
+| `startMonth`    | number   | `null`  | Batas awal bulan                |
+| `endMonth`      | number   | `null`  | Batas akhir bulan               |
+| `horizonMonths` | number   | `3`     | Horizon proyeksi agent (1–6)    |
 
 ### Output
 
@@ -368,14 +397,14 @@ Keyword registry diperluas berdasarkan bukti audit fallback, bukan tebakan. Pena
 
 ### Arsitektur
 
-| Lapisan | File | Tanggung Jawab |
-|---------|------|----------------|
-| Tipe | `packages/types/src/sidak.ts` | `RootCauseResult`, `RootCauseEvidence`, `RootCausePeriodBreakdown` |
-| Service | `apps/api/src/services/sidak/agent-root-causes.ts` | Registry, matching, grouping, sorting |
-| Integrasi | `apps/api/src/services/sidak/agent-directory.ts` | Panggil `deriveAgentRootCauses()` di `getAgentDetail()`; bangun `comparisonTable` (benchmark tim/service) via `buildAgentComparisonTable()` |
-| Hook | `apps/web/src/hooks/useAgentDetail.ts` | Filter `activeRootCauses` per bulan/layanan aktif; teruskan `data.comparisonTable` ke komponen |
+| Lapisan              | File                                                  | Tanggung Jawab                                                                                                                                                                                         |
+| -------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tipe                 | `packages/types/src/sidak.ts`                         | `RootCauseResult`, `RootCauseEvidence`, `RootCausePeriodBreakdown`                                                                                                                                     |
+| Service              | `apps/api/src/services/sidak/agent-root-causes.ts`    | Registry, matching, grouping, sorting                                                                                                                                                                  |
+| Integrasi            | `apps/api/src/services/sidak/agent-directory.ts`      | Panggil `deriveAgentRootCauses()` di `getAgentDetail()`; bangun `comparisonTable` (benchmark tim/service) via `buildAgentComparisonTable()`                                                            |
+| Hook                 | `apps/web/src/hooks/useAgentDetail.ts`                | Filter `activeRootCauses` per bulan/layanan aktif; teruskan `data.comparisonTable` ke komponen                                                                                                         |
 | Komponen (container) | `apps/web/src/components/sidak/AgentAuditDossier.tsx` | Full-width audit dossier: score strip + ticket impact + root-cause coaching; membungkus `RootCauseCard` & `TopTicketsCard` yang kini thin presentational blocks (tanpa outer `rounded-2xl bg-surface`) |
-| Komponen (thin) | `apps/web/src/components/sidak/RootCauseCard.tsx` | Render utama + secondary causes + empty state (di-embed dalam dossier) |
+| Komponen (thin)      | `apps/web/src/components/sidak/RootCauseCard.tsx`     | Render utama + secondary causes + empty state (di-embed dalam dossier)                                                                                                                                 |
 
 ### Trend Benchmark Comparison Table
 
@@ -397,12 +426,12 @@ Tepat di bawah trend chart (`AgentTrendTab`) pada `/sidak/agents/:id`, terdapat 
 
 **Frontend:** `AgentComparisonTable` merender kolom Parameter · Agent ini · Rata-rata tim · Rata-rata service · Selisih vs tim · Selisih vs service, plus baris scope (`Jan-Mei 2026 • CALL • <tim> • N agent tim / N agent service`). Empty state: `Belum ada data pembanding untuk range ini` bila tidak ada baris perbandingan di luar Total.
 
-| Lapisan | File | Tanggung Jawab |
-|---------|------|----------------|
-| Tipe | `packages/types/src/sidak.ts` | `AgentComparisonTable`, `AgentComparisonRow`, `AgentComparisonScope` |
-| Service | `apps/api/src/services/sidak/agent-directory.ts` | `buildAgentComparisonTable()` — query join, tally, cohort, sorting |
-| Route | `apps/api/src/routes/sidak/dashboard.ts` | `GET /agents/:id` teruskan `accessibleIds` ke `getAgentDetail()` |
-| Komponen | `apps/web/src/components/sidak/AgentComparisonTable.tsx` | Render tabel + scope line + empty state |
+| Lapisan  | File                                                     | Tanggung Jawab                                                       |
+| -------- | -------------------------------------------------------- | -------------------------------------------------------------------- |
+| Tipe     | `packages/types/src/sidak.ts`                            | `AgentComparisonTable`, `AgentComparisonRow`, `AgentComparisonScope` |
+| Service  | `apps/api/src/services/sidak/agent-directory.ts`         | `buildAgentComparisonTable()` — query join, tally, cohort, sorting   |
+| Route    | `apps/api/src/routes/sidak/dashboard.ts`                 | `GET /agents/:id` teruskan `accessibleIds` ke `getAgentDetail()`     |
+| Komponen | `apps/web/src/components/sidak/AgentComparisonTable.tsx` | Render tabel + scope line + empty state                              |
 
 ## BKO Parameter and Weights Resolver
 

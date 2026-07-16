@@ -31,13 +31,27 @@ export const qaIndicatorSchema = z.object({
   id: z.string().uuid(),
   service_type: serviceTypeSchema,
   name: z.string(),
+  parameter_group: z.string().nullable().optional(),
   category: categorySchema,
   bobot: z.number(),
   has_na: z.boolean(),
   threshold: z.number().nullable().optional(),
+  sort_order: z.number().int().optional(),
+  is_active: z.boolean().optional(),
   created_at: z.string().optional(),
 });
 export type QAIndicator = z.infer<typeof qaIndicatorSchema>;
+
+export type QAIndicatorLabelSource = Pick<QAIndicator, "name"> & {
+  parameter_group?: string | null;
+};
+
+export function formatQAIndicatorName(
+  indicator: QAIndicatorLabelSource,
+): string {
+  const group = indicator.parameter_group?.trim();
+  return group ? `${group} — ${indicator.name}` : indicator.name;
+}
 
 export const qaTemuanSchema = z.object({
   id: z.string().uuid(),
@@ -132,6 +146,7 @@ export const ruleIndicatorSchema = z.object({
   rule_version_id: z.string().uuid(),
   service_type: serviceTypeSchema,
   name: z.string(),
+  parameter_group: z.string().nullable().optional(),
   category: categorySchema,
   bobot: z.number(),
   has_na: z.boolean(),
@@ -511,10 +526,12 @@ export const resolvedSidakInputConfigSchema = z.object({
       id: z.string().uuid(),
       service_type: serviceTypeSchema,
       name: z.string(),
+      parameter_group: z.string().nullable().optional(),
       category: categorySchema,
       bobot: z.number(),
       has_na: z.boolean(),
       threshold: z.number().nullable().optional(),
+      sort_order: z.number().int().optional(),
       ruleIndicatorId: z.string().uuid().nullable().optional(),
       legacyIndicatorId: z.string().uuid().nullable().optional(),
     }),

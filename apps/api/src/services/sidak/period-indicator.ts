@@ -1,5 +1,10 @@
 import { supabaseAdmin } from "../../lib/supabase";
-import type { QAPeriod, QAIndicator, ServiceType, ResolvedSidakInputConfig } from "@trainers/types";
+import type {
+  QAPeriod,
+  QAIndicator,
+  ServiceType,
+  ResolvedSidakInputConfig,
+} from "@trainers/types";
 import { resolveEffectiveRuleVersionForPeriod } from "./rule-version-resolver";
 import { DEFAULT_SERVICE_WEIGHTS } from "../../lib/scoring";
 
@@ -100,7 +105,11 @@ export async function getIndicators(
 ): Promise<QAIndicator[]> {
   let query = supabaseAdmin.from("qa_indicators").select("*");
   if (serviceType) query = query.eq("service_type", serviceType);
-  const { data, error } = await query.order("service_type").order("name");
+  const { data, error } = await query
+    .eq("is_active", true)
+    .order("service_type")
+    .order("sort_order")
+    .order("name");
   if (error) throw new Error(`Gagal mengambil indikator QA: ${error.message}`);
   return data ?? [];
 }
@@ -108,9 +117,12 @@ export async function getIndicators(
 export async function createIndicator(indicator: {
   service_type: ServiceType;
   name: string;
+  parameter_group?: string | null;
   category: "critical" | "non_critical" | "none";
   bobot: number;
   has_na?: boolean;
+  sort_order?: number;
+  is_active?: boolean;
 }): Promise<QAIndicator> {
   const { data, error } = await supabaseAdmin
     .from("qa_indicators")
@@ -130,7 +142,10 @@ export async function getResolvedInputConfig(
 
   let activeVersion: any = null;
   if (periodId) {
-    activeVersion = await resolveEffectiveRuleVersionForPeriod(serviceType, periodId);
+    activeVersion = await resolveEffectiveRuleVersionForPeriod(
+      serviceType,
+      periodId,
+    );
   }
 
   let indicators: any[];
@@ -154,10 +169,12 @@ export async function getResolvedInputConfig(
       id: ri.legacy_indicator_id || ri.id,
       service_type: serviceType,
       name: ri.name,
+      parameter_group: ri.parameter_group ?? null,
       category: ri.category || "none",
       bobot: Number(ri.bobot),
       has_na: ri.has_na ?? false,
       threshold: ri.threshold,
+      sort_order: ri.sort_order ?? 0,
       ruleIndicatorId: ri.id,
       legacyIndicatorId: ri.legacy_indicator_id,
     }));
@@ -179,10 +196,12 @@ export async function getResolvedInputConfig(
         id: gi.id,
         service_type: gi.service_type,
         name: gi.name,
+        parameter_group: gi.parameter_group ?? null,
         category: gi.category,
         bobot: Number(gi.bobot),
         has_na: gi.has_na,
         threshold: gi.threshold,
+        sort_order: gi.sort_order ?? 0,
         ruleIndicatorId: null,
         legacyIndicatorId: gi.id,
       }));

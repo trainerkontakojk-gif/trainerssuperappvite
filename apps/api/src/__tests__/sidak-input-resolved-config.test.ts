@@ -52,6 +52,7 @@ describe("getResolvedInputConfig service and API route", () => {
         rule_version_id: "v-jan",
         service_type: "bko",
         name: "Parameter BKO 1",
+        parameter_group: "Kelompok BKO",
         category: "none",
         bobot: 1.0,
         has_na: false,
@@ -92,12 +93,12 @@ describe("getResolvedInputConfig service and API route", () => {
     expect(config.indicators).toHaveLength(1);
     expect(config.indicators[0].id).toBe("legacy-bko-1");
     expect(config.indicators[0].name).toBe("Parameter BKO 1");
+    expect(config.indicators[0].parameter_group).toBe("Kelompok BKO");
     expect(config.indicators[0].category).toBe("none");
   });
 
   it("falls back to global indicators and DEFAULT_SERVICE_WEIGHTS if no effective period rule version", async () => {
     const targetPeriod = { id: "p-jan", month: 1, year: 2026 };
-
 
     let queryCount = 0;
     pendingResolve = () => {

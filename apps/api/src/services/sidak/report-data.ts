@@ -2,6 +2,7 @@ import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { getSoftDeletedPesertaIds } from "./agent-directory";
 import { getIndicators, getPeriods } from "./period-indicator";
+import { formatQAIndicatorName } from "@trainers/types";
 
 export async function getDataReportRows(params: {
   serviceType?: string;
@@ -27,10 +28,12 @@ export async function getDataReportRows(params: {
         .filter((period) => period.year === params.year)
         .filter(
           (period) =>
-            params.startMonth === undefined || period.month >= params.startMonth,
+            params.startMonth === undefined ||
+            period.month >= params.startMonth,
         )
         .filter(
-          (period) => params.endMonth === undefined || period.month <= params.endMonth,
+          (period) =>
+            params.endMonth === undefined || period.month <= params.endMonth,
         )
         .map((period) => period.id)
     : [];
@@ -106,7 +109,7 @@ export async function getReportChartData(params: {
   for (const row of rows) {
     const ind = indicators.find((i) => i.id === row.indicator_id);
     if (ind) {
-      const key = ind.name;
+      const key = formatQAIndicatorName(ind);
       paretoMap.set(key, (paretoMap.get(key) ?? 0) + 1);
       if (ind.category === "critical") criticalCount++;
       else if (ind.category === "non_critical") nonCriticalCount++;
@@ -151,8 +154,11 @@ export async function getReportChartData(params: {
 }
 
 export async function getServiceWeights(): Promise<any[]> {
-  const { data, error } = await supabaseAdmin.from("qa_service_weights").select("*");
-  if (error) throw new Error(`Gagal mengambil service weight: ${error.message}`);
+  const { data, error } = await supabaseAdmin
+    .from("qa_service_weights")
+    .select("*");
+  if (error)
+    throw new Error(`Gagal mengambil service weight: ${error.message}`);
   return data ?? [];
 }
 

@@ -139,6 +139,88 @@ describe("calculateSessionScoreFromTemuan", () => {
     expect(score).toBeGreaterThanOrEqual(0);
     expect(score).toBeLessThanOrEqual(100);
   });
+
+  it("matches the SLIK reference weight for one failed 15% critical item", () => {
+    const slikIndicators: QAIndicator[] = [
+      makeIndicator({
+        id: "slik-nc-data",
+        service_type: "slik",
+        parameter_group: "Kesesuaian verifikasi (Verifikasi)",
+        name: "Kesesuaian Data",
+        category: "non_critical",
+        bobot: 0.15,
+      }),
+      makeIndicator({
+        id: "slik-nc-photo",
+        service_type: "slik",
+        parameter_group: "Kesesuaian verifikasi (Verifikasi)",
+        name: "Kesesuaian Foto",
+        category: "non_critical",
+        bobot: 0.15,
+      }),
+      makeIndicator({
+        id: "slik-nc-send",
+        service_type: "slik",
+        name: "Kelengkapan Pengiriman Hasil iDeb (Penarikan)",
+        category: "non_critical",
+        bobot: 0.4,
+      }),
+      makeIndicator({
+        id: "slik-nc-repeat-data",
+        service_type: "slik",
+        parameter_group: "Kesesuaian Verifikasi Ulang (Penarikan)",
+        name: "Kesesuaian Data",
+        category: "non_critical",
+        bobot: 0.15,
+      }),
+      makeIndicator({
+        id: "slik-nc-repeat-photo",
+        service_type: "slik",
+        parameter_group: "Kesesuaian Verifikasi Ulang (Penarikan)",
+        name: "Kesesuaian Foto",
+        category: "non_critical",
+        bobot: 0.15,
+      }),
+      ...[
+        ["slik-cr-reject", 0.15],
+        ["slik-cr-reason", 0.1],
+        ["slik-cr-result", 0.3],
+        ["slik-cr-team-data", 0.1],
+        ["slik-cr-team-photo", 0.05],
+        ["slik-cr-team-document", 0.05],
+        ["slik-cr-walkin-data", 0.1],
+        ["slik-cr-walkin-document", 0.15],
+      ].map(([id, bobot]) =>
+        makeIndicator({
+          id: String(id),
+          service_type: "slik",
+          name: String(id),
+          category: "critical",
+          bobot: Number(bobot),
+        }),
+      ),
+    ];
+
+    const sessionScore = calculateSessionScoreFromTemuan(
+      slikIndicators,
+      [{ indicator_id: "slik-cr-reject", nilai: 0 }],
+      DEFAULT_SERVICE_WEIGHTS.slik,
+    );
+    expect(sessionScore).toBeCloseTo(91, 5);
+
+    const aggregateScore = calculateQAScoreFromTemuan(
+      slikIndicators,
+      [
+        {
+          indicator_id: "slik-cr-reject",
+          nilai: 0,
+          no_tiket: "SLIK-001",
+        },
+      ],
+      DEFAULT_SERVICE_WEIGHTS.slik,
+    );
+    expect(aggregateScore.finalScore).toBeCloseTo(98.2, 5);
+  });
 });
 
 describe("calculateQAScoreFromTemuan", () => {

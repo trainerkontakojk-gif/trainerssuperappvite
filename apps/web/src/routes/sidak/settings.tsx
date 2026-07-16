@@ -3,11 +3,19 @@ import { sidakClient, unwrapResponse } from "../../lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Settings, Plus, Trash2,
-  History, Rocket, GitBranch
+  Settings,
+  Plus,
+  Trash2,
+  History,
+  Rocket,
+  GitBranch,
 } from "lucide-react";
 import { notify } from "../../lib/toast";
-import type { ServiceType, RuleVersion, QARuleIndicator } from "@trainers/types";
+import type {
+  ServiceType,
+  RuleVersion,
+  QARuleIndicator,
+} from "@trainers/types";
 import { formatPeriodLabel, SERVICE_LABELS } from "./settings/constants";
 import { RuleVersionPicker } from "./settings/components/RuleVersionPicker";
 import { ServiceWeightsPanel } from "./settings/components/ServiceWeightsPanel";
@@ -30,7 +38,9 @@ interface RuleVersionMeta {
 
 export default function SidakSettingsPage() {
   const [activeTeam, setActiveTeam] = useState<ServiceType>("call");
-  const [selectedVersion, setSelectedVersion] = useState<RuleVersion | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<RuleVersion | null>(
+    null,
+  );
   const [draftIndicators, setDraftIndicators] = useState<QARuleIndicator[]>([]);
   const [loadingIndicators, setLoadingIndicators] = useState(false);
   const [meta, setMeta] = useState<RuleVersionMeta | null>(null);
@@ -38,7 +48,9 @@ export default function SidakSettingsPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [changeReason, setChangeReason] = useState("");
   const [publishPeriodId, setPublishPeriodId] = useState<string>("");
-  const [previewVersion, setPreviewVersion] = useState<RuleVersion | null>(null);
+  const [previewVersion, setPreviewVersion] = useState<RuleVersion | null>(
+    null,
+  );
   const [publishConfirmed, setPublishConfirmed] = useState(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -48,48 +60,64 @@ export default function SidakSettingsPage() {
   const [editForm, setEditForm] = useState<IndicatorFormState | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const { data: versions, loading: versionsLoading, refetch: refetchVersions } = useApi<RuleVersion[]>(
-    `/sidak/rule-versions?service_type=${activeTeam}`
-  );
-  const { data: periods } = useApi<{ id: string; month: number; year: number }[]>("/sidak/periods");
+  const {
+    data: versions,
+    loading: versionsLoading,
+    refetch: refetchVersions,
+  } = useApi<RuleVersion[]>(`/sidak/rule-versions?service_type=${activeTeam}`);
+  const { data: periods } =
+    useApi<{ id: string; month: number; year: number }[]>("/sidak/periods");
 
   // Selection logic: Draft first, then published, then latest version
   useEffect(() => {
     if (versions && (versions as RuleVersion[]).length > 0) {
       setMeta(null);
-      const stillExists = selectedVersion ? versions.find(v => v.id === selectedVersion.id) : null;
+      const stillExists = selectedVersion
+        ? versions.find((v) => v.id === selectedVersion.id)
+        : null;
       if (stillExists) {
         setSelectedVersion(stillExists);
       } else {
         const draft = versions.find((v) => v.status === "draft");
         const published = versions.find((v) => v.status === "published");
-        const latest = [...versions].sort((a, b) => b.version_number - a.version_number)[0];
+        const latest = [...versions].sort(
+          (a, b) => b.version_number - a.version_number,
+        )[0];
         setSelectedVersion(draft || published || latest || versions[0]);
       }
     } else {
       setSelectedVersion(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versions?.length, activeTeam]);
 
   useEffect(() => {
     if (!versionsLoading && (!versions || versions.length === 0)) {
       let cancelled = false;
-      sidakClient["rule-versions"].meta.$get({ query: { service_type: activeTeam } })
+      sidakClient["rule-versions"].meta
+        .$get({ query: { service_type: activeTeam } })
         .then((res: Response) => unwrapResponse(res))
         .then((result: any) => {
           if (!cancelled) setMeta(result as RuleVersionMeta);
         })
-        .catch(() => { if (!cancelled) setMeta(null); });
-      return () => { cancelled = true; };
+        .catch(() => {
+          if (!cancelled) setMeta(null);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeam, versionsLoading, versions?.length]);
 
   const fetchVersionIndicators = useCallback(async (versionId: string) => {
     setLoadingIndicators(true);
     try {
-      const res = await unwrapResponse(await sidakClient["rule-versions"][":id"].indicators.$get({ param: { id: versionId } }));
+      const res = await unwrapResponse(
+        await sidakClient["rule-versions"][":id"].indicators.$get({
+          param: { id: versionId },
+        }),
+      );
       setDraftIndicators((res as QARuleIndicator[]) ?? []);
     } catch {
       setDraftIndicators([]);
@@ -117,18 +145,27 @@ export default function SidakSettingsPage() {
     if (selectedVersion.effective_period_id === publishPeriodId) {
       return selectedVersion.version_number;
     }
-    const versionsInTarget = versions?.filter((v) => v.effective_period_id === publishPeriodId) || [];
+    const versionsInTarget =
+      versions?.filter((v) => v.effective_period_id === publishPeriodId) || [];
     if (versionsInTarget.length === 0) return 1;
     return Math.max(...versionsInTarget.map((v) => v.version_number)) + 1;
   };
 
   const handleCreateDraft = async (sourceId?: string) => {
     try {
-      const draft = await unwrapResponse(await sidakClient["rule-versions"].$post({ json: {
-        service_type: activeTeam,
-        source_version_id: sourceId,
-      }}));
-      notify.success(sourceId ? "Draft revisi berhasil dibuat!" : "Draft baru berhasil dibuat!");
+      const draft = await unwrapResponse(
+        await sidakClient["rule-versions"].$post({
+          json: {
+            service_type: activeTeam,
+            source_version_id: sourceId,
+          },
+        }),
+      );
+      notify.success(
+        sourceId
+          ? "Draft revisi berhasil dibuat!"
+          : "Draft baru berhasil dibuat!",
+      );
       refetchVersions();
       setSelectedVersion(draft as RuleVersion);
     } catch (e: any) {
@@ -145,7 +182,9 @@ export default function SidakSettingsPage() {
       : "Hapus draft ini?";
     if (!confirm(msg)) return;
     try {
-      await unwrapResponse(await sidakClient["rule-versions"][":id"].$delete({ param: { id } }));
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":id"].$delete({ param: { id } }),
+      );
       notify.success("Draft berhasil dihapus");
       refetchVersions();
       if (selectedVersion?.id === id) {
@@ -160,10 +199,15 @@ export default function SidakSettingsPage() {
     if (!selectedVersion || !publishPeriodId) return;
     setIsPublishing(true);
     try {
-      await unwrapResponse(await sidakClient["rule-versions"][":id"].publish.$post({ param: { id: selectedVersion.id }, json: {
-        change_reason: changeReason || undefined,
-        effective_period_id: publishPeriodId,
-      }}));
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":id"].publish.$post({
+          param: { id: selectedVersion.id },
+          json: {
+            change_reason: changeReason || undefined,
+            effective_period_id: publishPeriodId,
+          },
+        }),
+      );
       notify.success("Rule version berhasil dipublish!");
       setPreviewVersion(null);
       setChangeReason("");
@@ -180,11 +224,19 @@ export default function SidakSettingsPage() {
     if (!selectedVersion) return;
     setSavingNew(true);
     try {
-      const payload = indicatorFormToPayload(form, selectedVersion.scoring_mode);
-      await unwrapResponse(await sidakClient["rule-versions"][":id"].indicators.$post({ param: { id: selectedVersion.id }, json: {
-        service_type: activeTeam,
-        ...payload,
-      }}));
+      const payload = indicatorFormToPayload(
+        form,
+        selectedVersion.scoring_mode,
+      );
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":id"].indicators.$post({
+          param: { id: selectedVersion.id },
+          json: {
+            service_type: activeTeam,
+            ...payload,
+          },
+        }),
+      );
       notify.success("Parameter berhasil ditambahkan ke draft.");
       setShowAddForm(false);
       fetchVersionIndicators(selectedVersion.id);
@@ -200,8 +252,18 @@ export default function SidakSettingsPage() {
     if (!selectedVersion || !editIndId) return;
     setSavingEdit(true);
     try {
-      const payload = indicatorFormToPayload(form, selectedVersion.scoring_mode);
-      await unwrapResponse(await sidakClient["rule-versions"][":versionId"].indicators[":indicatorId"].$put({ param: { versionId: selectedVersion.id, indicatorId: editIndId }, json: payload }));
+      const payload = indicatorFormToPayload(
+        form,
+        selectedVersion.scoring_mode,
+      );
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":versionId"].indicators[
+          ":indicatorId"
+        ].$put({
+          param: { versionId: selectedVersion.id, indicatorId: editIndId },
+          json: payload,
+        }),
+      );
       notify.success("Parameter berhasil diperbarui.");
       setEditIndId(null);
       setEditForm(null);
@@ -217,7 +279,13 @@ export default function SidakSettingsPage() {
   const handleDeleteIndicator = async (id: string) => {
     if (!selectedVersion) return;
     try {
-      await unwrapResponse(await sidakClient["rule-versions"][":versionId"].indicators[":indicatorId"].$delete({ param: { versionId: selectedVersion.id, indicatorId: id } }));
+      await unwrapResponse(
+        await sidakClient["rule-versions"][":versionId"].indicators[
+          ":indicatorId"
+        ].$delete({
+          param: { versionId: selectedVersion.id, indicatorId: id },
+        }),
+      );
       notify.success("Parameter dihapus dari draft.");
       fetchVersionIndicators(selectedVersion.id);
       refetchVersions();
@@ -228,9 +296,10 @@ export default function SidakSettingsPage() {
 
   const isDraft = selectedVersion?.status === "draft";
 
-  const publishedWhenDraftEmpty = isDraft && draftIndicators.length === 0
-    ? versions?.find((v) => v.status === "published")
-    : null;
+  const publishedWhenDraftEmpty =
+    isDraft && draftIndicators.length === 0
+      ? versions?.find((v) => v.status === "published")
+      : null;
 
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -241,7 +310,9 @@ export default function SidakSettingsPage() {
             <div className="w-8 h-8 rounded-xl bg-muted border border-border flex items-center justify-center text-muted-foreground">
               <History className="w-4 h-4" />
             </div>
-            <h1 className="font-outfit text-lg font-bold text-foreground">Versioning Parameter QA</h1>
+            <h1 className="font-outfit text-lg font-bold text-foreground">
+              Versioning Parameter QA
+            </h1>
           </div>
         </div>
 
@@ -277,15 +348,17 @@ export default function SidakSettingsPage() {
               Create Revision
             </button>
           )}
-          {!selectedVersion && !versionsLoading && (!versions || !versions.some((v) => v.status === "draft")) && (
-            <button
-              onClick={() => handleCreateDraft()}
-              className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Buat Draft Baru
-            </button>
-          )}
+          {!selectedVersion &&
+            !versionsLoading &&
+            (!versions || !versions.some((v) => v.status === "draft")) && (
+              <button
+                onClick={() => handleCreateDraft()}
+                className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-xl text-xs font-semibold uppercase tracking-wide transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Buat Draft Baru
+              </button>
+            )}
         </div>
       </header>
 
@@ -334,6 +407,7 @@ export default function SidakSettingsPage() {
                   loadingIndicators={loadingIndicators}
                   draftIndicators={draftIndicators}
                   publishedWhenDraftEmpty={publishedWhenDraftEmpty}
+                  selectedVersion={selectedVersion}
                   isDraft={isDraft}
                   handleCreateDraft={handleCreateDraft}
                   handleDeleteIndicator={handleDeleteIndicator}
@@ -347,8 +421,13 @@ export default function SidakSettingsPage() {
               <div className="h-full flex items-center justify-center py-20">
                 <div className="text-center p-8 border border-border bg-surface rounded-2xl max-w-sm mx-auto">
                   <Settings className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="font-outfit text-sm font-bold text-foreground">Pilih atau buat versi rules untuk melihat detail</p>
-                  <p className="text-xs text-muted-foreground mt-1">Gunakan panel di sebelah kiri untuk melihat riwayat versi parameter QA.</p>
+                  <p className="font-outfit text-sm font-bold text-foreground">
+                    Pilih atau buat versi rules untuk melihat detail
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Gunakan panel di sebelah kiri untuk melihat riwayat versi
+                    parameter QA.
+                  </p>
                 </div>
               </div>
             )}
@@ -360,6 +439,7 @@ export default function SidakSettingsPage() {
         {showAddForm && selectedVersion && (
           <AddIndicatorModal
             scoringMode={selectedVersion.scoring_mode}
+            serviceType={activeTeam}
             saving={savingNew}
             onClose={() => setShowAddForm(false)}
             onSubmit={handleAddIndicator}
@@ -369,6 +449,7 @@ export default function SidakSettingsPage() {
           <EditIndicatorModal
             initialForm={editForm}
             scoringMode={selectedVersion.scoring_mode}
+            serviceType={activeTeam}
             saving={savingEdit}
             onClose={() => {
               setEditIndId(null);

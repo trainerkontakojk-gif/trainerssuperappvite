@@ -2,7 +2,7 @@ import { supabaseAdmin } from "../../lib/supabase";
 import { fetchAllPages } from "../../lib/supabase-pagination";
 import { isCountableFinding } from "./shared-constants";
 import { getPeriods, getIndicators } from "./period-indicator";
-import type { QAPeriod } from "@trainers/types";
+import { formatQAIndicatorName, type QAPeriod } from "@trainers/types";
 
 const MONTHS_SHORT = [
   "Jan",
@@ -77,7 +77,7 @@ export async function calculateTopParameters(temuan: any[]) {
     if (!id) continue;
     const indicator = indicators.find((i) => i.id === id);
     if (!indicator) continue;
-    const name = indicator.name;
+    const name = formatQAIndicatorName(indicator);
 
     if (!countsPerService[service]) countsPerService[service] = {};
     if (!countsPerService[service][id])
@@ -87,9 +87,7 @@ export async function calculateTopParameters(temuan: any[]) {
 
   const result: Record<string, { name: string; count: number }> = {};
   Object.entries(countsPerService).forEach(([service, map]) => {
-    const sorted = Object.values(map).sort(
-      (a, b) => b.count - a.count,
-    );
+    const sorted = Object.values(map).sort((a, b) => b.count - a.count);
     if (sorted[0]) {
       result[service] = sorted[0];
     }

@@ -47,6 +47,7 @@ type DashboardRuleIndicatorRow = {
   legacy_indicator_id?: string | null;
   service_type?: ServiceType | string | null;
   name: string;
+  parameter_group?: string | null;
   category?: string | null;
   bobot: number | string;
   has_na?: boolean | null;
@@ -92,11 +93,11 @@ export function toDashboardScoreRows(
     if (typeof row.nilai !== "number") return [];
     return [
       {
-      indicator_id: row.indicator_id,
-      nilai: row.nilai,
-      no_tiket: row.no_tiket ?? null,
-      created_at: row.created_at,
-      period_id: row.period_id,
+        indicator_id: row.indicator_id,
+        nilai: row.nilai,
+        no_tiket: row.no_tiket ?? null,
+        created_at: row.created_at,
+        period_id: row.period_id,
       },
     ];
   });
@@ -124,6 +125,7 @@ export function toDashboardRuleIndicators(
     id: row.legacy_indicator_id || row.id,
     service_type: isServiceType(row.service_type) ? row.service_type : "call",
     name: row.name,
+    parameter_group: row.parameter_group ?? null,
     category: toParetoCategory(row.category),
     bobot: Number(row.bobot),
     has_na: row.has_na ?? false,
