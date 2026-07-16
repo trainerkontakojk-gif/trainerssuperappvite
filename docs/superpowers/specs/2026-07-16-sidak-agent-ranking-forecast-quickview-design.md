@@ -22,7 +22,14 @@ The feature is informational only. It does not add navigation, editing, filterin
 - **Tim Leader:** the child folder or batch/subteam where the agent is registered.
 - If the agent's folder has no parent, the current folder is used as both the combined and leader scope. The UI must avoid presenting two misleadingly different labels for the same cohort.
 - The ranking denominator is the number of agents eligible for ranking because they have auditable SIDAK data in the selected context. It is not the number of all profiler participants.
-- Ranking order and score must reuse the canonical SIDAK dashboard/ranking calculation. The quickview must not introduce another scoring formula.
+- The quickview ranking intentionally differs from the existing Ranking page:
+  - existing Ranking page: the largest finding count is placed first as the worst/most urgent agent;
+  - agent-detail quickview: the smallest finding count receives the highest rank.
+- Quickview rank is based only on the YTD countable finding total:
+  - `rank = 1 + number of agents with strictly fewer findings`;
+  - agents with the same finding total receive the same rank;
+  - score, critical status, and alphabetical order do not break ties.
+- The quickview must reuse the existing audited-agent population and countable-finding totals. It must not introduce another finding-count formula.
 
 ### 2.2 Time and service context
 
@@ -63,6 +70,8 @@ The rail is separated from the profile identity area by one horizontal divider. 
 - Do not add gradients, shadows, ornamental badges, nested cards, or decorative motion.
 - The rail is not clickable and has no tooltip.
 - Loading affects only the rail; the profile identity and actions remain usable.
+- A visible note spans the ranking area:
+  `Basis ranking: jumlah temuan paling sedikit (YTD). Jumlah sama mendapat peringkat yang sama.`
 
 ### 3.2 Responsive behavior
 
@@ -125,6 +134,7 @@ interface SidakAgentRankQuickview {
   total: number;
   scopeId: string | null;
   scopeLabel: string;
+  basis: "least_findings_ytd";
 }
 
 interface SidakAgentForecastQuickview {
@@ -186,12 +196,14 @@ It must not duplicate score calculation, ranking sorting, or forecast classifica
 
 For each resolved cohort:
 
-1. Reuse the canonical dashboard/ranking data path with `limit: 0`.
+1. Reuse the dashboard aggregation path with `limit: 0` to obtain the authorized audited-agent population and each agent's canonical `defects` count.
 2. Apply selected year, selected service, YTD period semantics, accessible agent IDs, allowed services, and the cohort folder ID.
-3. Locate the viewed agent in the canonical ordered ranking.
-4. Return its one-based position and the number of ranked agents.
+3. Locate the viewed agent and read its `defects` count.
+4. Calculate `1 + count(entries where entry.defects < viewedAgent.defects)`.
+5. Return that shared-tie rank and the number of ranked agents.
 
 The combined and leader calculations may execute in parallel after folder resolution.
+The existing Ranking page's descending order must remain unchanged.
 
 ### 6.4 Folder resolution
 
@@ -289,7 +301,8 @@ Add focused tests covering:
 
 - child-folder and parent-folder cohort resolution;
 - correct rank and total for both cohorts;
-- canonical ranking ordering reuse;
+- ascending least-findings quickview semantics even though `topAgents` arrives in descending worst-first order;
+- equal finding totals sharing the same rank;
 - standalone folder fallback;
 - agent absent from a cohort ranking;
 - inaccessible agent and leader fail-closed behavior;
@@ -334,6 +347,7 @@ Update the human-readable SIDAK logic/design documentation to record:
 
 - definitions of Tim Gabungan and Tim Leader;
 - YTD ranking semantics;
+- visible `jumlah temuan paling sedikit` ranking basis and shared-tie behavior;
 - denominator eligibility;
 - three-month deterministic forecast status;
 - access-scoped totals;
@@ -346,7 +360,7 @@ Update the human-readable SIDAK logic/design documentation to record:
 - Allowing users to change the forecast horizon from the profile.
 - Replacing the full Ranking or Forecast pages.
 - Adding AI-generated forecast commentary.
-- Changing SIDAK scoring, ranking order, or forecast thresholds.
+- Changing SIDAK scoring, the existing Ranking page order, or forecast thresholds.
 - Adding new database tables or migrations.
 
 ## 12. Rollback
