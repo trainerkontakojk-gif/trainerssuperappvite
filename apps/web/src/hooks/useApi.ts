@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const API_BASE = (import.meta as any).env?.VITE_API_URL || "/api/v1";
 
@@ -39,25 +39,40 @@ export function useApi<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestGenerationRef = useRef(0);
 
   const refetch = useCallback(async () => {
-    if (!path) return;
+    const requestGeneration = ++requestGenerationRef.current;
+    if (!path) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const result = await fetchApi<T>(path);
-      setData(result);
+      if (requestGeneration === requestGenerationRef.current) {
+        setData(result);
+      }
     } catch (e: any) {
-      setError(e.message);
+      if (requestGeneration === requestGenerationRef.current) {
+        setError(e.message);
+      }
     } finally {
-      setLoading(false);
+      if (requestGeneration === requestGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [path]);
 
   useEffect(() => {
     refetch();
+    return () => {
+      requestGenerationRef.current += 1;
+    };
   }, [refetch]);
 
   return { data, loading, error, refetch };
 }
-

@@ -1,6 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useApi, fetchApi } from "../hooks/useApi";
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function apiResponse<T>(data: T) {
+  return new Response(JSON.stringify({ success: true, data }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 function mockLocalStorage() {
   const store = new Map<string, string>();
@@ -57,6 +73,22 @@ describe("useApi", () => {
     expect(result.current.loading).toBe(false);
   });
 
+  it("clears retained state when the path becomes null", async () => {
+    const { result, rerender } = renderHook(
+      ({ path }: { path: string | null }) => useApi<any[]>(path),
+      { initialProps: { path: "/test" as string | null } },
+    );
+    await waitFor(() => expect(result.current.data).toBeTruthy());
+
+    rerender({ path: null });
+
+    await waitFor(() => {
+      expect(result.current.data).toBeNull();
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+    });
+  });
+
   it("sets error on API failure", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
@@ -85,6 +117,109 @@ describe("useApi", () => {
 
     await result.current.refetch();
     await waitFor(() => expect(result.current.data).toEqual([{ id: "2" }]));
+  });
+
+  it("ignores a stale success after a newer path request starts", async () => {
+    const oldRequest = deferred<Response>();
+    const newRequest = deferred<Response>();
+    vi.mocked(globalThis.fetch)
+      .mockReset()
+      .mockImplementationOnce(() => oldRequest.promise)
+      .mockImplementationOnce(() => newRequest.promise);
+
+    const { result, rerender } = renderHook(
+      ({ path }: { path: string }) => useApi<Array<{ id: string }>>(path),
+      { initialProps: { path: "/old" } },
+    );
+
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    rerender({ path: "/new" });
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      oldRequest.resolve(apiResponse([{ id: "old" }]));
+      await oldRequest.promise;
+    });
+
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(true);
+
+    await act(async () => {
+      newRequest.resolve(apiResponse([{ id: "new" }]));
+      await newRequest.promise;
+    });
+
+    expect(result.current.data).toEqual([{ id: "new" }]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("ignores a stale failure after the current path succeeds", async () => {
+    const oldRequest = deferred<Response>();
+    const newRequest = deferred<Response>();
+    vi.mocked(globalThis.fetch)
+      .mockReset()
+      .mockImplementationOnce(() => oldRequest.promise)
+      .mockImplementationOnce(() => newRequest.promise);
+
+    const { result, rerender } = renderHook(
+      ({ path }: { path: string }) => useApi<Array<{ id: string }>>(path),
+      { initialProps: { path: "/old" } },
+    );
+
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    rerender({ path: "/new" });
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      newRequest.resolve(apiResponse([{ id: "new" }]));
+      await newRequest.promise;
+    });
+    expect(result.current.data).toEqual([{ id: "new" }]);
+
+    await act(async () => {
+      oldRequest.reject(new Error("Old request failed"));
+      await oldRequest.promise.catch(() => undefined);
+    });
+
+    expect(result.current.data).toEqual([{ id: "new" }]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("manual refetch invalidates an earlier request for the same path", async () => {
+    const oldRequest = deferred<Response>();
+    const refetchRequest = deferred<Response>();
+    vi.mocked(globalThis.fetch)
+      .mockReset()
+      .mockImplementationOnce(() => oldRequest.promise)
+      .mockImplementationOnce(() => refetchRequest.promise);
+
+    const { result } = renderHook(() =>
+      useApi<Array<{ id: string }>>("/test"),
+    );
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+
+    let refetchPromise!: Promise<void>;
+    act(() => {
+      refetchPromise = result.current.refetch();
+    });
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      refetchRequest.resolve(apiResponse([{ id: "refetch" }]));
+      await refetchPromise;
+    });
+
+    await act(async () => {
+      oldRequest.resolve(apiResponse([{ id: "old" }]));
+      await oldRequest.promise;
+    });
+
+    expect(result.current.data).toEqual([{ id: "refetch" }]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
   });
 });
 

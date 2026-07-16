@@ -154,7 +154,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Settings** (`/sidak/settings`): Service weights configuration dengan versioned rules per service+periode.
   - **Periods** (`/sidak/periods`): Manajemen periode audit.
   - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian dan dynamic load-more copy.
-  - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
+  - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, ranking Tim Gabungan/Tim Leader, forecast 3 bulan (konteks tahun+layanan), ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
   - **Reports** (`/sidak/reports`): Data vs AI report selection.
   - **Reports Data** (`/sidak/reports-data`): Filter form + tabel temuan dengan kolom Layanan, Periode, Agen, Nomor Tiket, Parameter, Temuan, dan Skor + Excel export. Nomor tiket dinormalisasi dan ditampilkan dengan format monospace; isi Temuan dibungkus utuh tanpa truncation agar tetap terbaca.
   - **Reports AI** (`/sidak/reports-ai`): AI-powered report generation.
@@ -171,5 +171,6 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Sesi Tanpa Temuan**: Trainer/admin dapat membuat 5 sesi phantom (nilai=3) ketika agent belum memiliki temuan buruk.
   - **Excel Upload**: Template generation, parsing, dan validasi untuk bulk input temuan.
   - **Rank Change Indicator**: Perubahan posisi ranking (▲ +X / ▼ -X) dengan dynamic context subtitle "Sebelumnya Posisi X".
+  - **Agent Ranking Semantics**: Peringkat lebih tinggi = temuan lebih sedikit; peringkat terakhir = temuan terbanyak; jumlah temuan sama = peringkat sama (tidak ada tie-breaking buatan). Ranking ditampilkan dalam konteks Tim Gabungan dan Tim Leader per tahun+layanan.
   - **KPI Delta**: Persentase kenaikan/penurunan di KPI Dashboard dengan unit yang disesuaikan (persentase relatif untuk count/ratio, poin persentase untuk metrik persen).
 - **Catatan Teknis**: Backend API di `/api/v1/sidak/` (~19 endpoints) di-dekomposisi ke 6 sub-module route handler (`apps/api/src/routes/sidak/{core,dashboard,forecast,temuan,rule-versions,reports}.ts`). Business logic di `apps/api/src/services/sidak-service.ts` — barrel dari 14 sub-modules di `apps/api/src/services/sidak/`. Scoring engine di `apps/api/src/lib/scoring.ts`.

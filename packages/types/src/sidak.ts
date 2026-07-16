@@ -407,6 +407,36 @@ export interface SidakAgentForecastResponse {
   summary: SidakAgentForecastSummary;
 }
 
+export interface SidakAgentRankQuickview {
+  rank: number | null;
+  total: number;
+  scopeId: string | null;
+  scopeLabel: string;
+  basis: "least_findings_ytd";
+}
+
+export interface SidakAgentForecastQuickview {
+  status: "improving" | "declining" | "stable" | "insufficient_data";
+  label: "Membaik" | "Memburuk" | "Stabil/Stagnan" | "Data belum cukup";
+  supportingText: string;
+  findingsSlope: number | null;
+  sourcePointCount: number;
+  confidence: "low" | "medium" | "high" | null;
+  horizonMonths: 3;
+}
+
+export interface SidakAgentQuickviewResponse {
+  context: {
+    agentId: string;
+    year: number;
+    serviceType: ServiceType;
+    periodMode: "ytd";
+  };
+  combinedTeam: SidakAgentRankQuickview | null;
+  leaderTeam: SidakAgentRankQuickview | null;
+  forecast: SidakAgentForecastQuickview | null;
+}
+
 export type RootCauseClusterId =
   | "salah_nama_perusahaan_produk"
   | "kelebihan_standar_jawaban"

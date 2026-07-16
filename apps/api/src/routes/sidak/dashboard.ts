@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
+import { serviceTypeSchema } from "@trainers/types";
 import { requireRole } from "../../middleware/role";
 import * as sidakService from "../../services/sidak-service";
 import { getRankingData } from "../../services/sidak-ranking-service";
@@ -9,33 +10,108 @@ type Variables = { user: User; profile: any };
 
 const sidakDashboard = new Hono<{ Variables: Variables }>();
 
-async function resolveSidakFilterScope(c: any): Promise<sidakService.SidakFilterScope | null> {
+const agentQuickviewQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  service_type: serviceTypeSchema,
+});
+
+async function resolveSidakFilterScope(
+  c: any,
+): Promise<sidakService.SidakFilterScope | null> {
   const user = c.get("user");
   const profile = c.get("profile");
   return sidakService.getAccessibleSidakFilters(user.id, profile?.role ?? "");
 }
 
 // ── Agents ─────────────────────────────────────────────
-sidakDashboard.get("/agents", requireRole("admin", "trainer", "leader"), async (c) => {
-  const user = c.get("user");
-  const profile = c.get("profile");
-  const year = c.req.query("year")
-    ? parseInt(c.req.query("year")!)
-    : new Date().getFullYear();
-  const showAll = c.req.query("show_all") === "true";
-  const accessibleIds = await sidakService.getAccessibleAgentIds(
-    user.id,
-    profile?.role ?? "",
-  );
-  const filterScope = await resolveSidakFilterScope(c);
-  const result = await sidakService.getAgentDirectorySummary(
-    year,
-    accessibleIds ?? undefined,
-    showAll,
-    filterScope?.allowedServices ?? undefined,
-  );
-  return c.json({ success: true, data: result });
-});
+sidakDashboard.get(
+  "/agents",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const year = c.req.query("year")
+      ? parseInt(c.req.query("year")!)
+      : new Date().getFullYear();
+    const showAll = c.req.query("show_all") === "true";
+    const accessibleIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    const filterScope = await resolveSidakFilterScope(c);
+    const result = await sidakService.getAgentDirectorySummary(
+      year,
+      accessibleIds ?? undefined,
+      showAll,
+      filterScope?.allowedServices ?? undefined,
+    );
+    return c.json({ success: true, data: result });
+  },
+);
+
+sidakDashboard.get(
+  "/agents/:id/quickview",
+  requireRole("admin", "trainer", "leader"),
+  async (c) => {
+    const parsed = agentQuickviewQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Konteks quickview agent tidak valid.",
+          },
+        },
+        400,
+      );
+    }
+
+    const user = c.get("user");
+    const profile = c.get("profile");
+    const agentId = c.req.param("id");
+    const accessibleAgentIds = await sidakService.getAccessibleAgentIds(
+      user.id,
+      profile?.role ?? "",
+    );
+    if (accessibleAgentIds && !accessibleAgentIds.includes(agentId)) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "FORBIDDEN",
+            message: "Anda tidak memiliki akses ke data agent ini.",
+          },
+        },
+        403,
+      );
+    }
+
+    const filterScope = await resolveSidakFilterScope(c);
+    try {
+      const data = await sidakService.getSidakAgentQuickview({
+        agentId,
+        year: parsed.data.year,
+        requestedServiceType: parsed.data.service_type,
+        accessibleAgentIds,
+        filterScope,
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Quickview agent tidak tersedia.";
+      return c.json(
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message },
+        },
+        404,
+      );
+    }
+  },
+);
 
 sidakDashboard.get(
   "/agents/:id",

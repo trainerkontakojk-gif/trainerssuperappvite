@@ -1,5 +1,6 @@
 import { useParams, Link } from "@tanstack/react-router";
 import { useAgentDetail } from "../../hooks/useAgentDetail";
+import { useAgentQuickview } from "../../hooks/useAgentQuickview";
 import {
   ArrowLeft, AlertTriangle, RefreshCw,
   BarChart2, ShieldCheck, Activity,
@@ -43,6 +44,17 @@ export default function SidakAgentDetailPage() {
     teams, agentsInTeam, selectedTeam, loadingAgents,
     handleTeamChange, handleAgentChange,
   } = useAgentDetail(id);
+  const {
+    data: quickviewData,
+    loading: quickviewLoading,
+    error: quickviewError,
+    refetch: refetchQuickview,
+  } = useAgentQuickview(id, selectedYear, selectedService);
+
+  const handleRefresh = () => {
+    void refetch();
+    void refetchQuickview();
+  };
 
   const summaryRef = useRef<HTMLDivElement>(null);
   const trendRef = useRef<HTMLDivElement>(null);
@@ -118,7 +130,7 @@ export default function SidakAgentDetailPage() {
             <h1 className="font-outfit text-sm font-bold tracking-tight text-foreground">{data.peserta.nama}</h1>
           </div>
         </div>
-        <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted text-foreground">
+        <button onClick={handleRefresh} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted text-foreground">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           {loading ? "Memuat..." : "Refresh"}
         </button>
@@ -136,6 +148,9 @@ export default function SidakAgentDetailPage() {
           role={role}
           onExport={handleExport}
           onInputAudit={handleInputAudit}
+          quickviewData={quickviewData}
+          quickviewLoading={quickviewLoading}
+          quickviewError={quickviewError}
         />
       </div>
 

@@ -31,7 +31,7 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 
 - `docs/MONITORING_TOKEN_USAGE_BILLING.md`: Kontrak usage AI bulanan, billing Rupiah, pricing/kurs, quick-view modul, dan smoke test.
 - `docs/SUPABASE_LOCAL_BACKUP.md`: Backup lokal Supabase database dan Storage.
-- `docs/SIDAK_LOGIC_AND_SCORING.md`: Penjelasan logika bisnis SIDAK, rumus skor, clean-session, dan cara perhitungan.
+- `docs/SIDAK_LOGIC_AND_SCORING.md`: Logika bisnis SIDAK — rumus skor, clean-session, ranking agent (Tim Gabungan/Tim Leader), dan forecast 3 bulan per agent berdasarkan konteks tahun+layanan.
 - `docs/SIDAK_SCORING_GUARDRAILS.md`: Guardrail wajib sebelum mengubah scoring atau agregasi SIDAK.
 - `docs/forecasting-sidak.md`: Evaluasi metode forecasting SIDAK (regresi linear, MA-3, WMA-3) dan rekomendasi pengembangan.
 - `docs/LEADER_APPROVAL_ACCESS.md`: Leader approval-based data access untuk KTP dan SIDAK.

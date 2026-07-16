@@ -332,7 +332,145 @@ Submodul baru `/sidak/forecast` memakai service forecast dashboard yang sama unt
 - Gunakan `docs/SIDAK_SCORING_GUARDRAILS.md` untuk perubahan yang menyentuh scoring atau agregasi SIDAK.
 - **Tampilan UI**: Halaman input (`/sidak/input`) memakai grid responsif untuk pilihan folder, agen, periode, dan daftar temuan. Di mobile grid kembali menjadi satu kolom agar tetap mudah dibaca; di layar lebih lebar trainer bisa melihat lebih banyak pilihan atau sesi dalam satu viewport.
 
-## Agent Detail Score Source
+## Agent Detail Ranking and Forecast Quickview
+
+Halaman `/sidak/agents/:id` menampilkan rail quickview di dalam surface profil agent (`AgentProfileBar`). Quickview memakai konteks **tahun terpilih + layanan terpilih** dengan mode periode YTD; pilihan bulan aktif dan rentang grafik tren tidak mengubah quickview.
+
+### Endpoint
+
+`GET /sidak/agents/:id/quickview`
+
+| Parameter      | Tipe      | Validasi                               | Wajib | Deskripsi                              |
+| -------------- | --------- | -------------------------------------- | ----- | -------------------------------------- |
+| `year`         | `number`  | `z.coerce.number().int().min(2000).max(2100)` | Ya    | Tahun konteks                          |
+| `service_type` | `string`  | `serviceTypeSchema` (call\|chat\|email\|cso\|pencatatan\|bko\|slik) | Ya    | Layanan SIDAK                          |
+
+**Auth:** `requireRole("admin", "trainer", "leader")` — route guard.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "context": {
+      "agentId": "string",
+      "year": 2026,
+      "serviceType": "call",
+      "periodMode": "ytd"
+    },
+    "combinedTeam": {
+      "rank": 1 | null,
+      "total": 3,
+      "scopeId": "string | null",
+      "scopeLabel": "Tim Call",
+      "basis": "least_findings_ytd"
+    } | null,
+    "leaderTeam": { /* same shape */ } | null,
+    "forecast": {
+      "status": "improving" | "declining" | "stable" | "insufficient_data",
+      "label": "Membaik" | "Memburuk" | "Stabil/Stagnan" | "Data belum cukup",
+      "supportingText": "string",
+      "findingsSlope": number | null,
+      "sourcePointCount": number,
+      "confidence": "low" | "medium" | "high" | null,
+      "horizonMonths": 3
+    } | null
+  }
+}
+```
+
+**Error responses:**
+
+| Status | Code             | Skenario                                                    |
+| ------ | ---------------- | ----------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR` | `year` atau `service_type` tidak valid                       |
+| 403    | `FORBIDDEN`        | Agent tidak termasuk `accessibleAgentIds`                    |
+| 404    | `NOT_FOUND`        | Agent tidak ditemukan atau service gagal membangun quickview |
+
+Lihat `apps/api/src/routes/sidak/dashboard.ts` (baris 52–113) dan `apps/api/src/services/sidak/agent-quickview.ts`.
+
+### Scope Ranking
+
+- **Tim Gabungan** adalah folder induk dari batch/folder agent. Algoritme `resolveAgentFolders` di `agent-quickview.ts` (baris 57–90):
+  1. Cocokkan `batch_name` agent (case-insensitive, di-_trim_) dengan `folder.name` di katalog folder.
+  2. Dari kandidat yang cocok, cari folder child yang memiliki parent dengan `name` cocok `tim` agent → folder leader.
+  3. Fallback: child dengan `parent_id != null` mana pun → kandidat pertama → `null`.
+  4. folder gabungan = parent dari folder leader (jika leader punya parent), atau folder leader itu sendiri.
+- **Tim Leader** adalah folder/batch agent yang langsung cocok. Jika `leaderFolder.id === combinedFolder.id` (standalone atau parent-nya sendiri), backend hanya menjalankan **satu query ranking** dan kedua scope berbagi objek hasil (`leaderRankPromise = combinedRankPromise`). UI menampilkan label "Cohort yang sama dengan Tim Gabungan" saat `scopeId` sama.
+- **Ranking** hanya dihitung dari data tahun terpilih dan layanan terpilih via `getDashboardData()` dengan `folder_ids: [folder.id]`, `limit: 0`, dan di-scope oleh `accessibleAgentIds` serta `allowedServiceTypes`.
+- **Formula rank** (baris 113–117): `rank = 1 + topAgents.filter(a => a.defects < viewedAgent.defects).length`. Hanya agent dengan temuan **strictly lebih kecil** yang dihitung, sehingga temuan sama mendapat rank sama (contoh `1, 1, 3`).
+- **Denominator** (`total` / `dari N`) = `topAgents.length` — jumlah agent audited yang benar-benar masuk hasil ranking untuk folder tersebut, bukan seluruh peserta terdaftar.
+- **Null rank** terjadi ketika `viewedAgent` tidak ditemukan di `topAgents` (mis. agent tidak punya temuan di tahun/layanan terpilih). UI menampilkan "—" dengan teks "Agent belum masuk ranking pada konteks ini" atau "Belum ada agent pembanding" bila `total === 0`.
+- **Basis** semua ranking adalah `"least_findings_ytd"` — terikat microcopy: `Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.` (konstanta `RANKING_BASIS_NOTE` di komponen).
+
+### Forecast Tiga Bulan
+
+- Quickview mengambil entry dari deterministic agent forecast yang sama dengan halaman Forecast (`generateSidakAgentForecast`, `apps/api/src/services/sidak/forecast.ts`), menggunakan:
+  - Tahun = `params.year`
+  - Layanan = `effectiveServiceType`
+  - `startMonth = 1` (YTD dari Januari)
+  - `folderIds = [combinedFolder?.id]` (atau `undefined` jika folder tidak bisa di-resolve)
+  - `horizonMonths = 3` (tetap, tidak dapat dikonfigurasi dari quickview)
+- **Regresi linear** (`buildProjection`, baris 307–344): `slope = (n·Σxy − Σx·Σy) / (n·Σxx − Σx·Σx)`, `intercept = (Σy − slope·Σx) / n`, lalu `projected = max(0, slope·(n + horizonMonths − 1) + intercept)`.
+- **Klasifikasi status** (`classifyStatus`, baris 288–305):
+  - `historicalCount < 2` → `"insufficient_data"`
+  - `findingsSlope > +0.5` → `"declining"`
+  - `findingsSlope < −0.5` → `"improving"`
+  - Sisanya → `"stable"`
+- **Mapping label & supporting text** (konstanta `FORECAST_COPY`, baris 31–51):
+  | Status               | Label                | supportingText                          |
+  | -------------------- | -------------------- | --------------------------------------- |
+  | `improving`          | Membaik              | Temuan diproyeksikan turun              |
+  | `declining`          | Memburuk             | Temuan diproyeksikan naik               |
+  | `stable`             | Stabil/Stagnan       | Perubahan temuan belum signifikan       |
+  | `insufficient_data`  | Data belum cukup     | Butuh minimal 2 periode audit           |
+- **findingsSlope** di quickview: untuk status `insufficient_data` dengan `sourcePointCount < 2`, field di-set `null` (baris 136–139).
+- **Status tidak diklasifikasikan ulang di frontend** — quickview hanya memetakan nilai yang sudah dihasilkan service ke label/ikon/className.
+
+### Partial dan Failure States
+
+- Dossier utama dan quickview dimuat melalui hook terpisah (`useAgentDetail` dan `useAgentQuickview`). Dossier tetap dapat dirender ketika quickview masih loading atau gagal.
+- Tiga segmen (Tim Gabungan, Tim Leader, Forecast) dijalankan dengan `Promise.allSettled` (baris 237–241). `settledValue()` mengembalikan `null` untuk promise yang `rejected`. Kegagalan satu segmen tidak menghapus segmen lain yang berhasil.
+- **Loading skeleton**: `QuickviewSkeleton` — 3 kolom dengan efek `animate-pulse`, muncul saat `loading === true && !data`.
+- **Error state**: Pesan ringkas "Quickview belum dapat dimuat" + "Data ranking dan forecast tidak tersedia untuk sementara." — tanpa menampilkan error teknis mentah.
+- **Stale context suppression** (`useAgentQuickview`): Saat `agentId`, `year`, atau `serviceType` berubah, hook memvalidasi `data.context` cocok dengan parameter. Data lama disembunyikan (`suppressRetainedState`) sampai response konteks aktif tersedia. Error dari konteks lama juga disembunyikan.
+- **Refresh**: Tombol Refresh memicu `refetch()` dossier dan `refetchQuickview()` secara bersamaan (baris 54–57 di halaman agent).
+
+### Security Scoping
+
+| Layer   | Mekanisme                                                                                      | File                             |
+| ------- | ---------------------------------------------------------------------------------------------- | -------------------------------- |
+| Route   | `requireRole("admin", "trainer", "leader")`                                                    | `dashboard.ts`                   |
+| Route   | Guard `accessibleAgentIds.includes(agentId)` → 403 sebelum resolve filter atau panggil service | `dashboard.ts` baris 77–88       |
+| Service | Guard `!accessibleAgentIds.includes(agentId)` → throw sebelum query peserta atau folder        | `agent-quickview.ts` baris 152–157 |
+| Service | `resolveScopedServiceType()` memfilter service_type sesuai `allowedServices`                   | `access-scope.ts`                |
+| Service | `getDashboardData()` dan `generateSidakAgentForecast()` meneruskan `agent_ids`, `allowedServiceTypes`, dan `accessibleAgentIds` | `agent-quickview.ts` baris 192–234 |
+
+Agent di luar akses tidak boleh ikut numerator, denominator, maupun payload scope mana pun.
+
+### Arsitektur
+
+| Lapisan              | File                                                              | Tanggung Jawab                                                                          |
+| -------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Tipe                 | `packages/types/src/sidak.ts`                                     | `SidakAgentQuickviewResponse`, `SidakAgentRankQuickview`, `SidakAgentForecastQuickview` |
+| Service              | `apps/api/src/services/sidak/agent-quickview.ts`                  | `getSidakAgentQuickview()` — resolve folder, ranking, forecast, Promise.allSettled       |
+| Service (dipanggil)  | `apps/api/src/services/sidak/dashboard-data.ts`                   | `getDashboardData()` — query temuan per folder untuk ranking                            |
+| Service (dipanggil)  | `apps/api/src/services/sidak/forecast.ts`                         | `generateSidakAgentForecast()` — regresi linear, klasifikasi status                     |
+| Route                | `apps/api/src/routes/sidak/dashboard.ts`                          | `GET /agents/:id/quickview` — validasi, guard, delegasi                                |
+| Re-export            | `apps/api/src/services/sidak-service.ts`                          | `export * from "./sidak/agent-quickview"`                                              |
+| Hook                 | `apps/web/src/hooks/useAgentQuickview.ts`                         | Request, stale context suppression, error/loading management                           |
+| Komponen (container) | `apps/web/src/components/sidak/AgentProfileBar.tsx`               | Pass quickview props ke `AgentPerformanceQuickview`                                     |
+| Komponen (quickview) | `apps/web/src/components/sidak/AgentPerformanceQuickview.tsx`     | Render ranking + forecast rail, skeleton, error, ranking basis note                    |
+
+### Test Coverage
+
+| File                                                                               | Tests | Cakupan                                                                                |
+| ---------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------- |
+| `apps/api/src/__tests__/sidak-agent-quickview.test.ts`                             | 16    | Service contract, rank resolution, tie semantics, access rejection, folder resolution, scope filtering, forecast mapping, partial failure, combined=leader dedup |
+| `apps/api/src/__tests__/sidak-agent-quickview-route.test.ts`                       | 6     | Route forwarding, 403 guard (inaccessible & empty), 400 validation (year & service_type), 404 envelope |
+| `apps/web/src/__tests__/useAgentQuickview.test.tsx`                               | 5     | Request path, stale context suppression, stale error clearing, empty service, error clear on deselection |
+| `apps/web/src/__tests__/AgentPerformanceQuickview.test.tsx`                       | 15    | Full render, skeleton, null rank, unavailable state, partial failure, insufficient forecast, calm error, same-scope label, mobile grid, forecast icons |
+| `apps/web/src/__tests__/AgentProfileBar.test.tsx`                                 | 3     | Quickview fixture pass-through, props contract                                         |
 
 Skor bulanan halaman agent detail (`GET /sidak/agents/:id`) dihitung dari `qa_temuan` melalui scoring engine aplikasi dengan `PeriodScoringContext` yang spesifik per periode. Tabel `qa_dashboard_agent_period_summary` tidak digunakan sebagai sumber skor agent detail karena row history dapat berisi placeholder hasil migration refresh yang tidak setara dengan formula aplikasi.
 

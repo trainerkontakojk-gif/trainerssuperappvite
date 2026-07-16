@@ -11,6 +11,7 @@ export * from "./sidak/report-data";
 export * from "./sidak/ai-report-service";
 export * from "./sidak/dashboard-forecast";
 export * from "./sidak/forecast";
+export * from "./sidak/agent-quickview";
 export { roundTo } from "../lib/math-utils";
 export * from "./sidak/rule-version-resolver";
 export * from "./sidak/period-scoring-context";
