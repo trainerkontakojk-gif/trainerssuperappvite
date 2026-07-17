@@ -550,6 +550,50 @@ describe("useAgentDetail", () => {
     ]);
   });
 
+  it("includes temuan with unknown/inactive indicator_id using fallback label instead of silently filtering them out", async () => {
+    useApiMock.mockImplementation((path: string | null) => {
+      const serviceType = path
+        ? new URLSearchParams(path.split("?")[1] ?? "").get("service_type")
+        : null;
+      const data = buildAgentDetailData(serviceType);
+      // Add a temuan whose indicator_id does NOT exist in the active indicators array
+      data.temuan.push({
+        id: "temuan-defunct-indicator",
+        peserta_id: "agent-1",
+        period_id: "period-call",
+        indicator_id: "indicator-defunct",
+        service_type: "call",
+        no_tiket: "T-DEFUNCT",
+        nilai: 2,
+        ketidaksesuaian: "Historical finding with inactive indicator",
+        sebaiknya: "N/A",
+        tahun: 2026,
+        created_at: "2026-04-01T00:00:00Z",
+      });
+      return { data, loading: false, error: null, refetch: vi.fn() };
+    });
+
+    const { result } = renderHook(() => useAgentDetail("agent-1"));
+
+    await waitFor(() => expect(result.current.selectedService).toBe("email"));
+
+    result.current.handleServiceChange("call");
+    await waitFor(() => expect(result.current.selectedService).toBe("call"));
+    await waitFor(() => expect(result.current.selectedMonth).toBe(5));
+
+    const items = result.current.temuanDisplayItems;
+    const defunctItem = items.find(
+      (item) => item.id === "temuan-defunct-indicator",
+    );
+    expect(defunctItem).toBeDefined();
+    expect(defunctItem!.indicatorName).toBe("Indikator lama/nonaktif");
+    expect(defunctItem!.ketidaksesuaian).toBe(
+      "Historical finding with inactive indicator",
+    );
+    expect(defunctItem!.no_tiket).toBe("T-DEFUNCT");
+    expect(items.length).toBeGreaterThanOrEqual(3);
+  });
+
   it("does not reset the selected service while a stale previous-service response is still loading", async () => {
     useApiMock.mockImplementation((path: string | null) => {
       const serviceType = path

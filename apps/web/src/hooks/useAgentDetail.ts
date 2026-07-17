@@ -237,7 +237,6 @@ export function useAgentDetail(agentId: string) {
         if (selectedService === "all") return true;
         return t.service_type === selectedService;
       })
-      .filter((t: any) => indicators?.some((i) => i.id === t.indicator_id))
       .map((t: any) => {
         const pi = periodMap.get(t.period_id) ?? { month: 0, year: 0 };
         const ind = indicators?.find((i) => i.id === t.indicator_id);
@@ -245,7 +244,7 @@ export function useAgentDetail(agentId: string) {
           id: t.id,
           month: pi.month,
           year: pi.year,
-          indicatorName: ind?.name ?? "",
+          indicatorName: ind?.name ?? "Indikator lama/nonaktif",
           category: ind?.category ?? "non_critical",
           nilai: t.nilai ?? 0,
           ketidaksesuaian: t.ketidaksesuaian ?? null,
