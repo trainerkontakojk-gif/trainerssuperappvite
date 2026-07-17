@@ -84,6 +84,16 @@ Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi buil
 | `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key    |
 | `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all |
 
+### Catatan FFmpeg (Telefun Recording Remux)
+
+**FFmpeg wajib tersedia di container deployment Railway** untuk meremux recording audio Telefun agar seekable (play/pause/seek). Set env var berikut di **Telefun service** Railway:
+
+| Variable                       | Value      | Notes                                                              |
+| ------------------------------ | ---------- | ------------------------------------------------------------------ |
+| `RAILPACK_DEPLOY_APT_PACKAGES` | `ffmpeg`   | Menginstal FFmpeg di container build-time via Nixpacks apt-get     |
+
+Setelah remux berhasil, player menggunakan signed URL persisten; jika gagal, blob URL asli digunakan sebagai fallback. Lihat `docs/telefun.md` untuk detail implementasi remux.
+
 ### Catatan Penting: VITE_API_URL
 
 **VITE_API_URL harus suffix `/api/v1`**, bukan hanya domain API. Alasan:

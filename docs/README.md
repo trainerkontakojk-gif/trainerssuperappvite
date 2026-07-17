@@ -21,6 +21,8 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 
 - `README.md`: Ringkasan produk, setup lokal, env, dan command operasional.
 - `docs/architecture.md`: Arsitektur Monorepo (Vite + Hono + Supabase/AI), struktur folder, pola data flow, dan workflow verifikasi.
+- `docs/AGENT_WORKFLOW.md`: Agent context workflow — hierarki sumber kebenaran, aturan konflik, dan checklist wajib.
+- `docs/PHASE_PROGRESS.md`: Riwayat lengkap fase pengembangan (arsip historis dari `AGENTS.md`).
 - `docs/modules.md`: Status fitur per modul: Dashboard, KETIK, PDKT, TELEFUN, Profiler/KTP, dan SIDAK.
 - `docs/auth-rbac.md`: Role, approval akun, route guard, dan kontrak `profiles`.
 - `docs/auth-callback.md`: OAuth Google callback flow dan error handling.
