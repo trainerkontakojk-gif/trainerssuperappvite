@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   Minus,
   ShieldAlert,
   TrendingDown,
@@ -6,10 +7,12 @@ import {
   Trophy,
   type LucideIcon,
 } from "lucide-react";
+import { useState, useId } from "react";
 import type {
   SidakAgentForecastQuickview,
   SidakAgentQuickviewResponse,
   SidakAgentRankQuickview,
+  TiedPeerInfo,
 } from "@trainers/types";
 
 const RANKING_BASIS_NOTE =
@@ -50,6 +53,76 @@ interface RankMetricProps {
   sameAsCombined?: boolean;
 }
 
+function buildTieText(
+  rank: number,
+  peers: TiedPeerInfo[],
+): { summary: string; disclosure: boolean } {
+  if (peers.length === 1) {
+    return {
+      summary: `Berbagi peringkat ${rank} dengan ${peers[0].nama}`,
+      disclosure: false,
+    };
+  }
+  if (peers.length === 2) {
+    return {
+      summary: `Berbagi peringkat ${rank} dengan ${peers[0].nama} dan ${peers[1].nama}`,
+      disclosure: false,
+    };
+  }
+  // 3+ peers — collapsed
+  return {
+    summary: `Berbagi peringkat ${rank} dengan ${peers[0].nama} dan ${peers.length - 1} agen lain`,
+    disclosure: true,
+  };
+}
+
+function TieDisclosure({
+  peers,
+  rank,
+}: {
+  peers: TiedPeerInfo[];
+  rank: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+
+  return (
+    <div className="mt-0.5">
+      <span className="text-xs text-muted-foreground">
+        Berbagi peringkat {rank} dengan {peers[0].nama} dan {peers.length - 1}{" "}
+        agen lain
+      </span>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        aria-label={
+          open
+            ? `Sembunyikan daftar agen yang berbagi peringkat ${rank}`
+            : `Lihat semua agen yang berbagi peringkat ${rank}`
+        }
+        onClick={() => setOpen(!open)}
+        className="ml-1 inline-flex items-center gap-0.5 text-xs font-medium text-primary"
+      >
+        {open ? "Sembunyikan" : "Lihat"}
+        <ChevronDown
+          aria-hidden="true"
+          className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <ul id={id} className="mt-1 space-y-0.5 rounded bg-muted/50 px-2 py-1">
+          {peers.map((peer) => (
+            <li key={peer.agentId} className="text-xs text-muted-foreground">
+              • {peer.nama}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function RankMetric({
   label,
   metric,
@@ -66,6 +139,16 @@ function RankMetric({
         : metric.total > 0
           ? "Agent belum masuk ranking pada konteks ini"
           : "Belum ada agent pembanding";
+
+  // ── Tie info ──
+  const tiedAgents = metric?.tiedAgents ?? null;
+  const hasTieData = tiedAgents !== null && tiedAgents !== undefined;
+  const tieCount = hasTieData ? tiedAgents.length : 0;
+  const hasTie = tieCount > 0;
+  const tieText =
+    hasTie && metric?.rank != null
+      ? buildTieText(metric.rank, tiedAgents!)
+      : null;
 
   return (
     <div
@@ -88,6 +171,13 @@ function RankMetric({
         ) : null}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{supportingText}</p>
+      {hasTie && tieCount <= 2 && tieText ? (
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {tieText.summary}
+        </p>
+      ) : hasTie && tieCount >= 3 && metric?.rank != null ? (
+        <TieDisclosure peers={tiedAgents!} rank={metric.rank} />
+      ) : null}
     </div>
   );
 }

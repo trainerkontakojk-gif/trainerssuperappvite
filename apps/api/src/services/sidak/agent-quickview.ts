@@ -120,6 +120,18 @@ async function getRankForFolder(params: {
     scopeId: params.folder.id,
     scopeLabel: params.folder.name,
     basis: "least_findings_ytd",
+    tiedAgents: viewedAgent
+      ? dashboard.topAgents
+          .filter(
+            (agent) =>
+              agent.agentId !== params.agentId &&
+              agent.defects === viewedAgent.defects,
+          )
+          .map((agent) => ({
+            agentId: agent.agentId,
+            nama: agent.nama,
+          }))
+      : null,
   };
 }
 

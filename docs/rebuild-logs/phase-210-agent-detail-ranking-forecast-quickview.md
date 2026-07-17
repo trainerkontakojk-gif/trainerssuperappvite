@@ -2,7 +2,7 @@
 
 **Status:** DONE
 **Date:** 2026-07-16
-**Tests:** Focused verification: 45 passed (22 API + 23 web)
+**Tests:** Follow-up verification: API 22, AgentPerformance 24, combined web regression 31 (24+3+3+1)
 
 ## Summary
 
@@ -12,33 +12,52 @@ Menambahkan quickview rail pada halaman `/sidak/agents/:id` yang menampilkan per
 
 ### Source
 
-| File | Change |
-|------|--------|
-| `packages/types/src/sidak.ts` | Tambah `SidakAgentRankQuickview`, `SidakAgentForecastQuickview`, `SidakAgentQuickviewResponse` |
-| `apps/api/src/services/sidak/agent-quickview.ts` | Service baru: `getSidakAgentQuickview()` — resolve folder, ranking via `getDashboardData()`, forecast via `generateSidakAgentForecast()`, `Promise.allSettled` partial failure |
-| `apps/api/src/services/sidak-service.ts` | Re-export via `export * from "./sidak/agent-quickview"` |
-| `apps/api/src/services/sidak/access-scope.ts` | `SidakFilterScope` type (digunakan bersama) |
-| `apps/api/src/routes/sidak/dashboard.ts` | Route baru `GET /agents/:id/quickview` dengan validasi query (year, service_type), guard accessibleAgentIds, delegasi ke service |
-| `apps/web/src/hooks/useAgentQuickview.ts` | Hook baru: request path builder, stale context suppression via `matchesContext`, error/loading management |
-| `apps/web/src/components/sidak/AgentPerformanceQuickview.tsx` | Komponen baru: ranking rail 2 cohort + forecast + skeleton + error state + ranking basis note |
-| `apps/web/src/components/sidak/AgentProfileBar.tsx` | Props baru `quickviewData/quickviewLoading/quickviewError`, render `AgentPerformanceQuickview` |
-| `apps/web/src/routes/sidak/agents.$id.tsx` | Integrasi `useAgentQuickview(id, selectedYear, selectedService)`, refresh bersamaan dengan dossier |
+| File                                                          | Change                                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/types/src/sidak.ts`                                 | Tambah `SidakAgentRankQuickview`, `SidakAgentForecastQuickview`, `SidakAgentQuickviewResponse`                                                                                 |
+| `apps/api/src/services/sidak/agent-quickview.ts`              | Service baru: `getSidakAgentQuickview()` — resolve folder, ranking via `getDashboardData()`, forecast via `generateSidakAgentForecast()`, `Promise.allSettled` partial failure |
+| `apps/api/src/services/sidak-service.ts`                      | Re-export via `export * from "./sidak/agent-quickview"`                                                                                                                        |
+| `apps/api/src/services/sidak/access-scope.ts`                 | `SidakFilterScope` type (digunakan bersama)                                                                                                                                    |
+| `apps/api/src/routes/sidak/dashboard.ts`                      | Route baru `GET /agents/:id/quickview` dengan validasi query (year, service_type), guard accessibleAgentIds, delegasi ke service                                               |
+| `apps/web/src/hooks/useAgentQuickview.ts`                     | Hook baru: request path builder, stale context suppression via `matchesContext`, error/loading management                                                                      |
+| `apps/web/src/components/sidak/AgentPerformanceQuickview.tsx` | Komponen baru: ranking rail 2 cohort + forecast + skeleton + error state + ranking basis note                                                                                  |
+| `apps/web/src/components/sidak/AgentProfileBar.tsx`           | Props baru `quickviewData/quickviewLoading/quickviewError`, render `AgentPerformanceQuickview`                                                                                 |
+| `apps/web/src/routes/sidak/agents.$id.tsx`                    | Integrasi `useAgentQuickview(id, selectedYear, selectedService)`, refresh bersamaan dengan dossier                                                                             |
 
 ### Tests
 
-| File | Tests | Coverage |
-|------|-------|----------|
-| `apps/api/src/__tests__/sidak-agent-quickview.test.ts` | 16 | Service contract, rank resolution, tie semantics, access rejection (inaccessible + deny-all), folder resolution (duplicate child + parent match), scope filtering (filterScope), forecast mapping (4 status), partial failure (rank reject + forecast reject + folder reject), combined=leader dedup |
-| `apps/api/src/__tests__/sidak-agent-quickview-route.test.ts` | 6 | 200 forwarding, 403 for inaccessible agent, 403 for empty leader scope, 400 for invalid year, 400 for unsupported service_type, 404 envelope |
-| `apps/web/src/__tests__/useAgentQuickview.test.tsx` | 5 | Request path, stale service response suppress, stale error clear on context change, empty service no request, error clear on deselection |
-| `apps/web/src/__tests__/AgentPerformanceQuickview.test.tsx` | 15 | Full render (rank + forecast + basis note), loading skeleton, null rank + total=0, partial failure unavailable state, insufficient forecast, calm error (no raw message), same-cohort label, mobile grid class, forecast icons per status |
-| `apps/web/src/__tests__/AgentProfileBar.test.tsx` | 3 | Quickview fixture pass-through ke komponen, props contract |
+| File                                                         | Tests | Coverage                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------ | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/__tests__/sidak-agent-quickview.test.ts`       | 16    | Service contract, rank resolution, tie semantics, access rejection (inaccessible + deny-all), folder resolution (duplicate child + parent match), scope filtering (filterScope), forecast mapping (4 status), partial failure (rank reject + forecast reject + folder reject), combined=leader dedup                                                       |
+| `apps/api/src/__tests__/sidak-agent-quickview-route.test.ts` | 6     | 200 forwarding, 403 for inaccessible agent, 403 for empty leader scope, 400 for invalid year, 400 for unsupported service_type, 404 envelope                                                                                                                                                                                                               |
+| `apps/web/src/__tests__/useAgentQuickview.test.tsx`          | 5     | Request path, stale service response suppress, stale error clear on context change, empty service no request, error clear on deselection                                                                                                                                                                                                                   |
+| `apps/web/src/__tests__/AgentPerformanceQuickview.test.tsx`  | 24    | Full render (rank + forecast + basis note), loading skeleton, null rank + total=0, partial failure unavailable state, insufficient forecast, calm error (no raw message), same-cohort label, mobile grid class, forecast icons per status, tied peer semantics (1/2/3+), empty/null/undefined tiedAgents, disclosure expand, accessibility aria assertions |
+| `apps/web/src/__tests__/AgentProfileBar.test.tsx`            | 3     | Quickview fixture pass-through ke komponen, props contract                                                                                                                                                                                                                                                                                                 |
 
 ### Documentation
 
-| File | Change |
-|------|--------|
+| File                              | Change                                                                                                                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/SIDAK_LOGIC_AND_SCORING.md` | Replace section "Agent Detail Ranking and Forecast Quickview" (lines 335–366) dengan endpoint contract, scope ranking detail, forecast 3 bulan, partial/failure states, security scoping, arsitektur table, test coverage table |
+
+## UI Details
+
+- **Tied peers**: 1/2 peers — inline text; 3+ peers — collapsed `TieDisclosure` with expand/collapse button.
+- **Accessibility**: `aria-expanded`, `aria-controls`, `aria-label` on tie disclosure toggle; `aria-label` per cohort and forecast segment.
+- **Mobile**: `grid-cols-1 md:grid-cols-3` — vertical on mobile, 3-column on md+ ; no horizontal scroll.
+- **No comparison**: Quickview is display-only; no comparison toggle/switch unlike Agent Detail benchmark table.
+- **No ranking/dashboard/forecast change**: Read-only; quickview does not mutate DB, cache, or affect any other page state.
+
+## Verification
+
+| Verification             | Result                                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| API focused              | 22 passed                                                                                            |
+| AgentPerformance focused | 24 passed                                                                                            |
+| Combined web regression  | 31 passed (24 AgentPerformanceQuickview + 3 AgentProfileBar + 3 dashboard parity + 1 ranking parity) |
+| Build + lint             | Pass                                                                                                 |
+| `prettier --check docs/` | Pass                                                                                                 |
+| Manual visual QA         | Not yet done                                                                                         |
 
 ## Key Decisions
 

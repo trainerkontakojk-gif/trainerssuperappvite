@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type {
   SidakAgentForecastQuickview,
@@ -113,7 +114,9 @@ describe("AgentPerformanceQuickview", () => {
       const metric = screen.getByRole("group", {
         name: `${label}: belum tersedia`,
       });
-      expect(within(metric).getByText("Ranking belum tersedia")).toBeInTheDocument();
+      expect(
+        within(metric).getByText("Ranking belum tersedia"),
+      ).toBeInTheDocument();
       expect(
         within(metric).queryByText("Belum ada agent pembanding"),
       ).not.toBeInTheDocument();
@@ -181,7 +184,9 @@ describe("AgentPerformanceQuickview", () => {
     expect(
       within(metric).getByText("Forecast belum tersedia"),
     ).toBeInTheDocument();
-    expect(within(metric).queryByText("Data belum cukup")).not.toBeInTheDocument();
+    expect(
+      within(metric).queryByText("Data belum cukup"),
+    ).not.toBeInTheDocument();
     expect(
       within(metric).queryByText("Butuh minimal 2 periode audit"),
     ).not.toBeInTheDocument();
@@ -250,5 +255,178 @@ describe("AgentPerformanceQuickview", () => {
     });
     expect(within(metric).getByText(label)).toBeInTheDocument();
     expect(metric.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+  });
+
+  // ── Tie info fixtures ──
+  const tiedQuickview1: SidakAgentQuickviewResponse = {
+    ...quickviewFixture,
+    combinedTeam: {
+      ...quickviewFixture.combinedTeam!,
+      rank: 1,
+      total: 64,
+      tiedAgents: [{ agentId: "tania-002", nama: "Tania" }],
+    },
+  };
+
+  const tiedQuickview2: SidakAgentQuickviewResponse = {
+    ...quickviewFixture,
+    combinedTeam: {
+      ...quickviewFixture.combinedTeam!,
+      rank: 1,
+      total: 64,
+      tiedAgents: [
+        { agentId: "tania-002", nama: "Tania" },
+        { agentId: "budi-003", nama: "Budi" },
+      ],
+    },
+  };
+
+  const tiedQuickviewMany: SidakAgentQuickviewResponse = {
+    ...quickviewFixture,
+    combinedTeam: {
+      ...quickviewFixture.combinedTeam!,
+      rank: 2,
+      total: 64,
+      tiedAgents: [
+        { agentId: "tania-002", nama: "Tania" },
+        { agentId: "budi-003", nama: "Budi Santoso" },
+        { agentId: "siti-004", nama: "Siti Rahma" },
+        { agentId: "dimas-005", nama: "Dimas Putra" },
+      ],
+    },
+  };
+
+  // ── Tie 1 peer ──
+  it("shows 'Berbagi peringkat ... dengan {nama}' when 1 peer tied", () => {
+    renderQuickview({ data: tiedQuickview1 });
+
+    const metric = screen.getByRole("group", {
+      name: /Tim Gabungan: peringkat 1/,
+    });
+    expect(
+      within(metric).getByText("Berbagi peringkat 1 dengan Tania"),
+    ).toBeInTheDocument();
+    expect(within(metric).getByText("#1")).toBeInTheDocument();
+  });
+
+  // ── Tie 2 peer ──
+  it("shows '... dengan {nama1} dan {nama2}' when 2 peers tied", () => {
+    renderQuickview({ data: tiedQuickview2 });
+
+    const metric = screen.getByRole("group", {
+      name: /Tim Gabungan: peringkat 1/,
+    });
+    expect(
+      within(metric).getByText("Berbagi peringkat 1 dengan Tania dan Budi"),
+    ).toBeInTheDocument();
+  });
+
+  // ── Tie many (≥3) — collapsed ──
+  it("shows collapsed form when 3+ peers tied, with disclosure button", () => {
+    renderQuickview({ data: tiedQuickviewMany });
+
+    const metric = screen.getByRole("group", {
+      name: /Tim Gabungan: peringkat 2/,
+    });
+    expect(
+      within(metric).getByText(
+        "Berbagi peringkat 2 dengan Tania dan 3 agen lain",
+      ),
+    ).toBeInTheDocument();
+
+    const btn = within(metric).getByRole("button", {
+      name: /Lihat semua agen yang berbagi peringkat 2/,
+    });
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    expect(btn).toHaveAttribute("aria-controls");
+    expect(btn.getAttribute("aria-controls")).toBeTruthy();
+    expect(btn).toHaveAttribute(
+      "aria-label",
+      "Lihat semua agen yang berbagi peringkat 2",
+    );
+  });
+
+  // ── Tie many — expanded ──
+  it("shows all peer names when disclosure is expanded", async () => {
+    const user = userEvent.setup();
+    renderQuickview({ data: tiedQuickviewMany });
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /Lihat semua agen yang berbagi peringkat 2/,
+      }),
+    );
+
+    const btn = screen.getByRole("button", {
+      name: /Sembunyikan daftar agen yang berbagi peringkat 2/,
+    });
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    expect(btn).toHaveAttribute(
+      "aria-label",
+      "Sembunyikan daftar agen yang berbagi peringkat 2",
+    );
+    // aria-controls points to the rendered peers panel
+    const panelId = btn.getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId!)).toBeInTheDocument();
+
+    // All names visible (with bullet prefix in <li>)
+    expect(screen.getByText(/Budi Santoso/)).toBeInTheDocument();
+    expect(screen.getByText(/Siti Rahma/)).toBeInTheDocument();
+    expect(screen.getByText(/Dimas Putra/)).toBeInTheDocument();
+  });
+
+  // ── No tie (empty array) ──
+  it("does NOT render tie info when tiedAgents is empty array", () => {
+    renderQuickview({
+      data: {
+        ...quickviewFixture,
+        combinedTeam: {
+          ...quickviewFixture.combinedTeam!,
+          tiedAgents: [],
+        },
+      },
+    });
+    expect(screen.queryByText(/^Berbagi peringkat/)).not.toBeInTheDocument();
+  });
+
+  // ── Legacy (undefined) ──
+  it("does NOT render tie info when tiedAgents is undefined (legacy contract)", () => {
+    renderQuickview();
+    expect(screen.queryByText(/^Berbagi peringkat/)).not.toBeInTheDocument();
+  });
+
+  // ── Null (rank unavailable) ──
+  it("does NOT render tie info when tiedAgents is null", () => {
+    renderQuickview({
+      data: {
+        ...quickviewFixture,
+        combinedTeam: {
+          ...quickviewFixture.combinedTeam!,
+          rank: null,
+          total: 0,
+          tiedAgents: null,
+        },
+      },
+    });
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText(/^Berbagi peringkat/)).not.toBeInTheDocument();
+  });
+
+  // ── Tie info + ranking basis footnote coexist ──
+  it("tie info renders alongside the ranking-basis footnote", () => {
+    renderQuickview({ data: tiedQuickview1 });
+    expect(
+      screen.getByText(/Jumlah yang sama mendapat peringkat yang sama/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Berbagi peringkat 1 dengan Tania"),
+    ).toBeInTheDocument();
+  });
+
+  // ── Loading / null data: no stale tie ──
+  it("does NOT render tie info during loading state", () => {
+    renderQuickview({ data: null, loading: true });
+    expect(screen.queryByText(/^Berbagi peringkat/)).not.toBeInTheDocument();
   });
 });

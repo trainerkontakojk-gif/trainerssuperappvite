@@ -523,4 +523,240 @@ describe("getSidakAgentQuickview", () => {
     expect(result.combinedTeam).toEqual(result.leaderTeam);
     expect(result.combinedTeam?.scopeId).toBe("parent-call");
   });
+
+  describe("tiedAgents computation", () => {
+    it("returns tied peer (excluding the viewed agent) for a 1-peer tie", async () => {
+      mockDashboardByFolder({
+        "parent-call": [
+          {
+            agentId: "agent-1",
+            nama: "YBS",
+            batch: "X",
+            defects: 3,
+            score: 85,
+            hasCritical: false,
+          },
+          {
+            agentId: "tania-002",
+            nama: "Tania",
+            batch: "X",
+            defects: 3,
+            score: 85,
+            hasCritical: false,
+          },
+          {
+            agentId: "agent-3",
+            nama: "Agent 3",
+            batch: "X",
+            defects: 5,
+            score: 75,
+            hasCritical: true,
+          },
+        ],
+        "leader-dimas": rankedLeaderWorstFirst,
+      });
+
+      const result = await getSidakAgentQuickview(baseParams);
+
+      expect(result.combinedTeam?.rank).toBe(1);
+      expect(result.combinedTeam?.tiedAgents).toEqual([
+        { agentId: "tania-002", nama: "Tania" },
+      ]);
+    });
+
+    it("returns empty array when no tie exists (singleton)", async () => {
+      mockDashboardByFolder({
+        "parent-call": [
+          {
+            agentId: "agent-1",
+            nama: "YBS",
+            batch: "X",
+            defects: 1,
+            score: 95,
+            hasCritical: false,
+          },
+          {
+            agentId: "agent-2",
+            nama: "Agent 2",
+            batch: "X",
+            defects: 3,
+            score: 85,
+            hasCritical: false,
+          },
+          {
+            agentId: "agent-3",
+            nama: "Agent 3",
+            batch: "X",
+            defects: 5,
+            score: 75,
+            hasCritical: true,
+          },
+        ],
+        "leader-dimas": rankedLeaderWorstFirst,
+      });
+
+      const result = await getSidakAgentQuickview(baseParams);
+
+      expect(result.combinedTeam?.tiedAgents).toEqual([]);
+    });
+
+    it("excludes viewed agent and returns all other tied peers (3+ tie)", async () => {
+      mockDashboardByFolder({
+        "parent-call": [
+          {
+            agentId: "agent-1",
+            nama: "YBS",
+            batch: "X",
+            defects: 2,
+            score: 90,
+            hasCritical: false,
+          },
+          {
+            agentId: "tania-002",
+            nama: "Tania",
+            batch: "X",
+            defects: 2,
+            score: 90,
+            hasCritical: false,
+          },
+          {
+            agentId: "budi-003",
+            nama: "Budi Santoso",
+            batch: "X",
+            defects: 2,
+            score: 85,
+            hasCritical: false,
+          },
+          {
+            agentId: "siti-004",
+            nama: "Siti Rahma",
+            batch: "X",
+            defects: 2,
+            score: 85,
+            hasCritical: false,
+          },
+          {
+            agentId: "agent-5",
+            nama: "Agent 5",
+            batch: "X",
+            defects: 5,
+            score: 75,
+            hasCritical: true,
+          },
+        ],
+        "leader-dimas": rankedLeaderWorstFirst,
+      });
+
+      const result = await getSidakAgentQuickview(baseParams);
+
+      expect(result.combinedTeam?.rank).toBe(1);
+      expect(result.combinedTeam?.tiedAgents).toHaveLength(3);
+      expect(result.combinedTeam?.tiedAgents).toEqual(
+        expect.arrayContaining([
+          { agentId: "tania-002", nama: "Tania" },
+          { agentId: "budi-003", nama: "Budi Santoso" },
+          { agentId: "siti-004", nama: "Siti Rahma" },
+        ]),
+      );
+      // Ensure viewed agent is NOT in the list
+      expect(
+        result.combinedTeam?.tiedAgents?.find((a) => a.agentId === "agent-1"),
+      ).toBeUndefined();
+    });
+
+    it("returns null tiedAgents when agent is not found in topAgents (rank null)", async () => {
+      // agent-1 not in topAgents
+      mockDashboardByFolder({
+        "parent-call": [
+          {
+            agentId: "other-1",
+            nama: "Other",
+            batch: "X",
+            defects: 1,
+            score: 90,
+            hasCritical: false,
+          },
+        ],
+        "leader-dimas": [
+          {
+            agentId: "other-1",
+            nama: "Other",
+            batch: "X",
+            defects: 1,
+            score: 90,
+            hasCritical: false,
+          },
+        ],
+      });
+
+      const result = await getSidakAgentQuickview(baseParams);
+
+      expect(result.combinedTeam?.rank).toBeNull();
+      expect(result.combinedTeam?.tiedAgents).toBeNull();
+    });
+
+    it("returns null tiedAgents when combined ranking segment fails", async () => {
+      vi.mocked(getDashboardData).mockImplementation(async (params) => {
+        if (params.folder_ids?.[0] === "parent-call") {
+          throw new Error("combined ranking unavailable");
+        }
+        return {
+          topAgents: rankedLeaderWorstFirst,
+        } as Awaited<ReturnType<typeof getDashboardData>>;
+      });
+
+      const result = await getSidakAgentQuickview(baseParams);
+
+      expect(result.combinedTeam).toBeNull();
+    });
+
+    it("maintains deterministic order (defects descending, then nama ascending)", async () => {
+      mockDashboardByFolder({
+        "parent-call": [
+          {
+            agentId: "z-001",
+            nama: "Zeta",
+            batch: "X",
+            defects: 3,
+            score: 80,
+            hasCritical: false,
+          },
+          {
+            agentId: "agent-1",
+            nama: "YBS",
+            batch: "X",
+            defects: 1,
+            score: 95,
+            hasCritical: false,
+          },
+          {
+            agentId: "a-001",
+            nama: "Alpha",
+            batch: "X",
+            defects: 1,
+            score: 90,
+            hasCritical: false,
+          },
+          {
+            agentId: "b-001",
+            nama: "Beta",
+            batch: "X",
+            defects: 1,
+            score: 85,
+            hasCritical: false,
+          },
+        ],
+        "leader-dimas": rankedLeaderWorstFirst,
+      });
+
+      const result = await getSidakAgentQuickview(baseParams);
+
+      // YBS has defects=1, same as Alpha and Beta — tied group: Alpha, Beta
+      // Order should be alphabetical: Alpha, Beta
+      expect(result.combinedTeam?.tiedAgents).toEqual([
+        { agentId: "a-001", nama: "Alpha" },
+        { agentId: "b-001", nama: "Beta" },
+      ]);
+    });
+  });
 });

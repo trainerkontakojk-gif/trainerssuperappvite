@@ -407,12 +407,23 @@ export interface SidakAgentForecastResponse {
   summary: SidakAgentForecastSummary;
 }
 
+/** Informasi singkat agen yang berbagi peringkat (tie). */
+export interface TiedPeerInfo {
+  agentId: string;
+  nama: string;
+}
+
 export interface SidakAgentRankQuickview {
   rank: number | null;
   total: number;
   scopeId: string | null;
   scopeLabel: string;
   basis: "least_findings_ytd";
+  /** Agen-agen lain yang berbagi peringkat yang sama (tidak termasuk agent
+   *  yang sedang dilihat). `null/undefined` ketika data rank tidak tersedia.
+   *  `[]` berarti tidak ada tie. Urutan deterministik: mengikuti urutan
+   *  dashboard (defects descending, nama ascending setelah exclude viewedAgent). */
+  tiedAgents?: TiedPeerInfo[] | null;
 }
 
 export interface SidakAgentForecastQuickview {
