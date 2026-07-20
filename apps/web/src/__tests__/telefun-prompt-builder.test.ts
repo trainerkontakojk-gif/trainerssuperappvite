@@ -17,6 +17,43 @@ function makeConsumerType(
 }
 
 describe("buildTelefunLiveSystemInstruction", () => {
+  it("uses stable consumer IDs, rich descriptions, and the runtime control contract", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: {
+        name: "Siti",
+        gender: "female",
+        phone: "0812",
+        city: "Bandung",
+        voiceName: "Kore",
+        signatureName: "",
+      },
+      scenario: {
+        id: "a",
+        title: "A",
+        instruction: "X",
+        script: "Agent: Ada yang bisa dibantu?",
+        isActive: true,
+      },
+      consumerType: makeConsumerType({
+        id: "marah",
+        name: "Nama tanpa kata kunci",
+        description: "Detail persona kaya yang wajib dipertahankan.",
+      }),
+      responsePacingMode: "realistic",
+    });
+
+    expect(prompt).toContain("EMOSI: MARAH/KESAL");
+    expect(prompt).toContain("Detail persona kaya yang wajib dipertahankan.");
+    expect(prompt).toContain("TELEFUN_CONTROL:TIME_CUE");
+    expect(prompt).toContain("FAKTA DAN INTI SKENARIO (WAJIB)");
+    expect(prompt).toContain("URUTAN PERCAKAPAN (FLEKSIBEL)");
+    expect(prompt).toContain("ATURAN KELANJUTAN DAN PENUTUPAN");
+    expect(prompt).not.toContain("(<30 detik)");
+    expect(prompt).not.toContain("(30-45 detik)");
+    expect(prompt).not.toContain("Gunakan suara wanita");
+    expect(prompt).not.toContain("Pertahankan pitch");
+  });
+
   it("includes ROLEPLAY and identity", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: {
@@ -38,7 +75,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
         description: "Marah dan menuntut solusi.",
       }),
       responsePacingMode: "realistic",
-      maxCallDuration: 5,
     });
     expect(prompt).toContain("ROLEPLAY");
     expect(prompt).toContain("Siti Rahayu");
@@ -48,11 +84,17 @@ describe("buildTelefunLiveSystemInstruction", () => {
 
   it("includes only selected contextual challenges", () => {
     const prompt = buildTelefunLiveSystemInstruction({
-      identity: { name: "Siti", gender: "female", phone: "0812", city: "Bandung", voiceName: "Kore", signatureName: "" },
+      identity: {
+        name: "Siti",
+        gender: "female",
+        phone: "0812",
+        city: "Bandung",
+        voiceName: "Kore",
+        signatureName: "",
+      },
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 5,
       simulationChallengeTypes: ["interruption", "misunderstanding"],
     });
 
@@ -65,11 +107,17 @@ describe("buildTelefunLiveSystemInstruction", () => {
 
   it("omits the challenge section when no challenge is selected", () => {
     const prompt = buildTelefunLiveSystemInstruction({
-      identity: { name: "Budi", gender: "male", phone: "0811", city: "Jakarta", voiceName: "Fenrir", signatureName: "" },
+      identity: {
+        name: "Budi",
+        gender: "male",
+        phone: "0811",
+        city: "Jakarta",
+        voiceName: "Fenrir",
+        signatureName: "",
+      },
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "training_fast",
-      maxCallDuration: 0,
       simulationChallengeTypes: [],
     });
 
@@ -79,20 +127,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
   });
 
   it("allows contextual interruption only when that challenge is selected", () => {
-    const prompt = buildTelefunLiveSystemInstruction({
-      identity: { name: "Budi", gender: "male", phone: "0811", city: "Jakarta", voiceName: "Fenrir", signatureName: "" },
-      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
-      consumerType: makeConsumerType(),
-      responsePacingMode: "realistic",
-      maxCallDuration: 0,
-      simulationChallengeTypes: ["interruption"],
-    });
-
-    expect(prompt).toContain("MENYELA KONDISIONAL");
-    expect(prompt).not.toContain("JANGAN MENYELA AGEN");
-  });
-
-  it("includes KONSISTENSI SUARA section", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: {
         name: "Budi",
@@ -105,11 +139,31 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
+      simulationChallengeTypes: ["interruption"],
     });
-    expect(prompt).toContain("KONSISTENSI SUARA");
-    expect(prompt).toContain("JANGAN BERUBAH MENJADI LAWAN JENIS");
-    expect(prompt).toContain("JANGAN meniru atau menyesuaikan suara");
+
+    expect(prompt).toContain("MENYELA KONDISIONAL");
+    expect(prompt).not.toContain("JANGAN MENYELA AGEN");
+  });
+
+  it("keeps gender as character context while runtime controls the voice", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: {
+        name: "Budi",
+        gender: "male",
+        phone: "0811",
+        city: "Jakarta",
+        voiceName: "Fenrir",
+        signatureName: "",
+      },
+      scenario: { id: "a", title: "A", instruction: "X", isActive: true },
+      consumerType: makeConsumerType(),
+      responsePacingMode: "realistic",
+    });
+    expect(prompt).toContain("KONSISTENSI KARAKTER");
+    expect(prompt).toContain("KARAKTER: PRIA");
+    expect(prompt).toContain("Pemilihan voice teknis diatur aplikasi");
+    expect(prompt).not.toContain("Pertahankan pitch");
   });
 
   it("includes ATURAN ROLEPLAY section", () => {
@@ -125,7 +179,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("ATURAN ROLEPLAY");
     expect(prompt).toContain("JANGAN PERNAH MENAWARKAN BANTUAN");
@@ -134,7 +187,7 @@ describe("buildTelefunLiveSystemInstruction", () => {
     );
   });
 
-  it("includes expanded ATURAN BICARA with 6 rules", () => {
+  it("keeps speaking and closing rules in their dedicated sections", () => {
     const prompt = buildTelefunLiveSystemInstruction({
       identity: {
         name: "X",
@@ -147,12 +200,12 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("JANGAN PERNAH BERHENTI MENDADAK");
     expect(prompt).toContain("Abaikan suara bising kecil");
     expect(prompt).toContain("JANGAN MENYELA AGEN");
-    expect(prompt).toContain("JANGAN MENGAKHIRI PERCAKAPAN HANYA KARENA");
+    expect(prompt).toContain("ATURAN KELANJUTAN DAN PENUTUPAN");
+    expect(prompt).toContain("respons singkat");
   });
 
   it("emotion instruction for marah consumer", () => {
@@ -167,11 +220,11 @@ describe("buildTelefunLiveSystemInstruction", () => {
       },
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType({
+        id: "marah",
         name: "Marah & Emosional",
         description: "Marah.",
       }),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("EMOSI: MARAH/KESAL");
     expect(prompt).toContain("Nada tinggi dan cepat");
@@ -189,11 +242,11 @@ describe("buildTelefunLiveSystemInstruction", () => {
       },
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType({
+        id: "bingung",
         name: "Bingung & Gaptek",
         description: "Bingung.",
       }),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("EMOSI: BINGUNG/GAPTEK");
     expect(prompt).toContain("Bicara lambat");
@@ -212,11 +265,11 @@ describe("buildTelefunLiveSystemInstruction", () => {
       },
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType({
+        id: "pasrah",
         name: "Pasrah & Sedih",
         description: "Sedih.",
       }),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("EMOSI: SEDIH/PASRAH");
     expect(prompt).toContain("Bicara pelan, nada rendah");
@@ -235,7 +288,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("TEMPO RESPONS (REALISTIS)");
     expect(prompt).toContain(
@@ -256,7 +308,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "training_fast",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("TEMPO RESPONS (LATIHAN CEPAT)");
   });
@@ -274,12 +325,11 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 5,
     });
     expect(prompt).not.toContain("BATAS WAKTU");
     expect(prompt).not.toContain("MESKIPUN SKRIP BELUM SELESAI");
     expect(prompt).toContain(
-      "JANGAN menutup telepon berdasarkan perkiraan waktu sendiri",
+      "Jangan menutup berdasarkan perkiraan waktu sendiri",
     );
   });
 
@@ -301,15 +351,13 @@ describe("buildTelefunLiveSystemInstruction", () => {
       },
       consumerType: makeConsumerType({ name: "Netral" }),
       responsePacingMode: "realistic",
-      maxCallDuration: 15,
     });
 
-    expect(prompt).toContain("ATURAN PENYELESAIAN MASALAH");
+    expect(prompt).toContain("ATURAN KELANJUTAN DAN PENUTUPAN");
     expect(prompt).toContain("solusi awal");
     expect(prompt).toContain("website/link/form laporan");
-    expect(prompt).toContain("penjelasan agen terdengar cukup");
-    expect(prompt).toContain("JANGAN mengatakan \"terima kasih, saya tutup dulu\"");
-    expect(prompt).toContain("tunggu sampai aplikasi memberi instruksi penutup");
+    expect(prompt).toContain("penjelasan yang baru terdengar cukup");
+    expect(prompt).toContain("[TELEFUN_CONTROL:TIME_CUE]");
     expect(prompt).not.toContain("15 menit");
     expect(prompt).not.toContain("900 detik");
   });
@@ -333,7 +381,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("FORMAT DIALOG");
     expect(prompt).toContain("FORMAT POIN ALUR");
@@ -354,14 +401,13 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("SILENT HANDLING");
     expect(prompt).toContain("tunggu dengan sabar");
     expect(prompt).toContain("Jangan mengulang panggilan berkali-kali");
-    expect(prompt).toContain("Jangan mengakhiri sesi hanya karena agen diam");
-    expect(prompt).toContain("(<30 detik)");
-    expect(prompt).toContain("(30-45 detik)");
+    expect(prompt).toContain("Jika jeda terasa cukup lama");
+    expect(prompt).not.toContain("(<30 detik)");
+    expect(prompt).not.toContain("(30-45 detik)");
     expect(prompt).not.toContain("(<10 detik)");
     expect(prompt).not.toContain("(10-15 detik)");
   });
@@ -379,7 +425,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "training_fast",
-      maxCallDuration: 0,
     });
     expect(prompt).not.toContain("SILENT HANDLING");
   });
@@ -397,13 +442,14 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).toContain("ATURAN KEPATUHAN PROSEDURAL");
     expect(prompt).toContain("boleh saya hold?");
     expect(prompt).toContain("Iya silakan");
     expect(prompt).toContain("mencatat informasi");
-    expect(prompt).toContain("BUKAN berarti masalah Anda selesai");
+    expect(prompt).toContain(
+      "Mengikuti prosedur agen bukan berarti masalah selesai",
+    );
     expect(prompt).toContain("Konsumen NORMAL akan mengikuti");
     expect(prompt).toContain("SETELAH HOLD");
     expect(prompt).toContain("Halo? Masih ada?");
@@ -424,7 +470,6 @@ describe("buildTelefunLiveSystemInstruction", () => {
       scenario: { id: "a", title: "A", instruction: "X", isActive: true },
       consumerType: makeConsumerType(),
       responsePacingMode: "realistic",
-      maxCallDuration: 0,
     });
     expect(prompt).not.toContain("SKRIP PERCAKAPAN");
   });
@@ -450,13 +495,12 @@ describe("duration and time cue prompt", () => {
       },
       consumerType: makeConsumerType({ name: "Netral" }),
       responsePacingMode: "realistic",
-      maxCallDuration: 5,
     });
 
     expect(text).not.toContain("BATAS WAKTU");
     expect(text).not.toContain("merasa percakapan sudah mendekati");
     expect(text).toContain(
-      "JANGAN menutup telepon berdasarkan perkiraan waktu sendiri",
+      "Jangan menutup berdasarkan perkiraan waktu sendiri",
     );
   });
 });
@@ -464,17 +508,19 @@ describe("duration and time cue prompt", () => {
 describe("getTimeCueInstruction", () => {
   it("high urgency for <=20s with marah tone", () => {
     const text = getTimeCueInstruction(
-      makeConsumerType({ name: "Marah & Emosional" }),
+      makeConsumerType({ id: "marah", name: "Marah & Emosional" }),
       15,
     );
     expect(text).toContain("PRIORITAS TINGGI");
+    expect(text).toContain("[TELEFUN_CONTROL:TIME_CUE]");
+    expect(text).not.toContain("INSTRUKSI SISTEM");
     expect(text).toContain("menutup telepon sekarang secara natural");
     expect(text).toContain("Jangan sebutkan timer");
   });
 
   it("mid urgency for 45s seconds with gaptek tone", () => {
     const text = getTimeCueInstruction(
-      makeConsumerType({ name: "Bingung & Gaptek" }),
+      makeConsumerType({ id: "bingung", name: "Bingung & Gaptek" }),
       45,
     );
     expect(text).toContain("PERSIAPAN PENUTUP");

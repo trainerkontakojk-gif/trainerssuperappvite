@@ -763,7 +763,7 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
       if (
         !item ||
         item.type !== "message" ||
-        item.role !== "user" ||
+        (item.role !== "user" && item.role !== "system") ||
         !content ||
         content.length === 0 ||
         !content.every(
@@ -777,11 +777,21 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
         this.rejectClientEvent(eventType, "invalid_payload");
         return null;
       }
+      if (
+        item.role === "system" &&
+        (content.length !== 1 ||
+          !String((content[0] as Record<string, unknown>).text).startsWith(
+            "[TELEFUN_CONTROL:TIME_CUE]",
+          ))
+      ) {
+        this.rejectClientEvent(eventType, "invalid_payload");
+        return null;
+      }
       return {
         type: value.type,
         item: {
           type: "message",
-          role: "user",
+          role: item.role,
           content: content.map((part) => ({
             type: "input_text",
             text: (part as Record<string, unknown>).text,

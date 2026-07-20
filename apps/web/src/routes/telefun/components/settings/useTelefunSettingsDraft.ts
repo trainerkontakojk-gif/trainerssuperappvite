@@ -57,9 +57,7 @@ function resolveAvailableModel(
   if (
     selectedModel.model.provider === "openai" &&
     !isOpenAIReady(providerReadiness) &&
-    !(
-      providerReadiness.status === "loading" && isPersistedOpenAISelection
-    )
+    !(providerReadiness.status === "loading" && isPersistedOpenAISelection)
   ) {
     return normalizeTelefunLiveModelSelection(DEFAULT_TELEFUN_LIVE_MODEL_ID);
   }
@@ -105,6 +103,8 @@ export function buildTelefunSettingsForSave(params: {
     .realisticModeEnabled;
   delete (settingsToSave as unknown as Record<string, unknown>)
     .realisticModeDisruptionTypes;
+  delete (settingsToSave as unknown as Record<string, unknown>)
+    .systemInstruction;
   return settingsToSave;
 }
 

@@ -16,6 +16,7 @@ import {
   buildTelefunAuthMessage,
   getTelefunAudioConfiguration,
 } from "../routes/telefun/services/liveProtocol";
+import * as liveProtocol from "../routes/telefun/services/liveProtocol";
 import { TELEFUN_CONFIGURATION_CLOSE_CODE } from "@trainers/types";
 import { resolveFinalIdentity } from "../routes/telefun/telefunSettings";
 import {
@@ -24,6 +25,22 @@ import {
 } from "../routes/telefun/telefunVoiceRegistry";
 
 describe("telefun live protocol", () => {
+  it("exposes provider-specific runtime control message builders", () => {
+    expect(liveProtocol).toHaveProperty("buildGeminiRealtimeTextMessage");
+    expect(liveProtocol).toHaveProperty("buildOpenAiSystemInputItem");
+    expect(
+      liveProtocol.buildGeminiRealtimeTextMessage("[TELEFUN_CONTROL:TIME_CUE]"),
+    ).toEqual({
+      realtimeInput: { text: "[TELEFUN_CONTROL:TIME_CUE]" },
+    });
+    expect(
+      liveProtocol.buildOpenAiSystemInputItem("[TELEFUN_CONTROL:TIME_CUE]"),
+    ).toMatchObject({
+      type: "conversation.item.create",
+      item: { role: "system" },
+    });
+  });
+
   it("builds the first-message authentication frame without query concerns", () => {
     expect(buildTelefunAuthMessage("token-1", "session-1")).toEqual({
       type: "authenticate",

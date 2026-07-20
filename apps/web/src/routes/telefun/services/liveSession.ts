@@ -28,7 +28,8 @@ import {
   getTelefunAudioConfiguration,
   buildTelefunSessionConfigure,
   buildOpenAiInputAudioAppend,
-  buildOpenAiTextInputItem,
+  buildOpenAiSystemInputItem,
+  buildGeminiRealtimeTextMessage,
   buildOpenAiResponseCreate,
   buildOpenAiResponseCancel,
   buildOpenAiConversationItemTruncate,
@@ -513,10 +514,7 @@ export class LiveSession {
     if (sendCancel && hadActiveResponse) {
       this.sendOpenAiEvent(buildOpenAiResponseCancel());
     }
-    if (
-      playedSegment &&
-      !this.openAiTruncatedItems.has(playedSegment.itemId)
-    ) {
+    if (playedSegment && !this.openAiTruncatedItems.has(playedSegment.itemId)) {
       this.openAiTruncatedItems.add(playedSegment.itemId);
       this.sendOpenAiEvent(
         buildOpenAiConversationItemTruncate({
@@ -795,8 +793,7 @@ export class LiveSession {
       if (this.activeSources.size === 0 && this.pendingTurnCompletion) {
         if (
           this.config.telefunTransport === "openai-audio" &&
-          this.openAiPendingCompletionResponseId ===
-            this.openAiActiveResponseId
+          this.openAiPendingCompletionResponseId === this.openAiActiveResponseId
         ) {
           this.finishOpenAiPlaybackCompletion();
         } else if (this.config.telefunTransport === "gemini-live") {
@@ -861,7 +858,6 @@ export class LiveSession {
       consumerType:
         this.config.activeConsumerType ?? this.config.consumerTypes[0],
       responsePacingMode: this.config.responsePacingMode || "realistic",
-      maxCallDuration: this.config.maxCallDuration || 0,
       simulationChallengeTypes: this.config.simulationChallengeTypes,
     });
 
@@ -908,23 +904,6 @@ export class LiveSession {
     if (!setup) return;
     this.ws.send(JSON.stringify(setup));
     this.emitTimelineEvent("setup_sent");
-  }
-
-  private sendPrompt(text: string) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    if (this.config.telefunTransport === "openai-audio") {
-      this.sendOpenAiEvent(buildOpenAiTextInputItem(text));
-      this.sendOpenAiEvent(buildOpenAiResponseCreate());
-      return;
-    }
-    this.ws.send(
-      JSON.stringify({
-        clientContent: {
-          turns: [{ role: "user", parts: [{ text }] }],
-          turnComplete: true,
-        },
-      }),
-    );
   }
 
   private sendOpenAiEvent(event: unknown) {
@@ -1205,18 +1184,13 @@ export class LiveSession {
   public sendTimeCue(remainingSeconds: number) {
     const activeConsumer =
       this.config.activeConsumerType ?? this.config.consumerTypes[0];
-    if (!activeConsumer) {
-      this.sendPrompt(
-        `[SYSTEM: Waktu tinggal ${remainingSeconds} detik lagi. Segera akhiri telepon.]`,
-      );
-      this.emitTimelineEvent("time_cue_prompt_sent", {
-        type: "time_cue",
-        remainingSeconds,
-      });
-      return;
-    }
     const text = getTimeCueInstruction(activeConsumer, remainingSeconds);
-    this.sendPrompt(text);
+    if (this.config.telefunTransport === "openai-audio") {
+      this.sendOpenAiEvent(buildOpenAiSystemInputItem(text));
+      this.sendOpenAiEvent(buildOpenAiResponseCreate());
+    } else if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(buildGeminiRealtimeTextMessage(text)));
+    }
     this.emitTimelineEvent("time_cue_prompt_sent", {
       type: "time_cue",
       remainingSeconds,

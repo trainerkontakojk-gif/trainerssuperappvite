@@ -209,7 +209,6 @@ export default function TelefunLanding() {
       activeScenario: randomScenario,
       activeConsumerType: consumerType,
       scenarioTitle: randomScenario.title,
-      systemInstruction: randomScenario.instruction,
       consumerName: identity.name,
       consumerGender: identity.gender,
       voiceName,

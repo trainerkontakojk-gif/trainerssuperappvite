@@ -25,6 +25,17 @@ export function buildOpenAiTextInputItem(text: string) {
   };
 }
 
+export function buildOpenAiSystemInputItem(text: string) {
+  return {
+    type: "conversation.item.create" as const,
+    item: {
+      type: "message" as const,
+      role: "system" as const,
+      content: [{ type: "input_text" as const, text }],
+    },
+  };
+}
+
 export function buildOpenAiResponseCreate() {
   return { type: "response.create" as const };
 }

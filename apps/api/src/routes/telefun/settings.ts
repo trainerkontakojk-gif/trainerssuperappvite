@@ -30,7 +30,6 @@ export const telefunSettingsPayloadSchema = z
   .object({
     selectedModel: z.string(),
     voiceName: z.string(),
-    systemInstruction: z.string(),
     consumerName: z.string(),
     consumerGender: z.string(),
     scenarioTitle: z.string().optional(),

@@ -61,6 +61,12 @@ export function buildAudioStreamEndMessage() {
   };
 }
 
+export function buildGeminiRealtimeTextMessage(text: string) {
+  return {
+    realtimeInput: { text },
+  };
+}
+
 export function parsePcmSampleRate(
   mimeType: string | undefined,
   fallback = 24000,

@@ -75,7 +75,6 @@ export interface TelefunSessionConfig {
 export type TelefunAppSettings = {
   selectedModel: string;
   voiceName: string;
-  systemInstruction: string;
   consumerName: string;
   consumerGender: string;
   scenarioTitle?: string;
@@ -460,6 +459,7 @@ export function parseTelefunSettings(
     .realisticModeEnabled;
   delete (normalized as unknown as Record<string, unknown>)
     .realisticModeDisruptionTypes;
+  delete (normalized as unknown as Record<string, unknown>).systemInstruction;
   return normalized;
 }
 
@@ -583,8 +583,6 @@ export const DEFAULT_SCENARIOS: TelefunScenario[] = [
 export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
   selectedModel: DEFAULT_TELEFUN_LIVE_MODEL_ID,
   voiceName: "Kore",
-  systemInstruction:
-    "Anda adalah konsumen yang menghubungi OJK. Bantu agen melatih kemampuan komunikasi.",
   consumerName: "Budi Santoso",
   consumerGender: "male",
   scenarios: DEFAULT_SCENARIOS,

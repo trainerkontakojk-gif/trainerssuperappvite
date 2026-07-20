@@ -280,7 +280,7 @@ describe("LiveSession OpenAI browser runtime", () => {
     });
   });
 
-  it("sends time cues through the allowlisted OpenAI text item and response events", async () => {
+  it("sends time cues as an OpenAI system item followed by a response event", async () => {
     const session = new LiveSession(createOpenAiConfig());
     sessions.push(session);
     await session.connect("access-token");
@@ -302,8 +302,13 @@ describe("LiveSession OpenAI browser runtime", () => {
       type: "conversation.item.create",
       item: {
         type: "message",
-        role: "user",
-        content: [{ type: "input_text", text: expect.any(String) }],
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: expect.stringContaining("[TELEFUN_CONTROL:TIME_CUE]"),
+          },
+        ],
       },
     });
     expect(events[1]).toEqual({ type: "response.create" });

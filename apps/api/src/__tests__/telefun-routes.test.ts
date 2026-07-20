@@ -41,7 +41,6 @@ describe("telefun API payload and security validators", () => {
   const validSettingsBody = {
     selectedModel: "gemini-3.1-flash-live-preview",
     voiceName: "Kore",
-    systemInstruction: "Anda adalah konsumen OJK.",
     consumerName: "Agus",
     consumerGender: "male",
   };
@@ -89,6 +88,18 @@ describe("telefun API payload and security validators", () => {
         ...validSettingsBody,
         telefunModelId: "gpt-realtime-2.1",
         telefunTransport: "openai-audio",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("accepts but does not require the legacy systemInstruction field", () => {
+    expect(
+      telefunSettingsPayloadSchema.safeParse(validSettingsBody).success,
+    ).toBe(true);
+    expect(
+      telefunSettingsPayloadSchema.safeParse({
+        ...validSettingsBody,
+        systemInstruction: "Legacy value ignored by runtime.",
       }).success,
     ).toBe(true);
   });

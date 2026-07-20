@@ -331,7 +331,7 @@ Tidak ada lagi orchestrator atau engine realistic-mode di browser. Playback hany
 
 ### Auto Hangup
 
-Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertahap via fungsi `getTimeCueInstruction()` di `promptBuilder.ts`:
+Durasi panggilan dibatasi sesuai `maxCallDuration` oleh timer aplikasi. Timer memicu cue bertahap via `getTimeCueInstruction()` di `promptBuilder.ts`; model tidak menerima durasi total dan tidak menghitung sisa waktu sendiri.
 
 | Sisa Waktu | Aksi AI (konsumen) |
 |------------|-------------------|
@@ -339,6 +339,8 @@ Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertaha
 | 1 menit | Persiapan penutupan |
 | 30 detik | Mulai tutup percakapan |
 | 20 detik | HARUS tutup telepon sekarang |
+
+Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di system prompt awal. Gemini menerima marker lewat `realtimeInput.text`, sedangkan OpenAI menerima conversation item `role: "system"` lalu `response.create`. Marker bukan ucapan agen dan tidak boleh disebutkan oleh konsumen AI.
 
 ---
 
@@ -397,14 +399,15 @@ Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertaha
 
 ## 🎭 Prompt Perilaku Konsumen
 
-> Prompt konsumen hidup di **frontend** (`apps/web/`), dikirim sebagai `setup.systemInstruction` ke Gemini Live API.
+> Prompt konsumen hidup di **frontend** (`apps/web/`). Prompt awal dikirim sebagai `setup.systemInstruction` ke Gemini Live atau `session.update.instructions` ke OpenAI Realtime. Runtime time cue menggunakan jalur kontrol provider-aware yang dijelaskan di bagian Auto Hangup.
 
 ### File Utama
 
 | File | Lokasi | Fungsi |
 |------|--------|--------|
 | **`promptBuilder.ts`** | `apps/web/src/routes/telefun/services/` | **Otak prompt** — membangun system instruction |
-| **`geminiService.ts`** | `apps/web/src/routes/telefun/services/` | Kirim setup message ke proxy |
+| **`liveSession.ts`** | `apps/web/src/routes/telefun/services/` | Membangun setup provider dan mengirim runtime time cue |
+| **`simulationChallenges.ts`** | `apps/web/src/routes/telefun/services/` | Source of truth challenge dan kebijakan interruption |
 | **`telefunSettings.ts`** | `apps/web/src/routes/telefun/` | Tipe data scenario, consumer type, identity |
 | **`TelefunScenariosTab.tsx`** | `apps/web/src/routes/telefun/components/settings/` | UI editor skenario |
 
@@ -414,9 +417,8 @@ Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertaha
 buildTelefunLiveSystemInstruction({
   identity,           → nama, gender, kota, no HP
   scenario,           → judul masalah + instruksi + skrip opsional
-  consumerType,       → tipe konsumen (mementukan emosi)
+  consumerType,       → ID stabil + deskripsi lengkap persona
   responsePacingMode, → "realistic" | "training_fast"
-  maxCallDuration     → durasi maksimal
   simulationChallengeTypes → maksimal tiga tantangan opsional
 })
 ```
@@ -438,18 +440,21 @@ buildTelefunLiveSystemInstruction({
 
 | Fungsi / Variable | Konten |
 |-------------------|--------|
-| `getEmotionInstruction()` | Mapping nama tipe konsumen → instruksi emosi |
+| `getEmotionInstruction()` | Mapping `consumerType.id` → guidance emosi + deskripsi lengkap |
 | `pacingInstruction` (variable) | Tempo bicara: `realistic` vs `training_fast` |
-| `genderInnerText` (variable) | Instruksi gender suara konsumen |
-| `silentInstruction` (variable) | Cara menangani agen diam pada tempo natural |
-| `simulationChallengeTypes` | Tantangan kontekstual dari registry prompt-first |
-| `scriptInstruction` (variable) | Cara menggunakan skrip percakapan (opsional) |
-| `buildTelefunLiveSystemInstruction()` return value | **Prompt utama** — seluruh `systemInstruction` yang dikirim ke Gemini |
+| `characterGenderInstruction` (variable) | Konsistensi identitas gender; voice teknis diatur runtime |
+| `silentInstruction` (variable) | Cara relatif menangani agen diam tanpa menghitung detik |
+| `simulationChallengeTypes` | Tantangan kontekstual dan interruption policy dari registry prompt-first |
+| `scriptInstruction` (variable) | Hierarki fakta wajib, respons natural, dan urutan fleksibel |
+| `buildTelefunLiveSystemInstruction()` return value | **Prompt utama** untuk Gemini dan OpenAI |
+| `getTimeCueInstruction()` | Teks kontrol runtime dengan marker `TELEFUN_CONTROL:TIME_CUE` |
 
 **Tips:**
 - Ingin konsumen lebih ngotot? → Edit fungsi `getEmotionInstruction()` di `promptBuilder.ts`
 - Ingin tempo bicara berbeda? → Edit variable `pacingInstruction`
 - Ingin konsumen pakai logat? → Tambahkan di `instruction` field scenario
+
+`settings.systemInstruction` bukan lagi field aktif. Skenario dan builder di atas adalah source of truth; parser/save frontend membuang key legacy tersebut.
 
 ---
 

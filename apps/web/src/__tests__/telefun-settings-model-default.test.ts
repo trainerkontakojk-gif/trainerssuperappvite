@@ -227,6 +227,14 @@ describe("parseTelefunSettings", () => {
     expect(parseTelefunSettings({}).simulationChallengeTypes).toEqual([]);
   });
 
+  it("drops the legacy orphan systemInstruction during normalization", () => {
+    const result = parseTelefunSettings({
+      systemInstruction: "Legacy prompt that must not reach runtime.",
+    } as any);
+
+    expect("systemInstruction" in result).toBe(false);
+  });
+
   it("normalizes legacy challenge key to filtered, unique simulation challenges", () => {
     const result = parseTelefunSettings({
       realisticModeDisruptionTypes: [
@@ -256,6 +264,7 @@ describe("parseTelefunSettings", () => {
         ...DEFAULT_TELEFUN_SETTINGS,
         realisticModeEnabled: true,
         realisticModeDisruptionTypes: ["interruption"],
+        systemInstruction: "Legacy prompt that must not be saved.",
         simulationChallengeTypes: ["misunderstanding"],
       } as any,
       scenarios: DEFAULT_TELEFUN_SETTINGS.scenarios,
@@ -266,6 +275,7 @@ describe("parseTelefunSettings", () => {
     expect(result.simulationChallengeTypes).toEqual(["misunderstanding"]);
     expect("realisticModeEnabled" in result).toBe(false);
     expect("realisticModeDisruptionTypes" in result).toBe(false);
+    expect("systemInstruction" in result).toBe(false);
   });
 
   it("preserves valid model id", () => {
