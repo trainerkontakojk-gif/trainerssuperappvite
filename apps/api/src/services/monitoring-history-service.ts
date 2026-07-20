@@ -23,6 +23,7 @@ export interface UnifiedHistoryEntry {
     final?: number;
     empathy?: number;
     probing?: number;
+    resolution?: number;
     typo?: number;
     compliance?: number;
   };
@@ -60,8 +61,11 @@ function createTelefunSignature(
   >,
 ): string {
   const recordingUrl = typeof entry.history === "string" ? entry.history : "";
-  return [entry.user_id, entry.scenario_title, recordingUrl || entry.created_at]
-    .join("::");
+  return [
+    entry.user_id,
+    entry.scenario_title,
+    recordingUrl || entry.created_at,
+  ].join("::");
 }
 
 export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
@@ -72,7 +76,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       admin
         .from("ketik_history")
         .select(
-          "id, user_id, date, scenario_title, messages, final_score, empathy_score, probing_score, typo_score, compliance_score, review_status",
+          "id, user_id, date, scenario_title, messages, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status",
         )
         .order("date", { ascending: false })
         .limit(200),
@@ -85,7 +89,9 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
         .limit(200),
       admin
         .from("telefun_history")
-        .select("id, user_id, created_at, scenario_title, duration_seconds, recording_path, score, voice_assessment, ai_summary, strengths, weaknesses")
+        .select(
+          "id, user_id, created_at, scenario_title, duration_seconds, recording_path, score, voice_assessment, ai_summary, strengths, weaknesses",
+        )
         .order("created_at", { ascending: false })
         .limit(200),
       admin
@@ -101,9 +107,15 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
   if (pdktRes.error)
     console.error("[monitoring] Failed to read pdkt_history:", pdktRes.error);
   if (telefunHistoryRes.error)
-    console.error("[monitoring] Failed to read telefun_history:", telefunHistoryRes.error);
+    console.error(
+      "[monitoring] Failed to read telefun_history:",
+      telefunHistoryRes.error,
+    );
   if (telefunResultsRes.error)
-    console.error("[monitoring] Failed to read telefun results:", telefunResultsRes.error);
+    console.error(
+      "[monitoring] Failed to read telefun results:",
+      telefunResultsRes.error,
+    );
 
   const allUserIds = new Set<string>();
   (ketikRes.data || []).forEach((row) => allUserIds.add(row.user_id));
@@ -111,7 +123,10 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
   (telefunHistoryRes.data || []).forEach((row) => allUserIds.add(row.user_id));
   (telefunResultsRes.data || []).forEach((row) => allUserIds.add(row.user_id));
 
-  const profilesMap: Record<string, { email: string | null; role: string | null }> = {};
+  const profilesMap: Record<
+    string,
+    { email: string | null; role: string | null }
+  > = {};
   if (allUserIds.size > 0) {
     const { data: profilesData, error: profilesError } = await admin
       .from("profiles")
@@ -148,8 +163,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       scenario_title: safeString(row.scenario_title, "Simulasi Chat"),
       created_at: safeString(row.date, ""),
       duration_seconds: durationSeconds,
-      score:
-        typeof row.final_score === "number" ? row.final_score : null,
+      score: typeof row.final_score === "number" ? row.final_score : null,
       history: row.messages,
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
@@ -160,6 +174,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
               final: row.final_score ?? undefined,
               empathy: row.empathy_score ?? undefined,
               probing: row.probing_score ?? undefined,
+              resolution: row.resolution_score ?? undefined,
               typo: row.typo_score ?? undefined,
               compliance: row.compliance_score ?? undefined,
             }
@@ -202,8 +217,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       ),
       created_at: safeString(row.timestamp, ""),
       duration_seconds: safeNumber(row.time_taken, 0),
-      score:
-        typeof evaluation?.score === "number" ? evaluation.score : null,
+      score: typeof evaluation?.score === "number" ? evaluation.score : null,
       history: Array.isArray(row.emails) ? row.emails : [],
       user_email: profilesMap[row.user_id]?.email ?? undefined,
       user_role: profilesMap[row.user_id]?.role ?? undefined,
@@ -245,8 +259,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
 
   (telefunHistoryRes.data || []).forEach((row) => {
     const va =
-      row.voice_assessment &&
-      typeof row.voice_assessment === "object"
+      row.voice_assessment && typeof row.voice_assessment === "object"
         ? row.voice_assessment
         : null;
 
@@ -259,7 +272,10 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       duration_seconds: safeNumber(row.duration_seconds, 0),
       // Use voice_assessment.overallScore (0-10) when available, otherwise fall back to score
       score: va
-        ? safeNumber(va.overallScore, typeof row.score === "number" ? row.score : 0)
+        ? safeNumber(
+            va.overallScore,
+            typeof row.score === "number" ? row.score : 0,
+          )
         : typeof row.score === "number"
           ? row.score
           : null,
@@ -275,10 +291,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
             intonation_score: safeNumber(va.intonation?.score, 0),
             articulation_score: safeNumber(va.articulation?.score, 0),
             filler_words_count: safeNumber(va.fillerWords?.count, 0),
-            emotional_tone: safeString(
-              va.emotionalTone?.dominant,
-              "",
-            ),
+            emotional_tone: safeString(va.emotionalTone?.dominant, ""),
             strengths: Array.isArray(va.strengths)
               ? va.strengths.slice(0, 3)
               : [],
@@ -298,8 +311,7 @@ export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
       // merge the assessment into the existing entry
       const existing = unified.find(
         (e) =>
-          e.module === "telefun" &&
-          createTelefunSignature(e) === signature,
+          e.module === "telefun" && createTelefunSignature(e) === signature,
       );
       if (existing && !existing.telefun_assessment) {
         existing.telefun_assessment = entry.telefun_assessment;

@@ -98,16 +98,14 @@ export async function saveSettings(
     ketik: settings,
   };
 
-  const { error } = await adminClient
-    .from("user_settings")
-    .upsert(
-      {
-        user_id: userId,
-        settings: updatedSettings,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+  const { error } = await adminClient.from("user_settings").upsert(
+    {
+      user_id: userId,
+      settings: updatedSettings,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
 
   if (error) throw new Error(`Gagal menyimpan pengaturan: ${error.message}`);
 }
@@ -123,7 +121,7 @@ export async function getHistory(
   const res1 = await adminClient
     .from("ketik_history")
     .select(
-      "id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, typo_score, compliance_score, review_status",
+      "id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status",
     )
     .eq("user_id", userId)
     .order("date", { ascending: false })
@@ -183,6 +181,7 @@ export async function getHistory(
     finalScore: item.final_score,
     empathyScore: item.empathy_score,
     probingScore: item.probing_score,
+    resolutionScore: item.resolution_score ?? undefined,
     typoScore: item.typo_score,
     complianceScore: item.compliance_score,
     reviewStatus: item.review_status,
@@ -311,7 +310,7 @@ export async function getReviewDetail(
   const { data: history, error: historyError } = await adminClient
     .from("ketik_history")
     .select(
-      "review_status, final_score, empathy_score, probing_score, typo_score, compliance_score",
+      "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score",
     )
     .eq("id", sessionId)
     .eq("user_id", userId)
@@ -362,6 +361,7 @@ export async function getReviewDetail(
       final: history.final_score,
       empathy: history.empathy_score,
       probing: history.probing_score,
+      resolution: history.resolution_score ?? undefined,
       typo: history.typo_score,
       compliance: history.compliance_score,
     },

@@ -52,6 +52,8 @@ function downloadTranscript(session: KetikSessionHistoryItem) {
       footer += `Empathy: ${session.empathyScore}\n`;
     if (session.probingScore !== undefined)
       footer += `Probing: ${session.probingScore}\n`;
+    if (session.resolutionScore !== undefined)
+      footer += `Resolution: ${session.resolutionScore}\n`;
     if (session.typoScore !== undefined)
       footer += `Typo: ${session.typoScore}\n`;
     if (session.complianceScore !== undefined)

@@ -28,6 +28,9 @@ function KetikAssessment({ entry }: { entry: UnifiedHistoryEntry }) {
   const scoresList = [
     { label: "Empati", val: entry.scores.empathy },
     { label: "Probing", val: entry.scores.probing },
+    ...(entry.scores.resolution !== undefined
+      ? [{ label: "Resolusi", val: entry.scores.resolution }]
+      : []),
     { label: "Tulis", val: entry.scores.typo },
     { label: "Comply", val: entry.scores.compliance },
   ];
@@ -35,9 +38,15 @@ function KetikAssessment({ entry }: { entry: UnifiedHistoryEntry }) {
     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-2.5 border-t border-border/40 text-[11px] text-muted-foreground/80">
       {scoresList.map(({ label, val }, i) => (
         <span key={label} className="flex items-center gap-1">
-          {i > 0 && <span className="text-muted-foreground/30 mr-1.5 font-normal">·</span>}
+          {i > 0 && (
+            <span className="text-muted-foreground/30 mr-1.5 font-normal">
+              ·
+            </span>
+          )}
           <span>{label}</span>
-          <span className={`font-semibold ${getScoreColor(val ?? 0)}`}>{val ?? 0}</span>
+          <span className={`font-semibold ${getScoreColor(val ?? 0)}`}>
+            {val ?? 0}
+          </span>
         </span>
       ))}
     </div>
@@ -57,21 +66,33 @@ function PdktAssessment({ entry }: { entry: UnifiedHistoryEntry }) {
         </span>
         <span className="text-muted-foreground/30">·</span>
         {ev.typos_count > 0 ? (
-          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-amber)' }}>
+          <span
+            className="inline-flex items-center font-medium"
+            style={{ color: "var(--chart-amber)" }}
+          >
             {ev.typos_count} typo
           </span>
         ) : (
-          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-green)' }}>
+          <span
+            className="inline-flex items-center font-medium"
+            style={{ color: "var(--chart-green)" }}
+          >
             Tanpa typo
           </span>
         )}
         <span className="text-muted-foreground/30">·</span>
         {ev.clarity_issues_count > 0 ? (
-          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-amber)' }}>
+          <span
+            className="inline-flex items-center font-medium"
+            style={{ color: "var(--chart-amber)" }}
+          >
             {ev.clarity_issues_count} kejelasan
           </span>
         ) : (
-          <span className="inline-flex items-center font-medium" style={{ color: 'var(--chart-green)' }}>
+          <span
+            className="inline-flex items-center font-medium"
+            style={{ color: "var(--chart-green)" }}
+          >
             Jelas
           </span>
         )}
@@ -95,28 +116,46 @@ function TelefunAssessment({ entry }: { entry: UnifiedHistoryEntry }) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground/80">
         <span className="flex items-center gap-0.5">
           <span>WPM</span>:
-          <span className="font-semibold text-foreground">{ta.speaking_rate_wpm}</span>
+          <span className="font-semibold text-foreground">
+            {ta.speaking_rate_wpm}
+          </span>
         </span>
         <span className="text-muted-foreground/30">·</span>
         <span className="flex items-center gap-0.5">
           <span>Intonasi</span>:
-          <span className="font-semibold text-foreground">{ta.intonation_score}/10</span>
+          <span className="font-semibold text-foreground">
+            {ta.intonation_score}/10
+          </span>
         </span>
         <span className="text-muted-foreground/30">·</span>
         <span className="flex items-center gap-0.5">
           <span>Artikulasi</span>:
-          <span className="font-semibold text-foreground">{ta.articulation_score}/10</span>
+          <span className="font-semibold text-foreground">
+            {ta.articulation_score}/10
+          </span>
         </span>
         <span className="text-muted-foreground/30">·</span>
         <span className="flex items-center gap-0.5">
           <span>Filler</span>:
-          <span className="font-semibold" style={{ color: ta.filler_words_count > 3 ? 'var(--chart-amber)' : 'inherit' }}>{ta.filler_words_count}</span>
+          <span
+            className="font-semibold"
+            style={{
+              color:
+                ta.filler_words_count > 3 ? "var(--chart-amber)" : "inherit",
+            }}
+          >
+            {ta.filler_words_count}
+          </span>
         </span>
       </div>
       {ta.emotional_tone && (
         <div className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
-          <span className="font-medium uppercase tracking-wider text-[9px]">Emosi:</span>
-          <span className="font-semibold text-module-telefun capitalize">{ta.emotional_tone}</span>
+          <span className="font-medium uppercase tracking-wider text-[9px]">
+            Emosi:
+          </span>
+          <span className="font-semibold text-module-telefun capitalize">
+            {ta.emotional_tone}
+          </span>
         </div>
       )}
     </div>
@@ -161,15 +200,24 @@ export function HistoryCard({ entry, onViewDetail }: HistoryCardProps) {
         </div>
         {entry.score !== null ? (
           <div className="flex items-baseline gap-0.5">
-            <span className={`text-lg font-bold ${getScoreColor(entry.score, entry.module === "telefun" ? 10 : 100)}`}>
+            <span
+              className={`text-lg font-bold ${getScoreColor(entry.score, entry.module === "telefun" ? 10 : 100)}`}
+            >
               {entry.score}
             </span>
             <span className="text-[9px] text-muted-foreground/40 font-medium">
-              /{entry.module === "pdkt" ? "%" : entry.module === "telefun" ? "10" : "100"}
+              /
+              {entry.module === "pdkt"
+                ? "%"
+                : entry.module === "telefun"
+                  ? "10"
+                  : "100"}
             </span>
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground/30 font-semibold">-</span>
+          <span className="text-xs text-muted-foreground/30 font-semibold">
+            -
+          </span>
         )}
       </div>
 
@@ -180,16 +228,16 @@ export function HistoryCard({ entry, onViewDetail }: HistoryCardProps) {
 
       {/* Meta row: user + date + duration */}
       <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-0.5">
-        <span className="truncate max-w-[140px] font-medium text-muted-foreground/80">{entry.user_email || "-"}</span>
+        <span className="truncate max-w-[140px] font-medium text-muted-foreground/80">
+          {entry.user_email || "-"}
+        </span>
         <div className="flex items-center gap-2 text-muted-foreground/60">
           <span className="flex items-center gap-1 text-[10px]">
             <Clock size={10} />
             {formatDuration(entry.duration_seconds)}
           </span>
           <span>·</span>
-          <span className="text-[10px]">
-            {formatDate(entry.created_at)}
-          </span>
+          <span className="text-[10px]">{formatDate(entry.created_at)}</span>
         </div>
       </div>
 
@@ -199,9 +247,7 @@ export function HistoryCard({ entry, onViewDetail }: HistoryCardProps) {
       {entry.module === "telefun" && <TelefunAssessment entry={entry} />}
 
       {/* Action button (visual only now) */}
-      <div
-        className="mt-2 w-full px-3 py-2 rounded-lg text-[10px] font-semibold uppercase tracking-wider bg-foreground/[0.03] hover:bg-primary hover:text-primary-foreground text-muted-foreground border border-border/40 transition-all flex items-center justify-center gap-1"
-      >
+      <div className="mt-2 w-full px-3 py-2 rounded-lg text-[10px] font-semibold uppercase tracking-wider bg-foreground/[0.03] hover:bg-primary hover:text-primary-foreground text-muted-foreground border border-border/40 transition-all flex items-center justify-center gap-1">
         <Eye size={12} />
         Lihat Detail
       </div>

@@ -107,6 +107,42 @@ describe("KETIK settings and history input validation", () => {
       "invalid pacing mode",
       { ...DEFAULT_KETIK_SETTINGS, responsePacingMode: "instant" },
     ],
+    [
+      "scenario description above prompt limit",
+      {
+        ...DEFAULT_KETIK_SETTINGS,
+        scenarios: [
+          {
+            ...DEFAULT_KETIK_SETTINGS.scenarios[0],
+            description: "x".repeat(12_001),
+          },
+        ],
+      },
+    ],
+    [
+      "scenario script above prompt limit",
+      {
+        ...DEFAULT_KETIK_SETTINGS,
+        scenarios: [
+          {
+            ...DEFAULT_KETIK_SETTINGS.scenarios[0],
+            script: "x".repeat(20_001),
+          },
+        ],
+      },
+    ],
+    [
+      "consumer description above prompt limit",
+      {
+        ...DEFAULT_KETIK_SETTINGS,
+        consumerTypes: [
+          {
+            ...DEFAULT_KETIK_SETTINGS.consumerTypes[0],
+            description: "x".repeat(4_001),
+          },
+        ],
+      },
+    ],
   ])("rejects %s without saving", async (_label, payload) => {
     const response = await requestJson(buildApp(), "/settings", "PUT", payload);
 
@@ -133,6 +169,10 @@ describe("KETIK settings and history input validation", () => {
     [
       "invalid pacing metadata",
       { ...validMessage, pacingMeta: { mode: "unknown" } },
+    ],
+    [
+      "message above prompt limit",
+      { ...validMessage, text: "x".repeat(5_001) },
     ],
   ])("rejects %s without persisting history", async (_label, message) => {
     const response = await requestJson(buildApp(), "/history", "POST", {

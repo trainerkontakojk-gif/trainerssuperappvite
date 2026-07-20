@@ -115,6 +115,7 @@ describe("KETIK Service - History", () => {
                 },
               ],
               review_status: "completed",
+              resolution_score: 78,
             },
           ],
           error: null,
@@ -124,6 +125,7 @@ describe("KETIK Service - History", () => {
       expect(history).toHaveLength(1);
       expect(history[0].scenarioTitle).toBe("Pinjol Ilegal");
       expect(history[0].reviewStatus).toBe("completed");
+      expect(history[0].resolutionScore).toBe(78);
     });
   });
 

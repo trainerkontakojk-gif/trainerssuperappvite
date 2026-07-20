@@ -2,108 +2,26 @@ import {
   KetikScenario,
   KetikConsumerType,
   ChatMessage,
+  DEFAULT_KETIK_CONSUMER_TYPES,
+  DEFAULT_KETIK_SCENARIOS,
 } from "@trainers/types";
 import { generateGeminiContent } from "../../lib/gemini";
 import { generateOpenRouterContent } from "../../lib/openrouter";
 import { generateDeepSeekContent } from "../../lib/deepseek";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { UsageContext } from "../../lib/ai-usage";
-
-const DEFAULT_SCENARIOS: KetikScenario[] = [
-  {
-    id: "pinjol",
-    category: "Pinjol",
-    title: "Pinjol Ilegal",
-    description:
-      "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.",
-    isActive: true,
-  },
-  {
-    id: "penipuan",
-    category: "Penipuan",
-    title: "Penipuan Undian",
-    description:
-      "Konsumen menerima pesan menang undian dan diminta transfer pajak.",
-    isActive: true,
-  },
-  {
-    id: "slik",
-    category: "SLIK",
-    title: "Pengecekan SLIK",
-    description: "Konsumen ingin mengecek status BI Checking / SLIK.",
-    isActive: true,
-  },
-  {
-    id: "asuransi",
-    category: "Asuransi",
-    title: "Klaim Asuransi Ditolak",
-    description: "Konsumen mengeluh klaim asuransi kesehatannya ditolak.",
-    isActive: true,
-  },
-  {
-    id: "investasi",
-    category: "Investasi",
-    title: "Investasi Bodong",
-    description:
-      "Konsumen melaporkan tawaran investasi dengan imbal hasil tidak wajar.",
-    isActive: true,
-  },
-  {
-    id: "kartu-kredit",
-    category: "Perbankan",
-    title: "Tagihan Kartu Kredit",
-    description:
-      "Konsumen keberatan dengan biaya administrasi di kartu kreditnya.",
-    isActive: true,
-  },
-];
-
-const DEFAULT_CONSUMER_TYPES: KetikConsumerType[] = [
-  {
-    id: "marah",
-    name: "Marah & Emosional",
-    description:
-      "Konsumen sangat kesal karena merasa dirugikan. Nada chat tegas, mendesak, mudah terpancing.",
-    difficulty: "Sulit",
-  },
-  {
-    id: "bingung",
-    name: "Bingung & Gaptek",
-    description: "Konsumen awam, bingung, kurang paham istilah teknis.",
-    difficulty: "Sedang",
-  },
-  {
-    id: "kritis",
-    name: "Kritis & Detail",
-    description: "Konsumen teliti, skeptis, suka meminta dasar aturan.",
-    difficulty: "Sulit",
-  },
-  {
-    id: "ramah",
-    name: "Ramah & Kooperatif",
-    description: "Konsumen sopan, tenang, kooperatif.",
-    difficulty: "Mudah",
-  },
-  {
-    id: "terburu-buru",
-    name: "Terburu-buru",
-    description: "Konsumen sempit waktu, ingin jawaban cepat.",
-    difficulty: "Sedang",
-  },
-  {
-    id: "pasrah",
-    name: "Pasrah & Sedih",
-    description: "Konsumen lelah dan putus asa, nada chat sedih.",
-    difficulty: "Sedang",
-  },
-];
+import {
+  buildKetikScenarioDataBlock,
+  buildKetikTurnPrompt,
+  detectKetikPromptInjectionFields,
+} from "./prompt-policy";
 
 export function getScenarios(): KetikScenario[] {
-  return DEFAULT_SCENARIOS;
+  return DEFAULT_KETIK_SCENARIOS;
 }
 
 export function getConsumerTypes(): KetikConsumerType[] {
-  return DEFAULT_CONSUMER_TYPES;
+  return DEFAULT_KETIK_CONSUMER_TYPES;
 }
 
 export function sanitizeConsumerText(rawText: string): string {
@@ -156,6 +74,7 @@ export interface SessionTimingContext {
 function buildTimeLimitInstruction(
   simulationDurationMinutes: number | undefined,
   timing?: SessionTimingContext,
+  consumerMessageCount = 0,
 ): string {
   if (!simulationDurationMinutes || simulationDurationMinutes <= 0) {
     return "";
@@ -165,10 +84,7 @@ function buildTimeLimitInstruction(
     timing?.totalDurationSeconds ?? simulationDurationMinutes * 60;
   const remainingSecondsRaw = timing?.remainingSeconds;
 
-  if (
-    remainingSecondsRaw === undefined ||
-    Number.isNaN(remainingSecondsRaw)
-  ) {
+  if (remainingSecondsRaw === undefined || Number.isNaN(remainingSecondsRaw)) {
     return `
 STATUS WAKTU SIMULASI:
 - Simulasi dibatasi maksimal ${simulationDurationMinutes} menit.
@@ -188,12 +104,17 @@ STATUS WAKTU SIMULASI:
   );
 
   if (remainingSeconds <= nearEndThreshold) {
+    const earlyConversationOverride =
+      consumerMessageCount < 3
+        ? `
+- Karena belum ada 3 pesan konsumen, JANGAN tutup percakapan dan JANGAN keluarkan [NO_RESPONSE] meskipun waktu hampir habis. Sampaikan inti masalah secara singkat lebih dahulu.`
+        : "";
     return `
 STATUS WAKTU SIMULASI SAAT INI:
 - Sisa waktu nyata sekitar ${formatDurationLabel(remainingSeconds)}. Ini benar-benar fase akhir sesi.
 - Anda BOLEH mulai menutup percakapan secara natural, tetapi jangan mendadak memotong jawaban agen bila agen sedang memberi penjelasan penting.
 - Jika agen masih menjelaskan hal yang relevan, beri kesempatan satu respons singkat yang tetap menanggapi inti penjelasan, lalu arahkan ke penutupan yang wajar.
-- Jangan menyebut "timer", "waktu sistem", atau istilah teknis simulasi. Tetap sebagai konsumen biasa.`;
+- Jangan menyebut "timer", "waktu sistem", atau istilah teknis simulasi. Tetap sebagai konsumen biasa.${earlyConversationOverride}`;
   }
 
   if (remainingSeconds <= wrapUpThreshold) {
@@ -254,24 +175,28 @@ Gunakan skrip berikut sebagai panduan utama arah percakapan, informasi penting, 
 - BOLEH menyimpang dari urutan skrip bila diperlukan agar percakapan tetap realistis, menjawab pertanyaan agen dengan relevan, atau menutup percakapan secara natural.
 - Jika ada konflik antara skrip, pertanyaan agen, dan kondisi percakapan aktual, prioritaskan respons yang paling natural namun tetap konsisten dengan inti masalah pada skrip.
 
-Isi skrip:
-${scenario.script}`
+Isi skrip tersedia di field \`scenario.script\` pada blok data skenario.
+- Deskripsi skenario menetapkan inti masalah dan fakta utama; skrip mengatur alur serta detail respons.
+- Jika ada konflik fakta, pertahankan inti masalah dari deskripsi skenario dan abaikan bagian skrip yang bertentangan.`
     : "";
 
   const timeLimitInstruction = buildTimeLimitInstruction(
     config.simulationDuration,
     timing,
+    chatHistory.filter((message) => message.sender === "consumer").length,
   );
+
+  const scenarioDataBlock = buildKetikScenarioDataBlock({
+    identity: config.identity,
+    consumerType: config.consumerType,
+    scenario,
+  });
 
   const systemInstruction = `
 ROLEPLAY: Anda adalah KONSUMEN yang sedang menghubungi Kontak OJK 157 melalui chat. Anda bukan agen, bukan petugas, dan bukan AI.
-IDENTITAS ANDA (WAJIB KONSISTEN):
-- Nama: ${config.identity.name}
-- Kota Domisili: ${config.identity.city}
-- Nomor HP: ${config.identity.phone}
+${scenarioDataBlock}
 
-KARAKTER ANDA: ${config.consumerType.description}.
-Masalah Anda: ${scenario.description}.
+Gunakan field \`identity\` sebagai identitas konsumen yang wajib konsisten, \`consumerType\` sebagai karakter, dan \`scenario\` sebagai batas fakta kasus.
 
 ${scriptInstruction}
 ${timeLimitInstruction}
@@ -305,17 +230,30 @@ ATURAN BALASAN:
 15c. Anda boleh memberikan detail tambahan yang masuk akal sebagai elaborasi dari masalah yang sudah ada di skenario, tetapi jangan memperkenalkan masalah baru yang sama sekali berbeda.
   `;
 
-  const historyText = chatHistory
-    .filter((m) => m.sender !== "system")
-    .map((m) => `${m.sender === "agent" ? "[AGEN]" : "[KONSUMEN]"} ${m.text}`)
-    .join("\n");
+  const prompt = buildKetikTurnPrompt({
+    scenarioTitle: scenario.title,
+    chatHistory,
+  });
 
-  const prompt = `Skenario Saat Ini: ${scenario.title}\n\nRiwayat Chat:\n${historyText}\n\nInstruksi akhir:\n- Balas hanya sebagai konsumen.\n- Tulis 1 sampai 3 chat pendek yang relevan.\n- Jangan gunakan prefix nama pembicara.\n- Jangan ulangi isi pesan agen.\n- Hindari mengulang pola kalimat atau frasa yang sama seperti balasan sebelumnya kecuali memang sangat natural.\n\nBalas sebagai konsumen:`;
+  const suspiciousFields = detectKetikPromptInjectionFields({
+    scenario,
+    consumerType: config.consumerType,
+    chatHistory,
+  });
+  if (suspiciousFields.length > 0) {
+    console.warn("[KETIK] Instruction-like text detected in prompt data", {
+      fields: suspiciousFields,
+    });
+  }
 
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
   const isOpenRouter = provider === "openrouter";
   const isDeepSeek = provider === "deepseek";
   const usesConservativeTemperature = isOpenRouter || isDeepSeek;
+
+  // Provider-aware policy is intentional: Gemini remains more conversational,
+  // while OpenRouter/DeepSeek use conservative sampling and stricter script
+  // reinforcement to reduce observed instruction drift across those providers.
 
   const providerSystemInstruction =
     usesConservativeTemperature && hasScript

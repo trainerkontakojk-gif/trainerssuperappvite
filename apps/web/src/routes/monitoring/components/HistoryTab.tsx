@@ -39,7 +39,12 @@ const STATUS_OPTIONS: Array<{ value: ReviewStatus | ""; label: string }> = [
   { value: "not_started", label: "Belum Dinilai" },
 ];
 
-export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: HistoryTabProps) {
+export function HistoryTab({
+  historyData,
+  loading,
+  onViewDetail,
+  onRefresh,
+}: HistoryTabProps) {
   const [historySearch, setHistorySearch] = useState("");
   const [activeModule, setActiveModule] = useState("");
   const [historyStatus, setHistoryStatus] = useState<ReviewStatus | "">("");
@@ -56,7 +61,9 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
   const canDelete = role === "trainer" || role === "admin";
 
   const handleDelete = async (entry: UnifiedHistoryEntry) => {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus riwayat simulasi ini?")) {
+    if (
+      !window.confirm("Apakah Anda yakin ingin menghapus riwayat simulasi ini?")
+    ) {
       return;
     }
     const dId = `${entry.module}-${entry.id}`;
@@ -166,7 +173,14 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
       return true;
     });
-  }, [historyData, activeModule, historyStatus, historySearch, startDate, endDate]);
+  }, [
+    historyData,
+    activeModule,
+    historyStatus,
+    historySearch,
+    startDate,
+    endDate,
+  ]);
 
   // Pagination bounds
   const totalItems = filteredHistory.length;
@@ -207,21 +221,42 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
     switch (mod) {
       case "ketik":
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit" style={{ backgroundColor: 'var(--module-ketik-bg)', color: 'var(--module-ketik)', borderColor: 'var(--module-ketik-bg)' }}>
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit"
+            style={{
+              backgroundColor: "var(--module-ketik-bg)",
+              color: "var(--module-ketik)",
+              borderColor: "var(--module-ketik-bg)",
+            }}
+          >
             <MessageSquare size={12} />
             <span className="uppercase">ketik</span>
           </div>
         );
       case "pdkt":
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit" style={{ backgroundColor: 'var(--module-pdkt-bg)', color: 'var(--module-pdkt)', borderColor: 'var(--module-pdkt-bg)' }}>
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit"
+            style={{
+              backgroundColor: "var(--module-pdkt-bg)",
+              color: "var(--module-pdkt)",
+              borderColor: "var(--module-pdkt-bg)",
+            }}
+          >
             <Mail size={12} />
             <span className="uppercase">pdkt</span>
           </div>
         );
       case "telefun":
         return (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit" style={{ backgroundColor: 'var(--module-telefun-bg)', color: 'var(--module-telefun)', borderColor: 'var(--module-telefun-bg)' }}>
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider w-fit"
+            style={{
+              backgroundColor: "var(--module-telefun-bg)",
+              color: "var(--module-telefun)",
+              borderColor: "var(--module-telefun-bg)",
+            }}
+          >
             <Phone size={12} />
             <span className="uppercase">telefun</span>
           </div>
@@ -236,22 +271,26 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
       case "completed":
         return (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
-            <CheckCircle2 size={12} style={{ color: 'var(--chart-green)' }} />
-            <span style={{ color: 'var(--chart-green)' }}>Selesai Sukses</span>
+            <CheckCircle2 size={12} style={{ color: "var(--chart-green)" }} />
+            <span style={{ color: "var(--chart-green)" }}>Selesai Sukses</span>
           </div>
         );
       case "processing":
         return (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border animate-pulse">
-            <Loader2 size={12} className="animate-spin" style={{ color: 'var(--chart-amber)' }} />
-            <span style={{ color: 'var(--chart-amber)' }}>Diproses</span>
+            <Loader2
+              size={12}
+              className="animate-spin"
+              style={{ color: "var(--chart-amber)" }}
+            />
+            <span style={{ color: "var(--chart-amber)" }}>Diproses</span>
           </div>
         );
       case "failed":
         return (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
-            <AlertCircle size={12} style={{ color: 'var(--chart-red)' }} />
-            <span style={{ color: 'var(--chart-red)' }}>Gagal</span>
+            <AlertCircle size={12} style={{ color: "var(--chart-red)" }} />
+            <span style={{ color: "var(--chart-red)" }}>Gagal</span>
           </div>
         );
       default:
@@ -279,6 +318,9 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
       const submetrics = [
         { label: "Empati", val: s.empathy ?? 0 },
         { label: "Probing", val: s.probing ?? 0 },
+        ...(s.resolution !== undefined
+          ? [{ label: "Resolusi", val: s.resolution }]
+          : []),
         { label: "Tulis", val: s.typo ?? 0 },
         { label: "Comply", val: s.compliance ?? 0 },
       ];
@@ -288,16 +330,25 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
           {/* Main Score Badge */}
           <div
             className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
-            style={{ 
-              color: finalVal >= 80 ? 'var(--chart-green)' : finalVal >= 60 ? 'var(--chart-amber)' : 'var(--chart-red)',
+            style={{
+              color:
+                finalVal >= 80
+                  ? "var(--chart-green)"
+                  : finalVal >= 60
+                    ? "var(--chart-amber)"
+                    : "var(--chart-red)",
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-0.5">/100</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-0.5">
+              /100
+            </span>
           </div>
 
           {/* Submetrics Grid */}
-          <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
+          <div
+            className={`grid gap-x-4 min-w-[280px] ${s.resolution !== undefined ? "grid-cols-5" : "grid-cols-4"}`}
+          >
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
                 <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
@@ -315,7 +366,12 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
     if (entry.module === "pdkt") {
       const finalVal = entry.score ?? 0;
-      const ev = entry.pdkt_evaluation ?? { score: 0, feedback: "", typos_count: 0, clarity_issues_count: 0 };
+      const ev = entry.pdkt_evaluation ?? {
+        score: 0,
+        feedback: "",
+        typos_count: 0,
+        clarity_issues_count: 0,
+      };
       const submetrics = [
         { label: "Skor", val: `${ev.score}%` },
         { label: "Typo", val: ev.typos_count },
@@ -328,12 +384,19 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
           {/* Main Score Badge */}
           <div
             className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
-            style={{ 
-              color: finalVal >= 80 ? 'var(--chart-green)' : finalVal >= 60 ? 'var(--chart-amber)' : 'var(--chart-red)',
+            style={{
+              color:
+                finalVal >= 80
+                  ? "var(--chart-green)"
+                  : finalVal >= 60
+                    ? "var(--chart-amber)"
+                    : "var(--chart-red)",
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-0.5">/100</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-0.5">
+              /100
+            </span>
           </div>
 
           {/* Submetrics Grid */}
@@ -368,12 +431,19 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
           {/* Main Score Badge */}
           <div
             className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
-            style={{ 
-              color: finalVal >= 8.0 ? 'var(--chart-green)' : finalVal >= 6.0 ? 'var(--chart-amber)' : 'var(--chart-red)',
+            style={{
+              color:
+                finalVal >= 8.0
+                  ? "var(--chart-green)"
+                  : finalVal >= 6.0
+                    ? "var(--chart-amber)"
+                    : "var(--chart-red)",
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-0.5">/10</span>
+            <span className="text-[9px] text-muted-foreground/50 ml-0.5">
+              /10
+            </span>
           </div>
 
           {/* Submetrics Grid */}
@@ -434,7 +504,13 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
         {/* Card 2: KETIK */}
         <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--module-ketik-bg)', color: 'var(--module-ketik)' }}>
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{
+              backgroundColor: "var(--module-ketik-bg)",
+              color: "var(--module-ketik)",
+            }}
+          >
             <PenTool size={20} />
           </div>
           <div>
@@ -449,7 +525,13 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
         {/* Card 3: PDKT */}
         <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--module-pdkt-bg)', color: 'var(--module-pdkt)' }}>
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{
+              backgroundColor: "var(--module-pdkt-bg)",
+              color: "var(--module-pdkt)",
+            }}
+          >
             <Mail size={20} />
           </div>
           <div>
@@ -464,7 +546,13 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
         {/* Card 4: Telefun */}
         <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--module-telefun-bg)', color: 'var(--module-telefun)' }}>
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{
+              backgroundColor: "var(--module-telefun-bg)",
+              color: "var(--module-telefun)",
+            }}
+          >
             <Phone size={20} />
           </div>
           <div>
@@ -543,7 +631,9 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
             {showDatePicker && (
               <div className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Mulai</label>
+                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Mulai
+                  </label>
                   <input
                     type="date"
                     value={startDate}
@@ -555,7 +645,9 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Selesai</label>
+                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Selesai
+                  </label>
                   <input
                     type="date"
                     value={endDate}
@@ -646,7 +738,10 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
                       {entry.scenario_title}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 font-medium leading-relaxed line-clamp-1">
-                      {getScenarioDescription(entry.scenario_title, entry.module)}
+                      {getScenarioDescription(
+                        entry.scenario_title,
+                        entry.module,
+                      )}
                     </div>
                   </td>
 
@@ -686,7 +781,9 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
                         <button
                           onClick={() => {
                             const dId = `${entry.module}-${entry.id}`;
-                            setActiveDropdownId(activeDropdownId === dId ? null : dId);
+                            setActiveDropdownId(
+                              activeDropdownId === dId ? null : dId,
+                            );
                           }}
                           className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer min-h-[30px]"
                         >
@@ -711,10 +808,14 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
                               {canDelete && (
                                 <button
                                   onClick={() => handleDelete(entry)}
-                                  disabled={isDeleting === `${entry.module}-${entry.id}`}
+                                  disabled={
+                                    isDeleting === `${entry.module}-${entry.id}`
+                                  }
                                   className="w-full px-4 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
                                 >
-                                  {isDeleting === `${entry.module}-${entry.id}` ? "Menghapus..." : "Hapus"}
+                                  {isDeleting === `${entry.module}-${entry.id}`
+                                    ? "Menghapus..."
+                                    : "Hapus"}
                                 </button>
                               )}
                             </div>
@@ -728,9 +829,17 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
 
               {filteredHistory.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-muted-foreground">
-                    <MessageSquare size={32} className="mx-auto mb-3 opacity-20" />
-                    <p className="text-sm font-medium">Belum ada riwayat simulasi.</p>
+                  <td
+                    colSpan={7}
+                    className="text-center py-16 text-muted-foreground"
+                  >
+                    <MessageSquare
+                      size={32}
+                      className="mx-auto mb-3 opacity-20"
+                    />
+                    <p className="text-sm font-medium">
+                      Belum ada riwayat simulasi.
+                    </p>
                   </td>
                 </tr>
               )}
@@ -744,8 +853,9 @@ export function HistoryTab({ historyData, loading, onViewDetail, onRefresh }: Hi
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card rounded-xl border border-border/40 p-4 shadow-sm text-xs text-muted-foreground font-semibold">
           {/* Items Range Indicator */}
           <div>
-            Menampilkan {Math.min(totalItems, (currentPage - 1) * pageSize + 1)}-
-            {Math.min(totalItems, currentPage * pageSize)} dari {totalItems} hasil
+            Menampilkan {Math.min(totalItems, (currentPage - 1) * pageSize + 1)}
+            -{Math.min(totalItems, currentPage * pageSize)} dari {totalItems}{" "}
+            hasil
           </div>
 
           {/* Page Controls */}

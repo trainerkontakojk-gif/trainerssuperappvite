@@ -53,8 +53,13 @@ export async function triggerKetikAIReview(
           throw insertError;
         }
       }
-    } else if (existingJob.status === "completed" || existingJob.status === "processing") {
-      return { status: existingJob.status === "completed" ? "skipped" : "processing" };
+    } else if (
+      existingJob.status === "completed" ||
+      existingJob.status === "processing"
+    ) {
+      return {
+        status: existingJob.status === "completed" ? "skipped" : "processing",
+      };
     }
 
     await adminClient
@@ -64,7 +69,10 @@ export async function triggerKetikAIReview(
 
     return { status: "queued" };
   } catch (error) {
-    console.error(`[triggerKetikAIReview] Error for session ${sessionId}:`, error);
+    console.error(
+      `[triggerKetikAIReview] Error for session ${sessionId}:`,
+      error,
+    );
     if (canMarkFailed) {
       await adminClient
         .from("ketik_history")
@@ -168,7 +176,7 @@ export async function getKetikReviewStatus(
   const { data: history, error } = await adminClient
     .from("ketik_history")
     .select(
-      "review_status, final_score, empathy_score, probing_score, typo_score, compliance_score",
+      "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score",
     )
     .eq("id", sessionId)
     .eq("user_id", userId)
@@ -209,7 +217,8 @@ export async function getKetikReviewStatus(
       .from("ketik_review_jobs")
       .update({
         status: "failed",
-        error_message: decision.jobFailureMessage || decision.errorMessage || "Failed",
+        error_message:
+          decision.jobFailureMessage || decision.errorMessage || "Failed",
       })
       .eq("session_id", sessionId);
   }
@@ -227,6 +236,7 @@ export async function getKetikReviewStatus(
       final: history.final_score,
       empathy: history.empathy_score,
       probing: history.probing_score,
+      resolution: history.resolution_score ?? undefined,
       typo: history.typo_score,
       compliance: history.compliance_score,
     };

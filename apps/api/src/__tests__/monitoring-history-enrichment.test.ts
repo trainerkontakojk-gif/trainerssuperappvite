@@ -15,6 +15,7 @@ const mockKetikData = [
     final_score: 82,
     empathy_score: 80,
     probing_score: 75,
+    resolution_score: 78,
     typo_score: 90,
     compliance_score: 85,
     review_status: "completed",
@@ -63,11 +64,27 @@ const mockTelefunHistoryData = [
     score: 7.5,
     voice_assessment: {
       overallScore: 7.5,
-      speakingRate: { score: 8, verdict: "Baik", feedback: "Kecepatan sesuai", wordsPerMinute: 142 },
+      speakingRate: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "Kecepatan sesuai",
+        wordsPerMinute: 142,
+      },
       intonation: { score: 7, verdict: "Baik", feedback: "Intonasi natural" },
       articulation: { score: 8, verdict: "Baik", feedback: "Artikulasi jelas" },
-      fillerWords: { score: 9, verdict: "Sangat Baik", feedback: "Sedikit filler", count: 3, examples: ["eh", "anu"] },
-      emotionalTone: { score: 7, verdict: "Baik", feedback: "Empati terasa", dominant: "Empati" },
+      fillerWords: {
+        score: 9,
+        verdict: "Sangat Baik",
+        feedback: "Sedikit filler",
+        count: 3,
+        examples: ["eh", "anu"],
+      },
+      emotionalTone: {
+        score: 7,
+        verdict: "Baik",
+        feedback: "Empati terasa",
+        dominant: "Empati",
+      },
       transcript: "Agent: Halo\nCustomer: Saya mau bayar",
       highlights: ["De-eskalasi berhasil"],
       strengths: ["Artikulasi jelas", "Kecepatan sesuai"],
@@ -85,7 +102,11 @@ const mockTelefunResultsData = [
     user_id: "user-5",
     module: "telefun",
     score: 6,
-    details: { scenario: "Simulasi Lain", duration: 120, recordingUrl: "https://storage.supabase.co/telefun/r1.mp3" },
+    details: {
+      scenario: "Simulasi Lain",
+      duration: 120,
+      recordingUrl: "https://storage.supabase.co/telefun/r1.mp3",
+    },
     history: null,
     created_at: "2026-05-24T08:00:00Z",
   },
@@ -109,11 +130,16 @@ vi.mock("../lib/supabase", () => ({
         eq: () => chain,
         in: () => chain,
         then: (resolve: any) => {
-          if (table === "ketik_history") resolve({ data: mockKetikData, error: null });
-          else if (table === "pdkt_history") resolve({ data: mockPdktData, error: null });
-          else if (table === "telefun_history") resolve({ data: mockTelefunHistoryData, error: null });
-          else if (table === "results") resolve({ data: mockTelefunResultsData, error: null });
-          else if (table === "profiles") resolve({ data: mockProfiles, error: null });
+          if (table === "ketik_history")
+            resolve({ data: mockKetikData, error: null });
+          else if (table === "pdkt_history")
+            resolve({ data: mockPdktData, error: null });
+          else if (table === "telefun_history")
+            resolve({ data: mockTelefunHistoryData, error: null });
+          else if (table === "results")
+            resolve({ data: mockTelefunResultsData, error: null });
+          else if (table === "profiles")
+            resolve({ data: mockProfiles, error: null });
           else resolve({ data: [], error: null });
         },
       };
@@ -141,6 +167,7 @@ describe("getMonitoringHistory — enriched data", () => {
     expect(ketik!.scores!.final).toBe(82);
     expect(ketik!.scores!.empathy).toBe(80);
     expect(ketik!.scores!.probing).toBe(75);
+    expect(ketik!.scores!.resolution).toBe(78);
     expect(ketik!.scores!.typo).toBe(90);
     expect(ketik!.scores!.compliance).toBe(85);
   });
@@ -154,7 +181,9 @@ describe("getMonitoringHistory — enriched data", () => {
     expect(pdkt!.pdkt_evaluation!.typos_count).toBe(1);
     expect(pdkt!.pdkt_evaluation!.clarity_issues_count).toBe(0);
     expect(pdkt!.pdkt_evaluation!.content_gaps_count).toBe(1);
-    expect(pdkt!.pdkt_evaluation!.feedback).toBe("Jawaban sudah relevan dan jelas");
+    expect(pdkt!.pdkt_evaluation!.feedback).toBe(
+      "Jawaban sudah relevan dan jelas",
+    );
   });
 
   it("does not include pdkt_evaluation for uncompleted PDKT sessions", async () => {

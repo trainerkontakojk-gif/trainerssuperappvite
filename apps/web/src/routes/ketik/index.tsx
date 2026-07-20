@@ -167,6 +167,7 @@ export default function KetikLanding() {
                 finalScore: result.scores.final,
                 empathyScore: result.scores.empathy,
                 probingScore: result.scores.probing,
+                resolutionScore: result.scores.resolution,
                 typoScore: result.scores.typo,
                 complianceScore: result.scores.compliance,
               }
@@ -193,7 +194,9 @@ export default function KetikLanding() {
 
         if (returnedStatus === "failed") {
           setReviewProgress((prev) => ({ ...prev, status: "failed" }));
-          notify.error(result?.error || "Analisis AI gagal. Silakan coba lagi.");
+          notify.error(
+            result?.error || "Analisis AI gagal. Silakan coba lagi.",
+          );
           const failedSession = {
             ...selectedSessionForReview,
             reviewStatus: "failed" as const,
@@ -499,6 +502,7 @@ export default function KetikLanding() {
             finalScore: detail.scores.final,
             empathyScore: detail.scores.empathy,
             probingScore: detail.scores.probing,
+            resolutionScore: detail.scores.resolution,
             typoScore: detail.scores.typo,
             complianceScore: detail.scores.compliance,
           };
@@ -627,6 +631,7 @@ export default function KetikLanding() {
                 finalScore: data.scores.final,
                 empathyScore: data.scores.empathy,
                 probingScore: data.scores.probing,
+                resolutionScore: data.scores.resolution,
                 typoScore: data.scores.typo,
                 complianceScore: data.scores.compliance,
               };

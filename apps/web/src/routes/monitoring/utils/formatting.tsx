@@ -1,8 +1,4 @@
-import {
-  MessageCircle,
-  Mail,
-  Phone,
-} from "lucide-react";
+import { MessageCircle, Mail, Phone } from "lucide-react";
 
 export type ReviewStatus =
   | "not_started"
@@ -27,6 +23,7 @@ export type UnifiedHistoryEntry = {
     final?: number;
     empathy?: number;
     probing?: number;
+    resolution?: number;
     typo?: number;
     compliance?: number;
   };
@@ -102,7 +99,10 @@ export function getModuleBadgeClasses(module: string) {
   }
 }
 
-export function getScoreColor(score: number | null, scale: number = 100): string {
+export function getScoreColor(
+  score: number | null,
+  scale: number = 100,
+): string {
   if (score === null) return "text-muted-foreground";
   // Normalize to percentage for consistent color coding
   const pct = scale === 10 ? score * 10 : score;
@@ -165,16 +165,17 @@ export function getScenarioDescription(title: string, module: string): string {
   if (t.includes("penipuan")) return "Identifikasi dan pelaporan penipuan";
   if (module === "ketik") return "Simulasi chat interaktif dengan pelanggan";
   if (module === "pdkt") return "Korespondensi email dan penyelesaian masalah";
-  if (module === "telefun") return "Percakapan telepon interaktif dengan pelanggan";
+  if (module === "telefun")
+    return "Percakapan telepon interaktif dengan pelanggan";
   return "Simulasi interaktif";
 }
 
 export function getTelefunSubmetrics(score: number | null) {
   const s = score || 0;
-  const kepatuhan = Math.round((s * 0.65) * 10) / 10;
-  const empati = Math.round((s * 0.625) * 10) / 10;
-  const kejelasan = Math.round((s * 0.9375) * 10) / 10;
-  const solusi = Math.min(10, Math.round((s * 1.3125) * 10) / 10);
+  const kepatuhan = Math.round(s * 0.65 * 10) / 10;
+  const empati = Math.round(s * 0.625 * 10) / 10;
+  const kejelasan = Math.round(s * 0.9375 * 10) / 10;
+  const solusi = Math.min(10, Math.round(s * 1.3125 * 10) / 10);
   return {
     kepatuhan: kepatuhan.toFixed(1),
     empati: empati.toFixed(1),

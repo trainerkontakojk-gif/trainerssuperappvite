@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { SessionReviewModal } from "../routes/ketik/components/SessionReviewModal";
-import type { KetikSessionHistoryItem, KetikSessionReview, KetikTypoFinding } from "@trainers/types";
+import type {
+  KetikSessionHistoryItem,
+  KetikSessionReview,
+  KetikTypoFinding,
+} from "@trainers/types";
 
 const mockSession: KetikSessionHistoryItem = {
   id: "sess1",
@@ -24,7 +27,14 @@ const mockReview: KetikSessionReview = {
 };
 
 const mockTypos: KetikTypoFinding[] = [
-  { id: "t1", sessionId: "sess1", messageId: "m1", originalWord: "recieve", correctedWord: "receive", severity: "minor" },
+  {
+    id: "t1",
+    sessionId: "sess1",
+    messageId: "m1",
+    originalWord: "recieve",
+    correctedWord: "receive",
+    severity: "minor",
+  },
 ];
 
 function renderModal(
@@ -110,6 +120,7 @@ describe("SessionReviewModal", () => {
         finalScore: 85,
         empathyScore: 80,
         probingScore: 75,
+        resolutionScore: 78,
         typoScore: 90,
         complianceScore: 85,
         reviewStatus: "completed",
@@ -123,6 +134,8 @@ describe("SessionReviewModal", () => {
 
       expect(screen.getByText("80")).toBeDefined();
       expect(screen.getByText("75")).toBeDefined();
+      expect(screen.getByText("78")).toBeDefined();
+      expect(screen.getAllByText("Resolusi").length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText("90")).toBeDefined();
       expect(screen.getAllByText("85").length).toBe(2); // compliance card + final score
     });
@@ -133,7 +146,10 @@ describe("SessionReviewModal", () => {
         typos: mockTypos,
       });
 
-      expect(screen.getByText("Empathy")).toBeDefined();
+      expect(
+        screen.getAllByText("Empati & Komunikasi").length,
+      ).toBeGreaterThanOrEqual(1);
+      expect(screen.queryAllByText("Resolusi")).toHaveLength(0);
       expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(4);
     });
 
@@ -143,6 +159,7 @@ describe("SessionReviewModal", () => {
         finalScore: 85,
         empathyScore: 80,
         probingScore: 75,
+        resolutionScore: 78,
         typoScore: 90,
         complianceScore: 85,
         reviewStatus: "completed",

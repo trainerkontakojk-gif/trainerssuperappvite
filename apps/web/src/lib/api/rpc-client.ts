@@ -31,6 +31,7 @@ export type MonitoringHistoryEntry = {
     final?: number;
     empathy?: number;
     probing?: number;
+    resolution?: number;
     typo?: number;
     compliance?: number;
   };
@@ -100,6 +101,7 @@ export type KetikMonitoringReview = {
     final?: number;
     empathy?: number;
     probing?: number;
+    resolution?: number;
     typo?: number;
     compliance?: number;
   };
@@ -193,9 +195,7 @@ type AdminClient = {
           json: { email: string };
         }): Promise<RpcResponse<null>>;
       };
-      $delete(args: {
-        param: { id: string };
-      }): Promise<RpcResponse<null>>;
+      $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
     };
   };
   "access-groups": {
@@ -259,9 +259,7 @@ type AdminClient = {
   };
   "activity-logs": {
     ":id": {
-      $delete(args: {
-        param: { id: string };
-      }): Promise<RpcResponse<null>>;
+      $delete(args: { param: { id: string } }): Promise<RpcResponse<null>>;
     };
   };
 };
@@ -290,7 +288,9 @@ type AiClient = {
     $put(args: {
       json: Pick<
         PricingEntry,
-        "model_id" | "input_price_usd_per_million" | "output_price_usd_per_million"
+        | "model_id"
+        | "input_price_usd_per_million"
+        | "output_price_usd_per_million"
       > &
         Partial<
           Pick<
@@ -313,9 +313,7 @@ type AiClient = {
   };
   usage: {
     summary: {
-      $get(args: {
-        query: { module: string };
-      }): Promise<RpcResponse<unknown>>;
+      $get(args: { query: { module: string } }): Promise<RpcResponse<unknown>>;
     };
   };
 };
@@ -428,6 +426,7 @@ export const pdktClient = (rpcClient as any).v1.pdkt;
 export const telefunClient = (rpcClient as any).v1.telefun;
 export const sidakClient = (rpcClient as any).v1.sidak;
 export const aiClient = (rpcClient as any).v1.ai as unknown as AiClient;
-export const adminClient = (rpcClient as any).v1.admin as unknown as AdminClient;
+export const adminClient = (rpcClient as any).v1
+  .admin as unknown as AdminClient;
 export const profilerClient = (rpcClient as any).v1.profiler;
 export const healthClient = hc<HealthRouteType>(HC_BASE_URL, clientOptions);

@@ -18,10 +18,7 @@ import { getWibMonthBounds } from "../lib/timezone";
 import { parseTelefunTranscript } from "@trainers/types";
 import { getMonitoringHistory } from "../services/monitoring-history-service";
 import { getAiUsageSummary } from "../services/ai-usage-summary-service";
-import {
-  getBillingRate,
-  upsertBillingRate,
-} from "../lib/ai-billing-settings";
+import { getBillingRate, upsertBillingRate } from "../lib/ai-billing-settings";
 import {
   deleteMonitoringHistory,
   MonitoringHistoryDeleteError,
@@ -174,8 +171,18 @@ ai.get("/usage/summary", async (c) => {
 
   try {
     const months = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
     ];
     const startMonth = months[month - 1];
     const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -243,7 +250,7 @@ ai.get(
         const { data: history, error: historyError } = await admin
           .from("ketik_history")
           .select(
-            "review_status, final_score, empathy_score, probing_score, typo_score, compliance_score",
+            "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score",
           )
           .eq("id", id)
           .single();
@@ -271,6 +278,7 @@ ai.get(
                 final: history.final_score,
                 empathy: history.empathy_score,
                 probing: history.probing_score,
+                resolution: history.resolution_score ?? undefined,
                 typo: history.typo_score,
                 compliance: history.compliance_score,
               },
@@ -284,10 +292,7 @@ ai.get(
             .select("*")
             .eq("session_id", id)
             .maybeSingle(),
-          admin
-            .from("ketik_typo_findings")
-            .select("*")
-            .eq("session_id", id),
+          admin.from("ketik_typo_findings").select("*").eq("session_id", id),
         ]);
 
         return c.json({
@@ -299,6 +304,7 @@ ai.get(
               final: history.final_score,
               empathy: history.empathy_score,
               probing: history.probing_score,
+              resolution: history.resolution_score ?? undefined,
               typo: history.typo_score,
               compliance: history.compliance_score,
             },
@@ -363,7 +369,9 @@ ai.get(
       if (module === "telefun") {
         const { data: history, error: historyError } = await admin
           .from("telefun_history")
-          .select("score, recording_path, agent_recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus, messages")
+          .select(
+            "score, recording_path, agent_recording_path, scenario_title, duration_seconds, voice_assessment, ai_summary, strengths, weaknesses, coaching_focus, messages",
+          )
           .eq("id", id)
           .single();
 
@@ -382,7 +390,9 @@ ai.get(
 
         const voiceAssessment = history.voice_assessment;
         const normalizedScore =
-          voiceAssessment && typeof voiceAssessment === "object" && typeof voiceAssessment.overallScore === "number"
+          voiceAssessment &&
+          typeof voiceAssessment === "object" &&
+          typeof voiceAssessment.overallScore === "number"
             ? voiceAssessment.overallScore
             : history.score;
 
@@ -433,8 +443,7 @@ ai.get(
           success: false,
           error: {
             code: "DB_ERROR",
-            message:
-              error?.message || "Gagal memuat detail review monitoring.",
+            message: error?.message || "Gagal memuat detail review monitoring.",
           },
         },
         500,
@@ -557,7 +566,9 @@ ai.get(
 
     // Filter by action_category AFTER fetch (since action is a derived field)
     if (actionCategory === "simulation") {
-      logs = logs.filter((l) => isUsageActionInCategory(l.action, "simulation"));
+      logs = logs.filter((l) =>
+        isUsageActionInCategory(l.action, "simulation"),
+      );
     } else if (actionCategory === "review") {
       logs = logs.filter((l) => isUsageActionInCategory(l.action, "review"));
     }
@@ -651,112 +662,104 @@ type PricingDatabaseRow = {
   output_price_usd_per_million: number | null;
 } & Partial<Record<(typeof REALTIME_PRICING_COLUMNS)[number], number | null>>;
 
-ai.get(
-  "/monitoring/pricing",
-  requireRole("admin", "trainer"),
-  async (c) => {
-    const admin = createAdminClient();
-    let pricingResult = (await admin
+ai.get("/monitoring/pricing", requireRole("admin", "trainer"), async (c) => {
+  const admin = createAdminClient();
+  let pricingResult = (await admin
+    .from("ai_pricing_settings")
+    .select(EXPANDED_PRICING_SELECT)
+    .order("model_id", { ascending: true })) as unknown as {
+    data: PricingDatabaseRow[] | null;
+    error: { code?: string; message?: string } | null;
+  };
+
+  if (
+    pricingResult.error &&
+    isMissingRealtimePricingColumn(pricingResult.error)
+  ) {
+    pricingResult = (await admin
       .from("ai_pricing_settings")
-      .select(EXPANDED_PRICING_SELECT)
-      .order("model_id", { ascending: true })) as unknown as {
-      data: PricingDatabaseRow[] | null;
-      error: { code?: string; message?: string } | null;
-    };
+      .select(LEGACY_PRICING_SELECT)
+      .order("model_id", {
+        ascending: true,
+      })) as unknown as typeof pricingResult;
+  }
 
-    if (
-      pricingResult.error &&
-      isMissingRealtimePricingColumn(pricingResult.error)
-    ) {
-      pricingResult = (await admin
-        .from("ai_pricing_settings")
-        .select(LEGACY_PRICING_SELECT)
-        .order("model_id", { ascending: true })) as unknown as typeof pricingResult;
-    }
+  const { data, error } = pricingResult;
 
-    const { data, error } = pricingResult;
-
-    if (error)
-      return c.json(
-        { success: false, error: { code: "DB_ERROR", message: error.message } },
-        500,
-      );
-
-    const dbPricing: Array<
-      PricingDatabaseRow & {
-        input_price_usd_per_million: number;
-        output_price_usd_per_million: number;
-      }
-    > = (data || []).map(
-      (r) =>
-        ({
-          model_id: r.model_id,
-          input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
-          output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
-          ...Object.fromEntries(
-            REALTIME_PRICING_COLUMNS.map((column) => [
-              column,
-              r[column] ?? null,
-            ]),
-          ),
-        }) as PricingDatabaseRow & {
-          input_price_usd_per_million: number;
-          output_price_usd_per_million: number;
-        },
+  if (error)
+    return c.json(
+      { success: false, error: { code: "DB_ERROR", message: error.message } },
+      500,
     );
 
-    const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
-    const pricingModels = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
-      (model, index, models) =>
-        models.findIndex((candidate) => candidate.id === model.id) === index,
-    );
-    const result: Array<{
-      model_id: string;
-      model_name: string;
-      provider: string;
-      pricing_mode: "simple" | "realtime";
+  const dbPricing: Array<
+    PricingDatabaseRow & {
       input_price_usd_per_million: number;
       output_price_usd_per_million: number;
-      [key: string]: unknown;
-    }> = pricingModels.map((m) => ({
-      model_id: m.id,
-      model_name: m.name,
-      provider: m.provider,
-      pricing_mode: m.realtime ? ("realtime" as const) : ("simple" as const),
-      input_price_usd_per_million:
-        pricingMap.get(m.id)?.input_price_usd_per_million ?? 0,
-      output_price_usd_per_million:
-        pricingMap.get(m.id)?.output_price_usd_per_million ?? 0,
-      ...Object.fromEntries(
-        REALTIME_PRICING_COLUMNS.map((column) => [
-          column,
-          pricingMap.get(m.id)?.[column] ?? null,
-        ]),
-      ),
-    }));
-
-    for (const p of dbPricing) {
-      if (!result.some((r) => r.model_id === p.model_id)) {
-        result.push({
-          model_id: p.model_id,
-          model_name: p.model_id,
-          provider: "unknown" as const,
-          pricing_mode: "simple" as const,
-          input_price_usd_per_million: p.input_price_usd_per_million,
-          output_price_usd_per_million: p.output_price_usd_per_million,
-          ...Object.fromEntries(
-            REALTIME_PRICING_COLUMNS.map((column) => [
-              column,
-              p[column] ?? null,
-            ]),
-          ),
-        });
-      }
     }
+  > = (data || []).map(
+    (r) =>
+      ({
+        model_id: r.model_id,
+        input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
+        output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
+        ...Object.fromEntries(
+          REALTIME_PRICING_COLUMNS.map((column) => [column, r[column] ?? null]),
+        ),
+      }) as PricingDatabaseRow & {
+        input_price_usd_per_million: number;
+        output_price_usd_per_million: number;
+      },
+  );
 
-    return c.json({ success: true, data: result });
-  },
-);
+  const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
+  const pricingModels = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
+    (model, index, models) =>
+      models.findIndex((candidate) => candidate.id === model.id) === index,
+  );
+  const result: Array<{
+    model_id: string;
+    model_name: string;
+    provider: string;
+    pricing_mode: "simple" | "realtime";
+    input_price_usd_per_million: number;
+    output_price_usd_per_million: number;
+    [key: string]: unknown;
+  }> = pricingModels.map((m) => ({
+    model_id: m.id,
+    model_name: m.name,
+    provider: m.provider,
+    pricing_mode: m.realtime ? ("realtime" as const) : ("simple" as const),
+    input_price_usd_per_million:
+      pricingMap.get(m.id)?.input_price_usd_per_million ?? 0,
+    output_price_usd_per_million:
+      pricingMap.get(m.id)?.output_price_usd_per_million ?? 0,
+    ...Object.fromEntries(
+      REALTIME_PRICING_COLUMNS.map((column) => [
+        column,
+        pricingMap.get(m.id)?.[column] ?? null,
+      ]),
+    ),
+  }));
+
+  for (const p of dbPricing) {
+    if (!result.some((r) => r.model_id === p.model_id)) {
+      result.push({
+        model_id: p.model_id,
+        model_name: p.model_id,
+        provider: "unknown" as const,
+        pricing_mode: "simple" as const,
+        input_price_usd_per_million: p.input_price_usd_per_million,
+        output_price_usd_per_million: p.output_price_usd_per_million,
+        ...Object.fromEntries(
+          REALTIME_PRICING_COLUMNS.map((column) => [column, p[column] ?? null]),
+        ),
+      });
+    }
+  }
+
+  return c.json({ success: true, data: result });
+});
 
 ai.put(
   "/monitoring/pricing",
@@ -766,10 +769,11 @@ ai.put(
     const body = c.req.valid("json");
 
     const admin = createAdminClient();
-    const { error } = await admin.from("ai_pricing_settings").upsert(
-      buildPricingUpsertPayload(body, new Date().toISOString()),
-      { onConflict: "model_id" },
-    );
+    const { error } = await admin
+      .from("ai_pricing_settings")
+      .upsert(buildPricingUpsertPayload(body, new Date().toISOString()), {
+        onConflict: "model_id",
+      });
 
     if (error)
       return c.json(

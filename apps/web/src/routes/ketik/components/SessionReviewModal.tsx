@@ -22,10 +22,37 @@ import type {
 } from "@trainers/types";
 
 function getScoreGrade(score: number) {
-  if (score >= 90) return { label: "Sangat Baik", color: "text-emerald-600", bg: "bg-emerald-500/10", border: "border-emerald-500/25", bar: "bg-emerald-500" };
-  if (score >= 75) return { label: "Baik", color: "text-sky-600", bg: "bg-sky-500/10", border: "border-sky-500/25", bar: "bg-sky-500" };
-  if (score >= 60) return { label: "Cukup", color: "text-amber-600", bg: "bg-amber-500/10", border: "border-amber-500/25", bar: "bg-amber-500" };
-  return { label: "Perlu Coaching", color: "text-rose-600", bg: "bg-rose-500/10", border: "border-rose-500/25", bar: "bg-rose-500" };
+  if (score >= 90)
+    return {
+      label: "Sangat Baik",
+      color: "text-emerald-600",
+      bg: "bg-emerald-500/10",
+      border: "border-emerald-500/25",
+      bar: "bg-emerald-500",
+    };
+  if (score >= 75)
+    return {
+      label: "Baik",
+      color: "text-sky-600",
+      bg: "bg-sky-500/10",
+      border: "border-sky-500/25",
+      bar: "bg-sky-500",
+    };
+  if (score >= 60)
+    return {
+      label: "Cukup",
+      color: "text-amber-600",
+      bg: "bg-amber-500/10",
+      border: "border-amber-500/25",
+      bar: "bg-amber-500",
+    };
+  return {
+    label: "Perlu Coaching",
+    color: "text-rose-600",
+    bg: "bg-rose-500/10",
+    border: "border-rose-500/25",
+    bar: "bg-rose-500",
+  };
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -112,34 +139,47 @@ export function SessionReviewModal({
 
   const scoreCards = [
     {
-      label: "Empathy",
-      score: session.empathyScore || 0,
+      label: "Empati & Komunikasi",
+      score: session.empathyScore ?? 0,
       icon: Heart,
-      description: "Kemampuan memahami & merespons perasaan konsumen dengan hangat",
+      description:
+        "Kemampuan memahami & merespons perasaan konsumen dengan hangat",
       instruction: "Semakin tinggi semakin baik",
     },
     {
       label: "Probing",
-      score: session.probingScore || 0,
+      score: session.probingScore ?? 0,
       icon: Zap,
-      description: "Kemampuan menggali informasi & kebutuhan konsumen secara mendalam",
+      description:
+        "Kemampuan menggali informasi & kebutuhan konsumen secara mendalam",
       instruction: "Semakin tinggi semakin baik",
     },
     {
       label: "Tata Tulis",
-      score: session.typoScore || 0,
+      score: session.typoScore ?? 0,
       icon: AlertTriangle,
       description: "Kualitas penulisan: ejaan, tata bahasa, & kerapian pesan",
       instruction: "Semakin tinggi = semakin baik penulisan",
     },
     {
-      label: "Compliance",
-      score: session.complianceScore || 0,
+      label: "Kepatuhan",
+      score: session.complianceScore ?? 0,
       icon: Award,
       description: "Kepatuhan terhadap prosedur, regulasi, & etika komunikasi",
       instruction: "Semakin tinggi semakin baik",
     },
   ];
+
+  if (session.resolutionScore !== undefined) {
+    scoreCards.splice(2, 0, {
+      label: "Resolusi",
+      score: session.resolutionScore,
+      icon: Target,
+      description:
+        "Kejelasan solusi, langkah tindak lanjut, & kelengkapan jawaban",
+      instruction: "Semakin tinggi semakin baik",
+    });
+  }
 
   const scoreRubrik = [
     { range: "90-100", label: "Sangat Baik", color: "text-emerald-600" },
@@ -188,7 +228,7 @@ export function SessionReviewModal({
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
           {review ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {scoreCards.map((card) => {
                   const grade = getScoreGrade(card.score);
                   return (
@@ -207,7 +247,9 @@ export function SessionReviewModal({
                       <div className={`text-2xl font-black ${grade.color}`}>
                         {card.score}
                       </div>
-                      <div className={`text-[9px] font-bold ${grade.color} uppercase tracking-wider`}>
+                      <div
+                        className={`text-[9px] font-bold ${grade.color} uppercase tracking-wider`}
+                      >
                         {grade.label}
                       </div>
                       <ScoreBar score={card.score} />
@@ -231,17 +273,29 @@ export function SessionReviewModal({
                     <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/60">
                       Skor Akhir
                     </div>
-                    <div className={`text-3xl font-black ${getScoreGrade(session.finalScore || 0).color}`}>
+                    <div
+                      className={`text-3xl font-black ${getScoreGrade(session.finalScore || 0).color}`}
+                    >
                       {session.finalScore || 0}
                     </div>
-                    <div className={`text-[11px] font-bold ${getScoreGrade(session.finalScore || 0).color} mt-0.5`}>
+                    <div
+                      className={`text-[11px] font-bold ${getScoreGrade(session.finalScore || 0).color} mt-0.5`}
+                    >
                       {getScoreGrade(session.finalScore || 0).label}
                     </div>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5 text-right">
                   <div className="text-sm text-foreground/80 font-medium max-w-[360px]">
-                    Performa Anda dinilai dari: <strong>Empati</strong>, <strong>Probing</strong>, <strong>Tata Tulis</strong>, & <strong>Kepatuhan</strong>.
+                    Performa Anda dinilai dari:{" "}
+                    <strong>Empati & Komunikasi</strong>,{" "}
+                    <strong>Probing</strong>
+                    {session.resolutionScore !== undefined ? (
+                      <>
+                        , <strong>Resolusi</strong>
+                      </>
+                    ) : null}
+                    , <strong>Tata Tulis</strong>, & <strong>Kepatuhan</strong>.
                   </div>
                   <div className="flex items-center gap-2 justify-end text-[11px] text-muted-foreground/80">
                     <TrendingUp className="w-3.5 h-3.5" />
@@ -257,7 +311,10 @@ export function SessionReviewModal({
                 </summary>
                 <div className="flex items-center gap-4 mt-3 flex-wrap">
                   {scoreRubrik.map((r) => (
-                    <span key={r.label} className={`text-xs ${r.color} font-semibold`}>
+                    <span
+                      key={r.label}
+                      className={`text-xs ${r.color} font-semibold`}
+                    >
                       {r.range}: {r.label}
                     </span>
                   ))}

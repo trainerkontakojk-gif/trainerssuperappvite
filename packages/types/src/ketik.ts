@@ -3,6 +3,13 @@ import { z } from "zod";
 // ── KETIK Types ────────────────────────────────────────
 export type ChatSender = "agent" | "consumer" | "system";
 
+export const KETIK_PROMPT_LIMITS = {
+  scenarioDescription: 12_000,
+  scenarioScript: 20_000,
+  consumerDescription: 4_000,
+  chatMessageText: 5_000,
+} as const;
+
 export interface PacingMeta {
   mode: "realistic" | "training_fast";
   band: "short" | "normal" | "long" | "slow" | "follow_up" | "greeting_reply";
@@ -191,6 +198,7 @@ export interface KetikSessionHistoryItem {
   finalScore?: number;
   empathyScore?: number;
   probingScore?: number;
+  resolutionScore?: number;
   typoScore?: number;
   complianceScore?: number;
   reviewStatus?: "pending" | "processing" | "completed" | "failed";
@@ -204,6 +212,7 @@ export interface KetikReviewDetail {
     final: number;
     empathy: number;
     probing: number;
+    resolution?: number;
     typo: number;
     compliance: number;
   };
@@ -247,6 +256,7 @@ export interface ChatSession {
   finalScore?: number;
   empathyScore?: number;
   probingScore?: number;
+  resolutionScore?: number;
   typoScore?: number;
   complianceScore?: number;
   reviewStatus?: "pending" | "processing" | "completed" | "failed";
@@ -278,15 +288,15 @@ export const ketikScenarioSchema = z.object({
   id: z.string(),
   category: z.string(),
   title: z.string(),
-  description: z.string(),
+  description: z.string().max(KETIK_PROMPT_LIMITS.scenarioDescription),
   isActive: z.boolean(),
-  script: z.string().optional(),
+  script: z.string().max(KETIK_PROMPT_LIMITS.scenarioScript).optional(),
   images: z.array(z.string()).optional(),
 });
 export const chatMessageSchema = z.object({
   id: z.string(),
   sender: chatSenderSchema,
-  text: z.string(),
+  text: z.string().max(KETIK_PROMPT_LIMITS.chatMessageText),
   timestamp: z.string(),
   status: z.enum(["sent", "delivered", "read"]).optional(),
   pacingMeta: z
@@ -310,7 +320,7 @@ export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export const ketikConsumerTypeSchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string(),
+  description: z.string().max(KETIK_PROMPT_LIMITS.consumerDescription),
   difficulty: z.enum(["Mudah", "Sedang", "Sulit"]),
   isCustom: z.boolean().optional(),
 });
