@@ -521,6 +521,54 @@ describe("OpenAI Realtime response usage", () => {
     },
   };
 
+  it("persists assessment usage under telefun/voice_assessment", async () => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "ai_pricing_settings") {
+        return buildQueryResult({
+          input_text_price_usd_per_million: 4,
+          cached_input_text_price_usd_per_million: 0.4,
+          input_audio_price_usd_per_million: 32,
+          cached_input_audio_price_usd_per_million: 0.4,
+          output_text_price_usd_per_million: 24,
+          output_audio_price_usd_per_million: 64,
+        });
+      }
+      if (table === "ai_billing_settings") {
+        return buildQueryResult({ usd_to_idr_rate: 15_000 });
+      }
+      if (table === "ai_usage_logs") {
+        return {
+          insert: vi.fn(async (payload: Record<string, unknown>) => {
+            insertedUsagePayloads.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "assessment-response",
+      usage: responseUsage,
+    });
+    await expect(
+      flushOpenAIRealtimeUsage(
+        "telefun-assessment-s1",
+        "user-1",
+        summarizeOpenAIUsageAccumulator(accumulator)!,
+        "gpt-realtime-2.1",
+        undefined,
+        "voice_assessment",
+      ),
+    ).resolves.toBe(true);
+    expect(insertedUsagePayloads[0]).toMatchObject({
+      module: "telefun",
+      action: "voice_assessment",
+    });
+  });
+
   it("parses text, audio, and cached input details without inventing missing fields", () => {
     expect(parseOpenAIRealtimeUsage(responseUsage)).toEqual({
       inputTokens: 3_000_000,

@@ -159,6 +159,7 @@ apps/api/src/
 │
 ├── lib/
 │   ├── telefun-analysis.ts           # ★ Voice quality assessment (AI) + coaching summary
+│   ├── telefun-openai-assessment.ts  # Internal client untuk assessment OpenAI
 │   ├── telefun-hold-assessment.ts    # Hold behavior assessment
 │   ├── telefun-communication-profile.ts # Communication profile builder
 │   ├── telefun-scoring-errors.ts     # Error types scoring
@@ -206,6 +207,10 @@ apps/telefun/
 │   ├── transcript.ts          # Real-time transcript collector
 │   ├── usage.ts               # Token usage tracking & billing (dual-provider)
 │   ├── db.ts                  # Supabase DB queries (session CRUD)
+│   ├── internal-scoring-http.ts # Endpoint assessment internal terautentikasi
+│   ├── internal-scoring-auth.ts # Timing-safe bearer-token validation
+│   ├── scoring-audio.ts       # Agent-only recording + FFmpeg PCM24k
+│   ├── openai-voice-assessment.ts # Isolated GPT Realtime evaluator
 │   ├── auth.ts                # JWT token verification
 │   ├── env.ts                 # Environment validation (Zod) — Gemini + OpenAI key
 │   └── providers/             # ★ Provider adapter pattern
@@ -258,13 +263,13 @@ apps/telefun/
 
 ### Role Access
 
-| Role | Akses Telefun |
-|------|--------------|
-| **Admin** | ✅ Full — settings, call, history, review, monitoring |
-| **Trainer** | ✅ Full — settings, call, history, review, monitoring |
-| **QA** | ❌ Diblokir — backend `requireRole("admin","trainer")` + frontend gate |
-| **Leader** | ❌ Diblokir — maintenance modal "Akses Terbatas" |
-| **Agent** | ❌ Diblokir — maintenance modal "Akses Terbatas" |
+| Role        | Akses Telefun                                                          |
+| ----------- | ---------------------------------------------------------------------- |
+| **Admin**   | ✅ Full — settings, call, history, review, monitoring                  |
+| **Trainer** | ✅ Full — settings, call, history, review, monitoring                  |
+| **QA**      | ❌ Diblokir — backend `requireRole("admin","trainer")` + frontend gate |
+| **Leader**  | ❌ Diblokir — maintenance modal "Akses Terbatas"                       |
+| **Agent**   | ❌ Diblokir — maintenance modal "Akses Terbatas"                       |
 
 ### Session States
 
@@ -273,12 +278,12 @@ pending → active → completed
                 → failed
 ```
 
-| Status | Arti |
-|--------|------|
-| `pending` | Session dibuat, belum dimulai |
-| `active` | Panggilan sedang berlangsung |
-| `completed` | Panggilan selesai normal |
-| `failed` | Error — panggilan gagal |
+| Status      | Arti                          |
+| ----------- | ----------------------------- |
+| `pending`   | Session dibuat, belum dimulai |
+| `active`    | Panggilan sedang berlangsung  |
+| `completed` | Panggilan selesai normal      |
+| `failed`    | Error — panggilan gagal       |
 
 ### Scoring Lifecycle
 
@@ -312,14 +317,14 @@ Patch telefun_history → score, feedback, voice_assessment
 
 ### Hold Behavior
 
-| Aspek | Detail |
-|-------|--------|
-| Hold pertama | Maksimal **1 menit** |
-| Hold berikutnya | Maksimal **3 menit** |
-| Countdown | UI tampilkan + peringatan 10 detik terakhir |
-| Overtime | Tampilkan `+MM:SS` setelah batas |
-| Penilaian | **Deterministik** (bukan AI): Baik (score **10**, semua ≤ batas) atau Kurang (score **4**, ada yang melebihi). Final score: `(aiScore × 5 + holdScore) / 6` |
-| Saat hold | Mikrofon user dimute **+ audio AI diblokir** (`suppressGeminiAudio: true`) |
+| Aspek           | Detail                                                                                                                                                      |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hold pertama    | Maksimal **1 menit**                                                                                                                                        |
+| Hold berikutnya | Maksimal **3 menit**                                                                                                                                        |
+| Countdown       | UI tampilkan + peringatan 10 detik terakhir                                                                                                                 |
+| Overtime        | Tampilkan `+MM:SS` setelah batas                                                                                                                            |
+| Penilaian       | **Deterministik** (bukan AI): Baik (score **10**, semua ≤ batas) atau Kurang (score **4**, ada yang melebihi). Final score: `(aiScore × 5 + holdScore) / 6` |
+| Saat hold       | Mikrofon user dimute **+ audio AI diblokir** (`suppressGeminiAudio: true`)                                                                                  |
 
 ### Prompt-first conversation challenges
 
@@ -333,12 +338,12 @@ Tidak ada lagi orchestrator atau engine realistic-mode di browser. Playback hany
 
 Durasi panggilan dibatasi sesuai `maxCallDuration` oleh timer aplikasi. Timer memicu cue bertahap via `getTimeCueInstruction()` di `promptBuilder.ts`; model tidak menerima durasi total dan tidak menghitung sisa waktu sendiri.
 
-| Sisa Waktu | Aksi AI (konsumen) |
-|------------|-------------------|
-| 2 menit | Mulai arah ke penutup |
-| 1 menit | Persiapan penutupan |
-| 30 detik | Mulai tutup percakapan |
-| 20 detik | HARUS tutup telepon sekarang |
+| Sisa Waktu | Aksi AI (konsumen)           |
+| ---------- | ---------------------------- |
+| 2 menit    | Mulai arah ke penutup        |
+| 1 menit    | Persiapan penutupan          |
+| 30 detik   | Mulai tutup percakapan       |
+| 20 detik   | HARUS tutup telepon sekarang |
 
 Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di system prompt awal. Gemini menerima marker lewat `realtimeInput.text`, sedangkan OpenAI menerima conversation item `role: "system"` lalu `response.create`. Marker bukan ucapan agen dan tidak boleh disebutkan oleh konsumen AI.
 
@@ -371,12 +376,12 @@ Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di
 
 ### Saat Panggilan
 
-| Tombol | Fungsi |
-|--------|--------|
-| 🎙️ **Mute** | Matikan mikrofon |
-| ⏸️ **Hold** | Tahan panggilan (dengan timer) |
+| Tombol            | Fungsi                          |
+| ----------------- | ------------------------------- |
+| 🎙️ **Mute**       | Matikan mikrofon                |
+| ⏸️ **Hold**       | Tahan panggilan (dengan timer)  |
 | 📝 **Transcript** | Lihat teks percakapan real-time |
-| ⏹️ **Tutup** | Akhiri panggilan |
+| ⏹️ **Tutup**      | Akhiri panggilan                |
 
 ### Setelah Panggilan
 
@@ -403,13 +408,13 @@ Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di
 
 ### File Utama
 
-| File | Lokasi | Fungsi |
-|------|--------|--------|
-| **`promptBuilder.ts`** | `apps/web/src/routes/telefun/services/` | **Otak prompt** — membangun system instruction |
-| **`liveSession.ts`** | `apps/web/src/routes/telefun/services/` | Membangun setup provider dan mengirim runtime time cue |
-| **`simulationChallenges.ts`** | `apps/web/src/routes/telefun/services/` | Source of truth challenge dan kebijakan interruption |
-| **`telefunSettings.ts`** | `apps/web/src/routes/telefun/` | Tipe data scenario, consumer type, identity |
-| **`TelefunScenariosTab.tsx`** | `apps/web/src/routes/telefun/components/settings/` | UI editor skenario |
+| File                          | Lokasi                                             | Fungsi                                                 |
+| ----------------------------- | -------------------------------------------------- | ------------------------------------------------------ |
+| **`promptBuilder.ts`**        | `apps/web/src/routes/telefun/services/`            | **Otak prompt** — membangun system instruction         |
+| **`liveSession.ts`**          | `apps/web/src/routes/telefun/services/`            | Membangun setup provider dan mengirim runtime time cue |
+| **`simulationChallenges.ts`** | `apps/web/src/routes/telefun/services/`            | Source of truth challenge dan kebijakan interruption   |
+| **`telefunSettings.ts`**      | `apps/web/src/routes/telefun/`                     | Tipe data scenario, consumer type, identity            |
+| **`TelefunScenariosTab.tsx`** | `apps/web/src/routes/telefun/components/settings/` | UI editor skenario                                     |
 
 ### Komponen Prompt
 
@@ -438,18 +443,19 @@ buildTelefunLiveSystemInstruction({
 
 **Edit `promptBuilder.ts`** — bagian yang bisa diubah:
 
-| Fungsi / Variable | Konten |
-|-------------------|--------|
-| `getEmotionInstruction()` | Mapping `consumerType.id` → guidance emosi + deskripsi lengkap |
-| `pacingInstruction` (variable) | Tempo bicara: `realistic` vs `training_fast` |
-| `characterGenderInstruction` (variable) | Konsistensi identitas gender; voice teknis diatur runtime |
-| `silentInstruction` (variable) | Cara relatif menangani agen diam tanpa menghitung detik |
-| `simulationChallengeTypes` | Tantangan kontekstual dan interruption policy dari registry prompt-first |
-| `scriptInstruction` (variable) | Hierarki fakta wajib, respons natural, dan urutan fleksibel |
-| `buildTelefunLiveSystemInstruction()` return value | **Prompt utama** untuk Gemini dan OpenAI |
-| `getTimeCueInstruction()` | Teks kontrol runtime dengan marker `TELEFUN_CONTROL:TIME_CUE` |
+| Fungsi / Variable                                  | Konten                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------ |
+| `getEmotionInstruction()`                          | Mapping `consumerType.id` → guidance emosi + deskripsi lengkap           |
+| `pacingInstruction` (variable)                     | Tempo bicara: `realistic` vs `training_fast`                             |
+| `characterGenderInstruction` (variable)            | Konsistensi identitas gender; voice teknis diatur runtime                |
+| `silentInstruction` (variable)                     | Cara relatif menangani agen diam tanpa menghitung detik                  |
+| `simulationChallengeTypes`                         | Tantangan kontekstual dan interruption policy dari registry prompt-first |
+| `scriptInstruction` (variable)                     | Hierarki fakta wajib, respons natural, dan urutan fleksibel              |
+| `buildTelefunLiveSystemInstruction()` return value | **Prompt utama** untuk Gemini dan OpenAI                                 |
+| `getTimeCueInstruction()`                          | Teks kontrol runtime dengan marker `TELEFUN_CONTROL:TIME_CUE`            |
 
 **Tips:**
+
 - Ingin konsumen lebih ngotot? → Edit fungsi `getEmotionInstruction()` di `promptBuilder.ts`
 - Ingin tempo bicara berbeda? → Edit variable `pacingInstruction`
 - Ingin konsumen pakai logat? → Tambahkan di `instruction` field scenario
@@ -464,31 +470,33 @@ buildTelefunLiveSystemInstruction({
 
 Semua route membutuhkan role `admin` atau `trainer`.
 
-| Method | Endpoint | Deskripsi |
-|--------|----------|-----------|
-| `GET` | `/sessions` | Ambil daftar session (admin/trainer: semua, lain: milik sendiri) |
-| `POST` | `/sessions` | Buat session baru |
-| `PATCH` | `/sessions/:id` | Update session (status, transcript, metrics, score) |
-| `GET` | `/history/:id` | Detail session (dengan ownership check) |
-| `DELETE` | `/history/:id` | Hapus session + file storage |
-| `DELETE` | `/history` | Hapus semua session user |
-| `GET` | `/settings` | Ambil settings Telefun user |
-| `PUT` | `/settings` | Simpan settings Telefun user |
-| `GET` | `/recordings` | Daftar recording |
-| `GET` | `/recordings/:sessionId` | Signed URL untuk akses recording |
-| `POST` | `/recordings/:sessionId/remux` | Remux recording (ffmpeg) |
-| `POST` | `/annotations` | Simpan annotasi |
+| Method   | Endpoint                       | Deskripsi                                                        |
+| -------- | ------------------------------ | ---------------------------------------------------------------- |
+| `GET`    | `/sessions`                    | Ambil daftar session (admin/trainer: semua, lain: milik sendiri) |
+| `POST`   | `/sessions`                    | Buat session baru                                                |
+| `PATCH`  | `/sessions/:id`                | Update session (status, transcript, metrics, score)              |
+| `GET`    | `/history/:id`                 | Detail session (dengan ownership check)                          |
+| `DELETE` | `/history/:id`                 | Hapus session + file storage                                     |
+| `DELETE` | `/history`                     | Hapus semua session user                                         |
+| `GET`    | `/settings`                    | Ambil settings Telefun user                                      |
+| `PUT`    | `/settings`                    | Simpan settings Telefun user                                     |
+| `GET`    | `/recordings`                  | Daftar recording                                                 |
+| `GET`    | `/recordings/:sessionId`       | Signed URL untuk akses recording                                 |
+| `POST`   | `/recordings/:sessionId/remux` | Remux recording (ffmpeg)                                         |
+| `POST`   | `/annotations`                 | Simpan annotasi                                                  |
 
 ### Proxy Server (apps/telefun)
 
-| Endpoint | Type | Deskripsi |
-|----------|------|-----------|
-| `/health` | HTTP | Health check (uptime, timestamp) |
-| `/` atau `/ws` | WebSocket | Koneksi real-time dengan Gemini |
+| Endpoint       | Type      | Deskripsi                        |
+| -------------- | --------- | -------------------------------- |
+| `/health`      | HTTP      | Health check (uptime, timestamp) |
+| `/internal/telefun/scoring` | HTTP | Assessment OpenAI internal; bearer token, tanpa CORS |
+| `/` atau `/ws` | WebSocket | Koneksi real-time dengan Gemini  |
 
 #### WebSocket Protocol (Client → Proxy → Gemini)
 
 **Setup:**
+
 ```json
 {
   "setup": {
@@ -500,15 +508,19 @@ Semua route membutuhkan role `admin` atau `trainer`.
 ```
 
 **Audio input:**
+
 ```json
 {
   "realtimeInput": {
-    "mediaChunks": [{ "data": "base64audio...", "mimeType": "audio/pcm;rate=16000" }]
+    "mediaChunks": [
+      { "data": "base64audio...", "mimeType": "audio/pcm;rate=16000" }
+    ]
   }
 }
 ```
 
 **Session end:**
+
 ```json
 { "type": "session_end_request", "reason": "user" }
 ```
@@ -544,10 +556,21 @@ Session completed
   → enqueue_telefun_scoring (DB RPC)
   → telefun-scoring-worker.ts (claim job)
   → telefun-scoring-service.ts (process)
-    → telefun-analysis.ts (AI voice assessment via Gemini)
+    → telefun-analysis.ts (provider-matched routing)
+        • Gemini live model  → telefun-analysis.ts (Gemini 3.5 Flash voice assessment)
+        • OpenAI live model  → telefun-openai-assessment.ts (HTTP → Telefun internal endpoint)
+            → Telefun service: internal-scoring-http.ts (auth via TELEFUN_INTERNAL_TOKEN)
+                → scoring-audio.ts (load ONLY claimed agent recording + FFmpeg 24 kHz PCM16)
+                → openai-voice-assessment.ts (isolated GPT Realtime, model-exact evaluator)
+                → usage.ts (log telefun/voice_assessment dengan exact model + modality usage)
+                → return untrusted assessment JSON ke API
     → telefun-hold-assessment.ts (deterministic hold score)
-  → Patch telefun_history (score + feedback + voice_assessment)
+  → API validates canonical schema lalu patch telefun_history (score + voice_assessment)
 ```
+
+OpenAI assessment bersifat fail-closed: kegagalan endpoint, Realtime, validasi,
+atau usage logging tidak pernah fallback diam-diam ke Gemini. API tetap menjadi
+pemilik queue dan satu-satunya layer yang menyimpan hasil assessment final.
 
 ---
 
@@ -575,20 +598,20 @@ pnpm --filter @trainers/telefun test:core
 
 ### Test Files Penting
 
-| Layer | File | Coverage |
-|-------|------|----------|
-| Proxy | `server-protocol.test.ts` | Protocol detection, message parsing |
-| Proxy | `server-close.test.ts` | Close-code mapping |
-| Proxy | `transcript.test.ts` | Transcript collection, dedup |
-| Proxy | `session-drain.test.ts` | Drain lifecycle |
-| Proxy | `usage-modality.test.ts` | Usage tracking & billing |
-| Backend | `telefun-routes.test.ts` | Session CRUD, access control |
-| Backend | `telefun-assessment-boundary.test.ts` | Boundary assessment |
-| Backend | `telefun-scoring-service.test.ts` | Scoring lifecycle |
-| Backend | `telefun-hold-assessment.test.ts` | Hold scoring |
-| Backend | `telefun-analysis-hold.test.ts` | Hold analysis integration |
-| Backend | `telefun-schema-contract.test.ts` | DB schema contract |
-| Backend | `telefun-recording-access.test.ts` | Recording permission |
+| Layer   | File                                  | Coverage                            |
+| ------- | ------------------------------------- | ----------------------------------- |
+| Proxy   | `server-protocol.test.ts`             | Protocol detection, message parsing |
+| Proxy   | `server-close.test.ts`                | Close-code mapping                  |
+| Proxy   | `transcript.test.ts`                  | Transcript collection, dedup        |
+| Proxy   | `session-drain.test.ts`               | Drain lifecycle                     |
+| Proxy   | `usage-modality.test.ts`              | Usage tracking & billing            |
+| Backend | `telefun-routes.test.ts`              | Session CRUD, access control        |
+| Backend | `telefun-assessment-boundary.test.ts` | Boundary assessment                 |
+| Backend | `telefun-scoring-service.test.ts`     | Scoring lifecycle                   |
+| Backend | `telefun-hold-assessment.test.ts`     | Hold scoring                        |
+| Backend | `telefun-analysis-hold.test.ts`       | Hold analysis integration           |
+| Backend | `telefun-schema-contract.test.ts`     | DB schema contract                  |
+| Backend | `telefun-recording-access.test.ts`    | Recording permission                |
 
 ---
 
@@ -596,23 +619,37 @@ pnpm --filter @trainers/telefun test:core
 
 ### Proxy (apps/telefun) — dari `.env.local` root
 
-| Variable | Required | Default | Deskripsi |
-|----------|----------|---------|-----------|
-| `PORT` | ❌ | `3002` | Port server |
-| `SUPABASE_URL` | ✅ | — | Supabase URL |
-| `SUPABASE_ANON_KEY` | ✅ | — | Anon key (auth) |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | — | Service role (DB) |
-| `GEMINI_API_KEY` | ✅ | — | Gemini Live API key |
-| `ALLOWED_ORIGINS` | ❌ | `"*"` | CORS origins |
-| `NODE_ENV` | ❌ | `"development"` | Mode |
+| Variable                    | Required          | Default         | Deskripsi                                       |
+| --------------------------- | ----------------- | --------------- | ----------------------------------------------- |
+| `PORT`                      | ❌                | `3002`          | Port server                                     |
+| `SUPABASE_URL`              | ✅                | —               | Supabase URL                                    |
+| `SUPABASE_ANON_KEY`         | ✅                | —               | Anon key (auth)                                 |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅                | —               | Service role (DB)                               |
+| `GEMINI_API_KEY`            | ✅                | —               | Gemini Live API key                             |
+| `OPENAI_API_KEY`            | Jika OpenAI aktif | —               | Hanya di service Telefun                        |
+| `TELEFUN_OPENAI_ENABLED`    | ❌                | `false`         | Kill switch OpenAI                              |
+| `TELEFUN_INTERNAL_TOKEN`    | Jika OpenAI aktif | —               | Shared server-only token; nilai sama dengan API |
+| `ALLOWED_ORIGINS`           | ❌                | `"*"`           | CORS origins                                    |
+| `NODE_ENV`                  | ❌                | `"development"` | Mode                                            |
 
 ### Frontend — dari `VITE_*` env (via `.env.local` root)
 
-| Variable | Required | Deskripsi |
-|----------|----------|-----------|
-| `VITE_SUPABASE_URL` | ✅ | Supabase URL |
-| `VITE_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
-| `VITE_TELEFUN_WS_URL` | ✅ | WebSocket URL proxy (biasanya `ws://localhost:3002`) — dipakai di `liveProtocol.ts` & `geminiService.ts` |
+| Variable                 | Required | Deskripsi                                                                                                |
+| ------------------------ | -------- | -------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`      | ✅       | Supabase URL                                                                                             |
+| `VITE_SUPABASE_ANON_KEY` | ✅       | Supabase anon key                                                                                        |
+| `VITE_TELEFUN_WS_URL`    | ✅       | WebSocket URL proxy (biasanya `ws://localhost:3002`) — dipakai di `liveProtocol.ts` & `geminiService.ts` |
+
+### Backend API — server-only
+
+| Variable                 | Required          | Deskripsi                                     |
+| ------------------------ | ----------------- | --------------------------------------------- |
+| `TELEFUN_INTERNAL_URL`   | Jika OpenAI aktif | Origin privat service Telefun; hanya di API   |
+| `TELEFUN_INTERNAL_TOKEN` | Jika OpenAI aktif | Shared token yang sama dengan service Telefun |
+
+`OPENAI_API_KEY` tidak boleh dipasang pada API atau Frontend. Endpoint
+`POST /internal/telefun/scoring` tidak menyediakan CORS dan hanya menerima
+request server-to-server terautentikasi.
 
 ---
 

@@ -61,36 +61,40 @@ Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi buil
 
 ### API Service
 
-| Variable                    | Value                              | Notes                                                                                    |
-| --------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------- |
-| `PORT`                      | `$PORT`                            | Railway auto-inject                                                                      |
-| `NODE_ENV`                  | `production`                       | **Wajib** — tanpa ini, CORS fallback ke `localhost:3000` dan `ALLOWED_ORIGINS` diabaikan |
-| `VITE_SUPABASE_URL`         | `https://<project>.supabase.co`    | Supabase project URL                                                                     |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key                                                                         |
-| `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key                                                                    |
-| `OPENROUTER_API_KEY`        | `sk-or...`                         | OpenRouter API key                                                                       |
-| `DEEPSEEK_API_KEY`          | `sk-...`                           | DeepSeek API key (opsional — untuk model DeepSeek native)                                |
-| `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
+| Variable                    | Value                               | Notes                                                                                    |
+| --------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `PORT`                      | `$PORT`                             | Railway auto-inject                                                                      |
+| `NODE_ENV`                  | `production`                        | **Wajib** — tanpa ini, CORS fallback ke `localhost:3000` dan `ALLOWED_ORIGINS` diabaikan |
+| `VITE_SUPABASE_URL`         | `https://<project>.supabase.co`     | Supabase project URL                                                                     |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                            | Service role key                                                                         |
+| `GEMINI_API_KEY`            | `AI...`                             | Google Gemini API key                                                                    |
+| `OPENROUTER_API_KEY`        | `sk-or...`                          | OpenRouter API key                                                                       |
+| `DEEPSEEK_API_KEY`          | `sk-...`                            | DeepSeek API key (opsional — untuk model DeepSeek native)                                |
+| `TELEFUN_INTERNAL_URL`      | `http://<telefun-private-url>:3002` | Origin privat Telefun untuk assessment OpenAI; hanya di API                              |
+| `TELEFUN_INTERNAL_TOKEN`    | `<random>`                          | Shared server-only secret; nilai sama dengan Telefun                                     |
+| `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app`  | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
 
 ### Telefun Service
 
 Dua variable OpenAI di bawah hanya boleh dipasang pada service `apps/telefun`, bukan Web, Vercel, atau `apps/api`. Default flag tetap `false`, sehingga rollout awal tetap Gemini-only.
 
-| Variable                    | Value                              | Notes                                                          |
-| --------------------------- | ---------------------------------- | -------------------------------------------------------------- |
-| `PORT`                      | `$PORT`                            | Railway auto-inject                                            |
-| `NODE_ENV`                  | `production`                       |                                                                |
-| `SUPABASE_URL`              | `https://<project>.supabase.co`    | Supabase project URL                                           |
-| `SUPABASE_ANON_KEY`         | `eyJ...`                           | Supabase anon key                                              |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key                                               |
-| `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key                                          |
-| `OPENAI_API_KEY`            | `sk-...`                           | Backend-only; wajib bila `TELEFUN_OPENAI_ENABLED=true`         |
-| `TELEFUN_OPENAI_ENABLED`    | `false`                            | Kill switch; default/off mempertahankan Gemini-only            |
-| `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all                                       |
+| Variable                    | Value                              | Notes                                                                             |
+| --------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| `PORT`                      | `$PORT`                            | Railway auto-inject                                                               |
+| `NODE_ENV`                  | `production`                       |                                                                                   |
+| `SUPABASE_URL`              | `https://<project>.supabase.co`    | Supabase project URL                                                              |
+| `SUPABASE_ANON_KEY`         | `eyJ...`                           | Supabase anon key                                                                 |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key                                                                  |
+| `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key                                                             |
+| `OPENAI_API_KEY`            | `sk-...`                           | Backend-only; wajib bila `TELEFUN_OPENAI_ENABLED=true` (hanya di service Telefun) |
+| `TELEFUN_OPENAI_ENABLED`    | `false`                            | Kill switch; default/off mempertahankan Gemini-only                               |
+| `TELEFUN_INTERNAL_TOKEN`    | `<random>`                         | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web     |
+| `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all                                                          |
 
 Aturan secret/config:
 
 - `OPENAI_API_KEY` tidak boleh memakai prefix `VITE_`, tidak boleh berada di Vercel, dan tidak boleh disalin ke API service.
+- `TELEFUN_INTERNAL_URL` **hanya** di service API; mengarah ke private URL Railway service Telefun (bukan public Web). `TELEFUN_INTERNAL_TOKEN` adalah shared server-only secret yang nilainya SAMA persis di API dan Telefun; token ini tidak boleh berawalan `VITE_` dan tidak boleh di-deploy ke Vercel/Web.
 - `TELEFUN_OPENAI_ENABLED=false` menolak **sesi OpenAI baru** tanpa menghapus history/model pricing. Panggilan aktif tidak dipindahkan ke Gemini di tengah sesi.
 - Jika flag `true` tetapi key tidak ada/invalid, readiness OpenAI harus `not_ready` dan configure OpenAI ditolak dengan error aman. Service tetap dapat hidup untuk Gemini bila konfigurasi Gemini valid.
 - Mengubah Railway env memerlukan redeploy/restart service Telefun; jangan menganggap flag berubah in-process sebelum runtime mendukung reload.
@@ -99,9 +103,9 @@ Aturan secret/config:
 
 **FFmpeg wajib tersedia di container deployment Railway** untuk meremux recording audio Telefun agar seekable (play/pause/seek). Set env var berikut di **Telefun service** Railway:
 
-| Variable                       | Value      | Notes                                                              |
-| ------------------------------ | ---------- | ------------------------------------------------------------------ |
-| `RAILPACK_DEPLOY_APT_PACKAGES` | `ffmpeg`   | Menginstal FFmpeg di container build-time via Nixpacks apt-get     |
+| Variable                       | Value    | Notes                                                          |
+| ------------------------------ | -------- | -------------------------------------------------------------- |
+| `RAILPACK_DEPLOY_APT_PACKAGES` | `ffmpeg` | Menginstal FFmpeg di container build-time via Nixpacks apt-get |
 
 Setelah remux berhasil, player menggunakan signed URL persisten; jika gagal, blob URL asli digunakan sebagai fallback. Lihat `docs/telefun.md` untuk detail implementasi remux.
 
@@ -212,9 +216,11 @@ VITE_TELEFUN_WS_URL=ws://localhost:3002
 # Target runtime dual-provider; hanya dikonsumsi apps/telefun
 OPENAI_API_KEY=your_openai_key
 TELEFUN_OPENAI_ENABLED=false
+TELEFUN_INTERNAL_TOKEN=replace_with_random_internal_token
 
 # API
 VITE_API_URL=http://localhost:3001/api/v1
+TELEFUN_INTERNAL_URL=http://localhost:3002
 PORT=3001
 
 # MCP

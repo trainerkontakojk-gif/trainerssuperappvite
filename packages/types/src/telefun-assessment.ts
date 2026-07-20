@@ -138,6 +138,85 @@ export const telefunScoreEnvelopeSchema = z.object({
   assessment: z.unknown(),
 });
 
+/**
+ * Provider-neutral OpenAPI-compatible JSON schema for the voice quality
+ * assessment. Consumed by both the Gemini and OpenAI assessment transports so
+ * the two evaluators emit the same canonical shape before Zod validation.
+ *
+ * Mirrors `voiceQualityAssessmentInputSchema` above but MUST NOT include
+ * `holdManagement` or `communicationProfile` — those are system-derived and
+ * applied after parsing.
+ */
+export const TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    overallScore: { type: "number" },
+    speakingRate: {
+      type: "object",
+      properties: {
+        score: { type: "number" },
+        wordsPerMinute: { type: "number" },
+        verdict: { type: "string" },
+        feedback: { type: "string" },
+      },
+      required: ["score", "wordsPerMinute", "verdict", "feedback"],
+    },
+    intonation: {
+      type: "object",
+      properties: {
+        score: { type: "number" },
+        verdict: { type: "string" },
+        feedback: { type: "string" },
+      },
+      required: ["score", "verdict", "feedback"],
+    },
+    articulation: {
+      type: "object",
+      properties: {
+        score: { type: "number" },
+        verdict: { type: "string" },
+        feedback: { type: "string" },
+      },
+      required: ["score", "verdict", "feedback"],
+    },
+    fillerWords: {
+      type: "object",
+      properties: {
+        score: { type: "number" },
+        count: { type: "number" },
+        examples: { type: "array", items: { type: "string" } },
+        verdict: { type: "string" },
+        feedback: { type: "string" },
+      },
+      required: ["score", "count", "examples", "verdict", "feedback"],
+    },
+    emotionalTone: {
+      type: "object",
+      properties: {
+        score: { type: "number" },
+        dominant: { type: "string" },
+        verdict: { type: "string" },
+        feedback: { type: "string" },
+      },
+      required: ["score", "dominant", "verdict", "feedback"],
+    },
+    transcript: { type: "string" },
+    highlights: { type: "array", items: { type: "string" } },
+    strengths: { type: "array", items: { type: "string" } },
+  },
+  required: [
+    "overallScore",
+    "speakingRate",
+    "intonation",
+    "articulation",
+    "fillerWords",
+    "emotionalTone",
+    "transcript",
+    "highlights",
+    "strengths",
+  ],
+} as const;
+
 export type VoiceAspectScore = z.infer<typeof voiceAspectScoreSchema>;
 export type TelefunHoldAssessment = z.infer<typeof telefunHoldAssessmentSchema>;
 type ParsedVoiceQualityAssessment = z.output<

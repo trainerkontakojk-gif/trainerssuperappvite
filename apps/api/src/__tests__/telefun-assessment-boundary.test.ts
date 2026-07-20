@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseTelefunScoreResult,
   parseVoiceQualityAssessment,
+  TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA,
 } from "@trainers/types";
 
 const validAssessment = {
@@ -33,8 +34,8 @@ const validAssessment = {
 };
 
 describe("parseVoiceQualityAssessment", () => {
-  it("rejects non-object or incomplete shape", () => {
-    const invalidAssessments = [
+  it("rejects incomplete or invalid shapes", () => {
+    for (const input of [
       null,
       {},
       { overallScore: 8 },
@@ -48,46 +49,31 @@ describe("parseVoiceQualityAssessment", () => {
         ...validAssessment,
         fillerWords: { ...validAssessment.fillerWords, count: 1.5 },
       },
-    ];
-
-    for (const input of invalidAssessments) {
+    ]) {
       expect(parseVoiceQualityAssessment(input)).toBeNull();
     }
   });
 
-  it("clamps valid scores to 0-10", () => {
-    const resultHigh = parseVoiceQualityAssessment({
-      ...validAssessment,
-      overallScore: 12,
-    });
-    expect(resultHigh?.overallScore).toBe(10);
-
-    const resultLow = parseVoiceQualityAssessment({
-      ...validAssessment,
-      overallScore: -2,
-    });
-    expect(resultLow?.overallScore).toBe(0);
-  });
-
-  it("preserves score 0 as valid", () => {
-    const result = parseVoiceQualityAssessment({
-      ...validAssessment,
-      overallScore: 0,
-    });
-    expect(result?.overallScore).toBe(0);
-  });
-
-  it("validates and truncates highlights/strengths", () => {
-    const result = parseVoiceQualityAssessment({
-      ...validAssessment,
-      highlights: ["1", "2", "3", "4", "5", "6"],
-    });
-    expect(result?.highlights).toHaveLength(5);
+  it("clamps scores, preserves zero, and bounds arrays", () => {
+    expect(
+      parseVoiceQualityAssessment({ ...validAssessment, overallScore: 12 })
+        ?.overallScore,
+    ).toBe(10);
+    expect(
+      parseVoiceQualityAssessment({ ...validAssessment, overallScore: -2 })
+        ?.overallScore,
+    ).toBe(0);
+    expect(
+      parseVoiceQualityAssessment({
+        ...validAssessment,
+        highlights: ["1", "2", "3", "4", "5", "6"],
+      })?.highlights,
+    ).toHaveLength(5);
   });
 });
 
 describe("parseTelefunScoreResult", () => {
-  it("rejects invalid envelope", () => {
+  it("preserves the score envelope trust boundary", () => {
     expect(parseTelefunScoreResult(null)).toBeNull();
     expect(parseTelefunScoreResult(validAssessment)).toBeNull();
     expect(
@@ -97,24 +83,38 @@ describe("parseTelefunScoreResult", () => {
         assessment: validAssessment,
       }),
     ).toBeNull();
-  });
-
-  it("accepts valid result with score 0", () => {
-    const result = parseTelefunScoreResult({
+    const zeroResult = parseTelefunScoreResult({
       score: 0,
       feedback: "Bad",
       assessment: { ...validAssessment, overallScore: 0 },
     });
-    expect(result?.score).toBe(0);
-    expect(result?.assessment.overallScore).toBe(0);
+    expect(zeroResult?.score).toBe(0);
+    expect(zeroResult?.assessment.overallScore).toBe(0);
+    expect(
+      parseTelefunScoreResult({
+        score: 8,
+        feedback: "Mismatch",
+        assessment: { ...validAssessment, overallScore: 7 },
+      }),
+    ).toBeNull();
   });
+});
 
-  it("rejects result if score doesn't match assessment overallScore", () => {
-    const result = parseTelefunScoreResult({
-      score: 8,
-      feedback: "Mismatch",
-      assessment: { ...validAssessment, overallScore: 7 },
-    });
-    expect(result).toBeNull();
+describe("TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA", () => {
+  it("exports the complete provider-neutral voice assessment schema", () => {
+    expect(TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA.required).toEqual([
+      "overallScore",
+      "speakingRate",
+      "intonation",
+      "articulation",
+      "fillerWords",
+      "emotionalTone",
+      "transcript",
+      "highlights",
+      "strengths",
+    ]);
+    expect(
+      TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA.properties.fillerWords.required,
+    ).toContain("count");
   });
 });

@@ -42,7 +42,10 @@ export async function updateSession(
   }
 }
 
-export async function getOwnedSessionId(sessionId: string, userId: string): Promise<string | null> {
+export async function getOwnedSessionId(
+  sessionId: string,
+  userId: string,
+): Promise<string | null> {
   const { data, error } = await admin
     .from("telefun_history")
     .select("id")
@@ -51,4 +54,40 @@ export async function getOwnedSessionId(sessionId: string, userId: string): Prom
     .maybeSingle();
   if (error) throw new Error(`Gagal memeriksa session: ${error.message}`);
   return data?.id ?? null;
+}
+
+export interface ClaimedProcessingSession {
+  id: string;
+  user_id: string;
+  scenario_title: string;
+  agent_recording_path: string;
+  telefun_model_id: string;
+  scoring_status: string;
+}
+
+/**
+ * Fetch the minimal columns needed for OpenAI voice assessment. Must return a
+ * row only when the session is owned by `userId`, currently `processing`, and
+ * the stored `telefun_model_id` exactly matches the requested evaluator model.
+ * Rejects otherwise so the caller never downloads storage for an invalid request.
+ */
+export async function queryClaimedProcessingSession(
+  sessionId: string,
+  userId: string,
+  modelId: string,
+): Promise<ClaimedProcessingSession | null> {
+  const { data, error } = await admin
+    .from("telefun_history")
+    .select(
+      "id, user_id, scenario_title, agent_recording_path, telefun_model_id, scoring_status",
+    )
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .eq("telefun_model_id", modelId)
+    .eq("scoring_status", "processing")
+    .maybeSingle();
+
+  if (error) throw new Error(`Gagal memeriksa session: ${error.message}`);
+  if (!data) return null;
+  return data as ClaimedProcessingSession;
 }

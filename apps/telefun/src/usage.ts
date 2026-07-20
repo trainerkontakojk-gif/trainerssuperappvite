@@ -918,6 +918,7 @@ export async function flushOpenAIRealtimeUsage(
   aggregate: OpenAIUsageAggregate,
   modelId: string,
   sessionDurationMs?: number,
+  action: "voice_live" | "voice_assessment" = "voice_live",
 ): Promise<boolean> {
   const model = getTelefunLiveModel(modelId);
   if (model?.provider !== "openai") {
@@ -1029,7 +1030,7 @@ export async function flushOpenAIRealtimeUsage(
       provider: model.provider,
       model_id: model.id,
       module: "telefun",
-      action: "voice_live",
+      action,
       input_tokens: aggregate.inputTokens ?? 0,
       output_tokens: aggregate.outputTokens ?? 0,
       total_tokens: aggregate.totalTokens ?? 0,

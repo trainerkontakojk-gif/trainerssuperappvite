@@ -1,85 +1,20 @@
 import { createAdminClient } from "./supabase";
 import { generateGeminiContent } from "./gemini";
-import { parseVoiceQualityAssessment } from "@trainers/types";
+import {
+  parseVoiceQualityAssessment,
+  TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA,
+} from "@trainers/types";
 import type { VoiceQualityAssessment } from "@trainers/types";
+import { getTelefunLiveModel } from "@trainers/types";
 import { parseJsonFromModelText } from "./ai-json";
 import {
   normalizeTelefunHoldMetrics,
   evaluateTelefunHoldAssessment,
   applyHoldAssessmentToOverallScore,
 } from "./telefun-hold-assessment";
+import { requestOpenAITelefunAssessment } from "./telefun-openai-assessment";
 
 export type { VoiceQualityAssessment };
-
-const VOICE_ASSESSMENT_SCHEMA = {
-  type: "object",
-  properties: {
-    overallScore: { type: "number" },
-    speakingRate: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        wordsPerMinute: { type: "number" },
-        verdict: { type: "string" },
-        feedback: { type: "string" },
-      },
-      required: ["score", "wordsPerMinute", "verdict", "feedback"],
-    },
-    intonation: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        verdict: { type: "string" },
-        feedback: { type: "string" },
-      },
-      required: ["score", "verdict", "feedback"],
-    },
-    articulation: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        verdict: { type: "string" },
-        feedback: { type: "string" },
-      },
-      required: ["score", "verdict", "feedback"],
-    },
-    fillerWords: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        count: { type: "number" },
-        examples: { type: "array", items: { type: "string" } },
-        verdict: { type: "string" },
-        feedback: { type: "string" },
-      },
-      required: ["score", "count", "examples", "verdict", "feedback"],
-    },
-    emotionalTone: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        dominant: { type: "string" },
-        verdict: { type: "string" },
-        feedback: { type: "string" },
-      },
-      required: ["score", "dominant", "verdict", "feedback"],
-    },
-    transcript: { type: "string" },
-    highlights: { type: "array", items: { type: "string" } },
-    strengths: { type: "array", items: { type: "string" } },
-  },
-  required: [
-    "overallScore",
-    "speakingRate",
-    "intonation",
-    "articulation",
-    "fillerWords",
-    "emotionalTone",
-    "transcript",
-    "highlights",
-    "strengths",
-  ],
-};
 
 export async function analyzeVoiceQuality(
   sessionId: string,
@@ -95,7 +30,7 @@ export async function analyzeVoiceQuality(
   const { data: row, error: fetchError } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, scenario_title, agent_recording_path, voice_assessment, session_metrics",
+      "id, user_id, scenario_title, agent_recording_path, voice_assessment, session_metrics, telefun_model_id",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -103,7 +38,7 @@ export async function analyzeVoiceQuality(
   if (fetchError || !row) return { success: false, error: "Session not found" };
   if (row.user_id !== userId) return { success: false, error: "Unauthorized" };
 
-  // Compute hold assessment from session_metrics
+  // Compute hold assessment from session_metrics (shared by both providers)
   const sessionMetrics =
     row.session_metrics &&
     typeof row.session_metrics === "object" &&
@@ -165,6 +100,46 @@ export async function analyzeVoiceQuality(
     };
   }
 
+  // Provider-matched routing happens only after the shared cache boundary, so
+  // a completed assessment never opens another provider connection.
+  const liveModel = getTelefunLiveModel(row.telefun_model_id);
+  if (liveModel?.provider === "openai") {
+    const assessment = await requestOpenAITelefunAssessment({
+      sessionId,
+      userId,
+      modelId: row.telefun_model_id,
+    });
+    const synchronizedAssessment = parseVoiceQualityAssessment({
+      ...assessment,
+      holdManagement: holdAssessment,
+      overallScore: applyHoldAssessmentToOverallScore(
+        assessment.overallScore,
+        holdAssessment,
+      ),
+    });
+    if (!synchronizedAssessment) {
+      return { success: false, error: "Format hasil analisis tidak valid." };
+    }
+
+    const { error: updateError } = await adminClient
+      .from("telefun_history")
+      .update({
+        voice_assessment: synchronizedAssessment,
+        score: synchronizedAssessment.overallScore,
+        scoring_status: "completed",
+        scoring_completed_at: new Date().toISOString(),
+      })
+      .eq("id", sessionId);
+    if (updateError) {
+      console.error("[Telefun] Failed to save OpenAI assessment:", updateError);
+      return {
+        success: false,
+        error: "Gagal menyimpan hasil penilaian suara.",
+      };
+    }
+    return { success: true, assessment: synchronizedAssessment };
+  }
+
   const agentPath = row.agent_recording_path;
   if (!agentPath) {
     return { success: false, error: "No agent audio available for assessment" };
@@ -209,7 +184,7 @@ export async function analyzeVoiceQuality(
   `;
 
   const response = await generateGeminiContent({
-    model: "gemini-3.1-flash-lite",
+    model: "gemini-3.5-flash",
     systemInstruction:
       "Anda adalah pelatih vokal profesional dan analis wicara yang tegas dan objektif. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia.",
     contents: [
@@ -222,7 +197,7 @@ export async function analyzeVoiceQuality(
       },
     ],
     responseMimeType: "application/json",
-    responseSchema: VOICE_ASSESSMENT_SCHEMA as any,
+    responseSchema: TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA as any,
     usageContext: { module: "telefun", action: "voice_assessment" },
     userId,
   });
@@ -274,7 +249,8 @@ export async function analyzeVoiceQuality(
         .from("telefun_history")
         .update({
           scoring_status: "failed",
-          scoring_last_error: err instanceof Error ? err.message : "Parse error",
+          scoring_last_error:
+            err instanceof Error ? err.message : "Parse error",
         })
         .eq("id", sessionId)
         .in("scoring_status", ["processing", "pending"]);

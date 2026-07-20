@@ -388,6 +388,8 @@
 - `docs/ketik-system-prompt-audit.md` — Added remediation status, compatibility rules, input bounds, provider rationale, and deployment order.
 - `supabase/migrations/20260720044244_add_ketik_resolution_score.sql` — Adds nullable `public.ketik_history.resolution_score`.
 
+208.  **Telefun Provider-Matched Voice Assessment** — Routes voice assessment from the stored `telefun_model_id`: Gemini/legacy sessions use `gemini-3.5-flash`, while OpenAI sessions use the exact `gpt-realtime-2.1` or Mini model in a fresh isolated Realtime connection. Added a timing-safe authenticated Telefun internal endpoint, agent-only recording verification, bounded WebM-to-PCM conversion, canonical provider-neutral function schema, fail-closed API routing, deterministic hold composition, and `telefun/voice_assessment` modality usage logging. `OPENAI_API_KEY` remains exclusive to Telefun; API receives only the private Telefun URL and shared internal token. No migration or new runtime dependency. (IMPLEMENTED)
+
 ---
 
 ### Historical — Migration & Pagination Records

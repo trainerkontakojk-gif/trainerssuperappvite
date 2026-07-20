@@ -18,6 +18,7 @@ export const telefunEnvSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    TELEFUN_INTERNAL_TOKEN: optionalSecret,
     ALLOWED_ORIGINS: z.string().default("*"),
     NODE_ENV: z
       .enum(["development", "production", "test"])
@@ -29,6 +30,14 @@ export const telefunEnvSchema = z
         code: z.ZodIssueCode.custom,
         path: ["OPENAI_API_KEY"],
         message: "OPENAI_API_KEY is required when TELEFUN_OPENAI_ENABLED=true",
+      });
+    }
+    if (value.TELEFUN_OPENAI_ENABLED && !value.TELEFUN_INTERNAL_TOKEN) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TELEFUN_INTERNAL_TOKEN"],
+        message:
+          "TELEFUN_INTERNAL_TOKEN is required when TELEFUN_OPENAI_ENABLED=true",
       });
     }
   });

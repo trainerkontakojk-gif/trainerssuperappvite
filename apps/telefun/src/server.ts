@@ -44,6 +44,10 @@ import {
   resolveTelefunHealthCors,
 } from "./health.js";
 import { retryUsageAfterInFlight } from "./usage-flush-retry.js";
+import {
+  handleInternalScoringRequest,
+  INTERNAL_SCORING_PATH,
+} from "./internal-scoring-http.js";
 
 process.on("uncaughtException", (err) =>
   console.error("[Telefun] Uncaught:", err),
@@ -53,6 +57,13 @@ process.on("unhandledRejection", (reason) =>
 );
 
 const server = createServer((req, res) => {
+  if (
+    new URL(req.url ?? "/", "http://telefun.internal").pathname ===
+    INTERNAL_SCORING_PATH
+  ) {
+    void handleInternalScoringRequest(req, res);
+    return;
+  }
   if (req.url === "/health") {
     const cors = resolveTelefunHealthCors({
       allowedOrigins: env.ALLOWED_ORIGINS,

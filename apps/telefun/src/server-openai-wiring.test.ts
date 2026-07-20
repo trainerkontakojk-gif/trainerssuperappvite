@@ -49,4 +49,11 @@ describe("Telefun OpenAI server wiring", () => {
     expect(serverSource).toContain('activeProvider !== "openai"');
     expect(serverSource).not.toContain("OpenAI usage observed");
   });
+
+  it("wires the authenticated internal assessment route before public health handling", () => {
+    expect(serverSource).toContain("handleInternalScoringRequest(req, res)");
+    expect(
+      serverSource.indexOf("handleInternalScoringRequest(req, res)"),
+    ).toBeLessThan(serverSource.indexOf('if (req.url === "/health")'));
+  });
 });

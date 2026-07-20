@@ -42,12 +42,34 @@ describe("Telefun environment schema", () => {
     const parsed = parseTelefunEnv({
       ...REQUIRED_ENV,
       TELEFUN_OPENAI_ENABLED: "true",
-      OPENAI_API_KEY: "sk-configured",
+      OPENAI_API_KEY: "«redacted:sk-…»",
+      TELEFUN_INTERNAL_TOKEN: "internal-secret",
     });
 
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
     expect(parsed.data.TELEFUN_OPENAI_ENABLED).toBe(true);
-    expect(parsed.data.OPENAI_API_KEY).toBe("sk-configured");
+    expect(parsed.data.OPENAI_API_KEY).toBe("«redacted:sk-…»");
+  });
+
+  it("requires an internal token when OpenAI is enabled", () => {
+    const parsed = parseTelefunEnv({
+      ...REQUIRED_ENV,
+      TELEFUN_OPENAI_ENABLED: "true",
+      OPENAI_API_KEY: "«redacted:sk-…»",
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("accepts an internal token alongside OpenAI config", () => {
+    const parsed = parseTelefunEnv({
+      ...REQUIRED_ENV,
+      TELEFUN_OPENAI_ENABLED: "true",
+      OPENAI_API_KEY: "«redacted:sk-…»",
+      TELEFUN_INTERNAL_TOKEN: "internal-secret",
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.TELEFUN_INTERNAL_TOKEN).toBe("internal-secret");
   });
 });
