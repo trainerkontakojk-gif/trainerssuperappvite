@@ -12,7 +12,7 @@
     "test:fast": "vitest run",
     "test:full": "vitest run",
     "lint": "eslint .",
-    "start": "node dist/server.js"
+    "start": "tsx src/server.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
