@@ -1,12 +1,13 @@
-import React from 'react';
-import { X, Save, FileText, Users, User, Settings } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TelefunAppSettings as AppSettings } from '../telefunSettings';
-import { useTelefunSettingsDraft } from './settings/useTelefunSettingsDraft';
-import { TelefunScenariosTab } from './settings/TelefunScenariosTab';
-import { TelefunConsumersTab } from './settings/TelefunConsumersTab';
-import { TelefunIdentityTab } from './settings/TelefunIdentityTab';
-import { TelefunSystemTab } from './settings/TelefunSystemTab';
+import React from "react";
+import { X, Save, FileText, Users, User, Settings } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TelefunAppSettings as AppSettings } from "../telefunSettings";
+import { useTelefunSettingsDraft } from "./settings/useTelefunSettingsDraft";
+import { TelefunScenariosTab } from "./settings/TelefunScenariosTab";
+import { TelefunConsumersTab } from "./settings/TelefunConsumersTab";
+import { TelefunIdentityTab } from "./settings/TelefunIdentityTab";
+import { TelefunSystemTab } from "./settings/TelefunSystemTab";
+import { useTelefunProviderReadiness } from "../hooks/useTelefunProviderReadiness";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,7 +16,13 @@ interface SettingsModalProps {
   onSave: (newSettings: AppSettings) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  settings,
+  onSave,
+}) => {
+  const providerReadiness = useTelefunProviderReadiness(isOpen);
   const {
     activeTab,
     setActiveTab,
@@ -33,15 +40,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
     handleDeleteConsumer,
     handleSave,
     handleClose,
-  } = useTelefunSettingsDraft({ settings, isOpen, onSave, onClose });
+  } = useTelefunSettingsDraft({
+    settings,
+    isOpen,
+    onSave,
+    onClose,
+    providerReadiness,
+  });
 
   if (!isOpen) return null;
 
   const tabs = [
-    { id: 'scenarios' as const, label: 'Masalah', icon: FileText },
-    { id: 'consumers' as const, label: 'Karakter', icon: Users },
-    { id: 'identity' as const, label: 'Identitas', icon: User },
-    { id: 'system' as const, label: 'Sistem', icon: Settings },
+    { id: "scenarios" as const, label: "Masalah", icon: FileText },
+    { id: "consumers" as const, label: "Karakter", icon: Users },
+    { id: "identity" as const, label: "Identitas", icon: User },
+    { id: "system" as const, label: "Sistem", icon: Settings },
   ];
 
   return (
@@ -113,7 +126,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.15 }}
                   >
-                    {activeTab === 'scenarios' && (
+                    {activeTab === "scenarios" && (
                       <TelefunScenariosTab
                         scenarios={localSettings.scenarios}
                         scenarioForm={scenarioForm}
@@ -125,10 +138,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                       />
                     )}
 
-                    {activeTab === 'consumers' && (
+                    {activeTab === "consumers" && (
                       <TelefunConsumersTab
                         consumerTypes={localSettings.consumerTypes}
-                        preferredConsumerTypeId={localSettings.preferredConsumerTypeId}
+                        preferredConsumerTypeId={
+                          localSettings.preferredConsumerTypeId
+                        }
                         consumerForm={consumerForm}
                         handleSelectConsumerType={handleSelectConsumerType}
                         handleDeleteConsumer={handleDeleteConsumer}
@@ -136,19 +151,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, s
                       />
                     )}
 
-                    {activeTab === 'identity' && (
+                    {activeTab === "identity" && (
                       <TelefunIdentityTab
                         identitySettings={localSettings.identitySettings}
+                        telefunModelId={selectedTelefunModel}
                         setLocalSettings={setLocalSettings}
                       />
                     )}
 
-                    {activeTab === 'system' && (
+                    {activeTab === "system" && (
                       <TelefunSystemTab
                         localSettings={localSettings}
                         setLocalSettings={setLocalSettings}
                         selectedTelefunModel={selectedTelefunModel}
                         setSelectedTelefunModel={setSelectedTelefunModel}
+                        providerReadiness={providerReadiness}
                       />
                     )}
                   </motion.div>

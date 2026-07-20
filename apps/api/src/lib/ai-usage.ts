@@ -1,11 +1,12 @@
 import { createAdminClient } from "./supabase";
 import { normalizeModelId } from "./ai-models";
-import type { AIProvider } from "@trainers/types";
+import { getTelefunLiveModel, type AIProvider } from "@trainers/types";
 import {
   DEFAULT_USD_TO_IDR_RATE,
   getBillingRate,
 } from "./ai-billing-settings";
 import { calculateModalityCost } from "./modality-pricing";
+import { isMissingRealtimePricingColumn } from "./pricing-contract";
 
 export interface UsageContext {
   module: "ketik" | "pdkt" | "telefun" | "qa-analyzer";
@@ -17,7 +18,9 @@ interface TokenUsage {
   outputTokens: number;
   totalTokens: number;
   inputTextTokens?: number;
+  cachedInputTextTokens?: number;
   inputAudioTokens?: number;
+  cachedInputAudioTokens?: number;
   outputTextTokens?: number;
   outputAudioTokens?: number;
 }
@@ -34,7 +37,7 @@ function isMissingAiUsageStatusColumnError(error: unknown): boolean {
   const err = isPostgrestError(error) ? error : {};
   const msg = (err.message || "").toLowerCase();
   const newColumnPattern =
-    "status|error_message|input_text_tokens|input_audio_tokens|input_unspecified_tokens|output_text_tokens|output_audio_tokens|output_unspecified_tokens|input_text_price_usd_per_million|input_audio_price_usd_per_million|output_text_price_usd_per_million|output_audio_price_usd_per_million";
+    "status|error_message|input_text_tokens|cached_input_text_tokens|input_audio_tokens|cached_input_audio_tokens|input_unspecified_tokens|output_text_tokens|output_audio_tokens|output_unspecified_tokens|input_text_price_usd_per_million|cached_input_text_price_usd_per_million|input_audio_price_usd_per_million|cached_input_audio_price_usd_per_million|output_text_price_usd_per_million|output_audio_price_usd_per_million";
   
   if (err.code === "42703") {
     return new RegExp(
@@ -88,22 +91,35 @@ export async function logAiUsage(options: {
       }
     }
 
-    const [{ data: pricing }, billingRate] = await Promise.all([
-      admin
+    let pricingResult = await admin
+      .from("ai_pricing_settings")
+      .select(
+        "input_price_usd_per_million, output_price_usd_per_million, input_text_price_usd_per_million, cached_input_text_price_usd_per_million, input_audio_price_usd_per_million, cached_input_audio_price_usd_per_million, output_text_price_usd_per_million, output_audio_price_usd_per_million",
+      )
+      .eq("model_id", normalizedModelId)
+      .maybeSingle();
+    if (
+      pricingResult.error &&
+      isMissingRealtimePricingColumn(pricingResult.error)
+    ) {
+      pricingResult = await admin
         .from("ai_pricing_settings")
         .select("input_price_usd_per_million, output_price_usd_per_million")
         .eq("model_id", normalizedModelId)
-        .maybeSingle(),
-      getBillingRate(admin),
-    ]);
+        .maybeSingle();
+    }
+    if (pricingResult.error) throw pricingResult.error;
+    const pricing = pricingResult.data;
+    const billingRate = await getBillingRate(admin);
 
     let inputPricePerMillion = 0;
     let outputPricePerMillion = 0;
     const usdToIdrRate = billingRate ?? DEFAULT_USD_TO_IDR_RATE;
 
-    const isLiveModel = normalizedModelId.includes("live");
-    const defaultInput = isLiveModel ? 3.0 : 0;
-    const defaultOutput = isLiveModel ? 12.0 : 0;
+    const liveModel = getTelefunLiveModel(normalizedModelId);
+    const isGeminiLive = liveModel?.provider === "gemini";
+    const defaultInput = isGeminiLive ? 3.0 : 0;
+    const defaultOutput = isGeminiLive ? 12.0 : 0;
 
     if (!pricing) {
       console.warn(
@@ -134,7 +150,9 @@ export async function logAiUsage(options: {
     const modalityCost = calculateModalityCost(
       {
         inputTextTokens: options.tokens.inputTextTokens ?? 0,
+        cachedInputTextTokens: options.tokens.cachedInputTextTokens,
         inputAudioTokens: options.tokens.inputAudioTokens ?? 0,
+        cachedInputAudioTokens: options.tokens.cachedInputAudioTokens,
         inputUnspecifiedTokens,
         outputTextTokens: options.tokens.outputTextTokens ?? 0,
         outputAudioTokens: options.tokens.outputAudioTokens ?? 0,
@@ -143,6 +161,18 @@ export async function logAiUsage(options: {
       {
         inputPriceUsdPerMillion: inputPricePerMillion,
         outputPriceUsdPerMillion: outputPricePerMillion,
+        inputTextPriceUsdPerMillion:
+          pricing?.input_text_price_usd_per_million ?? undefined,
+        cachedInputTextPriceUsdPerMillion:
+          pricing?.cached_input_text_price_usd_per_million ?? undefined,
+        inputAudioPriceUsdPerMillion:
+          pricing?.input_audio_price_usd_per_million ?? undefined,
+        cachedInputAudioPriceUsdPerMillion:
+          pricing?.cached_input_audio_price_usd_per_million ?? undefined,
+        outputTextPriceUsdPerMillion:
+          pricing?.output_text_price_usd_per_million ?? undefined,
+        outputAudioPriceUsdPerMillion:
+          pricing?.output_audio_price_usd_per_million ?? undefined,
       },
       usdToIdrRate,
       normalizedModelId,
@@ -159,7 +189,9 @@ export async function logAiUsage(options: {
       output_tokens: outputTokens,
       total_tokens: totalTokens,
       input_text_tokens: options.tokens.inputTextTokens ?? null,
+      cached_input_text_tokens: options.tokens.cachedInputTextTokens ?? null,
       input_audio_tokens: options.tokens.inputAudioTokens ?? null,
+      cached_input_audio_tokens: options.tokens.cachedInputAudioTokens ?? null,
       input_unspecified_tokens:
         inputUnspecifiedTokens > 0 ? inputUnspecifiedTokens : null,
       output_text_tokens: options.tokens.outputTextTokens ?? null,
@@ -168,8 +200,12 @@ export async function logAiUsage(options: {
         outputUnspecifiedTokens > 0 ? outputUnspecifiedTokens : null,
       input_text_price_usd_per_million:
         modalityCost.inputTextPriceUsdPerMillion,
+      cached_input_text_price_usd_per_million:
+        modalityCost.cachedInputTextPriceUsdPerMillion,
       input_audio_price_usd_per_million:
         modalityCost.inputAudioPriceUsdPerMillion,
+      cached_input_audio_price_usd_per_million:
+        modalityCost.cachedInputAudioPriceUsdPerMillion,
       output_text_price_usd_per_million:
         modalityCost.outputTextPriceUsdPerMillion,
       output_audio_price_usd_per_million:
@@ -193,13 +229,19 @@ export async function logAiUsage(options: {
         status: _status,
         error_message: _errorMessage,
         input_text_tokens: _inputTextTokens,
+        cached_input_text_tokens: _cachedInputTextTokens,
         input_audio_tokens: _inputAudioTokens,
+        cached_input_audio_tokens: _cachedInputAudioTokens,
         input_unspecified_tokens: _inputUnspecifiedTokens,
         output_text_tokens: _outputTextTokens,
         output_audio_tokens: _outputAudioTokens,
         output_unspecified_tokens: _outputUnspecifiedTokens,
         input_text_price_usd_per_million: _inputTextPriceUsdPerMillion,
+        cached_input_text_price_usd_per_million:
+          _cachedInputTextPriceUsdPerMillion,
         input_audio_price_usd_per_million: _inputAudioPriceUsdPerMillion,
+        cached_input_audio_price_usd_per_million:
+          _cachedInputAudioPriceUsdPerMillion,
         output_text_price_usd_per_million: _outputTextPriceUsdPerMillion,
         output_audio_price_usd_per_million: _outputAudioPriceUsdPerMillion,
         ...legacyPayload

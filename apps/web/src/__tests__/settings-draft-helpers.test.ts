@@ -10,7 +10,9 @@ describe("settings draft commit helpers", () => {
   it("buildKetikSettingsForSave returns a new object and does not mutate localSettings", () => {
     const original = {
       ...DEFAULT_KETIK_SETTINGS,
-      scenarios: [{ ...DEFAULT_KETIK_SETTINGS.scenarios[0], title: "Original" }],
+      scenarios: [
+        { ...DEFAULT_KETIK_SETTINGS.scenarios[0], title: "Original" },
+      ],
     };
     const nextScenarios = [{ ...original.scenarios[0], title: "Changed" }];
 
@@ -28,16 +30,27 @@ describe("settings draft commit helpers", () => {
 
   it("buildPdktSettingsForSave preserves system fields while replacing collections immutably", () => {
     const original: PdktAppSettings = {
-      scenarios: [{
-        id: "s1",
-        category: "A",
-        title: "Old",
-        description: "D",
-        isActive: true,
-        recipientMode: "multiple",
-        recipientEmails: ["alpha@test.com"],
-      }],
-      consumerTypes: [{ id: "c1", name: "Old", description: "D", difficulty: "Medium", tone: "", isCustom: true }],
+      scenarios: [
+        {
+          id: "s1",
+          category: "A",
+          title: "Old",
+          description: "D",
+          isActive: true,
+          recipientMode: "multiple",
+          recipientEmails: ["alpha@test.com"],
+        },
+      ],
+      consumerTypes: [
+        {
+          id: "c1",
+          name: "Old",
+          description: "D",
+          difficulty: "Medium",
+          tone: "",
+          isCustom: true,
+        },
+      ],
       enableImageGeneration: true,
       globalConsumerTypeId: "random",
       selectedModel: "gemini-3.1-flash-lite-preview",
@@ -56,7 +69,12 @@ describe("settings draft commit helpers", () => {
         selectedModel: "gemini-3.1-flash-lite-preview",
         consumerNameMentionPattern: "upfront",
         writingStyleMode: "realistic",
-        customIdentity: { senderName: "Agent", bodyName: "Agent", email: "a@b.test", city: "Jakarta" },
+        customIdentity: {
+          senderName: "Agent",
+          bodyName: "Agent",
+          email: "a@b.test",
+          city: "Jakarta",
+        },
       },
     });
 
@@ -87,5 +105,128 @@ describe("settings draft commit helpers", () => {
     expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
     expect(result.telefunTransport).toBe("gemini-live");
     expect(original.telefunTransport).toBe("gemini-live");
+  });
+
+  it("buildTelefunSettingsForSave always replaces a client mismatch with registry transport", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gemini-3.1-flash-live-preview",
+      telefunTransport: "gemini-live" as const,
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      providerReadiness: {
+        status: "ready",
+        openai: { enabled: true, configured: true, ready: true },
+      },
+    });
+
+    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
+    expect(result.telefunTransport).toBe("openai-audio");
+    expect(result.telefunModelWarningReason).toBeUndefined();
+    expect(original.telefunTransport).toBe("gemini-live");
+  });
+
+  it("coerces an incompatible Gemini voice when switching to OpenAI", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      identitySettings: {
+        ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
+        gender: "female" as const,
+        voiceName: "Kore",
+      },
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      providerReadiness: {
+        status: "ready",
+        openai: { enabled: true, configured: true, ready: true },
+      },
+    });
+
+    expect(result.identitySettings.voiceName).toBe("marin");
+  });
+
+  it("fails closed to Gemini when save receives an unavailable OpenAI selection", () => {
+    const result = buildTelefunSettingsForSave({
+      localSettings: DEFAULT_TELEFUN_SETTINGS,
+      scenarios: DEFAULT_TELEFUN_SETTINGS.scenarios,
+      consumerTypes: DEFAULT_TELEFUN_SETTINGS.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      providerReadiness: { status: "unavailable", openai: null },
+    });
+
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe(
+      DEFAULT_TELEFUN_SETTINGS.telefunTransport,
+    );
+    expect(result.identitySettings.voiceName).toBe("");
+  });
+
+  it("preserves a persisted OpenAI selection while provider readiness is loading", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1",
+      telefunTransport: "openai-audio" as const,
+      identitySettings: {
+        ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
+        voiceName: "marin",
+      },
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      providerReadiness: { status: "loading", openai: null },
+    });
+
+    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
+    expect(result.telefunTransport).toBe("openai-audio");
+    expect(result.identitySettings.voiceName).toBe("marin");
+  });
+
+  it("rejects a new OpenAI selection while provider readiness is loading", () => {
+    const result = buildTelefunSettingsForSave({
+      localSettings: DEFAULT_TELEFUN_SETTINGS,
+      scenarios: DEFAULT_TELEFUN_SETTINGS.scenarios,
+      consumerTypes: DEFAULT_TELEFUN_SETTINGS.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      providerReadiness: { status: "loading", openai: null },
+    });
+
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe(
+      DEFAULT_TELEFUN_SETTINGS.telefunTransport,
+    );
+  });
+
+  it("returns to Gemini's gender-aware random state when switching from OpenAI", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      identitySettings: {
+        ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
+        gender: "female" as const,
+        voiceName: "cedar",
+      },
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: DEFAULT_TELEFUN_SETTINGS.telefunModelId,
+    });
+
+    expect(result.identitySettings.voiceName).toBe("");
   });
 });

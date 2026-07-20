@@ -3,14 +3,29 @@ import { aiClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 import { PricingRow } from "./PricingRow";
 import { mapError } from "../utils/formatting";
+import type { PricingEntry as ApiPricingEntry } from "../../../lib/api";
 
-export type PricingEntry = {
-  model_id: string;
-  model_name: string;
-  provider: string;
-  input_price_usd_per_million: number;
-  output_price_usd_per_million: number;
-};
+export type PricingEntry = ApiPricingEntry;
+
+export function buildPricingUpdatePayload(entry: PricingEntry) {
+  return {
+    model_id: entry.model_id,
+    input_price_usd_per_million: entry.input_price_usd_per_million,
+    output_price_usd_per_million: entry.output_price_usd_per_million,
+    input_text_price_usd_per_million:
+      entry.input_text_price_usd_per_million,
+    cached_input_text_price_usd_per_million:
+      entry.cached_input_text_price_usd_per_million,
+    input_audio_price_usd_per_million:
+      entry.input_audio_price_usd_per_million,
+    cached_input_audio_price_usd_per_million:
+      entry.cached_input_audio_price_usd_per_million,
+    output_text_price_usd_per_million:
+      entry.output_text_price_usd_per_million,
+    output_audio_price_usd_per_million:
+      entry.output_audio_price_usd_per_million,
+  };
+}
 
 interface PricingTabProps {
   pricing: PricingEntry[];
@@ -34,7 +49,9 @@ export function PricingTab({
   const handleSavePricing = async (entry: PricingEntry) => {
     try {
       await unwrapResponse(
-        await aiClient["monitoring/pricing"].$put({ json: entry }),
+        await aiClient["monitoring/pricing"].$put({
+          json: buildPricingUpdatePayload(entry),
+        }),
       );
       notify.success("Harga berhasil disimpan.");
       onRefresh();

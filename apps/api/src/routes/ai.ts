@@ -4,6 +4,7 @@ import { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import {
   AI_MODELS,
+  TELEFUN_LIVE_MODELS,
   getModelsForModule,
   resolveModelProvider,
 } from "../lib/ai-models";
@@ -27,6 +28,12 @@ import {
 } from "../services/monitoring-history-delete-service";
 
 import { isUsageActionInCategory } from "../lib/ai-usage-categories";
+import {
+  buildPricingUpsertPayload,
+  isMissingRealtimePricingColumn,
+  pricingUpsertSchema,
+  REALTIME_PRICING_COLUMNS,
+} from "../lib/pricing-contract";
 
 type Variables = { user: User; profile: any };
 
@@ -635,17 +642,39 @@ ai.get(
 );
 
 // ── Pricing CRUD ──────────────────────────────────────
+const LEGACY_PRICING_SELECT =
+  "model_id, input_price_usd_per_million, output_price_usd_per_million";
+const EXPANDED_PRICING_SELECT = `${LEGACY_PRICING_SELECT}, ${REALTIME_PRICING_COLUMNS.join(", ")}`;
+type PricingDatabaseRow = {
+  model_id: string;
+  input_price_usd_per_million: number | null;
+  output_price_usd_per_million: number | null;
+} & Partial<Record<(typeof REALTIME_PRICING_COLUMNS)[number], number | null>>;
+
 ai.get(
   "/monitoring/pricing",
   requireRole("admin", "trainer"),
   async (c) => {
     const admin = createAdminClient();
-    const { data, error } = await admin
+    let pricingResult = (await admin
       .from("ai_pricing_settings")
-      .select(
-        "model_id, input_price_usd_per_million, output_price_usd_per_million",
-      )
-      .order("model_id", { ascending: true });
+      .select(EXPANDED_PRICING_SELECT)
+      .order("model_id", { ascending: true })) as unknown as {
+      data: PricingDatabaseRow[] | null;
+      error: { code?: string; message?: string } | null;
+    };
+
+    if (
+      pricingResult.error &&
+      isMissingRealtimePricingColumn(pricingResult.error)
+    ) {
+      pricingResult = (await admin
+        .from("ai_pricing_settings")
+        .select(LEGACY_PRICING_SELECT)
+        .order("model_id", { ascending: true })) as unknown as typeof pricingResult;
+    }
+
+    const { data, error } = pricingResult;
 
     if (error)
       return c.json(
@@ -653,21 +682,57 @@ ai.get(
         500,
       );
 
-    const dbPricing = (data || []).map((r) => ({
-      model_id: r.model_id,
-      input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
-      output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
-    }));
+    const dbPricing: Array<
+      PricingDatabaseRow & {
+        input_price_usd_per_million: number;
+        output_price_usd_per_million: number;
+      }
+    > = (data || []).map(
+      (r) =>
+        ({
+          model_id: r.model_id,
+          input_price_usd_per_million: r.input_price_usd_per_million ?? 0,
+          output_price_usd_per_million: r.output_price_usd_per_million ?? 0,
+          ...Object.fromEntries(
+            REALTIME_PRICING_COLUMNS.map((column) => [
+              column,
+              r[column] ?? null,
+            ]),
+          ),
+        }) as PricingDatabaseRow & {
+          input_price_usd_per_million: number;
+          output_price_usd_per_million: number;
+        },
+    );
 
     const pricingMap = new Map(dbPricing.map((p) => [p.model_id, p]));
-    const result = AI_MODELS.map((m) => ({
+    const pricingModels = [...AI_MODELS, ...TELEFUN_LIVE_MODELS].filter(
+      (model, index, models) =>
+        models.findIndex((candidate) => candidate.id === model.id) === index,
+    );
+    const result: Array<{
+      model_id: string;
+      model_name: string;
+      provider: string;
+      pricing_mode: "simple" | "realtime";
+      input_price_usd_per_million: number;
+      output_price_usd_per_million: number;
+      [key: string]: unknown;
+    }> = pricingModels.map((m) => ({
       model_id: m.id,
       model_name: m.name,
       provider: m.provider,
+      pricing_mode: m.realtime ? ("realtime" as const) : ("simple" as const),
       input_price_usd_per_million:
         pricingMap.get(m.id)?.input_price_usd_per_million ?? 0,
       output_price_usd_per_million:
         pricingMap.get(m.id)?.output_price_usd_per_million ?? 0,
+      ...Object.fromEntries(
+        REALTIME_PRICING_COLUMNS.map((column) => [
+          column,
+          pricingMap.get(m.id)?.[column] ?? null,
+        ]),
+      ),
     }));
 
     for (const p of dbPricing) {
@@ -675,9 +740,16 @@ ai.get(
         result.push({
           model_id: p.model_id,
           model_name: p.model_id,
-          provider: "gemini" as const,
+          provider: "unknown" as const,
+          pricing_mode: "simple" as const,
           input_price_usd_per_million: p.input_price_usd_per_million,
           output_price_usd_per_million: p.output_price_usd_per_million,
+          ...Object.fromEntries(
+            REALTIME_PRICING_COLUMNS.map((column) => [
+              column,
+              p[column] ?? null,
+            ]),
+          ),
         });
       }
     }
@@ -685,12 +757,6 @@ ai.get(
     return c.json({ success: true, data: result });
   },
 );
-
-const pricingUpsertSchema = z.object({
-  model_id: z.string(),
-  input_price_usd_per_million: z.number().min(0),
-  output_price_usd_per_million: z.number().min(0),
-});
 
 ai.put(
   "/monitoring/pricing",
@@ -701,12 +767,7 @@ ai.put(
 
     const admin = createAdminClient();
     const { error } = await admin.from("ai_pricing_settings").upsert(
-      {
-        model_id: body.model_id,
-        input_price_usd_per_million: body.input_price_usd_per_million,
-        output_price_usd_per_million: body.output_price_usd_per_million,
-        updated_at: new Date().toISOString(),
-      },
+      buildPricingUpsertPayload(body, new Date().toISOString()),
       { onConflict: "model_id" },
     );
 

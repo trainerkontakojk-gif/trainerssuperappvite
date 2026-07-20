@@ -7,7 +7,10 @@ import {
   MALE_VOICES,
   FEMALE_VOICES,
 } from "../routes/telefun/telefunSettings";
-import { GEMINI_LIVE_VOICES_BY_GENDER } from "../routes/telefun/telefunVoiceRegistry";
+import {
+  GEMINI_LIVE_VOICES_BY_GENDER,
+  OPENAI_REALTIME_VOICES_BY_GENDER,
+} from "../routes/telefun/telefunVoiceRegistry";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -29,7 +32,14 @@ describe("resolveFinalIdentity gender-first", () => {
     expect(identity.gender).toBe("male");
     expect(MALE_VOICES.includes(identity.voiceName as any)).toBe(true);
     // name should be from a male profile, e.g. "Agus Setiawan", "Budi Hartono", etc.
-    const maleNames = ["Agus Setiawan", "Budi Hartono", "Hendra Wijaya", "Andi Pratama", "Rudi Hermawan", "Dian Permana"];
+    const maleNames = [
+      "Agus Setiawan",
+      "Budi Hartono",
+      "Hendra Wijaya",
+      "Andi Pratama",
+      "Rudi Hermawan",
+      "Dian Permana",
+    ];
     expect(maleNames).toContain(identity.name);
   });
 
@@ -47,7 +57,14 @@ describe("resolveFinalIdentity gender-first", () => {
 
     expect(identity.gender).toBe("female");
     expect(FEMALE_VOICES.includes(identity.voiceName as any)).toBe(true);
-    const femaleNames = ["Siti Rahayu", "Dewi Lestari", "Rina Marlina", "Fitri Handayani", "Mega Ayuningtyas", "Lina Kusuma"];
+    const femaleNames = [
+      "Siti Rahayu",
+      "Dewi Lestari",
+      "Rina Marlina",
+      "Fitri Handayani",
+      "Mega Ayuningtyas",
+      "Lina Kusuma",
+    ];
     expect(femaleNames).toContain(identity.name);
   });
 
@@ -89,6 +106,27 @@ describe("resolveFinalIdentity gender-first", () => {
 });
 
 describe("resolveFinalIdentity invalid voice normalization", () => {
+  it("resolves OpenAI identities without leaking a Gemini fallback voice", () => {
+    const identity = resolveFinalIdentity(
+      {
+        displayName: "Sari",
+        gender: "female",
+        phoneNumber: "0813",
+        city: "Jakarta",
+        signatureName: "",
+        voiceName: "Kore",
+      },
+      "gpt-realtime-2.1",
+    );
+
+    expect(OPENAI_REALTIME_VOICES_BY_GENDER.female).toContain(
+      identity.voiceName as any,
+    );
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).not.toContain(
+      identity.voiceName as any,
+    );
+  });
+
   it("[CHAR] normalizes legacy Ursa male voice to a provider-valid male voice", () => {
     const identity = resolveFinalIdentity({
       displayName: "Rudi",
@@ -101,7 +139,9 @@ describe("resolveFinalIdentity invalid voice normalization", () => {
 
     expect(identity.gender).toBe("male");
     expect(identity.voiceName).not.toBe("Ursa");
-    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(identity.voiceName as any);
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(
+      identity.voiceName as any,
+    );
   });
 
   it("[CHAR] normalizes legacy Dipper male voice to a provider-valid male voice", () => {
@@ -115,7 +155,9 @@ describe("resolveFinalIdentity invalid voice normalization", () => {
     });
 
     expect(identity.voiceName).not.toBe("Dipper");
-    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(identity.voiceName as any);
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.male).toContain(
+      identity.voiceName as any,
+    );
   });
 
   it("[CHAR] normalizes legacy female invalid voice (Capella) to a provider-valid female voice", () => {
@@ -129,7 +171,9 @@ describe("resolveFinalIdentity invalid voice normalization", () => {
     });
 
     expect(identity.voiceName).not.toBe("Capella");
-    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).toContain(identity.voiceName as any);
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).toContain(
+      identity.voiceName as any,
+    );
   });
 });
 
@@ -205,9 +249,8 @@ describe("parseTelefunSettings", () => {
   });
 
   it("save settings does not retain the realistic mode toggle or legacy challenge key", async () => {
-    const { buildTelefunSettingsForSave } = await import(
-      "../routes/telefun/components/settings/useTelefunSettingsDraft"
-    );
+    const { buildTelefunSettingsForSave } =
+      await import("../routes/telefun/components/settings/useTelefunSettingsDraft");
     const result = buildTelefunSettingsForSave({
       localSettings: {
         ...DEFAULT_TELEFUN_SETTINGS,
@@ -230,6 +273,38 @@ describe("parseTelefunSettings", () => {
       selectedModel: "gemini-3.0-flash-live-preview",
     });
     expect(result.selectedModel).toBe("gemini-3.0-flash-live-preview");
+  });
+
+  it("derives the canonical transport when a known persisted model has no transport", () => {
+    const result = parseTelefunSettings({
+      telefunModelId: "gpt-realtime-2.1-mini",
+    });
+
+    expect(result.telefunModelId).toBe("gpt-realtime-2.1-mini");
+    expect(result.telefunTransport).toBe("openai-audio");
+    expect(result.telefunModelWarningReason).toBeUndefined();
+  });
+
+  it("falls back unknown persisted models to Gemini 3.1 with a stable warning", () => {
+    const result = parseTelefunSettings({
+      telefunModelId: "legacy-unknown-live-model",
+      telefunTransport: "openai-audio",
+    });
+
+    expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
+    expect(result.telefunTransport).toBe("gemini-live");
+    expect(result.telefunModelWarningReason).toBe("unknown-model");
+  });
+
+  it("repairs mismatched persisted model and transport pairs with a stable warning", () => {
+    const result = parseTelefunSettings({
+      telefunModelId: "gemini-3.0-flash-live-preview",
+      telefunTransport: "openai-audio",
+    });
+
+    expect(result.telefunModelId).toBe("gemini-3.0-flash-live-preview");
+    expect(result.telefunTransport).toBe("gemini-live");
+    expect(result.telefunModelWarningReason).toBe("transport-mismatch");
   });
 
   it("parses maxCallDuration as number", () => {
@@ -306,8 +381,12 @@ describe("parseTelefunSettings coercion", () => {
       responsePacingMode: "slow-motion",
     } as any);
 
-    expect(result.telefunTransport).toBe(DEFAULT_TELEFUN_SETTINGS.telefunTransport);
-    expect(result.responsePacingMode).toBe(DEFAULT_TELEFUN_SETTINGS.responsePacingMode);
+    expect(result.telefunTransport).toBe(
+      DEFAULT_TELEFUN_SETTINGS.telefunTransport,
+    );
+    expect(result.responsePacingMode).toBe(
+      DEFAULT_TELEFUN_SETTINGS.responsePacingMode,
+    );
   });
 
   it("falls back to default collections when persisted collections are not arrays", () => {

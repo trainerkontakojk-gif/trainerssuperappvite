@@ -9,12 +9,136 @@ import {
   isCurrentGeminiSocket,
   extractGeminiTranscriptionChunks,
   parseControlMessage,
+  isTelefunControlEnvelope,
   isSessionEndRequest,
   isSessionEndComplete,
   parseTelefunAuthMessage,
+  parseTelefunSessionConfigure,
+  TELEFUN_MAX_INSTRUCTIONS_LENGTH,
 } from "./server-protocol.js";
+import { TELEFUN_CONFIGURATION_CLOSE_CODE } from "@trainers/types";
+
+const validGeminiConfigure = {
+  type: "telefun_session_configure",
+  modelId: "gemini-3.1-flash-live-preview",
+  transport: "gemini-live",
+  voice: "Kore",
+  instructions: "Layani nasabah secara natural.",
+  inputAudio: { format: "pcm16", sampleRate: 16000 },
+  responsePacingMode: "realistic",
+} as const;
 
 describe("telefun proxy protocol", () => {
+  describe("provider-neutral session configure", () => {
+    it("accepts a canonical Gemini configure and returns typed model metadata", () => {
+      const result = parseTelefunSessionConfigure(validGeminiConfigure);
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          configure: validGeminiConfigure,
+          model: {
+            id: "gemini-3.1-flash-live-preview",
+            provider: "gemini",
+            realtime: {
+              transport: "gemini-live",
+              inputSampleRateHz: 16000,
+            },
+          },
+        },
+      });
+      expect(TELEFUN_CONFIGURATION_CLOSE_CODE).toBe(4002);
+    });
+
+    it.each([
+      [
+        "unknown model",
+        { ...validGeminiConfigure, modelId: "gemini-live-unknown" },
+        "unknown_model",
+      ],
+      [
+        "transport mismatch",
+        { ...validGeminiConfigure, transport: "openai-audio" },
+        "model_transport_mismatch",
+      ],
+      [
+        "provider-incompatible voice",
+        { ...validGeminiConfigure, voice: "marin" },
+        "invalid_voice",
+      ],
+      [
+        "audio format",
+        {
+          ...validGeminiConfigure,
+          inputAudio: { format: "opus", sampleRate: 16000 },
+        },
+        "invalid_audio_format",
+      ],
+      [
+        "non-canonical sample rate",
+        {
+          ...validGeminiConfigure,
+          inputAudio: { format: "pcm16", sampleRate: 24000 },
+        },
+        "invalid_sample_rate",
+      ],
+      [
+        "pacing mode",
+        { ...validGeminiConfigure, responsePacingMode: "turbo" },
+        "invalid_response_pacing_mode",
+      ],
+      [
+        "empty instructions",
+        { ...validGeminiConfigure, instructions: "   " },
+        "invalid_instructions",
+      ],
+      [
+        "oversized instructions",
+        {
+          ...validGeminiConfigure,
+          instructions: "x".repeat(TELEFUN_MAX_INSTRUCTIONS_LENGTH + 1),
+        },
+        "invalid_instructions",
+      ],
+    ])("rejects %s with a stable reason", (_label, value, reason) => {
+      expect(parseTelefunSessionConfigure(value)).toEqual({
+        ok: false,
+        reason,
+      });
+    });
+
+    it("accepts only the canonical OpenAI pair, voice, and 24 kHz rate", () => {
+      expect(
+        parseTelefunSessionConfigure({
+          ...validGeminiConfigure,
+          modelId: "gpt-realtime-2.1-mini",
+          transport: "openai-audio",
+          voice: "cedar",
+          inputAudio: { format: "pcm16", sampleRate: 24000 },
+          responsePacingMode: "training_fast",
+        }),
+      ).toMatchObject({
+        ok: true,
+        value: {
+          model: { id: "gpt-realtime-2.1-mini", provider: "openai" },
+        },
+      });
+    });
+
+    it.each([
+      null,
+      [],
+      {},
+      { type: "telefun_session_configure" },
+      { ...validGeminiConfigure, inputAudio: null },
+    ])("rejects malformed envelope %#", (value) => {
+      expect(parseTelefunSessionConfigure(value)).toEqual({
+        ok: false,
+        reason: "invalid_envelope",
+      });
+    });
+  });
+
   it("parses a valid first-message authentication frame", () => {
     expect(
       parseTelefunAuthMessage({
@@ -292,6 +416,24 @@ describe("telefun proxy protocol", () => {
           outcome: "invalid",
         }),
       ).toBeNull();
+    });
+
+    it("detects malformed Telefun control envelopes for fail-closed handling", () => {
+      expect(
+        isTelefunControlEnvelope({
+          type: "session_end_request",
+          reason: "invalid",
+        }),
+      ).toBe(true);
+      expect(
+        isTelefunControlEnvelope({
+          type: "session_end_complete",
+          outcome: "invalid",
+        }),
+      ).toBe(true);
+      expect(isTelefunControlEnvelope({ realtimeInput: { audio: {} } })).toBe(
+        false,
+      );
     });
 
     it("returns null for non-object input", () => {

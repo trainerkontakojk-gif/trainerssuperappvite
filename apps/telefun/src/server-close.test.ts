@@ -9,17 +9,17 @@ describe("buildSafeCloseMetadata", () => {
     });
   });
 
-  it("falls back when Gemini closes without reason", () => {
+  it("falls back with provider-neutral copy when upstream closes without reason", () => {
     expect(buildSafeCloseMetadata(1000, Buffer.from(""))).toEqual({
       code: 1000,
-      reason: "Gemini upstream closed without reason",
+      reason: "Provider realtime upstream closed without reason",
     });
   });
 
   it("normalizes invalid upstream close code to 1011", () => {
     expect(buildSafeCloseMetadata(1005, "")).toEqual({
       code: 1011,
-      reason: "Gemini upstream closed without reason",
+      reason: "Provider realtime upstream closed without reason",
     });
   });
 });

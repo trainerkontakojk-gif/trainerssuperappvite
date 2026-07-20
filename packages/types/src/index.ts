@@ -3,6 +3,7 @@ export * from "./sidak";
 export * from "./ketik";
 export * from "./pdkt";
 export * from "./telefun";
+export * from "./telefun-voices";
 export * from "./profiler";
 export * from "./admin";
 export * from "./ai-models";

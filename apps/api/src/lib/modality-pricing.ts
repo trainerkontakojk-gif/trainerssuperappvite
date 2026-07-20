@@ -3,9 +3,13 @@
  * Pure function for computing per-modality costs from token counts.
  */
 
+import { getTelefunLiveModel } from "@trainers/types";
+
 export interface ModalityTokenCounts {
   inputTextTokens: number;
+  cachedInputTextTokens?: number;
   inputAudioTokens: number;
+  cachedInputAudioTokens?: number;
   inputUnspecifiedTokens?: number;
   outputTextTokens: number;
   outputAudioTokens: number;
@@ -16,7 +20,9 @@ export interface PricingRates {
   inputPriceUsdPerMillion: number;
   outputPriceUsdPerMillion: number;
   inputTextPriceUsdPerMillion?: number;
+  cachedInputTextPriceUsdPerMillion?: number;
   inputAudioPriceUsdPerMillion?: number;
+  cachedInputAudioPriceUsdPerMillion?: number;
   outputTextPriceUsdPerMillion?: number;
   outputAudioPriceUsdPerMillion?: number;
 }
@@ -25,7 +31,9 @@ export interface ModalityCostResult {
   costUsd: number;
   costIdr: number;
   inputTextPriceUsdPerMillion: number;
+  cachedInputTextPriceUsdPerMillion: number;
   inputAudioPriceUsdPerMillion: number;
+  cachedInputAudioPriceUsdPerMillion: number;
   outputTextPriceUsdPerMillion: number;
   outputAudioPriceUsdPerMillion: number;
 }
@@ -41,9 +49,8 @@ export function resolveModalityPricing(
   modelId: string,
   pricing: PricingRates,
 ): Required<PricingRates> {
-  const isGeminiLive =
-    modelId.toLowerCase().includes("gemini") &&
-    modelId.toLowerCase().includes("live");
+  const liveModel = getTelefunLiveModel(modelId);
+  const isGeminiLive = liveModel?.provider === "gemini";
 
   const liveDefaults = isGeminiLive ? GEMINI_LIVE_PRICING : null;
 
@@ -54,7 +61,17 @@ export function resolveModalityPricing(
       pricing.inputTextPriceUsdPerMillion ??
       liveDefaults?.inputTextPriceUsdPerMillion ??
       pricing.inputPriceUsdPerMillion,
+    cachedInputTextPriceUsdPerMillion:
+      pricing.cachedInputTextPriceUsdPerMillion ??
+      pricing.inputTextPriceUsdPerMillion ??
+      liveDefaults?.inputTextPriceUsdPerMillion ??
+      pricing.inputPriceUsdPerMillion,
     inputAudioPriceUsdPerMillion:
+      pricing.inputAudioPriceUsdPerMillion ??
+      liveDefaults?.inputAudioPriceUsdPerMillion ??
+      pricing.inputPriceUsdPerMillion,
+    cachedInputAudioPriceUsdPerMillion:
+      pricing.cachedInputAudioPriceUsdPerMillion ??
       pricing.inputAudioPriceUsdPerMillion ??
       liveDefaults?.inputAudioPriceUsdPerMillion ??
       pricing.inputPriceUsdPerMillion,
@@ -88,12 +105,24 @@ export function calculateModalityCost(
   modelId = "",
 ): ModalityCostResult {
   const resolvedPricing = resolveModalityPricing(modelId, pricing);
+  const cachedInputTextTokens = Math.min(
+    Math.max(tokens.cachedInputTextTokens ?? 0, 0),
+    Math.max(tokens.inputTextTokens, 0),
+  );
+  const cachedInputAudioTokens = Math.min(
+    Math.max(tokens.cachedInputAudioTokens ?? 0, 0),
+    Math.max(tokens.inputAudioTokens, 0),
+  );
 
   const costUsd =
-    (tokens.inputTextTokens / 1_000_000) *
+    ((tokens.inputTextTokens - cachedInputTextTokens) / 1_000_000) *
       resolvedPricing.inputTextPriceUsdPerMillion +
-    (tokens.inputAudioTokens / 1_000_000) *
+    (cachedInputTextTokens / 1_000_000) *
+      resolvedPricing.cachedInputTextPriceUsdPerMillion +
+    ((tokens.inputAudioTokens - cachedInputAudioTokens) / 1_000_000) *
       resolvedPricing.inputAudioPriceUsdPerMillion +
+    (cachedInputAudioTokens / 1_000_000) *
+      resolvedPricing.cachedInputAudioPriceUsdPerMillion +
     ((tokens.inputUnspecifiedTokens ?? 0) / 1_000_000) *
       resolvedPricing.inputPriceUsdPerMillion +
     (tokens.outputTextTokens / 1_000_000) *
@@ -108,8 +137,12 @@ export function calculateModalityCost(
     costIdr: Math.round(costUsd * usdToIdrRate),
     inputTextPriceUsdPerMillion:
       resolvedPricing.inputTextPriceUsdPerMillion,
+    cachedInputTextPriceUsdPerMillion:
+      resolvedPricing.cachedInputTextPriceUsdPerMillion,
     inputAudioPriceUsdPerMillion:
       resolvedPricing.inputAudioPriceUsdPerMillion,
+    cachedInputAudioPriceUsdPerMillion:
+      resolvedPricing.cachedInputAudioPriceUsdPerMillion,
     outputTextPriceUsdPerMillion:
       resolvedPricing.outputTextPriceUsdPerMillion,
     outputAudioPriceUsdPerMillion:

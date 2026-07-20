@@ -27,7 +27,7 @@ const liveSessionState = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("../routes/telefun/services/geminiService", () => ({
+vi.mock("../routes/telefun/services/liveSession", () => ({
   LiveSession: class MockLiveSession {
     connect = vi.fn();
     disconnect = vi.fn();
@@ -238,8 +238,8 @@ describe("PhoneInterface end-call finalization", () => {
 describe("LiveSession disconnect idempotency", () => {
   it("mengembalikan Promise yang sama untuk panggilan duplikat", async () => {
     const actual = await vi.importActual<
-      typeof import("../routes/telefun/services/geminiService")
-    >("../routes/telefun/services/geminiService");
+      typeof import("../routes/telefun/services/liveSession")
+    >("../routes/telefun/services/liveSession");
     const session = new actual.LiveSession(config);
     Object.assign(session, {
       ws: null,

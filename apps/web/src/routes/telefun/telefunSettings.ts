@@ -1,6 +1,21 @@
-import { GEMINI_LIVE_VOICES_BY_GENDER, isGeminiLiveVoiceName, resolveGeminiLiveVoice } from "./telefunVoiceRegistry";
+import {
+  DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  normalizeTelefunLiveModelSelection,
+  type TelefunLiveModelWarningReason,
+  type TelefunTransport,
+} from "@trainers/types";
+import {
+  GEMINI_LIVE_VOICES_BY_GENDER,
+  getDefaultVoiceForModel,
+  getVoicesForModel,
+  isVoiceValidForModel,
+  resolveGeminiLiveVoice,
+  resolveVoiceForModel,
+} from "./telefunVoiceRegistry";
 import type { TelefunSimulationChallengeType } from "./services/simulationChallenges";
 import { normalizeSimulationChallengeTypes } from "./services/simulationChallenges";
+
+export type { TelefunTransport } from "@trainers/types";
 
 export enum ConsumerDifficulty {
   Easy = "Easy",
@@ -44,16 +59,6 @@ export interface TelefunIdentity {
   signatureName: string;
 }
 
-export type TelefunTransport = "gemini-live" | "openai-audio";
-
-export interface TelefunVoiceModel {
-  id: string;
-  name: string;
-  telefunTransport: TelefunTransport;
-  description: string;
-  disabled: boolean;
-}
-
 export interface TelefunSessionConfig {
   scenarios: TelefunScenario[];
   consumerType: TelefunConsumerType;
@@ -83,38 +88,12 @@ export type TelefunAppSettings = {
   identitySettings: TelefunIdentitySettings;
   telefunModelId: string;
   telefunTransport?: TelefunTransport;
+  telefunModelWarningReason?: TelefunLiveModelWarningReason;
   activeScenario?: TelefunScenario;
   activeConsumerType?: TelefunConsumerType;
   sessionId?: string;
   resolvedIdentity?: TelefunIdentity;
 };
-
-
-
-
-export const VOICE_MODELS: TelefunVoiceModel[] = [
-  {
-    id: 'gemini-3.1-flash-live-preview',
-    name: 'Gemini 3.1 Flash Live',
-    telefunTransport: 'gemini-live',
-    description: 'Generasi terbaru dengan pemahaman konteks terbaik.',
-    disabled: false
-  },
-  {
-    id: 'gemini-3.0-flash-live-preview',
-    name: 'Gemini 3.0 Flash Live',
-    telefunTransport: 'gemini-live',
-    description: 'Stabil dan optimal untuk latensi rendah.',
-    disabled: false
-  },
-  {
-    id: 'openai-gpt4o-realtime',
-    name: 'GPT-4o Realtime',
-    telefunTransport: 'openai-audio',
-    description: 'Model OpenAI dengan kapabilitas audio native.',
-    disabled: true
-  }
-];
 
 export const MALE_VOICES = GEMINI_LIVE_VOICES_BY_GENDER.male;
 export const FEMALE_VOICES = GEMINI_LIVE_VOICES_BY_GENDER.female;
@@ -127,7 +106,11 @@ export function resolveVoiceForGender(
   requestedVoice: string | undefined,
   gender: "male" | "female",
 ): string {
-  return resolveGeminiLiveVoice({ requestedVoice, gender, random: Math.random });
+  return resolveGeminiLiveVoice({
+    requestedVoice,
+    gender,
+    random: Math.random,
+  });
 }
 
 export interface DefaultProfile {
@@ -225,9 +208,15 @@ export const DEFAULT_IDENTITY_POOL: DefaultProfile[] = [
   },
 ];
 
-function pickIdentityProfileForGender(gender: "male" | "female"): DefaultProfile {
-  const pool = DEFAULT_IDENTITY_POOL.filter((profile) => profile.gender === gender);
-  return pool[Math.floor(Math.random() * pool.length)] ?? DEFAULT_IDENTITY_POOL[0];
+function pickIdentityProfileForGender(
+  gender: "male" | "female",
+): DefaultProfile {
+  const pool = DEFAULT_IDENTITY_POOL.filter(
+    (profile) => profile.gender === gender,
+  );
+  return (
+    pool[Math.floor(Math.random() * pool.length)] ?? DEFAULT_IDENTITY_POOL[0]
+  );
 }
 
 function resolveGender(g?: "male" | "female" | "random"): "male" | "female" {
@@ -239,22 +228,27 @@ function resolveGender(g?: "male" | "female" | "random"): "male" | "female" {
 
 export function resolveFinalIdentity(
   identitySettings: TelefunIdentitySettings,
+  telefunModelId: string = DEFAULT_TELEFUN_LIVE_MODEL_ID,
 ): TelefunIdentity {
   const hasName = identitySettings.displayName.trim().length > 0;
   const hasPhone = identitySettings.phoneNumber.trim().length > 0;
   const hasCity = identitySettings.city.trim().length > 0;
 
   // When gender is "random", pick a random profile first, then use its gender
-  const finalGender = identitySettings.gender === "random"
-    ? pickIdentityProfileForGender(Math.random() > 0.5 ? "male" : "female").gender
-    : resolveGender(identitySettings.gender);
+  const finalGender =
+    identitySettings.gender === "random"
+      ? pickIdentityProfileForGender(Math.random() > 0.5 ? "male" : "female")
+          .gender
+      : resolveGender(identitySettings.gender);
 
   const fallbackProfile = pickIdentityProfileForGender(finalGender);
 
-  const resolvedVoice = resolveVoiceForGender(
-    identitySettings.voiceName || undefined,
-    finalGender,
-  );
+  const resolvedVoice = resolveVoiceForModel({
+    modelId: telefunModelId,
+    requestedVoice: identitySettings.voiceName || undefined,
+    gender: finalGender,
+    random: Math.random,
+  });
 
   if (hasName && hasPhone && hasCity) {
     return {
@@ -279,16 +273,21 @@ export function resolveFinalIdentity(
 
 const TELEFUN_GENDERS = ["random", "male", "female"] as const;
 const RESPONSE_PACING_MODES = ["realistic", "training_fast"] as const;
-const TELEFUN_TRANSPORTS = ["gemini-live", "openai-audio"] as const;
 
-function coerceTelefunGender(value: unknown): TelefunIdentitySettings["gender"] {
+function coerceTelefunGender(
+  value: unknown,
+): TelefunIdentitySettings["gender"] {
   return TELEFUN_GENDERS.includes(value as TelefunIdentitySettings["gender"])
     ? (value as TelefunIdentitySettings["gender"])
     : "random";
 }
 
-function coerceResponsePacingMode(value: unknown): TelefunAppSettings["responsePacingMode"] {
-  return RESPONSE_PACING_MODES.includes(value as TelefunAppSettings["responsePacingMode"])
+function coerceResponsePacingMode(
+  value: unknown,
+): TelefunAppSettings["responsePacingMode"] {
+  return RESPONSE_PACING_MODES.includes(
+    value as TelefunAppSettings["responsePacingMode"],
+  )
     ? (value as TelefunAppSettings["responsePacingMode"])
     : "realistic";
 }
@@ -307,10 +306,24 @@ function coerceTelefunDifficulty(value: unknown): ConsumerDifficulty {
     : ConsumerDifficulty.Medium;
 }
 
-function coerceTelefunTransport(value: unknown): TelefunTransport {
-  return TELEFUN_TRANSPORTS.includes(value as TelefunTransport)
-    ? (value as TelefunTransport)
-    : "gemini-live";
+export function coerceIdentityVoiceForModel(params: {
+  modelId: string;
+  voiceName: string;
+  gender: TelefunIdentitySettings["gender"];
+}): string {
+  const normalizedModel = normalizeTelefunLiveModelSelection(params.modelId);
+  if (normalizedModel.model.realtime.voiceProvider === "openai") {
+    return isVoiceValidForModel(normalizedModel.model.id, params.voiceName)
+      ? params.voiceName
+      : getDefaultVoiceForModel(normalizedModel.model.id);
+  }
+
+  if (!params.voiceName || params.gender === "random") return "";
+  return getVoicesForModel(normalizedModel.model.id, params.gender).some(
+    (voice) => voice === params.voiceName,
+  )
+    ? params.voiceName
+    : "";
 }
 
 function coerceTelefunScenarios(value: unknown): TelefunScenario[] {
@@ -365,6 +378,10 @@ function coerceTelefunConsumerTypes(value: unknown): TelefunConsumerType[] {
 export function parseTelefunSettings(
   parsed: Record<string, unknown>,
 ): TelefunAppSettings {
+  const normalizedLiveModel = normalizeTelefunLiveModelSelection(
+    parsed.telefunModelId,
+    parsed.telefunTransport,
+  );
   const identityRaw = parsed.identitySettings as
     | Record<string, unknown>
     | undefined;
@@ -388,13 +405,14 @@ export function parseTelefunSettings(
       };
     } else {
       const rawVoice = (identityRaw.voiceName as string) || "";
+      const gender = coerceTelefunGender(identityRaw.gender);
       identitySettings = {
         displayName: (identityRaw.displayName as string) || "",
-        gender: coerceTelefunGender(identityRaw.gender),
+        gender,
         phoneNumber: (identityRaw.phoneNumber as string) || "",
         city: (identityRaw.city as string) || "",
         signatureName: (identityRaw.signatureName as string) || "",
-        voiceName: isGeminiLiveVoiceName(rawVoice) ? rawVoice : "",
+        voiceName: rawVoice,
       };
     }
   } else {
@@ -408,10 +426,19 @@ export function parseTelefunSettings(
     };
   }
 
-  const rawChallengeTypes = parsed.simulationChallengeTypes ??
+  identitySettings = {
+    ...identitySettings,
+    voiceName: coerceIdentityVoiceForModel({
+      modelId: normalizedLiveModel.model.id,
+      voiceName: identitySettings.voiceName,
+      gender: identitySettings.gender,
+    }),
+  };
+
+  const rawChallengeTypes =
+    parsed.simulationChallengeTypes ??
     // Deprecated compatibility read for settings saved before prompt-first runtime.
     parsed.realisticModeDisruptionTypes;
-
   const normalized: TelefunAppSettings = {
     ...DEFAULT_TELEFUN_SETTINGS,
     ...parsed,
@@ -423,11 +450,16 @@ export function parseTelefunSettings(
         ? parsed.maxCallDuration
         : DEFAULT_TELEFUN_SETTINGS.maxCallDuration,
     responsePacingMode: coerceResponsePacingMode(parsed.responsePacingMode),
-    simulationChallengeTypes: normalizeSimulationChallengeTypes(rawChallengeTypes),
-    telefunTransport: coerceTelefunTransport(parsed.telefunTransport),
+    simulationChallengeTypes:
+      normalizeSimulationChallengeTypes(rawChallengeTypes),
+    telefunModelId: normalizedLiveModel.model.id,
+    telefunTransport: normalizedLiveModel.transport,
+    telefunModelWarningReason: normalizedLiveModel.warningReason,
   };
-  delete (normalized as unknown as Record<string, unknown>).realisticModeEnabled;
-  delete (normalized as unknown as Record<string, unknown>).realisticModeDisruptionTypes;
+  delete (normalized as unknown as Record<string, unknown>)
+    .realisticModeEnabled;
+  delete (normalized as unknown as Record<string, unknown>)
+    .realisticModeDisruptionTypes;
   return normalized;
 }
 
@@ -448,98 +480,108 @@ export const CONSUMER_GENDERS = [
 
 export const DEFAULT_CONSUMER_TYPES: TelefunConsumerType[] = [
   {
-    id: 'marah',
-    name: 'Marah & Emosional',
-    gender: 'random',
-    description: 'Konsumen sangat marah, nada bicara tinggi, emosional, dan tidak sabaran. Merasa dirugikan dan menuntut solusi instan. Sering meninggikan suara, memotong pembicaraan agen, dan menggunakan kalimat pendek yang tegas. Tetap terdengar seperti orang sungguhan yang sedang komplain via telepon, bukan karakter fiksi.',
-    difficulty: ConsumerDifficulty.Hard
+    id: "marah",
+    name: "Marah & Emosional",
+    gender: "random",
+    description:
+      "Konsumen sangat marah, nada bicara tinggi, emosional, dan tidak sabaran. Merasa dirugikan dan menuntut solusi instan. Sering meninggikan suara, memotong pembicaraan agen, dan menggunakan kalimat pendek yang tegas. Tetap terdengar seperti orang sungguhan yang sedang komplain via telepon, bukan karakter fiksi.",
+    difficulty: ConsumerDifficulty.Hard,
   },
   {
-    id: 'bingung',
-    name: 'Bingung & Gaptek',
-    gender: 'random',
-    description: 'Konsumen awam, agak bingung, dan kurang paham istilah teknis atau alur prosedur. Sering minta penjelasan ulang dengan bahasa sederhana, banyak jeda dan gumaman ("ehm", "anu", "begitu ya?"). Tetap terasa natural seperti orang yang benar-benar butuh dibantu, bukan dibuat bodoh-bodohan.',
-    difficulty: ConsumerDifficulty.Medium
+    id: "bingung",
+    name: "Bingung & Gaptek",
+    gender: "random",
+    description:
+      'Konsumen awam, agak bingung, dan kurang paham istilah teknis atau alur prosedur. Sering minta penjelasan ulang dengan bahasa sederhana, banyak jeda dan gumaman ("ehm", "anu", "begitu ya?"). Tetap terasa natural seperti orang yang benar-benar butuh dibantu, bukan dibuat bodoh-bodohan.',
+    difficulty: ConsumerDifficulty.Medium,
   },
   {
-    id: 'kritis',
-    name: 'Kritis & Detail',
-    gender: 'random',
-    description: 'Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template atau normatif. Suka meminta dasar aturan, alur resmi, atau SOP yang relevan. Tetap bicara sebagai konsumen yang cerdas dan hati-hati, bukan seperti auditor atau pegawai internal. Pertanyaan spesifik dan terstruktur.',
-    difficulty: ConsumerDifficulty.Hard
+    id: "kritis",
+    name: "Kritis & Detail",
+    gender: "random",
+    description:
+      "Konsumen teliti, skeptis, dan cepat menangkap jawaban yang terasa template atau normatif. Suka meminta dasar aturan, alur resmi, atau SOP yang relevan. Tetap bicara sebagai konsumen yang cerdas dan hati-hati, bukan seperti auditor atau pegawai internal. Pertanyaan spesifik dan terstruktur.",
+    difficulty: ConsumerDifficulty.Hard,
   },
   {
-    id: 'ramah',
-    name: 'Ramah & Kooperatif',
-    gender: 'random',
-    description: 'Konsumen sopan, tenang, dan kooperatif. Mau mengikuti arahan agen dan memberikan data yang diminta, tetapi tetap punya masalah yang ingin diselesaikan. Gaya bicara hangat dan wajar, tidak terlalu formal. Sering mengucapkan terima kasih dan menghargai bantuan agen.',
-    difficulty: ConsumerDifficulty.Easy
+    id: "ramah",
+    name: "Ramah & Kooperatif",
+    gender: "random",
+    description:
+      "Konsumen sopan, tenang, dan kooperatif. Mau mengikuti arahan agen dan memberikan data yang diminta, tetapi tetap punya masalah yang ingin diselesaikan. Gaya bicara hangat dan wajar, tidak terlalu formal. Sering mengucapkan terima kasih dan menghargai bantuan agen.",
+    difficulty: ConsumerDifficulty.Easy,
   },
   {
-    id: 'terburu-buru',
-    name: 'Terburu-buru',
-    gender: 'random',
-    description: 'Konsumen sedang sempit waktu, misalnya di jalan atau di sela kerja. Ingin jawaban cepat, langsung, dan praktis. Mudah memotong pembicaraan yang terlalu panjang, tetapi tetap realistis dan tidak asal marah. Cenderung memberi respons singkat dan mendesak.',
-    difficulty: ConsumerDifficulty.Medium
+    id: "terburu-buru",
+    name: "Terburu-buru",
+    gender: "random",
+    description:
+      "Konsumen sedang sempit waktu, misalnya di jalan atau di sela kerja. Ingin jawaban cepat, langsung, dan praktis. Mudah memotong pembicaraan yang terlalu panjang, tetapi tetap realistis dan tidak asal marah. Cenderung memberi respons singkat dan mendesak.",
+    difficulty: ConsumerDifficulty.Medium,
   },
   {
-    id: 'pasrah',
-    name: 'Pasrah & Sedih',
-    gender: 'random',
-    description: 'Konsumen lelah dan putus asa karena masalahnya belum selesai. Nada bicara sedih, khawatir, dan penuh harap saat menghubungi OJK. Tetap manusiawi, tidak melodramatis, dan cenderung mencari kepastian langkah berikutnya. Sering menghela napas atau bicara pelan.',
-    difficulty: ConsumerDifficulty.Medium
-  }
+    id: "pasrah",
+    name: "Pasrah & Sedih",
+    gender: "random",
+    description:
+      "Konsumen lelah dan putus asa karena masalahnya belum selesai. Nada bicara sedih, khawatir, dan penuh harap saat menghubungi OJK. Tetap manusiawi, tidak melodramatis, dan cenderung mencari kepastian langkah berikutnya. Sering menghela napas atau bicara pelan.",
+    difficulty: ConsumerDifficulty.Medium,
+  },
 ];
-
-
 
 export const DEFAULT_SCENARIOS: TelefunScenario[] = [
   {
-    id: 'pinjol',
-    category: 'Pinjol',
-    title: 'Pinjol Ilegal',
-    instruction: 'Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.',
+    id: "pinjol",
+    category: "Pinjol",
+    title: "Pinjol Ilegal",
+    instruction:
+      "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.",
     isActive: true,
   },
   {
-    id: 'penipuan',
-    category: 'Penipuan',
-    title: 'Penipuan Undian',
-    instruction: 'Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.',
+    id: "penipuan",
+    category: "Penipuan",
+    title: "Penipuan Undian",
+    instruction:
+      "Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.",
     isActive: true,
   },
   {
-    id: 'slik',
-    category: 'SLIK',
-    title: 'Pengecekan SLIK',
-    instruction: 'Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.',
+    id: "slik",
+    category: "SLIK",
+    title: "Pengecekan SLIK",
+    instruction:
+      "Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.",
     isActive: true,
   },
   {
-    id: 'asuransi',
-    category: 'Asuransi',
-    title: 'Klaim Asuransi Ditolak',
-    instruction: 'Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.',
+    id: "asuransi",
+    category: "Asuransi",
+    title: "Klaim Asuransi Ditolak",
+    instruction:
+      "Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.",
     isActive: true,
   },
   {
-    id: 'investasi',
-    category: 'Investasi',
-    title: 'Investasi Bodong',
-    instruction: 'Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).',
+    id: "investasi",
+    category: "Investasi",
+    title: "Investasi Bodong",
+    instruction:
+      "Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).",
     isActive: true,
   },
   {
-    id: 'kartu-kredit',
-    category: 'Perbankan',
-    title: 'Tagihan Kartu Kredit',
-    instruction: 'Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.',
+    id: "kartu-kredit",
+    category: "Perbankan",
+    title: "Tagihan Kartu Kredit",
+    instruction:
+      "Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.",
     isActive: true,
-  }
+  },
 ];
 
 export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
-  selectedModel: "gemini-3.1-flash-live-preview",
+  selectedModel: DEFAULT_TELEFUN_LIVE_MODEL_ID,
   voiceName: "Kore",
   systemInstruction:
     "Anda adalah konsumen yang menghubungi OJK. Bantu agen melatih kemampuan komunikasi.",
@@ -559,6 +601,6 @@ export const DEFAULT_TELEFUN_SETTINGS: TelefunAppSettings = {
     signatureName: "",
     voiceName: "",
   },
-  telefunModelId: "gemini-3.1-flash-live-preview",
+  telefunModelId: DEFAULT_TELEFUN_LIVE_MODEL_ID,
   telefunTransport: "gemini-live",
 };

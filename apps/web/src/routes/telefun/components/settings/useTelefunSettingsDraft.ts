@@ -1,23 +1,69 @@
-import { useState, useEffect } from 'react';
-import { useCrudForm } from '../../../../hooks/useCrudForm';
+import { useState, useEffect } from "react";
+import {
+  DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  normalizeTelefunLiveModelSelection,
+} from "@trainers/types";
+import { useCrudForm } from "../../../../hooks/useCrudForm";
 import {
   TelefunAppSettings as AppSettings,
   TelefunScenario as Scenario,
   TelefunConsumerType as ConsumerType,
   ConsumerDifficulty,
-  VOICE_MODELS as TELEFUN_AUDIO_MODELS
-} from '../../telefunSettings';
+  coerceIdentityVoiceForModel,
+} from "../../telefunSettings";
 import {
   normalizeTelefunConsumerDraft,
   normalizeTelefunScenarioDraft,
 } from "./telefunDraftNormalizers";
 import { normalizeSimulationChallengeTypes } from "../../services/simulationChallenges";
+import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
 
 interface UseTelefunSettingsDraftProps {
   settings: AppSettings;
   isOpen: boolean;
   onSave: (newSettings: AppSettings) => void;
   onClose: () => void;
+  providerReadiness?: TelefunProviderReadinessState;
+}
+
+const UNAVAILABLE_PROVIDER_READINESS: TelefunProviderReadinessState = {
+  status: "unavailable",
+  openai: null,
+};
+
+function isOpenAIReady(
+  providerReadiness: TelefunProviderReadinessState,
+): boolean {
+  return (
+    providerReadiness.status === "ready" &&
+    providerReadiness.openai.enabled &&
+    providerReadiness.openai.configured &&
+    providerReadiness.openai.ready
+  );
+}
+
+function resolveAvailableModel(
+  modelId: string,
+  providerReadiness: TelefunProviderReadinessState,
+  persistedSelection?: {
+    modelId?: string;
+    transport?: AppSettings["telefunTransport"];
+  },
+) {
+  const selectedModel = normalizeTelefunLiveModelSelection(modelId);
+  const isPersistedOpenAISelection =
+    persistedSelection?.modelId === selectedModel.model.id &&
+    persistedSelection.transport === selectedModel.transport;
+  if (
+    selectedModel.model.provider === "openai" &&
+    !isOpenAIReady(providerReadiness) &&
+    !(
+      providerReadiness.status === "loading" && isPersistedOpenAISelection
+    )
+  ) {
+    return normalizeTelefunLiveModelSelection(DEFAULT_TELEFUN_LIVE_MODEL_ID);
+  }
+  return selectedModel;
 }
 
 export function buildTelefunSettingsForSave(params: {
@@ -25,23 +71,40 @@ export function buildTelefunSettingsForSave(params: {
   scenarios: Scenario[];
   consumerTypes: ConsumerType[];
   selectedTelefunModel: string;
+  providerReadiness?: TelefunProviderReadinessState;
 }): AppSettings {
-  const selectedModel = TELEFUN_AUDIO_MODELS.find(
-    (model) => model.id === params.selectedTelefunModel,
+  const selectedModel = resolveAvailableModel(
+    params.selectedTelefunModel,
+    params.providerReadiness ?? UNAVAILABLE_PROVIDER_READINESS,
+    {
+      modelId: params.localSettings.telefunModelId,
+      transport: params.localSettings.telefunTransport,
+    },
   );
 
   const settingsToSave = {
     ...params.localSettings,
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes,
-    telefunTransport: selectedModel?.telefunTransport ?? "gemini-live",
-    telefunModelId: params.selectedTelefunModel,
+    telefunTransport: selectedModel.transport,
+    telefunModelId: selectedModel.model.id,
+    identitySettings: {
+      ...params.localSettings.identitySettings,
+      voiceName: coerceIdentityVoiceForModel({
+        modelId: selectedModel.model.id,
+        voiceName: params.localSettings.identitySettings.voiceName,
+        gender: params.localSettings.identitySettings.gender,
+      }),
+    },
   };
+  delete settingsToSave.telefunModelWarningReason;
   settingsToSave.simulationChallengeTypes = normalizeSimulationChallengeTypes(
     settingsToSave.simulationChallengeTypes,
   );
-  delete (settingsToSave as unknown as Record<string, unknown>).realisticModeEnabled;
-  delete (settingsToSave as unknown as Record<string, unknown>).realisticModeDisruptionTypes;
+  delete (settingsToSave as unknown as Record<string, unknown>)
+    .realisticModeEnabled;
+  delete (settingsToSave as unknown as Record<string, unknown>)
+    .realisticModeDisruptionTypes;
   return settingsToSave;
 }
 
@@ -50,21 +113,23 @@ export function useTelefunSettingsDraft({
   isOpen,
   onSave,
   onClose,
+  providerReadiness = UNAVAILABLE_PROVIDER_READINESS,
 }: UseTelefunSettingsDraftProps) {
-  const [activeTab, setActiveTab] = useState<'scenarios' | 'consumers' | 'identity' | 'system'>('scenarios');
+  const [activeTab, setActiveTab] = useState<
+    "scenarios" | "consumers" | "identity" | "system"
+  >("scenarios");
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
 
-  const [selectedTelefunModel, setSelectedTelefunModel] = useState<string>(
-    settings.telefunModelId || TELEFUN_AUDIO_MODELS[0]?.id || 'gemini-3.1-flash-live-preview'
-  );
+  const selectedTelefunModel =
+    localSettings.telefunModelId || DEFAULT_TELEFUN_LIVE_MODEL_ID;
 
   const scenarioForm = useCrudForm<Scenario>({
     generateId: () => `s-${Date.now()}`,
     defaultValues: {
-      category: '',
-      title: '',
-      instruction: '',
-      script: '',
+      category: "",
+      title: "",
+      instruction: "",
+      script: "",
       isActive: true,
     },
     validate: (draft) => !!(draft.title && draft.instruction && draft.category),
@@ -77,10 +142,10 @@ export function useTelefunSettingsDraft({
   const consumerForm = useCrudForm<ConsumerType>({
     generateId: () => `c-${Date.now()}`,
     defaultValues: {
-      name: '',
-      description: '',
+      name: "",
+      description: "",
       difficulty: ConsumerDifficulty.Medium,
-      gender: 'random',
+      gender: "random",
     },
     validate: (draft) => !!(draft.name && draft.description),
     createItem: (id, draft) => ({
@@ -92,73 +157,162 @@ export function useTelefunSettingsDraft({
   // Sync settings when modal opens
   useEffect(() => {
     if (isOpen) {
-      setLocalSettings(settings);
+      const selectedModel = normalizeTelefunLiveModelSelection(
+        settings.telefunModelId,
+        settings.telefunTransport,
+      );
+      setLocalSettings({
+        ...settings,
+        telefunModelId: selectedModel.model.id,
+        telefunTransport: selectedModel.transport,
+        identitySettings: {
+          ...settings.identitySettings,
+          voiceName: coerceIdentityVoiceForModel({
+            modelId: selectedModel.model.id,
+            voiceName: settings.identitySettings.voiceName,
+            gender: settings.identitySettings.gender,
+          }),
+        },
+      });
       scenarioForm.close();
       consumerForm.close();
-      setSelectedTelefunModel(settings.telefunModelId || TELEFUN_AUDIO_MODELS[0]?.id || 'gemini-3.1-flash-live-preview');
     }
   }, [isOpen, settings]);
+
+  useEffect(() => {
+    if (!isOpen || providerReadiness.status !== "unavailable") return;
+    setLocalSettings((prev) => {
+      const currentModel = normalizeTelefunLiveModelSelection(
+        prev.telefunModelId,
+        prev.telefunTransport,
+      );
+      if (currentModel.model.provider !== "openai") return prev;
+
+      const fallback = normalizeTelefunLiveModelSelection(
+        DEFAULT_TELEFUN_LIVE_MODEL_ID,
+      );
+      return {
+        ...prev,
+        telefunModelId: fallback.model.id,
+        telefunTransport: fallback.transport,
+        telefunModelWarningReason: "provider-unavailable",
+        identitySettings: {
+          ...prev.identitySettings,
+          voiceName: coerceIdentityVoiceForModel({
+            modelId: fallback.model.id,
+            voiceName: prev.identitySettings.voiceName,
+            gender: prev.identitySettings.gender,
+          }),
+        },
+      };
+    });
+  }, [isOpen, providerReadiness.status]);
+
+  const setSelectedTelefunModel = (modelId: string) => {
+    const selectedModel = normalizeTelefunLiveModelSelection(modelId);
+    if (
+      selectedModel.model.provider === "openai" &&
+      !isOpenAIReady(providerReadiness)
+    ) {
+      return;
+    }
+    setLocalSettings((prev) => {
+      const voiceName = coerceIdentityVoiceForModel({
+        modelId: selectedModel.model.id,
+        voiceName: prev.identitySettings.voiceName,
+        gender: prev.identitySettings.gender,
+      });
+      return {
+        ...prev,
+        telefunModelId: selectedModel.model.id,
+        telefunTransport: selectedModel.transport,
+        telefunModelWarningReason: undefined,
+        identitySettings: { ...prev.identitySettings, voiceName },
+      };
+    });
+  };
 
   const handleSelectAll = () => {
     setLocalSettings((prev: AppSettings) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: Scenario) => ({ ...s, isActive: true }))
+      scenarios: prev.scenarios.map((s: Scenario) => ({
+        ...s,
+        isActive: true,
+      })),
     }));
   };
 
   const handleUnselectAll = () => {
     setLocalSettings((prev: AppSettings) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: Scenario) => ({ ...s, isActive: false }))
+      scenarios: prev.scenarios.map((s: Scenario) => ({
+        ...s,
+        isActive: false,
+      })),
     }));
   };
 
   const handleToggleScenario = (id: string) => {
     setLocalSettings((prev: AppSettings) => ({
       ...prev,
-      scenarios: prev.scenarios.map((s: Scenario) => s.id === id ? { ...s, isActive: !s.isActive } : s)
+      scenarios: prev.scenarios.map((s: Scenario) =>
+        s.id === id ? { ...s, isActive: !s.isActive } : s,
+      ),
     }));
   };
 
   const handleDeleteScenario = (id: string) => {
-    if (window.confirm('Hapus skenario ini?')) {
+    if (window.confirm("Hapus skenario ini?")) {
       setLocalSettings((prev: AppSettings) => ({
         ...prev,
-        scenarios: prev.scenarios.filter((s: Scenario) => s.id !== id)
+        scenarios: prev.scenarios.filter((s: Scenario) => s.id !== id),
       }));
     }
   };
 
   const handleSelectConsumerType = (id: string) => {
-    setLocalSettings((prev: AppSettings) => ({ ...prev, preferredConsumerTypeId: id }));
+    setLocalSettings((prev: AppSettings) => ({
+      ...prev,
+      preferredConsumerTypeId: id,
+    }));
   };
 
   const handleDeleteConsumer = (id: string) => {
-    if (window.confirm('Hapus karakteristik ini?')) {
+    if (window.confirm("Hapus karakteristik ini?")) {
       setLocalSettings((prev: AppSettings) => {
-        const newTypes = prev.consumerTypes.filter((c: ConsumerType) => c.id !== id);
+        const newTypes = prev.consumerTypes.filter(
+          (c: ConsumerType) => c.id !== id,
+        );
         return {
           ...prev,
           consumerTypes: newTypes,
-          preferredConsumerTypeId: prev.preferredConsumerTypeId === id ? 'random' : prev.preferredConsumerTypeId
+          preferredConsumerTypeId:
+            prev.preferredConsumerTypeId === id
+              ? "random"
+              : prev.preferredConsumerTypeId,
         };
       });
     }
   };
 
   const hasUnsavedChanges = () => {
-    if (scenarioForm.isDirty(localSettings.scenarios) || consumerForm.isDirty(localSettings.consumerTypes)) {
+    if (
+      scenarioForm.isDirty(localSettings.scenarios) ||
+      consumerForm.isDirty(localSettings.consumerTypes)
+    ) {
       return true;
     }
     const original = JSON.stringify(settings);
 
     // Construct hypothetical settings with current selections
-    const selectedTelefunTransport = TELEFUN_AUDIO_MODELS.find((model) => model.id === selectedTelefunModel)?.telefunTransport || 'gemini-live';
+    const selectedModel =
+      normalizeTelefunLiveModelSelection(selectedTelefunModel);
     const currentSettings = {
       ...localSettings,
-      telefunModelId: selectedTelefunModel,
-      telefunTransport: selectedTelefunTransport,
+      telefunModelId: selectedModel.model.id,
+      telefunTransport: selectedModel.transport,
     };
+    delete currentSettings.telefunModelWarningReason;
 
     const current = JSON.stringify(currentSettings);
     return original !== current;
@@ -169,20 +323,28 @@ export function useTelefunSettingsDraft({
     const consumerDirty = consumerForm.isDirty(localSettings.consumerTypes);
 
     if (scenarioDirty && !scenarioForm.isValid()) {
-      setActiveTab('scenarios');
+      setActiveTab("scenarios");
       setTimeout(() => {
-        document.getElementById('scenario-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document
+          .getElementById("scenario-form")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
-      alert('Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.');
+      alert(
+        "Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.",
+      );
       return;
     }
 
     if (consumerDirty && !consumerForm.isValid()) {
-      setActiveTab('consumers');
+      setActiveTab("consumers");
       setTimeout(() => {
-        document.getElementById('consumer-form')?.scrollIntoView({ behavior: 'smooth' });
+        document
+          .getElementById("consumer-form")
+          ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
-      alert('Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.');
+      alert(
+        "Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.",
+      );
       return;
     }
 
@@ -198,6 +360,7 @@ export function useTelefunSettingsDraft({
       scenarios: nextScenarios,
       consumerTypes: nextConsumerTypes,
       selectedTelefunModel,
+      providerReadiness,
     });
 
     if (scenarioDirty) {
@@ -213,7 +376,8 @@ export function useTelefunSettingsDraft({
 
   const handleClose = () => {
     if (hasUnsavedChanges()) {
-      if (!window.confirm('Perubahan belum disimpan. Yakin ingin keluar?')) return;
+      if (!window.confirm("Perubahan belum disimpan. Yakin ingin keluar?"))
+        return;
     }
     onClose();
   };

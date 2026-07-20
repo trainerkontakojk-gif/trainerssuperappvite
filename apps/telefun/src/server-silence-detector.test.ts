@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverSource = readFileSync(join(__dirname, "server.ts"), "utf8");
+const geminiAdapterSource = readFileSync(
+  join(__dirname, "providers", "GeminiLiveAdapter.ts"),
+  "utf8",
+);
 
 describe("Telefun server silence detector", () => {
   it("does not instantiate or start the server-side SilenceDetector", () => {
@@ -30,8 +34,8 @@ describe("Telefun server silence detector", () => {
   });
 
   it("treats Gemini interruption as transcript and drain boundaries", () => {
-    expect(serverSource).toContain("parsed.serverContent?.interrupted");
+    expect(geminiAdapterSource).toContain("parsed.serverContent?.interrupted");
     expect(serverSource).toContain("transcriptCollector.interruptTurn()");
-    expect(serverSource).toContain("drainCoordinator.notifyInterrupted()");
+    expect(serverSource).toContain("drainCoordinator?.notifyInterrupted()");
   });
 });

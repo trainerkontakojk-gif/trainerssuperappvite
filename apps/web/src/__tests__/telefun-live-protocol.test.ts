@@ -14,7 +14,9 @@ import {
   shouldReportTelefunCloseError,
   processInputAudioFrame,
   buildTelefunAuthMessage,
+  getTelefunAudioConfiguration,
 } from "../routes/telefun/services/liveProtocol";
+import { TELEFUN_CONFIGURATION_CLOSE_CODE } from "@trainers/types";
 import { resolveFinalIdentity } from "../routes/telefun/telefunSettings";
 import {
   resolveGeminiLiveVoice,
@@ -78,8 +80,18 @@ describe("telefun live protocol", () => {
       "terputus mendadak",
     );
     expect(mapTelefunCloseEvent({ code: 1011, reason: "" }).message).toContain(
-      "Gemini",
+      "provider realtime",
     );
+    expect(mapTelefunCloseEvent({ code: 1005, reason: "" }).message).toContain(
+      "layanan suara",
+    );
+    const configurationClose = mapTelefunCloseEvent({
+      code: TELEFUN_CONFIGURATION_CLOSE_CODE,
+      reason: "Invalid Voice",
+    });
+    expect(configurationClose.severity).toBe("config");
+    expect(configurationClose.message).toMatch(/konfigurasi/i);
+    expect(configurationClose.message).toContain("Invalid Voice");
   });
 
   it("maps normal client close without surfacing a WebSocket error", () => {
@@ -146,6 +158,32 @@ describe("telefun live protocol", () => {
     expect(message.realtimeInput.audio.mimeType).toBe("audio/pcm;rate=16000");
     expect(typeof message.realtimeInput.audio.data).toBe("string");
     expect(message.realtimeInput.audio.data.length).toBeGreaterThan(0);
+  });
+
+  it("uses canonical model metadata for Telefun input and output sample rates", () => {
+    expect(
+      getTelefunAudioConfiguration("gemini-3.1-flash-live-preview"),
+    ).toMatchObject({ inputSampleRateHz: 16000, outputSampleRateHz: 24000 });
+    expect(getTelefunAudioConfiguration("gpt-realtime-2.1")).toMatchObject({
+      inputSampleRateHz: 24000,
+      outputSampleRateHz: 24000,
+    });
+    expect(getTelefunAudioConfiguration("unknown-model")).toMatchObject({
+      inputSampleRateHz: 16000,
+      outputSampleRateHz: 24000,
+    });
+  });
+
+  it("parameterizes the Gemini PCM envelope rate while preserving its default", () => {
+    const pcm16 = new Int16Array([1, -1]);
+
+    expect(
+      buildRealtimeAudioMessage(pcm16.buffer).realtimeInput.audio.mimeType,
+    ).toBe("audio/pcm;rate=16000");
+    expect(
+      buildRealtimeAudioMessage(pcm16.buffer, 24000).realtimeInput.audio
+        .mimeType,
+    ).toBe("audio/pcm;rate=24000");
   });
 
   it("float32ToPcm16Buffer converts Float32 audio to PCM16 ArrayBuffer", () => {

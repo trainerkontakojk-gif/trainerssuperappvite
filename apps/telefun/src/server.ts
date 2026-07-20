@@ -9,6 +9,11 @@ import {
   observeLiveUsageMetadata,
   commitPendingLiveUsageTurn,
   summarizeLiveUsageAccumulator,
+  createOpenAIUsageAccumulator,
+  observeOpenAIUsage,
+  summarizeOpenAIUsageAccumulator,
+  getOpenAIUsageDiagnostics,
+  flushOpenAIRealtimeUsage,
 } from "./usage.js";
 import { createSession, updateSession, getOwnedSessionId } from "./db.js";
 import { TurnManager } from "./turn-taking.js";
@@ -16,19 +21,29 @@ import { TranscriptCollector } from "./transcript.js";
 import {
   parseControlMessage,
   isSessionEndRequest,
-  isGeminiForwardableMessage,
-  isGeminiSetupMessage,
-  hasGeminiSetupComplete,
-  getGeminiGoAwayTimeLeftSeconds,
-  getSessionResumptionHandle,
-  buildGeminiReconnectSetupMessage,
-  isCurrentGeminiSocket,
-  extractGeminiTranscriptionChunks,
+  isTelefunControlEnvelope,
   parseTelefunAuthMessage,
 } from "./server-protocol.js";
 import { DrainCoordinator, type DrainOutcome } from "./session-drain.js";
 import { buildSafeCloseMetadata } from "./server-close.js";
 import { TelefunAuthGate } from "./server-auth.js";
+import { GeminiLiveAdapter } from "./providers/GeminiLiveAdapter.js";
+import {
+  OpenAIRealtimeAdapter,
+  buildSafeOpenAIDiagnosticLogMetadata,
+} from "./providers/OpenAIRealtimeAdapter.js";
+import type { RealtimeProviderAdapter } from "./providers/RealtimeProviderAdapter.js";
+import { createRealtimeProviderAdapter } from "./providers/provider-router.js";
+import {
+  TELEFUN_WEBSOCKET_SERVER_OPTIONS,
+  TelefunProviderConfigurationGate,
+} from "./server-configuration.js";
+import {
+  buildTelefunHealthPayload,
+  normalizeTelefunOrigin,
+  resolveTelefunHealthCors,
+} from "./health.js";
+import { retryUsageAfterInFlight } from "./usage-flush-retry.js";
 
 process.on("uncaughtException", (err) =>
   console.error("[Telefun] Uncaught:", err),
@@ -39,13 +54,43 @@ process.on("unhandledRejection", (reason) =>
 
 const server = createServer((req, res) => {
   if (req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
+    const cors = resolveTelefunHealthCors({
+      allowedOrigins: env.ALLOWED_ORIGINS,
+      requestOrigin: req.headers.origin,
+    });
+    if (!cors.allowed) {
+      res.writeHead(403, cors.headers);
+      res.end();
+      return;
+    }
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, cors.headers);
+      res.end();
+      return;
+    }
+    if (req.method !== "GET") {
+      res.writeHead(405, { ...cors.headers, Allow: "GET, OPTIONS" });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      ...cors.headers,
+      "Content-Type": "application/json",
+    });
     res.end(
-      JSON.stringify({
-        status: "ok",
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString(),
-      }),
+      JSON.stringify(
+        buildTelefunHealthPayload(
+          {
+            geminiConfigured: Boolean(env.GEMINI_API_KEY),
+            openAIEnabled: env.TELEFUN_OPENAI_ENABLED,
+            openAIConfigured: Boolean(env.OPENAI_API_KEY),
+          },
+          {
+            uptime: process.uptime(),
+            timestamp: new Date().toISOString(),
+          },
+        ),
+      ),
     );
     return;
   }
@@ -53,24 +98,17 @@ const server = createServer((req, res) => {
   res.end();
 });
 
-const wss = new WebSocketServer({ server });
-
-function normalizeOrigin(raw: string): string {
-  try {
-    return `${new URL(raw).protocol}//${new URL(raw).host}`;
-  } catch {
-    return raw.replace(/\/+$/, "");
-  }
-}
+const wss = new WebSocketServer({
+  server,
+  ...TELEFUN_WEBSOCKET_SERVER_OPTIONS,
+});
 
 const allowedOrigins =
   env.ALLOWED_ORIGINS === "*"
     ? []
     : env.ALLOWED_ORIGINS.split(",")
-        .map((o) => normalizeOrigin(o.trim()))
+        .map((o) => normalizeTelefunOrigin(o.trim()))
         .filter(Boolean);
-
-const MAX_RECONNECT_ATTEMPTS = 3;
 
 function connectGemini(): WebSocket {
   const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${env.GEMINI_API_KEY}`;
@@ -78,11 +116,9 @@ function connectGemini(): WebSocket {
 }
 
 wss.on("connection", async (ws, req) => {
-  const pendingMessages: string[] = [];
   const callStartedAt = Date.now();
   const transcriptCollector = new TranscriptCollector(callStartedAt);
-  let geminiWs: WebSocket | null = null;
-  let isGeminiOpen = false;
+  let providerAdapter: RealtimeProviderAdapter | null = null;
   let authed = false;
   let authTimeout: ReturnType<typeof setTimeout> | null = null;
   let userId = "";
@@ -93,15 +129,11 @@ wss.on("connection", async (ws, req) => {
     `http://${req.headers.host || "localhost"}`,
   );
   const usageAccumulator = createLiveUsageAccumulator();
+  const openAIUsageAccumulator = createOpenAIUsageAccumulator();
   let usageFlushed = false;
+  let usageFlushPromise: Promise<void> | null = null;
   let activeModelId = "gemini-3.1-flash-live-preview";
-  let reconnectAttempts = 0;
-  let geminiSetupComplete = false;
-  const postSetupQueue: string[] = [];
-  let cachedSetupMessage: string | null = null;
-  let latestSessionHandle: string | null = null;
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  let clientClosed = false;
+  let activeProvider: "gemini" | "openai" = "gemini";
   let finalized = false;
   let drainCoordinator: DrainCoordinator | null = null;
   let drainTimers: ReturnType<typeof setTimeout>[] = [];
@@ -109,9 +141,6 @@ wss.on("connection", async (ws, req) => {
   const keepaliveTimer = setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.ping();
-    }
-    if (geminiWs?.readyState === WebSocket.OPEN) {
-      geminiWs.ping();
     }
   }, 30_000);
 
@@ -130,19 +159,71 @@ wss.on("connection", async (ws, req) => {
     createSession,
   });
 
-  const flushUsage = async (sessionDurationMs?: number) => {
-    if (usageFlushed || !authed) return;
-    commitPendingLiveUsageTurn(usageAccumulator, "session_flush");
-    const usageAggregate = summarizeLiveUsageAccumulator(usageAccumulator);
-    if (!usageAggregate) return;
-    usageFlushed = true;
-    await flushLiveUsage(
-      requestId,
-      userId,
-      usageAggregate,
-      activeModelId,
-      sessionDurationMs,
-    );
+  const flushUsage = (sessionDurationMs?: number): Promise<void> => {
+    if (usageFlushed || !authed) return Promise.resolve();
+    if (usageFlushPromise) return usageFlushPromise;
+
+    const attempt = async () => {
+      if (activeProvider !== "openai") {
+        commitPendingLiveUsageTurn(usageAccumulator, "session_flush");
+        const usageAggregate = summarizeLiveUsageAccumulator(usageAccumulator);
+        if (!usageAggregate) return;
+        usageFlushed = true;
+        await flushLiveUsage(
+          requestId,
+          userId,
+          usageAggregate,
+          activeModelId,
+          sessionDurationMs,
+        );
+        return;
+      }
+
+      const usageAggregate = summarizeOpenAIUsageAccumulator(
+        openAIUsageAccumulator,
+      );
+      const diagnostics = getOpenAIUsageDiagnostics(openAIUsageAccumulator);
+      if (diagnostics.warnings.length > 0 || !usageAggregate) {
+        console.warn("[Telefun] OpenAI usage incomplete", {
+          requestId,
+          ...diagnostics,
+          hasAggregate: Boolean(usageAggregate),
+        });
+      }
+      if (!usageAggregate) {
+        usageFlushed = true;
+        return;
+      }
+      const persisted = await flushOpenAIRealtimeUsage(
+        requestId,
+        userId,
+        usageAggregate,
+        activeModelId,
+        sessionDurationMs,
+      );
+      if (!persisted) {
+        console.warn("[Telefun] OpenAI usage was not persisted", {
+          requestId,
+          modelId: activeModelId,
+        });
+        return;
+      }
+      usageFlushed = true;
+    };
+
+    usageFlushPromise = attempt().finally(() => {
+      usageFlushPromise = null;
+    });
+    return usageFlushPromise;
+  };
+
+  const scheduleUsageRetry = (sessionDurationMs?: number) => {
+    setTimeout(() => {
+      void retryUsageAfterInFlight(
+        () => flushUsage(sessionDurationMs),
+        () => usageFlushed,
+      );
+    }, 2_000);
   };
 
   const finalizeSessionOnce = async (
@@ -173,218 +254,131 @@ wss.on("connection", async (ws, req) => {
         }),
       );
     }
-    if (geminiWs?.readyState === WebSocket.OPEN) {
-      geminiWs.close(1000, "Session finalized");
-    }
+    providerAdapter?.close(1000, "Session finalized");
     if (ws.readyState === WebSocket.OPEN) {
       ws.close(1000, "Session finalized");
     }
   };
 
-  const sendToGemini = (raw: string) => {
-    if (geminiWs && isGeminiOpen && geminiWs.readyState === WebSocket.OPEN) {
-      geminiWs.send(raw);
-    } else {
-      pendingMessages.push(raw);
-    }
-  };
-
-  const buildReconnectSetupMessage = () => {
-    return buildGeminiReconnectSetupMessage(
-      cachedSetupMessage,
-      latestSessionHandle,
-    );
-  };
-
-  const scheduleReconnect = (delay: number) => {
-    if (clientClosed || reconnectTimer) return;
-    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
-    reconnectAttempts += 1;
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      if (ws.readyState !== WebSocket.OPEN || clientClosed) return;
-      geminiSetupComplete = false;
-      const previousSocket = geminiWs;
-      geminiWs = null;
-      isGeminiOpen = false;
-      if (
-        previousSocket &&
-        (previousSocket.readyState === WebSocket.OPEN ||
-          previousSocket.readyState === WebSocket.CONNECTING)
-      ) {
-        previousSocket.close(1000, "Reconnecting Gemini session");
-      }
-      setupGeminiWs();
-    }, delay);
-  };
-
-  const setupGeminiWs = () => {
-    const socket = connectGemini();
-    geminiWs = socket;
-
-    socket.on("open", () => {
-      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
-      isGeminiOpen = true;
-      console.log("[Telefun] Gemini Live connected");
-
-      if (reconnectAttempts > 0) {
-        const reconnectSetup = buildReconnectSetupMessage();
-        if (reconnectSetup) {
-          socket.send(reconnectSetup);
-        }
-      }
-
-      while (pendingMessages.length > 0) {
-        const msg = pendingMessages.shift();
-        if (msg) {
-          try {
-            const parsed = JSON.parse(msg);
-            if (isGeminiSetupMessage(parsed) || geminiSetupComplete) {
-              socket.send(msg);
-            } else {
-              postSetupQueue.push(msg);
-            }
-          } catch {
-            socket.send(msg);
-          }
-        }
-      }
-    });
-
-    socket.on("message", (data) => {
-      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
-      const raw = data.toString();
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        return;
-      }
-
-      if (parsed?.usageMetadata) {
-        observeLiveUsageMetadata(
-          usageAccumulator,
-          parsed.usageMetadata,
-          Date.now(),
-        );
-      }
-
-      // Extract AI text + detect turn boundaries
-      if (parsed) {
-        if (hasGeminiSetupComplete(parsed)) {
-          console.log("[Telefun] Gemini Setup Complete received, opening gate");
-          const resumed = reconnectAttempts > 0;
-          geminiSetupComplete = true;
-          reconnectAttempts = 0;
-          if (resumed && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "session_resumed" }));
-          }
-          while (postSetupQueue.length > 0) {
-            const msg = postSetupQueue.shift();
-            if (msg) sendToGemini(msg);
-          }
-        }
-        const transcriptChunks = extractGeminiTranscriptionChunks(parsed);
-        for (const chunk of transcriptChunks) {
-          transcriptCollector.append({
-            speaker: chunk.speaker,
-            text: chunk.text,
-            observedAtMs: Date.now(),
-          });
-        }
-
-        if (parsed.serverContent?.modelTurn?.parts) {
-          turnManager.startAiSpeaking();
-        }
-        if (parsed.serverContent?.turnComplete) {
+  const createGeminiAdapter = (
+    configuration: Parameters<typeof createRealtimeProviderAdapter>[0],
+  ) =>
+    new GeminiLiveAdapter({
+      configuration,
+      createSocket: connectGemini,
+      callbacks: {
+        forwardToClient: (raw) => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(raw);
+        },
+        observeUsage: (metadata, observedAtMs) => {
+          observeLiveUsageMetadata(usageAccumulator, metadata, observedAtMs);
+        },
+        appendTranscript: (entry) => transcriptCollector.append(entry),
+        startAiSpeaking: () => turnManager.startAiSpeaking(),
+        completeTurn: () => {
           transcriptCollector.completeTurn("consumer");
           turnManager.endAiSpeaking();
           commitPendingLiveUsageTurn(usageAccumulator, "turnComplete");
-        }
-        if (parsed.serverContent?.interrupted) {
+        },
+        interruptTurn: () => {
           transcriptCollector.interruptTurn();
           turnManager.endAiSpeaking();
           commitPendingLiveUsageTurn(usageAccumulator, "interrupted");
-        }
-
-        if (drainCoordinator) {
-          if (transcriptChunks.length > 0) drainCoordinator.notifyActivity();
-          if (parsed.serverContent?.turnComplete)
-            drainCoordinator.notifyTurnComplete();
-          if (parsed.serverContent?.interrupted)
-            drainCoordinator.notifyInterrupted();
-        }
-
-        const nextHandle = getSessionResumptionHandle(parsed);
-        if (nextHandle) {
-          latestSessionHandle = nextHandle;
-          console.log("[Telefun] Session resumption handle updated");
-        }
-
-        const goAwaySeconds = getGeminiGoAwayTimeLeftSeconds(parsed);
-        if (goAwaySeconds !== null) {
-          console.log(`[Telefun] GoAway received: ${goAwaySeconds}s remaining`);
+        },
+        notifyActivity: () => drainCoordinator?.notifyActivity(),
+        notifyTurnComplete: () => drainCoordinator?.notifyTurnComplete(),
+        notifyInterrupted: () => drainCoordinator?.notifyInterrupted(),
+        onFinalClose: (code, reason) => {
+          void flushUsage();
+          const closeMeta = buildSafeCloseMetadata(code, reason);
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(
-              JSON.stringify({
-                type: "session_reconnecting",
-                reason: "goAway",
-                timeLeftSeconds: goAwaySeconds,
-              }),
-            );
+            ws.close(closeMeta.code, closeMeta.reason);
           }
-          if (goAwaySeconds > 5 && !reconnectTimer) {
-            scheduleReconnect(250);
-          }
-        }
-      }
-
-      if (ws.readyState === WebSocket.OPEN) ws.send(raw);
+        },
+        onDiagnostic: (diagnostic) => {
+          console.warn("[Telefun] Gemini adapter diagnostic", {
+            requestId,
+            ...diagnostic,
+          });
+        },
+      },
     });
 
-    socket.on("error", (error) => {
-      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
-      console.error("[Telefun] Gemini WebSocket error:", error);
-    });
+  const createOpenAIAdapter = (
+    configuration: Parameters<typeof createRealtimeProviderAdapter>[0],
+  ) => {
+    const openAIKey = env.OPENAI_API_KEY;
+    if (!openAIKey) {
+      throw new Error("OpenAI Realtime is not configured");
+    }
 
-    socket.on("close", (code, reason) => {
-      if (!isCurrentGeminiSocket(geminiWs, socket)) return;
-      console.log(
-        `[Telefun] Gemini closed: ${code} (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
-      );
-      isGeminiOpen = false;
-      geminiSetupComplete = false;
-
-      if (
-        !clientClosed &&
-        code !== 1000 &&
-        reconnectAttempts < MAX_RECONNECT_ATTEMPTS
-      ) {
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 8000);
-        console.log(
-          `[Telefun] Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1})`,
-        );
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              type: "session_reconnecting",
-              reason: "gemini_close",
-              code,
-            }),
-          );
-        }
-        scheduleReconnect(delay);
-        return;
-      }
-
-      void flushUsage();
-      const closeMeta = buildSafeCloseMetadata(code, reason);
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close(closeMeta.code, closeMeta.reason);
-      }
+    return new OpenAIRealtimeAdapter({
+      configuration,
+      apiKey: openAIKey,
+      userId,
+      createSocket: (url, { headers }) => new WebSocket(url, { headers }),
+      callbacks: {
+        forwardToClient: (raw) => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(raw);
+        },
+        observeUsage: (observation, observedAtMs) => {
+          observeOpenAIUsage(openAIUsageAccumulator, observation, observedAtMs);
+        },
+        appendTranscript: (entry) => transcriptCollector.append(entry),
+        startAiSpeaking: () => turnManager.startAiSpeaking(),
+        completeTurn: () => {
+          transcriptCollector.completeTurn("consumer");
+          turnManager.endAiSpeaking();
+        },
+        interruptTurn: () => {
+          transcriptCollector.interruptTurn();
+          turnManager.endAiSpeaking();
+        },
+        notifyActivity: () => drainCoordinator?.notifyActivity(),
+        notifyTurnComplete: () => drainCoordinator?.notifyTurnComplete(),
+        notifyInterrupted: () => drainCoordinator?.notifyInterrupted(),
+        onFinalClose: (code, reason) => {
+          const closeMeta = buildSafeCloseMetadata(code, reason);
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close(closeMeta.code, closeMeta.reason);
+          }
+        },
+        onDiagnostic: (diagnostic) => {
+          console.warn("[Telefun] OpenAI adapter diagnostic", {
+            requestId,
+            ...buildSafeOpenAIDiagnosticLogMetadata(diagnostic),
+          });
+        },
+      },
     });
   };
+
+  const configurationGate = new TelefunProviderConfigurationGate({
+    createAdapter: (configuration) =>
+      createRealtimeProviderAdapter(configuration, {
+        createGeminiAdapter,
+        createOpenAIAdapter,
+        openAIEnabled: env.TELEFUN_OPENAI_ENABLED,
+        openAIConfigured: Boolean(env.OPENAI_API_KEY),
+      }),
+    onConfigured: (configuration, adapter) => {
+      providerAdapter = adapter;
+      activeModelId = configuration.model.id;
+      activeProvider = configuration.model.provider;
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "telefun_session_configured",
+            modelId: configuration.model.id,
+            transport: configuration.model.realtime.transport,
+          }),
+        );
+      }
+    },
+    onClose: (code, reason) => {
+      if (ws.readyState === WebSocket.OPEN) ws.close(code, reason);
+    },
+  });
 
   const authenticateClient = async (
     message: ReturnType<typeof parseTelefunAuthMessage>,
@@ -408,12 +402,12 @@ wss.on("connection", async (ws, req) => {
     sessionId = authResult.sessionId;
     authed = true;
     clearAuthTimeout();
-    console.log("[Telefun] User connected:", authResult.userEmail);
+    console.log("[Telefun] User authenticated", { requestId });
     ws.send(JSON.stringify({ type: "auth_ok", sessionId }));
-    setupGeminiWs();
+    configurationGate.start();
   };
 
-  // Message handler: validate and forward structured JSON to Gemini Live
+  // Message handler: authenticate, configure once, then delegate provider data.
   ws.on("message", (data) => {
     if (typeof data !== "string" && !Buffer.isBuffer(data)) {
       console.warn("[Telefun] Unsupported binary message type");
@@ -425,6 +419,10 @@ wss.on("connection", async (ws, req) => {
     try {
       parsed = JSON.parse(raw);
     } catch {
+      if (authed && !configurationGate.isConfigured()) {
+        configurationGate.rejectClientMessage("invalid_envelope");
+        return;
+      }
       console.warn("[Telefun] Dropping non-JSON client message");
       return;
     }
@@ -444,10 +442,10 @@ wss.on("connection", async (ws, req) => {
       return;
     }
 
-    const controlMsg = parseControlMessage(parsed);
-    if (controlMsg) {
-      if (isSessionEndRequest(controlMsg)) {
-        clientClosed = true;
+    if (isTelefunControlEnvelope(parsed)) {
+      const controlMsg = parseControlMessage(parsed);
+      if (controlMsg && isSessionEndRequest(controlMsg)) {
+        configurationGate.dispose();
         if (!drainCoordinator) {
           drainCoordinator = new DrainCoordinator({
             onFinalize: (outcome: DrainOutcome) => {
@@ -456,69 +454,35 @@ wss.on("connection", async (ws, req) => {
           });
         }
         drainCoordinator.startDrain();
+      } else {
+        configurationGate.rejectClientMessage("unexpected_control_message");
       }
       return;
     }
 
-    if (!isGeminiForwardableMessage(parsed)) {
-      console.warn("[Telefun] Dropping unsupported client JSON message");
-      return;
-    }
-
-    if ((parsed as any).setup?.model) {
-      activeModelId = (parsed as any).setup.model.replace(/^models\//, "");
-    }
-
-    if (isGeminiSetupMessage(parsed)) {
-      cachedSetupMessage = JSON.stringify(parsed);
-    }
-
-    if (isGeminiSetupMessage(parsed) || geminiSetupComplete) {
-      sendToGemini(JSON.stringify(parsed));
-    } else {
-      postSetupQueue.push(JSON.stringify(parsed));
-    }
+    if (configurationGate.handleMessage(parsed)) return;
+    providerAdapter?.handleClientMessage(parsed);
   });
 
   ws.on("close", async (code, reason) => {
     console.log(
       `[Telefun] Client closed: ${code} ${reason.toString() || "(no reason)"}`,
     );
-    clientClosed = true;
     clearAuthTimeout();
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
+    configurationGate.dispose();
     clearInterval(keepaliveTimer);
-    if (
-      geminiWs &&
-      (geminiWs.readyState === WebSocket.OPEN ||
-        geminiWs.readyState === WebSocket.CONNECTING)
-    ) {
-      geminiWs.close(1000, "Client disconnected");
-    }
+    providerAdapter?.close(1000, "Client disconnected");
     await finalizeSessionOnce("completed");
-    setTimeout(() => void flushUsage(), 2000);
+    scheduleUsageRetry(Math.floor((Date.now() - callStartedAt) / 1000) * 1000);
   });
 
   ws.on("error", async () => {
-    clientClosed = true;
     clearAuthTimeout();
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
+    configurationGate.dispose();
     clearInterval(keepaliveTimer);
-    if (
-      geminiWs &&
-      (geminiWs.readyState === WebSocket.OPEN ||
-        geminiWs.readyState === WebSocket.CONNECTING)
-    ) {
-      geminiWs.close(1011, "Client WebSocket error");
-    }
+    providerAdapter?.close(1011, "Client WebSocket error");
     await finalizeSessionOnce("failed");
-    setTimeout(() => void flushUsage(), 2000);
+    scheduleUsageRetry(Math.floor((Date.now() - callStartedAt) / 1000) * 1000);
   });
 
   // Validate origin
@@ -526,7 +490,7 @@ wss.on("connection", async (ws, req) => {
   if (
     env.ALLOWED_ORIGINS !== "*" &&
     origin &&
-    !allowedOrigins.includes(normalizeOrigin(origin))
+    !allowedOrigins.includes(normalizeTelefunOrigin(origin))
   ) {
     ws.close(4003, "Forbidden Origin");
     return;
@@ -547,7 +511,10 @@ wss.on("connection", async (ws, req) => {
 server.listen(env.PORT, "0.0.0.0", () => {
   console.log(`[Telefun] Server running on http://0.0.0.0:${env.PORT}`);
   console.log(
-    `[Telefun] Gemini API Key: ${env.GEMINI_API_KEY ? "***" + env.GEMINI_API_KEY.slice(-4) : "MISSING"}`,
+    `[Telefun] Gemini API Key: ${env.GEMINI_API_KEY ? "configured" : "missing"}`,
+  );
+  console.log(
+    `[Telefun] OpenAI Realtime: ${env.TELEFUN_OPENAI_ENABLED ? "enabled/configured" : "disabled"}`,
   );
 });
 

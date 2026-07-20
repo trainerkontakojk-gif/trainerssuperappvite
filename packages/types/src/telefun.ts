@@ -2,6 +2,21 @@ import type { JsonObject, JsonValue } from "./common";
 import type { VoiceQualityAssessment } from "./telefun-assessment";
 import type { TelefunTranscriptEntry } from "./telefun-transcript";
 
+export interface TelefunSessionConfigure {
+  type: "telefun_session_configure";
+  modelId: string;
+  transport: "gemini-live" | "openai-audio";
+  voice: string;
+  instructions: string;
+  inputAudio: {
+    format: "pcm16";
+    sampleRate: 16000 | 24000;
+  };
+  responsePacingMode: "realistic" | "training_fast";
+}
+
+export const TELEFUN_CONFIGURATION_CLOSE_CODE = 4002;
+
 export interface SpeechSegment {
   startMs: number;
   endMs: number;

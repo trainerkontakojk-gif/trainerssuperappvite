@@ -1,13 +1,14 @@
 # Telefun — Dokumentasi Modul Lengkap
 
 > **TELEFUN** = **Tele**phone **Fun**
-> Modul simulasi panggilan suara untuk melatih agen menangani telepon menggunakan **Gemini Live API**.
+> Modul simulasi panggilan suara untuk melatih agen menangani telepon.
+> Mendukung **dua provider realtime**: **Gemini Live API** (default) dan **OpenAI Realtime API** (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`).
 
 Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 
 1. **Frontend (React)** — UI untuk settings, panggilan, review, history
 2. **Backend API (Hono)** — REST API untuk CRUD session, settings, recordings
-3. **Proxy Server (WebSocket)** — Bridge antara frontend dan Gemini Live API
+3. **Proxy Server (WebSocket)** — Bridge antara frontend dan provider live API (Gemini Live / OpenAI Realtime) melalui **provider adapter pattern**
 
 ---
 
@@ -40,8 +41,8 @@ Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 │  └──────────┘  └──────┬───────┘  └────────────┘  └──────────────┘ │
 │                        │                                            │
 │              ┌─────────▼─────────┐                                  │
-│              │  geminiService.ts  │  WebSocket client                │
-│              │  + promptBuilder   │  (Gemini Live JSON protocol)    │
+|              │  geminiService.ts   │  WebSocket client                │
+|              │  + promptBuilder    │  (multi-provider protocol)      │
 │              └─────────┬─────────┘                                  │
 └────────────────────────┼────────────────────────────────────────────┘
                          │
@@ -60,15 +61,28 @@ Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 │  │ recordings.ts     │   │ Analysis │   │   ─ drain coordinator   │ │
 │  │ annotations.ts    │   │ (AI)     │   │   ─ transcript          │ │
 │  │ remux-recording.ts│   └──────────┘   │   ─ usage tracking      │ │
-│  └────────┬─────────┘                   └────────────┬────────────┘ │
+│  └────────┬─────────┘                   │   ─ provider adapter *  │ │
+│           │                             └────────────┬────────────┘ │
 └───────────┼──────────────────────────────────────────┼──────────────┘
-            │                                          │
-            ▼                                          ▼
-    ┌───────────────┐                     ┌─────────────────────┐
-    │   Supabase     │                     │  Gemini Live API    │
-    │  (database +   │                     │  BidiGenerateContent│
-    │   storage)     │                     │  (WebSocket)        │
-    └───────────────┘                     └─────────────────────┘
+│                                                      │
+│                ┌─────────────────────────┐            │
+│                │  Provider Adapter       │            │
+│                │  ├─ GeminiLiveAdapter   │◄───────────┤
+│                │  └─ OpenAIRealtimeAdapter           │
+│                └────────────┬────────────┘            │
+│                             │                         │
+│                             ▼                         │
+│                ┌──────────────────────┐               │
+│                │  Gemini Live API     │  (WebSocket)  │
+│                │  BidiGenerateContent │               │
+│                └──────────────────────┘               │
+│                             │                         │
+│                             ▼                         │
+│                ┌──────────────────────┐               │
+│                │  OpenAI Realtime API │  (WebSocket)  │
+│                │  gpt-realtime-2.1    │               │
+│                │  gpt-realtime-2.1-mini               │
+│                └──────────────────────┘               │
 ```
 
 ---
@@ -85,7 +99,7 @@ routes/telefun/
 ├── replay.tsx                   # Halaman replay/review sesi
 ├── telefunSettings.ts           # Tipe & default settings (scenarios, consumer types, identity)
 ├── telefunApi.ts                # API calls ke backend (settings, sessions, history)
-├── telefunVoiceRegistry.ts      # Mapping voice Gemini Live
+├── telefunVoiceRegistry.ts      # Mapping voice Gemini Live + GPT Realtime per gender
 ├── recordingPath.ts             # Helpers recording path
 ├── sessionFinalizer.ts          # Finalisasi session dari sisi client
 ├── types.ts                     # Tipe CallRecord dll
@@ -185,15 +199,19 @@ apps/api/src/
 apps/telefun/
 ├── src/
 │   ├── server.ts              # ★ Entrypoint — HTTP + WebSocket server
-│   ├── server-protocol.ts     # Protocol detection & Gemini message helpers
+│   ├── server-protocol.ts     # Protocol detection & message helpers
 │   ├── server-close.ts        # Close-code sanitizer
 │   ├── session-drain.ts       # Graceful drain coordinator
 │   ├── turn-taking.ts         # Turn state machine
 │   ├── transcript.ts          # Real-time transcript collector
-│   ├── usage.ts               # Token usage tracking & billing
+│   ├── usage.ts               # Token usage tracking & billing (dual-provider)
 │   ├── db.ts                  # Supabase DB queries (session CRUD)
 │   ├── auth.ts                # JWT token verification
-│   └── env.ts                 # Environment validation (Zod)
+│   ├── env.ts                 # Environment validation (Zod) — Gemini + OpenAI key
+│   └── providers/             # ★ Provider adapter pattern
+│       ├── ProviderAdapter.ts     # Interface
+│       ├── GeminiLiveAdapter.ts   # Gemini Live implementation
+│       └── OpenAIRealtimeAdapter.ts # gpt-realtime-2.1 / mini implementation
 ├── package.json
 ├── tsconfig.json
 └── vitest.config.ts
@@ -206,19 +224,21 @@ apps/telefun/
 ### Alur Penggunaan
 
 ```
-1. BUKA halaman Telefun → pilih scenario + consumer type di settings
+1. BUKA halaman Telefun → pilih scenario + consumer type + model/provider di settings
         │
 2. TEKAN tombol "Mulai Panggilan"
         │
 3. SISTEM:
    a. Kirim POST /api/v1/telefun/sessions → buat record di telefun_history
    b. Connect WebSocket ke proxy (apps/telefun) dengan JWT token
-   c. Kirim setup message (system instruction prompt → Gemini)
-   d. Tunggu setupComplete dari Gemini
+   c. Kirim configure message (model ID, transport, voice, instructions)
+   d. Proxy pilih provider adapter sesuai transport:
+      - Gemini: setup Gemini Live → tunggu setupComplete
+      - OpenAI: session.update → tunggu session.created
         │
 4. MULAI PERCAKAPAN:
-   a. User bicara → microphone → audio → WebSocket → proxy → Gemini
-   b. Gemini merespons → audio → proxy → WebSocket → speaker user
+   a. User bicara → microphone → audio → WebSocket → proxy → provider API
+   b. Provider merespons → audio → proxy → WebSocket → speaker user
    c. Real-time transcript muncul di UI
    d. Hold/mute bisa digunakan kapan saja
         │
@@ -337,6 +357,10 @@ Durasi panggilan dibatasi sesuai `maxCallDuration`. AI mendapat reminder bertaha
    - Tiap tipe punya emosi dan cara bicara berbeda
 4. **Tab "Identitas"**:
    - Atur nama, gender, kota, no HP konsumen
+   - Gemini Live dan GPT Realtime memfilter pilihan suara berdasarkan gender persona
+   - Saat gender **Acak**, picker suara dinonaktifkan dan runtime memilih voice dari kelompok gender final
+   - Gender voice GPT Realtime adalah metadata internal Telefun; OpenAI hanya menetapkan voice ID resmi
+   - Voice `alloy` tetap diterima untuk kompatibilitas setting lama, tetapi dinormalisasi ke voice gender-aware saat sesi baru dibuat
 5. **Tab "Sistem"**:
    - Pilih model (default: `gemini-3.1-flash-live-preview`)
    - Atur durasi maksimal panggilan

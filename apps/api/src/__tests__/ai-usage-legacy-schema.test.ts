@@ -209,4 +209,90 @@ describe("logAiUsage legacy schema compatibility", () => {
       usd_to_idr_rate: 17000,
     });
   });
+
+  it("retries only the legacy pricing projection when modality columns are missing", async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const pricingSelect = vi.fn((columns: string) => ({
+      eq: vi.fn().mockReturnValue({
+        maybeSingle: vi.fn().mockResolvedValue(
+          columns.includes("cached_input_text")
+            ? {
+                data: null,
+                error: {
+                  code: "PGRST204",
+                  message:
+                    "cached_input_text_price_usd_per_million missing from schema cache",
+                },
+              }
+            : {
+                data: {
+                  input_price_usd_per_million: 1,
+                  output_price_usd_per_million: 2,
+                },
+                error: null,
+              },
+        ),
+      }),
+    }));
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "ai_pricing_settings") return { select: pricingSelect };
+      if (table === "ai_billing_settings") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { usd_to_idr_rate: 15000 },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      return { insert };
+    });
+
+    await logAiUsage({
+      requestId: "req-pricing-legacy",
+      userId: "user-1",
+      provider: "gemini",
+      modelId: "gemini-3.1-flash-lite",
+      usageContext: { module: "ketik", action: "generate_consumer_response" },
+      tokens: { inputTokens: 1_000_000, outputTokens: 0, totalTokens: 1_000_000 },
+    });
+
+    expect(pricingSelect).toHaveBeenCalledTimes(2);
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({ estimated_cost_usd: 1 }),
+    );
+  });
+
+  it("does not persist zero-cost usage when pricing lookup fails unexpectedly", async () => {
+    const insert = vi.fn();
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "ai_pricing_settings") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: null,
+                error: { code: "42501", message: "permission denied" },
+              }),
+            }),
+          }),
+        };
+      }
+      return { insert };
+    });
+
+    await logAiUsage({
+      requestId: "req-pricing-error",
+      userId: "user-1",
+      provider: "openrouter",
+      modelId: "gpt-4o-mini",
+      usageContext: { module: "pdkt", action: "generate_template" },
+      tokens: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },
+    });
+
+    expect(insert).not.toHaveBeenCalled();
+  });
 });

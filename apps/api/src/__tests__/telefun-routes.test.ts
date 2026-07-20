@@ -22,10 +22,30 @@ import {
   buildSeekablePath,
 } from "../routes/telefun";
 
-import { telefunTranscriptSchema, parseTelefunTranscript } from "@trainers/types";
-import { telefunSimulationChallengeTypesSchema } from "../routes/telefun/settings";
+import {
+  getTelefunLiveModel,
+  telefunTranscriptSchema,
+  parseTelefunTranscript,
+} from "@trainers/types";
+import {
+  telefunSettingsPayloadSchema,
+  telefunSimulationChallengeTypesSchema,
+} from "../routes/telefun/settings";
+import {
+  telefunSessionCreatePayloadSchema,
+  telefunSessionUpdatePayloadSchema,
+  validateTelefunSessionDuration,
+} from "../routes/telefun/sessions";
 
 describe("telefun API payload and security validators", () => {
+  const validSettingsBody = {
+    selectedModel: "gemini-3.1-flash-live-preview",
+    voiceName: "Kore",
+    systemInstruction: "Anda adalah konsumen OJK.",
+    consumerName: "Agus",
+    consumerGender: "male",
+  };
+
   it("rejects unknown simulation challenge IDs at the settings boundary", () => {
     expect(
       telefunSimulationChallengeTypesSchema.safeParse([
@@ -60,6 +80,42 @@ describe("telefun API payload and security validators", () => {
     expect(payload.updated_at).toBe("2026-05-25T00:00:00.000Z");
   });
 
+  it("accepts legacy settings without Telefun model fields and valid canonical pairs", () => {
+    expect(
+      telefunSettingsPayloadSchema.safeParse(validSettingsBody).success,
+    ).toBe(true);
+    expect(
+      telefunSettingsPayloadSchema.safeParse({
+        ...validSettingsBody,
+        telefunModelId: "gpt-realtime-2.1",
+        telefunTransport: "openai-audio",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects unknown, incomplete, and mismatched settings model pairs", () => {
+    expect(
+      telefunSettingsPayloadSchema.safeParse({
+        ...validSettingsBody,
+        telefunModelId: "unknown-live-model",
+        telefunTransport: "gemini-live",
+      }).success,
+    ).toBe(false);
+    expect(
+      telefunSettingsPayloadSchema.safeParse({
+        ...validSettingsBody,
+        telefunModelId: "gpt-realtime-2.1",
+      }).success,
+    ).toBe(false);
+    expect(
+      telefunSettingsPayloadSchema.safeParse({
+        ...validSettingsBody,
+        telefunModelId: "gpt-realtime-2.1",
+        telefunTransport: "gemini-live",
+      }).success,
+    ).toBe(false);
+  });
+
   it("builds correct session insert payload with user details", () => {
     const body = {
       scenario_title: "Pinjol Ilegal",
@@ -90,9 +146,149 @@ describe("telefun API payload and security validators", () => {
       status: "active",
       configured_duration: null,
       response_pacing_mode: null,
-      telefun_model_id: null,
-      telefun_transport: null,
+      telefun_model_id: "gemini-3.1-flash-live-preview",
+      telefun_transport: "gemini-live",
     });
+  });
+
+  it("accepts canonical session pairs, model-only derivation, and Gemini defaults", () => {
+    const base = {
+      scenario_title: "Pinjol Ilegal",
+      consumer_name: "Siti",
+    };
+
+    expect(telefunSessionCreatePayloadSchema.safeParse(base).success).toBe(
+      true,
+    );
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        telefun_model_id: "gpt-realtime-2.1-mini",
+      }).success,
+    ).toBe(true);
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        telefun_model_id: "gpt-realtime-2.1",
+        telefun_transport: "openai-audio",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      buildTelefunSessionInsertPayload({ userId: "user-1", body: base }),
+    ).toMatchObject({
+      telefun_model_id: "gemini-3.1-flash-live-preview",
+      telefun_transport: "gemini-live",
+    });
+    expect(
+      buildTelefunSessionInsertPayload({
+        userId: "user-1",
+        body: { ...base, telefun_model_id: "gpt-realtime-2.1-mini" },
+      }),
+    ).toMatchObject({
+      telefun_model_id: "gpt-realtime-2.1-mini",
+      telefun_transport: "openai-audio",
+    });
+  });
+
+  it("rejects invalid session create pairs before database persistence", () => {
+    const base = {
+      scenario_title: "Pinjol Ilegal",
+      consumer_name: "Siti",
+    };
+
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        telefun_transport: "gemini-live",
+      }).success,
+    ).toBe(false);
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        telefun_model_id: "unknown-live-model",
+      }).success,
+    ).toBe(false);
+    expect(() =>
+      buildTelefunSessionInsertPayload({
+        userId: "user-1",
+        body: {
+          ...base,
+          telefun_model_id: "gpt-realtime-2.1",
+          telefun_transport: "gemini-live",
+        },
+      }),
+    ).toThrow("Model dan transport Telefun tidak cocok");
+  });
+
+  it("accepts OpenAI duration 3600 seconds and rejects 3601 seconds", () => {
+    const base = {
+      scenario_title: "Pinjol Ilegal",
+      consumer_name: "Siti",
+      telefun_model_id: "gpt-realtime-2.1",
+      telefun_transport: "openai-audio",
+    };
+
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        configured_duration: 3600,
+      }).success,
+    ).toBe(true);
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        configured_duration: 3601,
+      }).success,
+    ).toBe(false);
+    expect(() =>
+      buildTelefunSessionInsertPayload({
+        userId: "user-1",
+        body: { ...base, configured_duration: 3601 },
+      }),
+    ).toThrow("Durasi maksimum model Telefun adalah 3600 detik");
+  });
+
+  it("derives the session duration limit from resolved model metadata", () => {
+    const cappedModel = getTelefunLiveModel("gpt-realtime-2.1-mini");
+    const uncappedModel = getTelefunLiveModel("gemini-3.1-flash-live-preview");
+
+    expect(cappedModel).toBeDefined();
+    expect(uncappedModel).toBeDefined();
+    expect(() =>
+      validateTelefunSessionDuration(cappedModel!, 3600),
+    ).not.toThrow();
+    expect(() => validateTelefunSessionDuration(cappedModel!, 3601)).toThrow(
+      "Durasi maksimum model Telefun adalah 3600 detik",
+    );
+    expect(() =>
+      validateTelefunSessionDuration(uncappedModel!, 7200),
+    ).not.toThrow();
+  });
+
+  it("requires both model fields together for session updates", () => {
+    expect(
+      telefunSessionUpdatePayloadSchema.safeParse({
+        telefun_model_id: "gemini-3.0-flash-live-preview",
+        telefun_transport: "gemini-live",
+      }).success,
+    ).toBe(true);
+    expect(
+      telefunSessionUpdatePayloadSchema.safeParse({
+        telefun_model_id: "gemini-3.0-flash-live-preview",
+      }).success,
+    ).toBe(false);
+    expect(
+      telefunSessionUpdatePayloadSchema.safeParse({
+        telefun_model_id: "gpt-realtime-2.1-mini",
+        telefun_transport: "gemini-live",
+      }).success,
+    ).toBe(false);
+    expect(() =>
+      buildTelefunSessionUpdatePayload({
+        telefun_transport: "openai-audio",
+      }),
+    ).toThrow("Model dan transport Telefun harus diperbarui bersama");
   });
 
   it("validates recording path format and session ownership", () => {

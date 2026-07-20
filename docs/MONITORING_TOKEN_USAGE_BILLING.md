@@ -107,6 +107,8 @@ Yang dicatat pada setiap row `ai_usage_logs`:
 
 Untuk Telefun Live, `usageMetadata` diakumulasi per turn karena Gemini Live menagih seluruh Session Context Window pada setiap turn. `estimated_cost_*` menyimpan biaya token hasil SUM per turn. `per_minute_cost_*` menyimpan estimasi durasi audio sebagai fallback/sanity floor. `final_cost_*` adalah angka reporting: `MAX(estimated_cost_*, per_minute_cost_*)`.
 
+Paragraf di atas adalah **behavior Gemini saat ini**. Fallback per-menit tersebut tidak boleh diterapkan ke provider OpenAI.
+
 Kolom tambahan untuk audit:
 - `live_turn_count` — jumlah turn yang di-bill
 - `latest_input_tokens`, `latest_output_tokens`, `latest_total_tokens` — snapshot terakhir dari Gemini
@@ -124,6 +126,17 @@ Aturan penting:
 - retry/fallback internal tidak boleh menghasilkan row tambahan (setiap request_id unik)
 - jika provider tidak memberi metadata token, flow user tetap lanjut tetapi usage tidak dicatat
 - jika pricing model belum tersedia, flow user tetap lanjut tetapi usage tidak dicatat (cost 0)
+
+### Target OpenAI Realtime usage contract
+
+Kontrak ini berlaku setelah adapter dan migration OpenAI diimplementasikan; produksi pada fase dokumentasi masih Gemini-only.
+
+- Sumber usage OpenAI adalah event terminal `response.done`. Satu response ID hanya boleh dihitung sekali, walaupun event diterima ulang atau lifecycle finalization dipanggil berulang.
+- Parser mengambil text/audio input, cached text/audio input, dan text/audio output dari detail usage provider. Cached token dibebankan dengan cached rate, bukan full input rate.
+- Setiap row menyimpan snapshot `provider`, `model_id`, seluruh rate modality/cached yang aktif, kurs, dan hasil biaya. Tidak ada model/provider hardcoded ke Gemini pada jalur OpenAI.
+- Flat input/output pricing tetap dibaca untuk model legacy. Model realtime enam-rate memakai snapshot modality/cached tanpa menghapus kontrak lama.
+- Bila `response.done` tidak memuat usage yang valid, sesi user tetap diselesaikan dan kondisi tersebut dicatat sebagai diagnostic usage-missing. Sistem tidak mengarang token, tidak mengarang cost, dan tidak menggunakan per-minute/fallback Gemini.
+- Retry atau reconnect tidak boleh menambahkan biaya response yang sudah pernah dilihat. OpenAI reconnect merupakan sesi upstream baru yang discontinuous, tetapi dedupe tetap memakai identity response upstream dalam scope session logging.
 
 ### Activity Logs (Audit Trail)
 
@@ -171,6 +184,20 @@ Perilaku editor:
 
 - semua model di `AI_MODELS` selalu muncul, walau tabel pricing masih kosong
 - nilai `0` berarti usage model tersebut belum dihitung biayanya secara bermakna
+
+Target editor mendukung dua mode kompatibel:
+
+- **Legacy/simple:** `input_price_usd_per_million` dan `output_price_usd_per_million`.
+- **Realtime modality:** text input, cached text input, text output, audio input, cached audio input, dan audio output. Rate aktif disalin ke row usage agar histori tidak berubah ketika pricing diedit.
+
+Baseline OpenAI resmi (USD per satu juta token):
+
+| Model                   | Text input | Cached text input | Text output | Audio input | Cached audio input | Audio output |
+| ----------------------- | ---------: | ----------------: | ----------: | ----------: | -----------------: | -----------: |
+| `gpt-realtime-2.1`      |       4.00 |              0.40 |       24.00 |       32.00 |               0.40 |        64.00 |
+| `gpt-realtime-2.1-mini` |       0.60 |              0.06 |        2.40 |       10.00 |               0.30 |        20.00 |
+
+Baseline seed harus editable dan di-snapshot per usage; harga resmi perlu diverifikasi ulang sebelum enable produksi. Sumber model: [`gpt-realtime-2.1`](https://developers.openai.com/api/docs/models/gpt-realtime-2.1) dan [`gpt-realtime-2.1-mini`](https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini).
 
 ### Kurs USD/IDR
 
@@ -263,3 +290,5 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 - `docs/modules.md`
 - `docs/database.md`
 - `docs/auth-rbac.md`
+- [`docs/telefun.md`](telefun.md#kontrak-kontrol-provider-neutral-target) — kontrak control plane dan acceptance matrix dual-provider
+- [`docs/adr/telefun-realtime-provider-adapters.md`](adr/telefun-realtime-provider-adapters.md) — keputusan arsitektur adapter

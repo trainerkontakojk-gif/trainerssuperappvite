@@ -3,13 +3,144 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
-import type { TelefunTranscriptEntry } from "@trainers/types";
-import { telefunTranscriptSchema } from "@trainers/types";
+import {
+  DEFAULT_TELEFUN_LIVE_MODEL_ID,
+  getTelefunLiveModel,
+  isValidTelefunModelTransportPair,
+  telefunTranscriptSchema,
+  type AiModelRealtimeMetadata,
+  type TelefunTranscriptEntry,
+  type TelefunTransport,
+} from "@trainers/types";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
 
 type Variables = { user: User; profile: any };
 
 const telefunSessions = new Hono<{ Variables: Variables }>();
+
+export class TelefunSessionValidationError extends Error {}
+
+function resolveTelefunSessionModelPair(params: {
+  modelId?: string;
+  transport?: string;
+}) {
+  if (params.modelId === undefined && params.transport !== undefined) {
+    throw new TelefunSessionValidationError(
+      "Model Telefun wajib dikirim ketika transport disediakan.",
+    );
+  }
+
+  const modelId = params.modelId ?? DEFAULT_TELEFUN_LIVE_MODEL_ID;
+  const model = getTelefunLiveModel(modelId);
+  if (!model) {
+    throw new TelefunSessionValidationError("Model Telefun tidak dikenal.");
+  }
+
+  const transport = params.transport ?? model.realtime.transport;
+  if (!isValidTelefunModelTransportPair(model.id, transport)) {
+    throw new TelefunSessionValidationError(
+      "Model dan transport Telefun tidak cocok.",
+    );
+  }
+
+  return { model, transport: transport as TelefunTransport };
+}
+
+export function validateTelefunSessionDuration(
+  model: { realtime: AiModelRealtimeMetadata },
+  configuredDuration?: number,
+) {
+  const maxSessionMinutes = model.realtime.maxSessionMinutes;
+  if (maxSessionMinutes === undefined) return;
+
+  const maxSessionSeconds = maxSessionMinutes * 60;
+  if ((configuredDuration ?? 0) > maxSessionSeconds) {
+    throw new TelefunSessionValidationError(
+      `Durasi maksimum model Telefun adalah ${maxSessionSeconds} detik.`,
+    );
+  }
+}
+
+export const telefunSessionCreatePayloadSchema = z
+  .object({
+    scenario_title: z.string(),
+    consumer_name: z.string(),
+    consumer_gender: z.string().optional(),
+    consumer_phone: z.string().optional(),
+    consumer_city: z.string().optional(),
+    realistic_mode_enabled: z.boolean().default(false),
+    persona_config: z.any().optional(),
+    disruption_config: z.any().optional(),
+    configured_duration: z.number().optional(),
+    response_pacing_mode: z.string().optional(),
+    telefun_model_id: z.string().optional(),
+    telefun_transport: z.string().optional(),
+  })
+  .superRefine((body, ctx) => {
+    try {
+      const pair = resolveTelefunSessionModelPair({
+        modelId: body.telefun_model_id,
+        transport: body.telefun_transport,
+      });
+      validateTelefunSessionDuration(pair.model, body.configured_duration);
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Konfigurasi model Telefun tidak valid.",
+      });
+    }
+  });
+
+export const telefunSessionUpdatePayloadSchema = z
+  .object({
+    status: z.enum(["pending", "active", "completed", "failed"]).optional(),
+    duration_seconds: z.number().optional(),
+    messages: telefunTranscriptSchema.optional(),
+    recording_path: z.string().optional(),
+    agent_recording_path: z.string().optional(),
+    session_metrics: z.any().optional(),
+    voice_dashboard_metrics: z.any().optional(),
+    disruption_results: z.any().optional(),
+    persona_config: z.any().optional(),
+    realistic_mode_enabled: z.boolean().optional(),
+    score: z.number().optional(),
+    feedback: z.string().optional(),
+    configured_duration: z.number().optional(),
+    response_pacing_mode: z.string().optional(),
+    telefun_model_id: z.string().optional(),
+    telefun_transport: z.string().optional(),
+  })
+  .superRefine((body, ctx) => {
+    const hasModel = body.telefun_model_id !== undefined;
+    const hasTransport = body.telefun_transport !== undefined;
+    if (!hasModel && !hasTransport) return;
+
+    if (!hasModel || !hasTransport) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Model dan transport Telefun harus diperbarui bersama.",
+      });
+      return;
+    }
+
+    try {
+      resolveTelefunSessionModelPair({
+        modelId: body.telefun_model_id,
+        transport: body.telefun_transport,
+      });
+    } catch (error) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Konfigurasi model Telefun tidak valid.",
+      });
+    }
+  });
 
 telefunSessions.get("/sessions", async (c) => {
   const user = c.get("user");
@@ -62,6 +193,12 @@ export function buildTelefunSessionInsertPayload(params: {
     telefun_transport?: string;
   };
 }) {
+  const pair = resolveTelefunSessionModelPair({
+    modelId: params.body.telefun_model_id,
+    transport: params.body.telefun_transport,
+  });
+  validateTelefunSessionDuration(pair.model, params.body.configured_duration);
+
   return {
     user_id: params.userId,
     scenario_title: params.body.scenario_title,
@@ -75,30 +212,14 @@ export function buildTelefunSessionInsertPayload(params: {
     status: "active",
     configured_duration: params.body.configured_duration || null,
     response_pacing_mode: params.body.response_pacing_mode || null,
-    telefun_model_id: params.body.telefun_model_id || null,
-    telefun_transport: params.body.telefun_transport || null,
+    telefun_model_id: pair.model.id,
+    telefun_transport: pair.transport,
   };
 }
 
 telefunSessions.post(
   "/sessions",
-  zValidator(
-    "json",
-    z.object({
-      scenario_title: z.string(),
-      consumer_name: z.string(),
-      consumer_gender: z.string().optional(),
-      consumer_phone: z.string().optional(),
-      consumer_city: z.string().optional(),
-      realistic_mode_enabled: z.boolean().default(false),
-      persona_config: z.any().optional(),
-      disruption_config: z.any().optional(),
-      configured_duration: z.number().optional(),
-      response_pacing_mode: z.string().optional(),
-      telefun_model_id: z.string().optional(),
-      telefun_transport: z.string().optional(),
-    }),
-  ),
+  zValidator("json", telefunSessionCreatePayloadSchema),
   async (c) => {
     const user = c.get("user");
     const adminClient = createAdminClient();
@@ -118,6 +239,15 @@ telefunSessions.post(
       if (error) throw error;
       return c.json({ success: true, data });
     } catch (error: any) {
+      if (error instanceof TelefunSessionValidationError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "BAD_REQUEST", message: error.message },
+          },
+          400,
+        );
+      }
       return c.json(
         {
           success: false,
@@ -132,27 +262,44 @@ telefunSessions.post(
   },
 );
 
-export function buildTelefunSessionUpdatePayload(body: {
-  status?: "pending" | "active" | "completed" | "failed";
-  duration_seconds?: number;
-  messages?: TelefunTranscriptEntry[];
-  recording_path?: string;
-  agent_recording_path?: string;
-  session_metrics?: any;
-  voice_dashboard_metrics?: any;
-  disruption_results?: any;
-  persona_config?: any;
-  realistic_mode_enabled?: boolean;
-  score?: number;
-  feedback?: string;
-  configured_duration?: number;
-  response_pacing_mode?: string;
-  telefun_model_id?: string;
-  telefun_transport?: string;
-}, ownership?: {
-  userId: string;
-  sessionId: string;
-}) {
+export function buildTelefunSessionUpdatePayload(
+  body: {
+    status?: "pending" | "active" | "completed" | "failed";
+    duration_seconds?: number;
+    messages?: TelefunTranscriptEntry[];
+    recording_path?: string;
+    agent_recording_path?: string;
+    session_metrics?: any;
+    voice_dashboard_metrics?: any;
+    disruption_results?: any;
+    persona_config?: any;
+    realistic_mode_enabled?: boolean;
+    score?: number;
+    feedback?: string;
+    configured_duration?: number;
+    response_pacing_mode?: string;
+    telefun_model_id?: string;
+    telefun_transport?: string;
+  },
+  ownership?: {
+    userId: string;
+    sessionId: string;
+  },
+) {
+  const hasModel = body.telefun_model_id !== undefined;
+  const hasTransport = body.telefun_transport !== undefined;
+  if (hasModel !== hasTransport) {
+    throw new TelefunSessionValidationError(
+      "Model dan transport Telefun harus diperbarui bersama.",
+    );
+  }
+  if (hasModel && hasTransport) {
+    resolveTelefunSessionModelPair({
+      modelId: body.telefun_model_id,
+      transport: body.telefun_transport,
+    });
+  }
+
   if (
     ownership &&
     body.recording_path !== undefined &&
@@ -181,47 +328,51 @@ export function buildTelefunSessionUpdatePayload(body: {
 
   return {
     ...(body.status !== undefined ? { status: body.status } : {}),
-    ...(body.duration_seconds !== undefined ? { duration_seconds: body.duration_seconds } : {}),
+    ...(body.duration_seconds !== undefined
+      ? { duration_seconds: body.duration_seconds }
+      : {}),
     ...(body.messages !== undefined ? { messages: body.messages } : {}),
-    ...(body.recording_path !== undefined ? { recording_path: body.recording_path } : {}),
-    ...(body.agent_recording_path !== undefined ? { agent_recording_path: body.agent_recording_path } : {}),
-    ...(body.session_metrics !== undefined ? { session_metrics: body.session_metrics } : {}),
-    ...(body.voice_dashboard_metrics !== undefined ? { voice_dashboard_metrics: body.voice_dashboard_metrics } : {}),
-    ...(body.disruption_results !== undefined ? { disruption_results: body.disruption_results } : {}),
-    ...(body.persona_config !== undefined ? { persona_config: body.persona_config } : {}),
-    ...(body.realistic_mode_enabled !== undefined ? { realistic_mode_enabled: body.realistic_mode_enabled } : {}),
+    ...(body.recording_path !== undefined
+      ? { recording_path: body.recording_path }
+      : {}),
+    ...(body.agent_recording_path !== undefined
+      ? { agent_recording_path: body.agent_recording_path }
+      : {}),
+    ...(body.session_metrics !== undefined
+      ? { session_metrics: body.session_metrics }
+      : {}),
+    ...(body.voice_dashboard_metrics !== undefined
+      ? { voice_dashboard_metrics: body.voice_dashboard_metrics }
+      : {}),
+    ...(body.disruption_results !== undefined
+      ? { disruption_results: body.disruption_results }
+      : {}),
+    ...(body.persona_config !== undefined
+      ? { persona_config: body.persona_config }
+      : {}),
+    ...(body.realistic_mode_enabled !== undefined
+      ? { realistic_mode_enabled: body.realistic_mode_enabled }
+      : {}),
     ...(body.score !== undefined ? { score: body.score } : {}),
     ...(body.feedback !== undefined ? { feedback: body.feedback } : {}),
-    ...(body.configured_duration !== undefined ? { configured_duration: body.configured_duration } : {}),
-    ...(body.response_pacing_mode !== undefined ? { response_pacing_mode: body.response_pacing_mode } : {}),
-    ...(body.telefun_model_id !== undefined ? { telefun_model_id: body.telefun_model_id } : {}),
-    ...(body.telefun_transport !== undefined ? { telefun_transport: body.telefun_transport } : {}),
+    ...(body.configured_duration !== undefined
+      ? { configured_duration: body.configured_duration }
+      : {}),
+    ...(body.response_pacing_mode !== undefined
+      ? { response_pacing_mode: body.response_pacing_mode }
+      : {}),
+    ...(body.telefun_model_id !== undefined
+      ? { telefun_model_id: body.telefun_model_id }
+      : {}),
+    ...(body.telefun_transport !== undefined
+      ? { telefun_transport: body.telefun_transport }
+      : {}),
   };
 }
 
 telefunSessions.patch(
   "/sessions/:id",
-  zValidator(
-    "json",
-    z.object({
-      status: z.enum(["pending", "active", "completed", "failed"]).optional(),
-      duration_seconds: z.number().optional(),
-      messages: telefunTranscriptSchema.optional(),
-      recording_path: z.string().optional(),
-      agent_recording_path: z.string().optional(),
-      session_metrics: z.any().optional(),
-      voice_dashboard_metrics: z.any().optional(),
-      disruption_results: z.any().optional(),
-      persona_config: z.any().optional(),
-      realistic_mode_enabled: z.boolean().optional(),
-      score: z.number().optional(),
-      feedback: z.string().optional(),
-      configured_duration: z.number().optional(),
-      response_pacing_mode: z.string().optional(),
-      telefun_model_id: z.string().optional(),
-      telefun_transport: z.string().optional(),
-    }),
-  ),
+  zValidator("json", telefunSessionUpdatePayloadSchema),
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
@@ -244,7 +395,8 @@ telefunSessions.patch(
     } catch (error: any) {
       if (
         error?.message === "Invalid recording path ownership" ||
-        error?.message === "Invalid agent recording path ownership"
+        error?.message === "Invalid agent recording path ownership" ||
+        error instanceof TelefunSessionValidationError
       ) {
         return c.json(
           {

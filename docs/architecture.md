@@ -27,7 +27,9 @@ graph TD
     HonoAPI -->|SQL / Auth| Supabase[(Supabase / PostgreSQL)]
     ViteApp -->|Client SDK / Realtime| Supabase
     ViteApp -->|WebSocket Voice| TelefunProxy[Telefun Node Proxy]
-    TelefunProxy -->|Gemini Live WebSocket| GeminiLive[Gemini Live API]
+    TelefunProxy -->|Provider Adapter| RealtimeProvider[Realtime Provider]
+    RealtimeProvider -->|Gemini Live| GeminiLive[Gemini Live API]
+    RealtimeProvider -->|OpenAI Realtime| OpenAIRealtime[OpenAI Realtime API]
     HonoAPI -->|AI Analysis| AIProviders[Gemini / OpenRouter]
 ```
 
@@ -38,7 +40,7 @@ graph TD
 3. **Hono RPC**: Frontend mengonsumsi API via `hc<AppType>` dari Hono RPC — full type-safety tanpa perlu definisi API terpisah.
 4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage.
 5. **RLS (Row Level Security)**: Memastikan keamanan data di tingkat database berdasarkan role user (Admin, Trainer, Leader, Agent).
-6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio ke Gemini Live API.
+6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio ke provider live API (Gemini Live atau OpenAI Realtime) melalui **provider adapter pattern**.
 7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang saat ini mendukung Gemini, OpenRouter, dan DeepSeek (native client). Semua AI calls dicatat ke `ai_usage_logs`.
 8. **Shared Types (`packages/types`)**: Zod schemas dan TypeScript interfaces yang dipakai bersama oleh frontend dan backend.
 
@@ -161,6 +163,8 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
+- `OPENAI_API_KEY` (opsional — diperlukan untuk model GPT Realtime)
+- `TELEFUN_OPENAI_ENABLED` (opsional — feature flag untuk mengaktifkan model GPT Realtime)
 
 ### MCP / Tools:
 

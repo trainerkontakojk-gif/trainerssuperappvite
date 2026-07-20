@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LiveSession } from "../routes/telefun/services/geminiService";
+import { LiveSession } from "../routes/telefun/services/liveSession";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 
 function createDeferred() {

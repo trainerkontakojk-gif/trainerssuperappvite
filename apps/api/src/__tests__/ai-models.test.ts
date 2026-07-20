@@ -28,8 +28,24 @@ describe("ai model registry", () => {
     const models = getModelsForModule("qa-analyzer");
 
     expect(models.some((model) => model.id === "gemini-3.5-flash")).toBe(true);
-    expect(models.every((model) => model.capabilities?.supportsText)).toBe(true);
-    expect(models.some((model) => model.capabilities?.supportsText === false)).toBe(false);
+    expect(models.every((model) => model.capabilities?.supportsText)).toBe(
+      true,
+    );
+    expect(
+      models.some((model) => model.capabilities?.supportsText === false),
+    ).toBe(false);
+  });
+
+  it("returns only canonical live models for the Telefun module", () => {
+    const models = getModelsForModule("telefun");
+
+    expect(models.map((model) => model.id)).toEqual([
+      "gemini-3.1-flash-live-preview",
+      "gemini-3.0-flash-live-preview",
+      "gpt-realtime-2.1",
+      "gpt-realtime-2.1-mini",
+    ]);
+    expect(models.every((model) => model.realtime?.supportsAudio)).toBe(true);
   });
 
   it("exposes DeepSeek direct models only for ketik and pdkt", () => {
@@ -37,10 +53,14 @@ describe("ai model registry", () => {
       KETIK_PDKT_MODELS.some((model) => model.id === "deepseek-v4-pro"),
     ).toBe(true);
     expect(
-      getModelsForModule("ketik").some((model) => model.id === "deepseek-v4-flash"),
+      getModelsForModule("ketik").some(
+        (model) => model.id === "deepseek-v4-flash",
+      ),
     ).toBe(true);
     expect(
-      getModelsForModule("qa-analyzer").some((model) => model.id === "deepseek-v4-pro"),
+      getModelsForModule("qa-analyzer").some(
+        (model) => model.id === "deepseek-v4-pro",
+      ),
     ).toBe(false);
   });
 

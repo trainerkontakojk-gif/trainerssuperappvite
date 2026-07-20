@@ -1,29 +1,68 @@
-export type TelefunGender = "male" | "female";
+import {
+  DEFAULT_GEMINI_LIVE_VOICE,
+  DEFAULT_OPENAI_REALTIME_VOICE,
+  GEMINI_LIVE_VOICES,
+  GEMINI_LIVE_VOICES_BY_GENDER,
+  OPENAI_REALTIME_VOICES,
+  OPENAI_REALTIME_VOICES_BY_GENDER,
+  isGeminiLiveVoiceName,
+  isOpenAiRealtimeVoiceName,
+  normalizeTelefunLiveModelSelection,
+  type GeminiLiveVoiceName,
+  type OpenAiRealtimeVoiceName,
+  type TelefunGender,
+  type TelefunVoiceName,
+} from "@trainers/types";
 
-export type GeminiLiveVoiceName =
-  | "Puck"
-  | "Charon"
-  | "Kore"
-  | "Fenrir"
-  | "Leda"
-  | "Orus"
-  | "Aoede";
-
-export const GEMINI_LIVE_VOICES_BY_GENDER: Record<
+export {
+  DEFAULT_GEMINI_LIVE_VOICE,
+  DEFAULT_OPENAI_REALTIME_VOICE,
+  GEMINI_LIVE_VOICES,
+  GEMINI_LIVE_VOICES_BY_GENDER,
+  OPENAI_REALTIME_VOICES,
+  OPENAI_REALTIME_VOICES_BY_GENDER,
+  isGeminiLiveVoiceName,
+  isOpenAiRealtimeVoiceName,
+};
+export type {
+  GeminiLiveVoiceName,
+  OpenAiRealtimeVoiceName,
   TelefunGender,
-  readonly GeminiLiveVoiceName[]
-> = {
-  male: ["Puck", "Charon", "Fenrir", "Orus"],
-  female: ["Kore", "Leda", "Aoede"],
-} as const;
+  TelefunVoiceName,
+};
 
-const ALL_VALID_VOICES: readonly string[] = [
-  ...GEMINI_LIVE_VOICES_BY_GENDER.male,
-  ...GEMINI_LIVE_VOICES_BY_GENDER.female,
-];
+function getVoiceProviderForModel(modelId: string | null | undefined) {
+  return normalizeTelefunLiveModelSelection(modelId).model.realtime
+    .voiceProvider;
+}
 
-export function isGeminiLiveVoiceName(value: unknown): value is GeminiLiveVoiceName {
-  return ALL_VALID_VOICES.includes(value as string);
+export function getVoicesForModel(
+  modelId: string | null | undefined,
+  gender?: TelefunGender,
+): readonly TelefunVoiceName[] {
+  if (getVoiceProviderForModel(modelId) === "openai") {
+    return gender
+      ? OPENAI_REALTIME_VOICES_BY_GENDER[gender]
+      : OPENAI_REALTIME_VOICES;
+  }
+  return gender ? GEMINI_LIVE_VOICES_BY_GENDER[gender] : GEMINI_LIVE_VOICES;
+}
+
+export function getDefaultVoiceForModel(
+  modelId: string | null | undefined,
+): TelefunVoiceName {
+  return getVoiceProviderForModel(modelId) === "openai"
+    ? DEFAULT_OPENAI_REALTIME_VOICE
+    : DEFAULT_GEMINI_LIVE_VOICE;
+}
+
+export function isVoiceValidForModel(
+  modelId: string | null | undefined,
+  voice: unknown,
+): voice is TelefunVoiceName {
+  return getVoiceProviderForModel(modelId) === "openai"
+    ? isOpenAiRealtimeVoiceName(voice)
+    : isGeminiLiveVoiceName(voice);
 }
 
 export function resolveGeminiLiveVoice(params: {
@@ -31,12 +70,48 @@ export function resolveGeminiLiveVoice(params: {
   gender: TelefunGender;
   random?: () => number;
 }): GeminiLiveVoiceName {
-  const pool = GEMINI_LIVE_VOICES_BY_GENDER[params.gender];
-  const rand = params.random ?? Math.random;
-  if (params.requestedVoice && isGeminiLiveVoiceName(params.requestedVoice)) {
-    const voice = params.requestedVoice as GeminiLiveVoiceName;
-    if (pool.includes(voice)) return voice;
+  const pool: readonly GeminiLiveVoiceName[] =
+    GEMINI_LIVE_VOICES_BY_GENDER[params.gender];
+  return resolveVoiceFromPool({
+    requestedVoice: params.requestedVoice,
+    pool,
+    random: params.random,
+  });
+}
+
+function resolveVoiceFromPool<TVoice extends TelefunVoiceName>(params: {
+  requestedVoice?: string;
+  pool: readonly TVoice[];
+  random?: () => number;
+}): TVoice {
+  if (params.requestedVoice) {
+    const requestedVoice = params.requestedVoice as TVoice;
+    if (params.pool.includes(requestedVoice)) return requestedVoice;
   }
-  const index = Math.min(pool.length - 1, Math.max(0, Math.floor(rand() * pool.length)));
-  return pool[index];
+  const rand = params.random ?? Math.random;
+  const index = Math.min(
+    params.pool.length - 1,
+    Math.max(0, Math.floor(rand() * params.pool.length)),
+  );
+  return params.pool[index];
+}
+
+export function resolveVoiceForModel(params: {
+  modelId?: string | null;
+  requestedVoice?: string;
+  gender: TelefunGender;
+  random?: () => number;
+}): TelefunVoiceName {
+  if (getVoiceProviderForModel(params.modelId) === "openai") {
+    return resolveVoiceFromPool({
+      requestedVoice: params.requestedVoice,
+      pool: OPENAI_REALTIME_VOICES_BY_GENDER[params.gender],
+      random: params.random,
+    });
+  }
+  return resolveGeminiLiveVoice({
+    requestedVoice: params.requestedVoice,
+    gender: params.gender,
+    random: params.random,
+  });
 }

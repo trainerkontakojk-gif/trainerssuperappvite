@@ -9,8 +9,10 @@ import {
   TEXT_SIMULATION_MODELS,
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
+  TELEFUN_LIVE_MODELS,
 } from "@trainers/types";
 import type { AiModelModule } from "@trainers/types";
+type TextImageAIProvider = Exclude<AIProvider, "openai">;
 export {
   AI_MODELS,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
@@ -18,6 +20,7 @@ export {
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
   TEXT_SIMULATION_MODELS,
+  TELEFUN_LIVE_MODELS,
 };
 
 const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite";
@@ -36,17 +39,17 @@ export function normalizeModelId(modelId?: string | null): string {
   return LEGACY_ALIASES[modelId] || modelId;
 }
 
-export function getProviderFromModelId(modelId: string): AIProvider {
+export function getProviderFromModelId(modelId: string): TextImageAIProvider {
   const normalized = normalizeModelId(modelId);
-  return (
-    MODEL_REGISTRY.find((model) => model.id === normalized)?.provider ||
-    (normalized.includes("/") ? "openrouter" : "gemini")
-  );
+  return (MODEL_REGISTRY.find((model) => model.id === normalized)?.provider ||
+    (normalized.includes("/")
+      ? "openrouter"
+      : "gemini")) as TextImageAIProvider;
 }
 
 export function resolveModelProvider(modelId?: string | null): {
   modelId: string;
-  provider: AIProvider;
+  provider: TextImageAIProvider;
   isFallback: boolean;
   timeoutMs?: number;
 } {
@@ -55,7 +58,7 @@ export function resolveModelProvider(modelId?: string | null): {
   if (found)
     return {
       modelId: found.id,
-      provider: found.provider,
+      provider: found.provider as TextImageAIProvider,
       isFallback: false,
       timeoutMs: found.timeoutMs,
     };
@@ -68,13 +71,16 @@ export function resolveModelProvider(modelId?: string | null): {
   };
 }
 
-export function getModelsForModule(module: AiModelModule = "default"): AiModelInfo[] {
-  if (
-    module === "ketik" ||
-    module === "pdkt" ||
-    module === "qa-analyzer"
-  ) {
-    return module === "qa-analyzer" ? TEXT_SIMULATION_MODELS : KETIK_PDKT_MODELS;
+export function getModelsForModule(
+  module: AiModelModule = "default",
+): AiModelInfo[] {
+  if (module === "telefun") {
+    return [...TELEFUN_LIVE_MODELS];
+  }
+  if (module === "ketik" || module === "pdkt" || module === "qa-analyzer") {
+    return module === "qa-analyzer"
+      ? TEXT_SIMULATION_MODELS
+      : KETIK_PDKT_MODELS;
   }
   return AI_MODELS;
 }

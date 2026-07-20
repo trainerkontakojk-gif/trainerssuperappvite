@@ -14,7 +14,7 @@ import {
   TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS,
 } from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
-import { LiveSession } from "../services/geminiService";
+import { LiveSession } from "../services/liveSession";
 import {
   getTelefunTimeCueThreshold,
   type TelefunTimeCue,

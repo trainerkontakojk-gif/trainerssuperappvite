@@ -170,6 +170,32 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`ai_pricing_settings`**: Harga token input/output per model kanonik.
 - **`ai_billing_settings`**: Singleton table — tepat 1 baris (`key='default'`) menyimpan nilai kurs global USD ke IDR. Admin/trainer update via upsert, langsung berlaku untuk semua pengguna. Memiliki fallback legacy untuk kompatibilitas sebelum migrasi `20260618200000`.
 
+#### Target schema: realtime modality dan cached usage
+
+Bagian ini adalah **kontrak target additive** untuk task migration Telefun dual-provider; kolom target belum tersedia pada fase dokumentasi ini. Schema saat ini tetap memakai flat pricing `input_price_usd_per_million` / `output_price_usd_per_million`, ditambah snapshot modality non-cached yang sudah ada pada `ai_usage_logs`.
+
+Target `ai_pricing_settings` menambah rate nullable/default-compatible berikut:
+
+| Kelompok | Kolom target                                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------------------------------- |
+| Text     | `input_text_price_usd_per_million`, `cached_input_text_price_usd_per_million`, `output_text_price_usd_per_million`    |
+| Audio    | `input_audio_price_usd_per_million`, `cached_input_audio_price_usd_per_million`, `output_audio_price_usd_per_million` |
+
+Target `ai_usage_logs` mempertahankan snapshot provider/model yang dinamis pada `provider` dan `model_id`, lalu menambah snapshot cached berikut untuk rekonsiliasi:
+
+- `cached_input_text_tokens` dan `cached_input_audio_tokens` — jumlah cached input dari usage upstream; nullable membedakan metadata tidak tersedia dari nilai nol.
+- `cached_input_text_price_usd_per_million` dan `cached_input_audio_price_usd_per_million` — rate aktif yang disalin ke row usage saat request terjadi.
+- Snapshot modality/rate non-cached yang sudah ada (`input_text_*`, `input_audio_*`, `output_text_*`, `output_audio_*`) tetap digunakan bersama kolom cached baru.
+- `raw_usage_metadata` menyimpan payload usage ter-normalisasi untuk audit; dedupe OpenAI dilakukan berdasarkan response ID sebelum insert/final aggregation, bukan dengan menggandakan row.
+
+Kompatibilitas wajib:
+
+- Kolom flat `input_price_usd_per_million` dan `output_price_usd_per_million` **tidak dihapus**. Model legacy dan reader lama tetap dapat memakai kontrak dua-rate.
+- Migration harus additive dan idempotent. Historical row tidak di-backfill dengan token atau rate rekaan.
+- Nilai provider/model/rate pada `ai_usage_logs` adalah snapshot saat usage diterima; perubahan editor harga berikutnya tidak mengubah histori.
+- Jika OpenAI tidak mengirim usage, sistem tidak mengarang token/biaya dan tidak memakai fallback biaya Gemini.
+- Grant/RLS tabel pricing dan usage tetap server-side sesuai boundary yang sudah berlaku.
+
 ## Keamanan Data (Explicit Grants & RLS Policies)
 
 Sistem otorisasi data kami menggabungkan dua lapisan pertahanan utama: **Explicit Data API Grants** pada tingkat tabel/fungsi dan **Row Level Security (RLS)** pada tingkat baris.

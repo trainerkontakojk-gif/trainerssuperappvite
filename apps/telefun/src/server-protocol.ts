@@ -1,3 +1,105 @@
+import {
+  getTelefunLiveModel,
+  isGeminiLiveVoiceName,
+  isOpenAiRealtimeVoiceName,
+  type TelefunLiveModel,
+  type TelefunSessionConfigure,
+} from "@trainers/types";
+
+// Bound untrusted prompt text before it is ever handed to a provider adapter.
+// The limit is measured in JavaScript string code units and intentionally keeps
+// normal Telefun prompts while rejecting unexpectedly large control frames.
+export const TELEFUN_MAX_INSTRUCTIONS_LENGTH = 16_000;
+
+export type TelefunConfigureErrorReason =
+  | "invalid_envelope"
+  | "unknown_model"
+  | "model_transport_mismatch"
+  | "invalid_voice"
+  | "invalid_audio_format"
+  | "invalid_sample_rate"
+  | "invalid_response_pacing_mode"
+  | "invalid_instructions";
+
+export interface ValidatedTelefunSessionConfigure {
+  configure: TelefunSessionConfigure;
+  model: TelefunLiveModel;
+}
+
+export type TelefunConfigureParseResult =
+  | { ok: true; value: ValidatedTelefunSessionConfigure }
+  | { ok: false; reason: TelefunConfigureErrorReason };
+
+export function parseTelefunSessionConfigure(
+  value: unknown,
+): TelefunConfigureParseResult {
+  if (!isRecord(value) || value.type !== "telefun_session_configure") {
+    return { ok: false, reason: "invalid_envelope" };
+  }
+
+  const inputAudio = value.inputAudio;
+  if (
+    typeof value.modelId !== "string" ||
+    typeof value.transport !== "string" ||
+    typeof value.voice !== "string" ||
+    typeof value.instructions !== "string" ||
+    typeof value.responsePacingMode !== "string" ||
+    !isRecord(inputAudio) ||
+    typeof inputAudio.format !== "string" ||
+    typeof inputAudio.sampleRate !== "number"
+  ) {
+    return { ok: false, reason: "invalid_envelope" };
+  }
+
+  const model = getTelefunLiveModel(value.modelId);
+  if (!model) return { ok: false, reason: "unknown_model" };
+  if (value.transport !== model.realtime.transport) {
+    return { ok: false, reason: "model_transport_mismatch" };
+  }
+
+  const voiceIsValid =
+    model.realtime.voiceProvider === "gemini"
+      ? isGeminiLiveVoiceName(value.voice)
+      : isOpenAiRealtimeVoiceName(value.voice);
+  if (!voiceIsValid) return { ok: false, reason: "invalid_voice" };
+  if (inputAudio.format !== "pcm16") {
+    return { ok: false, reason: "invalid_audio_format" };
+  }
+  if (
+    (inputAudio.sampleRate !== 16_000 && inputAudio.sampleRate !== 24_000) ||
+    inputAudio.sampleRate !== model.realtime.inputSampleRateHz
+  ) {
+    return { ok: false, reason: "invalid_sample_rate" };
+  }
+  if (
+    value.responsePacingMode !== "realistic" &&
+    value.responsePacingMode !== "training_fast"
+  ) {
+    return { ok: false, reason: "invalid_response_pacing_mode" };
+  }
+  if (
+    value.instructions.trim().length === 0 ||
+    value.instructions.length > TELEFUN_MAX_INSTRUCTIONS_LENGTH
+  ) {
+    return { ok: false, reason: "invalid_instructions" };
+  }
+
+  const configure: TelefunSessionConfigure = {
+    type: "telefun_session_configure",
+    modelId: value.modelId,
+    transport: model.realtime.transport,
+    voice: value.voice,
+    instructions: value.instructions,
+    inputAudio: {
+      format: "pcm16",
+      sampleRate: inputAudio.sampleRate,
+    },
+    responsePacingMode: value.responsePacingMode,
+  };
+
+  return { ok: true, value: { configure, model } };
+}
+
 export function isGeminiForwardableMessage(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
@@ -174,6 +276,14 @@ export function parseControlMessage(
   }
 
   return null;
+}
+
+export function isTelefunControlEnvelope(value: unknown): boolean {
+  if (!isRecord(value) || !isString(value.type)) return false;
+  return (
+    value.type === "session_end_request" ||
+    value.type === "session_end_complete"
+  );
 }
 
 export function isSessionEndRequest(

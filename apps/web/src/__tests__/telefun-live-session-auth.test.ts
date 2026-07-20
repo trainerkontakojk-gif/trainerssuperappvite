@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LiveSession } from "../routes/telefun/services/geminiService";
+import { LiveSession } from "../routes/telefun/services/liveSession";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 
 type MessageHandler = ((event: { data: string }) => void) | null;
@@ -142,7 +142,7 @@ describe("LiveSession first-message authentication", () => {
     vi.useRealTimers();
   });
 
-  it("uses a query-free URL, sends auth first, and sends setup only after auth_ok", async () => {
+  it("sends authenticate, configure, then Gemini setup in deterministic order", async () => {
     const consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
     const config = createMockConfig();
     const onSessionCreated = vi.fn();
@@ -171,7 +171,31 @@ describe("LiveSession first-message authentication", () => {
     ).toBe(true);
     expect(socket.readyState).toBe(FakeWebSocket.OPEN);
     expect(socket.sent).toHaveLength(2);
-    expect(JSON.parse(socket.sent[1]).setup).toBeDefined();
+    const configureMessage = JSON.parse(socket.sent[1]);
+    expect(configureMessage).toMatchObject({
+      type: "telefun_session_configure",
+      modelId: "gemini-3.1-flash-live-preview",
+      transport: "gemini-live",
+      voice: expect.any(String),
+      instructions: expect.any(String),
+      inputAudio: { format: "pcm16", sampleRate: 16_000 },
+      responsePacingMode: "realistic",
+    });
+    expect(configureMessage).not.toHaveProperty("setup");
+
+    socket.receive({
+      type: "telefun_session_configured",
+      modelId: "gemini-3.1-flash-live-preview",
+      transport: "gemini-live",
+    });
+
+    expect(socket.sent).toHaveLength(3);
+    const setupMessage = JSON.parse(socket.sent[2]);
+    expect(setupMessage.setup).toBeDefined();
+    expect(
+      setupMessage.setup.generationConfig.speechConfig.voiceConfig
+        .prebuiltVoiceConfig.voiceName,
+    ).toBe(configureMessage.voice);
     expect(onSessionCreated).toHaveBeenCalledWith("session-1");
   });
 
@@ -214,5 +238,39 @@ describe("LiveSession first-message authentication", () => {
     const errorCountAfterClose = onError.mock.calls.length;
     await vi.advanceTimersByTimeAsync(20_000);
     expect(onError).toHaveBeenCalledTimes(errorCountAfterClose);
+  });
+
+  it("does not send configure when auth_ok arrives after disconnect begins", async () => {
+    session = new LiveSession(createMockConfig());
+    await session.connect("test-access-token");
+    const socket = sockets[0];
+    socket.open();
+    (session as unknown as { intentionalClose: boolean }).intentionalClose =
+      true;
+
+    socket.receive({ type: "auth_ok", sessionId: "session-1" });
+
+    expect(socket.sent).toHaveLength(1);
+    expect(JSON.parse(socket.sent[0]).type).toBe("authenticate");
+  });
+
+  it("does not send Gemini setup when configured ack arrives after disconnect begins", async () => {
+    session = new LiveSession(createMockConfig());
+    await session.connect("test-access-token");
+    const socket = sockets[0];
+    socket.open();
+    socket.receive({ type: "auth_ok", sessionId: "session-1" });
+    expect(socket.sent).toHaveLength(2);
+
+    (session as unknown as { intentionalClose: boolean }).intentionalClose =
+      true;
+    socket.receive({
+      type: "telefun_session_configured",
+      modelId: "gemini-3.1-flash-live-preview",
+      transport: "gemini-live",
+    });
+
+    expect(socket.sent).toHaveLength(2);
+    expect(JSON.parse(socket.sent[1]).type).toBe("telefun_session_configure");
   });
 });

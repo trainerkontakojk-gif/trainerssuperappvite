@@ -198,7 +198,10 @@ export default function TelefunLanding() {
             (ct) => ct.id === settings.preferredConsumerTypeId,
           ) || settings.consumerTypes[0];
 
-    const identity = resolveFinalIdentity(settings.identitySettings);
+    const identity = resolveFinalIdentity(
+      settings.identitySettings,
+      settings.telefunModelId,
+    );
     const voiceName = identity.voiceName || settings.voiceName;
 
     const sessionConfig: TelefunAppSettings = {

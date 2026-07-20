@@ -82,8 +82,15 @@ export type PricingEntry = {
   model_id: string;
   model_name: string;
   provider: string;
+  pricing_mode: "simple" | "realtime";
   input_price_usd_per_million: number;
   output_price_usd_per_million: number;
+  input_text_price_usd_per_million: number | null;
+  cached_input_text_price_usd_per_million: number | null;
+  input_audio_price_usd_per_million: number | null;
+  cached_input_audio_price_usd_per_million: number | null;
+  output_text_price_usd_per_million: number | null;
+  output_audio_price_usd_per_million: number | null;
 };
 
 export type KetikMonitoringReview = {
@@ -283,10 +290,19 @@ type AiClient = {
     $put(args: {
       json: Pick<
         PricingEntry,
-        | "model_id"
-        | "input_price_usd_per_million"
-        | "output_price_usd_per_million"
-      >;
+        "model_id" | "input_price_usd_per_million" | "output_price_usd_per_million"
+      > &
+        Partial<
+          Pick<
+            PricingEntry,
+            | "input_text_price_usd_per_million"
+            | "cached_input_text_price_usd_per_million"
+            | "input_audio_price_usd_per_million"
+            | "cached_input_audio_price_usd_per_million"
+            | "output_text_price_usd_per_million"
+            | "output_audio_price_usd_per_million"
+          >
+        >;
     }): Promise<RpcResponse<null>>;
   };
   "monitoring/billing": {

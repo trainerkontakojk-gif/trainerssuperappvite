@@ -74,15 +74,26 @@ Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi buil
 
 ### Telefun Service
 
-| Variable                    | Value                              | Notes                    |
-| --------------------------- | ---------------------------------- | ------------------------ |
-| `PORT`                      | `$PORT`                            | Railway auto-inject      |
-| `NODE_ENV`                  | `production`                       |                          |
-| `SUPABASE_URL`              | `https://<project>.supabase.co`    | Supabase project URL     |
-| `SUPABASE_ANON_KEY`         | `eyJ...`                           | Supabase anon key        |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key         |
-| `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key    |
-| `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all |
+Dua variable OpenAI di bawah hanya boleh dipasang pada service `apps/telefun`, bukan Web, Vercel, atau `apps/api`. Default flag tetap `false`, sehingga rollout awal tetap Gemini-only.
+
+| Variable                    | Value                              | Notes                                                          |
+| --------------------------- | ---------------------------------- | -------------------------------------------------------------- |
+| `PORT`                      | `$PORT`                            | Railway auto-inject                                            |
+| `NODE_ENV`                  | `production`                       |                                                                |
+| `SUPABASE_URL`              | `https://<project>.supabase.co`    | Supabase project URL                                           |
+| `SUPABASE_ANON_KEY`         | `eyJ...`                           | Supabase anon key                                              |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key                                               |
+| `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key                                          |
+| `OPENAI_API_KEY`            | `sk-...`                           | Backend-only; wajib bila `TELEFUN_OPENAI_ENABLED=true`         |
+| `TELEFUN_OPENAI_ENABLED`    | `false`                            | Kill switch; default/off mempertahankan Gemini-only            |
+| `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all                                       |
+
+Aturan secret/config:
+
+- `OPENAI_API_KEY` tidak boleh memakai prefix `VITE_`, tidak boleh berada di Vercel, dan tidak boleh disalin ke API service.
+- `TELEFUN_OPENAI_ENABLED=false` menolak **sesi OpenAI baru** tanpa menghapus history/model pricing. Panggilan aktif tidak dipindahkan ke Gemini di tengah sesi.
+- Jika flag `true` tetapi key tidak ada/invalid, readiness OpenAI harus `not_ready` dan configure OpenAI ditolak dengan error aman. Service tetap dapat hidup untuk Gemini bila konfigurasi Gemini valid.
+- Mengubah Railway env memerlukan redeploy/restart service Telefun; jangan menganggap flag berubah in-process sebelum runtime mendukung reload.
 
 ### Catatan FFmpeg (Telefun Recording Remux)
 
@@ -124,6 +135,17 @@ node scripts/deployment/railway-web-healthcheck-smoke.mjs
 
 Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`. Smoke ini juga memvalidasi security headers dasar dari static web server.
 
+### Telefun liveness dan provider readiness
+
+`GET /health` memisahkan:
+
+- **Liveness:** proses/event loop HTTP hidup. Tidak membuka koneksi Gemini/OpenAI.
+- **Readiness:** status konfigurasi non-sensitive per provider (enabled/disabled/configured) dan kemampuan menerima provider yang dipilih. Readiness tidak mengembalikan secret, suffix key, token, prompt, atau URL bercredential.
+
+Endpoint ini tidak membuka upstream dan tidak membuktikan quota/model access vendor. `GET` dan preflight `OPTIONS` mengikuti `ALLOWED_ORIGINS`: wildcard mengembalikan `Access-Control-Allow-Origin: *`, sedangkan allowlist hanya merefleksikan origin ter-normalisasi yang diizinkan serta `Vary: Origin`. Credentials tidak diaktifkan. Web menurunkan URL health dari origin `VITE_TELEFUN_WS_URL`, menghapus path/query/hash/credential, dan menganggap timeout, network error, non-2xx, atau payload malformed sebagai OpenAI unavailable.
+
+Routine Railway healthcheck, CI, dan smoke test **tidak boleh membuka sesi provider berbayar**. Koneksi upstream hanya dibuka setelah WebSocket user terautentikasi dan `telefun_session_configure` tervalidasi. Paid/manual provider smoke dijalankan terpisah dengan otorisasi eksplisit.
+
 ## Web Security Headers
 
 - Railway Web memakai `apps/web/public/serve.json`. File ini disalin Vite ke `apps/web/dist/serve.json`, lalu dibaca oleh `serve dist` saat `pnpm run start:web`.
@@ -146,10 +168,13 @@ Ekspektasi: `web, api, and telefun health return HTTP 200` and `All health check
 2. Telefun service env:
    - `ALLOWED_ORIGINS=https://<web-service>.up.railway.app`
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`
+   - Target OpenAI saja: `OPENAI_API_KEY` dan `TELEFUN_OPENAI_ENABLED=true`; biarkan flag `false` untuk baseline Gemini-only.
 3. Redeploy Web after changing any `VITE_*` value.
 4. Login, open `/telefun`, start call, allow mic, speak one sentence, wait for AI response, end call.
 5. Verify no close code `4001` (Unauthorized/Token invalid), `4003` (Forbidden Origin), `1006` (Connection drop), or `1011` (Gemini API error) in browser UI.
 6. Verify session appears in history and review opens.
+
+Baseline manual smoke di atas tetap menguji Gemini. Setelah runtime OpenAI tersedia, smoke OpenAI harus menjadi opt-in paid test yang memverifikasi model/voice 24 kHz, transcript, usage, drain, dan finalisasi tanpa mengubah smoke rutin menjadi koneksi provider berbayar.
 
 ## Development (Local)
 
@@ -184,6 +209,9 @@ DEEPSEEK_API_KEY=your_deepseek_key  # Optional
 
 # Telefun
 VITE_TELEFUN_WS_URL=ws://localhost:3002
+# Target runtime dual-provider; hanya dikonsumsi apps/telefun
+OPENAI_API_KEY=your_openai_key
+TELEFUN_OPENAI_ENABLED=false
 
 # API
 VITE_API_URL=http://localhost:3001/api/v1
@@ -460,6 +488,8 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 - [ ] Pastikan smoke header Web lulus dari Railway `serve dist`
 - [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
 - [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
+- [ ] Pastikan `TELEFUN_OPENAI_ENABLED=false` untuk rollout awal; jika diaktifkan, `OPENAI_API_KEY` hanya ada di Telefun service
+- [ ] Verify liveness/readiness tanpa membuka koneksi provider berbayar
 - [ ] Set up monitoring / alerting
 
 ### Vercel (Backup Web)

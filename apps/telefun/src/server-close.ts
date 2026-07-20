@@ -7,7 +7,7 @@ export function buildSafeCloseMetadata(code: number, reason: Buffer | string) {
       : 1011;
   const rawReason = Buffer.isBuffer(reason) ? reason.toString() : reason;
   const safeReason =
-    rawReason.trim() || "Gemini upstream closed without reason";
+    rawReason.trim() || "Provider realtime upstream closed without reason";
 
   return {
     code: safeCode,

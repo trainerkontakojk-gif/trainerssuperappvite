@@ -34,6 +34,13 @@ import {
   observeLiveUsageMetadata,
   commitPendingLiveUsageTurn,
   summarizeLiveUsageAccumulator,
+  calculateOpenAIRealtimeUsageCost,
+  createOpenAIUsageAccumulator,
+  flushOpenAIRealtimeUsage,
+  getOpenAIUsageDiagnostics,
+  observeOpenAIUsage,
+  parseOpenAIRealtimeUsage,
+  summarizeOpenAIUsageAccumulator,
 } from "../usage";
 
 // ── parseUsageMetadata — modality breakdown ──────────────
@@ -171,6 +178,23 @@ describe("Telefun Live per-minute billing", () => {
       finalCostIdr: 185,
     });
   });
+
+  it("does not apply the Gemini per-minute floor to OpenAI realtime models", () => {
+    const cost = calculateFinalLiveUsageCost({
+      modelId: "gpt-realtime-2.1",
+      perTokenCostUsd: 0.012345,
+      sessionDurationMs: 120_000,
+      usdToIdrRate: 15_000,
+    });
+
+    expect(cost).toEqual({
+      sessionDurationMs: 120_000,
+      perMinuteCostUsd: null,
+      perMinuteCostIdr: null,
+      finalCostUsd: 0.012345,
+      finalCostIdr: 185,
+    });
+  });
 });
 
 function buildQueryResult(data: Record<string, unknown> | null) {
@@ -260,46 +284,100 @@ describe("flushLiveUsage — per-minute billing payload", () => {
       }),
     });
   });
+
+  it.each(["gpt-realtime-2.1", "arbitrary-live-model"])(
+    "rejects non-Gemini canonical model %s before database access",
+    async (modelId) => {
+      insertedUsagePayloads.length = 0;
+      mockFrom.mockReset();
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      await flushLiveUsage(
+        "telefun-invalid-gemini",
+        "user-1",
+        {
+          turnCount: 1,
+          billedPromptTokenCount: 1,
+          billedResponseTokenCount: 1,
+          billedTotalTokenCount: 2,
+          latestSnapshot: {
+            promptTokenCount: 1,
+            responseTokenCount: 1,
+            totalTokenCount: 2,
+          },
+          rawUsageMetadata: {
+            billing_model: "gemini_live_context_window_per_turn_v1",
+            turn_count: 1,
+            latest: {
+              promptTokenCount: 1,
+              responseTokenCount: 1,
+              totalTokenCount: 2,
+            },
+            turns: [],
+          },
+        },
+        modelId,
+      );
+
+      expect(mockFrom).not.toHaveBeenCalled();
+      expect(insertedUsagePayloads).toHaveLength(0);
+      consoleError.mockRestore();
+    },
+  );
 });
 
 describe("Telefun Live context-window per-turn billing", () => {
   it("sums context-window usageMetadata per committed turn", () => {
     const acc = createLiveUsageAccumulator();
 
-    observeLiveUsageMetadata(acc, {
-      promptTokenCount: 500,
-      promptTokensDetails: [
-        { modality: "AUDIO", tokenCount: 400 },
-        { modality: "TEXT", tokenCount: 100 },
-      ],
-      responseTokenCount: 50,
-      responseTokensDetails: [{ modality: "AUDIO", tokenCount: 50 }],
-      totalTokenCount: 550,
-    }, 1_000);
+    observeLiveUsageMetadata(
+      acc,
+      {
+        promptTokenCount: 500,
+        promptTokensDetails: [
+          { modality: "AUDIO", tokenCount: 400 },
+          { modality: "TEXT", tokenCount: 100 },
+        ],
+        responseTokenCount: 50,
+        responseTokensDetails: [{ modality: "AUDIO", tokenCount: 50 }],
+        totalTokenCount: 550,
+      },
+      1_000,
+    );
     commitPendingLiveUsageTurn(acc, "turnComplete");
 
-    observeLiveUsageMetadata(acc, {
-      promptTokenCount: 800,
-      promptTokensDetails: [
-        { modality: "AUDIO", tokenCount: 640 },
-        { modality: "TEXT", tokenCount: 160 },
-      ],
-      responseTokenCount: 80,
-      responseTokensDetails: [{ modality: "AUDIO", tokenCount: 80 }],
-      totalTokenCount: 880,
-    }, 2_000);
+    observeLiveUsageMetadata(
+      acc,
+      {
+        promptTokenCount: 800,
+        promptTokensDetails: [
+          { modality: "AUDIO", tokenCount: 640 },
+          { modality: "TEXT", tokenCount: 160 },
+        ],
+        responseTokenCount: 80,
+        responseTokensDetails: [{ modality: "AUDIO", tokenCount: 80 }],
+        totalTokenCount: 880,
+      },
+      2_000,
+    );
     commitPendingLiveUsageTurn(acc, "turnComplete");
 
-    observeLiveUsageMetadata(acc, {
-      promptTokenCount: 1000,
-      promptTokensDetails: [
-        { modality: "AUDIO", tokenCount: 800 },
-        { modality: "TEXT", tokenCount: 200 },
-      ],
-      responseTokenCount: 100,
-      responseTokensDetails: [{ modality: "AUDIO", tokenCount: 100 }],
-      totalTokenCount: 1100,
-    }, 3_000);
+    observeLiveUsageMetadata(
+      acc,
+      {
+        promptTokenCount: 1000,
+        promptTokensDetails: [
+          { modality: "AUDIO", tokenCount: 800 },
+          { modality: "TEXT", tokenCount: 200 },
+        ],
+        responseTokenCount: 100,
+        responseTokensDetails: [{ modality: "AUDIO", tokenCount: 100 }],
+        totalTokenCount: 1100,
+      },
+      3_000,
+    );
     commitPendingLiveUsageTurn(acc, "turnComplete");
 
     const aggregate = summarizeLiveUsageAccumulator(acc);
@@ -331,9 +409,21 @@ describe("Telefun Live context-window per-turn billing", () => {
 
   it("counts a later smaller prompt snapshot as a new billable turn", () => {
     const acc = createLiveUsageAccumulator();
-    observeLiveUsageMetadata(acc, { promptTokenCount: 1200, responseTokenCount: 100, totalTokenCount: 1300 }, 1_000);
+    observeLiveUsageMetadata(
+      acc,
+      {
+        promptTokenCount: 1200,
+        responseTokenCount: 100,
+        totalTokenCount: 1300,
+      },
+      1_000,
+    );
     commitPendingLiveUsageTurn(acc, "turnComplete");
-    observeLiveUsageMetadata(acc, { promptTokenCount: 900, responseTokenCount: 90, totalTokenCount: 990 }, 2_000);
+    observeLiveUsageMetadata(
+      acc,
+      { promptTokenCount: 900, responseTokenCount: 90, totalTokenCount: 990 },
+      2_000,
+    );
     commitPendingLiveUsageTurn(acc, "turnComplete");
 
     const aggregate = summarizeLiveUsageAccumulator(acc);
@@ -344,7 +434,11 @@ describe("Telefun Live context-window per-turn billing", () => {
 
   it("commits pending metadata on session_flush boundary", () => {
     const acc = createLiveUsageAccumulator();
-    observeLiveUsageMetadata(acc, { promptTokenCount: 300, responseTokenCount: 30, totalTokenCount: 330 }, 1_000);
+    observeLiveUsageMetadata(
+      acc,
+      { promptTokenCount: 300, responseTokenCount: 30, totalTokenCount: 330 },
+      1_000,
+    );
     // Do NOT commit turnComplete - simulate disconnect before turn end
     commitPendingLiveUsageTurn(acc, "session_flush");
 
@@ -404,5 +498,470 @@ describe("Telefun Live context-window per-turn billing", () => {
     expect(cost.costIdr).toBe(129);
     expect(cost.inputUnspecifiedTokens).toBe(0);
     expect(cost.outputUnspecifiedTokens).toBe(0);
+  });
+});
+
+describe("OpenAI Realtime response usage", () => {
+  const responseUsage = {
+    total_tokens: 3_300_000,
+    input_tokens: 3_000_000,
+    output_tokens: 300_000,
+    input_token_details: {
+      text_tokens: 1_000_000,
+      audio_tokens: 2_000_000,
+      cached_tokens: 750_000,
+      cached_tokens_details: {
+        text_tokens: 250_000,
+        audio_tokens: 500_000,
+      },
+    },
+    output_token_details: {
+      text_tokens: 100_000,
+      audio_tokens: 200_000,
+    },
+  };
+
+  it("parses text, audio, and cached input details without inventing missing fields", () => {
+    expect(parseOpenAIRealtimeUsage(responseUsage)).toEqual({
+      inputTokens: 3_000_000,
+      outputTokens: 300_000,
+      totalTokens: 3_300_000,
+      inputTextTokens: 1_000_000,
+      inputAudioTokens: 2_000_000,
+      cachedInputTokens: 750_000,
+      cachedInputTextTokens: 250_000,
+      cachedInputAudioTokens: 500_000,
+      outputTextTokens: 100_000,
+      outputAudioTokens: 200_000,
+    });
+
+    expect(
+      parseOpenAIRealtimeUsage({
+        input_tokens: 5,
+        output_tokens: 7,
+        total_tokens: 12,
+      }),
+    ).toEqual({ inputTokens: 5, outputTokens: 7, totalTokens: 12 });
+    expect(parseOpenAIRealtimeUsage({})).toBeNull();
+  });
+
+  it("dedupes response IDs and excludes transcription observations from Realtime totals", () => {
+    const accumulator = createOpenAIUsageAccumulator();
+    const responseObservation = {
+      source: "openai_realtime_response" as const,
+      id: "resp_1",
+      usage: responseUsage,
+    };
+
+    expect(observeOpenAIUsage(accumulator, responseObservation, 1_000)).toBe(
+      true,
+    );
+    expect(observeOpenAIUsage(accumulator, responseObservation, 1_100)).toBe(
+      false,
+    );
+    expect(
+      observeOpenAIUsage(
+        accumulator,
+        {
+          source: "openai_input_transcription",
+          id: "item_1",
+          usage: {
+            type: "tokens",
+            input_tokens: 200,
+            output_tokens: 20,
+            total_tokens: 220,
+          },
+        },
+        1_200,
+      ),
+    ).toBe(true);
+
+    const aggregate = summarizeOpenAIUsageAccumulator(accumulator);
+    expect(aggregate).toMatchObject({
+      responseCount: 1,
+      inputTokens: 3_000_000,
+      outputTokens: 300_000,
+      totalTokens: 3_300_000,
+      cachedInputTextTokens: 250_000,
+      cachedInputAudioTokens: 500_000,
+    });
+    expect(aggregate?.rawUsageMetadata).toMatchObject({
+      billing_model: "openai_realtime_per_response_v1",
+      response_count: 1,
+      transcription_observation_count: 1,
+    });
+  });
+
+  it("keeps missing usage as a bounded warning instead of synthesizing tokens", () => {
+    const accumulator = createOpenAIUsageAccumulator();
+
+    for (let index = 0; index < 150; index += 1) {
+      observeOpenAIUsage(accumulator, {
+        source: "openai_realtime_response",
+        id: `missing_${index}`,
+        usage: null,
+      });
+    }
+
+    expect(summarizeOpenAIUsageAccumulator(accumulator)).toBeNull();
+    expect(getOpenAIUsageDiagnostics(accumulator)).toEqual({
+      missingUsageCount: 150,
+      unpriceableUsageCount: 0,
+      warnings: ["missing_openai_realtime_usage"],
+      recentMissingUsageIds: expect.arrayContaining(["missing_149"]),
+      recentUnpriceableUsageIds: [],
+    });
+    expect(
+      getOpenAIUsageDiagnostics(accumulator).recentMissingUsageIds.length,
+    ).toBeLessThanOrEqual(20);
+  });
+
+  it("charges cached input at cached rates and excludes it from full-rate input", () => {
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_cost",
+      usage: responseUsage,
+    });
+    const aggregate = summarizeOpenAIUsageAccumulator(accumulator)!;
+
+    expect(
+      calculateOpenAIRealtimeUsageCost(
+        aggregate,
+        {
+          inputTextPriceUsdPerMillion: 4,
+          cachedInputTextPriceUsdPerMillion: 0.4,
+          inputAudioPriceUsdPerMillion: 32,
+          cachedInputAudioPriceUsdPerMillion: 0.4,
+          outputTextPriceUsdPerMillion: 24,
+          outputAudioPriceUsdPerMillion: 64,
+        },
+        15_000,
+      ),
+    ).toEqual({
+      costUsd: 66.5,
+      costIdr: 997_500,
+      nonCachedInputTextTokens: 750_000,
+      nonCachedInputAudioTokens: 1_500_000,
+    });
+  });
+
+  it.each([
+    {
+      name: "missing cached modality details",
+      inputDetails: {
+        text_tokens: 80,
+        audio_tokens: 20,
+        cached_tokens: 10,
+      },
+    },
+    {
+      name: "partial cached modality details",
+      inputDetails: {
+        text_tokens: 80,
+        audio_tokens: 20,
+        cached_tokens: 10,
+        cached_tokens_details: { text_tokens: 10 },
+      },
+    },
+    {
+      name: "mismatched cached modality total",
+      inputDetails: {
+        text_tokens: 80,
+        audio_tokens: 20,
+        cached_tokens: 10,
+        cached_tokens_details: { text_tokens: 3, audio_tokens: 4 },
+      },
+    },
+  ])("fails closed for $name", async ({ inputDetails }) => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockReset();
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_unpriceable_cache",
+      usage: {
+        input_tokens: 100,
+        output_tokens: 5,
+        total_tokens: 105,
+        input_token_details: inputDetails,
+        output_token_details: { text_tokens: 5, audio_tokens: 0 },
+      },
+    });
+    const aggregate = summarizeOpenAIUsageAccumulator(accumulator)!;
+
+    expect(aggregate.cachedInputTokens).toBe(10);
+    expect(getOpenAIUsageDiagnostics(accumulator)).toMatchObject({
+      unpriceableUsageCount: 1,
+      warnings: ["unpriceable_openai_usage_breakdown"],
+    });
+    expect(
+      calculateOpenAIRealtimeUsageCost(
+        aggregate,
+        {
+          inputTextPriceUsdPerMillion: 4,
+          cachedInputTextPriceUsdPerMillion: 0.4,
+          inputAudioPriceUsdPerMillion: 32,
+          cachedInputAudioPriceUsdPerMillion: 0.4,
+          outputTextPriceUsdPerMillion: 24,
+          outputAudioPriceUsdPerMillion: 64,
+        },
+        15_000,
+      ),
+    ).toBeNull();
+    await expect(
+      flushOpenAIRealtimeUsage(
+        "telefun-unpriceable-cache",
+        "user-1",
+        aggregate,
+        "gpt-realtime-2.1",
+      ),
+    ).resolves.toBe(false);
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
+    consoleError.mockRestore();
+  });
+
+  it.each([
+    {
+      name: "missing input modality details",
+      inputDetails: undefined,
+      outputDetails: { text_tokens: 15, audio_tokens: 5 },
+    },
+    {
+      name: "partial input modality details",
+      inputDetails: { text_tokens: 80, cached_tokens: 0 },
+      outputDetails: { text_tokens: 15, audio_tokens: 5 },
+    },
+    {
+      name: "mismatched input modality total",
+      inputDetails: {
+        text_tokens: 70,
+        audio_tokens: 20,
+        cached_tokens: 0,
+      },
+      outputDetails: { text_tokens: 15, audio_tokens: 5 },
+    },
+    {
+      name: "missing output modality details",
+      inputDetails: {
+        text_tokens: 80,
+        audio_tokens: 20,
+        cached_tokens: 0,
+      },
+      outputDetails: undefined,
+    },
+    {
+      name: "partial output modality details",
+      inputDetails: {
+        text_tokens: 80,
+        audio_tokens: 20,
+        cached_tokens: 0,
+      },
+      outputDetails: { text_tokens: 15 },
+    },
+    {
+      name: "mismatched output modality total",
+      inputDetails: {
+        text_tokens: 80,
+        audio_tokens: 20,
+        cached_tokens: 0,
+      },
+      outputDetails: { text_tokens: 10, audio_tokens: 5 },
+    },
+  ])("fails closed for $name", async ({ inputDetails, outputDetails }) => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockReset();
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_unpriceable_modality",
+      usage: {
+        input_tokens: 100,
+        output_tokens: 20,
+        total_tokens: 120,
+        ...(inputDetails === undefined
+          ? {}
+          : { input_token_details: inputDetails }),
+        ...(outputDetails === undefined
+          ? {}
+          : { output_token_details: outputDetails }),
+      },
+    });
+    const aggregate = summarizeOpenAIUsageAccumulator(accumulator)!;
+
+    expect(getOpenAIUsageDiagnostics(accumulator)).toMatchObject({
+      unpriceableUsageCount: 1,
+      warnings: ["unpriceable_openai_usage_breakdown"],
+    });
+    expect(
+      calculateOpenAIRealtimeUsageCost(
+        aggregate,
+        {
+          inputTextPriceUsdPerMillion: 4,
+          cachedInputTextPriceUsdPerMillion: 0.4,
+          inputAudioPriceUsdPerMillion: 32,
+          cachedInputAudioPriceUsdPerMillion: 0.4,
+          outputTextPriceUsdPerMillion: 24,
+          outputAudioPriceUsdPerMillion: 64,
+        },
+        15_000,
+      ),
+    ).toBeNull();
+    await expect(
+      flushOpenAIRealtimeUsage(
+        "telefun-unpriceable-modality",
+        "user-1",
+        aggregate,
+        "gpt-realtime-2.1",
+      ),
+    ).resolves.toBe(false);
+    expect(mockFrom).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("uses the Mini cached rates instead of the full model cached rates", () => {
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_mini_cost",
+      usage: {
+        input_tokens: 1_000_000,
+        output_tokens: 0,
+        total_tokens: 1_000_000,
+        input_token_details: {
+          text_tokens: 1_000_000,
+          audio_tokens: 0,
+          cached_tokens: 500_000,
+          cached_tokens_details: {
+            text_tokens: 500_000,
+            audio_tokens: 0,
+          },
+        },
+        output_token_details: { text_tokens: 0, audio_tokens: 0 },
+      },
+    });
+
+    expect(
+      calculateOpenAIRealtimeUsageCost(
+        summarizeOpenAIUsageAccumulator(accumulator)!,
+        {
+          inputTextPriceUsdPerMillion: 0.6,
+          cachedInputTextPriceUsdPerMillion: 0.06,
+          inputAudioPriceUsdPerMillion: 10,
+          cachedInputAudioPriceUsdPerMillion: 0.3,
+          outputTextPriceUsdPerMillion: 2.4,
+          outputAudioPriceUsdPerMillion: 20,
+        },
+        15_000,
+      ),
+    ).toEqual({
+      costUsd: 0.33,
+      costIdr: 4_950,
+      nonCachedInputTextTokens: 500_000,
+      nonCachedInputAudioTokens: 0,
+    });
+  });
+
+  it("rejects non-OpenAI models before reading pricing or writing usage", async () => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockReset();
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_wrong_provider",
+      usage: responseUsage,
+    });
+
+    await expect(
+      flushOpenAIRealtimeUsage(
+        "telefun-wrong-provider",
+        "user-1",
+        summarizeOpenAIUsageAccumulator(accumulator)!,
+        "gemini-3.1-flash-live-preview",
+      ),
+    ).resolves.toBe(false);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
+    consoleError.mockRestore();
+  });
+
+  it("persists OpenAI provider, modality tokens, cached snapshots, and token-only billing", async () => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "ai_pricing_settings") {
+        return buildQueryResult({
+          input_price_usd_per_million: 4,
+          output_price_usd_per_million: 24,
+          input_text_price_usd_per_million: 4,
+          cached_input_text_price_usd_per_million: 0.4,
+          input_audio_price_usd_per_million: 32,
+          cached_input_audio_price_usd_per_million: 0.4,
+          output_text_price_usd_per_million: 24,
+          output_audio_price_usd_per_million: 64,
+        });
+      }
+      if (table === "ai_billing_settings") {
+        return buildQueryResult({ usd_to_idr_rate: 15_000 });
+      }
+      if (table === "ai_usage_logs") {
+        return {
+          insert: vi.fn(async (payload: Record<string, unknown>) => {
+            insertedUsagePayloads.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_persist",
+      usage: responseUsage,
+    });
+
+    await expect(
+      flushOpenAIRealtimeUsage(
+        "telefun-openai-test",
+        "user-1",
+        summarizeOpenAIUsageAccumulator(accumulator)!,
+        "gpt-realtime-2.1",
+        120_000,
+      ),
+    ).resolves.toBe(true);
+
+    expect(insertedUsagePayloads).toHaveLength(1);
+    expect(insertedUsagePayloads[0]).toMatchObject({
+      provider: "openai",
+      model_id: "gpt-realtime-2.1",
+      billing_model: "openai_realtime_per_response_v1",
+      input_text_tokens: 1_000_000,
+      cached_input_text_tokens: 250_000,
+      input_audio_tokens: 2_000_000,
+      cached_input_audio_tokens: 500_000,
+      output_text_tokens: 100_000,
+      output_audio_tokens: 200_000,
+      cached_input_text_price_usd_per_million: 0.4,
+      cached_input_audio_price_usd_per_million: 0.4,
+      estimated_cost_usd: 66.5,
+      estimated_cost_idr: 997_500,
+      session_duration_ms: 120_000,
+      per_minute_cost_usd: null,
+      per_minute_cost_idr: null,
+      final_cost_usd: 66.5,
+      final_cost_idr: 997_500,
+    });
   });
 });

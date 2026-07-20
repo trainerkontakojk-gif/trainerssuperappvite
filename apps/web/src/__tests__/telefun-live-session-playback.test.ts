@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { LiveSession } from "../routes/telefun/services/geminiService";
+import { LiveSession } from "../routes/telefun/services/liveSession";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 
 function createMockConfig(): TelefunAppSettings {
@@ -88,24 +88,27 @@ describe("LiveSession AI playback lifecycle", () => {
 
     session.audioContext = ctx;
     session.recordingDestination = {};
+    session.hasAuthenticated = true;
+    session.hasConfigured = true;
     (session as unknown as { activeSources: Set<unknown> }).activeSources =
       new Set();
 
-    (session as unknown as { setIsAiSpeaking: (v: boolean) => void }).setIsAiSpeaking(
-      true,
-    );
+    (
+      session as unknown as { setIsAiSpeaking: (v: boolean) => void }
+    ).setIsAiSpeaking(true);
 
-    (session as unknown as { playPcm: (d: Uint8Array, r: number) => void }).playPcm(
-      makePcmData([10000, -10000]),
-      24000,
-    );
+    (
+      session as unknown as { playPcm: (d: Uint8Array, r: number) => void }
+    ).playPcm(makePcmData([10000, -10000]), 24000);
 
     const activeSources = session.activeSources as Set<MockSource>;
     expect(activeSources.size).toBe(1);
 
     const source = sources[0];
     (
-      session as unknown as { handleJsonMessage: (msg: Record<string, unknown>) => void }
+      session as unknown as {
+        handleJsonMessage: (msg: Record<string, unknown>) => void;
+      }
     ).handleJsonMessage({
       serverContent: { interrupted: true },
     });
@@ -129,18 +132,25 @@ describe("LiveSession AI playback lifecycle", () => {
     session.activeSources = new Set();
     session.isAiSpeaking = true;
 
-    (session as unknown as { playPcm: (d: Uint8Array, r: number) => void }).playPcm(
-      makePcmData([10000, -10000]),
-      24000,
-    );
+    (
+      session as unknown as { playPcm: (d: Uint8Array, r: number) => void }
+    ).playPcm(makePcmData([10000, -10000]), 24000);
 
-    const source = (session.activeSources as Set<MockSource>).values().next().value as MockSource;
-    (session as unknown as { handleInputAudioFrame: (data: Float32Array) => void }).handleInputAudioFrame(
-      new Float32Array([0.4, 0.4, 0.4, 0.4]),
-    );
+    const source = (session.activeSources as Set<MockSource>).values().next()
+      .value as MockSource;
+    (
+      session as unknown as {
+        handleInputAudioFrame: (data: Float32Array) => void;
+      }
+    ).handleInputAudioFrame(new Float32Array([0.4, 0.4, 0.4, 0.4]));
 
     expect(source.stop).not.toHaveBeenCalled();
-    expect(Object.prototype.hasOwnProperty.call(session, "send" + "InterruptionPrompt")).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        session,
+        "send" + "InterruptionPrompt",
+      ),
+    ).toBe(false);
     expect(session.interruptionCount).toBe(0);
   });
 
@@ -153,17 +163,18 @@ describe("LiveSession AI playback lifecycle", () => {
 
     session.audioContext = ctx;
     session.recordingDestination = {};
+    session.hasAuthenticated = true;
+    session.hasConfigured = true;
     (session as unknown as { activeSources: Set<unknown> }).activeSources =
       new Set();
 
-    (session as unknown as { setIsAiSpeaking: (v: boolean) => void }).setIsAiSpeaking(
-      true,
-    );
+    (
+      session as unknown as { setIsAiSpeaking: (v: boolean) => void }
+    ).setIsAiSpeaking(true);
 
-    (session as unknown as { playPcm: (d: Uint8Array, r: number) => void }).playPcm(
-      makePcmData([10000, -10000]),
-      24000,
-    );
+    (
+      session as unknown as { playPcm: (d: Uint8Array, r: number) => void }
+    ).playPcm(makePcmData([10000, -10000]), 24000);
 
     const activeSources = session.activeSources as Set<{
       onended: (() => void) | null;
@@ -171,7 +182,9 @@ describe("LiveSession AI playback lifecycle", () => {
     expect(activeSources.size).toBe(1);
 
     (
-      session as unknown as { handleJsonMessage: (msg: Record<string, unknown>) => void }
+      session as unknown as {
+        handleJsonMessage: (msg: Record<string, unknown>) => void;
+      }
     ).handleJsonMessage({
       serverContent: { turnComplete: true },
     });
@@ -196,11 +209,15 @@ describe("LiveSession AI playback lifecycle", () => {
 
     session.audioContext = ctx;
     session.recordingDestination = {};
+    session.hasAuthenticated = true;
+    session.hasConfigured = true;
     (session as unknown as { activeSources: Set<unknown> }).activeSources =
       new Set();
 
     (
-      session as unknown as { handleJsonMessage: (msg: Record<string, unknown>) => void }
+      session as unknown as {
+        handleJsonMessage: (msg: Record<string, unknown>) => void;
+      }
     ).handleJsonMessage({
       serverContent: {
         modelTurn: {
@@ -219,7 +236,9 @@ describe("LiveSession AI playback lifecycle", () => {
     });
 
     (
-      session as unknown as { handleJsonMessage: (msg: Record<string, unknown>) => void }
+      session as unknown as {
+        handleJsonMessage: (msg: Record<string, unknown>) => void;
+      }
     ).handleJsonMessage({
       serverContent: {
         modelTurn: {
@@ -272,14 +291,13 @@ describe("LiveSession AI playback lifecycle", () => {
     (session as unknown as { activeSources: Set<unknown> }).activeSources =
       new Set();
 
-    (session as unknown as { setIsAiSpeaking: (v: boolean) => void }).setIsAiSpeaking(
-      true,
-    );
+    (
+      session as unknown as { setIsAiSpeaking: (v: boolean) => void }
+    ).setIsAiSpeaking(true);
 
-    (session as unknown as { playPcm: (d: Uint8Array, r: number) => void }).playPcm(
-      makePcmData([10000, -10000]),
-      24000,
-    );
+    (
+      session as unknown as { playPcm: (d: Uint8Array, r: number) => void }
+    ).playPcm(makePcmData([10000, -10000]), 24000);
 
     const activeSources = session.activeSources as Set<MockSource>;
     expect(activeSources.size).toBe(1);

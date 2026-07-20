@@ -134,7 +134,7 @@ describe("Telefun first-message auth gate", () => {
       "const authenticateClient = async",
     );
     const messageHandlerStart = serverSource.indexOf(
-      "// Message handler: validate and forward structured JSON to Gemini Live",
+      "// Message handler: authenticate, configure once, then delegate provider data.",
     );
     const authHandler = serverSource.slice(
       authHandlerStart,
@@ -143,11 +143,37 @@ describe("Telefun first-message auth gate", () => {
 
     expect(authHandler).toContain("await authGate.authenticate(message)");
     expect(authHandler.indexOf("if (!authResult.ok)")).toBeLessThan(
-      authHandler.indexOf("setupGeminiWs()"),
+      authHandler.indexOf("configurationGate.start()"),
     );
+    expect(authHandler).not.toContain("connectGemini()");
     expect(serverSource).toContain("if (!authed)");
     expect(serverSource).toContain('ws.close(4001, "Authentication Required")');
     expect(serverSource).toContain('ws.close(4001, "Authentication Timeout")');
     expect(serverSource).toContain("}, 10_000)");
+  });
+
+  it("rejects invalid pre-config frames and terminalizes on session end", () => {
+    expect(serverSource).toContain(
+      'configurationGate.rejectClientMessage("invalid_envelope")',
+    );
+    expect(serverSource).toContain(
+      'configurationGate.rejectClientMessage("unexpected_control_message")',
+    );
+    const sessionEndBranch = serverSource.slice(
+      serverSource.indexOf(
+        "if (controlMsg && isSessionEndRequest(controlMsg))",
+      ),
+      serverSource.indexOf("if (configurationGate.handleMessage(parsed))"),
+    );
+    expect(
+      sessionEndBranch.indexOf("configurationGate.dispose()"),
+    ).toBeLessThan(sessionEndBranch.indexOf("drainCoordinator.startDrain()"));
+  });
+
+  it("never logs a Gemini key suffix", () => {
+    expect(serverSource).not.toContain("env.GEMINI_API_KEY.slice");
+    expect(serverSource).toContain(
+      'env.GEMINI_API_KEY ? "configured" : "missing"',
+    );
   });
 });

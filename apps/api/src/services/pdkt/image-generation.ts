@@ -18,7 +18,7 @@ const MAX_DATA_URI_LENGTH = 650_000;
  */
 export type PdktImageGenerationDiagnostics = {
   attemptedModel: string;
-  provider: AIProvider;
+  provider: Exclude<AIProvider, "openai">;
   imageGenerationMode: "native" | "openrouter-modalities" | "none";
   reason?: "disabled" | "manual-attachment" | "provider-error" | "empty-output" | "oversized-output";
   error?: string;

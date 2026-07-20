@@ -90,4 +90,58 @@ describe("calculateModalityCost", () => {
     expect(result.costUsd).toBe(0.75);
     expect(result.costIdr).toBe(Math.round(0.75 * 15000));
   });
+
+  it("charges cached text and audio at cached rates without double charging full input", () => {
+    const result = calculateModalityCost(
+      {
+        inputTextTokens: 1_000_000,
+        cachedInputTextTokens: 250_000,
+        inputAudioTokens: 2_000_000,
+        cachedInputAudioTokens: 500_000,
+        outputTextTokens: 100_000,
+        outputAudioTokens: 200_000,
+      },
+      {
+        inputPriceUsdPerMillion: 4,
+        outputPriceUsdPerMillion: 24,
+        inputTextPriceUsdPerMillion: 4,
+        cachedInputTextPriceUsdPerMillion: 0.4,
+        inputAudioPriceUsdPerMillion: 32,
+        cachedInputAudioPriceUsdPerMillion: 0.4,
+        outputTextPriceUsdPerMillion: 24,
+        outputAudioPriceUsdPerMillion: 64,
+      },
+      15_000,
+      "gpt-realtime-2.1",
+    );
+
+    expect(result.costUsd).toBe(66.5);
+    expect(result.cachedInputTextPriceUsdPerMillion).toBe(0.4);
+    expect(result.cachedInputAudioPriceUsdPerMillion).toBe(0.4);
+  });
+
+  it("uses canonical registry metadata instead of a live substring", () => {
+    const rates: PricingRates = {
+      inputPriceUsdPerMillion: 9,
+      outputPriceUsdPerMillion: 11,
+    };
+    const tokens: ModalityTokenCounts = {
+      inputTextTokens: 1_000_000,
+      inputAudioTokens: 0,
+      outputTextTokens: 0,
+      outputAudioTokens: 0,
+    };
+
+    expect(
+      calculateModalityCost(tokens, rates, 1, "not-a-model-live").costUsd,
+    ).toBe(9);
+    expect(
+      calculateModalityCost(
+        tokens,
+        rates,
+        1,
+        "gemini-3.1-flash-live-preview",
+      ).costUsd,
+    ).toBe(0.75);
+  });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LiveSession } from "../routes/telefun/services/geminiService";
+import { LiveSession } from "../routes/telefun/services/liveSession";
 import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 
 interface FakeMessageEvent {
@@ -37,6 +37,7 @@ function createSession(socket: FakeSocket) {
   const session = new LiveSession(config);
   Object.assign(session, {
     ws: socket,
+    hasConfigured: true,
     cleanupAudio: vi.fn(),
     stopRecordingOnce: vi.fn(),
   });

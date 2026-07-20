@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serviceSource = readFileSync(
-  join(__dirname, "../routes/telefun/services/geminiService.ts"),
+  join(__dirname, "../routes/telefun/services/liveSession.ts"),
   "utf8",
 );
 
