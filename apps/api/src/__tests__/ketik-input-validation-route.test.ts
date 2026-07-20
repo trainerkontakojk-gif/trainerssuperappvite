@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { User } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import { DEFAULT_KETIK_SETTINGS, KETIK_PROMPT_LIMITS } from "@trainers/types";
 
 const { mockPersistSession, mockSaveSettings } = vi.hoisted(() => ({
   mockPersistSession: vi.fn(),
@@ -162,6 +162,30 @@ describe("KETIK settings and history input validation", () => {
     expect(mockPersistSession).toHaveBeenCalledWith("user-1", validHistory);
   });
 
+  it("accepts a history message at the 20,000-character limit and persists", async () => {
+    const historyWithLongMessage = {
+      ...validHistory,
+      messages: [
+        {
+          ...validMessage,
+          text: "x".repeat(KETIK_PROMPT_LIMITS.chatMessageText),
+        },
+      ],
+    };
+    const response = await requestJson(
+      buildApp(),
+      "/history",
+      "POST",
+      historyWithLongMessage,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockPersistSession).toHaveBeenCalledWith(
+      "user-1",
+      historyWithLongMessage,
+    );
+  });
+
   it.each([
     ["message without text", { ...validMessage, text: undefined }],
     ["invalid sender", { ...validMessage, sender: "customer" }],
@@ -172,7 +196,7 @@ describe("KETIK settings and history input validation", () => {
     ],
     [
       "message above prompt limit",
-      { ...validMessage, text: "x".repeat(5_001) },
+      { ...validMessage, text: "x".repeat(KETIK_PROMPT_LIMITS.chatMessageText + 1) },
     ],
   ])("rejects %s without persisting history", async (_label, message) => {
     const response = await requestJson(buildApp(), "/history", "POST", {

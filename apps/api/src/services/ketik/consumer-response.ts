@@ -13,6 +13,8 @@ import { UsageContext } from "../../lib/ai-usage";
 import {
   buildKetikScenarioDataBlock,
   buildKetikTurnPrompt,
+  compactChatHistory,
+  computeAvailableHistoryBudget,
   detectKetikPromptInjectionFields,
 } from "./prompt-policy";
 
@@ -230,11 +232,41 @@ ATURAN BALASAN:
 15c. Anda boleh memberikan detail tambahan yang masuk akal sebagai elaborasi dari masalah yang sudah ada di skenario, tetapi jangan memperkenalkan masalah baru yang sama sekali berbeda.
   `;
 
+  const { modelId, provider } = resolveModelProvider(config.selectedModel);
+  const isOpenRouter = provider === "openrouter";
+  const isDeepSeek = provider === "deepseek";
+  const usesConservativeTemperature = isOpenRouter || isDeepSeek;
+
+  // Provider-aware policy: Gemini uses higher temperature (0.82) for more
+  // conversational responses; OpenRouter/DeepSeek use conservative sampling
+  // (0.55) with strict script reinforcement to counter higher instruction
+  // drift observed across those providers. Kept asymmetric intentionally
+  // pending provider-neutral evidence to standardise.
+
+  const providerSystemInstruction =
+    usesConservativeTemperature && hasScript
+      ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
+      : systemInstruction;
+
+  // Compaction: total prompt budget mencakup providerSystemInstruction +
+  // fixed turn-prompt overhead; sisa budget untuk history dihitung dan
+  // dilewatkan ke compactChatHistory. Riwayat penuh tetap digunakan untuk
+  // injection detection dan timing.
+  const availableHistoryBudget = computeAvailableHistoryBudget(
+    providerSystemInstruction,
+    scenario.title,
+    chatHistory.length, // conservative omitted-count estimate (worst case)
+  );
+  const { compacted: compactedHistory, omittedCount } =
+    compactChatHistory(chatHistory, availableHistoryBudget);
+
   const prompt = buildKetikTurnPrompt({
     scenarioTitle: scenario.title,
-    chatHistory,
+    chatHistory: compactedHistory,
+    omittedCount,
   });
 
+  // Injection detection and timing still inspect the FULL chatHistory
   const suspiciousFields = detectKetikPromptInjectionFields({
     scenario,
     consumerType: config.consumerType,
@@ -245,20 +277,6 @@ ATURAN BALASAN:
       fields: suspiciousFields,
     });
   }
-
-  const { modelId, provider } = resolveModelProvider(config.selectedModel);
-  const isOpenRouter = provider === "openrouter";
-  const isDeepSeek = provider === "deepseek";
-  const usesConservativeTemperature = isOpenRouter || isDeepSeek;
-
-  // Provider-aware policy is intentional: Gemini remains more conversational,
-  // while OpenRouter/DeepSeek use conservative sampling and stricter script
-  // reinforcement to reduce observed instruction drift across those providers.
-
-  const providerSystemInstruction =
-    usesConservativeTemperature && hasScript
-      ? `${systemInstruction}\n\nMODEL SCRIPT MODE (WAJIB PATUH):\n- Ikuti system instruction dan skrip percakapan dengan ketat, tetapi tetap terdengar seperti chat manusia sungguhan.\n- Jangan menambah detail baru yang tidak ada di identitas, masalah, atau skrip kecuali benar-benar diperlukan untuk menjawab secara natural.\n- Prioritaskan konsistensi karakter, alur skrip, dan jawaban singkat yang relevan.\n- Jika skrip memberi arah percakapan, anggap itu sebagai batas perilaku utama, bukan sekadar saran ringan.\n- Hindari jawaban template yang berulang, frasa klise yang sama, atau struktur kalimat yang terlalu seragam di setiap balasan.\n- Bila ragu, pilih jawaban yang paling dekat dengan isi skrip dan riwayat chat, sambil tetap mempertahankan variasi diksi yang wajar.`
-      : systemInstruction;
 
   const callPayload = {
     model: modelId,

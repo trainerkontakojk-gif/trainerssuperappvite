@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { User } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { KETIK_PROMPT_LIMITS } from "@trainers/types";
 
 const { mockGenerateConsumerResponse, mockGetScenarios, mockGetConsumerTypes } = vi.hoisted(
   () => ({
@@ -143,5 +144,69 @@ describe("KETIK generate route role access", () => {
     const body = await response.json() as any;
     expect(body.success).toBe(false);
     expect(mockGenerateConsumerResponse).not.toHaveBeenCalled();
+  });
+
+  describe("chat message text boundary (20,000 chars)", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockGetScenarios.mockReturnValue([validScenario]);
+      mockGetConsumerTypes.mockReturnValue([validConsumerType]);
+      mockGenerateConsumerResponse.mockResolvedValue({
+        success: true,
+        text: "mock-response",
+      });
+    });
+
+    it("accepts 20,000-character message and calls AI", async () => {
+      const body = {
+        ...validBody,
+        chatHistory: [
+          {
+            id: "msg-1",
+            sender: "agent" as const,
+            text: "x".repeat(KETIK_PROMPT_LIMITS.chatMessageText),
+            timestamp: new Date().toISOString(),
+            status: "sent" as const,
+          },
+        ],
+      };
+      const response = await buildApp("leader-token").request("/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer leader-token",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockGenerateConsumerResponse).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects 20,001-character message without calling AI", async () => {
+      const body = {
+        ...validBody,
+        chatHistory: [
+          {
+            id: "msg-2",
+            sender: "agent" as const,
+            text: "x".repeat(KETIK_PROMPT_LIMITS.chatMessageText + 1),
+            timestamp: new Date().toISOString(),
+            status: "sent" as const,
+          },
+        ],
+      };
+      const response = await buildApp("leader-token").request("/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer leader-token",
+        },
+        body: JSON.stringify(body),
+      });
+
+      expect(response.status).toBe(400);
+      expect(mockGenerateConsumerResponse).not.toHaveBeenCalled();
+    });
   });
 });

@@ -16,6 +16,7 @@ import type {
   KetikQuickTemplate,
   PacingMeta,
 } from "@trainers/types";
+import { KETIK_PROMPT_LIMITS } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
 import { shouldLogKetikGenerationError } from "../lib/ketik-error";
 import {
@@ -101,6 +102,11 @@ export function ChatInterface({
   const totalSlowCountRef = useRef(0);
   const consecutiveSlowCountRef = useRef(0);
   const sendGenerationRef = useRef(0);
+
+  // ── Character counter ─────────────────────────────────
+  const charCount = inputText.length;
+  const maxChars = KETIK_PROMPT_LIMITS.chatMessageText;
+  const isOverLimit = charCount > maxChars;
 
   const [showTemplatePopup, setShowTemplatePopup] = useState(false);
   const [templateSearchQuery, setTemplateSearchQuery] = useState("");
@@ -283,6 +289,8 @@ export function ChatInterface({
 
     if (
       !inputText.trim() ||
+      isLoading ||
+      isOverLimit ||
       (sessionPhase !== "active" && sessionPhase !== "expired")
     )
       return;
@@ -513,7 +521,7 @@ export function ChatInterface({
         e.preventDefault();
         setShowTemplatePopup(false);
       }
-    } else if (e.key === "Enter" && !e.shiftKey) {
+    } else if (e.key === "Enter" && !e.shiftKey && !isLoading && !isOverLimit) {
       e.preventDefault();
       handleSend();
     }
@@ -798,7 +806,40 @@ export function ChatInterface({
                 className="max-h-48 min-h-11 w-full resize-none border-none bg-transparent py-1 text-base font-medium text-foreground outline-none placeholder:text-muted-foreground"
                 rows={1}
                 aria-label="Tulis pesan KETIK"
+                aria-describedby="ketik-char-counter"
+                aria-invalid={isOverLimit}
               />
+
+              {/* Character Counter */}
+              <div
+                id="ketik-char-counter"
+                className={`flex items-center justify-end gap-1 px-1 pt-1 text-xs font-medium tabular-nums ${
+                  isOverLimit
+                    ? "text-red-500"
+                    : "text-muted-foreground"
+                }`}
+                role="status"
+                aria-live="polite"
+                aria-label={`${charCount} karakter dari ${maxChars}`}
+              >
+                <span>{charCount.toLocaleString()}</span>
+                <span>/</span>
+                <span>{maxChars.toLocaleString()}</span>
+              </div>
+
+              {/* Over-limit error */}
+              {isOverLimit && (
+                <div
+                  className="flex items-center gap-1.5 px-1 pb-1 text-xs font-semibold text-red-500"
+                  role="alert"
+                  aria-live="assertive"
+                >
+                  <span>
+                    Pesan terlalu panjang ({charCount.toLocaleString()} karakter).
+                    Maksimum {maxChars.toLocaleString()} karakter.
+                  </span>
+                </div>
+              )}
 
               {/* Floating Template Popup */}
               <AnimatePresence>
@@ -860,9 +901,9 @@ export function ChatInterface({
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={handleSend}
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isLoading || isOverLimit}
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-14 md:w-14 ${
-                inputText.trim()
+                inputText.trim() && !isLoading && !isOverLimit
                   ? "module-clean-button-primary text-white cursor-pointer"
                   : "bg-foreground/5 text-muted-foreground cursor-not-allowed"
               }`}
@@ -870,7 +911,7 @@ export function ChatInterface({
               aria-label="Kirim pesan"
             >
               <Send
-                className={`h-5 w-5 md:h-6 md:w-6 ${inputText.trim() ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+                className={`h-5 w-5 md:h-6 md:w-6 ${inputText.trim() && !isLoading && !isOverLimit ? "translate-x-0.5 -translate-y-0.5" : ""}`}
               />
             </motion.button>
           </div>

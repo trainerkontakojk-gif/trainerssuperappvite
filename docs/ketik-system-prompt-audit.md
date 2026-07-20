@@ -25,12 +25,14 @@ Arsitektur prompt KETIK fungsional untuk skenario normal tetapi memiliki beberap
 
 ### Input Bounds
 
-- Scenario description: maksimum 12.000 karakter.
-- Scenario script: maksimum 20.000 karakter.
-- Consumer description: maksimum 4.000 karakter.
-- Chat message: maksimum 5.000 karakter.
+- Chat message: maksimum **20.000** karakter.
+- Scenario description: maksimum **12.000** karakter.
+- Scenario script: maksimum **20.000** karakter.
+- Consumer description: maksimum **4.000** karakter.
+- **Total prompt budget**: **100.000 karakter** deterministik — mencakup system instruction, data skenario, dan riwayat percakapan (bukan perangkat/model-specific tokens).
+- **Compaction**: Pesan terlama dibuang **utuh** (per-pesan) jika total prompt melebihi budget. Pesan terbaru selalu dipertahankan. Tidak ada pemotongan teks di tengah pesan. Tidak ada ringkasan/summary. Jumlah pesan yang dihilangkan diserialisasi sebagai metadata `omittedEarlierMessages` di dalam blok `<conversation_data>`.
 
-Batas tersebut diverifikasi di atas maksimum data hosted per 20 Juli 2026 (8.654 / 0 / 136 / 2.212 karakter), sehingga data existing tetap berada dalam kontrak baru.
+Batas tersebut diverifikasi di atas maksimum data hosted per 20 Juli 2026 (maksimum observasi: scenario description 8.654 / scenario script 0 / consumer description 136 / chat message 2.212 karakter), sehingga data existing tetap berada dalam kontrak baru.
 
 ### Deployment Status dan Urutan Lanjutan
 
