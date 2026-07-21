@@ -289,7 +289,6 @@ export function ChatInterface({
 
     if (
       !inputText.trim() ||
-      isLoading ||
       isOverLimit ||
       (sessionPhase !== "active" && sessionPhase !== "expired")
     )
@@ -521,7 +520,7 @@ export function ChatInterface({
         e.preventDefault();
         setShowTemplatePopup(false);
       }
-    } else if (e.key === "Enter" && !e.shiftKey && !isLoading && !isOverLimit) {
+    } else if (e.key === "Enter" && !e.shiftKey && !isOverLimit) {
       e.preventDefault();
       handleSend();
     }
@@ -901,9 +900,9 @@ export function ChatInterface({
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={handleSend}
-              disabled={!inputText.trim() || isLoading || isOverLimit}
+              disabled={!inputText.trim() || isOverLimit}
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background md:h-14 md:w-14 ${
-                inputText.trim() && !isLoading && !isOverLimit
+                inputText.trim() && !isOverLimit
                   ? "module-clean-button-primary text-white cursor-pointer"
                   : "bg-foreground/5 text-muted-foreground cursor-not-allowed"
               }`}
@@ -911,7 +910,7 @@ export function ChatInterface({
               aria-label="Kirim pesan"
             >
               <Send
-                className={`h-5 w-5 md:h-6 md:w-6 ${inputText.trim() && !isLoading && !isOverLimit ? "translate-x-0.5 -translate-y-0.5" : ""}`}
+                className={`h-5 w-5 md:h-6 md:w-6 ${inputText.trim() && !isOverLimit ? "translate-x-0.5 -translate-y-0.5" : ""}`}
               />
             </motion.button>
           </div>
