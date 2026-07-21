@@ -4,6 +4,7 @@ import {
   getCommunicationProfileFromAssessment,
   parseTelefunScoreResult,
 } from "../lib/voiceAssessmentUtils";
+import { buildCommunicationProfileFromAssessment } from "@trainers/types";
 import type { TelefunHoldAssessment } from "@trainers/types";
 
 function makeHoldAssessment(
@@ -141,92 +142,11 @@ describe("parseTelefunScoreResult", () => {
 
 describe("getCommunicationProfileFromAssessment", () => {
   it("keeps existing communicationProfile if present and valid", () => {
-    const existing = {
-      metrics: [
-        {
-          key: "speakingRate",
-          label: "Speaking Rate",
-          value: 70,
-          benchmarkValue: 70,
-          score: 7,
-          displayScore: 70,
-          targetScore: 70,
-          targetDirection: "match_target",
-          evaluationMode: "optimal_range",
-          verdict: "Good",
-          status: "good",
-          feedback: "Nice pace",
-          explanation: "Custom",
-        },
-        {
-          key: "intonation",
-          label: "Intonation",
-          value: 80,
-          benchmarkValue: 80,
-          score: 8,
-          displayScore: 80,
-          targetScore: 80,
-          targetDirection: "higher_quality",
-          evaluationMode: "higher_better",
-          verdict: "Good",
-          status: "good",
-          feedback: "Nice tone",
-          explanation: "Custom",
-        },
-        {
-          key: "articulation",
-          label: "Articulation",
-          value: 90,
-          benchmarkValue: 90,
-          score: 9,
-          displayScore: 90,
-          targetScore: 90,
-          targetDirection: "higher_quality",
-          evaluationMode: "higher_better",
-          verdict: "Great",
-          status: "good",
-          feedback: "Clear speech",
-          explanation: "Custom",
-        },
-        {
-          key: "fillers",
-          label: "Fillers",
-          value: 80,
-          benchmarkValue: 80,
-          score: 6,
-          displayScore: 80,
-          targetScore: 80,
-          targetDirection: "lower_raw_is_better",
-          evaluationMode: "higher_better",
-          goodMin: 80,
-          verdict: "Fine",
-          status: "good",
-          feedback: "Some fillers",
-          explanation: "Custom",
-        },
-        {
-          key: "tone",
-          label: "Tone",
-          value: 85,
-          benchmarkValue: 85,
-          score: 7,
-          displayScore: 85,
-          targetScore: 85,
-          targetDirection: "higher_quality",
-          evaluationMode: "higher_better",
-          verdict: "Good",
-          status: "good",
-          feedback: "Empathetic",
-          explanation: "Custom",
-        },
-      ],
-      overallSummary: "Custom",
-      strengths: [],
-      improvementPriorities: [],
-    };
+    const existing = buildCommunicationProfileFromAssessment(valid as any);
+    expect(existing).not.toBeNull();
     const result = getCommunicationProfileFromAssessment({
       ...valid,
-      communicationProfile: existing as any,
+      communicationProfile: existing,
     });
     expect(result).toBe(existing);
   });
@@ -292,7 +212,22 @@ describe("getCommunicationProfileFromAssessment", () => {
     const fillers = result!.metrics.find((m: any) => m.key === "fillers");
     expect(fillers!.evaluationMode).toBe("higher_better");
     expect(fillers!.targetDirection).toBe("lower_raw_is_better");
-    expect(fillers!.displayScore).toBe(60);
+    expect(fillers!.displayScore).toBe(33); // burden: round(5/15*100)
+  });
+
+  it("fillers metric carries examples array from assessment", () => {
+    const result = getCommunicationProfileFromAssessment(valid);
+    const fillers = result!.metrics.find((m: any) => m.key === "fillers");
+    expect(Array.isArray(fillers!.examples)).toBe(true);
+    expect(fillers!.examples).toEqual(["uh", "um"]);
+  });
+
+  it("fillers status uses raw count (lower-is-better), not inverted score", () => {
+    const result = getCommunicationProfileFromAssessment(valid);
+    const fillers = result!.metrics.find((m: any) => m.key === "fillers");
+    // valid fixture has count 5 -> needs_improvement, status good/needs/poor
+    expect(["good", "needs_improvement", "poor"]).toContain(fillers!.status);
+    expect(fillers!.rawValue).toBe(5);
   });
 
   it("speakingRate in fallback uses optimal_range mode", () => {

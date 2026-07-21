@@ -152,13 +152,17 @@ const VoiceRadarChartInner: React.FC<VoiceRadarChartInnerProps> = ({
       {!compact && (
         <div className="mt-4 px-4 py-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1 w-full text-center">
           <p className="font-semibold text-slate-700 dark:text-slate-300">
-            Diagram ini menunjukkan seberapa dekat hasil Anda dengan target QA
-            pada tiap aspek komunikasi, dengan pengecualian visual untuk
-            Fillers.
+            Diagram membandingkan hasil Anda (biru) dengan target QA (hijau).
           </p>
           <p>
-            Untuk Fillers, panduan target di diagram dibuat rendah, sedangkan
-            skor makin tinggi berarti kata pengisi makin sedikit.
+            Empat aspek (Speaking Rate, Intonation, Articulation, Tone): skor
+            biru <strong>mendekati</strong> target hijau = semakin baik
+            (terlalu rendah maupun terlalu tinggi kurang baik — deviasi absolut
+            terhadap target yang dinilai). Khusus Fillers
+            (↓): skor biru{" "}
+            <strong>di bawah</strong> hijau = baik (semakin sedikit kata
+            pengisi semakin baik). Angka pada sumbu hanya koordinat visual,
+            bukan skor akhir.
           </p>
         </div>
       )}

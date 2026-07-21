@@ -79,7 +79,7 @@ export const CommunicationProfileZoomModal: React.FC<
                   Profil Komunikasi
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Skor kualitas tinggi, panduan Fillers tetap rendah
+                  Skor kualitas 0–100, semua aspek skor tinggi = lebih baik
                 </p>
               </div>
               <button
@@ -146,7 +146,8 @@ export const CommunicationProfileZoomModal: React.FC<
                     <strong className="text-foreground">
                       Intonation, Tone, Articulation:
                     </strong>{" "}
-                    semakin tinggi skor, semakin baik.
+                    skor mendekati target ideal adalah yang terbaik, terlalu
+                    tinggi pun kurang baik.
                   </span>
                 </div>
                 <div className="flex items-start gap-2">
@@ -161,9 +162,9 @@ export const CommunicationProfileZoomModal: React.FC<
                   <TrendingDown className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                   <span>
                     <strong className="text-foreground">Fillers:</strong>{" "}
-                    panduan target di diagram dibuat rendah, sedangkan skor
-                    makin tinggi berarti kata pengisi makin sedikit. Detail
-                    tetap menampilkan jumlah filler mentah.
+                    angka rendah = sedikit kata pengisi (baik). Biru di
+                    bawah hijau = sesuai target. Jumlah dan contoh kata
+                    pengisi dapat dilihat pada kartu di bawah.
                   </span>
                 </div>
               </div>

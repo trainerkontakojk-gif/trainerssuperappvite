@@ -1,5 +1,6 @@
 export {
   BENCHMARK_DEFAULTS,
+  getMetricStatus,
   evaluateMetricStatus,
   generateExplanation,
   generateImprovementTip,

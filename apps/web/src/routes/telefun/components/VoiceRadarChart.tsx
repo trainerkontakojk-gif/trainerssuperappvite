@@ -12,6 +12,8 @@ interface VoiceRadarDatum {
   targetValue: number;
   fullMark: 100;
   evaluationMode: CommunicationMetric["evaluationMode"];
+  rawLabel?: string;
+  direction?: "higher_better" | "lower_better";
 }
 
 const FILLERS_RADAR_TARGET_GUIDE_VALUE = 20;
@@ -25,11 +27,11 @@ const AXIS_META: Record<
   CommunicationMetric["key"],
   { label: string; directionHint: string }
 > = {
-  speakingRate: { label: "Speaking Rate", directionHint: "ideal stabil" },
-  intonation: { label: "Intonation", directionHint: "semakin tinggi" },
-  articulation: { label: "Articulation", directionHint: "semakin tinggi" },
+  speakingRate: { label: "Speaking Rate", directionHint: "mendekati target" },
+  intonation: { label: "Intonation", directionHint: "mendekati target" },
+  articulation: { label: "Articulation", directionHint: "mendekati target" },
   fillers: { label: "Fillers", directionHint: "panduan rendah" },
-  tone: { label: "Tone", directionHint: "semakin tinggi" },
+  tone: { label: "Tone", directionHint: "mendekati target" },
 };
 
 export function buildVoiceRadarData(
@@ -49,6 +51,12 @@ export function buildVoiceRadarData(
         : (metric.targetScore ?? metric.benchmarkValue),
     fullMark: 100,
     evaluationMode: metric.evaluationMode,
+    rawLabel:
+      metric.key === "fillers" && metric.rawValue !== undefined
+        ? `${metric.rawValue} kata pengisi`
+        : undefined,
+    direction:
+      metric.key === "fillers" ? "lower_better" : "higher_better",
   }));
 }
 

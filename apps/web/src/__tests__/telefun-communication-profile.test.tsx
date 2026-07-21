@@ -321,7 +321,7 @@ describe("CommunicationProfileZoomModal", () => {
     expect(fillersElements.length).toBeGreaterThan(0);
     expect(
       screen.getAllByText(
-        /panduan target di diagram dibuat rendah, sedangkan skor makin tinggi berarti kata pengisi makin sedikit./,
+        /angka rendah = sedikit kata pengisi/,
       ).length,
     ).toBeGreaterThan(0);
   });

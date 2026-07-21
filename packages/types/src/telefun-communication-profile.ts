@@ -32,14 +32,20 @@ export const BENCHMARK_DEFAULTS: Record<
   },
   intonation: {
     benchmarkValue: 80,
-    evaluationMode: "higher_better",
-    goodMin: 75,
+    evaluationMode: "optimal_range",
+    idealMin: 70,
+    idealMax: 90,
+    goodMin: 55,
+    goodMax: 100,
     label: "Intonation",
   },
   articulation: {
     benchmarkValue: 90,
-    evaluationMode: "higher_better",
-    goodMin: 75,
+    evaluationMode: "optimal_range",
+    idealMin: 80,
+    idealMax: 100,
+    goodMin: 65,
+    goodMax: 100,
     label: "Articulation",
   },
   fillers: {
@@ -50,8 +56,11 @@ export const BENCHMARK_DEFAULTS: Record<
   },
   tone: {
     benchmarkValue: 85,
-    evaluationMode: "higher_better",
-    goodMin: 75,
+    evaluationMode: "optimal_range",
+    idealMin: 75,
+    idealMax: 95,
+    goodMin: 60,
+    goodMax: 100,
     label: "Tone",
   },
 };
@@ -78,18 +87,25 @@ export function normalizeSpeakingRateScore(
   return Math.max(10, 30 - Math.round((distance - 50) * 0.25));
 }
 
-export function normalizeFillerDisplayScore(
+export const FILLER_TARGET_COUNT = 3;
+export const FILLER_RADAR_MAX_COUNT = 15;
+
+export function mapFillerCountToRadarBurden(
   count: number | null | undefined,
 ): number | null {
   if (typeof count !== "number" || !Number.isFinite(count) || count < 0)
     return null;
-  if (count === 0) return 100;
-  if (count === 1) return 90;
-  if (count <= 3) return 80;
-  if (count <= 5) return 60;
-  if (count <= 8) return 40;
-  if (count <= 11) return 20;
-  return 10;
+  return Math.min(100, Math.round((count / FILLER_RADAR_MAX_COUNT) * 100));
+}
+
+export function evaluateFillerCountStatus(
+  count: number | null | undefined,
+): "good" | "needs_improvement" | "poor" {
+  if (typeof count !== "number" || !Number.isFinite(count) || count < 0)
+    return "poor";
+  if (count <= FILLER_TARGET_COUNT) return "good";
+  if (count <= 5) return "needs_improvement";
+  return "poor";
 }
 
 export function getMetricStatus(
@@ -153,6 +169,7 @@ export function generateExplanation(
     goodMin?: number;
     goodMax?: number;
   },
+  rawCount?: number,
 ): string {
   let status: "good" | "needs_improvement" | "poor";
   if (
@@ -167,22 +184,33 @@ export function generateExplanation(
 
   const def = BENCHMARK_DEFAULTS[key];
   if (status === "good") {
-    if (key === "fillers")
-      return `${def.label} Anda sangat minim, pertahankan.`;
+    if (key === "fillers") {
+      const c = typeof rawCount === "number" ? rawCount : null;
+      if (c === 0) return `Tidak ada kata pengisi terdeteksi. Pertahankan.`;
+      return `${c} kata pengisi terdeteksi (target maksimal ${FILLER_TARGET_COUNT}). Baik, pertahankan.`;
+    }
     if (key === "speakingRate")
       return `${def.label} Anda berada di rentang ideal.`;
+    if (def.evaluationMode === "optimal_range")
+      return `${def.label} Anda mendekati target ideal.`;
     return `${def.label} Anda sudah sangat baik.`;
   }
   if (status === "needs_improvement") {
-    if (key === "fillers")
-      return `${def.label} Anda masih ada, namun belum berlebihan. Kurangi lagi agar lebih profesional.`;
+    if (key === "fillers") {
+      const c = typeof rawCount === "number" ? rawCount : null;
+      return `${c} kata pengisi terdeteksi. Masih wajar, namun kurangi lagi agar lebih profesional (target maksimal ${FILLER_TARGET_COUNT}).`;
+    }
     if (key === "speakingRate")
       return `${def.label} Anda mendekati rentang ideal.`;
+    if (def.evaluationMode === "optimal_range")
+      return `${def.label} Anda cukup mendekati target, namun jaraknya masih bisa dikurangi.`;
     return `${def.label} Anda cukup baik, namun masih dapat ditingkatkan.`;
   }
 
-  if (key === "fillers")
-    return `${def.label} Anda terlalu sering muncul, perlu dikurangi secara sadar.`;
+  if (key === "fillers") {
+    const c = typeof rawCount === "number" ? rawCount : null;
+    return `${c} kata pengisi terdeteksi — terlalu sering. Sadari kebiasaan dan ganti dengan jeda senyap.`;
+  }
   if (key === "speakingRate")
     return `${def.label} Anda di luar rentang ideal, perlu penyesuaian.`;
   return `${def.label} Anda perlu perbaikan signifikan.`;
@@ -240,8 +268,8 @@ function getTargetDirection(
   key: CommunicationMetric["key"],
 ): CommunicationMetric["targetDirection"] {
   if (key === "fillers") return "lower_raw_is_better";
-  if (key === "speakingRate") return "match_target";
-  return "higher_quality";
+  // All metrics besides fillers use target-ideal semantics (match_target)
+  return "match_target";
 }
 
 export function buildCommunicationProfileFromAssessment(
@@ -276,16 +304,8 @@ export function buildCommunicationProfileFromAssessment(
     } else if (key === "fillers") {
       rawValue = assessment.fillerWords?.count;
       rawUnit = "filler_words";
-      const normScore = normalizeFillerDisplayScore(rawValue);
-      if (normScore !== null) {
-        displayScore = normScore;
-      } else {
-        displayScore = clamp(
-          Math.round((assessment.fillerWords?.score ?? 5) * 10),
-          0,
-          100,
-        );
-      }
+      const burden = mapFillerCountToRadarBurden(rawValue);
+      displayScore = burden ?? 50;
     } else if (key === "intonation") {
       displayScore = clamp(
         Math.round((assessment.intonation?.score ?? 5) * 10),
@@ -308,8 +328,11 @@ export function buildCommunicationProfileFromAssessment(
       );
     }
 
-    const status = evaluateMetricStatus(displayScore, def.evaluationMode, def);
-    const explanation = generateExplanation(key, displayScore, status);
+    const status =
+      key === "fillers"
+        ? evaluateFillerCountStatus(rawValue as number)
+        : getMetricStatus(displayScore, targetScore);
+    const explanation = generateExplanation(key, displayScore, status, def, rawValue as number);
     const improvementTip = generateImprovementTip(key, status);
 
     return {
@@ -328,6 +351,9 @@ export function buildCommunicationProfileFromAssessment(
       status,
       feedback: aspect.feedback,
       explanation,
+      ...(key === "fillers"
+        ? { examples: assessment.fillerWords?.examples ?? [] }
+        : {}),
       ...(improvementTip ? { improvementTip } : {}),
     };
   });
@@ -355,7 +381,7 @@ export function buildCommunicationProfileFromAssessment(
       goodCount === total
         ? "Profil komunikasi Anda sangat baik di seluruh aspek. Pertahankan konsistensi ini."
         : goodCount >= 3
-          ? `Profil komunikasi Anda cukup baik (${goodCount}/${total} aspek). Fokus pada perbaikan aspek yang masih di bawah target.`
+          ? `Profil komunikasi Anda cukup baik (${goodCount}/${total} aspek). Fokus pada perbaikan aspek yang belum mendekati target.`
           : `Profil komunikasi Anda perlu perbaikan signifikan (${goodCount}/${total} aspek). Gunakan tips perbaikan untuk setiap aspek.`,
     strengths:
       strengths.length > 0
@@ -394,7 +420,19 @@ export function enrichAssessmentWithCommunicationProfile(
         Number.isFinite(m.targetScore) &&
         typeof m.targetDirection === "string" &&
         typeof m.verdict === "string" &&
-        typeof m.feedback === "string",
+        typeof m.feedback === "string" &&
+        // Rebuild if target direction or evaluation mode changed
+        m.targetDirection === getTargetDirection(m.key) &&
+        m.evaluationMode === BENCHMARK_DEFAULTS[m.key].evaluationMode &&
+        // Rebuild if status does not match current formula
+        (m.key === "fillers"
+          ? evaluateFillerCountStatus(m.rawValue as number) === m.status
+          : getMetricStatus(m.displayScore, m.targetScore) === m.status) &&
+        // Force rebuild for fillers with old inverted score
+        (m.key !== "fillers" ||
+          (typeof m.rawValue === "number"
+            ? m.displayScore === mapFillerCountToRadarBurden(m.rawValue)
+            : false)),
     );
 
   if (isValid) return assessment;

@@ -667,3 +667,14 @@ request server-to-server terautentikasi.
 8. **Final cost** — `max(perTokenCost, perMinuteCost)` — tidak double charge.
 9. **Recording** — File rekaman di Supabase Storage bucket `telefun-recordings`, diakses via signed URL sementara.
 10. **Model default** — `gemini-3.1-flash-live-preview`. Bisa diganti di settings ke model Gemini Live lain.
+
+---
+
+## 📄 Dokumen Terkait
+
+| Dokumen                                             | Isi                                                     |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| [`TELEFUN_ASSESSMENT_CONTRACT.md`](TELEFUN_ASSESSMENT_CONTRACT.md) | Kontrak penilaian suara: skala, target sistem, status, radar, staleness |
+| [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md)            | Workflow pengembangan untuk AI agent                    |
+| [`architecture.md`](architecture.md)                | Arsitektur monorepo dan modul                           |
+| [`deployment.md`](deployment.md)                    | Konfigurasi deployment Railway                          |

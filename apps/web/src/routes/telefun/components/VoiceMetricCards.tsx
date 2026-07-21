@@ -3,6 +3,7 @@ import type {
   TelefunCommunicationProfile,
   CommunicationMetric,
 } from "@trainers/types";
+import { FILLER_TARGET_COUNT } from "@trainers/types";
 
 interface VoiceMetricCardsProps {
   profile: TelefunCommunicationProfile;
@@ -27,6 +28,16 @@ function formatRawMetric(metric: CommunicationMetric): string {
     return `${metric.rawValue} WPM`;
   }
   if (metric.key === "fillers") {
+    const count = metric.rawValue;
+    const countNum =
+      typeof count === "number"
+        ? count
+        : typeof count === "string"
+          ? Number(count)
+          : NaN;
+    if (Number.isFinite(countNum)) {
+      return `${countNum} kata pengisi${countNum === 1 ? "" : ""}`;
+    }
     return `${metric.rawValue} filler words`;
   }
   return String(metric.rawValue);
@@ -51,22 +62,59 @@ export const VoiceMetricCards: React.FC<VoiceMetricCardsProps> = ({
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
                   {metric.label}
                 </p>
-                <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
-                  {metric.displayScore}
-                  <span className="text-sm font-semibold text-slate-400">
-                    /100
-                  </span>
-                </p>
+                {metric.key === "fillers" ? (
+                  <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+                    {typeof metric.rawValue === "number"
+                      ? metric.rawValue
+                      : "—"}
+                    <span className="text-sm font-semibold text-slate-400">
+                      {" "}
+                      kata
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+                    {metric.displayScore}
+                    <span className="text-sm font-semibold text-slate-400">
+                      /100
+                    </span>
+                  </p>
+                )}
               </div>
               <span className={STATUS_CLASSES[metric.status] || ""}>
                 {STATUS_LABELS[metric.status] || metric.status}
               </span>
             </div>
-            {detail && (
+            {metric.key === "fillers" ? (
               <p className="mt-2 text-xs text-slate-500 font-medium">
-                Detail: {detail}
+                Target: maksimal {FILLER_TARGET_COUNT} · semakin sedikit semakin baik
               </p>
+            ) : (
+              detail && (
+                <p className="mt-2 text-xs text-slate-500 font-medium">
+                  Detail: {detail}
+                </p>
+              )
             )}
+            {metric.key === "fillers" &&
+              metric.examples &&
+              metric.examples.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
+                    Contoh terdeteksi
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {metric.examples.slice(0, 8).map((word, i) => (
+                      <span
+                        key={`${word}-${i}`}
+                        className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                      >
+                        {word}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             <p className="mt-3 text-xs leading-relaxed text-slate-600 dark:text-white/75">
               {metric.feedback || metric.explanation}
             </p>

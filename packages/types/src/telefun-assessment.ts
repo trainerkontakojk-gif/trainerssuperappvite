@@ -76,6 +76,7 @@ export const communicationMetricSchema = z.object({
   rawValue: z.union([z.number(), z.string()]).optional(),
   rawUnit: z.enum(["WPM", "filler_words", "dominant_tone"]).optional(),
   evaluationMode: communicationMetricModeSchema,
+  examples: z.array(z.string()).optional(),
   idealMin: finiteNumber.optional(),
   idealMax: finiteNumber.optional(),
   goodMin: finiteNumber.optional(),
