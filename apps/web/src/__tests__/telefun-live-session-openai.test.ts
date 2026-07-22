@@ -772,6 +772,7 @@ describe("LiveSession OpenAI browser runtime", () => {
       .slice(sentBeforeDisconnect)
       .map((raw) => JSON.parse(raw));
     expect(disconnectEvents).toEqual([
+      { type: "response.cancel" },
       { type: "session_end_request", reason: "user" },
     ]);
     socket.receive({
@@ -780,6 +781,37 @@ describe("LiveSession OpenAI browser runtime", () => {
     });
     await disconnect;
     expect((session as any).openAiPlaybackSegments).toEqual([]);
+    vi.useRealTimers();
+  });
+
+  it("sends response.cancel only once when OpenAI disconnect is requested twice", async () => {
+    vi.useFakeTimers();
+    const session = new LiveSession(createOpenAiConfig());
+    sessions.push(session);
+    vi.spyOn(session as any, "stopRecordingOnce").mockImplementation(
+      () => undefined,
+    );
+    await session.connect("access-token");
+    const socket = sockets[0];
+    socket.open();
+    socket.receive({ type: "auth_ok", sessionId: "session-openai-duplicate" });
+    socket.receive({
+      type: "telefun_session_configured",
+      modelId: "gpt-realtime-2.1-mini",
+      transport: "openai-audio",
+    });
+
+    const first = session.disconnect("user");
+    const second = session.disconnect("user");
+    expect(second).toBe(first);
+    expect(
+      socket.sent
+        .map((raw) => JSON.parse(raw))
+        .filter((event) => event.type === "response.cancel"),
+    ).toHaveLength(1);
+
+    socket.receive({ type: "session_end_complete", outcome: "turn_complete" });
+    await first;
     vi.useRealTimers();
   });
 

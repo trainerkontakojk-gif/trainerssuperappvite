@@ -37,6 +37,11 @@ Ikuti hierarki instruksi dan urutan kerja di [`docs/AGENT_WORKFLOW.md`](docs/AGE
 - **ECC specialized agents**: planner (kompleks/refactoring), tdd-guide (bug/fitur baru), architect (system design), code-reviewer (post-code), security-reviewer, build-error-resolver, docs-lookup (Context7), loop-operator.
 - Instruksi ke subagent WAJIB sertakan konteks monorepo (`apps/web`, `apps/api`, `packages/types`).
 
+### Kode — Wajib Semua Perubahan Kode Non-Docs
+
+- **Thermo Nuclear Code Quality Review** (`thermo-nuclear-code-quality-review`) — Quality gate: WAJIB di-load/dijalankan **setelah implementasi** (dan setelah UI audit bila berlaku), **sebelum verifikasi final/PR** untuk setiap perubahan kode.
+- Temuan material (bug, security flaw, arsitektur salah) WAJIB diperbaiki, lalu review/check terkait diulang. Docs-only/config sederhana boleh skip.
+
 ### UI/UX — Wajib Semua Perubahan Tampilan
 
 Dua skill saling melengkapi:

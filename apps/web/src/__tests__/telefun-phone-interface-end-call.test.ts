@@ -110,6 +110,8 @@ describe("PhoneInterface end-call finalization", () => {
     expect(session.disconnect).toHaveBeenCalledTimes(1);
     expect(onEndSession).not.toHaveBeenCalled();
     expect(endButton).toBeDisabled();
+    expect(screen.getByText("Mengakhiri...")).not.toHaveClass("hidden");
+    expect(screen.getByText("Mengakhiri panggilan...")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Aktifkan hold" }),
     ).toBeDisabled();
@@ -121,6 +123,21 @@ describe("PhoneInterface end-call finalization", () => {
     });
 
     expect(onEndSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("menampilkan label Hangup pada mobile saat panggilan aktif", async () => {
+    render(
+      React.createElement(PhoneInterface, {
+        config,
+        accessToken: "test-access-token",
+        onEndSession: vi.fn(),
+        onRecordingReady: vi.fn(),
+      }),
+    );
+
+    await waitFor(() => expect(liveSessionState.instances).toHaveLength(1));
+
+    expect(screen.getByText("Hangup")).not.toHaveClass("hidden");
   });
 
   it("timeout dan klik user tetap memakai satu disconnect", async () => {

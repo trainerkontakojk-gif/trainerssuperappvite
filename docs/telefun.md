@@ -251,11 +251,13 @@ apps/telefun/
    a. User klik "Tutup" → kirim session_end_request
    b. Proxy tunggu AI selesai bicara (drain: 2s quiet atau 10s hard limit)
    c. Session difinalisasi → transcript disimpan → usage dicatat
+   d. Frontend kembali ke home setelah penyimpanan rekaman/remux selesai; scoring tidak memblokir navigasi dan memperbarui riwayat saat hasil tersedia
         │
-6. SCORING (background):
-   a. Worker ambil session → analisis voice quality (AI)
-   b. Hitung hold assessment
-   c. Simpan score, feedback, voice assessment
+6. SCORING (background dari perspektif UI):
+   a. Setelah home tampil, frontend memicu endpoint scoring yang melakukan atomic claim
+   b. Worker menangani job queued/retry yang belum diklaim jalur frontend
+   c. Analisis voice quality (AI) + hitung hold assessment
+   d. Simpan score, feedback, voice assessment
         │
 7. REVIEW:
    Buka history → lihat transcript, score, voice radar, komunikasi profil
@@ -385,8 +387,9 @@ Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di
 
 ### Setelah Panggilan
 
-1. **Loading** — Scoring berjalan di background (beberapa detik)
-2. **Review** — Buka history, klik sesi untuk lihat:
+1. **Kembali ke home** — Pengguna tidak perlu menunggu scoring untuk melanjutkan workflow.
+2. **Loading** — Scoring berjalan di background (beberapa detik) dan hasilnya menyegarkan record sesi.
+3. **Review** — Buka history, klik sesi untuk lihat:
    - Transcript lengkap
    - Voice assessment (radar chart)
    - Score & feedback
@@ -487,11 +490,11 @@ Semua route membutuhkan role `admin` atau `trainer`.
 
 ### Proxy Server (apps/telefun)
 
-| Endpoint       | Type      | Deskripsi                        |
-| -------------- | --------- | -------------------------------- |
-| `/health`      | HTTP      | Health check (uptime, timestamp) |
-| `/internal/telefun/scoring` | HTTP | Assessment OpenAI internal; bearer token, tanpa CORS |
-| `/` atau `/ws` | WebSocket | Koneksi real-time dengan Gemini  |
+| Endpoint                    | Type      | Deskripsi                                            |
+| --------------------------- | --------- | ---------------------------------------------------- |
+| `/health`                   | HTTP      | Health check (uptime, timestamp)                     |
+| `/internal/telefun/scoring` | HTTP      | Assessment OpenAI internal; bearer token, tanpa CORS |
+| `/` atau `/ws`              | WebSocket | Koneksi real-time dengan Gemini                      |
 
 #### WebSocket Protocol (Client → Proxy → Gemini)
 
@@ -672,9 +675,9 @@ request server-to-server terautentikasi.
 
 ## 📄 Dokumen Terkait
 
-| Dokumen                                             | Isi                                                     |
-| --------------------------------------------------- | ------------------------------------------------------- |
+| Dokumen                                                            | Isi                                                                     |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | [`TELEFUN_ASSESSMENT_CONTRACT.md`](TELEFUN_ASSESSMENT_CONTRACT.md) | Kontrak penilaian suara: skala, target sistem, status, radar, staleness |
-| [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md)            | Workflow pengembangan untuk AI agent                    |
-| [`architecture.md`](architecture.md)                | Arsitektur monorepo dan modul                           |
-| [`deployment.md`](deployment.md)                    | Konfigurasi deployment Railway                          |
+| [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md)                           | Workflow pengembangan untuk AI agent                                    |
+| [`architecture.md`](architecture.md)                               | Arsitektur monorepo dan modul                                           |
+| [`deployment.md`](deployment.md)                                   | Konfigurasi deployment Railway                                          |

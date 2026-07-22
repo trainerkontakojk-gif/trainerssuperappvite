@@ -104,4 +104,42 @@ describe("Telefun local history parsing", () => {
       loadHistorySource.indexOf("localHistoryIsCorruptRef.current"),
     ).toBeLessThan(loadHistorySource.indexOf("await getTelefunSessions"));
   });
+
+  it("navigates home before starting background scoring", () => {
+    const handlerStart = landingSource.indexOf("const handleRecordingReady");
+    const handlerEnd = landingSource.indexOf(
+      "const handleDeleteSession",
+      handlerStart,
+    );
+    const handlerSource = landingSource.slice(handlerStart, handlerEnd);
+
+    const navigateHomeIndex = handlerSource.indexOf('setView("home")');
+    const startScoringIndex = handlerSource.indexOf("scoreTelefunSession");
+
+    expect(navigateHomeIndex).toBeGreaterThanOrEqual(0);
+    expect(startScoringIndex).toBeGreaterThan(navigateHomeIndex);
+  });
+
+  it("captures the usage run and baseline before background scoring can finish", () => {
+    const handlerStart = landingSource.indexOf("const handleRecordingReady");
+    const handlerEnd = landingSource.indexOf(
+      "const handleDeleteSession",
+      handlerStart,
+    );
+    const handlerSource = landingSource.slice(handlerStart, handlerEnd);
+    const scoringIndex = handlerSource.indexOf("scoreTelefunSession");
+
+    expect(handlerSource).toContain(
+      "const usageRunIdAtEndCall = sessionRunIdRef.current",
+    );
+    expect(handlerSource).toContain(
+      "const usageBaselineAtEndCall = sessionBaselineRef.current",
+    );
+    expect(
+      handlerSource.indexOf("const usageRunIdAtEndCall"),
+    ).toBeLessThan(scoringIndex);
+    expect(
+      handlerSource.indexOf("const usageBaselineAtEndCall"),
+    ).toBeLessThan(scoringIndex);
+  });
 });

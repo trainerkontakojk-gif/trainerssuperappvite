@@ -502,7 +502,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   let statusTextColor = "text-gray-400";
   let statusBorder = "border-white/5";
 
-  if (isOnHold) {
+  if (isDisconnecting) {
+    statusText = "Mengakhiri panggilan...";
+    statusBg = "bg-red-900/40";
+    statusTextColor = "text-red-400";
+    statusBorder = "border-red-500/30";
+  } else if (isOnHold) {
     statusText = "Panggilan di-HOLD";
     statusBg = "bg-yellow-900/40";
     statusTextColor = "text-yellow-400";
@@ -734,7 +739,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             <PhoneOff className="h-8 w-8 md:h-9 md:w-9" />
           </button>
           <span
-            className={`text-[10px] uppercase font-bold tracking-wider hidden md:block ${
+            className={`block text-xs uppercase font-bold tracking-wider ${
               isDisconnecting ? "text-red-400" : "text-red-500/70"
             }`}
           >

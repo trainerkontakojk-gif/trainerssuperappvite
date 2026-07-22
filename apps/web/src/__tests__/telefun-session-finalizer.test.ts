@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { finalizeTelefunSession } from "../routes/telefun/sessionFinalizer";
+import {
+  finalizeTelefunSession,
+  saveTelefunSession,
+  scoreTelefunSession,
+} from "../routes/telefun/sessionFinalizer";
 import type {
   SessionMetrics,
   TelefunScoreResult,
@@ -26,6 +30,14 @@ function baseMetrics(): SessionMetrics {
     inputTranscriptionChunks: [],
     sessionDurationMs: 12000,
   };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 describe("Telefun Session Finalizer", () => {
@@ -519,5 +531,63 @@ describe("Telefun Session Finalizer", () => {
     expect(metricsPatch).toBeDefined();
     expect(metricsPatch?.session_metrics?.hold).toBeDefined();
     expect(metricsPatch?.session_metrics?.hold?.count).toBe(1);
+  });
+
+  it("resolves save/remux before a deferred scoring phase completes", async () => {
+    const scoring = createDeferred<TelefunScoreResult>();
+    const scoreSession = vi.fn(() => scoring.promise);
+
+    const saved = await saveTelefunSession({
+      sessionId: "session-post-navigation",
+      fullBlob: null,
+      agentBlob: new Blob(["agent"]),
+      duration: 15,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(
+          async () => "user-1/session-post-navigation/agent_only.webm",
+        ),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        remuxRecording: vi.fn(async () => ({
+          success: true,
+          data: { remuxed: true, recordings: {} },
+        })),
+        scoreSession,
+      },
+    });
+
+    let scoringResolved = false;
+    const scoringPromise = scoreTelefunSession({
+      sessionId: "session-post-navigation",
+      agentRecordingPath: saved.agentRecordingPath,
+      dependencies: {
+        scoreSession,
+        patchSession: vi.fn(async () => {}),
+      },
+    }).then((result) => {
+      scoringResolved = true;
+      return result;
+    });
+
+    await Promise.resolve();
+    expect(saved.record.score).toBe(0);
+    expect(scoreSession).toHaveBeenCalledTimes(1);
+    expect(scoringResolved).toBe(false);
+
+    scoring.resolve({
+      score: 8,
+      feedback: "Bagus",
+      assessment: mockAssessment,
+    });
+    await expect(scoringPromise).resolves.toMatchObject({
+      scoringStatus: "succeeded",
+      score: 8,
+    });
   });
 });

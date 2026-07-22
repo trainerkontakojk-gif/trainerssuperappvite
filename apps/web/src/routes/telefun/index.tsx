@@ -19,7 +19,11 @@ import {
   shouldPersistTelefunLocalHistory,
 } from "./telefunLocalHistory";
 import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
-import { finalizeTelefunSession } from "./sessionFinalizer";
+import {
+  saveTelefunSession,
+  scoreTelefunSession,
+  type SavedTelefunSession,
+} from "./sessionFinalizer";
 import {
   pollUsageDelta,
   formatUsageDeltaLabel,
@@ -310,20 +314,22 @@ export default function TelefunLanding() {
     const finalSessionId = sessionId || `offline-${Date.now()}`;
     const optimisticId = optimisticRecordIdRef.current || finalSessionId;
     optimisticRecordIdRef.current = optimisticId;
+    let savedSession: SavedTelefunSession | null = null;
 
     try {
-      const { record, scoringStatus, saveFailed, uploadFailed } =
-        await finalizeTelefunSession({
-          sessionId: finalSessionId,
-          fullBlob,
-          agentBlob,
-          duration,
-          metrics,
-          localUrl: url,
-          sessionConfig,
-          scenarioTitle: finalScenario?.title || "Custom",
-          consumerName,
-        });
+      savedSession = await saveTelefunSession({
+        sessionId: finalSessionId,
+        fullBlob,
+        agentBlob,
+        duration,
+        metrics,
+        localUrl: url,
+        sessionConfig,
+        scenarioTitle: finalScenario?.title || "Custom",
+        consumerName,
+      });
+
+      const { record, saveFailed, uploadFailed } = savedSession;
 
       if (saveFailed) {
         notify.error(
@@ -334,10 +340,6 @@ export default function TelefunLanding() {
 
       if (uploadFailed) {
         notify.warning("Rekaman gagal diunggah, tetapi sesi tetap tersimpan.");
-      }
-
-      if (scoringStatus === "failed") {
-        notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
       }
 
       setHistory((prev) => {
@@ -384,43 +386,104 @@ export default function TelefunLanding() {
       setActiveAccessToken(null);
     }
 
-    const runId = sessionRunIdRef.current;
-    const baseline = sessionBaselineRef.current;
+    // Snapshot the completed run before background scoring yields. A new call may
+    // replace these refs before the older scoring request finishes.
+    const usageRunIdAtEndCall = sessionRunIdRef.current;
+    const usageBaselineAtEndCall = sessionBaselineRef.current;
 
-    if (baseline && runId === sessionRunIdRef.current) {
-      setSessionDeltaPending(true);
-      pollUsageDelta(() => fetchUsageSummary("telefun"), baseline)
-        .then((delta) => {
-          if (runId === sessionRunIdRef.current) {
-            setSessionDelta(delta);
-            if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
-              const format = (v: number) =>
-                v.toLocaleString("id-ID", {
-                  style: "currency",
-                  currency: "IDR",
-                  minimumFractionDigits: 0,
-                });
-              const parts = [`Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`];
-              const sim = delta.breakdown.simulation;
-              const rev = delta.breakdown.review;
+    const startUsagePolling = () => {
+      const runId = usageRunIdAtEndCall;
+      const baseline = usageBaselineAtEndCall;
 
-              if (sim.costIdr > 0 || sim.calls > 0) {
-                parts.push(`Simulasi ${format(sim.costIdr)}`);
+      if (baseline && runId === sessionRunIdRef.current) {
+        setSessionDeltaPending(true);
+        pollUsageDelta(() => fetchUsageSummary("telefun"), baseline)
+          .then((delta) => {
+            if (runId === sessionRunIdRef.current) {
+              setSessionDelta(delta);
+              if (delta && (delta.costIdr > 0 || delta.totalTokens > 0)) {
+                const format = (v: number) =>
+                  v.toLocaleString("id-ID", {
+                    style: "currency",
+                    currency: "IDR",
+                    minimumFractionDigits: 0,
+                  });
+                const parts = [
+                  `Biaya sesi ini: ${formatUsageDeltaLabel(delta)}`,
+                ];
+                const sim = delta.breakdown.simulation;
+                const rev = delta.breakdown.review;
+
+                if (sim.costIdr > 0 || sim.calls > 0) {
+                  parts.push(`Simulasi ${format(sim.costIdr)}`);
+                }
+                if (rev.costIdr > 0 || rev.calls > 0) {
+                  parts.push(`Penilaian AI ${format(rev.costIdr)}`);
+                }
+                notify.success(parts.join(" | "));
               }
-              if (rev.costIdr > 0 || rev.calls > 0) {
-                parts.push(`Penilaian AI ${format(rev.costIdr)}`);
-              }
-              notify.success(parts.join(" | "));
             }
-          }
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (runId === sessionRunIdRef.current) {
+              setSessionDeltaPending(false);
+            }
+          });
+      }
+    };
+
+    const savedSessionForScoring =
+      savedSession && !savedSession.saveFailed ? savedSession : null;
+    const scoringTask = savedSessionForScoring?.agentRecordingPath
+      ? scoreTelefunSession({
+          sessionId: finalSessionId,
+          agentRecordingPath: savedSessionForScoring.agentRecordingPath,
         })
-        .catch(() => {})
-        .finally(() => {
-          if (runId === sessionRunIdRef.current) {
-            setSessionDeltaPending(false);
-          }
-        });
-    }
+          .then((scoring) => {
+            if (scoring.scoringStatus === "failed") {
+              notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
+              return;
+            }
+            if (scoring.scoringStatus !== "succeeded") return;
+
+            const scoredRecord: CallRecord = {
+              ...savedSessionForScoring.record,
+              score: scoring.score ?? 0,
+              feedback: scoring.feedback,
+              voiceAssessment: scoring.voiceAssessment,
+            };
+            setHistory((prev) => {
+              const updated = prev.map((record) =>
+                record.id === finalSessionId || record.id === optimisticId
+                  ? scoredRecord
+                  : record,
+              );
+              if (
+                canOverwriteTelefunLocalHistory(
+                  localHistoryIsCorruptRef.current,
+                )
+              ) {
+                localStorage.setItem(
+                  "telefun_history",
+                  JSON.stringify(updated),
+                );
+              }
+              return updated;
+            });
+            setReviewRecord((previous) =>
+              previous?.id === finalSessionId || previous?.id === optimisticId
+                ? scoredRecord
+                : previous,
+            );
+          })
+          .catch((err) => {
+            console.error("Background Telefun scoring failed:", err);
+            notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
+          })
+      : Promise.resolve();
+
+    void scoringTask.finally(startUsagePolling).catch(() => {});
   };
 
   const handleDeleteSession = async (id: string) => {

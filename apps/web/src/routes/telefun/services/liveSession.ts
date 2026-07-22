@@ -117,6 +117,7 @@ export class LiveSession {
   private lastModelActivityMs: number = 0;
   private readonly STALLED_RESPONSE_START_MS = 20000;
   private readonly STALLED_RESPONSE_MID_MS = 25000;
+  private readonly RECORDING_FINALIZATION_TIMEOUT_MS = 10_000;
 
   private intentionalClose = false;
   private hasStoppedRecording = false;
@@ -768,7 +769,14 @@ export class LiveSession {
     sampleRate = 24000,
     openAiOwner?: OpenAiPlaybackOwner,
   ) {
-    if (!this.audioContext || !this.recordingDestination || this.isHeld) return;
+    if (
+      !this.audioContext ||
+      !this.recordingDestination ||
+      this.isHeld ||
+      this.intentionalClose
+    ) {
+      return;
+    }
 
     const float32 = new Float32Array(data.length / 2);
     const view = new DataView(data.buffer);
@@ -1033,10 +1041,20 @@ export class LiveSession {
     reason: "user" | "timeout" | "cleanup",
   ): Promise<void> {
     if (this.intentionalClose) return;
+    const recordingFinalizationDeadline =
+      Date.now() + this.RECORDING_FINALIZATION_TIMEOUT_MS;
     this.intentionalClose = true;
     this.clearSetupTimeout();
     this.stopStalledWatchdog();
     this.clearAiPlayback("disconnect");
+
+    if (
+      this.ws?.readyState === WebSocket.OPEN &&
+      this.hasConfigured &&
+      this.config.telefunTransport === "openai-audio"
+    ) {
+      this.ws.send(JSON.stringify(buildOpenAiResponseCancel()));
+    }
 
     // Stop sending audio
     this.stopRecordingOnce();
@@ -1079,8 +1097,22 @@ export class LiveSession {
     this.cleanupAudio();
     this.emitTimelineEvent("disconnect", { reason });
 
-    // Wait for recording finalization before resolving.
-    await this.recordingFinalizationPromise.catch(() => {});
+    // Drain and recording finalization share one end-call budget. Starting a new
+    // timeout here would make the worst case 5s drain + 10s callback wait.
+    const remainingFinalizationMs = Math.max(
+      0,
+      recordingFinalizationDeadline - Date.now(),
+    );
+    if (remainingFinalizationMs === 0) return;
+
+    let finalizationTimeout: ReturnType<typeof setTimeout> | null = null;
+    await Promise.race([
+      this.recordingFinalizationPromise.catch(() => {}),
+      new Promise<void>((resolve) => {
+        finalizationTimeout = setTimeout(resolve, remainingFinalizationMs);
+      }),
+    ]);
+    if (finalizationTimeout) clearTimeout(finalizationTimeout);
   }
 
   private stopRecordingOnce() {
@@ -1105,6 +1137,7 @@ export class LiveSession {
       this.resolveRecordingFinalization = resolve;
     });
 
+    // Give MediaRecorder onstop handlers time to flush their final chunks before building blobs.
     setTimeout(() => {
       this.emitRecording();
     }, 500);

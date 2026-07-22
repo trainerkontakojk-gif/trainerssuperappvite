@@ -279,6 +279,90 @@ describe("LiveSession AI playback lifecycle", () => {
     expect(session.nextStartTime).toBe(0);
   });
 
+  it("does not create new audio sources after intentional disconnect starts", () => {
+    const session = new LiveSession(createMockConfig()) as unknown as Record<
+      string,
+      unknown
+    >;
+    const { ctx, sources } = createMockAudio();
+
+    session.audioContext = ctx;
+    session.recordingDestination = {};
+    session.activeSources = new Set();
+    session.intentionalClose = true;
+
+    (
+      session as unknown as { playPcm: (d: Uint8Array, r: number) => void }
+    ).playPcm(makePcmData([10000, -10000]), 24000);
+
+    expect(sources).toHaveLength(0);
+    expect((session.activeSources as Set<unknown>).size).toBe(0);
+  });
+
+  it("does not play Gemini model-turn audio received during disconnect drain", () => {
+    const session = new LiveSession(createMockConfig()) as unknown as Record<
+      string,
+      unknown
+    >;
+    const { ctx, sources } = createMockAudio();
+
+    session.audioContext = ctx;
+    session.recordingDestination = {};
+    session.activeSources = new Set();
+    session.hasAuthenticated = true;
+    session.hasConfigured = true;
+    session.intentionalClose = true;
+
+    (
+      session as unknown as {
+        handleJsonMessage: (msg: Record<string, unknown>) => void;
+      }
+    ).handleJsonMessage({
+      serverContent: {
+        modelTurn: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: "audio/pcm;rate=24000",
+                data: Buffer.from(makePcmData([10000, -10000])).toString(
+                  "base64",
+                ),
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(sources).toHaveLength(0);
+  });
+
+  it("stops audio that was already buffered when disconnect starts", async () => {
+    const session = new LiveSession(createMockConfig()) as unknown as Record<
+      string,
+      unknown
+    >;
+    const { ctx, sources } = createMockAudio();
+
+    session.audioContext = ctx;
+    session.recordingDestination = {};
+    session.activeSources = new Set();
+    session.cleanupAudio = vi.fn();
+    session.stopRecordingOnce = vi.fn();
+
+    (
+      session as unknown as { playPcm: (d: Uint8Array, r: number) => void }
+    ).playPcm(makePcmData([10000, -10000]), 24000);
+    expect(sources).toHaveLength(1);
+
+    await (
+      session as unknown as { disconnect: (reason: "user") => Promise<void> }
+    ).disconnect("user");
+
+    expect(sources[0].stop).toHaveBeenCalledTimes(1);
+    expect((session.activeSources as Set<unknown>).size).toBe(0);
+  });
+
   it("setHold(true) clears active/queued AI playback so hold does not leak old audio", () => {
     const session = new LiveSession(createMockConfig()) as unknown as Record<
       string,
