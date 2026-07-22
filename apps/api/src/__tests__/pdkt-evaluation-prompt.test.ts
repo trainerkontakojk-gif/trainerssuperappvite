@@ -146,8 +146,8 @@ describe("buildPdktEvaluationPrompt", () => {
 
   it("keeps required evaluation instructions after compacting large data", () => {
     const { systemInstruction, prompt } = buildPdktEvaluationPrompt({
-      inboundEmailBody: "K".repeat(50_000),
-      agentReplyBody: "B".repeat(50_000),
+      inboundEmailBody: "K".repeat(100_000),
+      agentReplyBody: "B".repeat(100_000),
       scenarioTitle: "S".repeat(500),
       scenarioCategory: "C".repeat(500),
     });

@@ -9,7 +9,7 @@ Remediasi ini menutup trust-boundary, output validation, scoring, prompt-budget,
 ### Prompt boundary dan budget
 
 - Data dinamis generasi dan evaluasi diserialisasi serta di-escape (`<`, `>`, `&`, U+2028, dan U+2029) di dalam blok berlabel data-only. Scenario, persona konsumen, identity, recipient metadata, inbound body, agent reply, dan revision requirements tidak lagi diinterpolasi sebagai instruksi.
-- Prompt memiliki hard ceiling 100.000 karakter. Aplikasi memakai budget efektif 99.488 karakter dengan reserve 512 karakter untuk adapter provider; compaction hanya memotong nilai data dinamis dan mempertahankan instruksi serta format output.
+- Prompt memiliki hard ceiling 200.000 karakter. Aplikasi memakai budget efektif 199.488 karakter dengan reserve 512 karakter untuk adapter provider; compaction hanya memotong nilai data dinamis dan mempertahankan instruksi serta format output.
 - Prompt-specific limits diterapkan pada route generate template, session init/create, evaluate, mailbox batch, dan mailbox reply. Attachment/base64 tidak dimasukkan ke data prompt, sedangkan schema attachment dan persisted snapshot legacy tetap tidak dibatasi oleh kontrak prompt baru.
 
 ### Output, scoring, dan kompatibilitas

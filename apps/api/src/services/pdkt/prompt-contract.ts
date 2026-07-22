@@ -1,4 +1,4 @@
-export const PDKT_PROMPT_BUDGET = 100_000;
+export const PDKT_PROMPT_BUDGET = 200_000;
 // Covers the longest known provider adaptation: Gemini fallback boundary
 // markers plus OpenRouter/DeepSeek's JSON-only system suffix. Keep prompt
 // assembly below the hard ceiling before it reaches a provider adapter.

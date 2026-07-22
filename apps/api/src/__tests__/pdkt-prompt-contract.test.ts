@@ -333,8 +333,8 @@ describe("PDKT prompt serialization and budget helpers", () => {
     ).toThrow(/JSON biasa|plain JSON/i);
   });
 
-  it("enforces a 100,000-character assembled prompt budget", () => {
-    expect(PDKT_PROMPT_BUDGET).toBe(100_000);
+  it("enforces a 200,000-character assembled prompt budget", () => {
+    expect(PDKT_PROMPT_BUDGET).toBe(200_000);
     expect(PDKT_PROVIDER_ADAPTER_OVERHEAD_RESERVE).toBeGreaterThanOrEqual(512);
     expect(PDKT_APPLICATION_PROMPT_BUDGET).toBe(
       PDKT_PROMPT_BUDGET - PDKT_PROVIDER_ADAPTER_OVERHEAD_RESERVE,
@@ -345,7 +345,7 @@ describe("PDKT prompt serialization and budget helpers", () => {
         "s".repeat(60_000),
         "p".repeat(PDKT_APPLICATION_PROMPT_BUDGET - 60_000 + 1),
       ),
-    ).toThrow(/99488|efektif/i);
+    ).toThrow(/199488|efektif/i);
     expect(
       PDKT_APPLICATION_PROMPT_BUDGET +
         PDKT_PROVIDER_ADAPTER_OVERHEAD_RESERVE,
