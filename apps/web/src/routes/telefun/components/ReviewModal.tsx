@@ -17,7 +17,6 @@ import type {
   TelefunCoachingSummary,
   TelefunReplayAnnotation,
 } from "@trainers/types";
-import type { VoiceDashboardMetrics } from "../services/reviewTypes";
 import { VoiceAssessmentSection } from "./VoiceAssessmentSection";
 import type {
   ReplayAnnotationItem,
@@ -27,7 +26,6 @@ import { useApi } from "../../../hooks/useApi";
 import { telefunClient, unwrapResponse } from "../../../lib/api";
 import { notify } from "../../../lib/toast";
 
-const VoiceEvaluationDashboard = lazy(() => import("./VoiceEvaluationDashboard").then((module) => ({ default: module.VoiceEvaluationDashboard })));
 const ReplayAnnotator = lazy(() => import("./ReplayAnnotator").then((module) => ({ default: module.ReplayAnnotator })));
 
 interface ReviewModalProps {
@@ -43,7 +41,6 @@ interface ReviewModalProps {
 export type ReviewModalTab =
   | "details"
   | "assessment"
-  | "voice_dashboard"
   | "replay";
 
 function formatDuration(seconds: number): string {
@@ -89,12 +86,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   const [assessment, setAssessment] = useState<VoiceQualityAssessment | null>(
     record?.voiceAssessment ?? null,
   );
-  const [voiceDashboardMetrics, setVoiceDashboardMetrics] =
-    useState<VoiceDashboardMetrics | null>(
-      record?.voiceDashboardMetrics
-        ? (record.voiceDashboardMetrics as VoiceDashboardMetrics)
-        : null,
-    );
   const [retryTrigger, setRetryTrigger] = useState(0);
 
   const summaryPath =
@@ -133,11 +124,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       setActiveTab("details");
     }
     setAssessment(record.voiceAssessment ?? null);
-    setVoiceDashboardMetrics(
-      record.voiceDashboardMetrics
-        ? (record.voiceDashboardMetrics as VoiceDashboardMetrics)
-        : null,
-    );
     setRecordingError(null);
     setRecordingLoading(false);
 
@@ -204,11 +190,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     [coachingSummary],
   );
 
-  const effectiveVoiceMetrics =
-    voiceDashboardMetrics ??
-    (record?.voiceDashboardMetrics
-      ? (record.voiceDashboardMetrics as VoiceDashboardMetrics)
-      : null);
   const handleAssessmentUpdate = useCallback(
     (nextAssessment: VoiceQualityAssessment) => {
       setAssessment(nextAssessment);
@@ -330,22 +311,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 Kualitas Suara Agen
                 {activeTab === 'assessment' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
               </button>
-              <>
-                  <button
-                    onClick={() => setActiveTab('voice_dashboard')}
-                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'voice_dashboard' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
-                  >
-                    Evaluasi Suara
-                    {activeTab === 'voice_dashboard' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('replay')}
-                    className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'replay' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
-                  >
-                    Anotasi Replay
-                    {activeTab === 'replay' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
-                  </button>
-              </>
+              <button
+                onClick={() => setActiveTab('replay')}
+                className={`pb-3 px-2 text-sm font-bold tracking-tight transition-all relative whitespace-nowrap shrink-0 ${activeTab === 'replay' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                Anotasi Replay
+                {activeTab === 'replay' && <motion.div layoutId="tab-underline" className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-full" />}
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
@@ -482,26 +454,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                       onAssessmentUpdate={handleAssessmentUpdate}
                       transcript={record.transcript}
                     />
-                  </motion.div>
-                )}
-
-                {activeTab === 'voice_dashboard' && (
-                  <motion.div
-                    key="voice_dashboard"
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                  >
-                    <Suspense fallback={<div className="text-sm text-muted-foreground">Memuat evaluasi suara...</div>}>
-                      <VoiceEvaluationDashboard
-                        sessionId={record.id}
-                        metrics={effectiveVoiceMetrics}
-                        isLoading={false}
-                        error={undefined}
-                        notice={undefined}
-                        onRetry={() => {}}
-                      />
-                    </Suspense>
                   </motion.div>
                 )}
 
