@@ -119,6 +119,130 @@ describe("PDKT Mailbox Batch Route E2E", () => {
       });
     });
 
+    it("rejects an oversized inbound email body before calling the mailbox RPC", async () => {
+      await createAuthenticatedApp("trainer");
+      const res = await app.request("/api/v1/pdkt/mailbox/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_name: "Test Sender",
+          sender_email: "test@sender.com",
+          subject: "Welcome",
+          snippet: "Snippet",
+          scenario_snapshot: {
+            id: "s1",
+            title: "T",
+            description: "D",
+            category: "Sales",
+            isActive: true,
+          },
+          config_snapshot: {
+            scenarios: [],
+            consumerType: { id: "c1", name: "C", description: "D" },
+            identity: { name: "N", email: "E", city: "C", bodyName: "N" },
+          },
+          inbound_email: {
+            id: "e1",
+            from: "a@b.com",
+            to: "c@d.com",
+            subject: "S",
+            body: "x".repeat(50_001),
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("rejects a mailbox config snapshot with more than one scenario", async () => {
+      await createAuthenticatedApp("trainer");
+      const scenario = {
+        id: "s1",
+        title: "T",
+        description: "D",
+        category: "Sales",
+        isActive: true,
+      };
+      const res = await app.request("/api/v1/pdkt/mailbox/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_name: "Test Sender",
+          sender_email: "test@sender.com",
+          subject: "Welcome",
+          snippet: "Snippet",
+          scenario_snapshot: scenario,
+          config_snapshot: {
+            scenarios: [scenario, { ...scenario, id: "s2" }],
+            consumerType: { id: "c1", name: "C", description: "D" },
+            identity: { name: "N", email: "E", city: "C", bodyName: "N" },
+          },
+          inbound_email: {
+            id: "e1",
+            from: "a@b.com",
+            to: "c@d.com",
+            subject: "S",
+            body: "Valid body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("accepts a large attachment that is excluded from prompt limits", async () => {
+      await createAuthenticatedApp("trainer");
+      const attachment = `data:image/png;base64,${"A".repeat(60_000)}`;
+      const res = await app.request("/api/v1/pdkt/mailbox/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_name: "Test Sender",
+          sender_email: "test@sender.com",
+          subject: "Welcome",
+          snippet: "Snippet",
+          scenario_snapshot: {
+            id: "s1",
+            title: "T",
+            description: "D",
+            category: "Sales",
+            isActive: true,
+          },
+          config_snapshot: {
+            scenarios: [],
+            consumerType: { id: "c1", name: "C", description: "D" },
+            identity: { name: "N", email: "E", city: "C", bodyName: "N" },
+          },
+          inbound_email: {
+            id: "e1",
+            from: "a@b.com",
+            to: "c@d.com",
+            subject: "S",
+            body: "Valid body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+            attachments: [attachment],
+          },
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith(
+        "submit_pdkt_mailbox_batch",
+        expect.objectContaining({
+          p_inbound_email: expect.objectContaining({
+            attachments: [attachment],
+          }),
+        }),
+      );
+    });
+
     it("sanitizes 'function not found' error but logs it", async () => {
       await createAuthenticatedApp("trainer");
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

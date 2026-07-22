@@ -57,7 +57,13 @@ vi.mock("../lib/gemini", () => ({
     success: true,
     text: JSON.stringify({
       subject: "Test Subject",
-      body: "Ini adalah email penipuan yang sangat panjang dan detil, melanggar batas kata untuk memenuhi kriteria 500 kata. ".repeat(40),
+      body: Array.from(
+        { length: 5 },
+        () =>
+          "Ini adalah email penipuan yang sangat panjang dan detil untuk memenuhi kebijakan isi. ".repeat(
+            9,
+          ),
+      ).join("\n\n"),
     }),
   }),
 }));
@@ -99,6 +105,38 @@ afterEach(() => {
 });
 
 describe("PDKT Unified Session Create Route", () => {
+  it.each([
+    "/api/v1/pdkt/generate-template",
+    "/api/v1/pdkt/session/init",
+    "/api/v1/pdkt/session/create",
+  ])("rejects draft prompt fields above the prompt-specific request limit at %s", async (path) => {
+    await createAuthenticatedApp("trainer");
+    const res = await app.request(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioDraft: {
+          id: "pinjol",
+          category: "Pinjol",
+          title: "x".repeat(501),
+          description: "Keluhan",
+          isActive: true,
+          isLicensed: false,
+        },
+        consumerTypeId: "marah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it("orchestrates identity, email generation, image generation, and batch persistence atomically", async () => {
     await createAuthenticatedApp("trainer");
     const res = await app.request("/api/v1/pdkt/session/create", {

@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import {
-  pdktMailboxBatchSchema,
-  pdktMailboxReplySchema,
-  evaluateSchema,
+  pdktMailboxBatchPromptSchema,
+  pdktMailboxReplyPromptSchema,
+  evaluatePromptSchema,
   pdktMailboxBulkDeleteSchema,
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
@@ -41,7 +41,7 @@ mailbox.get(
 mailbox.post(
   "/batch",
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  zValidator("json", pdktMailboxBatchSchema),
+  zValidator("json", pdktMailboxBatchPromptSchema),
   async (c) => {
     const body = c.req.valid("json");
     const userClient = getUserClient(c);
@@ -118,7 +118,7 @@ mailbox.post(
 mailbox.post(
   "/reply",
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  zValidator("json", pdktMailboxReplySchema),
+  zValidator("json", pdktMailboxReplyPromptSchema),
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
@@ -169,7 +169,7 @@ mailbox.post(
   "/evaluate",
   requireRole("admin", "trainer", "leader"),
   aiRateLimitMiddleware,
-  zValidator("json", evaluateSchema),
+  zValidator("json", evaluatePromptSchema),
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");

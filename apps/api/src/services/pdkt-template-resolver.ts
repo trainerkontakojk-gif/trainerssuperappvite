@@ -9,7 +9,7 @@ import {
   UNLICENSED_COMPANY_NAMES,
 } from "./pdkt-company-names";
 import {
-  buildPdktEmailGenerationPolicy,
+  buildPdktIdentityRenderingPolicy,
   renderPdktIdentityByMentionPattern,
 } from "./pdkt-email-policy";
 
@@ -56,15 +56,7 @@ export function renderPdktConsumerName(
   identity: PdktIdentity,
   pattern: ResolvedConsumerNameMentionPattern,
 ): string {
-  const config = {
-    scenarios: [],
-    consumerType: {} as any,
-    identity,
-    enableImageGeneration: false,
-    resolvedConsumerNameMentionPattern: pattern,
-    writingStyleMode: "training" as const,
-  };
-  const policy = buildPdktEmailGenerationPolicy(config, {} as any, "template");
+  const policy = buildPdktIdentityRenderingPolicy(identity, pattern);
   const { body: resolvedBody } = renderPdktIdentityByMentionPattern(body, "", policy);
   return resolvedBody;
 }
@@ -87,15 +79,11 @@ export function resolvePdktTemplateBody(input: PdktTemplateResolutionInput) {
     company.name,
   );
 
-  const config = {
-    scenarios: [input.scenario],
-    consumerType: {} as any,
-    identity: input.identity,
-    enableImageGeneration: false,
-    resolvedConsumerNameMentionPattern: input.mentionPattern,
-    writingStyleMode: "training" as const,
-  };
-  const policy = buildPdktEmailGenerationPolicy(config, input.scenario, "template");
+  const policy = buildPdktIdentityRenderingPolicy(
+    input.identity,
+    input.mentionPattern,
+    input.scenario,
+  );
 
   const { subject, body } = renderPdktIdentityByMentionPattern(
     bodyWithCompany,

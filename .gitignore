@@ -28,6 +28,7 @@ opencode.json
 docs/superpowers/
 plan/
 .agents/
+.codex/
 skills-lock.json
 .hermes/
 

@@ -83,12 +83,19 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - DUMMY_PROFILES pool 20 identitas dengan 25 kota acak untuk variasi identitas konsumen.
   - Usage delta setelah evaluasi async di-retry hingga 2x (2s delay) untuk akurasi.
   - **DeepSeek direct**: Model `DeepSeek V4 Pro` dan `DeepSeek V4 Flash` tersedia di pengaturan PDKT jika `DEEPSEEK_API_KEY` diset di environment backend.
+  - **Prompt trust boundary**: Seluruh data dinamis untuk generasi dan evaluasi (skenario, persona konsumen, identitas, metadata penerima, email inbound, dan balasan agent) diserialisasi serta di-escape di dalam blok data-only. Teks di dalam blok tersebut tidak diperlakukan sebagai instruksi model.
+  - **Prompt contract**: Output AI untuk template, email awal, dan evaluasi wajib lolos strict Zod schema. Output evaluasi AI wajib memiliki lima dimensi `scoreBreakdown`, sementara `scoreBreakdown` pada histori tersimpan tetap opsional agar histori lama masih dapat dibaca.
+  - **Prompt budget**: Hard ceiling prompt adalah 100.000 karakter, dengan budget aplikasi efektif 99.488 karakter dan reserve adapter provider 512 karakter. Compaction hanya memotong nilai data dinamis; instruksi dan format output tidak dipotong.
+  - **Prompt ingress limits**: Schema berbatas diterapkan pada route generate template, inisialisasi/create session, evaluate, mailbox batch, dan mailbox reply. Attachment/base64 serta schema persisted legacy tetap tidak dibatasi oleh kontrak prompt karena attachment tidak diteruskan sebagai data prompt.
+  - **Kebijakan panjang**: Consumer dengan stable ID `terburu-buru` memakai 250-500 kata dan 3-5 paragraf; consumer lain memakai 500-1.000 kata dan 5-8 paragraf. Prompt, retry, dan final validation memakai policy yang sama.
+  - **Model dan usage**: Fallback model PDKT menggunakan `DEFAULT_AI_MODEL_ID` dari registry kanonikal. Mekanisme AI usage logging yang sudah ada tetap dipertahankan.
 - **Evaluasi AI (Single-Turn)**:
   - Prompt hanya menerima tepat satu email inbound konsumen dan satu balasan agent OJK 157.
-  - Seluruh body kedua email diteruskan ke prompt tanpa konteks thread tambahan.
+  - Body kedua email diteruskan sebagai data-only yang diserialisasi dan di-escape, tanpa konteks thread tambahan.
   - Input dengan jumlah atau komposisi pesan selain satu inbound dan satu balasan ditolak sebelum AI dipanggil.
   - Metadata panjang body dicatat via `console.debug` tanpa menyimpan isi email ke log.
-  - **Retry & JSON Contract**: Retry transient error (429/500/503/timeout) hingga 2x dengan delay 250/500ms tetap dipertahankan. Output JSON contract (`score`, `typos`, `clarityIssues`, `contentGaps`, `feedback`) tidak berubah.
+  - **Scoring deterministik**: Skor dasar dihitung backend sebagai pembulatan rata-rata berbobot setara dari lima dimensi (`recipientDirectionScore`, `normativeResponseScore`, `clarityScore`, `typoScore`, dan `templateComplianceScore`). Recipient conflict cap diterapkan sesudahnya; feedback mencatat cap hanya jika score atau dimensi arah penerima benar-benar berubah.
+  - **Retry & JSON Contract**: Retry transient error (429/500/503/timeout) hingga 2x dengan delay 250/500ms tetap dipertahankan. Response tersimpan tetap kompatibel dengan histori lama, tetapi output AI baru wajib membawa `scoreBreakdown` yang valid.
 
 ## 4. TELEFUN (Telephone Fun)
 

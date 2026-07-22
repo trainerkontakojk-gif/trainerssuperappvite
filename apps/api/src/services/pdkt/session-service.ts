@@ -7,15 +7,17 @@ import {
   type PdktAttachmentDiagnostics,
   WritingStyleMode,
   ResolvedConsumerNameMentionPattern,
+  pdktInitialEmailAiOutputSchema,
+  pdktTemplateAiOutputSchema,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { parseJsonFromModelText } from "../../lib/ai-json";
-import { resolveModelProvider } from "../../lib/ai-models";
+import { DEFAULT_AI_MODEL_ID } from "../../lib/ai-models";
 import { resolvePdktTemplateBody } from "../pdkt-template-resolver";
 import { generatePdktScenarioImages } from "./image-generation";
 import {
   buildPdktEmailGenerationPolicy,
-  buildPdktSystemInstruction,
+  buildPdktGenerationMessages,
   renderPdktIdentityByMentionPattern,
   validatePdktEmailPolicyCompliance,
   buildPdktRetryHint,
@@ -30,15 +32,51 @@ import {
   resolvePdktRecipientContext,
 } from "./recipient-targets";
 
-const PDKT_MIN_WORD_COUNT = 500;
-
-function getPdktWordCountPolicy(model: string) {
-  const provider = resolveModelProvider(model).provider;
+function getContentStats(body: string) {
   return {
-    provider,
-    retryLengthThreshold: PDKT_MIN_WORD_COUNT,
-    failureLengthThreshold: provider === "deepseek" ? 1 : PDKT_MIN_WORD_COUNT,
+    wordCount: body.split(/\s+/).filter(Boolean).length,
+    paragraphCount: body
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean).length,
   };
+}
+
+function getLengthViolations(
+  body: string,
+  policy: ReturnType<typeof buildPdktEmailGenerationPolicy>,
+): string[] {
+  const { wordCount, paragraphCount } = getContentStats(body);
+  const { minWords, maxWords, minParagraphs, maxParagraphs } =
+    policy.contentLength;
+  const violations: string[] = [];
+  if (wordCount < minWords || wordCount > maxWords) {
+    violations.push(
+      `Panjang isi harus ${minWords}-${maxWords} kata (aktual ${wordCount}).`,
+    );
+  }
+  if (paragraphCount < minParagraphs || paragraphCount > maxParagraphs) {
+    violations.push(
+      `Jumlah paragraf harus ${minParagraphs}-${maxParagraphs} (aktual ${paragraphCount}).`,
+    );
+  }
+  return violations;
+}
+
+function parseTemplateAiOutput(value: unknown) {
+  const parsed = pdktTemplateAiOutputSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("format output AI untuk template tidak valid.");
+  }
+  return parsed.data;
+}
+
+function parseInitialEmailAiOutput(value: unknown) {
+  const parsed = pdktInitialEmailAiOutputSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error("format output AI untuk email awal tidak valid.");
+  }
+  return parsed.data;
 }
 
 /**
@@ -79,17 +117,18 @@ export async function generateScenarioEmailTemplate(
     };
   }
 
-  const model = config.selectedModel || "gemini-3.1-flash-lite";
-  const wordCountPolicy = getPdktWordCountPolicy(model);
+  const model = config.selectedModel || DEFAULT_AI_MODEL_ID;
   const policy = buildPdktEmailGenerationPolicy(config, scenario, "template");
-  const systemInstruction = buildPdktSystemInstruction(policy, false);
-  const prompt = `Tulis template email pengaduan lengkap untuk skenario: ${scenario.title}. Deskripsi: ${scenario.description}. Karakter: ${config.consumerType.name}. PENTING: Template harus sangat panjang (500-1000 kata), terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;
 
-  const executeGeneration = async (retryPrompt?: string) => {
-    const finalPrompt = retryPrompt ? `${prompt}\n\nREVISI: ${retryPrompt}` : prompt;
+  const executeGeneration = async (revisionRequirements: string[] = []) => {
+    const { systemInstruction, prompt } = buildPdktGenerationMessages(
+      policy,
+      false,
+      revisionRequirements,
+    );
     const response = await callAI({
       model,
-      prompt: finalPrompt,
+      prompt,
       systemInstruction,
       responseMimeType: "application/json",
       usageContext,
@@ -98,11 +137,13 @@ export async function generateScenarioEmailTemplate(
 
     if (!response.success) throw new Error(response.error || "Gagal generate template.");
     const responseText = response.text || "{}";
-    const jsonResponse = parseJsonFromModelText(responseText);
+    const jsonResponse = parseTemplateAiOutput(
+      parseJsonFromModelText(responseText),
+    );
 
     const resolved = resolvePdktTemplateBody({
       subject: jsonResponse.subject || "",
-      body: jsonResponse.body || "",
+      body: jsonResponse.body,
       scenario,
       identity: config.identity,
       mentionPattern: config.resolvedConsumerNameMentionPattern,
@@ -110,15 +151,15 @@ export async function generateScenarioEmailTemplate(
 
     const subject = normalizeSubject(resolved.subject) || resolved.subject;
     const body = resolved.body;
-    const wordCount = body.split(/\s+/).filter(Boolean).length;
     const violations = validatePdktEmailPolicyCompliance({ subject, body }, policy);
+    const lengthViolations = getLengthViolations(body, policy);
 
     return {
       subject,
       body,
-      wordCount,
       leftoverPlaceholders: resolved.leftoverPlaceholders,
       violations,
+      lengthViolations,
     };
   };
 
@@ -127,16 +168,12 @@ export async function generateScenarioEmailTemplate(
 
     if (
       result.leftoverPlaceholders.length > 0 ||
-      result.wordCount < wordCountPolicy.retryLengthThreshold ||
+      result.lengthViolations.length > 0 ||
       result.violations.length > 0
     ) {
       const placeholderHint =
         result.leftoverPlaceholders.length > 0
           ? `Template sebelumnya masih mengandung placeholder ${result.leftoverPlaceholders.join(", ")}. Ganti semuanya dengan teks konkret tanpa tanda kurung siku atau kurung kurawal.`
-          : "";
-      const lengthHint =
-        result.wordCount < wordCountPolicy.retryLengthThreshold
-          ? "Template sebelumnya terlalu pendek. Buat jauh lebih panjang, detail, dan bertele-tele (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
           : "";
       const violationHint =
         result.violations.length > 0
@@ -145,7 +182,11 @@ export async function generateScenarioEmailTemplate(
 
       try {
         result = await executeGeneration(
-          [placeholderHint, lengthHint, violationHint].filter(Boolean).join(" "),
+          [
+            placeholderHint,
+            ...result.lengthViolations,
+            violationHint,
+          ].filter(Boolean),
         );
       } catch (err) {
         console.warn("[PDKT] Template retry failed, using first attempt:", err);
@@ -159,10 +200,10 @@ export async function generateScenarioEmailTemplate(
       };
     }
 
-    if (result.wordCount < wordCountPolicy.failureLengthThreshold) {
+    if (result.lengthViolations.length > 0) {
       return {
         success: false,
-        error: "Hasil template terlalu pendek. Silakan klik Generate ulang untuk mencoba lagi.",
+        error: "Hasil template terlalu pendek/panjang atau jumlah paragraf belum sesuai. Silakan klik Generate ulang untuk mencoba lagi.",
       };
     }
 
@@ -257,22 +298,21 @@ export async function initializeEmailSession(
   // AI Generation Flow
   const customAttachments: string[] = scenario.attachmentImages || [];
   const hasCustomImages = customAttachments.length > 0;
-  const model = config.selectedModel || "gemini-3.1-flash-lite";
-  const wordCountPolicy = getPdktWordCountPolicy(model);
+  const model = config.selectedModel || DEFAULT_AI_MODEL_ID;
   const policy = buildPdktEmailGenerationPolicy(
     configWithRecipientContext,
     scenario,
     "initial_email",
   );
-  const systemInstruction = buildPdktSystemInstruction(policy, hasCustomImages);
-
-  const prompt = `Tulis email pengaduan pertama Anda sekarang. Masalah: ${scenario.title}. Karakter: ${config.consumerType.name}. PENTING: Email harus 500-1000 kata, terdiri dari 5-8 paragraf terpisah (gunakan \\n\\n antar paragraf). Jangan tulis dalam 1 paragraf saja.`;
-
-  const executeSessionGeneration = async (retryPrompt?: string) => {
-    const finalPrompt = retryPrompt ? `${prompt}\n\nREVISI: ${retryPrompt}` : prompt;
+  const executeSessionGeneration = async (revisionRequirements: string[] = []) => {
+    const { systemInstruction, prompt } = buildPdktGenerationMessages(
+      policy,
+      hasCustomImages,
+      revisionRequirements,
+    );
     const response = await callAI({
       model,
-      prompt: finalPrompt,
+      prompt,
       systemInstruction,
       responseMimeType: "application/json",
       usageContext: { module: "pdkt", action: "init_email" },
@@ -284,23 +324,25 @@ export async function initializeEmailSession(
     }
 
     const responseText = response.text || "{}";
-    const jsonResponse = parseJsonFromModelText(responseText);
+    const jsonResponse = parseInitialEmailAiOutput(
+      parseJsonFromModelText(responseText),
+    );
 
     const { subject, body } = renderPdktIdentityByMentionPattern(
-      jsonResponse.body || "",
-      jsonResponse.subject || "",
+      jsonResponse.body,
+      jsonResponse.subject,
       policy,
     );
 
     const normalizedSubject = normalizeSubject(subject) || subject;
-    const wordCount = body.split(/\s+/).filter(Boolean).length;
     const violations = validatePdktEmailPolicyCompliance({ subject: normalizedSubject, body }, policy);
+    const lengthViolations = getLengthViolations(body, policy);
 
     return {
       subject: normalizedSubject,
       body,
-      wordCount,
       violations,
+      lengthViolations,
     };
   };
 
@@ -309,18 +351,13 @@ export async function initializeEmailSession(
 
     if (
       result.violations.length > 0 ||
-      result.wordCount < wordCountPolicy.retryLengthThreshold
+      result.lengthViolations.length > 0
     ) {
       const violationHint =
         result.violations.length > 0 ? buildPdktRetryHint(result.violations, policy) : "";
-      const lengthHint =
-        result.wordCount < wordCountPolicy.retryLengthThreshold
-          ? "Email terlalu pendek. Buat jauh lebih panjang (target 500-1000 kata, minimal 500 kata, 5-8 paragraf terpisah dengan baris kosong, tanpa bullet points)."
-          : "";
-
       try {
         result = await executeSessionGeneration(
-          [violationHint, lengthHint].filter(Boolean).join(" "),
+          [violationHint, ...result.lengthViolations].filter(Boolean),
         );
       } catch (err) {
         console.warn("[PDKT] Session init retry failed, using first attempt:", err);
@@ -334,10 +371,10 @@ export async function initializeEmailSession(
       };
     }
 
-    if (result.wordCount < wordCountPolicy.failureLengthThreshold) {
+    if (result.lengthViolations.length > 0) {
       return {
         success: false,
-        error: "Email awal terlalu pendek. Silakan coba lagi.",
+        error: "Email awal terlalu pendek/panjang atau jumlah paragraf belum sesuai. Silakan coba lagi.",
       };
     }
 
@@ -468,7 +505,7 @@ export function resolvePdktGenerationConfig(body: {
       primaryRecipientType: scenario.primaryRecipientType,
     }),
     enableImageGeneration: body.enableImageGeneration ?? true,
-    selectedModel: body.selectedModel || "gemini-3.1-flash-lite",
+    selectedModel: body.selectedModel || DEFAULT_AI_MODEL_ID,
     resolvedConsumerNameMentionPattern: body.resolvedConsumerNameMentionPattern || "none",
     writingStyleMode: body.writingStyleMode || "training",
   };
@@ -496,5 +533,5 @@ export function getSystemInstruction(config: PdktSessionConfig, hasCustomImages:
   const scenario = config.scenarios[0];
   if (!scenario) return "Tidak ada skenario.";
   const policy = buildPdktEmailGenerationPolicy(config, scenario, "initial_email");
-  return buildPdktSystemInstruction(policy, hasCustomImages);
+  return buildPdktGenerationMessages(policy, hasCustomImages).systemInstruction;
 }

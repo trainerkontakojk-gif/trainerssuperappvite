@@ -10,6 +10,7 @@ export * from "./pdkt/shared-utils";
 export * from "./pdkt/mailbox-service";
 export * from "./pdkt/session-service";
 export * from "./pdkt/evaluation-service";
+export * from "./pdkt/prompt-contract";
 
 // Internal library re-exports
 export { parseJsonFromModelText } from "../lib/ai-json";

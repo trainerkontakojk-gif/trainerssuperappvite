@@ -13,6 +13,7 @@ vi.mock("../lib/deepseek", () => ({
 }));
 
 vi.mock("../lib/ai-models", () => ({
+  DEFAULT_AI_MODEL_ID: "gemini-3.1-flash-lite",
   resolveModelProvider: vi.fn(),
 }));
 
@@ -106,7 +107,13 @@ const mockConsumerType: PdktConsumerType = {
 };
 
 function buildBody(wordCount: number): string {
-  return Array.from({ length: wordCount }, () => "kata").join(" ");
+  const words = Array.from({ length: wordCount }, () => "kata");
+  const paragraphs = Array.from({ length: 5 }, (_, index) => {
+    const start = Math.floor((index * wordCount) / 5);
+    const end = Math.floor(((index + 1) * wordCount) / 5);
+    return words.slice(start, end).join(" ");
+  });
+  return paragraphs.filter(Boolean).join("\n\n");
 }
 
 function buildConfig(overrides: Record<string, any> = {}): PdktSessionConfig {
@@ -246,7 +253,9 @@ describe("generateScenarioEmailTemplate", () => {
       expect(mockGeminiContent).toHaveBeenCalledTimes(2);
       const retryPrompt = mockGeminiContent.mock.calls[1][0] as any;
       expect(retryPrompt.contents?.[0]?.parts?.[0]?.text).toContain("REVISI");
-      expect(retryPrompt.contents?.[0]?.parts?.[0]?.text).toContain("terlalu pendek");
+      expect(retryPrompt.systemInstruction).toContain(
+        "Panjang isi harus 500-1000 kata",
+      );
     });
 
     it("retries when violations exist and succeeds on retry", async () => {
@@ -400,6 +409,7 @@ describe("generateScenarioEmailTemplate", () => {
       expect(result.success).toBe(false);
       expect(result.error).toContain("Tidak ada data JSON");
     });
+
   });
 
   describe("model/provider selection", () => {
@@ -462,62 +472,6 @@ describe("generateScenarioEmailTemplate", () => {
       expect(mockOpenRouterContent).not.toHaveBeenCalled();
     });
 
-    it("allows DeepSeek direct template generation to continue even when the output is short", async () => {
-      setupDeepSeekProvider();
-      const shortBody = buildBody(100);
-      mockDeepSeekContent
-        .mockReset()
-        .mockResolvedValueOnce({
-          success: true,
-          text: JSON.stringify({ subject: "DeepSeek Template", body: shortBody }),
-        })
-        .mockResolvedValueOnce({
-          success: true,
-          text: JSON.stringify({ subject: "DeepSeek Template Retry", body: shortBody }),
-        });
-      mockParseJson
-        .mockReset()
-        .mockReturnValueOnce({ subject: "DeepSeek Template", body: shortBody })
-        .mockReturnValueOnce({ subject: "DeepSeek Template Retry", body: shortBody });
-      mockValidateCompliance.mockReset().mockReturnValue([]);
-
-      const result = await generateScenarioEmailTemplate(
-        mockPinjolScenario,
-        buildConfig({ selectedModel: "deepseek-v4-pro" }),
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.body?.split(/\s+/).filter(Boolean).length).toBe(100);
-      expect(mockDeepSeekContent).toHaveBeenCalledTimes(2);
-    });
-
-    it("allows DeepSeek direct to continue even when the first email is still short", async () => {
-      setupDeepSeekProvider();
-      const shortBody = buildBody(100);
-      mockDeepSeekContent
-        .mockReset()
-        .mockResolvedValueOnce({
-          success: true,
-          text: JSON.stringify({ subject: "DeepSeek Short", body: shortBody }),
-        })
-        .mockResolvedValueOnce({
-          success: true,
-          text: JSON.stringify({ subject: "DeepSeek Short Retry", body: shortBody }),
-        });
-      mockParseJson
-        .mockReset()
-        .mockReturnValueOnce({ subject: "DeepSeek Short", body: shortBody })
-        .mockReturnValueOnce({ subject: "DeepSeek Short Retry", body: shortBody });
-      mockValidateCompliance.mockReset().mockReturnValue([]);
-
-      const result = await initializeEmailSession(
-        buildConfig({ selectedModel: "deepseek-v4-pro" }),
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.message?.body?.split(/\s+/).filter(Boolean).length).toBe(100);
-      expect(mockDeepSeekContent).toHaveBeenCalledTimes(2);
-    });
   });
 });
 
@@ -683,7 +637,7 @@ describe("initializeEmailSession", () => {
       expect(result.success).toBe(true);
       expect(mockGeminiContent).toHaveBeenCalledTimes(2);
       expect(
-        mockGeminiContent.mock.calls[1][0].contents?.[0]?.parts?.[0]?.text,
+        mockGeminiContent.mock.calls[1][0].systemInstruction,
       ).toContain(violation);
     });
 

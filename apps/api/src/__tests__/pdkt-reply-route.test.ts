@@ -182,6 +182,61 @@ describe("PDKT Reply Route E2E", () => {
       expect(res.status).toBe(400);
     });
 
+    it("rejects an oversized reply body before calling the mailbox RPC", async () => {
+      await createAuthenticatedApp("trainer");
+      const res = await app.request("/api/v1/pdkt/mailbox/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mailboxId: "00000000-0000-0000-0000-000000000001",
+          reply: {
+            id: "reply-1",
+            from: "cc@ojk.go.id",
+            to: "user@test.com",
+            subject: "Re: Test",
+            body: "x".repeat(50_001),
+            timestamp: new Date().toISOString(),
+            isAgent: true,
+          },
+          timeTaken: 60,
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("accepts a large attachment that is excluded from prompt limits", async () => {
+      await createAuthenticatedApp("trainer");
+      const attachment = `data:image/png;base64,${"A".repeat(60_000)}`;
+      const res = await app.request("/api/v1/pdkt/mailbox/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mailboxId: "00000000-0000-0000-0000-000000000001",
+          reply: {
+            id: "reply-1",
+            from: "cc@ojk.go.id",
+            to: "user@test.com",
+            subject: "Re: Test",
+            body: "Terima kasih.",
+            timestamp: new Date().toISOString(),
+            isAgent: true,
+            attachments: [attachment],
+          },
+          timeTaken: 60,
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith(
+        "submit_pdkt_mailbox_reply",
+        expect.objectContaining({
+          p_agent_reply: expect.objectContaining({ attachments: [attachment] }),
+        }),
+      );
+    });
+
     it("returns error when RPC fails", async () => {
       await createAuthenticatedApp("trainer");
       mockRpc.mockResolvedValueOnce({

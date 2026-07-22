@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { generateEmailSchema } from "@trainers/types";
+import { generateEmailPromptSchema } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
 import { requireRole } from "../../middleware/role";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
@@ -46,7 +46,7 @@ simulation.post(
   "/generate-template",
   requireRole("admin", "trainer", "leader"),
   aiRateLimitMiddleware,
-  zValidator("json", generateEmailSchema),
+  zValidator("json", generateEmailPromptSchema),
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
@@ -89,7 +89,7 @@ simulation.post(
   "/session/init",
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   aiRateLimitMiddleware,
-  zValidator("json", generateEmailSchema),
+  zValidator("json", generateEmailPromptSchema),
   async (c) => {
     const body = c.req.valid("json");
     const user = c.get("user");
@@ -133,8 +133,8 @@ simulation.post(
   aiRateLimitMiddleware,
   zValidator(
     "json",
-    generateEmailSchema.extend({
-      client_request_id: z.string().optional(),
+    generateEmailPromptSchema.extend({
+      client_request_id: z.string().max(200).optional(),
     }),
   ),
   async (c) => {

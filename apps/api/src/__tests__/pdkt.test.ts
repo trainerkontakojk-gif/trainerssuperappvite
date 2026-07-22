@@ -201,7 +201,7 @@ describe("PDKT Service", () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("melanggar");
+      expect(result.error).toContain("terlalu pendek/panjang");
     });
   });
 });

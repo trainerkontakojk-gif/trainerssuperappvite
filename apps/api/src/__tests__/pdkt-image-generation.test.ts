@@ -3,13 +3,22 @@ import { initializeEmailSession } from "../services/pdkt-service";
 import * as pdktImageGen from "../services/pdkt/image-generation";
 import { PdktSessionConfig, PdktScenario } from "@trainers/types";
 
+const buildValidGeneratedBody = vi.hoisted(() => (wordCount = 600) => {
+  const words = Array.from({ length: wordCount }, () => "word");
+  return Array.from({ length: 5 }, (_, index) => {
+    const start = Math.floor((index * wordCount) / 5);
+    const end = Math.floor(((index + 1) * wordCount) / 5);
+    return words.slice(start, end).join(" ");
+  }).join("\n\n");
+});
+
 // Mock AI libraries
 vi.mock("../lib/gemini", () => ({
-  generateGeminiContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: "word ".repeat(600) }) }),
+  generateGeminiContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: buildValidGeneratedBody() }) }),
 }));
 
 vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: "word ".repeat(600) }) }),
+  generateOpenRouterContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: buildValidGeneratedBody() }) }),
 }));
 
 vi.mock("../services/pdkt/image-generation", () => ({
@@ -42,7 +51,7 @@ describe("PDKT Image Generation Integration", () => {
   it("should generate AI images when enableImageGeneration is true and no manual attachments", async () => {
     const result = await initializeEmailSession(mockConfig);
 
-    expect(result.success).toBe(true);
+    expect(result.success, result.error).toBe(true);
     expect(pdktImageGen.generatePdktScenarioImages).toHaveBeenCalled();
     expect(result.message?.attachments).toContain("data:image/png;base64,ai-generated-image");
     expect(result.message?.attachmentSource).toBe("ai");

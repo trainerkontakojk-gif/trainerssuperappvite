@@ -3,6 +3,7 @@ import {
   AiModelInfo,
   AIProvider,
   AI_MODELS,
+  DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
   DEEPSEEK_MODELS,
   KETIK_PDKT_MODELS,
@@ -15,6 +16,7 @@ import type { AiModelModule } from "@trainers/types";
 type TextImageAIProvider = Exclude<AIProvider, "openai">;
 export {
   AI_MODELS,
+  DEFAULT_AI_MODEL_ID,
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
   KETIK_PDKT_MODELS,
   TEXT_MODELS,
@@ -23,7 +25,6 @@ export {
   TELEFUN_LIVE_MODELS,
 };
 
-const DEFAULT_MODEL_ID = "gemini-3.1-flash-lite";
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
   (m) => m.provider === "gemini",
 );
@@ -35,7 +36,7 @@ const LEGACY_ALIASES: Record<string, string> = {
 const MODEL_REGISTRY = [...AI_MODELS, ...DEEPSEEK_MODELS];
 
 export function normalizeModelId(modelId?: string | null): string {
-  if (!modelId) return DEFAULT_MODEL_ID;
+  if (!modelId) return DEFAULT_AI_MODEL_ID;
   return LEGACY_ALIASES[modelId] || modelId;
 }
 
