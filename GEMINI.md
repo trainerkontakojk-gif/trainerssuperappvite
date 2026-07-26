@@ -144,7 +144,7 @@ Project ini memiliki knowledge graph di `graphify-out/` dengan god nodes, commun
 
 ### WAJIB: Gunakan graphify secara otomatis
 
-Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — baik oleh agent utama maupun oleh subagent lewat Task tool. Ini berlaku untuk semua skenario:
+Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — baik oleh agent utama maupun oleh worker Pi via tmux saat orchestrator-mode aktif. Ini berlaku untuk semua skenario:
 
 #### Untuk Planning
 
@@ -159,10 +159,10 @@ Graphify HARUS digunakan sebagai referensi utama untuk memahami codebase — bai
 - Jika ragu dengan dampak perubahan, query graphify dulu untuk cek cross-file relationships.
 - SETELAH selesai mengubah kode, WAJIB jalankan `graphify update .` untuk menjaga graph tetap sinkron.
 
-#### Untuk Subagent (Task tool)
+#### Untuk Worker Pi (orchestrator-mode)
 
-- Saat mengirim task ke subagent via Task tool, SERTAKAN instruksi: "Gunakan graphify dulu untuk referensi codebase sebelum memulai."
-- Subagent harus query graphify via `graphify query "<pertanyaan>"` sebelum menulis kode.
+- Saat mengirim task ke worker Pi via tmux, SERTAKAN instruksi: "Gunakan graphify dulu untuk referensi codebase sebelum memulai."
+- Worker Pi harus query graphify via `graphify query "<pertanyaan>"` sebelum menulis kode.
 
 ### Aturan Penting
 

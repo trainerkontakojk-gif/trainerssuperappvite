@@ -27,15 +27,15 @@ Ikuti hierarki instruksi dan urutan kerja di [`docs/AGENT_WORKFLOW.md`](docs/AGE
   - Setelah modifikasi kode, jalankan `graphify update .` (AST-only, gratis)
   - Prioritas: graphify query > `GRAPH_REPORT.md` > grep manual
   - Jangan skip karena dirty files (normal setelah hooks/update)
-  - Subagent via Task tool WAJIB sertakan instruksi: "Gunakan graphify dulu untuk referensi codebase."
+  - Jika memakai Pi orchestrator-mode, worker Pi via tmux WAJIB diberi instruksi: "Gunakan graphify dulu untuk referensi codebase."
 
 ---
 
 ## 3. Agent & Subagent Execution
 
-- **Superpower Skill** (`general`) — default untuk eksplorasi, implementasi, debugging, testing.
-- **ECC specialized agents**: planner (kompleks/refactoring), tdd-guide (bug/fitur baru), architect (system design), code-reviewer (post-code), security-reviewer, build-error-resolver, docs-lookup (Context7), loop-operator.
-- Instruksi ke subagent WAJIB sertakan konteks monorepo (`apps/web`, `apps/api`, `packages/types`).
+- **Pi skills** — gunakan skill yang relevan untuk eksplorasi, implementasi, debugging, testing.
+- **Pi orchestrator-mode** — opt-in untuk task kompleks; worker dijalankan sebagai proses Pi terpisah via tmux.
+- Instruksi ke worker Pi WAJIB sertakan konteks monorepo (`apps/web`, `apps/api`, `packages/types`).
 
 ### Kode — Wajib Semua Perubahan Kode Non-Docs
 
@@ -57,7 +57,7 @@ Agent WAJIB load/use skill `ui-ux-pro-max` dan `impeccable` by name (`skill_view
 - **SIDAK-Auditor**: Audit logic SIDAK dari `reference-repo` ke `apps/api`. Validasi `indicator_id` dan `service_type` ketat.
 - **AI-Usage-Guard**: Pastikan setiap modul AI (KETIK, PDKT, Telefun) melakukan logging usage via service backend.
 
-Panggil via Superpower Skill dengan instruksi spesifik, atau via ECC agent untuk audit mendalam.
+Gunakan skill Pi dengan instruksi spesifik. Untuk audit mendalam multi-worker, gunakan `orchestrator-mode` hanya setelah diminta eksplisit.
 
 ---
 

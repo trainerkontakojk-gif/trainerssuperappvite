@@ -54,4 +54,6 @@ pnpm --dir apps/api exec vitest run src/__tests__/pdkt-mailbox-batch-route.test.
 - Scoped ESLint untuk file yang berubah: **exit 0**.
 - Root `pnpm lint`: **exit 1** karena lima error baseline pada file yang tidak disentuh oleh remediation ini: empat `prefer-const` di `apps/api/src/__tests__/telefun-communication-profile.test.ts` dan satu `no-useless-assignment` di `apps/api/src/services/ketik/prompt-policy.ts`; lint juga melaporkan tujuh warning. Sesuai pre-push gate, hasil ini dicatat sebagai blocker dan tidak diklaim lulus.
 - Mandatory Thermo Nuclear Code Quality Review: **APPROVE**, tanpa finding material tersisa.
-- Tidak ada commit atau push yang dilakukan.
+- Commit [`a8e8fc0`](https://github.com/trainerkontakojk-gif/trainerssuperappvite/commit/a8e8fc06e7572a82074c6bcc1e93799350a99e94) (`feat(pdkt): Implement prompt contract and remediation based on audit findings`) berisi seluruh implementation remediation dan dokumentasi.
+- Commit [`33de996`](https://github.com/trainerkontakojk-gif/trainerssuperappvite/commit/33de9964c8bf1c18514ea95b0a8b235fad595d14) (`fix(pdkt): update prompt budget to 200,000 characters and adjust related tests and documentation`) menaikkan hard ceiling ke 200.000 karakter.
+- Kedua commit sudah dipush ke `origin/main` (HEAD `33de996` == `origin/main`).
