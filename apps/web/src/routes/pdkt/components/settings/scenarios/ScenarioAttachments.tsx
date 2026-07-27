@@ -16,29 +16,33 @@ export function ScenarioAttachments({
   fileInputRef,
 }: ScenarioAttachmentsProps) {
   return (
-    <div className="col-span-2">
-      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+    <div className="col-span-2 border-t border-border pt-5">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Lampiran Bukti / Media
-      </label>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="flex flex-col items-center justify-center w-full h-28 border border-dashed border-border rounded-md cursor-pointer hover:bg-foreground/[0.02] hover:border-foreground/30 transition-colors group">
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label
+          htmlFor="scenario-attachment-upload"
+          className="group flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border transition-colors hover:border-foreground/30 hover:bg-foreground/[0.02] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-foreground"
+        >
           <div className="flex flex-col items-center justify-center py-4">
-            <FileUp className="w-5 h-5 mb-1.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <FileUp className="mb-1.5 h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
             <p className="text-xs font-medium text-foreground">
               Pilih Gambar / PDF
             </p>
           </div>
           <input
+            id="scenario-attachment-upload"
             type="file"
             accept="image/*,.pdf,application/pdf"
             ref={fileInputRef}
             onChange={onUpload}
-            className="hidden"
+            className="sr-only"
           />
         </label>
 
         {attachmentImages.length > 0 && (
-          <div className="flex gap-2 p-3 bg-card/25 border border-border rounded-xl overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto border-l-2 border-border px-3 py-2 scrollbar-hide">
             {attachmentImages.map((img, index) => (
               <div key={index} className="relative shrink-0 group">
                 <ScenarioImage
@@ -49,7 +53,8 @@ export function ScenarioAttachments({
                 <button
                   type="button"
                   onClick={() => onRemove(index)}
-                  className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center shadow transition-opacity cursor-pointer"
+                  aria-label={`Hapus lampiran ${index + 1}`}
+                  className="absolute -right-2 -top-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-destructive text-destructive-foreground transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>

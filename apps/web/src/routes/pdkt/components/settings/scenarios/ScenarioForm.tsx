@@ -1,243 +1,224 @@
-import React from "react";
-import { ChevronRight } from "lucide-react";
-import { PdktScenario } from "@trainers/types";
+import React, { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+import type { PdktScenario } from "@trainers/types";
 import { useCrudForm } from "../../../../../hooks/useCrudForm";
-import {
-  SettingsField,
-  SettingsInput,
-  SettingsSelect,
-} from "../SettingsPrimitives";
-import { ScenarioAdvancedSummary } from "./ScenarioAdvancedSummary";
 import { ScenarioStickyFooter } from "./ScenarioStickyFooter";
-import type { ScenarioWizardStep } from "./ScenarioWizardStepHeader";
-import { ScenarioWizardStepHeader } from "./ScenarioWizardStepHeader";
+import {
+  ScenarioWizardStepHeader,
+  type ScenarioStepStatus,
+  type ScenarioWizardStep,
+} from "./ScenarioWizardStepHeader";
 
-interface ScenarioFormProps {
+interface Props {
   scenarioForm: ReturnType<typeof useCrudForm<PdktScenario>>;
-  categories: string[];
-  isNewCategoryInput: boolean;
-  setIsNewCategoryInput: (val: boolean) => void;
-  newScenarioCategory: string;
-  setNewScenarioCategory: (val: string) => void;
   activeStep: ScenarioWizardStep;
+  statuses: Record<ScenarioWizardStep, ScenarioStepStatus>;
   onStepChange: (step: ScenarioWizardStep) => void;
-  onSave: () => void;
+  onNext: () => void;
+  onBack: () => void;
   onCancel: () => void;
-  advancedContent?: React.ReactNode;
+  onSubmit: () => void;
+  canNext: boolean;
+  scenarioContent: React.ReactNode;
+  profileContent: React.ReactNode;
+  emailContent: React.ReactNode;
+  simulationContent: React.ReactNode;
 }
 
 export function ScenarioForm({
   scenarioForm,
-  categories,
-  isNewCategoryInput,
-  setIsNewCategoryInput,
-  newScenarioCategory,
-  setNewScenarioCategory,
   activeStep,
+  statuses,
   onStepChange,
-  onSave,
+  onNext,
+  onBack,
   onCancel,
-  advancedContent,
-}: ScenarioFormProps) {
+  onSubmit,
+  canNext,
+  scenarioContent,
+  profileContent,
+  emailContent,
+  simulationContent,
+}: Props) {
+  const editing = Boolean(scenarioForm.editingId);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (scenarioForm.isOpen) closeButtonRef.current?.focus();
+  }, [scenarioForm.isOpen]);
+
   if (!scenarioForm.isOpen) return null;
 
   return (
     <div
       id="scenario-form"
-      className="bg-card rounded-xl border border-border overflow-hidden"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onCancel();
+        }
+      }}
+      className="flex min-h-0 flex-1 flex-col bg-card"
     >
-      <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
-        <h3 className="font-bold text-foreground text-base tracking-tight">
-          {scenarioForm.editingId ? "Edit Skenario" : "Tambah Skenario Baru"}
-        </h3>
-      </div>
+      <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
+        <div>
+          <h2
+            id="scenario-wizard-title"
+            className="text-xl font-bold tracking-tight text-foreground"
+          >
+            {editing ? "Edit Skenario PDKT" : "Tambah Skenario PDKT"}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Lengkapi informasi secara bertahap untuk membuat simulasi email.
+          </p>
+        </div>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          onClick={onCancel}
+          aria-label="Tutup wizard skenario"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-foreground hover:bg-foreground/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </header>
 
-      <div className="p-6 space-y-5">
+      <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5 pb-[env(safe-area-inset-bottom)] sm:px-6">
         <ScenarioWizardStepHeader
           activeStep={activeStep}
+          statuses={statuses}
           onStepChange={onStepChange}
         />
-
         <section
-          id="scenario-form-basic"
-          className="rounded-xl border border-border bg-background p-4 space-y-4"
+          id="scenario-step-scenario"
+          hidden={activeStep !== "scenario"}
+          className="space-y-5 pt-5"
+          aria-labelledby="scenario-step-scenario-title"
         >
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h4 className="text-sm font-semibold text-foreground tracking-tight">
-                Info Dasar
-              </h4>
-              <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-                Isi bagian ini dulu agar skenario bisa disimpan.
-              </p>
-            </div>
-            <span className="text-[11px] font-medium text-muted-foreground">
-              Langkah 1
-            </span>
+          <div>
+            <h3
+              id="scenario-step-scenario-title"
+              className="text-lg font-bold text-foreground"
+            >
+              Skenario Permasalahan
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Jelaskan situasi yang akan dihadapi agent dalam simulasi email.
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="col-span-1">
-              <SettingsField label="Kategori Masalah" id="scenario-category">
-                {!isNewCategoryInput ? (
-                  <SettingsSelect
-                    id="scenario-category"
-                    value={scenarioForm.draft.category || ""}
-                    onChange={(e) => {
-                      if (e.target.value === "NEW") {
-                        setIsNewCategoryInput(true);
-                        setNewScenarioCategory("");
-                        scenarioForm.setDraft({ category: "" });
-                      } else {
-                        setNewScenarioCategory(e.target.value);
-                        scenarioForm.setDraft({ category: e.target.value });
-                      }
-                    }}
-                  >
-                    <option value="">Pilih Kategori</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                    <option value="NEW">+ Tambah Kategori Lainnya</option>
-                  </SettingsSelect>
-                ) : (
-                  <div className="flex gap-2">
-                    <SettingsInput
-                      id="scenario-category-new"
-                      type="text"
-                      placeholder="Nama Kategori Baru"
-                      value={newScenarioCategory}
-                      onChange={(e) => {
-                        setNewScenarioCategory(e.target.value);
-                        scenarioForm.setDraft({ category: e.target.value });
-                      }}
-                    />
-                    <button
-                      onClick={() => setIsNewCategoryInput(false)}
-                      className="px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 rounded-md transition-colors cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                )}
-              </SettingsField>
-            </div>
-
-            <div className="col-span-2">
-              <SettingsField label="Judul Skenario" id="scenario-title">
-                <SettingsInput
-                  id="scenario-title"
-                  type="text"
-                  placeholder="Contoh: Kesalahan Transaksi Real-time"
-                  value={scenarioForm.draft.title || ""}
-                  onChange={(e) =>
-                    scenarioForm.setDraft({ title: e.target.value })
-                  }
-                />
-              </SettingsField>
-            </div>
-
-            <div className="col-span-2">
-              <SettingsField
-                label="Deskripsi Detail Masalah"
-                id="scenario-description"
-              >
-                <textarea
-                  id="scenario-description"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors placeholder:text-muted-foreground/30 font-normal leading-relaxed"
-                  rows={3}
-                  placeholder="Jelaskan konteks masalah yang harus diselesaikan oleh agen..."
-                  value={scenarioForm.draft.description || ""}
-                  onChange={(e) =>
-                    scenarioForm.setDraft({ description: e.target.value })
-                  }
-                />
-              </SettingsField>
-            </div>
-
-            <div className="col-span-2 p-4 rounded-xl border border-border bg-card/25 flex items-center justify-between gap-4">
+          {scenarioContent}
+        </section>
+        <section
+          id="scenario-step-profile"
+          hidden={activeStep !== "profile"}
+          className="space-y-5 pt-5"
+          aria-labelledby="scenario-step-profile-title"
+        >
+          <div>
+            <h3
+              id="scenario-step-profile-title"
+              className="text-lg font-bold text-foreground"
+            >
+              Profil Pengirim
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Atur siapa pengirim email dan bagaimana cara pengirim
+              berkomunikasi.
+            </p>
+          </div>
+          {profileContent}
+        </section>
+        <section
+          id="scenario-step-email"
+          hidden={activeStep !== "email"}
+          className="space-y-5 pt-5"
+          aria-labelledby="scenario-step-email-title"
+        >
+          <div>
+            <h3
+              id="scenario-step-email-title"
+              className="text-lg font-bold text-foreground"
+            >
+              Email &amp; Pengaturan
+            </h3>
+          </div>
+          <div className="space-y-5">
+            <section
+              className="space-y-4 rounded-xl border border-border p-4"
+              aria-labelledby="email-config-title"
+            >
               <div>
-                <label className="block text-xs font-semibold text-foreground">
-                  Entitas Berizin OJK (LJK Resmi)
-                </label>
-                <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                  Aktifkan jika skenario ini ditujukan untuk entitas legal berizin (Bank, Asuransi resmi) agar AI memakai nama asli LJK.
+                <h4
+                  id="email-config-title"
+                  className="text-base font-semibold text-foreground"
+                >
+                  Konfigurasi Email
+                </h4>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Atur penerima, template, dan lampiran untuk skenario ini.
                 </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={scenarioForm.draft.isLicensed || false}
-                  onChange={(e) =>
-                    scenarioForm.setDraft({ isLicensed: e.target.checked })
-                  }
-                />
-                <div className="w-9 h-5 bg-border rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border/40 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-              </label>
-            </div>
+              {emailContent}
+            </section>
+            <section
+              className="space-y-4 rounded-xl border border-border p-4"
+              aria-labelledby="simulation-settings-title"
+            >
+              <div>
+                <h4
+                  id="simulation-settings-title"
+                  className="text-base font-semibold text-foreground"
+                >
+                  Pengaturan Simulasi
+                </h4>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Sesuaikan perilaku AI yang digunakan dalam simulasi.
+                </p>
+              </div>
+              {simulationContent}
+            </section>
           </div>
         </section>
-
-        <ScenarioAdvancedSummary
-          draft={scenarioForm.draft}
-          isExpanded={activeStep === "advanced"}
-          onToggle={() =>
-            onStepChange(activeStep === "advanced" ? "basic" : "advanced")
-          }
-        />
-
-        <section
-          id="scenario-form-advanced"
-          aria-hidden={activeStep !== "advanced"}
-          className={activeStep === "advanced" ? "space-y-5" : "hidden"}
-        >
-          {advancedContent}
-        </section>
-      </div>
+      </main>
 
       <ScenarioStickyFooter>
-        <div className="flex items-center gap-2 flex-wrap">
-          {activeStep === "advanced" ? (
-            <button
-              type="button"
-              onClick={() => onStepChange("basic")}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
-            >
-              <ChevronRight className="w-3.5 h-3.5 rotate-180" />
-              Kembali ke Info Dasar
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onStepChange("advanced")}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-              Lanjut ke Detail
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
+        {activeStep === "scenario" && (
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-foreground/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
           >
             Batal
           </button>
+        )}
+        {activeStep !== "scenario" && (
           <button
             type="button"
-            onClick={onSave}
-            disabled={!scenarioForm.draft.title || !scenarioForm.draft.description}
-            className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            onClick={onBack}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-foreground/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
           >
-            Simpan
+            Kembali
           </button>
-        </div>
+        )}
+        {activeStep === "email" ? (
+          <button
+            type="button"
+            onClick={onSubmit}
+            className="rounded-md bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+          >
+            {editing ? "Simpan Perubahan" : "Buat Skenario"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!canNext}
+            className="rounded-md bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+          >
+            Lanjut
+          </button>
+        )}
       </ScenarioStickyFooter>
     </div>
   );

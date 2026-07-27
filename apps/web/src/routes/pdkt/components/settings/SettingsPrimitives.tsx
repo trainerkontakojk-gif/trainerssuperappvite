@@ -4,17 +4,44 @@ interface SettingsFieldProps {
   label: string;
   id?: string;
   helperText?: string;
+  required?: boolean;
+  optional?: boolean;
+  error?: string;
   className?: string;
   children: React.ReactNode;
 }
 
-export function SettingsField({ label, id, helperText, className = "", children }: SettingsFieldProps) {
+export function SettingsField({
+  label,
+  id,
+  helperText,
+  required,
+  optional: _optional,
+  error,
+  className = "",
+  children,
+}: SettingsFieldProps) {
   return (
     <div className={`space-y-1.5 ${className}`}>
-      <label htmlFor={id} className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-        {label}
+      <label
+        htmlFor={id}
+        className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5"
+      >
+        {label}{" "}
+        {required ? (
+          <span className="ml-1 text-xs font-semibold text-foreground">
+            Wajib
+          </span>
+        ) : (
+          <span className="ml-1 text-xs text-muted-foreground">Opsional</span>
+        )}
       </label>
       {children}
+      {error && (
+        <p id={`${id}-error`} role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       {helperText && (
         <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
           {helperText}
@@ -28,7 +55,10 @@ interface SettingsInputProps extends React.InputHTMLAttributes<HTMLInputElement>
   className?: string;
 }
 
-export function SettingsInput({ className = "", ...props }: SettingsInputProps) {
+export function SettingsInput({
+  className = "",
+  ...props
+}: SettingsInputProps) {
   return (
     <input
       className={`w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30 ${className}`}
@@ -41,7 +71,11 @@ interface SettingsSelectProps extends React.SelectHTMLAttributes<HTMLSelectEleme
   className?: string;
 }
 
-export function SettingsSelect({ className = "", children, ...props }: SettingsSelectProps) {
+export function SettingsSelect({
+  className = "",
+  children,
+  ...props
+}: SettingsSelectProps) {
   return (
     <div className="relative group">
       <select

@@ -58,7 +58,6 @@ export function normalizePdktScenarioDraft(
     recipientEmails: normalizePdktRecipientEmails(draft.recipientEmails),
     sampleEmailTemplate: draft.sampleEmailTemplate ?? { subject: "", body: "" },
     alwaysUseSampleEmail: draft.alwaysUseSampleEmail ?? false,
-    isLicensed: draft.isLicensed ?? false,
     isActive: draft.isActive ?? true,
     script: draft.script,
     attachmentImages: draft.attachmentImages ?? [],

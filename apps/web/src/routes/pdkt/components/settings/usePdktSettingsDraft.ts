@@ -1,8 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import type {
-  PdktScenario,
-  PdktConsumerType,
-} from "@trainers/types";
+import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
@@ -31,6 +28,16 @@ interface PdktSystemDraft {
   customIdentity: NonNullable<AppSettings["customIdentity"]>;
 }
 
+function normalizePdktScenarioForSave(scenario: PdktScenario): PdktScenario {
+  const compatibilityScenario = { ...(scenario as Record<string, unknown>) };
+  delete compatibilityScenario.isLicensed;
+
+  return {
+    ...compatibilityScenario,
+    ...normalizePdktScenarioDraft(scenario),
+  } as PdktScenario;
+}
+
 export function buildPdktSettingsForSave(params: {
   localSettings: AppSettings;
   scenarios: PdktScenario[];
@@ -39,7 +46,7 @@ export function buildPdktSettingsForSave(params: {
 }): AppSettings {
   return {
     ...params.localSettings,
-    scenarios: params.scenarios,
+    scenarios: params.scenarios.map(normalizePdktScenarioForSave),
     consumerTypes: params.consumerTypes,
     enableImageGeneration: params.system.enableImageGeneration,
     globalConsumerTypeId: params.system.globalConsumerTypeId,
@@ -107,7 +114,6 @@ export function usePdktSettingsDraft({
         body: "",
       },
       alwaysUseSampleEmail: false,
-      isLicensed: false,
       isActive: true,
       attachmentImages: [],
     }),
@@ -191,7 +197,10 @@ export function usePdktSettingsDraft({
       return;
     }
 
-    if (scenarioForm.draft.alwaysUseSampleEmail && !scenarioForm.draft.sampleEmailTemplate?.body?.trim()) {
+    if (
+      scenarioForm.draft.alwaysUseSampleEmail &&
+      !scenarioForm.draft.sampleEmailTemplate?.body?.trim()
+    ) {
       setActiveTab("scenarios");
       setTimeout(() => {
         document
@@ -199,7 +208,7 @@ export function usePdktSettingsDraft({
           ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
       notify.warning(
-        'Isi body template email jika Anda memilih "Always use this email".',
+        "Isi body template email jika opsi template selalu digunakan aktif.",
       );
       return;
     }
@@ -259,6 +268,44 @@ export function usePdktSettingsDraft({
       );
       console.error(e);
     }
+  };
+
+  const hasUnsavedChanges = () => {
+    const baselineModel = coercePdktModelId(settings.selectedModel);
+    return (
+      JSON.stringify(localSettings) !==
+        JSON.stringify({ ...settings, selectedModel: baselineModel }) ||
+      customSenderName !== (settings.customIdentity?.senderName || "") ||
+      customBodyName !== (settings.customIdentity?.bodyName || "") ||
+      customEmail !== (settings.customIdentity?.email || "") ||
+      customCity !== (settings.customIdentity?.city || "") ||
+      enableImageGeneration !== (settings.enableImageGeneration ?? true) ||
+      globalConsumerTypeId !== (settings.globalConsumerTypeId || "random") ||
+      selectedModel !== baselineModel ||
+      consumerNameMentionPattern !==
+        (settings.consumerNameMentionPattern || "random") ||
+      writingStyleMode !== (settings.writingStyleMode || "training") ||
+      scenarioForm.isDirty(localSettings.scenarios) ||
+      consumerForm.isDirty(localSettings.consumerTypes)
+    );
+  };
+
+  const discardUnsavedChanges = () => {
+    const normalizedModel = coercePdktModelId(settings.selectedModel);
+    setLocalSettings({ ...settings, selectedModel: normalizedModel });
+    setCustomSenderName(settings.customIdentity?.senderName || "");
+    setCustomBodyName(settings.customIdentity?.bodyName || "");
+    setCustomEmail(settings.customIdentity?.email || "");
+    setCustomCity(settings.customIdentity?.city || "");
+    setEnableImageGeneration(settings.enableImageGeneration ?? true);
+    setGlobalConsumerTypeId(settings.globalConsumerTypeId || "random");
+    setSelectedModel(normalizedModel);
+    setConsumerNameMentionPattern(
+      settings.consumerNameMentionPattern || "random",
+    );
+    setWritingStyleMode(settings.writingStyleMode || "training");
+    scenarioForm.close();
+    consumerForm.close();
   };
 
   const handleResetDefaults = () => {
@@ -329,5 +376,7 @@ export function usePdktSettingsDraft({
     setWritingStyleMode,
     handleSave,
     handleResetDefaults,
+    hasUnsavedChanges,
+    discardUnsavedChanges,
   };
 }

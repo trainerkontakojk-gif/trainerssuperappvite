@@ -14,7 +14,6 @@ export const DEFAULT_SCENARIOS: PdktScenario[] = [
     description:
       "Konsumen diteror oleh pinjol ilegal padahal tidak pernah meminjam.",
     isActive: true,
-    isLicensed: false,
   },
   {
     id: "penipuan",
@@ -23,7 +22,6 @@ export const DEFAULT_SCENARIOS: PdktScenario[] = [
     description:
       "Konsumen menerima pesan menang undian dan diminta transfer pajak pemenang.",
     isActive: true,
-    isLicensed: false,
   },
   {
     id: "slik",
@@ -32,7 +30,6 @@ export const DEFAULT_SCENARIOS: PdktScenario[] = [
     description:
       "Konsumen ingin mengecek status BI Checking / SLIK karena pengajuan KPR ditolak.",
     isActive: true,
-    isLicensed: true,
   },
   {
     id: "asuransi",
@@ -41,7 +38,6 @@ export const DEFAULT_SCENARIOS: PdktScenario[] = [
     description:
       "Konsumen mengeluh karena klaim asuransi kesehatannya ditolak dengan alasan yang tidak jelas.",
     isActive: true,
-    isLicensed: true,
   },
   {
     id: "investasi",
@@ -50,7 +46,6 @@ export const DEFAULT_SCENARIOS: PdktScenario[] = [
     description:
       "Konsumen melaporkan adanya tawaran investasi dengan imbal hasil tidak wajar (ponzi).",
     isActive: true,
-    isLicensed: false,
   },
   {
     id: "kartu-kredit",
@@ -59,7 +54,6 @@ export const DEFAULT_SCENARIOS: PdktScenario[] = [
     description:
       "Konsumen keberatan dengan adanya biaya administrasi atau tagihan yang tidak dikenal di kartu kreditnya.",
     isActive: true,
-    isLicensed: true,
   },
 ];
 

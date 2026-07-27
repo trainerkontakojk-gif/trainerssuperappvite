@@ -51,7 +51,6 @@ const scenario: PdktScenario = {
   title: "Pinjol Ilegal",
   description: "Konsumen diteror pinjol ilegal.",
   isActive: true,
-  isLicensed: false,
 };
 const consumerType: PdktConsumerType = {
   id: "ramah",

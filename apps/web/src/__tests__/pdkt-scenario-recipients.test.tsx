@@ -33,12 +33,17 @@ describe("PDKT scenario recipient editor", () => {
 
     render(<TestHarness />);
 
-    await user.selectOptions(screen.getByLabelText("Penerima Utama"), "ojk");
-    await user.selectOptions(screen.getByLabelText("Mode Penerima"), "multiple");
+    await user.selectOptions(screen.getByLabelText(/Penerima Utama/), "ojk");
+    await user.selectOptions(
+      screen.getByLabelText(/Mode Penerima/),
+      "multiple",
+    );
     await user.click(screen.getByRole("button", { name: /tambah alamat/i }));
     await user.click(screen.getByRole("button", { name: /tambah alamat/i }));
 
-    const recipientInputs = screen.getAllByPlaceholderText("alamat.tujuan@domain.com");
+    const recipientInputs = screen.getAllByPlaceholderText(
+      "alamat.tujuan@domain.com",
+    );
     await user.type(recipientInputs[0], "alpha@test.com");
     await user.type(recipientInputs[1], "beta@test.com");
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   X,
   User,
@@ -14,10 +14,7 @@ import { PdktSystemTab } from "./settings/PdktSystemTab";
 import { PdktScenariosTab } from "./settings/PdktScenariosTab";
 import { PdktConsumersTab } from "./settings/PdktConsumersTab";
 import { PdktIdentityTab } from "./settings/PdktIdentityTab";
-import type {
-  PdktScenario,
-  PdktConsumerType,
-} from "@trainers/types";
+import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import { type PdktAppSettings as AppSettings } from "../pdktSettings";
 
 interface SettingsModalProps {
@@ -64,6 +61,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setWritingStyleMode,
     handleSave,
     handleResetDefaults,
+    hasUnsavedChanges,
+    discardUnsavedChanges,
   } = usePdktSettingsDraft({
     settings,
     isOpen,
@@ -71,6 +70,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose,
     defaultScenarios,
     defaultConsumerTypes,
+  });
+
+  const requestClose = () => {
+    if (
+      hasUnsavedChanges() &&
+      !window.confirm("Perubahan belum disimpan. Yakin ingin keluar?")
+    )
+      return;
+    discardUnsavedChanges();
+    onClose();
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") requestClose();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   });
 
   if (!isOpen) return null;
@@ -90,19 +108,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={requestClose}
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
           />
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={
+              scenarioForm.isOpen
+                ? "scenario-wizard-title"
+                : "settings-modal-title"
+            }
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border"
+            className={`relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border ${scenarioForm.isOpen ? "fixed inset-0 max-w-none max-h-none min-h-dvh h-dvh rounded-none pb-[env(safe-area-inset-bottom)] sm:relative sm:inset-auto sm:max-w-5xl sm:max-h-[86vh] sm:min-h-0 sm:h-[90vh] sm:rounded-2xl" : ""}`}
           >
             {/* Modal Header */}
-            <div className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0 bg-card">
+            <div
+              hidden={scenarioForm.isOpen}
+              className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0 bg-card"
+            >
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+                <h2
+                  id="settings-modal-title"
+                  className="text-lg sm:text-xl font-bold text-foreground tracking-tight"
+                >
                   Pengaturan Simulasi
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -112,7 +143,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
               <button
-                onClick={onClose}
+                onClick={requestClose}
+                aria-label="Tutup pengaturan"
                 className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border"
               >
                 <X className="w-4 h-4" />
@@ -121,14 +153,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
               {/* Sidebar Navigation */}
-              <div className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-border bg-foreground/[0.01] flex md:flex-col overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3 gap-1 scrollbar-hide">
+              <div
+                hidden={scenarioForm.isOpen}
+                className="w-full md:w-52 shrink-0 border-b md:border-b-0 md:border-r border-border bg-foreground/[0.01] flex md:flex-col overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3 gap-1 scrollbar-hide"
+              >
                 {tabs.map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 ${
+                      className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
                         isActive
                           ? "bg-foreground/5 text-foreground border border-border/50"
                           : "text-foreground/75 hover:bg-foreground/[0.02] hover:text-foreground border border-transparent"
@@ -142,7 +177,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6 bg-background/20">
+              <div
+                className={`flex-1 overflow-y-auto ${scenarioForm.isOpen ? "flex flex-col p-0" : "px-5 py-6 sm:px-6 bg-background/20"}`}
+              >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}
@@ -159,12 +196,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         enableImageGeneration={enableImageGeneration}
                         setEnableImageGeneration={setEnableImageGeneration}
                         customIdentity={{
-                          name: customSenderName,
+                          senderName: customSenderName,
                           bodyName: customBodyName,
                           email: customEmail,
                           city: customCity,
                         }}
+                        setCustomSenderName={setCustomSenderName}
+                        setCustomBodyName={setCustomBodyName}
+                        setCustomEmail={setCustomEmail}
+                        setCustomCity={setCustomCity}
                         globalConsumerTypeId={globalConsumerTypeId}
+                        setGlobalConsumerTypeId={setGlobalConsumerTypeId}
+                        consumerNameMentionPattern={consumerNameMentionPattern}
+                        setConsumerNameMentionPattern={
+                          setConsumerNameMentionPattern
+                        }
+                        selectedModel={selectedModel}
+                        setSelectedModel={setSelectedModel}
+                        writingStyleMode={writingStyleMode}
+                        setWritingStyleMode={setWritingStyleMode}
                         setLocalSettings={setLocalSettings}
                       />
                     )}
@@ -190,7 +240,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         customCity={customCity}
                         setCustomCity={setCustomCity}
                         consumerNameMentionPattern={consumerNameMentionPattern}
-                        setConsumerNameMentionPattern={setConsumerNameMentionPattern}
+                        setConsumerNameMentionPattern={
+                          setConsumerNameMentionPattern
+                        }
                         handleResetDefaults={handleResetDefaults}
                       />
                     )}
@@ -208,7 +260,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0">
+            <div
+              hidden={scenarioForm.isOpen}
+              className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0"
+            >
               <button
                 onClick={handleResetDefaults}
                 className="flex items-center gap-2 text-xs font-medium text-red-500/80 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5"
@@ -218,7 +273,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
               <div className="flex gap-3">
                 <button
-                  onClick={onClose}
+                  onClick={requestClose}
                   className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
                 >
                   Batal

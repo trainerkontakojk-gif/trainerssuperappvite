@@ -3,11 +3,7 @@ import type {
   PdktScenario,
   ResolvedConsumerNameMentionPattern,
 } from "@trainers/types";
-import {
-  LICENSED_COMPANY_NAMES,
-  SCENARIO_COMPANY_CATEGORY_MAP,
-  UNLICENSED_COMPANY_NAMES,
-} from "./pdkt-company-names";
+import { UNLICENSED_COMPANY_NAMES } from "./pdkt-company-names";
 import {
   buildPdktIdentityRenderingPolicy,
   renderPdktIdentityByMentionPattern,
@@ -38,14 +34,12 @@ function replaceAllPatterns(
 }
 
 export function resolvePdktCompanyName(scenario: PdktScenario, pickIndex = Date.now()) {
-  const category = SCENARIO_COMPANY_CATEGORY_MAP[scenario.title] || scenario.category || "default";
-  const pool = scenario.isLicensed
-    ? LICENSED_COMPANY_NAMES[category] || LICENSED_COMPANY_NAMES.Perbankan
-    : UNLICENSED_COMPANY_NAMES[category] || UNLICENSED_COMPANY_NAMES.default;
+  const category = scenario.category || "default";
+  const pool = UNLICENSED_COMPANY_NAMES[category] || UNLICENSED_COMPANY_NAMES.default;
   const name = pool[Math.abs(pickIndex) % pool.length];
 
   return {
-    kind: scenario.isLicensed ? ("licensed" as const) : ("unlicensed" as const),
+    kind: "unlicensed" as const,
     name,
     category,
   };

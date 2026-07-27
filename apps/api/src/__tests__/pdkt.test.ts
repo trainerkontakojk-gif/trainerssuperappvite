@@ -177,7 +177,6 @@ describe("PDKT Service", () => {
         title: "Test Scenario",
         description: "Description",
         isActive: true,
-        isLicensed: true,
       };
       const config = {
         scenarios: [scenario],

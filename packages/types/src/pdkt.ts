@@ -80,7 +80,6 @@ export const pdktScenarioSchema = z.object({
     })
     .optional(),
   alwaysUseSampleEmail: z.boolean().optional(),
-  isLicensed: z.boolean().optional(),
   attachmentImages: z.array(z.string()).optional(),
 });
 export type PdktScenario = z.infer<typeof pdktScenarioSchema>;

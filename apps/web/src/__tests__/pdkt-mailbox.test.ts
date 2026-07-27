@@ -93,7 +93,6 @@ describe("PDKT Settings Helpers", () => {
         title: "Test",
         description: "Test",
         isActive: true,
-        isLicensed: false,
       },
       {
         name: "Budi",

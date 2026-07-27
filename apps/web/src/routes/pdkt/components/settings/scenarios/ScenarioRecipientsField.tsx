@@ -25,7 +25,9 @@ export function ScenarioRecipientsField({
   const recipientMode = draft.recipientMode ?? "single";
   const primaryRecipientType = draft.primaryRecipientType ?? "reported_company";
   const recipientEmails = draft.recipientEmails ?? [];
-  const invalidEmails = new Set(findInvalidPdktRecipientEmails(recipientEmails));
+  const invalidEmails = new Set(
+    findInvalidPdktRecipientEmails(recipientEmails),
+  );
 
   const updateRecipientEmails = (next: string[]) => {
     onDraftChange({ recipientEmails: next });
@@ -36,19 +38,23 @@ export function ScenarioRecipientsField({
   };
 
   const handleRemoveEmail = (index: number) => {
-    updateRecipientEmails(recipientEmails.filter((_, current) => current !== index));
+    updateRecipientEmails(
+      recipientEmails.filter((_, current) => current !== index),
+    );
   };
 
   const handleChangeEmail = (index: number, value: string) => {
     updateRecipientEmails(
-      recipientEmails.map((email, current) => (current === index ? value : email)),
+      recipientEmails.map((email, current) =>
+        current === index ? value : email,
+      ),
     );
   };
 
   return (
     <div
       id="scenario-recipient-targets"
-      className="col-span-2 rounded-xl border border-border bg-card/20 p-4 space-y-4"
+      className="col-span-2 space-y-4 pb-5"
     >
       <div className="flex items-start gap-3">
         <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -59,7 +65,8 @@ export function ScenarioRecipientsField({
             Email Tujuan
           </h4>
           <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-            Atur alamat tujuan per skenario. Alamat fallback sistem tetap selalu tersedia.
+            Atur alamat tujuan per skenario. Alamat fallback sistem tetap selalu
+            tersedia.
           </p>
         </div>
       </div>
@@ -96,7 +103,8 @@ export function ScenarioRecipientsField({
               value={recipientMode}
               onChange={(e) =>
                 onDraftChange({
-                  recipientMode: e.target.value === "multiple" ? "multiple" : "single",
+                  recipientMode:
+                    e.target.value === "multiple" ? "multiple" : "single",
                 })
               }
             >
@@ -107,7 +115,7 @@ export function ScenarioRecipientsField({
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-lg border border-border bg-background px-3 py-2">
+          <div className="border-b border-border pb-3">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Alamat Fallback Sistem
             </div>
@@ -123,13 +131,14 @@ export function ScenarioRecipientsField({
                   Alamat Tambahan
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Tambahkan alamat custom untuk skenario ini. Email invalid akan diblok saat simpan.
+                  Tambahkan alamat custom untuk skenario ini. Email invalid akan
+                  diblok saat simpan.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddEmail}
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-foreground/5 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Tambah alamat
@@ -138,13 +147,15 @@ export function ScenarioRecipientsField({
 
             <div className="space-y-2">
               {recipientEmails.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-foreground/[0.02] px-3 py-3 text-xs text-muted-foreground">
-                  Belum ada alamat tambahan. Fallback sistem akan dipakai otomatis.
+                <div className="border-l-2 border-border px-3 py-2 text-xs text-muted-foreground">
+                  Belum ada alamat tambahan. Fallback sistem akan dipakai
+                  otomatis.
                 </div>
               ) : (
                 recipientEmails.map((email, index) => {
                   const trimmed = normalizePdktRecipientEmail(email);
-                  const isInvalid = trimmed.length > 0 && invalidEmails.has(trimmed);
+                  const isInvalid =
+                    trimmed.length > 0 && invalidEmails.has(trimmed);
                   return (
                     <div key={index} className="flex items-start gap-2">
                       <div className="flex-1 space-y-1">
@@ -152,12 +163,24 @@ export function ScenarioRecipientsField({
                           id={`scenario-recipient-email-${index}`}
                           type="email"
                           placeholder="alamat.tujuan@domain.com"
+                          aria-label={`Alamat email tambahan ${index + 1}`}
                           value={email}
-                          onChange={(e) => handleChangeEmail(index, e.target.value)}
+                          onChange={(e) =>
+                            handleChangeEmail(index, e.target.value)
+                          }
                           aria-invalid={isInvalid}
+                          aria-describedby={
+                            isInvalid
+                              ? `scenario-recipient-email-${index}-error`
+                              : undefined
+                          }
                         />
                         {isInvalid && (
-                          <p className="text-[11px] text-destructive">
+                          <p
+                            id={`scenario-recipient-email-${index}-error`}
+                            className="text-[11px] text-destructive"
+                            role="alert"
+                          >
                             Format email tidak valid.
                           </p>
                         )}
@@ -177,7 +200,13 @@ export function ScenarioRecipientsField({
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Mode <span className="font-medium text-foreground">single</span> membatasi alamat tambahan aktif. Mode <span className="font-medium text-foreground">multiple</span> memakai semua alamat tambahan sekaligus.
+              Mode{" "}
+              <span className="font-medium text-foreground">satu alamat</span>{" "}
+              membatasi alamat tambahan aktif. Mode{" "}
+              <span className="font-medium text-foreground">
+                beberapa alamat
+              </span>{" "}
+              memakai semua alamat tambahan sekaligus.
             </p>
           </div>
         </div>

@@ -22,7 +22,6 @@ const scenario: PdktScenario = {
   title: "Klaim Asuransi Ditolak",
   description: "Konsumen mengeluh klaim ditolak.",
   isActive: true,
-  isLicensed: true,
 };
 
 describe("pdkt-email-policy", () => {

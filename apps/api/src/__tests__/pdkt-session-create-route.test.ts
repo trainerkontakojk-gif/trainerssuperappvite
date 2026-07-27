@@ -121,7 +121,6 @@ describe("PDKT Unified Session Create Route", () => {
           title: "x".repeat(501),
           description: "Keluhan",
           isActive: true,
-          isLicensed: false,
         },
         consumerTypeId: "marah",
         identity: {
@@ -258,7 +257,6 @@ describe("PDKT Unified Session Create Route", () => {
           title: "Pinjol Ilegal",
           description: "Konsumen diteror pinjol ilegal.",
           isActive: true,
-          isLicensed: false,
           recipientMode: "multiple",
           recipientEmails: ["alpha@test.com", "beta@test.com"],
           alwaysUseSampleEmail: true,
@@ -322,7 +320,6 @@ describe("PDKT Unified Session Create Route", () => {
           title: "Pinjol Ilegal",
           description: "Konsumen diteror pinjol ilegal.",
           isActive: true,
-          isLicensed: false,
           primaryRecipientType: "ojk",
           recipientMode: "single",
           recipientEmails: ["company@test.com"],

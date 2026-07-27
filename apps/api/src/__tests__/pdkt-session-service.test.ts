@@ -30,6 +30,7 @@ vi.mock("../services/pdkt-email-policy", async () => {
 });
 
 import { generateGeminiContent } from "../lib/gemini";
+import { readPdktSettings } from "../lib/pdkt-settings";
 import { generateOpenRouterContent } from "../lib/openrouter";
 import { generateDeepSeekContent } from "../lib/deepseek";
 import { resolveModelProvider } from "../lib/ai-models";
@@ -95,7 +96,6 @@ const mockPinjolScenario: PdktScenario = {
   title: "Pinjol Ilegal",
   description: "Konsumen diteror pinjol ilegal.",
   isActive: true,
-  isLicensed: false,
 };
 
 const mockConsumerType: PdktConsumerType = {
@@ -713,6 +713,43 @@ describe("resolvePdktGenerationConfig", () => {
     expect(result.scenario.title).toBe("Draft Pinjol");
     expect(result.consumerType.name).toBe("Draft Ramah");
     expect(result.config.identity.email).toBe("budi@mail.com");
+  });
+
+  it("keeps normalized OJK primary and custom recipients in resolved session config", () => {
+    const normalized = readPdktSettings({
+      enableImageGeneration: true,
+      scenarios: [
+        {
+          ...mockPinjolScenario,
+          isLicensed: true,
+          primaryRecipientType: "ojk",
+          recipientMode: "multiple",
+          recipientEmails: ["company@example.com", "support@example.com"],
+        },
+      ],
+    });
+    const scenarioDraft = (normalized?.scenarios as unknown[] | undefined)?.[
+      0
+    ] as PdktScenario;
+
+    const result = resolvePdktGenerationConfig({
+      scenarioDraft,
+      consumerTypeDraft: mockConsumerType,
+      consumerTypeId: "ramah",
+      identity: mockIdentity,
+    });
+
+    expect(result.scenario.primaryRecipientType).toBe("ojk");
+    expect(result.scenario.recipientEmails).toEqual([
+      "company@example.com",
+      "support@example.com",
+    ]);
+    expect(result.config.recipientContext).toEqual({
+      primaryRecipientType: "ojk",
+      primaryRecipientAddress: "konsumen@ojk.go.id",
+      ccRecipients: ["company@example.com", "support@example.com"],
+      replyIntent: "reply_to_ojk",
+    });
   });
 
   it("resolves scenario and consumer type from IDs", () => {

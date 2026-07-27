@@ -1,87 +1,58 @@
 import React from "react";
+import { Check } from "lucide-react";
 
-export type ScenarioWizardStep = "basic" | "advanced";
+export type ScenarioWizardStep = "scenario" | "profile" | "email";
+export type ScenarioStepStatus = "Belum diisi" | "Sedang diisi" | "Selesai";
 
-interface ScenarioWizardStepHeaderProps {
+interface Props {
   activeStep: ScenarioWizardStep;
+  statuses: Record<ScenarioWizardStep, ScenarioStepStatus>;
   onStepChange: (step: ScenarioWizardStep) => void;
 }
 
+const steps: { id: ScenarioWizardStep; label: string }[] = [
+  { id: "scenario", label: "1. Skenario" },
+  { id: "profile", label: "2. Profil Pengirim" },
+  { id: "email", label: "3. Email & Pengaturan" },
+];
+
 export function ScenarioWizardStepHeader({
   activeStep,
+  statuses,
   onStepChange,
-}: ScenarioWizardStepHeaderProps) {
-  const steps = [
-    {
-      id: "basic" as const,
-      label: "Langkah 1",
-      title: "Info Dasar",
-      description: "Wajib diisi untuk menyimpan skenario.",
-    },
-    {
-      id: "advanced" as const,
-      label: "Langkah 2",
-      title: "Detail Lanjutan (Opsional)",
-      description: "Dipakai hanya jika email atau lampiran memang diperlukan.",
-    },
-  ];
-
+}: Props) {
   return (
-    <div className="rounded-xl border border-border bg-card/40 p-4 space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h4 className="text-sm font-semibold text-foreground tracking-tight">
-            Wizard Skenario
-          </h4>
-          <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-            Bagi pengisian menjadi dua langkah agar lebih mudah dipindai.
-          </p>
-        </div>
-        <span className="text-[11px] font-medium text-muted-foreground">
-          Langkah aktif: {activeStep === "basic" ? "1" : "2"}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {steps.map((step) => {
-          const isActive = activeStep === step.id;
+    <nav
+      aria-label="Tahapan pengaturan skenario"
+      className="border-b border-border pb-4"
+    >
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {steps.map(({ id, label }) => {
+          const active = activeStep === id;
+          const status = statuses[id];
           return (
             <button
-              key={step.id}
+              key={id}
               type="button"
-              onClick={() => onStepChange(step.id)}
-              className={`rounded-lg border px-3 py-3 text-left transition-colors cursor-pointer ${
-                isActive
-                  ? "border-primary bg-primary/5"
-                  : "border-border bg-background hover:bg-foreground/[0.02]"
-              }`}
+              aria-current={active ? "step" : undefined}
+              aria-controls={`scenario-step-${id}`}
+              aria-label={`${label}, ${status}`}
+              onClick={() => onStepChange(id)}
+              className={`rounded-lg border px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${active ? "border-foreground bg-foreground/5" : "border-border hover:bg-foreground/5"}`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className={`text-[11px] font-semibold uppercase tracking-wide ${
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  {step.label}
-                </span>
-                {step.id === "advanced" && (
-                  <span className="text-[11px] font-medium text-muted-foreground">
-                    Opsional
-                  </span>
+              <span className="block text-sm font-semibold text-foreground">
+                {label}
+              </span>
+              <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                {status === "Selesai" && (
+                  <Check aria-hidden="true" className="h-3.5 w-3.5" />
                 )}
-              </div>
-              <div className="mt-1">
-                <div className="text-sm font-semibold text-foreground tracking-tight">
-                  {step.title}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-                  {step.description}
-                </p>
-              </div>
+                {status}
+              </span>
             </button>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }

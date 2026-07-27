@@ -34,25 +34,39 @@ export function readPdktSettings(settings: unknown): JsonRecord | null {
   return migratePdktSettings(pdkt);
 }
 
-function migratePdktSettings(pdkt: JsonRecord): JsonRecord {
-  const result = { ...pdkt };
+function sanitizeScenario(value: unknown): JsonRecord | null {
+  if (!isPlainObject(value)) return null;
 
-  const scenarios = Array.isArray(result.scenarios) ? result.scenarios : [];
-  if (scenarios.length > 0) {
-    result.scenarios = (scenarios as any[]).map((s) => {
-      const migrated = { ...s };
-      if (s.script && (!s.sampleEmailTemplate || !s.sampleEmailTemplate.body)) {
-        migrated.sampleEmailTemplate = {
-          ...migrated.sampleEmailTemplate,
-          body: s.script,
-        };
-        migrated.alwaysUseSampleEmail = false;
-      }
-      return migrated;
-    });
+  const { isLicensed: _ignored, ...scenario } = value;
+  if (
+    typeof scenario.script === "string" &&
+    (!isPlainObject(scenario.sampleEmailTemplate) ||
+      typeof scenario.sampleEmailTemplate.body !== "string" ||
+      !scenario.sampleEmailTemplate.body)
+  ) {
+    scenario.sampleEmailTemplate = {
+      ...(isPlainObject(scenario.sampleEmailTemplate)
+        ? scenario.sampleEmailTemplate
+        : {}),
+      body: scenario.script,
+    };
+    scenario.alwaysUseSampleEmail = false;
   }
+  return scenario;
+}
 
+function sanitizePdktSettings(pdkt: JsonRecord): JsonRecord {
+  const result = { ...pdkt };
+  if (Array.isArray(result.scenarios)) {
+    result.scenarios = result.scenarios
+      .map(sanitizeScenario)
+      .filter((scenario): scenario is JsonRecord => scenario !== null);
+  }
   return result;
+}
+
+function migratePdktSettings(pdkt: JsonRecord): JsonRecord {
+  return sanitizePdktSettings(pdkt);
 }
 
 export function writePdktSettings(
@@ -61,6 +75,6 @@ export function writePdktSettings(
 ): JsonRecord {
   return {
     ...(isPlainObject(existingSettings) ? existingSettings : {}),
-    pdkt: nextSettings,
+    pdkt: sanitizePdktSettings(nextSettings),
   };
 }

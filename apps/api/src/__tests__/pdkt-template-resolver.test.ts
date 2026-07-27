@@ -19,7 +19,6 @@ const asuransiScenario: PdktScenario = {
   title: "Klaim Asuransi Ditolak",
   description: "Konsumen mengeluh klaim ditolak.",
   isActive: true,
-  isLicensed: true,
 };
 
 const pinjolScenario: PdktScenario = {
@@ -28,11 +27,10 @@ const pinjolScenario: PdktScenario = {
   title: "Pinjol Ilegal",
   description: "Konsumen diteror pinjol ilegal.",
   isActive: true,
-  isLicensed: false,
 };
 
 describe("pdkt template resolver", () => {
-  it("replaces consumer and licensed company placeholders in manual templates", () => {
+  it("replaces consumer and fictitious company placeholders in manual templates", () => {
     const result = resolvePdktTemplateBody({
       subject: "Klaim saya",
       body: "Saya {{consumer_name}} mengadu soal [Nama Perusahaan Asuransi].",
@@ -44,7 +42,7 @@ describe("pdkt template resolver", () => {
 
     expect(result.body).not.toContain("{{consumer_name}}");
     expect(result.body).not.toContain("[Nama Perusahaan Asuransi]");
-    expect(result.body).toContain("Prudential Indonesia");
+    expect(result.body).toContain("Dana Cepat 88");
     expect(result.body).toContain("Budi");
     expect(result.body).not.toContain("Budi Santoso");
     expect(result.leftoverPlaceholders).toEqual([]);
@@ -89,7 +87,7 @@ describe("pdkt template resolver", () => {
 
       expect(result.body).not.toContain(v);
       expect(result.leftoverPlaceholders).toEqual([]);
-      expect(result.body).toContain("Prudential Indonesia");
+      expect(result.body).toContain("Dana Cepat 88");
     }
   });
 
@@ -106,7 +104,7 @@ describe("pdkt template resolver", () => {
     expect(result.subject).toBe("Halo Budi Santoso");
     expect(result.body).toContain("Budi");
     expect(result.body).not.toContain("Budi Santoso");
-    expect(result.body).toContain("Prudential Indonesia");
+    expect(result.body).toContain("Dana Cepat 88");
     expect(result.leftoverPlaceholders).toEqual([]);
   });
 
@@ -122,6 +120,6 @@ describe("pdkt template resolver", () => {
 
     expect(result.subject).not.toContain("Budi");
     expect(result.body).not.toContain("Budi");
-    expect(result.body).toContain("Prudential Indonesia");
+    expect(result.body).toContain("Dana Cepat 88");
   });
 });

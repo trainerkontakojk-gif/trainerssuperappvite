@@ -13,10 +13,6 @@ import {
   compactPdktPromptData,
   serializePdktPromptData,
 } from "./pdkt/prompt-contract";
-import {
-  LICENSED_COMPANY_NAMES,
-  SCENARIO_COMPANY_CATEGORY_MAP,
-} from "./pdkt-company-names";
 
 export interface PdktIdentityRenderingPolicy {
   mentionPattern: ResolvedConsumerNameMentionPattern;
@@ -93,12 +89,8 @@ export function buildPdktEmailGenerationPolicy(
   };
 }
 
-export function getCompanyNameInstruction(scenario?: PdktScenario): string {
-  if (!scenario?.isLicensed) {
-    return `1. PENAMAAN PERUSAHAAN: WAJIB mengarang NAMA entitas/perusahaan fiktif yang diadukan. JANGAN menggunakan kata "Bank", "Asuransi", atau "Sekuritas" karena entitas ilegal tidak berhak menggunakan nama tersebut. Contoh: "Pinjaman Kilat Nusantara", "Dana Cepat 88", "Investasi Cuan Jaya".`;
-  }
-
-  return "1. PENAMAAN PERUSAHAAN: Gunakan SALAH SATU nama resmi dari field allowedLicensedCompanyNames pada blok data konteks. JANGAN mengarang nama perusahaan lain.";
+export function getCompanyNameInstruction(_scenario?: PdktScenario): string {
+  return `1. PENAMAAN PERUSAHAAN: WAJIB mengarang NAMA entitas/perusahaan fiktif yang diadukan. JANGAN menggunakan kata "Bank", "Asuransi", atau "Sekuritas" karena entitas ilegal tidak berhak menggunakan nama tersebut. Contoh: "Pinjaman Kilat Nusantara", "Dana Cepat 88", "Investasi Cuan Jaya".`;
 }
 
 export function getConsumerNameMentionInstruction(
@@ -152,15 +144,6 @@ export function getRecipientDirectionInstruction(
     `;
 }
 
-function getLicensedCompanyNames(scenario: PdktScenario): string[] {
-  if (!scenario.isLicensed) return [];
-  const category =
-    SCENARIO_COMPANY_CATEGORY_MAP[scenario.title] ||
-    scenario.category ||
-    "Perbankan";
-  return LICENSED_COMPANY_NAMES[category] || [];
-}
-
 function buildGenerationContext(
   policy: PdktEmailPolicy,
   revisionRequirements: string[] = [],
@@ -171,7 +154,6 @@ function buildGenerationContext(
       category: policy.scenario.category,
       title: policy.scenario.title,
       description: policy.scenario.description,
-      isLicensed: policy.scenario.isLicensed ?? null,
       sampleEmailTemplate: policy.scenario.sampleEmailTemplate
         ? {
             subject: policy.scenario.sampleEmailTemplate.subject ?? null,
@@ -193,7 +175,6 @@ function buildGenerationContext(
       city: policy.identity.city,
     },
     recipientContext: policy.recipientContext ?? null,
-    allowedLicensedCompanyNames: getLicensedCompanyNames(policy.scenario),
     revisionRequirements,
   };
 }
