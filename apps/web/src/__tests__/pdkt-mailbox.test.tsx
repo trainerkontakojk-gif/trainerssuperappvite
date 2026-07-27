@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { act } from "react";
 import {
@@ -13,6 +13,11 @@ import type { PdktMailboxItem } from "@trainers/types";
 
 const useApiMock = vi.hoisted(() => vi.fn());
 const historyGetMock = vi.hoisted(() => vi.fn());
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 vi.mock("../lib/api", () => ({
   pdktClient: {
@@ -504,5 +509,153 @@ describe("EmailDetailPane Component", () => {
     expect(backBtn).toBeDefined();
     fireEvent.click(backBtn);
     expect(handleBackToList).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["raw base64", btoa("%PDF-1.4\\nfixture")],
+    ["data URI", `data:application/pdf;base64,${btoa("%PDF-1.4\\nfixture")}`],
+  ])("opens %s PDFs through a Blob object URL", (_label, attachment) => {
+    const openMock = vi
+      .spyOn(window, "open")
+      .mockImplementation(() => null);
+    const createObjectUrlMock = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:pdkt-pdf");
+    render(
+      <EmailDetailPane
+        item={{
+          ...mockItem,
+          inbound_email: { body: "", attachments: [attachment] } as any,
+        }}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
+
+    expect(createObjectUrlMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "application/pdf" }),
+    );
+    expect(openMock).toHaveBeenCalledWith(
+      "blob:pdkt-pdf",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    expect(openMock.mock.calls[0][0]).not.toMatch(/^data:/);
+    expect(screen.queryByAltText("Zoomed Attachment")).toBeNull();
+    createObjectUrlMock.mockRestore();
+    openMock.mockRestore();
+  });
+
+  it.each(["Enter", " "])(
+    "opens a PDF through the Blob boundary on %s keyboard activation",
+    (key) => {
+      const openMock = vi
+        .spyOn(window, "open")
+        .mockImplementation(() => null);
+      const createObjectUrlMock = vi
+        .spyOn(URL, "createObjectURL")
+        .mockReturnValue("blob:pdkt-pdf-keyboard");
+      const attachment = btoa("%PDF-1.4\\nfixture");
+      render(
+        <EmailDetailPane
+          item={{
+            ...mockItem,
+            inbound_email: { body: "", attachments: [attachment] } as any,
+          }}
+          onReply={() => {}}
+          onDelete={() => {}}
+          evaluation={null}
+          evaluationStatus={null}
+          evaluationError={null}
+          onRetryEval={() => {}}
+        />,
+      );
+
+      fireEvent.keyDown(screen.getByRole("button", { name: "PDF" }), { key });
+
+      expect(createObjectUrlMock).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "application/pdf" }),
+      );
+      expect(openMock).toHaveBeenCalledWith(
+        "blob:pdkt-pdf-keyboard",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      expect(screen.queryByAltText("Zoomed Attachment")).toBeNull();
+    },
+  );
+
+  it("revokes a PDF Blob URL after window.open throws", () => {
+    vi.useFakeTimers();
+    const openMock = vi.spyOn(window, "open").mockImplementation(() => {
+      throw new Error("popup blocked");
+    });
+    const createObjectUrlMock = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:pdkt-pdf-throws");
+    const revokeObjectUrlMock = vi.spyOn(URL, "revokeObjectURL");
+    const attachment = btoa("%PDF-1.4\\nfixture");
+    render(
+      <EmailDetailPane
+        item={{
+          ...mockItem,
+          inbound_email: { body: "", attachments: [attachment] } as any,
+        }}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+
+    expect(() =>
+      fireEvent.keyDown(screen.getByRole("button", { name: "PDF" }), {
+        key: "Enter",
+      }),
+    ).not.toThrow();
+    expect(openMock).toHaveBeenCalledTimes(1);
+    expect(revokeObjectUrlMock).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(revokeObjectUrlMock).toHaveBeenCalledWith("blob:pdkt-pdf-throws");
+    expect(createObjectUrlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps image activation in the zoom modal without PDF navigation", () => {
+    const openMock = vi
+      .spyOn(window, "open")
+      .mockImplementation(() => null);
+    const image = btoa("\x89PNG\r\n\x1a\nfixture");
+    render(
+      <EmailDetailPane
+        item={{
+          ...mockItem,
+          inbound_email: { body: "", attachments: [image] } as any,
+        }}
+        onReply={() => {}}
+        onDelete={() => {}}
+        evaluation={null}
+        evaluationStatus={null}
+        evaluationError={null}
+        onRetryEval={() => {}}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Attachment 1" }), {
+      key: "Enter",
+    });
+
+    expect(screen.getByAltText("Zoomed Attachment")).toBeDefined();
+    expect(openMock).not.toHaveBeenCalled();
+    openMock.mockRestore();
   });
 });

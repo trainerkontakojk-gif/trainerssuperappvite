@@ -15,6 +15,23 @@ export function isPdfAttachment(base64: string): boolean {
   return getAttachmentDataUri(base64).startsWith("data:application/pdf");
 }
 
+export function getPdfBlob(base64: string): Blob | null {
+  if (!isPdfAttachment(base64)) return null;
+
+  try {
+    const payload = base64.startsWith("data:")
+      ? base64.slice(base64.indexOf(",") + 1)
+      : base64;
+    const binary = atob(payload);
+    const bytes = Uint8Array.from(binary, (character) =>
+      character.charCodeAt(0),
+    );
+    return new Blob([bytes], { type: "application/pdf" });
+  } catch {
+    return null;
+  }
+}
+
 export function getImageDataUri(base64: string): string {
   return getAttachmentDataUri(base64);
 }

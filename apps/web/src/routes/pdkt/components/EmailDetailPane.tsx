@@ -13,7 +13,11 @@ import {
 } from "lucide-react";
 import type { PdktMailboxItem } from "@trainers/types";
 import ScenarioImage from "./ScenarioImage";
-import { getAttachmentDataUri, isPdfAttachment } from "../utils/detectMimeType";
+import {
+  getAttachmentDataUri,
+  getPdfBlob,
+  isPdfAttachment,
+} from "../utils/detectMimeType";
 
 interface EmailDetailPaneProps {
   item: PdktMailboxItem;
@@ -117,7 +121,21 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   const handleAttachmentClick = (base64: string) => {
     const attachmentUri = getAttachmentDataUri(base64);
     if (isPdfAttachment(base64)) {
-      window.open(attachmentUri, "_blank", "noopener,noreferrer");
+      try {
+        const pdfBlob = getPdfBlob(base64);
+        if (!pdfBlob || typeof URL.createObjectURL !== "function") return;
+
+        const objectUrl = URL.createObjectURL(pdfBlob);
+        try {
+          window.open(objectUrl, "_blank", "noopener,noreferrer");
+        } finally {
+          window.setTimeout(() => {
+            URL.revokeObjectURL?.(objectUrl);
+          }, 60_000);
+        }
+      } catch {
+        // Keep malformed attachments and blocked popups from breaking the pane.
+      }
       return;
     }
 
