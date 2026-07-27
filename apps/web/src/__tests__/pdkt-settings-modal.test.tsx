@@ -90,6 +90,26 @@ async function reachEmailStage(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("PDKT scenario wizard", () => {
+  it("shows the Gemini/OpenAI-only model registry in the system tab", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByRole("button", { name: "Sistem" }));
+
+    [
+      "Gemini 3.6 Flash",
+      "Gemini 3.5 Flash Lite",
+      "GPT 5.6 Luna",
+      "GPT 5.4 Mini",
+    ].forEach((name) => {
+      expect(screen.getByText(name)).toBeDefined();
+    });
+    expect(screen.queryByText(/OpenRouter/i)).toBeNull();
+    expect(screen.queryByText(/DeepSeek/i)).toBeNull();
+    expect(screen.getAllByText("Gemini").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+  });
+
   beforeEach(() => vi.restoreAllMocks());
 
   it("renders the exact three-stage contract and disables invalid progress", async () => {

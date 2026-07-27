@@ -622,37 +622,40 @@ pnpm --filter @trainers/telefun test:core
 
 ### Proxy (apps/telefun) — dari `.env.local` root
 
-| Variable                    | Required          | Default         | Deskripsi                                       |
-| --------------------------- | ----------------- | --------------- | ----------------------------------------------- |
-| `PORT`                      | ❌                | `3002`          | Port server                                     |
-| `SUPABASE_URL`              | ✅                | —               | Supabase URL                                    |
-| `SUPABASE_ANON_KEY`         | ✅                | —               | Anon key (auth)                                 |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅                | —               | Service role (DB)                               |
-| `GEMINI_API_KEY`            | ✅                | —               | Gemini Live API key                             |
-| `OPENAI_API_KEY`            | Jika OpenAI aktif | —               | Hanya di service Telefun                        |
-| `TELEFUN_OPENAI_ENABLED`    | ❌                | `false`         | Kill switch OpenAI                              |
-| `TELEFUN_INTERNAL_TOKEN`    | Jika OpenAI aktif | —               | Shared server-only token; nilai sama dengan API |
-| `ALLOWED_ORIGINS`           | ❌                | `"*"`           | CORS origins                                    |
-| `NODE_ENV`                  | ❌                | `"development"` | Mode                                            |
+| Variable                    | Required          | Default         | Deskripsi                                                                 |
+| --------------------------- | ----------------- | --------------- | ------------------------------------------------------------------------- |
+| `PORT`                      | ❌                | `3002`          | Port server                                                               |
+| `SUPABASE_URL`              | ✅                | —               | Supabase URL                                                              |
+| `SUPABASE_ANON_KEY`         | ✅                | —               | Anon key (auth)                                                           |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅                | —               | Service role (DB)                                                         |
+| `GEMINI_API_KEY`            | ✅                | —               | Gemini Live API key                                                       |
+| `OPENAI_API_KEY`            | Jika OpenAI realtime aktif | —       | Khusus service Telefun untuk OpenAI Realtime; tidak pernah ke Frontend     |
+| `TELEFUN_OPENAI_ENABLED`    | ❌                | `false`         | Kill switch OpenAI realtime                                               |
+| `TELEFUN_INTERNAL_TOKEN`    | Jika OpenAI aktif | —               | Shared server-only token; nilai sama dengan API                            |
+| `ALLOWED_ORIGINS`           | ❌                | `"*"`           | CORS origins                                                              |
+| `NODE_ENV`                  | ❌                | `"development"` | Mode                                                                      |
 
 ### Frontend — dari `VITE_*` env (via `.env.local` root)
 
-| Variable                 | Required | Deskripsi                                                                                                |
-| ------------------------ | -------- | -------------------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`      | ✅       | Supabase URL                                                                                             |
-| `VITE_SUPABASE_ANON_KEY` | ✅       | Supabase anon key                                                                                        |
+| Variable                 | Required | Deskripsi                                                                                               |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`      | ✅       | Supabase URL                                                                                            |
+| `VITE_SUPABASE_ANON_KEY` | ✅       | Supabase anon key                                                                                       |
 | `VITE_TELEFUN_WS_URL`    | ✅       | WebSocket URL proxy (biasanya `ws://localhost:3002`) — dipakai di `liveProtocol.ts` & `geminiService.ts` |
 
 ### Backend API — server-only
 
-| Variable                 | Required          | Deskripsi                                     |
-| ------------------------ | ----------------- | --------------------------------------------- |
-| `TELEFUN_INTERNAL_URL`   | Jika OpenAI aktif | Origin privat service Telefun; hanya di API   |
-| `TELEFUN_INTERNAL_TOKEN` | Jika OpenAI aktif | Shared token yang sama dengan service Telefun |
+| Variable                 | Required                 | Deskripsi                                                                 |
+| ------------------------ | ------------------------ | ------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`         | Wajib untuk text generation | Key server-only API untuk direct text generation                           |
+| `TELEFUN_INTERNAL_URL`   | Jika OpenAI aktif        | Origin privat service Telefun; hanya di API                                |
+| `TELEFUN_INTERNAL_TOKEN` | Jika OpenAI aktif        | Shared token yang sama dengan service Telefun                              |
 
-`OPENAI_API_KEY` tidak boleh dipasang pada API atau Frontend. Endpoint
-`POST /internal/telefun/scoring` tidak menyediakan CORS dan hanya menerima
-request server-to-server terautentikasi.
+`OPENAI_API_KEY` bersifat server-only. API memakai key-nya sendiri untuk
+text generation direct, sedangkan Telefun memakai `OPENAI_API_KEY` terpisah
+hanya saat OpenAI Realtime diaktifkan. Frontend tidak pernah menerima key ini.
+Endpoint `POST /internal/telefun/scoring` tidak menyediakan CORS dan hanya
+menerima request server-to-server terautentikasi.
 
 ---
 

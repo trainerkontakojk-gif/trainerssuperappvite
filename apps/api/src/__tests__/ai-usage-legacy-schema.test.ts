@@ -127,7 +127,7 @@ describe("logAiUsage legacy schema compatibility", () => {
     await logAiUsage({
       requestId: "req-2",
       userId: "user-2",
-      provider: "openrouter",
+      provider: "openai",
       modelId: "gpt-4o-mini",
       usageContext: { module: "pdkt", action: "generate_template" },
       tokens: { inputTokens: 50, outputTokens: 100, totalTokens: 150 },
@@ -287,7 +287,7 @@ describe("logAiUsage legacy schema compatibility", () => {
     await logAiUsage({
       requestId: "req-pricing-error",
       userId: "user-1",
-      provider: "openrouter",
+      provider: "openai",
       modelId: "gpt-4o-mini",
       usageContext: { module: "pdkt", action: "generate_template" },
       tokens: { inputTokens: 10, outputTokens: 10, totalTokens: 20 },

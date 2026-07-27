@@ -4,7 +4,6 @@ import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { DEFAULT_PDKT_MODEL_ID, coercePdktModelId } from "../../pdktSettings";
-import { TEXT_MODELS } from "../../pdktSettings";
 import {
   normalizePdktConsumerDraft,
   normalizePdktScenarioDraft,
@@ -50,7 +49,7 @@ export function buildPdktSettingsForSave(params: {
     consumerTypes: params.consumerTypes,
     enableImageGeneration: params.system.enableImageGeneration,
     globalConsumerTypeId: params.system.globalConsumerTypeId,
-    selectedModel: params.system.selectedModel,
+    selectedModel: coercePdktModelId(params.system.selectedModel),
     consumerNameMentionPattern: params.system.consumerNameMentionPattern,
     writingStyleMode: params.system.writingStyleMode,
     customIdentity: params.system.customIdentity,
@@ -68,7 +67,10 @@ export function usePdktSettingsDraft({
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system"
   >("scenarios");
-  const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
+  const [localSettings, setLocalSettings] = useState<AppSettings>(() => ({
+    ...settings,
+    selectedModel: coercePdktModelId(settings.selectedModel),
+  }));
 
   // Identity Form State
   const [customSenderName, setCustomSenderName] = useState(
@@ -92,7 +94,7 @@ export function usePdktSettingsDraft({
     localSettings.globalConsumerTypeId || "random",
   );
   const [selectedModel, setSelectedModel] = useState(
-    localSettings.selectedModel || DEFAULT_PDKT_MODEL_ID,
+    coercePdktModelId(localSettings.selectedModel || DEFAULT_PDKT_MODEL_ID),
   );
 
   const [consumerNameMentionPattern, setConsumerNameMentionPattern] = useState(
@@ -156,12 +158,7 @@ export function usePdktSettingsDraft({
   // Sync state when modal opens to ensure fresh data
   useEffect(() => {
     if (isOpen) {
-      const normalizedModel = coercePdktModelId(settings.selectedModel);
-      const nextSelectedModel = TEXT_MODELS.some(
-        (model) => model.id === normalizedModel,
-      )
-        ? normalizedModel
-        : DEFAULT_PDKT_MODEL_ID;
+      const nextSelectedModel = coercePdktModelId(settings.selectedModel);
       setLocalSettings({ ...settings, selectedModel: nextSelectedModel });
       setCustomSenderName(settings.customIdentity?.senderName || "");
       setCustomBodyName(settings.customIdentity?.bodyName || "");

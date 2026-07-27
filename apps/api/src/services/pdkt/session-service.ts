@@ -410,7 +410,7 @@ export async function initializeEmailSession(
             source: "ai",
             status: "attached",
             attemptedModel: imageResult.diagnostics?.attemptedModel,
-            provider: imageResult.diagnostics?.provider,
+            provider: imageResult.diagnostics?.provider === "openai" ? "openai" : "gemini",
           };
         } else {
           attachmentDiagnostics = {
@@ -418,7 +418,7 @@ export async function initializeEmailSession(
             status: "failed",
             reason: imageResult.diagnostics?.reason || "empty-output",
             attemptedModel: imageResult.diagnostics?.attemptedModel,
-            provider: imageResult.diagnostics?.provider,
+            provider: imageResult.diagnostics?.provider === "openai" ? "openai" : "gemini",
             message: imageResult.warning || "Gagal membuat bukti gambar.",
           };
         }

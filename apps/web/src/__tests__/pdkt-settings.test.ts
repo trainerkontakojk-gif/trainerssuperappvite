@@ -43,12 +43,20 @@ describe("PDKT Settings Helpers", () => {
     writingStyleMode: "training",
   };
 
-  it("coerces invalid model to default", () => {
+  it("coerces legacy model IDs to supported direct models", () => {
     expect(coercePdktModelId("invalid-model")).toBe("gemini-3.1-flash-lite");
     expect(coercePdktModelId("gemini-3.1-pro-preview")).toBe(
       "gemini-3.1-pro-preview",
     );
-    expect(coercePdktModelId("deepseek-v4-pro")).toBe("deepseek-v4-pro");
+    expect(coercePdktModelId("gpt-5.4-mini")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("deepseek-v4-pro")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("deepseek-v4-flash")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("openai/gpt-4o-mini")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("openrouter/gpt-4o-mini")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("deepseek/deepseek-v3")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("legacy-provider/gpt-4o-mini")).toBe(
+      "gpt-5.4-mini",
+    );
   });
 
   it("resolves random name mention to a valid pattern", () => {

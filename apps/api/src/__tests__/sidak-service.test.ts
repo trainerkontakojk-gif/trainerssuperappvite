@@ -29,8 +29,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn().mockResolvedValue({ success: true, text: '{"executiveSummary": "test summary"}' }),
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn().mockResolvedValue({ success: true, text: '{"executiveSummary": "test summary"}' }),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn().mockResolvedValue({ success: true, text: '{"executiveSummary": "test summary"}' }),
 }));
 
 import * as sidakService from "../services/sidak-service";

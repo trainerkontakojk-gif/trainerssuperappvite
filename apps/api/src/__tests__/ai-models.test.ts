@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { KETIK_PDKT_MODELS, TEXT_MODELS } from "@trainers/types";
-import { getModelsForModule, resolveModelProvider } from "../lib/ai-models";
+import {
+  IMAGE_GENERATION_MODELS,
+  KETIK_PDKT_MODELS,
+  TEXT_MODELS,
+} from "@trainers/types";
+import {
+  DEFAULT_AI_MODEL_ID,
+  getModelsForModule,
+  normalizeModelId,
+  resolveModelProvider,
+} from "../lib/ai-models";
 
 describe("ai model registry", () => {
   it("exposes Gemini 3.5 Flash as a Gemini text simulation model", () => {
@@ -48,27 +57,46 @@ describe("ai model registry", () => {
     expect(models.every((model) => model.realtime?.supportsAudio)).toBe(true);
   });
 
-  it("exposes DeepSeek direct models only for ketik and pdkt", () => {
+  it("exposes only direct Gemini and OpenAI active text models", () => {
     expect(
-      KETIK_PDKT_MODELS.some((model) => model.id === "deepseek-v4-pro"),
+      [
+        "gemini-3.6-flash",
+        "gemini-3.5-flash-lite",
+        "gpt-5.6-luna",
+        "gpt-5.4-mini",
+      ].every((id) => KETIK_PDKT_MODELS.some((model) => model.id === id)),
     ).toBe(true);
     expect(
-      getModelsForModule("ketik").some(
-        (model) => model.id === "deepseek-v4-flash",
+      KETIK_PDKT_MODELS.every((model) =>
+        ["gemini", "openai"].includes(model.provider),
       ),
     ).toBe(true);
-    expect(
-      getModelsForModule("qa-analyzer").some(
-        (model) => model.id === "deepseek-v4-pro",
-      ),
-    ).toBe(false);
   });
 
-  it("routes DeepSeek direct models to the DeepSeek provider", () => {
-    expect(resolveModelProvider("deepseek-v4-pro")).toMatchObject({
-      modelId: "deepseek-v4-pro",
-      provider: "deepseek",
-      isFallback: false,
+  it("keeps the active provider contract limited to Gemini and OpenAI", () => {
+    expect(
+      [...TEXT_MODELS, ...IMAGE_GENERATION_MODELS].every((model) =>
+        ["gemini", "openai"].includes(model.provider),
+      ),
+    ).toBe(true);
+    expect(
+      IMAGE_GENERATION_MODELS.every(
+        (model) => model.capabilities?.imageGenerationMode !== "none",
+      ),
+    ).toBe(true);
+  });
+
+  it("normalizes legacy provider selections while preserving supported and unknown IDs", () => {
+    expect(normalizeModelId("gpt-5.4-mini")).toBe("gpt-5.4-mini");
+    expect(normalizeModelId("openrouter/gpt-4o-mini")).toBe("gpt-5.4-mini");
+    expect(normalizeModelId("legacy-provider/gpt-4o-mini")).toBe(
+      "gpt-5.4-mini",
+    );
+    expect(normalizeModelId("deepseek-v4-pro")).toBe("gpt-5.4-mini");
+    expect(resolveModelProvider("unknown-model")).toMatchObject({
+      modelId: DEFAULT_AI_MODEL_ID,
+      provider: "gemini",
+      isFallback: true,
     });
   });
 });

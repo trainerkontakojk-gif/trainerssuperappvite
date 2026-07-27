@@ -5,7 +5,6 @@ import {
   DEFAULT_IMAGE_GENERATION_MODEL_ID,
 } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenRouterContent } from "../../lib/openrouter";
 import { UsageContext } from "../../lib/ai-usage";
 import { Modality } from "@google/genai";
 
@@ -18,8 +17,8 @@ const MAX_DATA_URI_LENGTH = 650_000;
  */
 export type PdktImageGenerationDiagnostics = {
   attemptedModel: string;
-  provider: Exclude<AIProvider, "openai">;
-  imageGenerationMode: "native" | "openrouter-modalities" | "none";
+  provider: AIProvider;
+  imageGenerationMode: "native" | "none";
   reason?: "disabled" | "manual-attachment" | "provider-error" | "empty-output" | "oversized-output";
   error?: string;
 };
@@ -160,56 +159,19 @@ export async function generatePdktScenarioImages(
           imageGenerationMode: mode,
         },
       };
-    } else {
-      // OpenRouter uses modalities: ["image"] for image generation models
-      const response = await generateOpenRouterContent({
-        model: resolvedModel,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        modalities: ["image"],
-        usageContext: finalUsageContext,
-        userId,
-      });
-
-      if (!response.success) {
-        return {
-          success: false,
-          images: [],
-          warning: `Gagal membuat bukti gambar (${response.error || "OpenRouter provider error"}).`,
-          diagnostics: {
-            attemptedModel: resolvedModel,
-            provider: "openrouter",
-            imageGenerationMode: mode,
-            reason: "provider-error",
-            error: response.error,
-          },
-        };
-      }
-
-      const normalized = normalizeAttachments(response.images);
-      if (normalized.length === 0) {
-        return {
-          success: false,
-          images: [],
-          warning: "Model OpenRouter tidak menghasilkan data gambar valid.",
-          diagnostics: {
-            attemptedModel: resolvedModel,
-            provider: "openrouter",
-            imageGenerationMode: mode,
-            reason: "empty-output",
-          },
-        };
-      }
-
-      return {
-        success: true,
-        images: normalized,
-        diagnostics: {
-          attemptedModel: resolvedModel,
-          provider: "openrouter",
-          imageGenerationMode: mode,
-        },
-      };
     }
+
+    return {
+      success: false,
+      images: [],
+      warning: "Provider tidak mendukung pembuatan gambar.",
+      diagnostics: {
+        attemptedModel: resolvedModel,
+        provider,
+        imageGenerationMode: "none",
+        reason: "provider-error",
+      },
+    };
   } catch (error: unknown) {
     const errorStr = error instanceof Error
       ? error.message

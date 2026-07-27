@@ -19,8 +19,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_ANON_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
-  OPENROUTER_API_KEY: z.string().min(1),
-  DEEPSEEK_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1),
   ALLOWED_ORIGINS: z.string().optional(),
   NODE_ENV: z
     .enum(["development", "production", "test"])

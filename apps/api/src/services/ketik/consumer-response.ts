@@ -6,8 +6,7 @@ import {
   DEFAULT_KETIK_SCENARIOS,
 } from "@trainers/types";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenRouterContent } from "../../lib/openrouter";
-import { generateDeepSeekContent } from "../../lib/deepseek";
+import { generateOpenAIContent } from "../../lib/openai";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { UsageContext } from "../../lib/ai-usage";
 import {
@@ -233,15 +232,9 @@ ATURAN BALASAN:
   `;
 
   const { modelId, provider } = resolveModelProvider(config.selectedModel);
-  const isOpenRouter = provider === "openrouter";
-  const isDeepSeek = provider === "deepseek";
-  const usesConservativeTemperature = isOpenRouter || isDeepSeek;
+  const usesConservativeTemperature = provider === "openai";
 
-  // Provider-aware policy: Gemini uses higher temperature (0.82) for more
-  // conversational responses; OpenRouter/DeepSeek use conservative sampling
-  // (0.55) with strict script reinforcement to counter higher instruction
-  // drift observed across those providers. Kept asymmetric intentionally
-  // pending provider-neutral evidence to standardise.
+  // Gemini uses a conversational temperature; direct OpenAI uses conservative sampling.
 
   const providerSystemInstruction =
     usesConservativeTemperature && hasScript
@@ -288,11 +281,9 @@ ATURAN BALASAN:
   };
 
   try {
-    const response = isOpenRouter
-      ? await generateOpenRouterContent(callPayload)
-      : isDeepSeek
-        ? await generateDeepSeekContent(callPayload)
-        : await generateGeminiContent(callPayload);
+    const response = provider === "openai"
+      ? await generateOpenAIContent(callPayload)
+      : await generateGeminiContent(callPayload);
 
     if (!response.success) {
       return { success: false, error: response.error || "AI tidak tersedia." };

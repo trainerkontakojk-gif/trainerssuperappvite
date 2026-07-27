@@ -390,6 +390,8 @@
 
 208.  **Telefun Provider-Matched Voice Assessment** — Routes voice assessment from the stored `telefun_model_id`: Gemini/legacy sessions use `gemini-3.5-flash`, while OpenAI sessions use the exact `gpt-realtime-2.1` or Mini model in a fresh isolated Realtime connection. Added a timing-safe authenticated Telefun internal endpoint, agent-only recording verification, bounded WebM-to-PCM conversion, canonical provider-neutral function schema, fail-closed API routing, deterministic hold composition, and `telefun/voice_assessment` modality usage logging. `OPENAI_API_KEY` remains exclusive to Telefun; API receives only the private Telefun URL and shared internal token. No migration or new runtime dependency. (IMPLEMENTED)
 
+209.  **AI Provider Gemini/OpenAI Docs Sync** — Updated canonical docs and contributor summaries to reflect direct Gemini/OpenAI runtime only, direct OpenAI Responses API wrapper, API-side `OPENAI_API_KEY` boundary, legacy model normalization, Gemini-native PDKT image generation, and Gemini→OpenAI KETIK review fallback. Historical logs preserved. (DONE)
+
 ---
 
 ### Historical — Migration & Pagination Records

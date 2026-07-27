@@ -76,10 +76,12 @@ Gunakan prefix `VITE_` untuk variabel yang dibaca langsung saat build frontend:
 
 Variabel ini dipakai oleh server API:
 
-- `SUPABASE_URL`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_ANON_KEY`
 - `GEMINI_API_KEY`
-- `OPENROUTER_API_KEY`
+- `OPENAI_API_KEY`
 
 ### Telefun (`apps/telefun`)
 

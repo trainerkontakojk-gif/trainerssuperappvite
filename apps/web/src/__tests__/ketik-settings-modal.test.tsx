@@ -80,9 +80,22 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     const systemTabButton = screen.getByText("Sistem");
     await user.click(systemTabButton);
 
-    // Click on Gemini 3.5 Flash card
-    const gemini35Card = screen.getByText("Gemini 3.5 Flash");
-    expect(screen.getByText("DeepSeek V4 Pro")).toBeDefined();
+    const expectedModels = [
+      "Gemini 3.6 Flash",
+      "Gemini 3.5 Flash Lite",
+      "GPT 5.6 Luna",
+      "GPT 5.4 Mini",
+    ];
+
+    expectedModels.forEach((name) => {
+      expect(screen.getByText(name)).toBeDefined();
+    });
+    expect(screen.queryByText(/OpenRouter/i)).toBeNull();
+    expect(screen.queryByText(/DeepSeek/i)).toBeNull();
+    expect(screen.getAllByText("Gemini").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+
+    const gemini35Card = screen.getByText("Gemini 3.5 Flash Lite");
     await user.click(gemini35Card);
 
     // Click Save Changes (Simpan Perubahan)
@@ -91,7 +104,7 @@ describe("KETIK SettingsModal Characterization Tests", () => {
 
     expect(onSaveMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedModel: "gemini-3.5-flash",
+        selectedModel: "gemini-3.5-flash-lite",
       }),
     );
   });

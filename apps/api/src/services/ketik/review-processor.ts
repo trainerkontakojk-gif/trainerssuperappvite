@@ -1,6 +1,6 @@
 import { createAdminClient } from "../../lib/supabase";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenRouterContent } from "../../lib/openrouter";
+import { generateOpenAIContent } from "../../lib/openai";
 import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { UsageContext } from "../../lib/ai-usage";
 import { extractJsonObjectText } from "./shared-utils";
@@ -37,20 +37,20 @@ async function generateKetikReviewAiResponse(options: {
       return geminiResp;
     }
     console.warn(
-      "[KETIK Review] Gemini failed, falling back to OpenRouter:",
+      "[KETIK Review] Gemini failed, falling back to direct OpenAI:",
       geminiResp.error,
     );
   } catch (err) {
     console.warn(
-      "[KETIK Review] Gemini exception, falling back to OpenRouter:",
+      "[KETIK Review] Gemini exception, falling back to direct OpenAI:",
       err,
     );
   }
 
-  // Fallback to OpenRouter
+  // Fallback to direct OpenAI Responses API
   try {
-    const orResp = await generateOpenRouterContent({
-      model: "openai/gpt-4o-mini",
+    const orResp = await generateOpenAIContent({
+      model: "gpt-5.4-mini",
       systemInstruction: options.systemInstruction,
       contents: options.contents,
       responseMimeType: "application/json",
@@ -60,7 +60,7 @@ async function generateKetikReviewAiResponse(options: {
     });
     return orResp;
   } catch (err) {
-    console.error("[KETIK Review] OpenRouter fallback also failed:", err);
+    console.error("[KETIK Review] OpenAI fallback also failed:", err);
     return {
       success: false,
       error: "AI tidak tersedia dari provider manapun.",

@@ -17,8 +17,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: buildValidGeneratedBody() }) }),
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: buildValidGeneratedBody() }) }),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn().mockResolvedValue({ success: true, text: JSON.stringify({ subject: "Test Subject", body: buildValidGeneratedBody() }) }),
 }));
 
 vi.mock("../services/pdkt/image-generation", () => ({
@@ -162,7 +162,7 @@ describe("PDKT Image Generation Integration", () => {
       const { generatePdktScenarioImages } = await vi.importActual<typeof import("../services/pdkt/image-generation")>(
         "../services/pdkt/image-generation"
       );
-      const configNoImageCapability = { ...mockConfig, selectedModel: "deepseek-v4-flash" };
+      const configNoImageCapability = { ...mockConfig, selectedModel: "gpt-5.4-mini" };
       
       const { generateGeminiContent } = await import("../lib/gemini");
       vi.mocked(generateGeminiContent).mockResolvedValueOnce({

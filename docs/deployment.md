@@ -68,15 +68,14 @@ Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi buil
 | `VITE_SUPABASE_URL`         | `https://<project>.supabase.co`     | Supabase project URL                                                                     |
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                            | Service role key                                                                         |
 | `GEMINI_API_KEY`            | `AI...`                             | Google Gemini API key                                                                    |
-| `OPENROUTER_API_KEY`        | `sk-or...`                          | OpenRouter API key                                                                       |
-| `DEEPSEEK_API_KEY`          | `sk-...`                            | DeepSeek API key (opsional — untuk model DeepSeek native)                                |
+| `OPENAI_API_KEY`            | `sk-...`                            | OpenAI API key untuk text generation direct via Responses API                            |
 | `TELEFUN_INTERNAL_URL`      | `http://<telefun-private-url>:3002` | Origin privat Telefun untuk assessment OpenAI; hanya di API                              |
 | `TELEFUN_INTERNAL_TOKEN`    | `<random>`                          | Shared server-only secret; nilai sama dengan Telefun                                     |
 | `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app`  | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
 
 ### Telefun Service
 
-Dua variable OpenAI di bawah hanya boleh dipasang pada service `apps/telefun`, bukan Web, Vercel, atau `apps/api`. Default flag tetap `false`, sehingga rollout awal tetap Gemini-only.
+`OPENAI_API_KEY` dipakai per service: API service untuk text generation direct, Telefun service untuk realtime jika `TELEFUN_OPENAI_ENABLED=true`. Pastikan secret-nya terpisah antar service. Default flag Telefun tetap `false`, sehingga rollout awal tetap Gemini-only.
 
 | Variable                    | Value                              | Notes                                                                             |
 | --------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
@@ -86,14 +85,14 @@ Dua variable OpenAI di bawah hanya boleh dipasang pada service `apps/telefun`, b
 | `SUPABASE_ANON_KEY`         | `eyJ...`                           | Supabase anon key                                                                 |
 | `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...`                           | Service role key                                                                  |
 | `GEMINI_API_KEY`            | `AI...`                            | Google Gemini API key                                                             |
-| `OPENAI_API_KEY`            | `sk-...`                           | Backend-only; wajib bila `TELEFUN_OPENAI_ENABLED=true` (hanya di service Telefun) |
+| `OPENAI_API_KEY`            | `sk-...`                           | Realtime-only; set terpisah dari API service bila `TELEFUN_OPENAI_ENABLED=true`    |
 | `TELEFUN_OPENAI_ENABLED`    | `false`                            | Kill switch; default/off mempertahankan Gemini-only                               |
 | `TELEFUN_INTERNAL_TOKEN`    | `<random>`                         | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web     |
 | `ALLOWED_ORIGINS`           | `https://<web-url>.up.railway.app` | Atau `*` untuk allow all                                                          |
 
 Aturan secret/config:
 
-- `OPENAI_API_KEY` tidak boleh memakai prefix `VITE_`, tidak boleh berada di Vercel, dan tidak boleh disalin ke API service.
+- `OPENAI_API_KEY` wajib ada di API service untuk text generation direct. Jika Telefun OpenAI diaktifkan, set `OPENAI_API_KEY` terpisah di service Telefun; jangan share secret antar service. `OPENAI_API_KEY` tidak boleh memakai prefix `VITE_` dan tidak boleh berada di Vercel.
 - `TELEFUN_INTERNAL_URL` **hanya** di service API; mengarah ke private URL Railway service Telefun (bukan public Web). `TELEFUN_INTERNAL_TOKEN` adalah shared server-only secret yang nilainya SAMA persis di API dan Telefun; token ini tidak boleh berawalan `VITE_` dan tidak boleh di-deploy ke Vercel/Web.
 - `TELEFUN_OPENAI_ENABLED=false` menolak **sesi OpenAI baru** tanpa menghapus history/model pricing. Panggilan aktif tidak dipindahkan ke Gemini di tengah sesi.
 - Jika flag `true` tetapi key tidak ada/invalid, readiness OpenAI harus `not_ready` dan configure OpenAI ditolak dengan error aman. Service tetap dapat hidup untuk Gemini bila konfigurasi Gemini valid.
@@ -189,7 +188,7 @@ API (`apps/api`) me-load `.env.local` dari **repo root** menggunakan path absolu
 ```ts
 // apps/api/src/lib/env.ts
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "../../..");
+const repoRoot = path.resolve(__dirname, "../../../..");
 const envFile = path.join(repoRoot, ".env.local");
 process.loadEnvFile(envFile);
 ```
@@ -204,17 +203,16 @@ Supabase client (`apps/api/src/lib/supabase.ts`) menggunakan nilai dari modul `e
 # Supabase
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # AI
 GEMINI_API_KEY=your_gemini_key
-OPENROUTER_API_KEY=your_openrouter_key
-DEEPSEEK_API_KEY=your_deepseek_key  # Optional
+OPENAI_API_KEY=your_api_openai_key
 
 # Telefun
 VITE_TELEFUN_WS_URL=ws://localhost:3002
-# Target runtime dual-provider; hanya dikonsumsi apps/telefun
-OPENAI_API_KEY=your_openai_key
+# Set a separate OPENAI_API_KEY in the Telefun service if TELEFUN_OPENAI_ENABLED=true
 TELEFUN_OPENAI_ENABLED=false
 TELEFUN_INTERNAL_TOKEN=replace_with_random_internal_token
 
@@ -260,7 +258,7 @@ curl http://localhost:3001/api/health
 #  -> Cek raw aiResponse.text untuk diagnosis lebih lanjut
 
 # 5. Jika error "AI tidak tersedia dari provider manapun."
-#  -> Cek GEMINI_API_KEY dan OPENROUTER_API_KEY di .env.local
+#  -> Cek GEMINI_API_KEY dan OPENAI_API_KEY di service API
 #  -> Verifikasi dengan curl ke endpoint AI provider
 
 # 6. Jika review stuck "processing" lebih dari 5 menit
@@ -494,7 +492,7 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 - [ ] Pastikan smoke header Web lulus dari Railway `serve dist`
 - [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
 - [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
-- [ ] Pastikan `TELEFUN_OPENAI_ENABLED=false` untuk rollout awal; jika diaktifkan, `OPENAI_API_KEY` hanya ada di Telefun service
+- [ ] Pastikan `TELEFUN_OPENAI_ENABLED=false` untuk rollout awal; jika diaktifkan, set `OPENAI_API_KEY` terpisah di Telefun service (API service tetap memerlukan key sendiri)
 - [ ] Verify liveness/readiness tanpa membuka koneksi provider berbayar
 - [ ] Set up monitoring / alerting
 

@@ -1,7 +1,6 @@
 export const PDKT_PROMPT_BUDGET = 200_000;
-// Covers the longest known provider adaptation: Gemini fallback boundary
-// markers plus OpenRouter/DeepSeek's JSON-only system suffix. Keep prompt
-// assembly below the hard ceiling before it reaches a provider adapter.
+// Reserve space for provider-specific prompt adaptation before the hard
+// ceiling is reached by a provider adapter.
 export const PDKT_PROVIDER_ADAPTER_OVERHEAD_RESERVE = 512;
 export const PDKT_APPLICATION_PROMPT_BUDGET =
   PDKT_PROMPT_BUDGET - PDKT_PROVIDER_ADAPTER_OVERHEAD_RESERVE;
@@ -22,13 +21,17 @@ function assertPlainJsonData(
   }
   if (typeof value === "number") {
     if (Number.isFinite(value)) return;
-    throw new Error("Data prompt PDKT harus berupa plain JSON biasa dengan angka finite.");
+    throw new Error(
+      "Data prompt PDKT harus berupa plain JSON biasa dengan angka finite.",
+    );
   }
   if (typeof value !== "object") {
     throw new Error("Data prompt PDKT harus berupa plain JSON biasa.");
   }
   if (ancestors.has(value)) {
-    throw new Error("Data prompt PDKT tidak boleh memiliki referensi sirkular.");
+    throw new Error(
+      "Data prompt PDKT tidak boleh memiliki referensi sirkular.",
+    );
   }
 
   const isArray = Array.isArray(value);
@@ -37,7 +40,9 @@ function assertPlainJsonData(
     (!isArray && prototype !== Object.prototype && prototype !== null) ||
     Object.prototype.hasOwnProperty.call(value, "toJSON")
   ) {
-    throw new Error("Data prompt PDKT harus berupa plain JSON biasa tanpa toJSON atau class khusus.");
+    throw new Error(
+      "Data prompt PDKT harus berupa plain JSON biasa tanpa toJSON atau class khusus.",
+    );
   }
 
   ancestors.add(value);
@@ -50,7 +55,9 @@ function assertPlainJsonData(
       }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor?.enumerable || !("value" in descriptor)) {
-        throw new Error("Data prompt PDKT harus berupa plain JSON biasa tanpa accessor.");
+        throw new Error(
+          "Data prompt PDKT harus berupa plain JSON biasa tanpa accessor.",
+        );
       }
       assertPlainJsonData(descriptor.value, ancestors);
     }
@@ -135,14 +142,20 @@ export function compactPdktPromptData<T>(
   budget: number,
 ): { compacted: T; serialized: string; truncated: boolean } {
   if (!Number.isSafeInteger(budget) || budget < 0) {
-    throw new Error("Budget data prompt PDKT harus berupa bilangan bulat non-negatif.");
+    throw new Error(
+      "Budget data prompt PDKT harus berupa bilangan bulat non-negatif.",
+    );
   }
 
   assertPlainJsonData(value);
 
   const originalSerialized = serializePdktPromptData(value);
   if (originalSerialized.length <= budget) {
-    return { compacted: value, serialized: originalSerialized, truncated: false };
+    return {
+      compacted: value,
+      serialized: originalSerialized,
+      truncated: false,
+    };
   }
 
   let lower = 0;

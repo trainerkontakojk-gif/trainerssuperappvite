@@ -6,8 +6,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn(),
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn(),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn(),
 }));
 
 vi.mock("../lib/supabase", () => ({

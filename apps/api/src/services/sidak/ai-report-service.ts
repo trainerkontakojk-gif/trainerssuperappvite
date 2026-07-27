@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { getDataReportRows } from "./report-data";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenRouterContent } from "../../lib/openrouter";
-import { generateDeepSeekContent } from "../../lib/deepseek";
+import { generateOpenAIContent } from "../../lib/openai";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 
@@ -98,12 +97,9 @@ Buat laporan dengan format JSON:
     userId,
   };
 
-  const result =
-    modelInfo.provider === "openrouter"
-      ? await generateOpenRouterContent(genOptions)
-      : modelInfo.provider === "deepseek"
-        ? await generateDeepSeekContent(genOptions)
-      : await generateGeminiContent(genOptions);
+  const result = modelInfo.provider === "openai"
+    ? await generateOpenAIContent(genOptions)
+    : await generateGeminiContent(genOptions);
 
   if (!result.success) {
     throw new Error(result.error || "Gagal generate laporan");

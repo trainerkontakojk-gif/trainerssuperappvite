@@ -4,12 +4,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn(),
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn(),
-}));
-
-vi.mock("../lib/deepseek", () => ({
-  generateDeepSeekContent: vi.fn(),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn(),
 }));
 
 vi.mock("../lib/ai-models", () => ({
@@ -23,8 +19,7 @@ import {
   SessionTimingContext,
 } from "../services/ketik/consumer-response";
 import { generateGeminiContent } from "../lib/gemini";
-import { generateOpenRouterContent } from "../lib/openrouter";
-import { generateDeepSeekContent } from "../lib/deepseek";
+import { generateOpenAIContent } from "../lib/openai";
 import { resolveModelProvider } from "../lib/ai-models";
 import {
   DEFAULT_KETIK_CONSUMER_TYPES,
@@ -34,8 +29,7 @@ import {
 } from "@trainers/types";
 
 const mockGeminiContent = vi.mocked(generateGeminiContent);
-const mockOpenRouterContent = vi.mocked(generateOpenRouterContent);
-const mockDeepSeekContent = vi.mocked(generateDeepSeekContent);
+const mockOpenAIContent = vi.mocked(generateOpenAIContent);
 const mockResolveProvider = vi.mocked(resolveModelProvider);
 
 function buildConfig(overrides: Record<string, any> = {}) {
@@ -74,15 +68,8 @@ function mockGeminiSuccess(text: string) {
   });
 }
 
-function mockOpenRouterSuccess(text: string) {
-  mockOpenRouterContent.mockResolvedValueOnce({
-    success: true,
-    text,
-  });
-}
-
-function mockDeepSeekSuccess(text: string) {
-  mockDeepSeekContent.mockResolvedValueOnce({
+function mockOpenAISuccess(text: string) {
+  mockOpenAIContent.mockResolvedValueOnce({
     success: true,
     text,
   });
@@ -97,21 +84,12 @@ function setupGeminiProvider() {
   });
 }
 
-function setupOpenRouterProvider() {
+function setupOpenAIProvider() {
   mockResolveProvider.mockReturnValue({
-    modelId: "openrouter/deepseek",
-    provider: "openrouter",
+    modelId: "gpt-5.4-mini",
+    provider: "openai",
     isFallback: false,
     timeoutMs: 120_000,
-  });
-}
-
-function setupDeepSeekProvider() {
-  mockResolveProvider.mockReturnValue({
-    modelId: "deepseek-v4-pro",
-    provider: "deepseek",
-    isFallback: false,
-    timeoutMs: 180_000,
   });
 }
 
@@ -177,36 +155,37 @@ describe("generateConsumerResponse", () => {
       expect(result.success).toBe(true);
       expect(result.text).toBe("Saya mau lapor pinjol ilegal.");
       expect(mockGeminiContent).toHaveBeenCalledTimes(1);
-      expect(mockOpenRouterContent).not.toHaveBeenCalled();
+
     });
 
-    it("calls OpenRouter when provider is openrouter", async () => {
-      setupOpenRouterProvider();
-      mockOpenRouterSuccess("Saya mau lapor penipuan.");
+    it("calls OpenAI when provider is openai", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("Saya mau lapor penipuan.");
       const result = await generateConsumerResponse(
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         testScenario,
         testHistory,
       );
       expect(result.success).toBe(true);
       expect(result.text).toBe("Saya mau lapor penipuan.");
-      expect(mockOpenRouterContent).toHaveBeenCalledTimes(1);
+      expect(mockOpenAIContent).toHaveBeenCalledTimes(1);
+      expect(mockOpenAIContent.mock.calls[0][0]).toMatchObject({ model: "gpt-5.4-mini" });
       expect(mockGeminiContent).not.toHaveBeenCalled();
     });
 
-    it("calls DeepSeek when provider is deepseek", async () => {
-      setupDeepSeekProvider();
-      mockDeepSeekSuccess("Saya mau lapor masalah saya.");
+    it("calls OpenAI with the canonical model payload", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("Saya mau lapor masalah saya.");
       const result = await generateConsumerResponse(
-        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         testScenario,
         testHistory,
       );
       expect(result.success).toBe(true);
       expect(result.text).toBe("Saya mau lapor masalah saya.");
-      expect(mockDeepSeekContent).toHaveBeenCalledTimes(1);
+      expect(mockOpenAIContent).toHaveBeenCalledTimes(1);
       expect(mockGeminiContent).not.toHaveBeenCalled();
-      expect(mockOpenRouterContent).not.toHaveBeenCalled();
+
     });
   });
 
@@ -328,79 +307,79 @@ describe("generateConsumerResponse", () => {
     });
   });
 
-  describe("strict script mode (OpenRouter + hasScript)", () => {
-    it("applies stricter system instruction for OpenRouter with script", async () => {
-      setupOpenRouterProvider();
-      mockOpenRouterSuccess("Saya mengikuti skrip yang diberikan.");
+  describe("strict script mode (OpenAI + hasScript)", () => {
+    it("applies stricter system instruction for OpenAI with script", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("Saya mengikuti skrip yang diberikan.");
       const scenarioWithScript: KetikScenario = {
         ...testScenario,
         script: "Agent: Halo\nConsumer: Saya mau lapor",
       };
       const result = await generateConsumerResponse(
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         scenarioWithScript,
         testHistory,
       );
       expect(result.success).toBe(true);
-      const callArgs = mockOpenRouterContent.mock.calls[0][0];
+      const callArgs = mockOpenAIContent.mock.calls[0][0];
       expect(callArgs.systemInstruction).toContain("MODEL SCRIPT MODE");
       expect(callArgs.systemInstruction).toContain("WAJIB PATUH");
     });
 
-    it("uses lower temperature for OpenRouter with strictScriptMode", async () => {
-      setupOpenRouterProvider();
-      mockOpenRouterSuccess("OK.");
+    it("uses lower temperature for OpenAI with strictScriptMode", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("OK.");
       const scenarioWithScript: KetikScenario = {
         ...testScenario,
         script: "A: Halo\nC: Halo juga",
       };
       const result = await generateConsumerResponse(
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         scenarioWithScript,
         testHistory,
       );
       expect(result.success).toBe(true);
-      const callArgs = mockOpenRouterContent.mock.calls[0][0];
+      const callArgs = mockOpenAIContent.mock.calls[0][0];
       expect(callArgs.temperature).toBe(0.55);
     });
 
-    it("uses 0.55 for OpenRouter without a script", async () => {
-      setupOpenRouterProvider();
-      mockOpenRouterSuccess("OK tanpa script.");
+    it("uses 0.55 for OpenAI without a script", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("OK tanpa script.");
       await generateConsumerResponse(
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         testScenario,
         testHistory,
       );
-      expect(mockOpenRouterContent.mock.calls[0][0].temperature).toBe(0.55);
+      expect(mockOpenAIContent.mock.calls[0][0].temperature).toBe(0.55);
       expect(
-        mockOpenRouterContent.mock.calls[0][0].systemInstruction,
+        mockOpenAIContent.mock.calls[0][0].systemInstruction,
       ).not.toContain("MODEL SCRIPT MODE");
     });
 
-    it("uses 0.55 for DeepSeek with and without a script", async () => {
-      setupDeepSeekProvider();
-      mockDeepSeekSuccess("OK tanpa script.");
+    it("uses 0.55 for OpenAI with and without a script", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("OK tanpa script.");
       await generateConsumerResponse(
-        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         testScenario,
         testHistory,
       );
-      expect(mockDeepSeekContent.mock.calls[0][0].temperature).toBe(0.55);
+      expect(mockOpenAIContent.mock.calls[0][0].temperature).toBe(0.55);
       expect(
-        mockDeepSeekContent.mock.calls[0][0].systemInstruction,
+        mockOpenAIContent.mock.calls[0][0].systemInstruction,
       ).not.toContain("MODEL SCRIPT MODE");
 
       vi.clearAllMocks();
-      setupDeepSeekProvider();
-      mockDeepSeekSuccess("OK dengan script.");
+      setupOpenAIProvider();
+      mockOpenAISuccess("OK dengan script.");
       await generateConsumerResponse(
-        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         { ...testScenario, script: "Consumer: Saya ingin melapor." },
         testHistory,
       );
-      expect(mockDeepSeekContent.mock.calls[0][0].temperature).toBe(0.55);
-      expect(mockDeepSeekContent.mock.calls[0][0].systemInstruction).toContain(
+      expect(mockOpenAIContent.mock.calls[0][0].temperature).toBe(0.55);
+      expect(mockOpenAIContent.mock.calls[0][0].systemInstruction).toContain(
         "MODEL SCRIPT MODE",
       );
     });
@@ -523,12 +502,12 @@ describe("generateConsumerResponse", () => {
     });
 
     it("returns generic error when provider returns success: false without message", async () => {
-      setupOpenRouterProvider();
-      mockOpenRouterContent.mockResolvedValueOnce({
+      setupOpenAIProvider();
+      mockOpenAIContent.mockResolvedValueOnce({
         success: false,
       });
       const result = await generateConsumerResponse(
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         testScenario,
         testHistory,
       );
@@ -569,21 +548,21 @@ describe("generateConsumerResponse", () => {
       expect(callArgs.userId).toBe("user-123");
     });
 
-    it("passes usageContext and userId to OpenRouter call", async () => {
-      setupOpenRouterProvider();
-      mockOpenRouterSuccess("OK.");
+    it("passes usageContext and userId to OpenAI call", async () => {
+      setupOpenAIProvider();
+      mockOpenAISuccess("OK.");
       const usageContext = {
         module: "ketik" as const,
         action: "simulasi" as const,
       };
       await generateConsumerResponse(
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
         testScenario,
         testHistory,
         usageContext,
         "user-456",
       );
-      const callArgs = mockOpenRouterContent.mock.calls[0][0];
+      const callArgs = mockOpenAIContent.mock.calls[0][0];
       expect(callArgs.usageContext).toEqual(usageContext);
       expect(callArgs.userId).toBe("user-456");
     });

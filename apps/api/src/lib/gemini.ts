@@ -173,9 +173,7 @@ export async function generateGeminiContent(options: {
           await logAiUsage({
             requestId: `gemini-${randomUUID()}`,
             userId: options.userId,
-            provider: getProviderFromModelId(modelName) as
-              | "gemini"
-              | "openrouter",
+            provider: getProviderFromModelId(modelName),
             modelId: modelName,
             usageContext: options.usageContext,
             tokens: { inputTokens, outputTokens, totalTokens },

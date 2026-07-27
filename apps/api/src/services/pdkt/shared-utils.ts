@@ -1,12 +1,11 @@
 import { UsageContext } from "../../lib/ai-usage";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { generateGeminiContent } from "../../lib/gemini";
-import { generateOpenRouterContent } from "../../lib/openrouter";
-import { generateDeepSeekContent } from "../../lib/deepseek";
+import { generateOpenAIContent } from "../../lib/openai";
 
 /**
  * Shared AI caller for PDKT services.
- * Handles provider routing (Gemini vs OpenRouter).
+ * Handles provider routing between Gemini and OpenAI.
  */
 export async function callAI(options: {
   model: string;
@@ -18,8 +17,6 @@ export async function callAI(options: {
   userId?: string;
 }) {
   const { modelId, provider } = resolveModelProvider(options.model);
-  const isOpenRouter = provider === "openrouter";
-  const isDeepSeek = provider === "deepseek";
 
   const payload = {
     model: modelId,
@@ -31,10 +28,8 @@ export async function callAI(options: {
     userId: options.userId,
   };
 
-  return isOpenRouter
-    ? await generateOpenRouterContent(payload)
-    : isDeepSeek
-      ? await generateDeepSeekContent(payload)
+  return provider === "openai"
+    ? await generateOpenAIContent(payload)
     : await generateGeminiContent(payload);
 }
 

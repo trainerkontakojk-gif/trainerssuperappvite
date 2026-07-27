@@ -1,4 +1,4 @@
-import { Edit2, Sparkles, Settings, Check } from "lucide-react";
+import { Edit2, Sparkles, Settings } from "lucide-react";
 import { TEXT_MODELS } from "../../pdktSettings";
 
 export interface PdktSystemTabProps {
@@ -148,16 +148,8 @@ export function PdktSystemTab({
                     <h4 className="text-sm font-bold text-foreground tracking-tight truncate">
                       {model.name}
                     </h4>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
-                        providerLabel === "openrouter"
-                          ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
-                          : providerLabel === "deepseek"
-                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                          : "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                      }`}
-                    >
-                      {providerLabel}
+                    <span className="px-1.5 py-0.5 rounded border text-[11px] font-medium bg-foreground/[0.03] text-foreground/70 border-border">
+                      {providerLabel === "gemini" ? "Gemini" : "OpenAI"}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground font-medium">

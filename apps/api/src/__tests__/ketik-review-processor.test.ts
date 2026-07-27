@@ -13,8 +13,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: mockGenerateGeminiContent,
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn(),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn(),
 }));
 
 import { processKetikReviewJob } from "../services/ketik/review-processor";

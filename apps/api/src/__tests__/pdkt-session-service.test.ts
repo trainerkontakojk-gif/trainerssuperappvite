@@ -4,12 +4,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn(),
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn(),
-}));
-
-vi.mock("../lib/deepseek", () => ({
-  generateDeepSeekContent: vi.fn(),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn(),
 }));
 
 vi.mock("../lib/ai-models", () => ({
@@ -31,8 +27,7 @@ vi.mock("../services/pdkt-email-policy", async () => {
 
 import { generateGeminiContent } from "../lib/gemini";
 import { readPdktSettings } from "../lib/pdkt-settings";
-import { generateOpenRouterContent } from "../lib/openrouter";
-import { generateDeepSeekContent } from "../lib/deepseek";
+import { generateOpenAIContent } from "../lib/openai";
 import { resolveModelProvider } from "../lib/ai-models";
 import { parseJsonFromModelText } from "../lib/ai-json";
 import { validatePdktEmailPolicyCompliance } from "../services/pdkt-email-policy";
@@ -50,8 +45,7 @@ import type {
 } from "@trainers/types";
 
 const mockGeminiContent = vi.mocked(generateGeminiContent);
-const mockOpenRouterContent = vi.mocked(generateOpenRouterContent);
-const mockDeepSeekContent = vi.mocked(generateDeepSeekContent);
+const mockOpenAIContent = vi.mocked(generateOpenAIContent);
 const mockResolveProvider = vi.mocked(resolveModelProvider);
 const mockParseJson = vi.mocked(parseJsonFromModelText);
 const mockValidateCompliance = vi.mocked(validatePdktEmailPolicyCompliance);
@@ -65,21 +59,12 @@ function setupGeminiProvider() {
   });
 }
 
-function setupOpenRouterProvider() {
+function setupOpenAIProvider() {
   mockResolveProvider.mockReturnValue({
-    modelId: "openrouter/deepseek",
-    provider: "openrouter",
+    modelId: "gpt-5.4-mini",
+    provider: "openai",
     isFallback: false,
     timeoutMs: 120_000,
-  });
-}
-
-function setupDeepSeekProvider() {
-  mockResolveProvider.mockReturnValue({
-    modelId: "deepseek-v4-pro",
-    provider: "deepseek",
-    isFallback: false,
-    timeoutMs: 180_000,
   });
 }
 
@@ -132,8 +117,7 @@ function buildConfig(overrides: Record<string, any> = {}): PdktSessionConfig {
 beforeEach(() => {
   // Full reset to clear mockResolvedValueOnce queues from prior tests
   mockGeminiContent.mockReset();
-  mockOpenRouterContent.mockReset();
-  mockDeepSeekContent.mockReset();
+  mockOpenAIContent.mockReset();
   mockResolveProvider.mockReset();
   mockParseJson.mockReset();
   mockValidateCompliance.mockReset();
@@ -429,47 +413,47 @@ describe("generateScenarioEmailTemplate", () => {
       );
       expect(result.success).toBe(true);
       expect(mockGeminiContent).toHaveBeenCalled();
-      expect(mockOpenRouterContent).not.toHaveBeenCalled();
+
     });
 
-    it("uses OpenRouter when selectedModel has /", async () => {
-      setupOpenRouterProvider();
+    it("uses OpenAI when selectedModel has /", async () => {
+      setupOpenAIProvider();
       const body = buildBody(600);
-      mockOpenRouterContent.mockReset().mockResolvedValue({
+      mockOpenAIContent.mockReset().mockResolvedValue({
         success: true,
-        text: JSON.stringify({ subject: "OR Test", body }),
-        
+        text: JSON.stringify({ subject: "OpenAI Test", body }),
       });
-      mockParseJson.mockReset().mockReturnValue({ subject: "OR Test", body });
+      mockParseJson.mockReset().mockReturnValue({ subject: "OpenAI Test", body });
       mockValidateCompliance.mockReset().mockReturnValue([]);
 
       const result = await generateScenarioEmailTemplate(
         mockPinjolScenario,
-        buildConfig({ selectedModel: "openrouter/deepseek" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
       );
       expect(result.success).toBe(true);
-      expect(mockOpenRouterContent).toHaveBeenCalled();
+      expect(mockOpenAIContent).toHaveBeenCalledTimes(1);
+      expect(mockOpenAIContent.mock.calls[0][0]).toMatchObject({ model: "gpt-5.4-mini" });
       expect(mockGeminiContent).not.toHaveBeenCalled();
     });
 
-    it("uses DeepSeek when selectedModel is DeepSeek direct", async () => {
-      setupDeepSeekProvider();
+    it("uses OpenAI with the canonical model payload", async () => {
+      setupOpenAIProvider();
       const body = buildBody(600);
-      mockDeepSeekContent.mockReset().mockResolvedValue({
+      mockOpenAIContent.mockReset().mockResolvedValue({
         success: true,
-        text: JSON.stringify({ subject: "DeepSeek Test", body }),
+        text: JSON.stringify({ subject: "OpenAI Test", body }),
       });
-      mockParseJson.mockReset().mockReturnValue({ subject: "DeepSeek Test", body });
+      mockParseJson.mockReset().mockReturnValue({ subject: "OpenAI Test", body });
       mockValidateCompliance.mockReset().mockReturnValue([]);
 
       const result = await generateScenarioEmailTemplate(
         mockPinjolScenario,
-        buildConfig({ selectedModel: "deepseek-v4-pro" }),
+        buildConfig({ selectedModel: "gpt-5.4-mini" }),
       );
       expect(result.success).toBe(true);
-      expect(mockDeepSeekContent).toHaveBeenCalled();
+      expect(mockOpenAIContent).toHaveBeenCalled();
       expect(mockGeminiContent).not.toHaveBeenCalled();
-      expect(mockOpenRouterContent).not.toHaveBeenCalled();
+
     });
 
   });

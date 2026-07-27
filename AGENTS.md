@@ -105,8 +105,9 @@ Frontend prefix `VITE_`, backend/telefun langsung. MCP key di `.env.local`. Liha
 
 - **Model registry**: `apps/api/src/lib/ai-models.ts` — source of truth untuk ID model dan provider. Jangan hardcode.
 - **Usage logging**: Semua AI calls dicatat ke `ai_usage_logs` via `logAiUsage()` dengan `UsageContext` + `userId`. Jika pricing model tidak ada, catat token dengan cost 0.
-- **Provider routing**: `resolveModelProvider()` via registry lookup (gemini, openrouter, deepseek).
-- **Error handling**: Ekstraksi teks defensif — jangan asumsikan `response.text` stabil. OpenRouter retry 4× dengan backoff. Gemini fallback jika `developer instruction not enabled`.
+- **Provider routing**: `resolveModelProvider()` via registry lookup (gemini, openai). Legacy OpenRouter/DeepSeek selections dinormalisasi ke model direct sebelum resolve.
+- **Newly added text IDs**: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Telefun's realtime registry remains separate.
+- **Error handling**: Ekstraksi teks defensif — jangan asumsikan `response.text` stabil. Gemini fallback jika `developer instruction not enabled`; direct OpenAI memakai Responses API wrapper.
 - **RPC Migration selesai**: Gunakan `fetchApi` dari `hooks/useApi` atau Hono RPC. Jangan gunakan `getApi`/`postApi`/`putApi`/`deleteApi`.
 
 ### FFmpeg (Telefun Recording)

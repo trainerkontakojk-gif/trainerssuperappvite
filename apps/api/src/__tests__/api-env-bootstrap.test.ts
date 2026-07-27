@@ -14,7 +14,7 @@ describe("API Env Bootstrap", () => {
     process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     process.env.GEMINI_API_KEY = "test-gemini-key";
-    process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+    process.env.OPENAI_API_KEY = "test-openai-key";
   });
 
   afterEach(() => {
@@ -51,7 +51,7 @@ describe("API Env Bootstrap", () => {
     process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     process.env.GEMINI_API_KEY = "test-gemini-key";
-    process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+    process.env.OPENAI_API_KEY = "test-openai-key";
 
     await expect(import("../lib/env")).resolves.toBeDefined();
   });
@@ -66,7 +66,7 @@ describe("API Env Bootstrap", () => {
     delete process.env.SUPABASE_ANON_KEY;
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.GEMINI_API_KEY;
-    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENAI_API_KEY;
 
     process.loadEnvFile = vi.fn(() => {
       throw new Error("ENOENT");
@@ -90,7 +90,7 @@ describe("Supabase Client Bootstrap", () => {
     process.env.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRlc3QiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3OTE3MDY1MSwiZXhwIjoxOTA1MTI2NjUxfQ.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
     process.env.GEMINI_API_KEY = "test-gemini-key";
-    process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+    process.env.OPENAI_API_KEY = "test-openai-key";
   });
 
   afterEach(() => {

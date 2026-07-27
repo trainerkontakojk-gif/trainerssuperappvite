@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/gemini", () => ({ generateGeminiContent: vi.fn() }));
-vi.mock("../lib/openrouter", () => ({ generateOpenRouterContent: vi.fn() }));
-vi.mock("../lib/deepseek", () => ({ generateDeepSeekContent: vi.fn() }));
+vi.mock("../lib/openai", () => ({ generateOpenAIContent: vi.fn() }));
 vi.mock("../lib/ai-models", () => ({
   DEFAULT_AI_MODEL_ID: "gemini-3.1-flash-lite",
   resolveModelProvider: vi.fn(),
@@ -13,7 +12,7 @@ vi.mock("../services/pdkt-email-policy", async () => {
   return { ...actual, validatePdktEmailPolicyCompliance: vi.fn() };
 });
 
-import { generateDeepSeekContent } from "../lib/deepseek";
+import { generateOpenAIContent } from "../lib/openai";
 import { generateGeminiContent } from "../lib/gemini";
 import { parseJsonFromModelText } from "../lib/ai-json";
 import { resolveModelProvider } from "../lib/ai-models";
@@ -34,7 +33,7 @@ import type {
 } from "@trainers/types";
 
 const mockGeminiContent = vi.mocked(generateGeminiContent);
-const mockDeepSeekContent = vi.mocked(generateDeepSeekContent);
+const mockOpenAIContent = vi.mocked(generateOpenAIContent);
 const mockParseJson = vi.mocked(parseJsonFromModelText);
 const mockResolveProvider = vi.mocked(resolveModelProvider);
 const mockValidateCompliance = vi.mocked(validatePdktEmailPolicyCompliance);
@@ -89,7 +88,7 @@ function buildConfig(
 beforeEach(() => {
   vi.clearAllMocks();
   mockGeminiContent.mockReset();
-  mockDeepSeekContent.mockReset();
+  mockOpenAIContent.mockReset();
   mockParseJson.mockReset();
   mockResolveProvider.mockReset().mockReturnValue({
     modelId: "gemini-3.1-flash-lite",
@@ -186,22 +185,22 @@ describe("PDKT generation length and budget contracts", () => {
   });
 
   it.each(["template", "initial"] as const)(
-    "fails closed for short DeepSeek %s output after retry",
+    "fails closed for short OpenAI %s output after retry",
     async (mode) => {
       const body = buildBody(100);
       mockResolveProvider.mockReturnValue({
-        modelId: "deepseek-v4-pro",
-        provider: "deepseek",
+        modelId: "gpt-5.4-mini",
+        provider: "openai",
         isFallback: false,
         timeoutMs: 180_000,
       });
-      mockDeepSeekContent
+      mockOpenAIContent
         .mockResolvedValueOnce({ success: true, text: "{}" })
         .mockResolvedValueOnce({ success: true, text: "{}" });
       mockParseJson
         .mockReturnValueOnce({ subject: "Pendek", body })
         .mockReturnValueOnce({ subject: "Masih Pendek", body });
-      const config = buildConfig({ selectedModel: "deepseek-v4-pro" });
+      const config = buildConfig({ selectedModel: "gpt-5.4-mini" });
 
       const result =
         mode === "template"
@@ -210,7 +209,7 @@ describe("PDKT generation length and budget contracts", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("terlalu pendek");
-      expect(mockDeepSeekContent).toHaveBeenCalledTimes(2);
+      expect(mockOpenAIContent).toHaveBeenCalledTimes(2);
     },
   );
 });

@@ -74,16 +74,8 @@ export function KetikSystemTab({
                     <h4 className="font-semibold text-foreground text-sm truncate">
                       {model.name}
                     </h4>
-                    <span
-                      className={`px-1.5 py-0.5 rounded border text-[11px] font-medium ${
-                        model.provider === "openrouter"
-                          ? "bg-orange-500/10 text-orange-600 border-orange-500/20"
-                          : model.provider === "deepseek"
-                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                          : "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                      }`}
-                    >
-                      {model.provider}
+                    <span className="px-1.5 py-0.5 rounded border text-[11px] font-medium bg-foreground/[0.03] text-foreground/70 border-border">
+                      {model.provider === "gemini" ? "Gemini" : "OpenAI"}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">

@@ -30,7 +30,7 @@ graph TD
     TelefunProxy -->|Provider Adapter| RealtimeProvider[Realtime Provider]
     RealtimeProvider -->|Gemini Live| GeminiLive[Gemini Live API]
     RealtimeProvider -->|OpenAI Realtime| OpenAIRealtime[OpenAI Realtime API]
-    HonoAPI -->|AI Analysis| AIProviders[Gemini / OpenRouter]
+    HonoAPI -->|AI Analysis| AIProviders[Gemini / OpenAI]
 ```
 
 ### Penjelasan Alur:
@@ -41,7 +41,7 @@ graph TD
 4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage.
 5. **RLS (Row Level Security)**: Memastikan keamanan data di tingkat database berdasarkan role user (Admin, Trainer, Leader, Agent).
 6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio ke provider live API (Gemini Live atau OpenAI Realtime) melalui **provider adapter pattern**.
-7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang saat ini mendukung Gemini, OpenRouter, dan DeepSeek (native client). Semua AI calls dicatat ke `ai_usage_logs`.
+7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang aktifnya hanya Gemini dan OpenAI direct. Semua AI calls dicatat ke `ai_usage_logs`.
 8. **Shared Types (`packages/types`)**: Zod schemas dan TypeScript interfaces yang dipakai bersama oleh frontend dan backend.
 
 ## Directory Structure
@@ -130,16 +130,17 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 
 ## AI Integration Pattern
 
-- Integrasi AI dipusatkan di backend service wrapper (`apps/api/src/lib/gemini.ts`, `apps/api/src/lib/openrouter.ts`).
-- Pemilihan model dan provider mengikuti canonical mapping di `apps/api/src/lib/ai-models.ts`.
+- Integrasi AI dipusatkan di backend service wrapper (`apps/api/src/lib/gemini.ts`, `apps/api/src/lib/openai.ts`).
+- Pemilihan model dan provider mengikuti canonical mapping di `apps/api/src/lib/ai-models.ts`. Newly added text model IDs: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Telefun's realtime registry remains separate. Legacy OpenRouter/DeepSeek selections dinormalisasi ke model direct yang setara.
 - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs` via `logAiUsage()`.
 - `logAiUsage()` sekarang menerima parameter `status` (`'success'` | `'failed'` | `'timeout'`) dan `errorMessage`. Jika gagal/timeout, token di-set ke 0 dan error message dicatat.
-- `resolveModelProvider()` mencari provider via `MODEL_REGISTRY` lookup, bukan hanya deteksi `/`. Tiga provider: `gemini`, `openrouter`, `deepseek`.
-- OpenRouter punya 4-attempt retry dengan backoff untuk 429. Error response dipetakan via `formatOpenRouterError()` — 401 (API Key invalid), 402 (Insufficient Credit), 403 (Access Denied), dan error codes lain dengan detail message dari response body. KETIK `ChatInterface` menekan console noise untuk expected AI errors via `shouldLogKetikGenerationError()` guard.
-- DeepSeek punya client native (`apps/api/src/lib/deepseek.ts`) dengan retry, error formatting, dan usage logging. Provider routing di `routes/ai.ts` dan service-service KETIK/PDKT menggunakan `isDeepSeek` flag. PDKT mendapat word count policy lebih longgar untuk DeepSeek via `getPdktWordCountPolicy()`.
+- `resolveModelProvider()` mencari provider via `MODEL_REGISTRY` lookup. Provider aktif hanya `gemini` dan `openai`.
+- OpenAI direct memakai Responses API wrapper (`POST /v1/responses`) dengan `instructions`, `input`, `text.format`, dan usage token counters.
+- Gemini tetap memakai retry/fallback jika `developer instruction not enabled`.
+- KETIK review mencoba Gemini terlebih dahulu, lalu fallback langsung ke OpenAI bila Gemini gagal atau key tidak tersedia.
+- PDKT image generation hanya memakai jalur Gemini-native; tidak ada fallback OpenRouter/DeepSeek untuk lampiran gambar.
 - KETIK memisahkan prompt policy dari orkestrasi provider: `prompt-policy.ts` menyerialisasi scenario/history sebagai escaped JSON data blocks, sedangkan `review-policy.ts` mendefinisikan prompt dan normalisasi lima dimensi review. Field konfigurasi atau chat tidak boleh diinterpolasi sebagai instruksi mentah.
 - KETIK review baru menggunakan lima dimensi (`empathy`, `probing`, `resolution`, `typo`, `compliance`). `resolution_score` nullable menjaga backward compatibility; consumer wajib memperlakukan nilai null/absen sebagai review lama, bukan skor 0.
-- Temperatur KETIK sengaja provider-aware: Gemini `0.82`, OpenRouter/DeepSeek `0.55`; provider non-Gemini juga mendapat strict script reinforcement untuk mengurangi instruction drift.
 - Caller modul tidak boleh mengasumsikan bentuk response SDK/provider selalu stabil; ekstraksi `text` harus defensif.
 - Usage AI dicatat server-side setelah request final (sukses maupun gagal). Setiap `request_id` unik — retry/fallback internal tidak menghasilkan row tambahan. Response tanpa metadata token tidak boleh menghasilkan usage log palsu.
 
@@ -157,8 +158,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_ANON_KEY`
 - `GEMINI_API_KEY`
-- `OPENROUTER_API_KEY`
-- `DEEPSEEK_API_KEY` (opsional — untuk model DeepSeek native)
+- `OPENAI_API_KEY` (wajib untuk text generation direct via Responses API)
 
 ### Telefun Server (`apps/telefun`) — variabel langsung:
 
@@ -166,7 +166,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
-- `OPENAI_API_KEY` (opsional — diperlukan untuk model GPT Realtime)
+- `OPENAI_API_KEY` (khusus Telefun Realtime; diset terpisah dari API service)
 - `TELEFUN_OPENAI_ENABLED` (opsional — feature flag untuk mengaktifkan model GPT Realtime)
 
 ### MCP / Tools:

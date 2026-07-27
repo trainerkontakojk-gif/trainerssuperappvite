@@ -6,6 +6,7 @@ import type {
   KetikQuickTemplate,
 } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
+import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import {
@@ -21,6 +22,22 @@ export interface UseKetikSettingsDraftProps {
   onClose: () => void;
 }
 
+const LEGACY_MODEL_IDS = new Set(["deepseek-v4-pro", "deepseek-v4-flash"]);
+
+export function coerceKetikModelId(modelId?: string | null): string {
+  if (TEXT_MODELS.some((model) => model.id === modelId)) {
+    return modelId as string;
+  }
+
+  if (typeof modelId === "string") {
+    if (LEGACY_MODEL_IDS.has(modelId) || modelId.includes("/")) {
+      return "gpt-5.4-mini";
+    }
+  }
+
+  return DEFAULT_KETIK_SETTINGS.selectedModel;
+}
+
 export function buildKetikSettingsForSave(params: {
   localSettings: KetikAppSettings;
   scenarios: KetikScenario[];
@@ -29,6 +46,7 @@ export function buildKetikSettingsForSave(params: {
 }): KetikAppSettings {
   return {
     ...params.localSettings,
+    selectedModel: coerceKetikModelId(params.localSettings.selectedModel),
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes,
     quickTemplates: params.quickTemplates,
@@ -65,6 +83,7 @@ export function useKetikSettingsDraft({
   >("scenarios");
   const [localSettings, setLocalSettings] = useState<KetikAppSettings>(() => ({
     ...settings,
+    selectedModel: coerceKetikModelId(settings.selectedModel),
     quickTemplates:
       settings.quickTemplates || DEFAULT_KETIK_SETTINGS.quickTemplates || [],
   }));
@@ -189,6 +208,7 @@ export function useKetikSettingsDraft({
     if (isOpen) {
       setLocalSettings({
         ...settings,
+        selectedModel: coerceKetikModelId(settings.selectedModel),
         quickTemplates:
           settings.quickTemplates ||
           DEFAULT_KETIK_SETTINGS.quickTemplates ||

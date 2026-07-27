@@ -127,9 +127,10 @@ Sebelum mengimplementasikan fitur yang menggunakan library eksternal (Supabase, 
 ## AI Integration Conventions
 
 - **Model registry**: `apps/api/src/lib/ai-models.ts` adalah sumber kebenaran untuk ID model dan provider mapping.
-- **Usage logging**: Setiap AI call via `generateGeminiContent()` atau `generateOpenRouterContent()` mewajibkan `UsageContext` dan `userId`. Log otomatis ke `ai_usage_logs` via `logAiUsage()`.
-- **Provider routing**: `resolveModelProvider()` mendeteksi Gemini (tanpa `/`) vs OpenRouter (dengan `/`).
-- **Retry**: OpenRouter punya 4-attempt retry dengan backoff untuk 429. Gemini punya fallback jika `developer instruction not enabled`.
+- **Usage logging**: Setiap AI call via `generateGeminiContent()` atau `generateOpenAIContent()` mewajibkan `UsageContext` dan `userId`. Log otomatis ke `ai_usage_logs` via `logAiUsage()`.
+- **Provider routing**: `resolveModelProvider()` mencari provider via `MODEL_REGISTRY` lookup, bukan hanya deteksi `/`. Provider aktif hanya `gemini` dan `openai`; legacy OpenRouter/DeepSeek selections dinormalisasi ke model direct.
+- **Newly added text model IDs**: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Telefun's realtime registry remains separate.
+- **Retry**: OpenAI Responses API punya 4-attempt retry dengan backoff untuk 429. Gemini punya fallback jika `developer instruction not enabled`.
 - **Error handling**: Jangan asumsikan `response.text` stabil antar versi SDK. Ekstraksi teks defensif: cek string, function, lalu fallback ke candidates.
 - **Scenarios & constants**: Didefinisikan server-side di `apps/api/src/services/ketik-service.ts` dan `pdkt-service.ts` (belum DB-backed).
 

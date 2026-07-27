@@ -47,7 +47,7 @@ describe("KETIK Service - Settings", () => {
         }),
       });
       const settings = await ketikService.getSettings("user1");
-      expect(settings.selectedModel).toBe("openai/gpt-4o-mini");
+      expect(settings.selectedModel).toBe("gpt-5.4-mini");
       expect(settings.simulationDuration).toBe(10);
       expect(settings.responsePacingMode).toBe("training_fast");
     });

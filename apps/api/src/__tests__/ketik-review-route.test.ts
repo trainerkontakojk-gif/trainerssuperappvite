@@ -13,8 +13,8 @@ vi.mock("../lib/supabase", () => ({
   createAdminClient: mockCreateAdminClient,
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn(),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn(),
 }));
 
 vi.mock("../middleware/rateLimit", () => ({

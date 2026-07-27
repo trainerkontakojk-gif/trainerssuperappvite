@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
-import { buildKetikSettingsForSave } from "../routes/ketik/components/settings/useKetikSettingsDraft";
+import {
+  buildKetikSettingsForSave,
+  coerceKetikModelId,
+} from "../routes/ketik/components/settings/useKetikSettingsDraft";
+import { coercePdktModelId } from "../routes/pdkt/pdktSettings";
 import { buildPdktSettingsForSave } from "../routes/pdkt/components/settings/usePdktSettingsDraft";
 import { buildTelefunSettingsForSave } from "../routes/telefun/components/settings/useTelefunSettingsDraft";
 import { DEFAULT_TELEFUN_SETTINGS } from "../routes/telefun/telefunSettings";
@@ -26,6 +30,25 @@ describe("settings draft commit helpers", () => {
     expect(result).not.toBe(original);
     expect(result.scenarios[0].title).toBe("Changed");
     expect(original.scenarios[0].title).toBe("Original");
+  });
+
+  it("buildKetikSettingsForSave normalizes legacy model selections to GPT 5.4 Mini", () => {
+    const result = buildKetikSettingsForSave({
+      localSettings: {
+        ...DEFAULT_KETIK_SETTINGS,
+        selectedModel: "openrouter/gpt-4o-mini",
+      },
+      scenarios: DEFAULT_KETIK_SETTINGS.scenarios,
+      consumerTypes: DEFAULT_KETIK_SETTINGS.consumerTypes,
+      quickTemplates: DEFAULT_KETIK_SETTINGS.quickTemplates ?? [],
+    });
+
+    expect(result.selectedModel).toBe("gpt-5.4-mini");
+    expect(coerceKetikModelId("deepseek-v4-pro")).toBe("gpt-5.4-mini");
+    expect(coerceKetikModelId("deepseek/deepseek-v3")).toBe("gpt-5.4-mini");
+    expect(coerceKetikModelId("unknown-model")).toBe(
+      DEFAULT_KETIK_SETTINGS.selectedModel,
+    );
   });
 
   it("buildPdktSettingsForSave preserves system fields while replacing collections immutably", () => {
@@ -85,6 +108,47 @@ describe("settings draft commit helpers", () => {
     expect(result.enableImageGeneration).toBe(false);
     expect(original.scenarios[0].title).toBe("Old");
     expect(original.enableImageGeneration).toBe(true);
+  });
+
+  it("buildPdktSettingsForSave normalizes legacy model selections to GPT 5.4 Mini", () => {
+    const customIdentity = {
+      senderName: "",
+      bodyName: "",
+      email: "",
+      city: "",
+    };
+    const original: PdktAppSettings = {
+      scenarios: [],
+      consumerTypes: [],
+      enableImageGeneration: true,
+      globalConsumerTypeId: "random",
+      selectedModel: "gemini-3.1-flash-lite",
+      consumerNameMentionPattern: "random",
+      writingStyleMode: "training",
+      customIdentity,
+    };
+
+    const result = buildPdktSettingsForSave({
+      localSettings: {
+        ...original,
+        selectedModel: "openai/gpt-4o-mini",
+      },
+      scenarios: [],
+      consumerTypes: [],
+      system: {
+        enableImageGeneration: true,
+        globalConsumerTypeId: "random",
+        selectedModel: "openai/gpt-4o-mini",
+        consumerNameMentionPattern: "random",
+        writingStyleMode: "training",
+        customIdentity,
+      },
+    });
+
+    expect(result.selectedModel).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("deepseek-v4-flash")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("openrouter/gpt-4o-mini")).toBe("gpt-5.4-mini");
+    expect(coercePdktModelId("unknown-model")).toBe("gemini-3.1-flash-lite");
   });
 
   it("buildTelefunSettingsForSave derives transport from selected model without mutating localSettings", () => {

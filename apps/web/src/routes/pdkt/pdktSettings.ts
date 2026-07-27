@@ -88,9 +88,20 @@ const DUMMY_PROFILES = [
   { name: "Indah Permatasari", email: "indah.permatasari.model@gmail.com" },
 ];
 
+const LEGACY_MODEL_IDS = new Set(["deepseek-v4-pro", "deepseek-v4-flash"]);
+
 export function coercePdktModelId(modelId?: string | null): string {
-  const exists = TEXT_MODELS.some((model) => model.id === modelId);
-  return exists ? (modelId as string) : DEFAULT_PDKT_MODEL_ID;
+  if (TEXT_MODELS.some((model) => model.id === modelId)) {
+    return modelId as string;
+  }
+
+  if (typeof modelId === "string") {
+    if (LEGACY_MODEL_IDS.has(modelId) || modelId.includes("/")) {
+      return "gpt-5.4-mini";
+    }
+  }
+
+  return DEFAULT_PDKT_MODEL_ID;
 }
 
 export function coerceWritingStyleMode(

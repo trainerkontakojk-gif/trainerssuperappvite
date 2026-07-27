@@ -38,8 +38,8 @@ vi.mock("../lib/gemini", () => ({
   generateGeminiContent: vi.fn(),
 }));
 
-vi.mock("../lib/openrouter", () => ({
-  generateOpenRouterContent: vi.fn(),
+vi.mock("../lib/openai", () => ({
+  generateOpenAIContent: vi.fn(),
 }));
 
 import { extractJsonObjectText } from "../services/ketik-service";
