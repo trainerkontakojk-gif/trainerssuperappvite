@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { Check, Edit2, Trash2, Plus, ArrowLeft, Image as ImageIcon, X } from "lucide-react";
-import { KetikAppSettings, KetikScenario } from "@trainers/types";
+import {
+  KetikAppSettings,
+  KetikScenario,
+  KETIK_PROMPT_LIMITS,
+} from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { normalizeKetikScenarioDraft } from "./ketikDraftNormalizers";
@@ -53,6 +57,8 @@ export function KetikScenariosTab({
   const totalScenarios = scenarios.length;
   const allSelected = totalScenarios > 0 && activeCount === totalScenarios;
   const noneSelected = activeCount === 0;
+  const scenarioDescription = scenarioForm.draft.description || "";
+  const formattedScenarioDescriptionLimit = KETIK_PROMPT_LIMITS.scenarioDescription.toLocaleString("id-ID");
 
   const handleAddClick = () => {
     scenarioForm.openAdd();
@@ -213,15 +219,27 @@ export function KetikScenariosTab({
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              <label
+                htmlFor="ketik-scenario-description"
+                className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2"
+              >
                 Deskripsi Masalah
               </label>
               <textarea
+                id="ketik-scenario-description"
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors"
                 rows={3}
-                value={scenarioForm.draft.description || ""}
+                value={scenarioDescription}
+                maxLength={KETIK_PROMPT_LIMITS.scenarioDescription}
+                aria-describedby="ketik-scenario-description-counter"
                 onChange={(e) => scenarioForm.setDraft({ description: e.target.value })}
               />
+              <p
+                id="ketik-scenario-description-counter"
+                className="mt-2 text-xs text-muted-foreground"
+              >
+                {scenarioDescription.length.toLocaleString("id-ID")} / {formattedScenarioDescriptionLimit}
+              </p>
             </div>
             <div>
               <div className="flex items-center justify-between gap-4 mb-2">

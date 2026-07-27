@@ -113,6 +113,61 @@ describe("PDKT scenario wizard", () => {
     expect(screen.getByRole("button", { name: "Batal" })).toBeDefined();
   });
 
+  it("shows and updates the scenario description character counter", async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+
+    const description = screen.getByPlaceholderText(
+      "Jelaskan konteks masalah yang harus diselesaikan oleh agen...",
+    );
+    expect(screen.getByText("0 / 50.000")).toBeDefined();
+    expect(description).toHaveAttribute("maxLength", "50000");
+    expect(description).toHaveAttribute(
+      "aria-describedby",
+      "scenario-description-counter",
+    );
+    expect(screen.queryByText("Deskripsi masalah wajib diisi.")).toBeNull();
+
+    fireEvent.change(description, { target: { value: "Konteks" } });
+    expect(screen.getByText("7 / 50.000")).toBeDefined();
+
+    await user.clear(description);
+    await user.click(
+      screen.getByRole("button", { name: /2\. Profil Pengirim/ }),
+    );
+    expect(screen.getByText("Deskripsi masalah wajib diisi.")).toBeDefined();
+    expect(description).toHaveAttribute(
+      "aria-describedby",
+      "scenario-description-counter scenario-description-error",
+    );
+  });
+
+  it("does not truncate a loaded over-limit scenario description", async () => {
+    const user = userEvent.setup();
+    renderModal({
+      settings: {
+        ...initialSettings,
+        scenarios: [
+          {
+            ...initialSettings.scenarios[0],
+            description: "x".repeat(50_001),
+          },
+        ],
+      },
+    });
+
+    await user.click(screen.getByTitle("Edit"));
+
+    const description = screen.getByPlaceholderText(
+      "Jelaskan konteks masalah yang harus diselesaikan oleh agen...",
+    );
+    expect(description).toHaveValue("x".repeat(50_001));
+    expect(screen.getByText("50.001 / 50.000")).toBeDefined();
+  });
+
   it("keeps optional profile fields passable and retains values across stages", async () => {
     const user = userEvent.setup();
     renderModal({

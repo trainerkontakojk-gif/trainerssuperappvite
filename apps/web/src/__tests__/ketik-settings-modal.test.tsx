@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsModal } from "../routes/ketik/components/SettingsModal";
 import type { KetikAppSettings } from "@trainers/types";
@@ -170,6 +170,56 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     await user.click(screen.getByText("Sistem"));
 
     expect(screen.getByDisplayValue("20")).toBeDefined();
+  });
+
+  it("shows and updates the KETIK scenario description character counter", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SettingsModal {...defaultProps} />);
+
+    await user.click(screen.getByText("Masalah"));
+    await user.click(screen.getByRole("button", { name: /tambah skenario baru/i }));
+
+    const description = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(screen.getByText("0 / 12.000")).toBeDefined();
+    expect(description).toHaveAttribute("maxLength", "12000");
+    expect(description).toHaveAttribute(
+      "aria-describedby",
+      "ketik-scenario-description-counter",
+    );
+    expect(description).toHaveAttribute("id", "ketik-scenario-description");
+    expect(screen.getByLabelText("Deskripsi Masalah")).toBe(description);
+
+    fireEvent.change(description, { target: { value: "Deskripsi baru" } });
+    expect(screen.getByText("14 / 12.000")).toBeDefined();
+
+    await user.clear(description);
+    expect(screen.getByText("0 / 12.000")).toBeDefined();
+  });
+
+  it("does not truncate a loaded over-limit KETIK scenario description", async () => {
+    const { container } = render(
+      <SettingsModal
+        {...defaultProps}
+        settings={{
+          ...initialSettings,
+          scenarios: [
+            {
+              ...initialSettings.scenarios[0],
+              description: "x".repeat(12_001),
+            },
+          ],
+        }}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Masalah"));
+    const scenarioCard = screen.getByText(initialSettings.scenarios[0].title).closest("div.flex.items-start");
+    await user.click(scenarioCard!.querySelectorAll("button")[1]);
+
+    const description = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(description.value).toHaveLength(12_001);
+    expect(screen.getByText("12.001 / 12.000")).toBeDefined();
   });
 
   it("closes and reopens with fresh settings from props", () => {

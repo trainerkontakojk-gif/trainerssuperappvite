@@ -1,5 +1,9 @@
 import React, { useRef, useState } from "react";
-import type { PdktConsumerType, PdktScenario } from "@trainers/types";
+import {
+  PDKT_PROMPT_INPUT_LIMITS,
+  type PdktConsumerType,
+  type PdktScenario,
+} from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { pdktClient, unwrapResponse } from "../../../../lib/api";
@@ -119,6 +123,7 @@ export function PdktScenariosTab(props: Props) {
   } | null>(null);
 
   const draft = scenarioForm.draft;
+  const descriptionLength = (draft.description || "").length;
   const categories = Array.from(
     new Set(scenarios.map((scenario) => scenario.category).filter(Boolean)),
   );
@@ -137,6 +142,10 @@ export function PdktScenariosTab(props: Props) {
         ? "Format email tidak valid."
         : "",
   };
+  const descriptionErrorId =
+    attempted.has("description") && scenarioErrors.description
+      ? "scenario-description-error"
+      : undefined;
   const scenarioValid =
     !scenarioErrors.category &&
     !scenarioErrors.title &&
@@ -559,12 +568,24 @@ export function PdktScenariosTab(props: Props) {
                 aria-invalid={Boolean(
                   attempted.has("description") && scenarioErrors.description,
                 )}
-                aria-describedby="scenario-description-error"
+                aria-describedby={[
+                  "scenario-description-counter",
+                  descriptionErrorId,
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                maxLength={PDKT_PROMPT_INPUT_LIMITS.longText}
                 onChange={(event) =>
                   scenarioForm.setDraft({ description: event.target.value })
                 }
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground focus:outline-none"
               />
+              <p
+                id="scenario-description-counter"
+                className="text-xs text-muted-foreground"
+              >
+                {descriptionLength.toLocaleString("id-ID")} / {PDKT_PROMPT_INPUT_LIMITS.longText.toLocaleString("id-ID")}
+              </p>
             </SettingsField>
           </div>
         }
