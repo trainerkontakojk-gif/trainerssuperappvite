@@ -15,6 +15,17 @@ const SERVICE_LABELS: Record<string, string> = {
   slik: "SLIK",
 };
 
+function normalizeServiceOptions(services: string[]): string[] {
+  const seen = new Set<string>();
+  return services.flatMap((raw) => {
+    const key = raw.trim().toLowerCase();
+    const service = key === "digital chat" || key === "digital_chat" ? "chat" : key;
+    if (!service || seen.has(service)) return [];
+    seen.add(service);
+    return service;
+  });
+}
+
 interface Props {
   selectedService: string;
   onServiceChange: (v: string) => void;
@@ -46,15 +57,15 @@ export default function DashboardFilters({
   leaderLockedService,
   availableServices,
 }: Props) {
-  const serviceOptions = availableServices?.length
-    ? availableServices
-    : Object.entries(SERVICE_LABELS).map(([k]) => k);
+  const serviceOptions = normalizeServiceOptions(
+    availableServices?.length
+      ? availableServices
+      : Object.entries(SERVICE_LABELS).map(([k]) => k),
+  );
 
-  const serviceLabels: Record<string, string> = availableServices?.length
-    ? Object.fromEntries(
-        availableServices.map((svc) => [svc, SERVICE_LABELS[svc] || svc]),
-      )
-    : SERVICE_LABELS;
+  const serviceLabels: Record<string, string> = Object.fromEntries(
+    serviceOptions.map((svc) => [svc, SERVICE_LABELS[svc] || svc]),
+  );
 
   const { groupedFolders, standaloneFolders } =
     buildSidakFolderSelectGroups(folders);

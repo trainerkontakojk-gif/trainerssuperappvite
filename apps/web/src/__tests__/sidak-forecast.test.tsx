@@ -513,6 +513,90 @@ describe("SidakForecastPage", () => {
     document.documentElement.classList.remove("dark");
   });
 
+  it("deduplicates Chat aliases while keeping canonical service values", async () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        ...dashboardData,
+        availableServices: ["call", "Chat", "Digital Chat", "email"],
+      },
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+
+    render(<SidakForecastPage />);
+
+    const serviceSelect = (screen.getAllByRole("combobox") as HTMLSelectElement[])
+      .find((select) => Array.from(select.options).some((option) => option.value === "chat"))!;
+
+    expect(Array.from(serviceSelect.options).map((option) => option.value)).toEqual([
+      "call",
+      "chat",
+      "email",
+    ]);
+    expect(Array.from(serviceSelect.options).map((option) => option.text)).toEqual([
+      "Call",
+      "Chat",
+      "Email",
+    ]);
+  });
+
+  it("resets the folder and forecast requests when switching from Call to Chat", async () => {
+    const callDashboardData = { ...dashboardData, availableServices: ["call", "chat"] };
+    const chatDashboardData = {
+      ...callDashboardData,
+      folders: [{ id: "folder-chat", name: "Tim Whatsapp", parent_id: null }],
+    };
+    vi.mocked(useApi).mockReturnValue({
+      data: callDashboardData,
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+
+    const { rerender } = render(<SidakForecastPage />);
+
+    const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    const serviceSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === "chat"),
+    )!;
+    const folderSelect = selects.find((select) =>
+      Array.from(select.options).some((option) => option.value === "folder-call"),
+    )!;
+
+    await waitFor(() => expect(folderSelect.value).toBe("folder-call"));
+    fireEvent.change(serviceSelect, { target: { value: "chat" } });
+
+    vi.mocked(useApi).mockReturnValue({
+      data: chatDashboardData,
+      loading: false,
+      refetch: vi.fn(),
+      error: null,
+    } as any);
+    rerender(<SidakForecastPage />);
+
+    await waitFor(() => {
+      expect(folderSelect.value).toBe("folder-chat");
+    });
+    await waitFor(() => {
+      const serviceForecastCall = vi.mocked(
+        sidakClient.dashboard.forecast.$post,
+      ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+      const agentForecastCall = vi.mocked(
+        sidakClient.forecast.agents.$post,
+      ).mock.calls.at(-1)?.[0] as { json?: any } | undefined;
+
+      expect(serviceForecastCall?.json?.filters).toMatchObject({
+        serviceType: "chat",
+        folderIds: ["folder-chat"],
+      });
+      expect(agentForecastCall?.json).toMatchObject({
+        serviceType: "chat",
+        folderIds: ["folder-chat"],
+      });
+    });
+  });
+
   it("locks leader forecast requests to Chat when only Chat is available", async () => {
     vi.mocked(useApi).mockReturnValue({
       data: chatOnlyDashboardData,

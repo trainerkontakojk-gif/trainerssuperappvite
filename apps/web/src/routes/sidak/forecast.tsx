@@ -45,6 +45,22 @@ import {
 const MONTH_OPTIONS = [1, 2, 3, 4, 5, 6] as const;
 const MAX_VISIBLE_PARAMETER_SERIES = 2;
 
+function normalizeAvailableServices(services: string[] | undefined): string[] {
+  const aliases: Record<string, string> = {
+    chat: "chat",
+    "digital chat": "chat",
+    digital_chat: "chat",
+  };
+  const seen = new Set<string>();
+  return (services ?? Object.keys(SERVICE_LABELS)).flatMap((raw) => {
+    const key = raw.trim().toLowerCase();
+    const service = aliases[key] ?? key;
+    if (!service || seen.has(service)) return [];
+    seen.add(service);
+    return service;
+  });
+}
+
 function toPeriodQueryParts(params: {
   year: number;
   serviceType: string;
@@ -419,9 +435,10 @@ export default function SidakForecastPage() {
     () => (data?.availableYears?.length ? data.availableYears : [currentYear]),
     [data, currentYear],
   );
-  const availableServices = data?.availableServices?.length
-    ? data.availableServices
-    : (Object.keys(SERVICE_LABELS) as string[]);
+  const availableServices = useMemo(
+    () => normalizeAvailableServices(data?.availableServices),
+    [data?.availableServices],
+  );
   const leaderLockedService =
     availableServices.length === 1 ? String(availableServices[0]) : undefined;
   const effectiveService = leaderLockedService ?? selectedService;
@@ -767,7 +784,7 @@ export default function SidakForecastPage() {
               );
               setSelectedService(value);
               setSelectedFolder(matchedFolder?.id ?? "ALL");
-              initialFolderSetRef.current = true;
+              initialFolderSetRef.current = Boolean(matchedFolder);
             }}
             selectedFolder={selectedFolder}
             onFolderChange={setSelectedFolder}

@@ -5,7 +5,6 @@ import type {
 } from "./dashboard-types";
 import {
   getDashboardServiceLabel,
-  toDashboardServiceSet,
   toDashboardTemuanRows,
   toDashboardWeightMap,
   toParetoCategory,
@@ -106,64 +105,6 @@ async function fetchAllTemuan(opts: {
   return allData;
 }
 
-async function fetchDistinctServiceTypes(opts: {
-  service_type?: string;
-  period_ids?: string[];
-  year?: number;
-  peserta_id?: string;
-  agent_ids?: string[];
-  folderNames?: string[] | null;
-  excludedIds: string[];
-  allowedSvcs?: ServiceType[] | null;
-}): Promise<{ service_type: string }[]> {
-  const allData: { service_type: string }[] = [];
-  let from = 0;
-  let hasMore = true;
-
-  while (hasMore) {
-    let query = supabaseAdmin
-      .from("qa_temuan")
-      .select("service_type, profiler_peserta!inner(id, batch_name)")
-      .order("id", { ascending: true })
-      .range(from, from + PAGINATION_STEP - 1);
-
-    if (opts.allowedSvcs) {
-      query = query.in("service_type", opts.allowedSvcs);
-    }
-    if (opts.period_ids && opts.period_ids.length > 0) {
-      query = query.in("period_id", opts.period_ids);
-    }
-    if (opts.year) {
-      query = query.eq("tahun", opts.year);
-    }
-    if (opts.peserta_id) {
-      query = query.eq("peserta_id", opts.peserta_id);
-    }
-    if (opts.agent_ids && opts.agent_ids.length > 0) {
-      query = query.in("peserta_id", opts.agent_ids);
-    }
-    if (opts.folderNames && opts.folderNames.length > 0) {
-      query = query.in("profiler_peserta.batch_name", opts.folderNames);
-    }
-    if (opts.excludedIds.length > 0) {
-      query = query.not("peserta_id", "in", `(${opts.excludedIds.join(",")})`);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData.push(...data);
-      hasMore = data.length === PAGINATION_STEP;
-      from += PAGINATION_STEP;
-    }
-  }
-
-  return allData;
-}
-
 export async function getDashboardData(params: {
   period_ids?: string[];
   service_type?: string;
@@ -208,25 +149,18 @@ export async function getDashboardData(params: {
     }
   }
 
-  const [allTemuan, distinctServiceRows] = await Promise.all([
-    fetchAllTemuan({
-      service_type: params.service_type,
-      period_ids: params.period_ids,
-      year: params.year,
-      peserta_id: params.peserta_id,
-      agent_ids: params.agent_ids,
-      folderNames,
-      excludedIds,
-      allowedSvcs,
-    }),
-    fetchDistinctServiceTypes({
-      period_ids: params.period_ids,
-      year: params.year,
-      folderNames,
-      excludedIds,
-      allowedSvcs,
-    }),
-  ]);
+  // Service options come from the active SIDAK master/scope, not from rows in
+  // the currently selected period, folder, or service.
+  const allTemuan = await fetchAllTemuan({
+    service_type: params.service_type,
+    period_ids: params.period_ids,
+    year: params.year,
+    peserta_id: params.peserta_id,
+    agent_ids: params.agent_ids,
+    folderNames,
+    excludedIds,
+    allowedSvcs,
+  });
   const rows = toDashboardTemuanRows(allTemuan);
 
   const weightMap = toDashboardWeightMap(weights?.data);
@@ -528,10 +462,9 @@ export async function getDashboardData(params: {
   ].sort((a, b) => b - a);
   const currentYear = params.year ?? new Date().getFullYear();
 
-  const distinctSvcs = toDashboardServiceSet(distinctServiceRows);
   const availableServices = allowedSvcs
-    ? allowedSvcs.filter((svc) => distinctSvcs.has(svc))
-    : VALID_SERVICE_TYPES.filter((svc) => distinctSvcs.has(svc));
+    ? VALID_SERVICE_TYPES.filter((svc) => allowedSvcs.includes(svc))
+    : [...VALID_SERVICE_TYPES];
 
   return {
     periods,

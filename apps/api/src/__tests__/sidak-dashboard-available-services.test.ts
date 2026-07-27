@@ -204,15 +204,24 @@ describe("getDashboardData availableServices regression", () => {
     expect(result.availableServices).not.toContain("chat");
   });
 
-  it("returns empty availableServices when no data matches year filter", async () => {
+  it("returns every active master service when no data matches the selected period", async () => {
     mockTemuan = [];
 
     const result = await sidakService.getDashboardData({
       service_type: "call",
       year: 2025,
+      folder_ids: ["folder-1"],
     });
 
-    expect(result.availableServices).toEqual([]);
+    expect(result.availableServices).toEqual([
+      "call",
+      "chat",
+      "email",
+      "cso",
+      "pencatatan",
+      "bko",
+      "slik",
+    ]);
   });
 
   it("availableServices reflects leader scope even without serviceTypeLocked", async () => {
@@ -242,6 +251,6 @@ describe("getDashboardData availableServices regression", () => {
       allowedServiceTypes: ["call", "chat"],
     });
 
-    expect(result.availableServices).toEqual(["call"]);
+    expect(result.availableServices).toEqual(["call", "chat"]);
   });
 });
