@@ -15,6 +15,18 @@ vi.mock("framer-motion", async () => {
     AnimatePresence: ({ children }: any) => <>{children}</>,
   };
 });
+const apiMocks = vi.hoisted(() => ({
+  generateIdentity: vi.fn(),
+  generateTemplate: vi.fn(),
+  unwrapResponse: vi.fn(),
+}));
+vi.mock("../lib/api", () => ({
+  pdktClient: {
+    "generate-identity": { $post: apiMocks.generateIdentity },
+    "generate-template": { $post: apiMocks.generateTemplate },
+  },
+  unwrapResponse: apiMocks.unwrapResponse,
+}));
 vi.mock("../../../lib/toast", () => ({
   notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
@@ -69,11 +81,14 @@ function renderModal(
   return { onSave, onClose };
 }
 
-async function completeScenarioStage(user: ReturnType<typeof userEvent.setup>) {
+async function completeScenarioStage(
+  user: ReturnType<typeof userEvent.setup>,
+  title = " Wizard",
+) {
   await user.selectOptions(screen.getByLabelText(/Kategori/), "Kepatuhan");
   fireEvent.change(
     screen.getByPlaceholderText("Contoh: Kesalahan Transaksi Real-time"),
-    { target: { value: " Wizard" } },
+    { target: { value: title } },
   );
   fireEvent.change(
     screen.getByPlaceholderText(
@@ -82,6 +97,47 @@ async function completeScenarioStage(user: ReturnType<typeof userEvent.setup>) {
     { target: { value: " Konteks" } },
   );
   await user.click(screen.getByRole("button", { name: "Lanjut" }));
+}
+
+async function fillScenarioIdentity(
+  identity: {
+    senderName: string;
+    bodyName: string;
+    email: string;
+    city: string;
+  },
+) {
+  fireEvent.change(screen.getByLabelText(/Nama pengirim/), {
+    target: { value: identity.senderName },
+  });
+  fireEvent.change(screen.getByLabelText(/Nama panggilan/), {
+    target: { value: identity.bodyName },
+  });
+  fireEvent.change(document.getElementById("custom-email")!, {
+    target: { value: identity.email },
+  });
+  fireEvent.change(screen.getByLabelText(/Kota/, { selector: "input" }), {
+    target: { value: identity.city },
+  });
+}
+
+async function createScenarioWithIdentity(
+  user: ReturnType<typeof userEvent.setup>,
+  title: string,
+  identity: {
+    senderName: string;
+    bodyName: string;
+    email: string;
+    city: string;
+  },
+) {
+  await user.click(
+    screen.getByRole("button", { name: /tambah skenario baru/i }),
+  );
+  await completeScenarioStage(user, title);
+  fillScenarioIdentity(identity);
+  await user.click(screen.getByRole("button", { name: "Lanjut" }));
+  await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
 }
 
 async function reachEmailStage(user: ReturnType<typeof userEvent.setup>) {
@@ -110,7 +166,13 @@ describe("PDKT scenario wizard", () => {
     expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
   });
 
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    apiMocks.generateIdentity.mockReset();
+    apiMocks.generateTemplate.mockReset();
+    apiMocks.unwrapResponse.mockReset();
+    apiMocks.unwrapResponse.mockImplementation(async (value: unknown) => value);
+  });
 
   it("renders the exact three-stage contract and disables invalid progress", async () => {
     const user = userEvent.setup();
@@ -213,6 +275,165 @@ describe("PDKT scenario wizard", () => {
     expect(screen.getByDisplayValue("Profil Baru")).toBeDefined();
   });
 
+  it("uses the generated fallback identity for blank scenario and global values when generating templates", async () => {
+    const user = userEvent.setup();
+    const generatedFallbackIdentity = {
+      name: "Generated Sender",
+      bodyName: "Generated Body",
+      email: "generated@example.com",
+      city: "Generated City",
+    };
+    apiMocks.generateIdentity.mockResolvedValue(generatedFallbackIdentity);
+    apiMocks.generateTemplate.mockResolvedValue({
+      subject: "Template Subject",
+      body: "Template Body",
+    });
+    renderModal({
+      settings: {
+        ...initialSettings,
+        customIdentity: {
+          senderName: "",
+          email: "",
+          city: "",
+          bodyName: "",
+        },
+      },
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await reachEmailStage(user);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Generate" })).not.toBeDisabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() =>
+      expect(apiMocks.generateIdentity).toHaveBeenCalledTimes(1),
+    );
+    expect(apiMocks.generateTemplate).toHaveBeenCalledTimes(1);
+    expect(apiMocks.generateTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        json: expect.objectContaining({
+          identity: generatedFallbackIdentity,
+        }),
+      }),
+    );
+  });
+
+  it("isolates scenario identity from global identity and saves the override", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderModal();
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await completeScenarioStage(user);
+
+    const scenarioName = screen.getByLabelText(/Nama pengirim/);
+    const scenarioBodyName = screen.getByLabelText(/Nama panggilan/);
+    await user.clear(scenarioName);
+    await user.type(scenarioName, "Scenario Sender");
+    await user.clear(scenarioBodyName);
+    await user.type(scenarioBodyName, "Scenario");
+    const scenarioEmail = document.getElementById("custom-email")!;
+    await user.clear(scenarioEmail);
+    await user.type(scenarioEmail, "scenario@example.com");
+    await user.type(
+      screen.getByLabelText(/Kota/, { selector: "input" }),
+      "Surabaya",
+    );
+    expect(
+      screen.getByText(
+        "Berlaku khusus untuk skenario ini. Field kosong akan memakai nilai skenario terkait, lalu identitas default.",
+      ),
+    ).toBeDefined();
+
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
+    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+
+    const savedSettings = onSave.mock.calls[0][0];
+    expect(savedSettings.customIdentity).toEqual(
+      initialSettings.customIdentity,
+    );
+    expect(savedSettings.scenarios).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          identity: {
+            name: "Scenario Sender",
+            bodyName: "Scenario",
+            email: "scenario@example.com",
+            city: "Surabaya",
+          },
+        }),
+      ]),
+    );
+  });
+
+  it("keeps distinct scenario identity overrides isolated when reopening each edit", async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await createScenarioWithIdentity(user, " Alpha", {
+      senderName: "Alpha Sender",
+      bodyName: "Alpha",
+      email: "alpha@example.com",
+      city: "Alpha City",
+    });
+    await createScenarioWithIdentity(user, " Beta", {
+      senderName: "Beta Sender",
+      bodyName: "Beta",
+      email: "beta@example.com",
+      city: "Beta City",
+    });
+
+    await waitFor(() => expect(screen.getAllByTitle("Edit")).toHaveLength(3));
+    await user.click(screen.getAllByTitle("Edit")[1]);
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    expect(screen.getByLabelText(/Nama pengirim/)).toHaveValue("Alpha Sender");
+    expect(screen.getByLabelText(/Nama panggilan/)).toHaveValue("Alpha");
+    expect(document.getElementById("custom-email")).toHaveValue(
+      "alpha@example.com",
+    );
+    expect(screen.getByLabelText(/Kota/, { selector: "input" })).toHaveValue(
+      "Alpha City",
+    );
+    await user.click(screen.getByRole("button", { name: "Tutup wizard skenario" }));
+    await waitFor(() => expect(screen.getAllByTitle("Edit")).toHaveLength(3));
+
+    await user.click(screen.getAllByTitle("Edit")[2]);
+    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    expect(screen.getByLabelText(/Nama pengirim/)).toHaveValue("Beta Sender");
+    expect(screen.getByLabelText(/Nama panggilan/)).toHaveValue("Beta");
+    expect(document.getElementById("custom-email")).toHaveValue(
+      "beta@example.com",
+    );
+    expect(screen.getByLabelText(/Kota/, { selector: "input" })).toHaveValue(
+      "Beta City",
+    );
+  });
+
+  it("canceling a scenario identity edit leaves the global identity unchanged", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderModal();
+    await user.click(
+      screen.getByRole("button", { name: /tambah skenario baru/i }),
+    );
+    await completeScenarioStage(user);
+    const scenarioName = screen.getByLabelText(/Nama pengirim/);
+    await user.clear(scenarioName);
+    await user.type(scenarioName, "Canceled Scenario");
+    await user.click(
+      screen.getByRole("button", { name: "Tutup wizard skenario" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Identitas" }));
+    expect(screen.getByLabelText(/Nama Pengirim \(Header\)/)).toHaveValue(
+      "Jane Doe",
+    );
+  });
+
   it("shows two profile cards and all stage 3 settings immediately", async () => {
     const user = userEvent.setup();
     renderModal();
@@ -249,10 +470,7 @@ describe("PDKT scenario wizard", () => {
     await completeScenarioStage(user);
     await user.click(screen.getByRole("button", { name: "Lanjut" }));
 
-    await user.selectOptions(
-      screen.getByLabelText(/Penerima Utama/),
-      "ojk",
-    );
+    await user.selectOptions(screen.getByLabelText(/Penerima Utama/), "ojk");
     await user.selectOptions(
       screen.getByLabelText(/Mode Penerima/),
       "multiple",

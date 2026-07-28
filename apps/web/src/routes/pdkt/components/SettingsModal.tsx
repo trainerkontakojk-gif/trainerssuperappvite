@@ -201,10 +201,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           email: customEmail,
                           city: customCity,
                         }}
-                        setCustomSenderName={setCustomSenderName}
-                        setCustomBodyName={setCustomBodyName}
-                        setCustomEmail={setCustomEmail}
-                        setCustomCity={setCustomCity}
                         globalConsumerTypeId={globalConsumerTypeId}
                         setGlobalConsumerTypeId={setGlobalConsumerTypeId}
                         consumerNameMentionPattern={consumerNameMentionPattern}

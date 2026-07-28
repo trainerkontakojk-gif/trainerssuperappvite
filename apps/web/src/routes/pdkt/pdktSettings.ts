@@ -136,6 +136,54 @@ export function resolveConsumerNameMentionPattern(
   return patterns[Math.floor(Math.random() * patterns.length)];
 }
 
+type PdktCustomIdentity = NonNullable<PdktAppSettings["customIdentity"]>;
+
+function firstNonBlank(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+export function resolvePdktScenarioIdentity({
+  scenario,
+  customIdentity,
+  fallbackIdentity,
+}: {
+  scenario: PdktScenario;
+  customIdentity?: PdktCustomIdentity;
+  fallbackIdentity: PdktIdentity;
+}): PdktIdentity {
+  const scenarioIdentity = scenario.identity;
+
+  return {
+    name: firstNonBlank(
+      scenarioIdentity?.name,
+      customIdentity?.senderName,
+      fallbackIdentity.name,
+    ),
+    email: firstNonBlank(
+      scenarioIdentity?.email,
+      customIdentity?.email,
+      fallbackIdentity.email,
+    ),
+    city: firstNonBlank(
+      scenarioIdentity?.city,
+      customIdentity?.city,
+      fallbackIdentity.city,
+    ),
+    bodyName: firstNonBlank(
+      scenarioIdentity?.bodyName,
+      scenarioIdentity?.name,
+      customIdentity?.bodyName,
+      customIdentity?.senderName,
+      fallbackIdentity.bodyName,
+    ),
+  };
+}
+
 export function generatePdktSessionConfig(
   settings: PdktAppSettings,
   scenario: PdktScenario,
@@ -160,17 +208,11 @@ export function generatePdktSessionConfig(
       ];
   }
 
-  const customIdentity = settings.customIdentity;
-
-  const identity: PdktIdentity = {
-    name: customIdentity?.senderName || fallbackIdentity.name,
-    email: customIdentity?.email || fallbackIdentity.email,
-    city: customIdentity?.city || fallbackIdentity.city,
-    bodyName:
-      customIdentity?.bodyName ||
-      customIdentity?.senderName ||
-      fallbackIdentity.bodyName,
-  };
+  const identity = resolvePdktScenarioIdentity({
+    scenario,
+    customIdentity: settings.customIdentity,
+    fallbackIdentity,
+  });
 
   const resolvedConsumerNameMentionPattern = resolveConsumerNameMentionPattern(
     settings.consumerNameMentionPattern,

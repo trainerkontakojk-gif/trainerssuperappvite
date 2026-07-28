@@ -10,7 +10,7 @@ The PDKT add/edit surface is now a single three-step wizard rather than the form
 - Exact steps: **`1. Skenario`**, **`2. Profil Pengirim`**, **`3. Email & Pengaturan`**.
 - Step statuses are **`Belum diisi`**, **`Sedang diisi`**, or **`Selesai`**, derived from live draft/validation state.
 - Step 1 contains scenario basics and no LJK/licensed-entity control. The helper uses **`Jelaskan situasi yang akan dihadapi agent dalam simulasi email.`**
-- Step 2 contains the two profile cards: `Identitas Pengirim` and `Karakter dan Gaya Komunikasi`.
+- Step 2 contains the two profile cards: `Identitas Pengirim` (scenario-local override, not global) and `Karakter dan Gaya Komunikasi`.
 - Step 3 keeps all settings directly visible when **`Email & Pengaturan`** is active, in two clearly separated sections: **`Konfigurasi Email`** (with helper `Atur penerima, template, dan lampiran untuk skenario ini.`) and **`Pengaturan Simulasi`** (with helper `Sesuaikan perilaku AI yang digunakan dalam simulasi.`). Steps 1 and 2 remain hidden while inactive. The obsolete `Pengaturan Lanjutan` accordion and compact summary are removed.
 - Footer labels are exact: step 1 `Batal`/`Lanjut`; step 2 `Kembali`/`Lanjut`; step 3 `Kembali` plus `Buat Skenario` (add) or `Simpan Perubahan` (edit).
 - Inline validation, accessible stepper/dialog controls, focus handling, Escape handling, attachment affordances, and mobile dynamic-viewport/safe-area behavior are implemented.

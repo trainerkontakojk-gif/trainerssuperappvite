@@ -3,12 +3,14 @@ import {
   coercePdktModelId,
   resolveConsumerNameMentionPattern,
   generatePdktSessionConfig,
+  resolvePdktScenarioIdentity,
   type PdktAppSettings,
 } from "../routes/pdkt/pdktSettings";
-import type {
-  PdktScenario,
-  PdktConsumerType,
-  PdktIdentity,
+import {
+  pdktPromptScenarioSchema,
+  type PdktScenario,
+  type PdktConsumerType,
+  type PdktIdentity,
 } from "@trainers/types";
 
 describe("PDKT Settings Helpers", () => {
@@ -64,6 +66,85 @@ describe("PDKT Settings Helpers", () => {
     expect(["upfront", "middle", "late", "none"]).toContain(pattern);
 
     expect(resolveConsumerNameMentionPattern("upfront")).toBe("upfront");
+  });
+
+  it("resolves scenario identity fields before global and fallback values", () => {
+    const config = generatePdktSessionConfig(
+      {
+        ...mockSettings,
+        customIdentity: {
+          senderName: " Global Name ",
+          email: "global@test.com",
+          city: "Global City",
+          bodyName: "Global Body",
+        },
+      },
+      {
+        ...mockScenario,
+        title: "Scenario Title",
+        identity: {
+          name: " Scenario Name ",
+          email: "",
+          city: "   ",
+          bodyName: "",
+        },
+      },
+      mockFallbackIdentity,
+    );
+
+    expect(config.identity).toEqual({
+      name: "Scenario Name",
+      email: "global@test.com",
+      city: "Global City",
+      bodyName: "Scenario Name",
+    });
+  });
+
+  it("uses each fallback when scenario and global fields are blank", () => {
+    expect(
+      resolvePdktScenarioIdentity({
+        scenario: { ...mockScenario, identity: { name: "  " } },
+        customIdentity: {
+          senderName: " ",
+          email: "",
+          city: "  ",
+          bodyName: "",
+        },
+        fallbackIdentity: mockFallbackIdentity,
+      }),
+    ).toEqual(mockFallbackIdentity);
+  });
+
+  it("omits raw scenario identity at the prompt boundary", () => {
+    const promptScenario = pdktPromptScenarioSchema.parse({
+      ...mockScenario,
+      identity: { name: "Scenario Name" },
+    });
+
+    expect(promptScenario).not.toHaveProperty("identity");
+  });
+
+  it("preserves legacy scenario identity behavior", () => {
+    const config = generatePdktSessionConfig(
+      {
+        ...mockSettings,
+        customIdentity: {
+          senderName: "Custom Name",
+          email: "custom@test.com",
+          city: "Bandung",
+          bodyName: "Custom",
+        },
+      },
+      mockScenario,
+      mockFallbackIdentity,
+    );
+
+    expect(config.identity).toEqual({
+      name: "Custom Name",
+      email: "custom@test.com",
+      city: "Bandung",
+      bodyName: "Custom",
+    });
   });
 
   it("overrides identity with custom identity", () => {

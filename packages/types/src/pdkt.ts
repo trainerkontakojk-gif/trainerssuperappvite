@@ -63,6 +63,14 @@ export const pdktConsumerTypeSchema = z.object({
 });
 export type PdktConsumerType = z.infer<typeof pdktConsumerTypeSchema>;
 
+export const pdktScenarioIdentitySchema = z.object({
+  name: z.string().optional(),
+  bodyName: z.string().optional(),
+  email: z.string().optional(),
+  city: z.string().optional(),
+});
+export type PdktScenarioIdentity = z.infer<typeof pdktScenarioIdentitySchema>;
+
 export const pdktScenarioSchema = z.object({
   id: z.string(),
   category: z.string(),
@@ -81,6 +89,7 @@ export const pdktScenarioSchema = z.object({
     .optional(),
   alwaysUseSampleEmail: z.boolean().optional(),
   attachmentImages: z.array(z.string()).optional(),
+  identity: pdktScenarioIdentitySchema.optional(),
 });
 export type PdktScenario = z.infer<typeof pdktScenarioSchema>;
 
@@ -115,23 +124,25 @@ export const pdktPromptConsumerTypeSchema = pdktConsumerTypeSchema.extend({
   tone: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText).optional(),
 });
 
-export const pdktPromptScenarioSchema = pdktScenarioSchema.extend({
-  id: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.id),
-  category: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),
-  title: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),
-  description: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText),
-  recipientEmails: z
-    .array(boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.emailAddress))
-    .max(PDKT_PROMPT_INPUT_LIMITS.recipientCount)
-    .optional(),
-  script: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText).optional(),
-  sampleEmailTemplate: z
-    .object({
-      subject: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText).optional(),
-      body: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText),
-    })
-    .optional(),
-});
+export const pdktPromptScenarioSchema = pdktScenarioSchema
+  .omit({ identity: true })
+  .extend({
+    id: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.id),
+    category: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),
+    title: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),
+    description: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText),
+    recipientEmails: z
+      .array(boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.emailAddress))
+      .max(PDKT_PROMPT_INPUT_LIMITS.recipientCount)
+      .optional(),
+    script: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText).optional(),
+    sampleEmailTemplate: z
+      .object({
+        subject: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText).optional(),
+        body: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText),
+      })
+      .optional(),
+  });
 
 export const pdktPromptIdentitySchema = pdktIdentitySchema.extend({
   name: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText),

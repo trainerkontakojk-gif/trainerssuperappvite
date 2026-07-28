@@ -46,6 +46,20 @@ export function findInvalidPdktRecipientEmails(value: unknown): string[] {
   return invalidEmails;
 }
 
+function normalizePdktScenarioIdentity(
+  identity: PdktScenario["identity"],
+): PdktScenario["identity"] {
+  if (!identity) return undefined;
+
+  const normalized = Object.fromEntries(
+    Object.entries(identity)
+      .filter(([, value]) => typeof value === "string" && value.trim())
+      .map(([key, value]) => [key, (value as string).trim()]),
+  ) as NonNullable<PdktScenario["identity"]>;
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 export function normalizePdktScenarioDraft(
   draft: Partial<Omit<PdktScenario, "id">>,
 ): Omit<PdktScenario, "id"> {
@@ -61,6 +75,7 @@ export function normalizePdktScenarioDraft(
     isActive: draft.isActive ?? true,
     script: draft.script,
     attachmentImages: draft.attachmentImages ?? [],
+    identity: normalizePdktScenarioIdentity(draft.identity),
   };
 }
 

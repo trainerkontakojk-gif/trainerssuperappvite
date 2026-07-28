@@ -2,13 +2,14 @@ import React, { useRef, useState } from "react";
 import {
   PDKT_PROMPT_INPUT_LIMITS,
   type PdktConsumerType,
+  type PdktIdentity,
   type PdktScenario,
 } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
 import { pdktClient, unwrapResponse } from "../../../../lib/api";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
-import { TEXT_MODELS } from "../../pdktSettings";
+import { resolvePdktScenarioIdentity, TEXT_MODELS } from "../../pdktSettings";
 import {
   findInvalidPdktRecipientEmails,
   normalizePdktScenarioDraft,
@@ -42,10 +43,6 @@ interface Props {
     email: string;
     city: string;
   };
-  setCustomSenderName: (value: string) => void;
-  setCustomBodyName: (value: string) => void;
-  setCustomEmail: (value: string) => void;
-  setCustomCity: (value: string) => void;
   globalConsumerTypeId: string;
   setGlobalConsumerTypeId: (value: string) => void;
   consumerNameMentionPattern: AppSettings["consumerNameMentionPattern"];
@@ -89,10 +86,6 @@ export function PdktScenariosTab(props: Props) {
     enableImageGeneration,
     setEnableImageGeneration,
     customIdentity,
-    setCustomSenderName,
-    setCustomBodyName,
-    setCustomEmail,
-    setCustomCity,
     globalConsumerTypeId,
     setGlobalConsumerTypeId,
     consumerNameMentionPattern,
@@ -113,7 +106,6 @@ export function PdktScenariosTab(props: Props) {
   const wizardSnapshot = useRef<{
     draft: Omit<PdktScenario, "id">;
     editingId: string | null;
-    identity: Props["customIdentity"];
     enableImageGeneration: boolean;
     globalConsumerTypeId: string;
     consumerNameMentionPattern: Props["consumerNameMentionPattern"];
@@ -137,8 +129,8 @@ export function PdktScenariosTab(props: Props) {
       ? ""
       : "Deskripsi masalah wajib diisi.",
     email:
-      customIdentity.email.trim() &&
-      !isValidPdktRecipientEmail(customIdentity.email.trim())
+      draft.identity?.email?.trim() &&
+      !isValidPdktRecipientEmail(draft.identity.email.trim())
         ? "Format email tidak valid."
         : "",
   };
@@ -222,7 +214,6 @@ export function PdktScenariosTab(props: Props) {
         ? (({ id: _, ...rest }) => rest)(editing)
         : { ...EMPTY_SCENARIO_DRAFT },
       editingId: editing?.id ?? null,
-      identity: { ...customIdentity },
       enableImageGeneration,
       globalConsumerTypeId,
       consumerNameMentionPattern,
@@ -239,7 +230,6 @@ export function PdktScenariosTab(props: Props) {
     if (!snapshot) return false;
     const current = {
       draft,
-      identity: customIdentity,
       enableImageGeneration,
       globalConsumerTypeId,
       consumerNameMentionPattern,
@@ -251,7 +241,6 @@ export function PdktScenariosTab(props: Props) {
       JSON.stringify(current) !==
       JSON.stringify({
         draft: snapshot.draft,
-        identity: snapshot.identity,
         enableImageGeneration: snapshot.enableImageGeneration,
         globalConsumerTypeId: snapshot.globalConsumerTypeId,
         consumerNameMentionPattern: snapshot.consumerNameMentionPattern,
@@ -269,10 +258,6 @@ export function PdktScenariosTab(props: Props) {
       scenarioForm.setDraft(snapshot.draft);
       scenarioForm.setEditingId(snapshot.editingId);
       scenarioForm.setIsOpen(false);
-      setCustomSenderName(snapshot.identity.senderName);
-      setCustomBodyName(snapshot.identity.bodyName);
-      setCustomEmail(snapshot.identity.email);
-      setCustomCity(snapshot.identity.city);
       setEnableImageGeneration(snapshot.enableImageGeneration);
       setGlobalConsumerTypeId(snapshot.globalConsumerTypeId);
       setConsumerNameMentionPattern(snapshot.consumerNameMentionPattern);
@@ -317,8 +302,10 @@ export function PdktScenariosTab(props: Props) {
       setStep("email");
       if (invalidRecipients.length) {
         setAttempted((previous) => new Set([...previous, "email"]));
-        const firstInvalidRecipientIndex = (draft.recipientEmails ?? []).findIndex(
-          (email) => invalidRecipients.includes(email.trim().toLowerCase()),
+        const firstInvalidRecipientIndex = (
+          draft.recipientEmails ?? []
+        ).findIndex((email) =>
+          invalidRecipients.includes(email.trim().toLowerCase()),
         );
         focusField(
           `scenario-recipient-email-${Math.max(firstInvalidRecipientIndex, 0)}`,
@@ -343,13 +330,10 @@ export function PdktScenariosTab(props: Props) {
     key: keyof Props["customIdentity"],
     value: string,
   ) => {
-    const setters = {
-      senderName: setCustomSenderName,
-      bodyName: setCustomBodyName,
-      email: setCustomEmail,
-      city: setCustomCity,
-    };
-    setters[key](value);
+    const identityKey = key === "senderName" ? "name" : key;
+    scenarioForm.setDraft({
+      identity: { ...draft.identity, [identityKey]: value },
+    });
     if (key === "email")
       setAttempted(
         (previous) => new Set([...previous].filter((item) => item !== "email")),
@@ -399,6 +383,9 @@ export function PdktScenariosTab(props: Props) {
     }
     setGenerating(true);
     try {
+      const fallbackIdentity = (await unwrapResponse(
+        await pdktClient["generate-identity"].$post({ json: {} }),
+      )) as PdktIdentity;
       const result = (await unwrapResponse(
         await pdktClient["generate-template"].$post({
           json: {
@@ -412,12 +399,14 @@ export function PdktScenariosTab(props: Props) {
                 ? "ramah"
                 : globalConsumerTypeId,
             consumerTypeDraft: selectedConsumer,
-            identity: {
-              name: customIdentity.senderName || "Budi Santoso",
-              bodyName: customIdentity.bodyName || "Budi",
-              email: customIdentity.email || "budi@example.com",
-              city: customIdentity.city || "Jakarta",
-            },
+            identity: resolvePdktScenarioIdentity({
+              scenario: {
+                id: scenarioForm.editingId || "draft",
+                ...normalizePdktScenarioDraft({ ...draft, category }),
+              },
+              customIdentity,
+              fallbackIdentity,
+            }),
           },
         }),
       )) as { subject: string; body: string };
@@ -584,7 +573,8 @@ export function PdktScenariosTab(props: Props) {
                 id="scenario-description-counter"
                 className="text-xs text-muted-foreground"
               >
-                {descriptionLength.toLocaleString("id-ID")} / {PDKT_PROMPT_INPUT_LIMITS.longText.toLocaleString("id-ID")}
+                {descriptionLength.toLocaleString("id-ID")} /{" "}
+                {PDKT_PROMPT_INPUT_LIMITS.longText.toLocaleString("id-ID")}
               </p>
             </SettingsField>
           </div>
@@ -595,6 +585,10 @@ export function PdktScenariosTab(props: Props) {
               <h4 className="text-base font-semibold text-foreground">
                 Identitas Pengirim
               </h4>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Berlaku khusus untuk skenario ini. Field kosong akan memakai
+                nilai skenario terkait, lalu identitas default.
+              </p>
               <SettingsField
                 label="Nama pengirim"
                 id="custom-sender-name"
@@ -602,7 +596,7 @@ export function PdktScenariosTab(props: Props) {
               >
                 <SettingsInput
                   id="custom-sender-name"
-                  value={customIdentity.senderName}
+                  value={draft.identity?.name || ""}
                   onChange={(event) =>
                     updateIdentity("senderName", event.target.value)
                   }
@@ -615,7 +609,7 @@ export function PdktScenariosTab(props: Props) {
               >
                 <SettingsInput
                   id="custom-body-name"
-                  value={customIdentity.bodyName}
+                  value={draft.identity?.bodyName || ""}
                   onChange={(event) =>
                     updateIdentity("bodyName", event.target.value)
                   }
@@ -632,7 +626,7 @@ export function PdktScenariosTab(props: Props) {
                 <SettingsInput
                   id="custom-email"
                   type="email"
-                  value={customIdentity.email}
+                  value={draft.identity?.email || ""}
                   aria-invalid={Boolean(
                     attempted.has("email") && scenarioErrors.email,
                   )}
@@ -645,7 +639,7 @@ export function PdktScenariosTab(props: Props) {
               <SettingsField label="Kota" id="custom-city" optional>
                 <SettingsInput
                   id="custom-city"
-                  value={customIdentity.city}
+                  value={draft.identity?.city || ""}
                   onChange={(event) =>
                     updateIdentity("city", event.target.value)
                   }

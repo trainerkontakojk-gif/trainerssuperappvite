@@ -180,6 +180,67 @@ describe("PDKT Unified Session Create Route", () => {
     });
   });
 
+  it("drops raw scenarioDraft.identity before session creation and keeps the top-level identity as the runtime source", async () => {
+    await createAuthenticatedApp("trainer");
+    const runtimeIdentity = {
+      name: "Runtime Budi",
+      email: "runtime.budi@mail.com",
+      city: "Jakarta",
+      bodyName: "Runtime Budi",
+    };
+
+    const res = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        scenarioDraft: {
+          id: "pinjol",
+          category: "Pinjol",
+          title: "Pinjol Ilegal",
+          description: "Konsumen diteror pinjol ilegal.",
+          isActive: true,
+          identity: {
+            name: "Scenario Budi",
+            email: "scenario.budi@mail.com",
+            city: "Bogor",
+            bodyName: "Scenario Budi",
+          },
+        },
+        consumerTypeId: "marah",
+        identity: runtimeIdentity,
+        enableImageGeneration: false,
+        selectedModel: "gemini-3.1-flash-lite",
+        resolvedConsumerNameMentionPattern: "none",
+        writingStyleMode: "training",
+        client_request_id: "req-identity-contract-001",
+      }),
+    });
+
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.success).toBe(true);
+
+    const rpcCall = mockRpc.mock.calls.find(
+      ([method]) => method === "submit_pdkt_mailbox_batch",
+    );
+    expect(rpcCall).toBeDefined();
+    const [, rpcArgs] = rpcCall ?? [];
+
+    expect(rpcArgs).toEqual(
+      expect.objectContaining({
+        p_config_snapshot: expect.objectContaining({
+          identity: runtimeIdentity,
+        }),
+      }),
+    );
+    expect(rpcArgs?.p_config_snapshot?.scenarios?.[0]).not.toHaveProperty(
+      "identity",
+    );
+    expect(rpcArgs?.p_scenario_snapshot).not.toHaveProperty("identity");
+  });
+
   it("handles custom body name in the payload correctly", async () => {
     await createAuthenticatedApp("trainer");
     const res = await app.request("/api/v1/pdkt/session/create", {

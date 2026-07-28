@@ -106,6 +106,83 @@ describe("pdkt-settings", () => {
     });
   });
 
+  it("preserves namespaced scenario identity and unrelated metadata while stripping legacy isLicensed", () => {
+    const existing = {
+      ketik: { enabled: true },
+    };
+    const namespaced = {
+      selectedModel: "openai/gpt-4o-mini",
+      scenarios: [
+        {
+          id: "scenario-1",
+          title: "Scenario 1",
+          isLicensed: true,
+          identity: {
+            name: "Scenario Sender",
+            bodyName: "Scenario Body",
+            email: "scenario@example.com",
+            city: "Bandung",
+          },
+          metadata: {
+            source: "wizard",
+            revision: 2,
+          },
+        },
+        {
+          id: "scenario-2",
+          title: "Scenario 2",
+          metadata: {
+            preserved: true,
+          },
+        },
+      ],
+      customIdentity: {
+        senderName: "Global Sender",
+        bodyName: "Global Body",
+        email: "global@example.com",
+        city: "Jakarta",
+      },
+    };
+    const expected = {
+      selectedModel: "openai/gpt-4o-mini",
+      scenarios: [
+        {
+          id: "scenario-1",
+          title: "Scenario 1",
+          identity: {
+            name: "Scenario Sender",
+            bodyName: "Scenario Body",
+            email: "scenario@example.com",
+            city: "Bandung",
+          },
+          metadata: {
+            source: "wizard",
+            revision: 2,
+          },
+        },
+        {
+          id: "scenario-2",
+          title: "Scenario 2",
+          metadata: {
+            preserved: true,
+          },
+        },
+      ],
+      customIdentity: {
+        senderName: "Global Sender",
+        bodyName: "Global Body",
+        email: "global@example.com",
+        city: "Jakarta",
+      },
+    };
+
+    expect(readPdktSettings({ pdkt: namespaced })).toEqual(expected);
+    expect(writePdktSettings(existing, namespaced)).toEqual({
+      ...existing,
+      pdkt: expected,
+    });
+  });
+
   it("migrates script into a template body when no body exists", () => {
     const legacy = {
       enableImageGeneration: false,

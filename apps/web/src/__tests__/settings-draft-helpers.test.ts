@@ -110,6 +110,30 @@ describe("settings draft commit helpers", () => {
     expect(original.enableImageGeneration).toBe(true);
   });
 
+  it("normalizes scenario identity overrides without retaining blank fields", async () => {
+    const { normalizePdktScenarioDraft } =
+      await import("../routes/pdkt/components/settings/pdktDraftNormalizers");
+
+    const result = normalizePdktScenarioDraft({
+      category: "A",
+      title: "Scenario",
+      description: "D",
+      isActive: true,
+      identity: {
+        name: "  Scenario Name  ",
+        bodyName: "   ",
+        email: "scenario@example.com",
+        city: " Bandung ",
+      },
+    });
+
+    expect(result.identity).toEqual({
+      name: "Scenario Name",
+      email: "scenario@example.com",
+      city: "Bandung",
+    });
+  });
+
   it("buildPdktSettingsForSave normalizes legacy model selections to GPT 5.4 Mini", () => {
     const customIdentity = {
       senderName: "",
