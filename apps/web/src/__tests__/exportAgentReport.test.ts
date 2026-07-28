@@ -16,6 +16,7 @@ import type {
   RootCauseResult,
 } from "@trainers/types";
 import type {
+  AgentHtmlExportContext,
   TicketScoreExport,
   TemuanDisplayItemExport,
 } from "../utils/exportAgentReport";
@@ -65,6 +66,9 @@ const sampleRootCauses: RootCauseResult[] = [
     periods: [
       { periodId: "p2", month: 5, year: 2026, label: "05/2026", serviceType: "call", findingsCount: 2, criticalFindingsCount: 1, affectedTickets: 2 },
       { periodId: "p1", month: 1, year: 2026, label: "01/2026", serviceType: "call", findingsCount: 1, criticalFindingsCount: 0, affectedTickets: 1 },
+    ],
+    ticketReferences: [
+      { no_tiket: "T-100", periodId: "p2", periodLabel: "Mei 2026", findingsCount: 2, criticalFindingsCount: 1 },
     ],
   },
 ];
@@ -322,6 +326,8 @@ describe("generateHTML", () => {
     expect(html).toContain('data-trend-filter="summary"');
     expect(html).toContain('data-trend-filter="total"');
     expect(html).toContain('aria-pressed="true"');
+    expect((html.match(/data-trend-filter="summary"/g) ?? [])).toHaveLength(1);
+    expect((html.match(/data-trend-filter="total"/g) ?? [])).toHaveLength(1);
     expect(html).toMatch(/<script>\s*\(\(\) =>/);
     expect(html).not.toContain("<script src=");
   });
@@ -369,9 +375,14 @@ describe("generateHTML", () => {
 
     button?.click();
 
+    const totalNodes = Array.from(
+      document.querySelectorAll('[data-chart-series][data-series-total="true"]'),
+    );
+
     expect(button?.getAttribute("aria-pressed")).toBe("true");
     expect(selectedNodes.every((node) => !node.hasAttribute("hidden"))).toBe(true);
     expect(otherNodes.every((node) => node.hasAttribute("hidden"))).toBe(true);
+    expect(totalNodes.every((node) => node.hasAttribute("hidden"))).toBe(true);
 
     button?.click();
 
@@ -454,8 +465,8 @@ describe("generateHTML", () => {
   it("renders score summary table", () => {
     const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call");
     expect(html).toContain("Analisis Performa Bulanan");
-    expect(html).toContain("01/2026");
-    expect(html).toContain("05/2026");
+    expect(html).toContain("Jan");
+    expect(html).toContain("Mei");
   });
 
   it("renders findings table with all columns", () => {
@@ -499,6 +510,179 @@ describe("generateHTML", () => {
     expect(html).toContain("Jan");
     expect(html).toContain("Feb");
     expect(html).toContain("Skor Final");
+  });
+
+  it("labels the trend with the changed selected year", () => {
+    const html = generateHTML(sampleData({ initialYear: 2025 }), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call");
+    expect(html).toContain("Rentang Statistik: Jan - Mar 2026");
+    expect(html).not.toContain("Rentang Statistik: Jan - Mar 2025");
+  });
+
+  it("keeps every trend series and value in a hidden accessible table", () => {
+    const datasets = Array.from({ length: 7 }, (_, index) => ({
+      label: `Parameter ${index + 1}`,
+      data: [index, null, index + 2] as unknown as number[],
+      isTotal: index === 0,
+    }));
+    const html = generateHTML(sampleData({ personalTrend: { labels: ["Jan", "Feb", "Mar"], datasets } }), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "static");
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    expect(parsed.querySelector("table.trend-data-table.sr-only")).not.toBeNull();
+    expect(parsed.querySelectorAll("table.trend-data-table tbody tr")).toHaveLength(3);
+    expect(html).toContain("Parameter 7");
+    expect(parsed.querySelector(".trend-data-table thead")?.textContent).toContain("Periode");
+    expect(parsed.querySelector(".trend-data-table thead")?.textContent).toContain("Parameter 1");
+  });
+
+  it("does not bridge null trend gaps in area segments", () => {
+    const html = generateHTML(sampleData({ personalTrend: { labels: ["Jan", "Feb", "Mar"], datasets: [{ label: "Total Temuan", data: [1, null, 2] as unknown as number[], isTotal: true }] } }), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call");
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    const area = parsed.querySelector('[data-chart-series][data-series-key="series-0"] path');
+    expect(area?.getAttribute("d")).toContain("M58.00");
+    expect(area?.getAttribute("d")).toContain("M936.00");
+    expect(area?.getAttribute("d")).not.toContain("L936.00 366.00 L58.00 366.00");
+  });
+
+  it("uses non-focusable status spans for static trend filters", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "static");
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    expect(parsed.querySelectorAll(".trend-filters button")).toHaveLength(0);
+    expect(parsed.querySelectorAll(".trend-filters [role='button']")).toHaveLength(0);
+    expect(parsed.querySelectorAll(".trend-filters span.trend-filter").length).toBeGreaterThan(0);
+  });
+
+  it.each([1, 2, 3])("matches quickview tie cardinality %s", (count) => {
+    const peers = Array.from({ length: count }, (_, index) => ({ agentId: `peer-${index}`, nama: `<Peer ${index}>` }));
+    const quickview = {
+      context: { agentId: "agent-1", year: 2026, serviceType: "call", periodMode: "ytd" as const },
+      combinedTeam: { rank: 2, total: 8, scopeId: "same", basis: "least_findings_ytd", scopeLabel: "Tim Gabungan", tiedAgents: peers },
+      leaderTeam: { rank: null, total: 0, scopeId: "same", basis: "least_findings_ytd", scopeLabel: "Tim Leader", tiedAgents: null },
+      forecast: null,
+    } as NonNullable<AgentHtmlExportContext["quickview"]>;
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", count === 3 ? "static" : "interactive", { quickview });
+    expect(html).toContain(count === 1 ? "Berbagi peringkat 2 dengan &lt;Peer 0&gt;" : count === 2 ? "Berbagi peringkat 2 dengan &lt;Peer 0&gt; dan &lt;Peer 1&gt;" : "Berbagi peringkat 2 dengan &lt;Peer 0&gt; dan 2 agen lain");
+    if (count === 3) expect(html).toContain("<details class=\"quickview-ties\">");
+    expect(html).not.toContain("Semakin tinggi peringkat");
+  });
+
+  it("survives malformed numeric runtime payloads", () => {
+    const malformed = sampleData({ personalTrend: { labels: ["Jan", "Feb"], datasets: [{ label: "Total", data: [Number.NaN, Number.POSITIVE_INFINITY] as unknown as number[], isTotal: true }] } });
+    const hostileSummaries = [
+      {
+        ...sampleSummaries[0],
+        month: 5,
+        year: Number.POSITIVE_INFINITY as unknown as number,
+      },
+    ];
+    const hostileRootCauses = [
+      {
+        ...sampleRootCauses[0],
+        findingsCount: Number.POSITIVE_INFINITY as unknown as number,
+        ticketReferences: [
+          {
+            no_tiket: "T-999",
+            periodId: "p-hostile",
+            periodLabel: "<b>Mei</b> 2026",
+            findingsCount: Number.POSITIVE_INFINITY as unknown as number,
+            criticalFindingsCount: 1,
+          },
+        ],
+      },
+    ];
+    const html = generateHTML(
+      malformed,
+      hostileSummaries as AgentPeriodSummary[],
+      sampleTemuan,
+      [{ ...sampleTickets[0], scoreDeduction: Number.NaN, findingCount: Number.POSITIVE_INFINITY }],
+      hostileRootCauses as RootCauseResult[],
+      2026,
+      "call",
+    );
+    expect(html).not.toMatch(/NaN|Infinity|undefined/);
+    expect(html).not.toMatch(/width:(?:NaN|Infinity)/);
+    expect(html).toContain("&lt;b&gt;Mei&lt;/b&gt; 2026");
+    expect(html).toContain("0 temuan");
+  });
+
+  it("escapes hostile comparison scope labels in the summary and benchmark headings", () => {
+    const html = generateHTML(
+      sampleData({
+        comparisonTable: {
+          scope: {
+            year: 2026,
+            serviceType: "call",
+            startMonth: 1,
+            endMonth: 5,
+            teamLabel: "<b>Tim Call</b>",
+            serviceLabel: 'call"><img src=x onerror=alert(1)>',
+          },
+          rows: [
+            {
+              key: "total",
+              label: "Total Temuan",
+              agentCount: 6,
+              teamAverage: 4,
+              serviceAverage: 5,
+              teamAgentCount: 3,
+              serviceAgentCount: 10,
+            },
+          ],
+        },
+      }),
+      sampleSummaries,
+      sampleTemuan,
+      sampleTickets,
+      sampleRootCauses,
+      2026,
+      'call"><script>alert(1)</script>',
+      "static",
+    );
+
+    expect(html).not.toMatch(/<script[^>]*>/i);
+    expect(html).not.toMatch(/<img[^>]*>/i);
+    expect(html).toContain("&lt;b&gt;Tim Call&lt;/b&gt;");
+    expect(html).toContain('call&quot;&gt;&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).toContain("Tahun 2026");
+    expect(html).toContain("Jan-Mei 2026");
+  });
+
+  it("finite-normalizes runtime-cast years in the summary and benchmark headings", () => {
+    const html = generateHTML(
+      sampleData({
+        personalTrend: { labels: [], datasets: [] },
+        comparisonTable: {
+          scope: {
+            year: Number.POSITIVE_INFINITY as unknown as number,
+            serviceType: "call",
+            startMonth: 1,
+            endMonth: 5,
+            teamLabel: "Tim Call",
+            serviceLabel: "Call",
+          },
+          rows: [
+            {
+              key: "total",
+              label: "Total Temuan",
+              agentCount: 6,
+              teamAverage: 4,
+              serviceAverage: 5,
+              teamAgentCount: 3,
+              serviceAgentCount: 10,
+            },
+          ],
+        },
+      }),
+      sampleSummaries,
+      sampleTemuan,
+      sampleTickets,
+      sampleRootCauses,
+      Number.POSITIVE_INFINITY as unknown as number,
+      "call",
+      "static",
+    );
+
+    expect(html).not.toMatch(/\bNaN\b|\bInfinity\b/);
+    expect(html).toContain("Tahun 0");
+    expect(html).toContain("Jan-Mei 0");
   });
 
   it("renders comparison table when present", () => {
@@ -560,14 +744,14 @@ describe("generateHTML", () => {
       "static",
     );
 
-    expect(html).toContain("Rata-rata layanan sama");
+    expect(html).toContain("Rata-rata service sama");
     expect(html).toContain("% vs tim");
-    expect(html).toContain("% vs layanan sama");
+    expect(html).toContain("% vs service sama");
     expect(html).toContain("+50%");
     expect(html).toContain("-50%");
     expect(html).toContain("0%");
     expect(html).toContain("n/a");
-    expect(html).toContain("3 agent tim / 10 agent layanan sama");
+    expect(html).toContain("3 agent tim / 10 agent service sama");
   });
 
   it("handles empty state gracefully", () => {
@@ -580,7 +764,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Belum ada ringkasan skor");
+    expect(html).toContain("Data belum tersedia");
     expect(html).toContain("Tidak ada data temuan");
   });
 
@@ -591,5 +775,135 @@ describe("generateHTML", () => {
     // Should contain light mode background
     expect(html).toContain("#f8fafc"); // body background
     expect(html).toContain("#ffffff"); // card background
+  });
+
+  it("starts interactive trend and findings in the same state as the live page", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "interactive", { selectedMonth: 5 });
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    expect(parsed.querySelectorAll('[data-chart-series]:not([hidden])')).toHaveLength(4);
+    expect(parsed.querySelector('[data-trend-filter="summary"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(parsed.querySelectorAll(".findings-period[open]")).toHaveLength(0);
+  });
+
+  it("uses the period immediately before the selected month for the delta", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "static", { selectedMonth: 5 });
+    expect(html).toContain('+2.0%');
+    expect(html).not.toContain('Delta</span><span class="stat-value" style="color: #6b7280;">-</span>');
+  });
+
+  it("matches the live benchmark service wording", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call");
+    expect(html).toContain("agent service sama");
+    expect(html).toContain("% vs service sama");
+    expect(html).not.toContain("agent layanan sama");
+    expect(html).not.toContain("% vs layanan sama");
+  });
+
+  it("keeps interactive trend filters aligned with live series semantics", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "interactive");
+    expect(html).toMatch(/filter === 'total'\s*\?\s*isTotal\s*:/);
+    expect(html).not.toContain(": isTotal || node.getAttribute('data-series-key') === filter");
+  });
+
+  it("renders the selected dossier as a non-interactive snapshot", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "interactive", { selectedMonth: 3 });
+    expect(html).toContain('aria-label="Bulan audit terpilih"');
+    expect(html).not.toContain('data-month-panel=');
+    expect(html).not.toContain('data-month="');
+  });
+
+  it("renders inert report actions inside the profile header and keeps shell controls non-focusable", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "interactive", {
+      isStaff: true,
+    } as AgentHtmlExportContext);
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    expect(parsed.querySelectorAll(".shell-actions")).toHaveLength(0);
+    expect(parsed.querySelectorAll(".shell-refresh button, .shell-refresh a, .shell-refresh [role='button']")).toHaveLength(0);
+    expect(parsed.querySelectorAll(".profile-actions")).toHaveLength(1);
+    expect(parsed.querySelectorAll(".profile-actions button, .profile-actions a, .profile-actions [tabindex='0']")).toHaveLength(0);
+    expect(parsed.querySelectorAll(".service-pills button, .service-pills a, .service-pills [tabindex='0']")).toHaveLength(0);
+    expect(parsed.querySelector(".service-pills .service-pill")).not.toBeNull();
+    expect(html).toContain("Refresh");
+    expect(html).toContain("UNDUH LAPORAN");
+    expect(html).toContain("INPUT AUDIT");
+    expect(html).not.toContain("Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir");
+    expect(html).toContain("agent service sama");
+    expect(html).not.toContain("snapshot-badge");
+    expect(html).not.toContain('<details class="findings-period" open');
+  });
+
+  it("hides INPUT AUDIT when export context is not staff-visible", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "interactive", {
+      isStaff: false,
+    } as AgentHtmlExportContext);
+    expect(html).not.toContain("INPUT AUDIT");
+  });
+
+  it("matches the live MonthRail first-paint chip treatment", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "static", {
+      selectedMonth: 5,
+    });
+    expect(html).toContain("min-width:84px");
+    expect(html).toContain("padding:6px 8px 10px");
+    expect(html).toContain("font-size:10px");
+    expect(html).toContain("font-size:16px");
+    expect(html).toContain("height:3px");
+    expect(html).toContain("month-score-indicator");
+  });
+
+  it("preserves the live connected surfaces and chart semantics", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "static", {
+      selectedMonth: 5,
+      trendStartMonth: 1,
+      trendEndMonth: 5,
+    });
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+    expect(parsed.querySelector(".audit-dossier .dossier-score-strip")).not.toBeNull();
+    expect(parsed.querySelector(".audit-dossier .dossier-lower-row")).not.toBeNull();
+    expect(parsed.querySelector(".audit-dossier .dossier-ticket-column")).not.toBeNull();
+    expect(parsed.querySelector(".audit-dossier .dossier-root-cause-column")).not.toBeNull();
+    expect(html).toContain('data-series-total="true"');
+    expect(html).toContain('stroke="#111827"');
+    expect(html).toContain('fill="#111827"');
+    expect(html).toContain('stroke="#d97706"');
+    expect(html).toContain('fill="#d97706"');
+  });
+
+  it("keeps export root-cause and ticket evidence semantically aligned", () => {
+    const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", "interactive");
+    expect(html).toContain("T-100");
+    expect(html).toContain("Tampilkan tiket");
+    expect(html).not.toContain("T-099</strong>");
+  });
+
+  it("includes the live page shell and snapshot context in both HTML variants", () => {
+    const context = {
+      selectedMonth: 5,
+      trendStartMonth: 1,
+      trendEndMonth: 5,
+      quickview: {
+        context: { agentId: "agent-1", year: 2026, serviceType: "call", periodMode: "ytd" },
+        combinedTeam: { rank: 2, total: 8, scopeId: "combined", basis: "least_findings_ytd", scopeLabel: "Tim Gabungan", tiedAgents: [] },
+        leaderTeam: { rank: 1, total: 4, scopeId: "leader", basis: "least_findings_ytd", scopeLabel: "Tim Leader", tiedAgents: [] },
+        forecast: { status: "improving", label: "Membaik", supportingText: "Tren temuan menurun", findingsSlope: -1, sourcePointCount: 3, confidence: "high", horizonMonths: 3 },
+      },
+    } as AgentHtmlExportContext;
+    for (const variant of ["static", "interactive"] as const) {
+      const html = generateHTML(sampleData(), sampleSummaries, sampleTemuan, sampleTickets, sampleRootCauses, 2026, "call", variant, context);
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      expect(parsed.querySelectorAll(".context-control-bar")).toHaveLength(1);
+      expect(parsed.querySelectorAll(".shell-actions")).toHaveLength(0);
+      expect(parsed.querySelectorAll(".profile-actions")).toHaveLength(1);
+      expect(parsed.querySelectorAll(".section-tabs")).toHaveLength(1);
+      expect(parsed.querySelectorAll(".profile-bar > .quickview-rail")).toHaveLength(1);
+      expect(parsed.querySelector(".profile-bar > .quickview-rail[role='region']")).not.toBeNull();
+      expect(html).toContain("SIDAK PERSONAL AUDIT");
+      expect(html).toContain("Ringkasan Skor");
+      expect(html).toContain("Grafik Tren");
+      expect(html).toContain("Daftar Temuan");
+      expect(html).toContain("Tim Gabungan");
+      expect(html).toContain("Mei");
+      expect(html.indexOf("SIDAK PERSONAL AUDIT")).toBeLessThan(html.indexOf("Analisis Performa Bulanan"));
+    }
   });
 });

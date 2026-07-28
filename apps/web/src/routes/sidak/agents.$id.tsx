@@ -55,6 +55,7 @@ export default function SidakAgentDetailPage() {
     void refetch();
     void refetchQuickview();
   };
+  const isStaff = role === "trainer" || role === "admin" || role === "leader";
 
   const summaryRef = useRef<HTMLDivElement>(null);
   const trendRef = useRef<HTMLDivElement>(null);
@@ -146,7 +147,13 @@ export default function SidakAgentDetailPage() {
           bergabungDate={data.peserta.bergabung_date}
           fotoUrl={data.peserta.foto_url}
           role={role}
-          onExport={handleExport}
+          onExport={(format) => handleExport(format, {
+            selectedMonth,
+            trendStartMonth,
+            trendEndMonth,
+            quickview: quickviewData,
+            isStaff,
+          })}
           onInputAudit={handleInputAudit}
           quickviewData={quickviewData}
           quickviewLoading={quickviewLoading}

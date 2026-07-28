@@ -12,7 +12,10 @@ import {
   calculateSessionScoreFromTemuan,
   DEFAULT_SERVICE_WEIGHTS,
 } from "../lib/scoring";
-import type { AgentReportFormat } from "../utils/exportAgentReport";
+import type {
+  AgentHtmlExportContext,
+  AgentReportFormat,
+} from "../utils/exportAgentReport";
 
 interface TicketScore {
   no_tiket: string;
@@ -156,7 +159,7 @@ export function useAgentDetail(agentId: string) {
     if (!data || !foldersLoaded || isStaffRole === false) return;
     const initTeam = data.peserta?.batch_name ?? data.peserta?.tim ?? "";
     if (initTeam) setSelectedTeam(initTeam);
-  }, [data, foldersLoaded]);
+  }, [data, foldersLoaded, isStaffRole]);
 
   // Fetch agents when selectedTeam changes
   useEffect(() => {
@@ -441,7 +444,7 @@ export function useAgentDetail(agentId: string) {
   }, [temuan]);
 
   const handleExport = useCallback(
-    async (format: AgentReportFormat) => {
+    async (format: AgentReportFormat, exportContext: AgentHtmlExportContext = {}) => {
       try {
         const {
           generateCSV,
@@ -490,6 +493,7 @@ export function useAgentDetail(agentId: string) {
             selectedYear,
             selectedService,
             variant,
+            exportContext,
           );
           mimeType = "text/html;charset=utf-8;";
           extension = `${variant === "interactive" ? "interaktif" : "statis"}.html`;

@@ -11,8 +11,16 @@ interface TrendSeries {
   color: string;
 }
 
+interface TrendFilterControl {
+  key: string;
+  label: string;
+  color?: string;
+  isButton: boolean;
+  isPressed: boolean;
+}
+
 const TREND_COLORS = [
-  "#2563eb",
+  "#111827",
   "#0f766e",
   "#d97706",
   "#be123c",
@@ -30,8 +38,13 @@ function escHtml(value: unknown): string {
     .replace(/'/g, "&#039;");
 }
 
-function finiteValue(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+function finiteValue(value: unknown, fallback = 0, min = -Infinity, max = Infinity): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+function finiteText(value: unknown): string {
+  return String(finiteValue(value));
 }
 
 function normalizeTrend(data: AgentDetailData): {
@@ -46,7 +59,7 @@ function normalizeTrend(data: AgentDetailData): {
     .map(({ dataset, index }) => ({
       index,
       total: dataset.data.reduce(
-        (sum, value) => sum + (finiteValue(value) ?? 0),
+        (sum, value) => sum + finiteValue(value),
         0,
       ),
     }))
@@ -61,7 +74,9 @@ function normalizeTrend(data: AgentDetailData): {
       key: "series-" + index,
       label: dataset.label,
       data: labels.map((_, valueIndex) =>
-        finiteValue(dataset.data[valueIndex]),
+        typeof dataset.data[valueIndex] === "number" && Number.isFinite(dataset.data[valueIndex])
+          ? dataset.data[valueIndex]
+          : null,
       ),
       isTotal: dataset.isTotal,
       isSummary: dataset.isTotal || summaryIndexes.has(index),
@@ -77,77 +92,98 @@ function buildPath(
   xFor: (index: number) => number,
   yFor: (value: number) => number,
 ): string {
-  let drawing = false;
   const commands: string[] = [];
-  values.forEach((value, index) => {
-    if (value === null) {
-      drawing = false;
-      return;
+  let segment: Array<{ x: number; y: number }> = [];
+  const flush = () => {
+    if (!segment.length) return;
+    commands.push(`M${segment[0].x.toFixed(2)} ${segment[0].y.toFixed(2)}`);
+    for (let index = 1; index < segment.length; index += 1) {
+      const previous = segment[index - 1];
+      const current = segment[index];
+      const midpoint = (previous.x + current.x) / 2;
+      commands.push(`Q${previous.x.toFixed(2)} ${previous.y.toFixed(2)} ${midpoint.toFixed(2)} ${((previous.y + current.y) / 2).toFixed(2)}`);
+      commands.push(`T${current.x.toFixed(2)} ${current.y.toFixed(2)}`);
     }
-    commands.push(
-      (drawing ? "L" : "M") +
-        xFor(index).toFixed(2) +
-        " " +
-        yFor(value).toFixed(2),
-    );
-    drawing = true;
+    segment = [];
+  };
+  values.forEach((value, index) => {
+    if (value === null) { flush(); return; }
+    segment.push({ x: xFor(index), y: yFor(value) });
   });
+  flush();
   return commands.join(" ");
 }
 
-function buildRawTrendTable(labels: string[], series: TrendSeries[]): string {
-  const headings = series
-    .map((item) => '<th class="num">' + escHtml(item.label) + "</th>")
-    .join("");
-  const rows = labels
-    .map((label, labelIndex) => {
-      const cells = series
-        .map((item) => {
-          const value = item.data[labelIndex];
-          return '<td class="num">' + (value === null ? "-" : value) + "</td>";
-        })
-        .join("");
-      return "<tr><td>" + escHtml(label) + "</td>" + cells + "</tr>";
-    })
-    .join("");
-
-  return [
-    '<div class="table-scroll">',
-    '<table class="trend-table">',
-    "<thead><tr><th>Periode</th>" + headings + "</tr></thead>",
-    "<tbody>" + rows + "</tbody>",
-    "</table>",
-    "</div>",
-  ].join("");
+export function buildAreaPath(
+  values: Array<number | null>,
+  xFor: (index: number) => number,
+  yFor: (value: number) => number,
+  baseline: number,
+): string {
+  const segments: string[] = [];
+  let segment: Array<{ x: number; y: number }> = [];
+  const flush = () => {
+    if (segment.length >= 2) {
+      const first = segment[0];
+      const last = segment[segment.length - 1];
+      const commands = [`M${first.x.toFixed(2)} ${first.y.toFixed(2)}`];
+      for (let index = 1; index < segment.length; index += 1) {
+        const previous = segment[index - 1];
+        const current = segment[index];
+        const midpoint = (previous.x + current.x) / 2;
+        commands.push(`Q${previous.x.toFixed(2)} ${previous.y.toFixed(2)} ${midpoint.toFixed(2)} ${((previous.y + current.y) / 2).toFixed(2)}`);
+        commands.push(`T${current.x.toFixed(2)} ${current.y.toFixed(2)}`);
+      }
+      const line = commands.join(" ");
+      segments.push(`${line} L${last.x.toFixed(2)} ${baseline.toFixed(2)} L${first.x.toFixed(2)} ${baseline.toFixed(2)} Z`);
+    }
+    segment = [];
+  };
+  values.forEach((value, index) => {
+    if (value === null) { flush(); return; }
+    segment.push({ x: xFor(index), y: yFor(value) });
+  });
+  flush();
+  return segments.join(" ");
 }
 
-function buildFilterControls(series: TrendSeries[]): string {
-  const parameterButtons = series
-    .filter((item) => !item.isTotal)
-    .map(
-      (item) =>
-        '<button type="button" class="trend-filter" data-trend-filter="' +
-        escHtml(item.key) +
-        '" aria-pressed="false"><span class="legend-dot" style="background:' +
-        item.color +
-        '"></span>' +
-        escHtml(item.label) +
-        "</button>",
-    )
-    .join("");
+function buildFilterControls(series: TrendSeries[], variant: AgentHtmlVariant): string {
+  const parameterSeries = series.filter((item) => !item.isTotal);
+  const controls: TrendFilterControl[] = [
+    { key: "summary", label: "Ringkasan", isButton: variant === "interactive", isPressed: true },
+    { key: "total", label: "Total Temuan", isButton: variant === "interactive", isPressed: false },
+    ...parameterSeries.map((item) => ({
+      key: item.key,
+      label: item.label,
+      color: item.color,
+      isButton: variant === "interactive",
+      isPressed: false,
+    })),
+  ];
 
-  return [
-    '<div class="trend-filters" aria-label="Filter seri grafik">',
-    '<button type="button" class="trend-filter" data-trend-filter="summary" aria-pressed="true">Ringkasan</button>',
-    '<button type="button" class="trend-filter" data-trend-filter="total" aria-pressed="false">Total Temuan</button>',
-    parameterButtons,
-    "</div>",
-  ].join("");
+  const renderedControls = controls.map((control) => {
+    if (control.isButton) {
+      const button = '<button type="button" class="trend-filter" data-trend-filter="' + control.key + '" aria-pressed="' + (control.isPressed ? 'true' : 'false') + '">';
+      if (control.key === "summary" || control.key === "total") {
+        return button + control.label + '</button>';
+      }
+      return button + '<span class="legend-dot" style="background:' + escHtml(control.color) + '"></span>' + escHtml(control.label) + '</button>';
+    }
+    if (control.key === "summary" || control.key === "total") {
+      return '<span class="trend-filter" data-trend-filter="' + control.key + '" aria-current="' + (control.key === "summary" ? 'true' : 'false') + '">' + control.label + '</span>';
+    }
+    return '<span class="trend-filter"><span class="legend-dot" style="background:' + escHtml(control.color) + '"></span>' + escHtml(control.label) + '</span>';
+  });
+
+  return variant === "interactive"
+    ? '<div class="trend-filters" aria-label="Filter seri grafik">' + renderedControls.join('') + '</div>'
+    : '<div class="trend-filters" aria-label="Filter seri grafik" aria-description="Snapshot statis; filter tidak interaktif">' + renderedControls.join('') + '</div>';
 }
 
 export function buildTrendReportHtml(
   data: AgentDetailData,
   variant: AgentHtmlVariant,
+  selectedYear: number,
 ): string {
   const { labels, series } = normalizeTrend(data);
   const trendRangeLabel = labels.length > 0
@@ -210,14 +246,11 @@ export function buildTrendReportHtml(
     )
     .join("");
 
-  const visibleSeries = variant === "static"
-    ? series.filter((item) => item.isSummary)
-    : series;
+  const visibleSeries = series;
   const seriesMarkup = visibleSeries
     .map((item) => {
       const path = buildPath(item.data, xFor, yFor);
-      const hidden =
-        variant === "interactive" && !item.isSummary ? " hidden" : "";
+      const hidden = "";
       const points = item.data
         .map((value, index) => {
           if (value === null) return "";
@@ -231,11 +264,15 @@ export function buildTrendReportHtml(
           ].join("");
         })
         .join("");
+      const areaPath = buildAreaPath(item.data, xFor, yFor, height - plotBottom);
       return [
         '<g data-chart-series data-series="' + escHtml(item.label) +
           '" data-series-key="' + escHtml(item.key) +
           '" data-series-total="' + item.isTotal +
           '" data-series-summary="' + item.isSummary + '"' + hidden + ">",
+        areaPath
+          ? '<path d="' + areaPath + '" fill="' + item.color + '" fill-opacity="' + (item.isTotal ? '0.08' : '0.05') + '" stroke="none"/>'
+          : "",
         path
           ? '<path d="' + path + '" fill="none" stroke="' + item.color +
               '" stroke-width="' + (item.isTotal ? 3 : 2) +
@@ -249,8 +286,7 @@ export function buildTrendReportHtml(
 
   const legend = visibleSeries
     .map((item) => {
-      const hidden =
-        variant === "interactive" && !item.isSummary ? " hidden" : "";
+      const hidden = "";
       return [
         '<span class="chart-legend-item" data-chart-series data-series="' +
           escHtml(item.label) + '" data-series-key="' + escHtml(item.key) +
@@ -263,17 +299,15 @@ export function buildTrendReportHtml(
     })
     .join("");
 
-  const controls = variant === "interactive"
-    ? buildFilterControls(series)
-    : "";
-  const rawTable = buildRawTrendTable(labels, series);
+  // Static keeps the same first paint; its controls are intentionally inert without JS.
+  const controls = buildFilterControls(series, variant);
 
   return [
     '<section class="report-section" data-report-section="trend">',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16l4-5 4 3 5-7"/></svg></span>',
     '<div><h2>Tren Pergerakan Skor</h2><p>Data Tren &bull; Rentang Statistik: ' +
-      escHtml(trendRangeLabel) + " " + escHtml(data.initialYear) + "</p></div>",
+      escHtml(trendRangeLabel) + " " + escHtml(selectedYear) + "</p></div>",
     "</div>",
     '<div class="card trend-card">',
     '<div class="trend-intro">',
@@ -294,15 +328,12 @@ export function buildTrendReportHtml(
       labels.length + " periode dan " + series.length + " seri data.</figcaption>",
     "</figure>",
     '<div class="chart-legend">' + legend + "</div>",
+    '<table class="trend-data-table sr-only"><caption>Data tren lengkap untuk konteks tahun ' + escHtml(selectedYear) + '</caption><thead><tr><th>Periode</th>' + series.map((item) => '<th>' + escHtml(item.label) + '</th>').join('') + '</tr></thead><tbody>' + labels.map((label, index) => '<tr><th>' + escHtml(label) + '</th>' + series.map((item) => '<td>' + (item.data[index] === null ? '—' : finiteText(item.data[index])) + '</td>').join('') + '</tr>').join('') + '</tbody></table>',
     '<div class="trend-stats">',
     '<div class="trend-stat"><span>Volume Periode</span><strong>' +
       labels.length + '</strong><small>Periode Aktif</small></div>',
     '<div class="trend-insight"><span>Insight Tren</span><p>Gunakan pola naik-turun per parameter untuk menentukan fokus coaching pada periode berikutnya.</p></div>',
     "</div>",
-    variant === "interactive"
-      ? '<details class="trend-data"><summary>Lihat data tren lengkap</summary>' +
-          rawTable + "</details>"
-      : rawTable,
     "</div>",
     "</section>",
   ].join("");
@@ -322,30 +353,29 @@ export function buildInteractiveReportScript(
   const applyFilter = (filter) => {
     series.forEach((node) => {
       const isTotal = node.getAttribute('data-series-total') === 'true';
-      const visible = filter === 'summary'
-        ? node.getAttribute('data-series-summary') === 'true'
+      const visible = filter === null
+        ? true
         : filter === 'total'
           ? isTotal
-          : isTotal || node.getAttribute('data-series-key') === filter;
+          : node.getAttribute('data-series-key') === filter;
       node.toggleAttribute('hidden', !visible);
     });
     buttons.forEach((button) => {
+      const buttonFilter = button.getAttribute('data-trend-filter');
       button.setAttribute(
         'aria-pressed',
-        String(button.getAttribute('data-trend-filter') === filter),
+        String(filter === null ? buttonFilter === 'summary' : buttonFilter === filter),
       );
     });
   };
   buttons.forEach((button) => {
     button.addEventListener('click', () => {
       const filter = button.getAttribute('data-trend-filter') || 'summary';
-      const nextFilter = filter !== 'summary' && button.getAttribute('aria-pressed') === 'true'
-        ? 'summary'
-        : filter;
-      applyFilter(nextFilter);
+      const current = button.getAttribute('aria-pressed') === 'true';
+      applyFilter(current || filter === 'summary' ? null : filter);
     });
   });
-  applyFilter('summary');
+  applyFilter(null);
 })();
 </script>`;
 }
