@@ -301,6 +301,15 @@ describe("buildTelefunLiveSystemInstruction", () => {
     });
     expect(prompt).toContain("EMOSI: SEDIH/PASRAH");
     expect(prompt).toContain("Bicara pelan, nada rendah");
+    expect(prompt).toContain("suara patah-patah");
+    expect(prompt).toContain("terisak");
+    expect(prompt).toContain("Setelah empati yang tepat dan tulus");
+    expect(prompt).toContain("Prioritaskan menceritakan sedih, takut, dan beratnya kesulitan");
+    expect(prompt).toContain("bukan solusi akhir");
+    expect(prompt).toContain("langkah konkret");
+    expect(prompt).toContain("diagnosis klinis");
+    expect(prompt).not.toContain("sob");
+    expect(prompt).not.toContain("self-harm content");
   });
 
   it("realistic pacing has 6 rules", () => {

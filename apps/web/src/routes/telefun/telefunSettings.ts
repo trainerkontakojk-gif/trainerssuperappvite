@@ -349,24 +349,37 @@ function coerceTelefunScenarios(value: unknown): TelefunScenario[] {
   return scenarios.length > 0 ? scenarios : DEFAULT_TELEFUN_SETTINGS.scenarios;
 }
 
+export function normalizeTelefunConsumerDifficulty(
+  consumerType: TelefunConsumerType,
+): TelefunConsumerType {
+  return consumerType.id === "pasrah"
+    ? { ...consumerType, difficulty: ConsumerDifficulty.Hard }
+    : consumerType;
+}
+
+function normalizeTelefunConsumerType(
+  item: Record<string, unknown>,
+): TelefunConsumerType | null {
+  const id = coerceString(item.id);
+  const name = coerceString(item.name);
+  const description = coerceString(item.description);
+  if (!id || !name || !description) return null;
+
+  return normalizeTelefunConsumerDifficulty({
+    id,
+    name,
+    description,
+    difficulty: coerceTelefunDifficulty(item.difficulty),
+    gender: coerceString(item.gender) || "random",
+  });
+}
+
 function coerceTelefunConsumerTypes(value: unknown): TelefunConsumerType[] {
   if (!Array.isArray(value)) return DEFAULT_TELEFUN_SETTINGS.consumerTypes;
 
   const consumerTypes = value
     .filter(isRecord)
-    .map((item): TelefunConsumerType | null => {
-      const id = coerceString(item.id);
-      const name = coerceString(item.name);
-      const description = coerceString(item.description);
-      if (!id || !name || !description) return null;
-      return {
-        id,
-        name,
-        description,
-        difficulty: coerceTelefunDifficulty(item.difficulty),
-        gender: coerceString(item.gender) || "random",
-      };
-    })
+    .map(normalizeTelefunConsumerType)
     .filter((item): item is TelefunConsumerType => item !== null);
 
   return consumerTypes.length > 0
@@ -524,8 +537,8 @@ export const DEFAULT_CONSUMER_TYPES: TelefunConsumerType[] = [
     name: "Pasrah & Sedih",
     gender: "random",
     description:
-      "Konsumen lelah dan putus asa karena masalahnya belum selesai. Nada bicara sedih, khawatir, dan penuh harap saat menghubungi OJK. Tetap manusiawi, tidak melodramatis, dan cenderung mencari kepastian langkah berikutnya. Sering menghela napas atau bicara pelan.",
-    difficulty: ConsumerDifficulty.Medium,
+      "Konsumen lelah, tertekan, dan hampir menangis karena masalahnya belum selesai. Nada bicara sedih, lirih, dan penuh jeda; sesekali terdengar suara patah-patah, terisak pelan, atau napas berat yang natural. Fokus pada beban emosional dan kesulitan nyata, bukan detail baru. Empati yang tepat membuatnya mau mendengar, tetapi tetap butuh arahan konkret; jangan dibuat seolah masalah selesai hanya karena sudah didengar.",
+    difficulty: ConsumerDifficulty.Hard,
   },
 ];
 

@@ -202,7 +202,8 @@ function getEmotionInstruction(consumerType: TelefunConsumerType): string {
       "EMOSI: RAMAH/KOOPERATIF. Bicara hangat, tenang, dan tetap fokus pada masalah.",
     "terburu-buru":
       "EMOSI: TERBURU-BURU. Bicara ringkas, mendesak, dan minta langkah praktis.",
-    pasrah: "EMOSI: SEDIH/PASRAH. Bicara pelan, nada rendah, banyak jeda.",
+    pasrah:
+      "EMOSI: SEDIH/PASRAH (HARD). Bicara pelan, nada rendah, dengan suara patah-patah, terisak, atau menahan tangis secara natural. Prioritaskan menceritakan sedih, takut, dan beratnya kesulitan; jangan langsung ke pokok masalah. Setelah empati yang tepat dan tulus, baru mau mendengar dan buka cerita sedikit demi sedikit. Empati membuka ruang, tetapi bukan solusi akhir; langkah konkret tetap dibutuhkan. Hindari diagnosis klinis, jangan mengglorifikasi penderitaan, dan jangan mengada-ada soal keinginan menyakiti diri sendiri.",
   };
   const guidance =
     guidanceById[consumerType.id] ??
@@ -213,7 +214,8 @@ function getEmotionInstruction(consumerType: TelefunConsumerType): string {
     kritis: "Mulai menuntut kepastian. Jawaban spesifik dan konsisten menurunkan keberatan bertahap; klaim tanpa dasar membuat Anda menguji detailnya.",
     ramah: "Kooperatif sejak awal, tetapi tetap punya kebutuhan. Respons efektif menambah kepercayaan secara bertahap, bukan langsung mengakhiri masalah.",
     "terburu-buru": "Tetap mendesak. Langkah praktis yang jelas menurunkan desakan sedikit demi sedikit; jawaban bertele-tele membuat Anda meminta inti jawaban.",
-    pasrah: "Mulai rendah energi dan sulit percaya. Empati yang konsisten perlahan membuat Anda terbuka; jangan tiba-tiba menjadi ceria atau langsung pulih.",
+    pasrah:
+      "Mulai rendah energi dan sulit percaya. Setelah empati yang tepat dan tulus, Anda perlahan mau mendengar; yang lebih dulu diungkap adalah sedih, takut, dan beratnya kesulitan, bukan langsung pokok masalah. Empati membuka ruang, tetapi bukan solusi akhir; masalah substantif tetap butuh langkah konkret. Jangan tiba-tiba menjadi ceria atau langsung pulih.",
   };
   return `${guidance} PROFIL LENGKAP: ${consumerType.description}\nTANGGA KESABARAN DAN KEBERATAN: ${ladderById[consumerType.id] ?? "Pertahankan keberatan secara wajar; respons baik menurunkan resistensi bertahap, respons buruk mempertahankannya."}`;
 }
@@ -233,7 +235,8 @@ function getReactionInstruction(consumerTypeId: string): string {
     kritis: "Jawaban konsisten membuat Anda melunak bertahap; klaim tidak jelas membuat Anda meminta dasar dan kepastian.",
     ramah: "Sikap efektif membuat Anda kooperatif; jawaban tidak mampu tetap membuat Anda meminta opsi realistis.",
     "terburu-buru": "Jawaban ringkas dan praktis membantu; penundaan atau monolog membuat Anda mendesak inti solusi.",
-    pasrah: "Empati yang tenang membuat Anda berani bercerita; dipotong membuat Anda makin tertutup dan pasif.",
+    pasrah:
+      "Empati yang tenang membuat Anda mau mendengar dan bercerita sedikit demi sedikit; dipotong membuat Anda makin tertutup dan pasif. Empati membantu membuka ruang, tetapi tidak menyelesaikan masalah.",
   };
   return `REAKSI TERHADAP PERLAKUAN AGEN:\n${reactions[consumerTypeId] ?? "Perlakuan empatik membantu secara bertahap; dipotong, terburu-buru, atau tidak mampu menjawab mempertahankan keberatan secara wajar."} Jangan mengubah identitas atau fakta skenario.`;
 }

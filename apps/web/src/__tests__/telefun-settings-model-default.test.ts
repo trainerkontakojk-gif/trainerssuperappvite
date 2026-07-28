@@ -223,6 +223,15 @@ describe("parseTelefunSettings", () => {
     expect(result.responsePacingMode).toBe("realistic");
   });
 
+  it("keeps the default pasrah consumer type on Hard", () => {
+    const pasrah = DEFAULT_TELEFUN_SETTINGS.consumerTypes.find(
+      (consumerType) => consumerType.id === "pasrah",
+    );
+
+    expect(pasrah?.difficulty).toBe(ConsumerDifficulty.Hard);
+    expect(pasrah?.description).toContain("sedih");
+  });
+
   it("defaults simulationChallengeTypes to an empty array", () => {
     expect(parseTelefunSettings({}).simulationChallengeTypes).toEqual([]);
   });
@@ -259,6 +268,16 @@ describe("parseTelefunSettings", () => {
   it("save settings does not retain the realistic mode toggle or legacy challenge key", async () => {
     const { buildTelefunSettingsForSave } =
       await import("../routes/telefun/components/settings/useTelefunSettingsDraft");
+    const customConsumers = [
+      {
+        id: "pasrah",
+        name: "Pasrah versi custom",
+        gender: "female",
+        description: "Deskripsi custom yang harus tetap aman.",
+        difficulty: ConsumerDifficulty.Easy,
+      },
+      DEFAULT_TELEFUN_SETTINGS.consumerTypes[0],
+    ];
     const result = buildTelefunSettingsForSave({
       localSettings: {
         ...DEFAULT_TELEFUN_SETTINGS,
@@ -268,11 +287,18 @@ describe("parseTelefunSettings", () => {
         simulationChallengeTypes: ["misunderstanding"],
       } as any,
       scenarios: DEFAULT_TELEFUN_SETTINGS.scenarios,
-      consumerTypes: DEFAULT_TELEFUN_SETTINGS.consumerTypes,
+      consumerTypes: customConsumers,
       selectedTelefunModel: DEFAULT_TELEFUN_SETTINGS.telefunModelId,
     });
 
     expect(result.simulationChallengeTypes).toEqual(["misunderstanding"]);
+    expect(result.consumerTypes).toEqual([
+      {
+        ...customConsumers[0],
+        difficulty: ConsumerDifficulty.Hard,
+      },
+      customConsumers[1],
+    ]);
     expect("realisticModeEnabled" in result).toBe(false);
     expect("realisticModeDisruptionTypes" in result).toBe(false);
     expect("systemInstruction" in result).toBe(false);
@@ -465,6 +491,30 @@ describe("parseTelefunSettings coercion", () => {
         description: "Deskripsi",
         difficulty: ConsumerDifficulty.Medium,
         gender: "random",
+      },
+    ]);
+  });
+
+  it("keeps persisted pasrah metadata but forces Hard difficulty", () => {
+    const result = parseTelefunSettings({
+      consumerTypes: [
+        {
+          id: "pasrah",
+          name: "Pasrah versi custom",
+          gender: "female",
+          description: "Deskripsi custom yang harus tetap aman.",
+          difficulty: "Easy",
+        },
+      ],
+    } as any);
+
+    expect(result.consumerTypes).toEqual([
+      {
+        id: "pasrah",
+        name: "Pasrah versi custom",
+        gender: "female",
+        description: "Deskripsi custom yang harus tetap aman.",
+        difficulty: ConsumerDifficulty.Hard,
       },
     ]);
   });

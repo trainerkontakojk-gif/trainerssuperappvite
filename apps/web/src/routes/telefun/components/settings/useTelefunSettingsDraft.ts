@@ -10,6 +10,7 @@ import {
   TelefunConsumerType as ConsumerType,
   ConsumerDifficulty,
   coerceIdentityVoiceForModel,
+  normalizeTelefunConsumerDifficulty,
 } from "../../telefunSettings";
 import {
   normalizeTelefunConsumerDraft,
@@ -83,7 +84,7 @@ export function buildTelefunSettingsForSave(params: {
   const settingsToSave = {
     ...params.localSettings,
     scenarios: params.scenarios,
-    consumerTypes: params.consumerTypes,
+    consumerTypes: params.consumerTypes.map(normalizeTelefunConsumerDifficulty),
     telefunTransport: selectedModel.transport,
     telefunModelId: selectedModel.model.id,
     identitySettings: {

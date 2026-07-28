@@ -362,7 +362,7 @@ Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di
    - Isi **instruksi** — panduan perilaku konsumen
    - Opsional: **skrip** — dialog atau poin alur percakapan
 3. **Tab "Konsumen"** (Consumer Types):
-   - Pilih tipe konsumen: Marah, Gaptek, Sedih, atau Netral
+   - Pilih tipe konsumen: Marah, Gaptek, Sedih (pasrah default-nya Hard), atau Netral
    - Tiap tipe punya emosi dan cara bicara berbeda
 4. **Tab "Identitas"**:
    - Atur nama, gender, kota, no HP konsumen
@@ -400,7 +400,7 @@ Semua cue diawali marker `[TELEFUN_CONTROL:TIME_CUE]` yang sudah dikontrakkan di
 ### Settings Lanjutan
 
 - **Default scenarios** bisa diubah permanen via UI (tersimpan di Supabase per user)
-- **Consumer types** (emosi) juga bisa ditambah/edit di settings
+- **Consumer types** (emosi) juga bisa ditambah/edit di settings; entry legacy `pasrah` otomatis dinormalisasi ke `Hard` tanpa menghapus `name`/`gender`/`description` yang sudah dikustom
 - **Tantangan percakapan** tersimpan sebagai daftar ID baru; settings legacy tetap dibaca in-memory agar kompatibel
 
 ---
