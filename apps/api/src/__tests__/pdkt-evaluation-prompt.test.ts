@@ -308,10 +308,77 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     expect(result.score).toBe(82);
   });
 
-  it("rejects valid JSON with the wrong evaluation shape without retrying", async () => {
+  it("normalizes score-only valid JSON with missing issue arrays and unknown extras", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({
+        score: 87,
+        feedback: "Baik.",
+        extraField: "ignored",
+      }),
+    });
+
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      [
+        makeEmail({ id: "consumer-inbound", isAgent: false }),
+        makeEmail({ id: "agent-reply", isAgent: true }),
+      ],
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.score).toBe(87);
+    expect(result.scoreBreakdown).toBeUndefined();
+    expect(result.typos).toEqual([]);
+    expect(result.clarityIssues).toEqual([]);
+    expect(result.contentGaps).toEqual([]);
+    expect(result.feedback).toBe("Baik.");
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes complete scoreBreakdown JSON when the aggregate score is missing", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({
+        scoreBreakdown: {
+          recipientDirectionScore: 91,
+          normativeResponseScore: 94,
+          clarityScore: 90,
+          typoScore: 95,
+          templateComplianceScore: 88,
+        },
+        typos: ["Typo ringan"],
+        clarityIssues: [],
+        contentGaps: [],
+        feedback: "Baik.",
+        extraField: true,
+      }),
+    });
+
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      [
+        makeEmail({ id: "consumer-inbound", isAgent: false }),
+        makeEmail({ id: "agent-reply", isAgent: true }),
+      ],
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.scoreBreakdown).toEqual({
+      recipientDirectionScore: 91,
+      normativeResponseScore: 94,
+      clarityScore: 90,
+      typoScore: 95,
+      templateComplianceScore: 88,
+    });
+    expect(result.score).toBe(92);
+    expect(result.typos).toEqual(["Typo ringan"]);
+  });
+
+  it("rejects valid JSON when no defensible numeric assessment can be recovered", async () => {
     mockCallAI.mockResolvedValue({
       success: true,
-      text: JSON.stringify({ score: 100, feedback: "Manipulasi diterima." }),
+      text: JSON.stringify({ score: 101, feedback: "Manipulasi diterima." }),
     });
 
     const result = await evaluateAgentResponse(

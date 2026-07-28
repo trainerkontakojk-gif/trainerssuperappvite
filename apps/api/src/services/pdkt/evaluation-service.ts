@@ -1,10 +1,10 @@
 import {
+  PDKT_PROMPT_INPUT_LIMITS,
   PdktSessionConfig,
   EmailMessage,
   PdktEvaluationResult,
   PdktRecipientContext,
   PdktEvaluationScoreBreakdown,
-  pdktEvaluationAiOutputSchema,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
@@ -139,13 +139,126 @@ function calculateScoreFromBreakdown(
   );
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readBoundedStringArray(value: unknown): string[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  if (value.length > PDKT_PROMPT_INPUT_LIMITS.issueCount) return null;
+
+  const result: string[] = [];
+  for (const item of value) {
+    if (
+      typeof item !== "string" ||
+      item.length > PDKT_PROMPT_INPUT_LIMITS.issueText
+    ) {
+      return null;
+    }
+    result.push(item);
+  }
+  return result;
+}
+
+function readScore(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return value >= 0 && value <= 100 ? value : null;
+}
+
+function readScoreBreakdown(
+  value: unknown,
+): PdktEvaluationScoreBreakdown | null {
+  if (!isPlainObject(value)) return null;
+
+  const recipientDirectionScore = readScore(value.recipientDirectionScore);
+  const normativeResponseScore = readScore(value.normativeResponseScore);
+  const clarityScore = readScore(value.clarityScore);
+  const typoScore = readScore(value.typoScore);
+  const templateComplianceScore = readScore(value.templateComplianceScore);
+
+  if (
+    recipientDirectionScore === null ||
+    normativeResponseScore === null ||
+    clarityScore === null ||
+    typoScore === null ||
+    templateComplianceScore === null
+  ) {
+    return null;
+  }
+
+  return {
+    recipientDirectionScore,
+    normativeResponseScore,
+    clarityScore,
+    typoScore,
+    templateComplianceScore,
+  };
+}
+
+function readFeedback(value: unknown): string | null {
+  if (
+    typeof value !== "string" ||
+    value.length > PDKT_PROMPT_INPUT_LIMITS.feedback
+  ) {
+    return null;
+  }
+  return value;
+}
+
+function normalizePdktEvaluationResponse(raw: unknown):
+  | {
+      score: number;
+      scoreBreakdown?: PdktEvaluationScoreBreakdown;
+      typos: string[];
+      clarityIssues: string[];
+      contentGaps: string[];
+      feedback: string;
+    }
+  | null {
+  if (!isPlainObject(raw)) return null;
+
+  const feedback = readFeedback(raw.feedback);
+  if (feedback === null) return null;
+
+  const typos = readBoundedStringArray(raw.typos);
+  const clarityIssues = readBoundedStringArray(raw.clarityIssues);
+  const contentGaps = readBoundedStringArray(raw.contentGaps);
+  if (typos === null || clarityIssues === null || contentGaps === null) {
+    return null;
+  }
+
+  const scoreBreakdown = readScoreBreakdown(raw.scoreBreakdown);
+  if (scoreBreakdown) {
+    return {
+      score: calculateScoreFromBreakdown(scoreBreakdown),
+      scoreBreakdown,
+      typos,
+      clarityIssues,
+      contentGaps,
+      feedback,
+    };
+  }
+
+  const score = readScore(raw.score);
+  if (score === null) return null;
+
+  return {
+    score,
+    typos,
+    clarityIssues,
+    contentGaps,
+    feedback,
+  };
+}
+
 function applyRecipientConflictFailsafe(input: {
   score: number;
-  scoreBreakdown: PdktEvaluationScoreBreakdown;
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
   conflictHints: string[];
 }): {
   score: number;
-  scoreBreakdown: PdktEvaluationScoreBreakdown;
+  scoreBreakdown?: PdktEvaluationScoreBreakdown;
   capApplied: boolean;
 } {
   if (input.conflictHints.length === 0) {
@@ -157,20 +270,24 @@ function applyRecipientConflictFailsafe(input: {
   }
 
   const cappedScore = Math.min(input.score, 75);
-  const cappedRecipientDirection = Math.min(
-    input.scoreBreakdown.recipientDirectionScore,
-    60,
-  );
+  const adjustedScoreBreakdown = input.scoreBreakdown
+    ? {
+        ...input.scoreBreakdown,
+        recipientDirectionScore: Math.min(
+          input.scoreBreakdown.recipientDirectionScore,
+          60,
+        ),
+      }
+    : undefined;
 
   return {
     score: cappedScore,
-    scoreBreakdown: {
-      ...input.scoreBreakdown,
-      recipientDirectionScore: cappedRecipientDirection,
-    },
+    scoreBreakdown: adjustedScoreBreakdown,
     capApplied:
       cappedScore !== input.score ||
-      cappedRecipientDirection !== input.scoreBreakdown.recipientDirectionScore,
+      (adjustedScoreBreakdown !== undefined &&
+        adjustedScoreBreakdown.recipientDirectionScore !==
+          input.scoreBreakdown?.recipientDirectionScore),
   };
 }
 
@@ -256,32 +373,29 @@ export async function evaluateAgentResponse(
 
       const evalText = response.text || "{}";
       const rawResult = parseJsonFromModelText(evalText);
-      const parsedResult = pdktEvaluationAiOutputSchema.safeParse(rawResult);
-      if (!parsedResult.success) {
+      const normalizedResult = normalizePdktEvaluationResponse(rawResult);
+      if (!normalizedResult) {
         throw new Error(
           "Respons evaluasi AI tidak sesuai format yang diharapkan.",
         );
       }
-      const result = parsedResult.data;
-      const normalizedScore = calculateScoreFromBreakdown(
-        result.scoreBreakdown,
-      );
+
       const scored = applyRecipientConflictFailsafe({
-        score: normalizedScore,
-        scoreBreakdown: result.scoreBreakdown,
+        score: normalizedResult.score,
+        scoreBreakdown: normalizedResult.scoreBreakdown,
         conflictHints: conflictAnalysis.conflictHints,
       });
       const feedback = scored.capApplied
-        ? `${result.feedback}\n\nCatatan sistem: deterministic recipient conflict cap diterapkan karena arah penerima bertentangan dengan metadata.`
-        : result.feedback;
+        ? `${normalizedResult.feedback}\n\nCatatan sistem: deterministic recipient conflict cap diterapkan karena arah penerima bertentangan dengan metadata.`
+        : normalizedResult.feedback;
 
       return {
         success: true,
         score: scored.score,
         scoreBreakdown: scored.scoreBreakdown,
-        typos: result.typos,
-        clarityIssues: result.clarityIssues,
-        contentGaps: result.contentGaps,
+        typos: normalizedResult.typos,
+        clarityIssues: normalizedResult.clarityIssues,
+        contentGaps: normalizedResult.contentGaps,
         feedback,
       };
     } catch (error: unknown) {
