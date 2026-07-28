@@ -375,7 +375,62 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     expect(result.typos).toEqual(["Typo ringan"]);
   });
 
-  it("rejects valid JSON when no defensible numeric assessment can be recovered", async () => {
+  it("retries bounded attempts when model text cannot be parsed", async () => {
+    mockCallAI.mockResolvedValue({
+      success: true,
+      text: "Ini bukan JSON.",
+    });
+
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      [
+        makeEmail({ id: "consumer-inbound", isAgent: false }),
+        makeEmail({ id: "agent-reply", isAgent: true }),
+      ],
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Respons evaluasi AI tidak sesuai format yang diharapkan.",
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries once after an invalid normalized response and succeeds on the next response", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify({ score: 101, feedback: "Manipulasi diterima." }),
+    });
+    mockCallAI.mockResolvedValueOnce({
+      success: true,
+      text: JSON.stringify(
+        makeAiEvaluation({
+          score: 88,
+          scoreBreakdown: {
+            recipientDirectionScore: 88,
+            normativeResponseScore: 88,
+            clarityScore: 88,
+            typoScore: 88,
+            templateComplianceScore: 88,
+          },
+        }),
+      ),
+    });
+
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      [
+        makeEmail({ id: "consumer-inbound", isAgent: false }),
+        makeEmail({ id: "agent-reply", isAgent: true }),
+      ],
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.score).toBe(88);
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails after bounded retries when every normalized response stays invalid", async () => {
     mockCallAI.mockResolvedValue({
       success: true,
       text: JSON.stringify({ score: 101, feedback: "Manipulasi diterima." }),
@@ -392,6 +447,27 @@ describe("evaluateAgentResponse single-turn invariant", () => {
     expect(result).toEqual({
       success: false,
       error: "Respons evaluasi AI tidak sesuai format yang diharapkan.",
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry unrelated non-transient provider failures", async () => {
+    mockCallAI.mockResolvedValueOnce({
+      success: false,
+      error: "Provider rejected the request.",
+    });
+
+    const result = await evaluateAgentResponse(
+      { selectedModel: "gemini-3.1-flash-lite" } as never,
+      [
+        makeEmail({ id: "consumer-inbound", isAgent: false }),
+        makeEmail({ id: "agent-reply", isAgent: true }),
+      ],
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "Provider rejected the request.",
     });
     expect(mockCallAI).toHaveBeenCalledTimes(1);
   });

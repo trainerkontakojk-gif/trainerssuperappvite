@@ -291,6 +291,13 @@ function applyRecipientConflictFailsafe(input: {
   };
 }
 
+class InvalidPdktEvaluationResponseError extends Error {
+  constructor() {
+    super("Respons evaluasi AI tidak sesuai format yang diharapkan.");
+    this.name = "InvalidPdktEvaluationResponseError";
+  }
+}
+
 export async function evaluateAgentResponse(
   config: PdktSessionConfig,
   emails: EmailMessage[],
@@ -372,12 +379,16 @@ export async function evaluateAgentResponse(
         throw new Error(response.error || "Gagal mendapatkan respons AI.");
 
       const evalText = response.text || "{}";
-      const rawResult = parseJsonFromModelText(evalText);
+      let rawResult: unknown;
+      try {
+        rawResult = parseJsonFromModelText(evalText);
+      } catch {
+        throw new InvalidPdktEvaluationResponseError();
+      }
+
       const normalizedResult = normalizePdktEvaluationResponse(rawResult);
       if (!normalizedResult) {
-        throw new Error(
-          "Respons evaluasi AI tidak sesuai format yang diharapkan.",
-        );
+        throw new InvalidPdktEvaluationResponseError();
       }
 
       const scored = applyRecipientConflictFailsafe({
@@ -400,7 +411,10 @@ export async function evaluateAgentResponse(
       };
     } catch (error: unknown) {
       lastError = error;
-      if (!isTransientAiError(error) || attempt === retryDelaysMs.length) break;
+      const isRetryableEvaluationError =
+        error instanceof InvalidPdktEvaluationResponseError ||
+        isTransientAiError(error);
+      if (!isRetryableEvaluationError || attempt === retryDelaysMs.length) break;
 
       await new Promise((resolve) =>
         setTimeout(resolve, retryDelaysMs[attempt]),
