@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   PDKT_PROMPT_INPUT_LIMITS,
   type PdktConsumerType,
@@ -102,7 +102,29 @@ export function PdktScenariosTab(props: Props) {
   const [generating, setGenerating] = useState(false);
   const [attempted, setAttempted] = useState<Set<ErrorKey>>(new Set());
   const [emailVisited, setEmailVisited] = useState(false);
+  const [pendingAttachmentReads, setPendingAttachmentReads] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorGenerationRef = useRef(0);
+  const pendingAttachmentReadsRef = useRef(0);
+
+  const beginEditor = () => {
+    editorGenerationRef.current += 1;
+    pendingAttachmentReadsRef.current = 0;
+    setPendingAttachmentReads(0);
+  };
+
+  const closeEditor = () => {
+    editorGenerationRef.current += 1;
+    pendingAttachmentReadsRef.current = 0;
+    setPendingAttachmentReads(0);
+    scenarioForm.close();
+  };
+
+  useEffect(() => {
+    return () => {
+      editorGenerationRef.current += 1;
+    };
+  }, []);
   const wizardSnapshot = useRef<{
     draft: Omit<PdktScenario, "id">;
     editingId: string | null;
@@ -209,6 +231,7 @@ export function PdktScenariosTab(props: Props) {
   const next = () => goToStep(step === "scenario" ? "profile" : "email");
 
   const openWizard = (editing: PdktScenario | null) => {
+    beginEditor();
     wizardSnapshot.current = {
       draft: editing
         ? (({ id: _, ...rest }) => rest)(editing)
@@ -255,9 +278,7 @@ export function PdktScenariosTab(props: Props) {
     if (wizardIsDirty() && !window.confirm(CONFIRM_MESSAGE)) return;
     const snapshot = wizardSnapshot.current;
     if (snapshot) {
-      scenarioForm.setDraft(snapshot.draft);
-      scenarioForm.setEditingId(snapshot.editingId);
-      scenarioForm.setIsOpen(false);
+      closeEditor();
       setEnableImageGeneration(snapshot.enableImageGeneration);
       setGlobalConsumerTypeId(snapshot.globalConsumerTypeId);
       setConsumerNameMentionPattern(snapshot.consumerNameMentionPattern);
@@ -275,6 +296,7 @@ export function PdktScenariosTab(props: Props) {
   };
 
   const saveScenario = () => {
+    if (pendingAttachmentReads > 0) return;
     if (!scenarioValid) {
       setStep("scenario");
       markAndFocus(
@@ -321,7 +343,7 @@ export function PdktScenariosTab(props: Props) {
       ...previous,
       scenarios: scenarioForm.save(previous.scenarios, normalized),
     }));
-    scenarioForm.close();
+    closeEditor();
     setStep("scenario");
     setAttempted(new Set());
   };
@@ -342,6 +364,7 @@ export function PdktScenariosTab(props: Props) {
 
   const uploadAttachment = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    const readGeneration = editorGenerationRef.current;
     if (!file) {
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
@@ -361,14 +384,56 @@ export function PdktScenariosTab(props: Props) {
     } else if ((draft.attachmentImages || []).length >= 5) {
       notify.warning("Maksimal 5 lampiran per skenario.");
     } else {
+      const draftGeneration = scenarioForm.getDraftGeneration();
       const reader = new FileReader();
-      reader.onloadend = () =>
-        scenarioForm.setDraft({
-          attachmentImages: [
-            ...(scenarioForm.draft.attachmentImages || []),
-            reader.result as string,
-          ],
+      let settled = false;
+      pendingAttachmentReadsRef.current += 1;
+      setPendingAttachmentReads(pendingAttachmentReadsRef.current);
+      const finishRead = () => {
+        if (settled) return;
+        settled = true;
+        if (editorGenerationRef.current === readGeneration) {
+          pendingAttachmentReadsRef.current = Math.max(
+            0,
+            pendingAttachmentReadsRef.current - 1,
+          );
+          setPendingAttachmentReads(pendingAttachmentReadsRef.current);
+        }
+      };
+      const isCurrentEditor = () =>
+        editorGenerationRef.current === readGeneration &&
+        scenarioForm.getDraftGeneration() === draftGeneration &&
+        scenarioForm.isOpen;
+      reader.onloadend = () => {
+        if (settled) return;
+        if (!isCurrentEditor()) {
+          finishRead();
+          return;
+        }
+        if (typeof reader.result !== "string") {
+          notify.error(`Gagal membaca file ${file.name}.`);
+          finishRead();
+          return;
+        }
+        scenarioForm.setDraft((previous) => {
+          if ((previous.attachmentImages || []).length >= 5) {
+            notify.warning("Maksimal 5 lampiran per skenario.");
+            return {};
+          }
+          return {
+            attachmentImages: [
+              ...(previous.attachmentImages || []),
+              reader.result as string,
+            ],
+          };
         });
+        finishRead();
+      };
+      reader.onerror = () => {
+        if (settled) return;
+        if (isCurrentEditor()) notify.error(`Gagal membaca file ${file.name}.`);
+        finishRead();
+      };
       reader.readAsDataURL(file);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -444,6 +509,7 @@ export function PdktScenariosTab(props: Props) {
         onBack={() => setStep(step === "email" ? "profile" : "scenario")}
         onCancel={cancel}
         onSubmit={saveScenario}
+        pendingAttachmentReads={pendingAttachmentReads}
         canNext={step === "scenario" ? scenarioValid : profileValid}
         scenarioContent={
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -785,6 +851,11 @@ export function PdktScenariosTab(props: Props) {
                 )}
               />
             </ScenarioTemplateField>
+            {pendingAttachmentReads > 0 && (
+              <p role="status" className="text-xs text-muted-foreground">
+                Membaca lampiran...
+              </p>
+            )}
             <ScenarioAttachments
               attachmentImages={draft.attachmentImages || []}
               onUpload={uploadAttachment}

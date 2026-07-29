@@ -22,7 +22,7 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: KetikAppSettings;
-  onSave: (newSettings: KetikAppSettings) => void;
+  onSave: (newSettings: KetikAppSettings) => Promise<void>;
 }
 
 export function SettingsModal({
@@ -51,7 +51,13 @@ export function SettingsModal({
     handleIdentityChange,
     handleSave,
     handleResetDefaults,
+    isSaving,
   } = useKetikSettingsDraft({ settings, isOpen, onSave, onClose });
+
+  const requestClose = () => {
+    if (isSaving) return;
+    onClose();
+  };
 
   const tabs = [
     { id: "scenarios", label: "Masalah", icon: FileText },
@@ -72,7 +78,7 @@ export function SettingsModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={requestClose}
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
           />
           <motion.div
@@ -93,8 +99,9 @@ export function SettingsModal({
                 </div>
               </div>
               <button
-                onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border"
+                onClick={requestClose}
+                disabled={isSaving}
+                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -143,7 +150,9 @@ export function SettingsModal({
                     {activeTab === "consumers" && (
                       <KetikConsumersTab
                         consumerTypes={localSettings.consumerTypes}
-                        activeConsumerTypeId={localSettings.activeConsumerTypeId}
+                        activeConsumerTypeId={
+                          localSettings.activeConsumerTypeId
+                        }
                         consumerForm={consumerForm}
                         setLocalSettings={setLocalSettings}
                       />
@@ -186,24 +195,27 @@ export function SettingsModal({
             <div className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0">
               <button
                 onClick={handleResetDefaults}
-                className="flex items-center gap-2 text-xs font-medium text-red-500/80 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5"
+                disabled={isSaving}
+                className="flex items-center gap-2 text-xs font-medium text-red-500/80 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Reset Default
               </button>
               <div className="flex gap-3">
                 <button
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
+                  onClick={requestClose}
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2"
+                  disabled={isSaving || scenarioForm.isOpen}
+                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
-                  Simpan Perubahan
+                  {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
                 </button>
               </div>
             </div>

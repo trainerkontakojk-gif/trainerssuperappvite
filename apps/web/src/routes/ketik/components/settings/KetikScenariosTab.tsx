@@ -1,5 +1,13 @@
-import React, { useState } from "react";
-import { Check, Edit2, Trash2, Plus, ArrowLeft, Image as ImageIcon, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Check,
+  Edit2,
+  Trash2,
+  Plus,
+  ArrowLeft,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
 import {
   KetikAppSettings,
   KetikScenario,
@@ -23,6 +31,28 @@ export function KetikScenariosTab({
   const [isNewCategoryInput, setIsNewCategoryInput] = useState(false);
   const [newScenarioCategory, setNewScenarioCategory] = useState("");
   const [isScenarioScriptEnabled, setIsScenarioScriptEnabled] = useState(false);
+  const [pendingImageReads, setPendingImageReads] = useState(0);
+  const editorGenerationRef = useRef(0);
+  const pendingImageReadsRef = useRef(0);
+
+  const beginEditor = () => {
+    editorGenerationRef.current += 1;
+    pendingImageReadsRef.current = 0;
+    setPendingImageReads(0);
+  };
+
+  const closeEditor = () => {
+    editorGenerationRef.current += 1;
+    pendingImageReadsRef.current = 0;
+    setPendingImageReads(0);
+    scenarioForm.close();
+  };
+
+  useEffect(() => {
+    return () => {
+      editorGenerationRef.current += 1;
+    };
+  }, []);
 
   const handleSelectAll = () =>
     setLocalSettings((prev) => ({
@@ -58,9 +88,11 @@ export function KetikScenariosTab({
   const allSelected = totalScenarios > 0 && activeCount === totalScenarios;
   const noneSelected = activeCount === 0;
   const scenarioDescription = scenarioForm.draft.description || "";
-  const formattedScenarioDescriptionLimit = KETIK_PROMPT_LIMITS.scenarioDescription.toLocaleString("id-ID");
+  const formattedScenarioDescriptionLimit =
+    KETIK_PROMPT_LIMITS.scenarioDescription.toLocaleString("id-ID");
 
   const handleAddClick = () => {
+    beginEditor();
     scenarioForm.openAdd();
     setNewScenarioCategory("");
     setIsNewCategoryInput(false);
@@ -68,6 +100,7 @@ export function KetikScenariosTab({
   };
 
   const handleEditClick = (scenario: KetikScenario) => {
+    beginEditor();
     scenarioForm.openEdit(scenario);
     setNewScenarioCategory(scenario.category);
     setIsNewCategoryInput(!categories.includes(scenario.category));
@@ -75,10 +108,20 @@ export function KetikScenariosTab({
   };
 
   const handleSaveScenario = () => {
-    const category = isNewCategoryInput ? newScenarioCategory : newScenarioCategory || "Umum";
-    if (!scenarioForm.draft.title || !scenarioForm.draft.description || !category) return;
+    if (pendingImageReads > 0) return;
+    const category = isNewCategoryInput
+      ? newScenarioCategory
+      : newScenarioCategory || "Umum";
+    if (
+      !scenarioForm.draft.title ||
+      !scenarioForm.draft.description ||
+      !category
+    )
+      return;
 
-    const draftScript = isScenarioScriptEnabled ? scenarioForm.draft.script : "";
+    const draftScript = isScenarioScriptEnabled
+      ? scenarioForm.draft.script
+      : "";
 
     const normalizedDraft = normalizeKetikScenarioDraft({
       ...scenarioForm.draft,
@@ -91,33 +134,71 @@ export function KetikScenariosTab({
       scenarios: scenarioForm.save(prev.scenarios, normalizedDraft),
     }));
 
-    scenarioForm.close();
+    closeEditor();
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      const readGeneration = editorGenerationRef.current;
       Array.from(e.target.files).forEach((file) => {
         if (file.size > 500 * 1024) {
           notify.error(
-            `File ${file.name} terlalu besar (>500KB). Mohon kompres gambar terlebih dahulu.`
+            `File ${file.name} terlalu besar (>500KB). Mohon kompres gambar terlebih dahulu.`,
           );
           return;
         }
+        const draftGeneration = scenarioForm.getDraftGeneration();
         const reader = new FileReader();
+        let settled = false;
+        pendingImageReadsRef.current += 1;
+        setPendingImageReads(pendingImageReadsRef.current);
+        const finishRead = () => {
+          if (settled) return;
+          settled = true;
+          if (editorGenerationRef.current === readGeneration) {
+            pendingImageReadsRef.current = Math.max(
+              0,
+              pendingImageReadsRef.current - 1,
+            );
+            setPendingImageReads(pendingImageReadsRef.current);
+          }
+        };
+        const isCurrentEditor = () =>
+          editorGenerationRef.current === readGeneration &&
+          scenarioForm.getDraftGeneration() === draftGeneration &&
+          scenarioForm.isOpen;
         reader.onloadend = () => {
-          const currentImages = scenarioForm.draft.images || [];
-          scenarioForm.setDraft({ images: [...currentImages, reader.result as string] });
+          if (settled) return;
+          if (!isCurrentEditor()) {
+            finishRead();
+            return;
+          }
+          if (typeof reader.result !== "string") {
+            notify.error(`Gagal membaca file ${file.name}.`);
+            finishRead();
+            return;
+          }
+          scenarioForm.setDraft((previous) => ({
+            images: [...(previous.images || []), reader.result as string],
+          }));
+          finishRead();
+        };
+        reader.onerror = () => {
+          if (settled) return;
+          if (isCurrentEditor())
+            notify.error(`Gagal membaca file ${file.name}.`);
+          finishRead();
         };
         reader.readAsDataURL(file);
       });
+      e.target.value = "";
     }
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
-    const currentImages = scenarioForm.draft.images || [];
-    scenarioForm.setDraft({
-      images: currentImages.filter((_, idx) => idx !== indexToRemove),
-    });
+    scenarioForm.setDraft((previous) => ({
+      images: (previous.images || []).filter((_, idx) => idx !== indexToRemove),
+    }));
   };
 
   if (scenarioForm.isOpen) {
@@ -125,7 +206,7 @@ export function KetikScenariosTab({
       <div className="space-y-6 pb-10">
         <div className="flex items-center gap-2 border-b border-border pb-4">
           <button
-            onClick={scenarioForm.close}
+            onClick={closeEditor}
             className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -135,7 +216,9 @@ export function KetikScenariosTab({
         <div className="bg-card border border-border rounded-xl overflow-hidden relative">
           <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
             <h3 className="font-bold text-foreground text-base tracking-tight">
-              {scenarioForm.editingId ? "Edit Skenario" : "Tambah Skenario Baru"}
+              {scenarioForm.editingId
+                ? "Edit Skenario"
+                : "Tambah Skenario Baru"}
             </h3>
           </div>
           <div className="p-6 space-y-6">
@@ -215,7 +298,9 @@ export function KetikScenariosTab({
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-foreground outline-none transition-colors placeholder:text-muted-foreground/30"
                 placeholder="Contoh: Gagal Transfer"
                 value={scenarioForm.draft.title || ""}
-                onChange={(e) => scenarioForm.setDraft({ title: e.target.value })}
+                onChange={(e) =>
+                  scenarioForm.setDraft({ title: e.target.value })
+                }
               />
             </div>
             <div>
@@ -232,13 +317,16 @@ export function KetikScenariosTab({
                 value={scenarioDescription}
                 maxLength={KETIK_PROMPT_LIMITS.scenarioDescription}
                 aria-describedby="ketik-scenario-description-counter"
-                onChange={(e) => scenarioForm.setDraft({ description: e.target.value })}
+                onChange={(e) =>
+                  scenarioForm.setDraft({ description: e.target.value })
+                }
               />
               <p
                 id="ketik-scenario-description-counter"
                 className="mt-2 text-xs text-muted-foreground"
               >
-                {scenarioDescription.length.toLocaleString("id-ID")} / {formattedScenarioDescriptionLimit}
+                {scenarioDescription.length.toLocaleString("id-ID")} /{" "}
+                {formattedScenarioDescriptionLimit}
               </p>
             </div>
             <div>
@@ -264,7 +352,9 @@ export function KetikScenariosTab({
                 >
                   <span
                     className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                      isScenarioScriptEnabled ? "bg-primary border-primary text-primary-foreground" : "border-border bg-transparent text-transparent"
+                      isScenarioScriptEnabled
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "border-border bg-transparent text-transparent"
                     }`}
                   >
                     <Check className="w-2.5 h-2.5 stroke-[3]" />
@@ -280,12 +370,20 @@ export function KetikScenariosTab({
                 }`}
                 rows={8}
                 value={scenarioForm.draft.script || ""}
-                onChange={(e) => scenarioForm.setDraft({ script: e.target.value })}
+                onChange={(e) =>
+                  scenarioForm.setDraft({ script: e.target.value })
+                }
                 disabled={!isScenarioScriptEnabled}
                 placeholder={`Contoh format 1 - Dialog:\nAgent: Selamat pagi, ada yang bisa saya bantu?\nKonsumen: Mas saya ada masalah transaksi.\n\nContoh format 2 - Alur:\nAwal:\n- Konsumen membuka chat dengan nada panik.`}
               />
               <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                Checklist <span className="font-semibold text-foreground">Ikuti Skrip</span> untuk mengaktifkan kolom ini. Saat tidak dicentang, konsumen akan dibiarkan lebih bebas dan kreatif mengikuti konteks skenario.
+                Checklist{" "}
+                <span className="font-semibold text-foreground">
+                  Ikuti Skrip
+                </span>{" "}
+                untuk mengaktifkan kolom ini. Saat tidak dicentang, konsumen
+                akan dibiarkan lebih bebas dan kreatif mengikuti konteks
+                skenario.
               </p>
             </div>
             <div>
@@ -310,36 +408,49 @@ export function KetikScenariosTab({
                   className="hidden"
                 />
               </label>
-              {scenarioForm.draft.images && scenarioForm.draft.images.length > 0 && (
-                <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
-                  {scenarioForm.draft.images.map((img, idx) => (
-                    <div key={idx} className="relative w-20 h-20 shrink-0 group">
-                      <img
-                        src={img}
-                        alt={`Preview ${idx}`}
-                        className="object-cover w-full h-full rounded-md border border-border"
-                      />
-                      <button
-                        onClick={() => handleRemoveImage(idx)}
-                        className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center shadow transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              {pendingImageReads > 0 && (
+                <p role="status" className="mt-3 text-xs text-muted-foreground">
+                  Membaca lampiran...
+                </p>
               )}
+              {scenarioForm.draft.images &&
+                scenarioForm.draft.images.length > 0 && (
+                  <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
+                    {scenarioForm.draft.images.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="relative w-20 h-20 shrink-0 group"
+                      >
+                        <img
+                          src={img}
+                          alt={`Preview ${idx}`}
+                          className="object-cover w-full h-full rounded-md border border-border"
+                        />
+                        <button
+                          onClick={() => handleRemoveImage(idx)}
+                          className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center shadow transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
             <div className="flex justify-end gap-2.5 pt-4 border-t border-border">
               <button
-                onClick={scenarioForm.close}
+                onClick={closeEditor}
                 className="px-4 py-2 rounded-md text-[13px] font-medium text-muted-foreground hover:bg-foreground/5 transition-colors"
               >
                 Batal
               </button>
               <button
                 onClick={handleSaveScenario}
-                disabled={!scenarioForm.draft.title || !scenarioForm.draft.description}
+                disabled={
+                  pendingImageReads > 0 ||
+                  !scenarioForm.draft.title ||
+                  !scenarioForm.draft.description
+                }
                 className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Simpan

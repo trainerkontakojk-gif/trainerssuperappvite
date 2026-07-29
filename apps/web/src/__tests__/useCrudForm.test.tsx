@@ -37,6 +37,19 @@ function renderScenarioForm() {
 }
 
 describe("useCrudForm", () => {
+  it("accepts a functional draft patch for async updates", () => {
+    const { result } = renderScenarioForm();
+
+    act(() => {
+      result.current.openAdd();
+      result.current.setDraft((previous) => ({
+        title: `${previous.title}async`,
+      }));
+    });
+
+    expect(result.current.draft.title).toBe("async");
+  });
+
   it("creates a new item from a normalized draft override", () => {
     const { result, generateId, createItem } = renderScenarioForm();
     const items: ScenarioItem[] = [];
@@ -139,12 +152,14 @@ describe("useCrudForm", () => {
       });
     });
 
-    expect(result.current.isValid({
-      category: "",
-      title: "Missing category",
-      script: "",
-      isActive: true,
-    })).toBe(false);
+    expect(
+      result.current.isValid({
+        category: "",
+        title: "Missing category",
+        script: "",
+        isActive: true,
+      }),
+    ).toBe(false);
     expect(nextItems).toBe(items);
   });
 });

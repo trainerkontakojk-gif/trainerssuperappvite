@@ -3,10 +3,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { ApiResponse } from "@trainers/types";
 import { env } from "./lib/env";
-import {
-  authMiddleware,
-  type AuthVariables,
-} from "./middleware/auth";
+import { authMiddleware, type AuthVariables } from "./middleware/auth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
 import {
@@ -28,9 +25,9 @@ const allowedOrigins =
     ? env.ALLOWED_ORIGINS?.split(",")
         .map((o) => o.trim())
         .filter(Boolean) || []
-    : (env.ALLOWED_ORIGINS?.split(",")
+    : env.ALLOWED_ORIGINS?.split(",")
         .map((o) => o.trim())
-        .filter(Boolean)) || ["http://localhost:3000", "http://localhost:3005"];
+        .filter(Boolean) || ["http://localhost:3000", "http://localhost:3005"];
 
 if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   console.warn(
@@ -44,7 +41,14 @@ if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
 const app = new Hono().basePath("/api");
 
 app.use("*", securityHeadersMiddleware);
-app.use("*", cors({ origin: allowedOrigins, credentials: true }));
+app.use(
+  "*",
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    exposeHeaders: ["x-settings-version"],
+  }),
+);
 app.use(requestLogger);
 app.use("/v1/*", rateLimitMiddleware);
 
@@ -53,15 +57,14 @@ app.onError((err, c) => {
 
   const originHeader = c.req.header("Origin");
   const matchedOrigin =
-    originHeader && allowedOrigins.includes(originHeader)
-      ? originHeader
-      : null;
+    originHeader && allowedOrigins.includes(originHeader) ? originHeader : null;
 
   applySecurityHeaders(c.res.headers);
 
   if (matchedOrigin) {
     c.header("Access-Control-Allow-Origin", matchedOrigin);
     c.header("Access-Control-Allow-Credentials", "true");
+    c.header("Access-Control-Expose-Headers", "x-settings-version");
     c.header("Vary", "Origin", { append: true });
   } else {
     c.res.headers.delete("Access-Control-Allow-Origin");
@@ -197,15 +200,10 @@ const v1Api = new Hono<{ Variables: AuthVariables }>()
   .route("/telefun", telefun);
 
 // Combined for RPC type export — no `.use()` calls, clean type inference
-const _allRoutes = new Hono()
-  .route("/", healthCheck)
-  .route("/v1", v1Api);
+const _allRoutes = new Hono().route("/", healthCheck).route("/v1", v1Api);
 
 // ── Actual app with middleware ──
-app
-  .route("/", healthCheck)
-  .use("/v1/*", authMiddleware)
-  .route("/v1", v1Api);
+app.route("/", healthCheck).use("/v1/*", authMiddleware).route("/v1", v1Api);
 
 export type AppType = typeof _allRoutes;
 export type KetikRouteType = typeof ketik;

@@ -17,6 +17,7 @@ import type {
 import { Link } from "@tanstack/react-router";
 import { Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
 import { notify } from "../../lib/toast";
+import { createSettingsVersionStore } from "../../lib/settings-contract";
 import {
   type PdktAppSettings,
   generatePdktSessionConfig,
@@ -111,6 +112,7 @@ export default function PdktSimulation({
 
   // Timer for time_taken (per mailbox)
   const sessionStartTimeRef = useRef<Record<string, number>>({});
+  const settingsVersionRef = useRef(createSettingsVersionStore());
 
   // Evaluation tracking by mailbox id
   const [evaluations, setEvaluations] = useState<
@@ -189,9 +191,11 @@ export default function PdktSimulation({
   // Fetch Settings & History from DB
   const fetchSettings = async () => {
     try {
+      const response = await pdktClient.settings.$get();
       const res = await (unwrapResponse(
-        await pdktClient.settings.$get(),
+        response,
       ) as Promise<PdktAppSettings | null>);
+      settingsVersionRef.current.capture(response);
       if (res) {
         setSettings(res);
       } else {
@@ -460,16 +464,15 @@ export default function PdktSimulation({
 
   // Save Settings handler
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
-    try {
-      await unwrapResponse(
-        await pdktClient.settings.$post({ json: { settings: newSettings } }),
-      );
-      setSettings(newSettings);
-      // Refetch history as scenarios configuration might affect display
-      await fetchHistory();
-    } catch (err) {
-      notify.error("Gagal menyimpan pengaturan.");
-    }
+    const response = await pdktClient.settings.$post(
+      { json: { settings: newSettings } },
+      settingsVersionRef.current.requiredRequestOptions(),
+    );
+    await unwrapResponse(response);
+    settingsVersionRef.current.capture(response);
+    setSettings(newSettings);
+    // Refetch history as scenarios configuration might affect display
+    await fetchHistory();
   };
 
   // Delete specific history session

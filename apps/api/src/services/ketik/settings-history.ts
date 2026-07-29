@@ -9,6 +9,11 @@ import {
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
 import { KETIK_PDKT_MODELS, normalizeModelId } from "../../lib/ai-models";
+import {
+  ABSENT_SETTINGS_VERSION,
+  guardedUserSettingsWrite,
+  isSettingsConflictError,
+} from "../../lib/guarded-user-settings";
 
 const coerceKetikModelId = (modelId?: string) => {
   const normalized = normalizeModelId(modelId);
@@ -67,49 +72,70 @@ function parseSettings(stored: Partial<KetikAppSettings>): KetikAppSettings {
   };
 }
 
-export async function getSettings(userId: string): Promise<KetikAppSettings> {
+export type KetikSettingsSnapshot = {
+  settings: KetikAppSettings;
+  version: string;
+};
+
+export async function getSettingsSnapshot(
+  userId: string,
+): Promise<KetikSettingsSnapshot> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient
     .from("user_settings")
-    .select("settings")
+    .select("settings, updated_at")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error || !data?.settings?.ketik) {
+  if (error) throw error;
+
+  return {
+    settings:
+      data?.settings?.ketik && typeof data.settings.ketik === "object"
+        ? parseSettings(data.settings.ketik as Partial<KetikAppSettings>)
+        : DEFAULT_KETIK_SETTINGS,
+    version:
+      typeof data?.updated_at === "string"
+        ? data.updated_at
+        : ABSENT_SETTINGS_VERSION,
+  };
+}
+
+export async function getSettings(userId: string): Promise<KetikAppSettings> {
+  try {
+    return (await getSettingsSnapshot(userId)).settings;
+  } catch {
     return DEFAULT_KETIK_SETTINGS;
   }
-
-  const stored = data.settings.ketik as Partial<KetikAppSettings>;
-  return parseSettings(stored);
 }
 
 export async function saveSettings(
   userId: string,
   settings: KetikAppSettings,
-): Promise<void> {
+  expectedVersion?: string,
+): Promise<string> {
   const adminClient = createAdminClient();
 
-  const { data: existing } = await adminClient
-    .from("user_settings")
-    .select("settings")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const updatedSettings = {
-    ...(existing?.settings || {}),
-    ketik: settings,
-  };
-
-  const { error } = await adminClient.from("user_settings").upsert(
-    {
-      user_id: userId,
-      settings: updatedSettings,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" },
-  );
-
-  if (error) throw new Error(`Gagal menyimpan pengaturan: ${error.message}`);
+  try {
+    const saved = await guardedUserSettingsWrite(
+      adminClient,
+      userId,
+      (existingSettings) => ({
+        ...(existingSettings && typeof existingSettings === "object"
+          ? existingSettings
+          : {}),
+        ketik: settings,
+      }),
+      expectedVersion,
+    );
+    return saved.updated_at;
+  } catch (error: unknown) {
+    if (isSettingsConflictError(error)) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Gagal menyimpan pengaturan: ${message}`, {
+      cause: error,
+    });
+  }
 }
 
 export async function getHistory(

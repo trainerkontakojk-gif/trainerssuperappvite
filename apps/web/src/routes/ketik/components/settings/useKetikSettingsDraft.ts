@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type {
   KetikAppSettings,
   KetikScenario,
@@ -9,6 +9,7 @@ import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../../../lib/aiModels";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
+import { getSettingsSaveErrorMessage } from "../../../../lib/settings-contract";
 import {
   normalizeKetikScenarioDraft,
   normalizeKetikConsumerDraft,
@@ -18,7 +19,7 @@ import {
 export interface UseKetikSettingsDraftProps {
   settings: KetikAppSettings;
   isOpen: boolean;
-  onSave: (newSettings: KetikAppSettings) => void;
+  onSave: (newSettings: KetikAppSettings) => Promise<void>;
   onClose: () => void;
 }
 
@@ -81,6 +82,8 @@ export function useKetikSettingsDraft({
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system" | "template"
   >("scenarios");
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
   const [localSettings, setLocalSettings] = useState<KetikAppSettings>(() => ({
     ...settings,
     selectedModel: coerceKetikModelId(settings.selectedModel),
@@ -214,7 +217,9 @@ export function useKetikSettingsDraft({
           DEFAULT_KETIK_SETTINGS.quickTemplates ||
           [],
       });
-      const nextDurationMode = classifyDurationMode(settings.simulationDuration);
+      const nextDurationMode = classifyDurationMode(
+        settings.simulationDuration,
+      );
       setDurationMode(nextDurationMode);
       setCustomInputValue(
         nextDurationMode === "custom"
@@ -228,15 +233,20 @@ export function useKetikSettingsDraft({
     }
   }, [isOpen, settings]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saveInFlightRef.current) return;
     const scenarioDirty = scenarioForm.isDirty(localSettings.scenarios);
     const consumerDirty = consumerForm.isDirty(localSettings.consumerTypes);
-    const templateDirty = templateForm.isDirty(localSettings.quickTemplates || []);
+    const templateDirty = templateForm.isDirty(
+      localSettings.quickTemplates || [],
+    );
 
     if (scenarioDirty && !scenarioForm.isValid()) {
       setActiveTab("scenarios");
       setTimeout(() => {
-        document.getElementById("scenario-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document
+          .getElementById("scenario-form")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
       notify.warning(
         "Skenario yang sedang Anda buat belum lengkap. Isi judul dan deskripsi masalah terlebih dahulu, atau klik Batal untuk membatalkan skenario.",
@@ -246,7 +256,9 @@ export function useKetikSettingsDraft({
     if (consumerDirty && !consumerForm.isValid()) {
       setActiveTab("consumers");
       setTimeout(() => {
-        document.getElementById("consumer-form")?.scrollIntoView({ behavior: "smooth" });
+        document
+          .getElementById("consumer-form")
+          ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
       notify.warning(
         "Karakter yang sedang Anda buat belum lengkap. Isi nama dan deskripsi karakteristik terlebih dahulu, atau klik Batal untuk membatalkan karakter.",
@@ -256,7 +268,9 @@ export function useKetikSettingsDraft({
     if (templateDirty && !templateForm.isValid()) {
       setActiveTab("template");
       setTimeout(() => {
-        document.getElementById("template-form")?.scrollIntoView({ behavior: "smooth" });
+        document
+          .getElementById("template-form")
+          ?.scrollIntoView({ behavior: "smooth" });
       }, 100);
       notify.warning(
         "Template yang sedang Anda buat belum lengkap. Isi keyword dan konten terlebih dahulu, atau klik Batal untuk membatalkan template.",
@@ -272,7 +286,7 @@ export function useKetikSettingsDraft({
       : localSettings.consumerTypes;
     const nextQuickTemplates = templateDirty
       ? templateForm.save(localSettings.quickTemplates || [])
-      : (localSettings.quickTemplates || []);
+      : localSettings.quickTemplates || [];
 
     const settingsToSave = buildKetikSettingsForSave({
       localSettings,
@@ -281,30 +295,50 @@ export function useKetikSettingsDraft({
       quickTemplates: nextQuickTemplates,
     });
 
-    if (scenarioDirty) {
-      scenarioForm.close();
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    try {
+      await onSave(settingsToSave);
+      if (scenarioDirty) scenarioForm.close();
+      if (consumerDirty) consumerForm.close();
+      if (templateDirty) templateForm.close();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      notify.error(
+        getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
+      );
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
-    if (consumerDirty) {
-      consumerForm.close();
-    }
-    if (templateDirty) {
-      templateForm.close();
-    }
-
-    onSave(settingsToSave);
-    onClose();
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
+    if (saveInFlightRef.current) return;
     if (
       window.confirm(
         "Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.",
       )
     ) {
-      setLocalSettings(DEFAULT_KETIK_SETTINGS);
-      scenarioForm.close();
-      consumerForm.close();
-      templateForm.close();
+      saveInFlightRef.current = true;
+      setIsSaving(true);
+      try {
+        await onSave(DEFAULT_KETIK_SETTINGS);
+        setLocalSettings(DEFAULT_KETIK_SETTINGS);
+        scenarioForm.close();
+        consumerForm.close();
+        templateForm.close();
+        onClose();
+      } catch (e) {
+        console.error(e);
+        notify.error(
+          getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
+        );
+      } finally {
+        saveInFlightRef.current = false;
+        setIsSaving(false);
+      }
     }
   };
 
@@ -328,5 +362,6 @@ export function useKetikSettingsDraft({
     handleIdentityChange,
     handleSave,
     handleResetDefaults,
+    isSaving,
   };
 }

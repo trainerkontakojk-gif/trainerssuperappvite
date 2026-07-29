@@ -18,6 +18,7 @@ interface Props {
   onBack: () => void;
   onCancel: () => void;
   onSubmit: () => void;
+  pendingAttachmentReads: number;
   canNext: boolean;
   scenarioContent: React.ReactNode;
   profileContent: React.ReactNode;
@@ -34,6 +35,7 @@ export function ScenarioForm({
   onBack,
   onCancel,
   onSubmit,
+  pendingAttachmentReads,
   canNext,
   scenarioContent,
   profileContent,
@@ -205,7 +207,8 @@ export function ScenarioForm({
           <button
             type="button"
             onClick={onSubmit}
-            className="rounded-md bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
+            disabled={pendingAttachmentReads > 0}
+            className="rounded-md bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-foreground"
           >
             {editing ? "Simpan Perubahan" : "Buat Skenario"}
           </button>

@@ -40,6 +40,7 @@ const accentSoftClassName = "bg-emerald-100";
 
 export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
+  const userId = session?.user?.id;
   const profile = useAuthStore((s) => s.profile);
   const canStartReview = ["admin", "trainer", "qa"].includes(
     profile?.role || "",
@@ -90,7 +91,7 @@ export default function KetikLanding() {
   useEffect(() => {
     const init = async () => {
       try {
-        const s = await ketikApi.getSettings();
+        const s = await ketikApi.getSettings(userId);
         setSettings(s);
       } catch (e) {
         console.warn("[Ketik] Failed to load settings, using defaults");
@@ -103,14 +104,15 @@ export default function KetikLanding() {
       }
     };
     init();
-  }, []);
+  }, [userId]);
 
   const handleSaveSettings = async (newSettings: KetikAppSettings) => {
-    setSettings(newSettings);
     try {
-      await ketikApi.saveSettings(newSettings);
+      await ketikApi.saveSettings(newSettings, userId);
+      setSettings(newSettings);
     } catch (e) {
       console.error("[Ketik] Failed to save settings:", e);
+      throw e;
     }
   };
 

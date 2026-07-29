@@ -7,6 +7,19 @@ import type {
   ChatMessage,
 } from "@trainers/types";
 import { aiClient, ketikClient, unwrapResponse } from "../../lib/api";
+import {
+  createSettingsVersionStore,
+  safeReadKetikSettingsBackup,
+  safeWriteKetikSettingsBackup,
+} from "../../lib/settings-contract";
+
+const settingsVersion = createSettingsVersionStore();
+let settingsVersionUserId: string | undefined;
+
+function prepareSettingsVersion(userId: string | undefined): void {
+  settingsVersion.clear();
+  settingsVersionUserId = userId;
+}
 
 export const ketikApi = {
   getScenarios: async () => {
@@ -33,28 +46,47 @@ export const ketikApi = {
     const res = await ketikClient.generate.$post({ json: body });
     return unwrapResponse(res) as Promise<{ text: string }>;
   },
-  getSettings: async () => {
+  getSettings: async (userId?: string) => {
+    prepareSettingsVersion(userId);
     try {
       const res = await ketikClient.settings.$get();
-      const settings = await unwrapResponse(res) as KetikAppSettings;
-      localStorage.setItem("ketik_settings_backup", JSON.stringify(settings));
+      const settings = (await unwrapResponse(res)) as KetikAppSettings;
+      settingsVersion.capture(res);
+      const version = settingsVersion.current();
+      if (version) {
+        safeWriteKetikSettingsBackup(undefined, userId, version, settings);
+      }
       return settings;
     } catch (error) {
-      const backup = localStorage.getItem("ketik_settings_backup");
+      const backup = safeReadKetikSettingsBackup<KetikAppSettings>(
+        undefined,
+        userId,
+      );
       if (backup) {
+        settingsVersion.restore(backup.version);
         console.warn(
           "API error fetching settings, using localStorage backup",
           error,
         );
-        return JSON.parse(backup) as KetikAppSettings;
+        return backup.settings;
       }
       throw error;
     }
   },
-  saveSettings: async (settings: KetikAppSettings) => {
-    localStorage.setItem("ketik_settings_backup", JSON.stringify(settings));
-    const res = await ketikClient.settings.$put({ json: settings });
+  saveSettings: async (settings: KetikAppSettings, userId?: string) => {
+    if (settingsVersionUserId !== userId) {
+      prepareSettingsVersion(userId);
+    }
+    const res = await ketikClient.settings.$put(
+      { json: settings },
+      settingsVersion.requiredRequestOptions(),
+    );
     await unwrapResponse(res);
+    settingsVersion.capture(res);
+    const version = settingsVersion.current();
+    if (version) {
+      safeWriteKetikSettingsBackup(undefined, userId, version, settings);
+    }
   },
   getHistory: async () => {
     const res = await ketikClient.history.$get();
@@ -113,7 +145,7 @@ export const ketikApi = {
       const res = await aiClient.usage.summary.$get({
         query: { module: "ketik" },
       });
-      return await unwrapResponse(res) as unknown;
+      return (await unwrapResponse(res)) as unknown;
     } catch {
       return null;
     }

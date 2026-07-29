@@ -40,11 +40,18 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Riwayat Sesi**: Peserta bisa meninjau kembali percakapan sebelumnya.
   - **AI Review**: Evaluasi AI menggunakan rubrik Bahasa Indonesia dengan skala `0-100`.
   - **Usage Bulanan**: Quick-view `Usage Bulan Ini` dengan indikator kenaikan biaya sesi (`+Rp`).
+  - **Scenario Image Safety**: Lampiran gambar diakumulasi secara functional; FileReader yang terlambat, pending, atau gagal tidak bisa menimpa draft yang sudah ditutup atau dibuka ulang.
 - **Akses**: `admin`, `trainer`, `leader`, `qa`, `tl`, `spv`, `om`, dan `agent` dapat memakai simulasi KETIK; analisis AI tetap dibatasi `admin`, `trainer`, dan `qa`.
-- **Catatan Teknis**: KETIK menyimpan history chat di `ketik_history`. Review AI bersifat manual — user memicu review setelah sesi selesai. Backend API di `/api/v1/ketik/` menangani chat, review, dan history.
+- **Catatan Teknis**: KETIK menyimpan history chat di `ketik_history`. Review AI bersifat manual — user memicu review setelah sesi selesai. Backend API di `/api/v1/ketik/` menangani chat, review, history, dan settings.
   - **Manual-only review**: Analisis AI hanya dimulai dari tombol "Mulai Analisis" oleh user, bukan otomatis saat sesi selesai.
   - **Retry after failure**: Jika review gagal, user dapat mengklik "Jalankan Ulang Analisis" untuk retry. Job status di-reset dari `failed` ke `queued`.
   - **Status reconciliation**: Polling status merekonsiliasi `ketik_history.review_status` dengan `ketik_review_jobs.status` agar UI tidak stuck pada `pending`.
+  - **Scenario image safety**: Lampiran gambar ditambah dengan akumulasi functional; callback FileReader yang terlambat, pending, atau errored diabaikan, dan save tidak jalan sampai pembacaan selesai.
+  - **Save & reset safety**: Save scenario, save settings, dan reset settings menunggu request selesai; state draf tetap terbuka bila persisten gagal atau konflik.
+  - **Settings versioning**: GET/PUT settings membaca dan mengirim `x-settings-version`. Save wajib membawa header itu; backend memakai optimistic compare-and-swap pada `user_settings.updated_at`. Jika versi stale, respons `409 SETTINGS_CONFLICT` minta user memuat ulang/sinkronisasi lalu retry.
+  - **Best-effort backup**: Recovery cache KETIK memakai `localStorage` per user (`ketik_settings_backup:<userId>`). Backup hanya ditulis setelah GET/save berhasil, dan kegagalan storage/quota diabaikan karena server tetap sumber kebenaran.
+  - **CORS exposure**: CORS API mengekspos `x-settings-version` agar browser dapat membaca versi terbaru.
+  - **No migration/storage redesign**: Perubahan ini tidak menambah migrasi atau merombak storage; guard hanya memakai row `user_settings` yang sudah ada.
   - **Provider fallback**: Review AI mencoba Gemini terlebih dahulu, lalu fallback langsung ke OpenAI Responses API (`gpt-5.4-mini`) jika Gemini gagal atau key tidak tersedia.
   - **Role restriction**: Hanya role `admin`, `trainer`, dan `qa` yang dapat menjalankan analisis AI. Role lain melihat tombol disabled dengan pesan akses.
   - **Sanitizer safety**: Structured JSON response tidak disanitasi sebelum parsing. Sanitasi hanya diterapkan ke field string setelah parse untuk mencegah corrupt JSON.
@@ -69,12 +76,17 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **PDF Attachments**: Scenario setup menerima lampiran PDF sebagai bukti. Preview dirender sebagai file tile; gambar tetap di-zoom, PDF dibuka di tab baru.
   - **Multi-Recipient Email Targets**: Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`. Field Penerima Utama mengatur arah narasi email awal.
   - **Scenario Editor Wizard**: Wizard terstruktur untuk membuat dan mengedit skenario PDKT dengan langkah-langkah terpandu.
+  - **Attachment & Submit Safety**: Lampiran skenario diakumulasi secara functional; FileReader yang terlambat atau errored tidak bisa menimpa draft baru, submit/reset native dikunci sampai pembacaan selesai, dan save/reset menunggu request sukses sebelum menutup form.
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
   - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.
 - **Catatan Teknis**:
   - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
   - Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Settings response API selalu mengikuti kontrak `{ success, data }`.
+  - **Settings versioning**: GET/POST settings membaca dan mengirim `x-settings-version`. Save wajib membawa header itu; backend memakai optimistic compare-and-swap pada `user_settings.updated_at`. Jika versi stale, respons `409 SETTINGS_CONFLICT` minta user memuat ulang/sinkronisasi lalu retry.
+  - **CORS exposure**: CORS API mengekspos `x-settings-version` agar browser dapat membaca versi terbaru.
+  - **No migration/storage redesign**: Perubahan ini tidak menambah migrasi atau merombak storage; namespace `pdkt` tetap disimpan pada row `user_settings` yang sama.
+  - **Awaited save/reset**: `usePdktSettingsDraft()` dan wizard menunggu `onSave` selesai sebelum menutup modal; error atau konflik menjaga draf tetap terbuka untuk retry.
   - Setiap skenario bisa menyimpan daftar email tujuan tambahan per skenario dengan mode `single` atau `multiple`; `konsumen@ojk.go.id` tetap menjadi fallback bawaan.
   - Field **Penerima Utama** mengatur arah narasi email awal: jika dipilih perusahaan terlapor, sapaan/isi/penutup ditujukan ke perusahaan dan OJK hanya boleh muncul sebagai fallback, tembusan, atau referensi.
   - Backend API di `/api/v1/pdkt/` menangani mailbox, compose, reply, dan evaluation.

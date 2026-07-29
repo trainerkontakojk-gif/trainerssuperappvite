@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import type { PdktAppSettings as AppSettings } from "../../pdktSettings";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { notify } from "../../../../lib/toast";
+import { getSettingsSaveErrorMessage } from "../../../../lib/settings-contract";
 import { DEFAULT_PDKT_MODEL_ID, coercePdktModelId } from "../../pdktSettings";
 import {
   normalizePdktConsumerDraft,
@@ -12,7 +13,7 @@ import {
 export interface UsePdktSettingsDraftProps {
   settings: AppSettings;
   isOpen: boolean;
-  onSave: (newSettings: AppSettings) => void;
+  onSave: (newSettings: AppSettings) => Promise<void>;
   onClose: () => void;
   defaultScenarios: PdktScenario[];
   defaultConsumerTypes: PdktConsumerType[];
@@ -67,6 +68,8 @@ export function usePdktSettingsDraft({
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system"
   >("scenarios");
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(() => ({
     ...settings,
     selectedModel: coercePdktModelId(settings.selectedModel),
@@ -177,7 +180,8 @@ export function usePdktSettingsDraft({
     }
   }, [isOpen, settings, closeScenarioForm, closeConsumerForm]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saveInFlightRef.current) return;
     const scenarioDirty = scenarioForm.isDirty(localSettings.scenarios);
     const consumerDirty = consumerForm.isDirty(localSettings.consumerTypes);
 
@@ -250,15 +254,22 @@ export function usePdktSettingsDraft({
         },
       });
 
-      if (scenarioDirty) {
-        scenarioForm.close();
+      saveInFlightRef.current = true;
+      setIsSaving(true);
+      try {
+        await onSave(settingsToSave);
+        if (scenarioDirty) scenarioForm.close();
+        if (consumerDirty) consumerForm.close();
+        onClose();
+      } catch (e) {
+        console.error(e);
+        notify.error(
+          getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
+        );
+      } finally {
+        saveInFlightRef.current = false;
+        setIsSaving(false);
       }
-      if (consumerDirty) {
-        consumerForm.close();
-      }
-
-      onSave(settingsToSave);
-      onClose();
     } catch (e) {
       notify.error(
         "Gagal menyimpan! Ukuran data (gambar) terlalu besar untuk penyimpanan browser. Silakan hapus beberapa gambar.",
@@ -305,7 +316,8 @@ export function usePdktSettingsDraft({
     consumerForm.close();
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
+    if (saveInFlightRef.current) return;
     if (
       window.confirm(
         "Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.",
@@ -327,22 +339,32 @@ export function usePdktSettingsDraft({
         },
       };
 
-      setLocalSettings(defaultSettings);
-      setEnableImageGeneration(true);
-      setGlobalConsumerTypeId("random");
-      setSelectedModel(DEFAULT_PDKT_MODEL_ID);
-      setConsumerNameMentionPattern("random");
-      setWritingStyleMode("training");
-      setCustomSenderName("");
-      setCustomBodyName("");
-      setCustomEmail("");
-      setCustomCity("");
-
-      scenarioForm.close();
-      consumerForm.close();
-
-      onSave(defaultSettings);
-      onClose();
+      saveInFlightRef.current = true;
+      setIsSaving(true);
+      try {
+        await onSave(defaultSettings);
+        setLocalSettings(defaultSettings);
+        setEnableImageGeneration(true);
+        setGlobalConsumerTypeId("random");
+        setSelectedModel(DEFAULT_PDKT_MODEL_ID);
+        setConsumerNameMentionPattern("random");
+        setWritingStyleMode("training");
+        setCustomSenderName("");
+        setCustomBodyName("");
+        setCustomEmail("");
+        setCustomCity("");
+        scenarioForm.close();
+        consumerForm.close();
+        onClose();
+      } catch (e) {
+        console.error(e);
+        notify.error(
+          getSettingsSaveErrorMessage(e, "Gagal menyimpan pengaturan."),
+        );
+      } finally {
+        saveInFlightRef.current = false;
+        setIsSaving(false);
+      }
     }
   };
 
@@ -373,6 +395,7 @@ export function usePdktSettingsDraft({
     setWritingStyleMode,
     handleSave,
     handleResetDefaults,
+    isSaving,
     hasUnsavedChanges,
     discardUnsavedChanges,
   };

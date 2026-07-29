@@ -12,8 +12,14 @@ import type { PdktAppSettings } from "./pdktSettings";
 import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
 import type { PdktScenario, PdktConsumerType } from "@trainers/types";
 import { notify } from "../../lib/toast";
-import { pollUsageDelta, formatUsageDeltaLabel, type UsageDelta, type UsageSnapshot } from "../../lib/usage-snapshot";
+import {
+  pollUsageDelta,
+  formatUsageDeltaLabel,
+  type UsageDelta,
+  type UsageSnapshot,
+} from "../../lib/usage-snapshot";
 import { fetchUsageSummary } from "../../lib/usage-summary";
+import { createSettingsVersionStore } from "../../lib/settings-contract";
 
 const accentClassName = "text-purple-500";
 const accentSoftClassName = "bg-purple-100";
@@ -77,6 +83,7 @@ export default function PdktLanding() {
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const usageSnapshotRef = useRef<UsageSnapshot | null>(null);
+  const settingsVersionRef = useRef(createSettingsVersionStore());
 
   const { data: defaultScenarios } = useApi<PdktScenario[]>("/pdkt/scenarios");
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
@@ -85,7 +92,11 @@ export default function PdktLanding() {
 
   const fetchSettings = async () => {
     try {
-      const res = await (unwrapResponse(await pdktClient.settings.$get()) as Promise<PdktAppSettings | null>);
+      const response = await pdktClient.settings.$get();
+      const res = await (unwrapResponse(
+        response,
+      ) as Promise<PdktAppSettings | null>);
+      settingsVersionRef.current.capture(response);
       if (res) {
         setSettings(res);
       } else {
@@ -100,7 +111,9 @@ export default function PdktLanding() {
 
   const fetchHistory = async () => {
     try {
-      const res = (await unwrapResponse(await pdktClient.history.$get())) as any[];
+      const res = (await unwrapResponse(
+        await pdktClient.history.$get(),
+      )) as any[];
       if (res) {
         const mapped = res.map((item: any) => ({
           id: item.id,
@@ -129,18 +142,21 @@ export default function PdktLanding() {
   }, []);
 
   const handleSaveSettings = async (newSettings: PdktAppSettings) => {
-    try {
-      await unwrapResponse(await pdktClient.settings.$post({ json: { settings: newSettings } }));
-      setSettings(newSettings);
-      await fetchHistory();
-    } catch (err) {
-      notify.error("Gagal menyimpan pengaturan.");
-    }
+    const response = await pdktClient.settings.$post(
+      { json: { settings: newSettings } },
+      settingsVersionRef.current.requiredRequestOptions(),
+    );
+    await unwrapResponse(response);
+    settingsVersionRef.current.capture(response);
+    setSettings(newSettings);
+    await fetchHistory();
   };
 
   const handleDeleteSession = async (historyId: string) => {
     try {
-      await unwrapResponse(await pdktClient.history[":id"].$delete({ param: { id: historyId } }));
+      await unwrapResponse(
+        await pdktClient.history[":id"].$delete({ param: { id: historyId } }),
+      );
       setHistory((prev) => prev.filter((h) => h.id !== historyId));
     } catch (err) {
       console.error("[PDKT] Failed to delete session:", err);
@@ -157,7 +173,9 @@ export default function PdktLanding() {
     }
   };
 
-  const [replaySession, setReplaySession] = useState<SessionHistory | null>(null);
+  const [replaySession, setReplaySession] = useState<SessionHistory | null>(
+    null,
+  );
 
   const handleSelectSession = (session: SessionHistory) => {
     setReplaySession(session);
@@ -301,8 +319,7 @@ export default function PdktLanding() {
                         sessionDelta.totalTokens > 0 ||
                         sessionDelta.totalCalls > 0) && (
                         <span className="ml-auto text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                          {formatUsageDeltaLabel(sessionDelta)} sesi
-                          terakhir
+                          {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
                         </span>
                       )}
                   </motion.button>
@@ -319,7 +336,11 @@ export default function PdktLanding() {
             className="fixed inset-0 z-[100] flex flex-col overflow-hidden transition-colors duration-500 bg-background"
           >
             <div className="w-full h-full relative flex flex-col bg-card">
-              <PdktSimulation onBack={() => setView("home")} onBeforeActivity={captureUsageBaseline} onAfterActivity={computeUsageDeltaNow} />
+              <PdktSimulation
+                onBack={() => setView("home")}
+                onBeforeActivity={captureUsageBaseline}
+                onAfterActivity={computeUsageDeltaNow}
+              />
             </div>
           </motion.div>
         )}

@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import { readPdktSettings, writePdktSettings } from "../../lib/pdkt-settings";
 import { requireRole } from "../../middleware/role";
 import {
-  Variables,
-  getUserClient,
-  jsonServerError,
-} from "./route-utils";
+  guardedUserSettingsWrite,
+  isSettingsConflictError,
+} from "../../lib/guarded-user-settings";
+import { Variables, getUserClient, jsonServerError } from "./route-utils";
 
 const settings = new Hono<{ Variables: Variables }>();
 
@@ -19,12 +19,16 @@ settings.get(
     try {
       const { data, error } = await userClient
         .from("user_settings")
-        .select("settings")
+        .select("settings, updated_at")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (error) throw error;
 
+      c.header(
+        "x-settings-version",
+        typeof data?.updated_at === "string" ? data.updated_at : "absent",
+      );
       return c.json({
         success: true,
         data: readPdktSettings(data?.settings),
@@ -44,36 +48,26 @@ settings.post(
     const body = await c.req.json();
 
     try {
-      const { data: existing, error: existingError } = await userClient
-        .from("user_settings")
-        .select("settings")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (existingError) throw existingError;
-
-      const updatedSettings = writePdktSettings(
-        existing?.settings,
-        body.settings,
+      const data = await guardedUserSettingsWrite(
+        userClient,
+        user.id,
+        (existingSettings) =>
+          writePdktSettings(existingSettings, body.settings),
+        c.req.header("x-settings-version"),
       );
 
-      const { data, error } = await userClient
-        .from("user_settings")
-        .upsert(
-          {
-            user_id: user.id,
-            settings: updatedSettings,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" },
-        )
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      c.header("x-settings-version", data.updated_at);
       return c.json({ success: true, data });
     } catch (error: unknown) {
+      if (isSettingsConflictError(error)) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "SETTINGS_CONFLICT", message: error.message },
+          },
+          409,
+        );
+      }
       return jsonServerError(c, error);
     }
   },

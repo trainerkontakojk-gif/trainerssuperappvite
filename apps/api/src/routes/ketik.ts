@@ -10,6 +10,7 @@ import * as ketikService from "../services/ketik-service";
 import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import { createAdminClient } from "../lib/supabase";
+import { isSettingsConflictError } from "../lib/guarded-user-settings";
 import { z } from "zod";
 
 type Variables = { user: User; profile: any };
@@ -99,8 +100,9 @@ ketik.post(
 ketik.get("/settings", async (c) => {
   const user = c.get("user");
   try {
-    const settings = await ketikService.getSettings(user.id);
-    return c.json({ success: true, data: settings });
+    const snapshot = await ketikService.getSettingsSnapshot(user.id);
+    c.header("x-settings-version", snapshot.version);
+    return c.json({ success: true, data: snapshot.settings });
   } catch (err: any) {
     return c.json(
       {
@@ -119,16 +121,32 @@ ketik.put(
     const user = c.get("user");
     const body = c.req.valid("json");
     try {
-      await ketikService.saveSettings(user.id, body);
+      const version = c.req.header("x-settings-version");
+      const newVersion = await ketikService.saveSettings(
+        user.id,
+        body,
+        version,
+      );
+      c.header("x-settings-version", newVersion);
       return c.json({
         success: true,
         message: "Pengaturan berhasil disimpan.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      if (isSettingsConflictError(err)) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "SETTINGS_CONFLICT", message: err.message },
+          },
+          409,
+        );
+      }
+      const message = err instanceof Error ? err.message : String(err);
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: err.message },
+          error: { code: "INTERNAL_ERROR", message },
         },
         500,
       );

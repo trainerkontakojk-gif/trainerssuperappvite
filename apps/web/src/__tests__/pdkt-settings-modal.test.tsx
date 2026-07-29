@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsModal } from "../routes/pdkt/components/SettingsModal";
 import type { PdktAppSettings as AppSettings } from "../routes/pdkt/pdktSettings";
+import { ApiError } from "../lib/api";
+import { notify } from "../lib/toast";
 
 vi.mock("framer-motion", async () => {
   const actual = (await vi.importActual("framer-motion")) as any;
@@ -20,14 +22,19 @@ const apiMocks = vi.hoisted(() => ({
   generateTemplate: vi.fn(),
   unwrapResponse: vi.fn(),
 }));
-vi.mock("../lib/api", () => ({
-  pdktClient: {
-    "generate-identity": { $post: apiMocks.generateIdentity },
-    "generate-template": { $post: apiMocks.generateTemplate },
-  },
-  unwrapResponse: apiMocks.unwrapResponse,
-}));
-vi.mock("../../../lib/toast", () => ({
+vi.mock("../lib/api", async () => {
+  const actual =
+    await vi.importActual<typeof import("../lib/api")>("../lib/api");
+  return {
+    ...actual,
+    pdktClient: {
+      "generate-identity": { $post: apiMocks.generateIdentity },
+      "generate-template": { $post: apiMocks.generateTemplate },
+    },
+    unwrapResponse: apiMocks.unwrapResponse,
+  };
+});
+vi.mock("../lib/toast", () => ({
   notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
@@ -65,7 +72,7 @@ const initialSettings: AppSettings = {
 function renderModal(
   overrides: Partial<React.ComponentProps<typeof SettingsModal>> = {},
 ) {
-  const onSave = vi.fn();
+  const onSave = vi.fn().mockResolvedValue(undefined);
   const onClose = vi.fn();
   render(
     <SettingsModal
@@ -99,14 +106,12 @@ async function completeScenarioStage(
   await user.click(screen.getByRole("button", { name: "Lanjut" }));
 }
 
-async function fillScenarioIdentity(
-  identity: {
-    senderName: string;
-    bodyName: string;
-    email: string;
-    city: string;
-  },
-) {
+async function fillScenarioIdentity(identity: {
+  senderName: string;
+  bodyName: string;
+  email: string;
+  city: string;
+}) {
   fireEvent.change(screen.getByLabelText(/Nama pengirim/), {
     target: { value: identity.senderName },
   });
@@ -250,30 +255,38 @@ describe("PDKT scenario wizard", () => {
     expect(screen.getByText("50.001 / 50.000")).toBeDefined();
   });
 
-  it("keeps optional profile fields passable and retains values across stages", async () => {
-    const user = userEvent.setup();
-    renderModal({
-      settings: {
-        ...initialSettings,
-        customIdentity: { senderName: "", email: "", city: "", bodyName: "" },
-      },
-    });
-    await user.click(
-      screen.getByRole("button", { name: /tambah skenario baru/i }),
-    );
-    await completeScenarioStage(user);
-    expect(screen.getByText("Profil Pengirim")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Lanjut" })).not.toBeDisabled();
-    await user.type(screen.getByLabelText(/Nama pengirim/), "Profil Baru");
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
-    expect(screen.getByText("Konfigurasi Email")).toBeDefined();
-    expect(document.getElementById("simulation-settings-title")).toBeDefined();
-    await user.click(screen.getByRole("button", { name: "Kembali" }));
-    expect(
-      screen.getByRole("button", { name: /3\. Email & Pengaturan, Selesai/ }),
-    ).toBeDefined();
-    expect(screen.getByDisplayValue("Profil Baru")).toBeDefined();
-  });
+  // These multi-stage user-event flows are intentionally scoped to 15s because
+  // they exercise the complete wizard rather than a single interaction.
+  it(
+    "keeps optional profile fields passable and retains values across stages",
+    { timeout: 15000 },
+    async () => {
+      const user = userEvent.setup();
+      renderModal({
+        settings: {
+          ...initialSettings,
+          customIdentity: { senderName: "", email: "", city: "", bodyName: "" },
+        },
+      });
+      await user.click(
+        screen.getByRole("button", { name: /tambah skenario baru/i }),
+      );
+      await completeScenarioStage(user);
+      expect(screen.getByText("Profil Pengirim")).toBeDefined();
+      expect(screen.getByRole("button", { name: "Lanjut" })).not.toBeDisabled();
+      await user.type(screen.getByLabelText(/Nama pengirim/), "Profil Baru");
+      await user.click(screen.getByRole("button", { name: "Lanjut" }));
+      expect(screen.getByText("Konfigurasi Email")).toBeDefined();
+      expect(
+        document.getElementById("simulation-settings-title"),
+      ).toBeDefined();
+      await user.click(screen.getByRole("button", { name: "Kembali" }));
+      expect(
+        screen.getByRole("button", { name: /3\. Email & Pengaturan, Selesai/ }),
+      ).toBeDefined();
+      expect(screen.getByDisplayValue("Profil Baru")).toBeDefined();
+    },
+  );
 
   it("uses the generated fallback identity for blank scenario and global values when generating templates", async () => {
     const user = userEvent.setup();
@@ -305,7 +318,9 @@ describe("PDKT scenario wizard", () => {
     );
     await reachEmailStage(user);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Generate" })).not.toBeDisabled(),
+      expect(
+        screen.getByRole("button", { name: "Generate" }),
+      ).not.toBeDisabled(),
     );
     await user.click(screen.getByRole("button", { name: "Generate" }));
 
@@ -322,97 +337,111 @@ describe("PDKT scenario wizard", () => {
     );
   });
 
-  it("isolates scenario identity from global identity and saves the override", async () => {
-    const user = userEvent.setup();
-    const { onSave } = renderModal();
-    await user.click(
-      screen.getByRole("button", { name: /tambah skenario baru/i }),
-    );
-    await completeScenarioStage(user);
+  it(
+    "isolates scenario identity from global identity and saves the override",
+    { timeout: 15000 },
+    async () => {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+      await user.click(
+        screen.getByRole("button", { name: /tambah skenario baru/i }),
+      );
+      await completeScenarioStage(user);
 
-    const scenarioName = screen.getByLabelText(/Nama pengirim/);
-    const scenarioBodyName = screen.getByLabelText(/Nama panggilan/);
-    await user.clear(scenarioName);
-    await user.type(scenarioName, "Scenario Sender");
-    await user.clear(scenarioBodyName);
-    await user.type(scenarioBodyName, "Scenario");
-    const scenarioEmail = document.getElementById("custom-email")!;
-    await user.clear(scenarioEmail);
-    await user.type(scenarioEmail, "scenario@example.com");
-    await user.type(
-      screen.getByLabelText(/Kota/, { selector: "input" }),
-      "Surabaya",
-    );
-    expect(
-      screen.getByText(
-        "Berlaku khusus untuk skenario ini. Field kosong akan memakai nilai skenario terkait, lalu identitas default.",
-      ),
-    ).toBeDefined();
+      const scenarioName = screen.getByLabelText(/Nama pengirim/);
+      const scenarioBodyName = screen.getByLabelText(/Nama panggilan/);
+      await user.clear(scenarioName);
+      await user.type(scenarioName, "Scenario Sender");
+      await user.clear(scenarioBodyName);
+      await user.type(scenarioBodyName, "Scenario");
+      const scenarioEmail = document.getElementById("custom-email")!;
+      await user.clear(scenarioEmail);
+      await user.type(scenarioEmail, "scenario@example.com");
+      await user.type(
+        screen.getByLabelText(/Kota/, { selector: "input" }),
+        "Surabaya",
+      );
+      expect(
+        screen.getByText(
+          "Berlaku khusus untuk skenario ini. Field kosong akan memakai nilai skenario terkait, lalu identitas default.",
+        ),
+      ).toBeDefined();
 
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
-    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
-    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+      await user.click(screen.getByRole("button", { name: "Lanjut" }));
+      await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
+      await user.click(
+        screen.getByRole("button", { name: /simpan perubahan/i }),
+      );
 
-    const savedSettings = onSave.mock.calls[0][0];
-    expect(savedSettings.customIdentity).toEqual(
-      initialSettings.customIdentity,
-    );
-    expect(savedSettings.scenarios).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          identity: {
-            name: "Scenario Sender",
-            bodyName: "Scenario",
-            email: "scenario@example.com",
-            city: "Surabaya",
-          },
-        }),
-      ]),
-    );
-  });
+      const savedSettings = onSave.mock.calls[0][0];
+      expect(savedSettings.customIdentity).toEqual(
+        initialSettings.customIdentity,
+      );
+      expect(savedSettings.scenarios).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            identity: {
+              name: "Scenario Sender",
+              bodyName: "Scenario",
+              email: "scenario@example.com",
+              city: "Surabaya",
+            },
+          }),
+        ]),
+      );
+    },
+  );
 
-  it("keeps distinct scenario identity overrides isolated when reopening each edit", async () => {
-    const user = userEvent.setup();
-    renderModal();
+  it(
+    "keeps distinct scenario identity overrides isolated when reopening each edit",
+    { timeout: 15000 },
+    async () => {
+      const user = userEvent.setup();
+      renderModal();
 
-    await createScenarioWithIdentity(user, " Alpha", {
-      senderName: "Alpha Sender",
-      bodyName: "Alpha",
-      email: "alpha@example.com",
-      city: "Alpha City",
-    });
-    await createScenarioWithIdentity(user, " Beta", {
-      senderName: "Beta Sender",
-      bodyName: "Beta",
-      email: "beta@example.com",
-      city: "Beta City",
-    });
+      await createScenarioWithIdentity(user, " Alpha", {
+        senderName: "Alpha Sender",
+        bodyName: "Alpha",
+        email: "alpha@example.com",
+        city: "Alpha City",
+      });
+      await createScenarioWithIdentity(user, " Beta", {
+        senderName: "Beta Sender",
+        bodyName: "Beta",
+        email: "beta@example.com",
+        city: "Beta City",
+      });
 
-    await waitFor(() => expect(screen.getAllByTitle("Edit")).toHaveLength(3));
-    await user.click(screen.getAllByTitle("Edit")[1]);
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
-    expect(screen.getByLabelText(/Nama pengirim/)).toHaveValue("Alpha Sender");
-    expect(screen.getByLabelText(/Nama panggilan/)).toHaveValue("Alpha");
-    expect(document.getElementById("custom-email")).toHaveValue(
-      "alpha@example.com",
-    );
-    expect(screen.getByLabelText(/Kota/, { selector: "input" })).toHaveValue(
-      "Alpha City",
-    );
-    await user.click(screen.getByRole("button", { name: "Tutup wizard skenario" }));
-    await waitFor(() => expect(screen.getAllByTitle("Edit")).toHaveLength(3));
+      await waitFor(() => expect(screen.getAllByTitle("Edit")).toHaveLength(3));
+      await user.click(screen.getAllByTitle("Edit")[1]);
+      await user.click(screen.getByRole("button", { name: "Lanjut" }));
+      expect(screen.getByLabelText(/Nama pengirim/)).toHaveValue(
+        "Alpha Sender",
+      );
+      expect(screen.getByLabelText(/Nama panggilan/)).toHaveValue("Alpha");
+      expect(document.getElementById("custom-email")).toHaveValue(
+        "alpha@example.com",
+      );
+      expect(screen.getByLabelText(/Kota/, { selector: "input" })).toHaveValue(
+        "Alpha City",
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Tutup wizard skenario" }),
+      );
+      await waitFor(() => expect(screen.getAllByTitle("Edit")).toHaveLength(3));
 
-    await user.click(screen.getAllByTitle("Edit")[2]);
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
-    expect(screen.getByLabelText(/Nama pengirim/)).toHaveValue("Beta Sender");
-    expect(screen.getByLabelText(/Nama panggilan/)).toHaveValue("Beta");
-    expect(document.getElementById("custom-email")).toHaveValue(
-      "beta@example.com",
-    );
-    expect(screen.getByLabelText(/Kota/, { selector: "input" })).toHaveValue(
-      "Beta City",
-    );
-  });
+      await user.click(screen.getAllByTitle("Edit")[2]);
+      await user.click(screen.getByRole("button", { name: "Lanjut" }));
+      expect(screen.getByLabelText(/Nama pengirim/)).toHaveValue("Beta Sender");
+      expect(screen.getByLabelText(/Nama panggilan/)).toHaveValue("Beta");
+      expect(document.getElementById("custom-email")).toHaveValue(
+        "beta@example.com",
+      );
+      expect(screen.getByLabelText(/Kota/, { selector: "input" })).toHaveValue(
+        "Beta City",
+      );
+    },
+  );
 
   it("canceling a scenario identity edit leaves the global identity unchanged", async () => {
     const user = userEvent.setup();
@@ -675,6 +704,221 @@ describe("PDKT scenario wizard", () => {
     ).toBeNull();
   });
 
+  it("accumulates out-of-order attachment reads and blocks wizard save until reads finish", async () => {
+    class ControlledFileReader {
+      static instances: ControlledFileReader[] = [];
+      result: string | null = null;
+      onloadend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      readAsDataURL() {
+        ControlledFileReader.instances.push(this);
+      }
+
+      complete(result: string) {
+        this.result = result;
+        this.onloadend?.();
+      }
+    }
+
+    vi.stubGlobal("FileReader", ControlledFileReader);
+    try {
+      const user = userEvent.setup();
+      const { onSave } = renderModal();
+      await user.click(
+        screen.getByRole("button", { name: /tambah skenario baru/i }),
+      );
+      await reachEmailStage(user);
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["one"], "one.pdf", { type: "application/pdf" })],
+        },
+      });
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["two"], "two.png", { type: "image/png" })],
+        },
+      });
+      expect(ControlledFileReader.instances).toHaveLength(2);
+      const wizardSave = screen.getByRole("button", { name: "Buat Skenario" });
+      await waitFor(() => expect(wizardSave).toBeDisabled());
+      await user.click(wizardSave);
+      expect(
+        screen.getByRole("button", { name: "Buat Skenario" }),
+      ).toBeDisabled();
+
+      ControlledFileReader.instances[1].complete("data:image/png;base64,two");
+      ControlledFileReader.instances[0].complete(
+        "data:application/pdf;base64,one",
+      );
+      await waitFor(() => expect(wizardSave).not.toBeDisabled());
+      await user.click(wizardSave);
+      await user.click(
+        screen.getByRole("button", { name: "Simpan Perubahan" }),
+      );
+
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scenarios: expect.arrayContaining([
+            expect.objectContaining({
+              attachmentImages: [
+                "data:image/png;base64,two",
+                "data:application/pdf;base64,one",
+              ],
+            }),
+          ]),
+        }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ignores a late attachment completion after cancel and reopen", async () => {
+    class ControlledFileReader {
+      static instances: ControlledFileReader[] = [];
+      result: string | null = null;
+      onloadend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      readAsDataURL() {
+        ControlledFileReader.instances.push(this);
+      }
+
+      complete(result: string) {
+        this.result = result;
+        this.onloadend?.();
+      }
+    }
+
+    vi.stubGlobal("FileReader", ControlledFileReader);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      const user = userEvent.setup();
+      renderModal();
+      await user.click(
+        screen.getByRole("button", { name: /tambah skenario baru/i }),
+      );
+      await reachEmailStage(user);
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["old"], "old.pdf", { type: "application/pdf" })],
+        },
+      });
+      expect(ControlledFileReader.instances).toHaveLength(1);
+
+      await user.click(
+        screen.getByRole("button", { name: "Tutup wizard skenario" }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: /tambah skenario baru/i }),
+      );
+      await reachEmailStage(user);
+      ControlledFileReader.instances[0].complete(
+        "data:application/pdf;base64,old",
+      );
+
+      expect(
+        screen.queryByRole("button", { name: "Hapus lampiran 1" }),
+      ).toBeNull();
+      expect(confirm).toHaveBeenCalledWith(
+        "Perubahan belum disimpan. Yakin ingin keluar?",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      confirm.mockRestore();
+    }
+  });
+
+  it("rejects non-string and error FileReader results without attachments", async () => {
+    class ControlledFileReader {
+      static instances: ControlledFileReader[] = [];
+      result: string | ArrayBuffer | null = null;
+      onloadend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      readAsDataURL() {
+        ControlledFileReader.instances.push(this);
+      }
+
+      complete(result: string | ArrayBuffer | null) {
+        this.result = result;
+        this.onloadend?.();
+      }
+
+      fail() {
+        this.onerror?.();
+        this.onloadend?.();
+      }
+    }
+
+    vi.stubGlobal("FileReader", ControlledFileReader);
+    try {
+      const user = userEvent.setup();
+      renderModal();
+      await user.click(
+        screen.getByRole("button", { name: /tambah skenario baru/i }),
+      );
+      await reachEmailStage(user);
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, {
+        target: {
+          files: [new File(["bad"], "bad.pdf", { type: "application/pdf" })],
+        },
+      });
+      ControlledFileReader.instances[0].complete(new ArrayBuffer(1));
+      expect(
+        screen.queryByRole("button", { name: "Hapus lampiran 1" }),
+      ).toBeNull();
+
+      fireEvent.change(input, {
+        target: {
+          files: [
+            new File(["error"], "error.pdf", { type: "application/pdf" }),
+          ],
+        },
+      });
+      vi.mocked(notify.error).mockClear();
+      ControlledFileReader.instances[1].fail();
+      expect(notify.error).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByRole("button", { name: "Hapus lampiran 1" }),
+      ).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the modal retryable and prevents duplicate settings saves", async () => {
+    let rejectSave!: (error: Error) => void;
+    const savePromise = new Promise<void>((_, reject) => {
+      rejectSave = reject;
+    });
+    const onSave = vi.fn().mockReturnValue(savePromise);
+    const user = userEvent.setup();
+    renderModal({ onSave });
+
+    const saveButton = screen.getByRole("button", {
+      name: /simpan perubahan/i,
+    });
+    await user.click(saveButton);
+    expect(saveButton).toBeDisabled();
+    await user.click(saveButton);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    rejectSave(new Error("network failure"));
+    await waitFor(() => expect(saveButton).not.toBeDisabled());
+    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+  });
+
   it("keeps reset confirmation and uses the exact dirty confirmation for wizard close", async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
@@ -683,6 +927,53 @@ describe("PDKT scenario wizard", () => {
     expect(confirm).toHaveBeenCalledWith(
       "Apakah Anda yakin ingin mereset semua pengaturan (skenario & karakteristik) ke awal? Data yang Anda buat akan hilang.",
     );
+  });
+
+  it("shows changed-elsewhere guidance for a settings conflict and retains the modal", async () => {
+    const user = userEvent.setup();
+    const onSave = vi
+      .fn()
+      .mockRejectedValue(new ApiError("SETTINGS_CONFLICT", "stale settings"));
+    renderModal({ onSave });
+
+    await user.click(screen.getByRole("button", { name: /simpan perubahan/i }));
+    await waitFor(() =>
+      expect(notify.error).toHaveBeenCalledWith(
+        expect.stringContaining("diubah di tempat lain"),
+      ),
+    );
+    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+  });
+
+  it("preserves the visible draft when reset persistence is rejected", async () => {
+    let rejectSave!: (error: Error) => void;
+    const onSave = vi.fn().mockReturnValue(
+      new Promise<void>((_, reject) => {
+        rejectSave = reject;
+      }),
+    );
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderModal({ onSave });
+
+    await user.click(screen.getByRole("button", { name: "Identitas" }));
+    const sender = screen.getByLabelText(/Nama Pengirim \(Header\)/);
+    await user.clear(sender);
+    await user.type(sender, "Draft yang harus dipertahankan");
+    await user.click(screen.getByRole("button", { name: /reset default/i }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByDisplayValue("Draft yang harus dipertahankan"),
+    ).toBeDefined();
+
+    rejectSave(new Error("network failure"));
+    await waitFor(() =>
+      expect(
+        screen.getByDisplayValue("Draft yang harus dipertahankan"),
+      ).toBeDefined(),
+    );
+    expect(screen.getByText("Pengaturan Simulasi")).toBeDefined();
+    confirm.mockRestore();
   });
 
   it("scopes wizard cancel to wizard changes and preserves unrelated modal edits", async () => {
