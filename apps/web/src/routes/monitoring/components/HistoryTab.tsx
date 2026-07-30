@@ -15,9 +15,7 @@ import {
 import {
   type UnifiedHistoryEntry,
   type ReviewStatus,
-  getScoreColor,
   getScenarioDescription,
-  getTelefunSubmetrics,
   formatDate,
   formatDuration,
 } from "../utils/formatting";
@@ -83,41 +81,6 @@ export function HistoryTab({
     }
   };
 
-  // Dynamic growth computation (last 7 days vs previous 7 days)
-  const growthStats = useMemo(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
-    const getGrowth = (mod?: string) => {
-      const entries = mod
-        ? historyData.filter((h) => h.module === mod)
-        : historyData;
-      const recent = entries.filter((h) => {
-        const d = new Date(h.created_at);
-        return d >= sevenDaysAgo && d <= now;
-      }).length;
-      const old = entries.filter((h) => {
-        const d = new Date(h.created_at);
-        return d >= fourteenDaysAgo && d < sevenDaysAgo;
-      }).length;
-
-      if (old === 0) {
-        return { val: recent > 0 ? 100 : 0, isUp: true };
-      }
-      const diff = recent - old;
-      const val = Math.round((diff / old) * 100);
-      return { val: Math.abs(val), isUp: val >= 0 };
-    };
-
-    return {
-      all: getGrowth(),
-      ketik: getGrowth("ketik"),
-      pdkt: getGrowth("pdkt"),
-      telefun: getGrowth("telefun"),
-    };
-  }, [historyData]);
-
   // Counts per module
   const moduleCounts = useMemo(() => {
     return {
@@ -151,9 +114,20 @@ export function HistoryTab({
       // Search match
       if (historySearch) {
         const query = historySearch.toLowerCase();
-        const searchMatch =
-          h.scenario_title?.toLowerCase().includes(query) ||
-          h.user_email?.toLowerCase().includes(query);
+        const searchableFields = [
+          h.scenario_title,
+          h.user_email,
+          h.consumer_name,
+          h.consumer_phone,
+          h.consumer_city,
+          h.consumer_gender,
+          h.consumer_type,
+          h.recipient,
+          h.contact,
+        ].filter((field): field is string => Boolean(field));
+        const searchMatch = searchableFields.some((field) =>
+          field.toLowerCase().includes(query),
+        );
         if (!searchMatch) return false;
       }
 
@@ -303,10 +277,33 @@ export function HistoryTab({
     }
   };
 
+  const renderConsumerContext = (entry: UnifiedHistoryEntry) => {
+    const name = entry.consumer_name || "Tidak tersedia";
+    const context =
+      entry.module === "ketik"
+        ? [entry.consumer_phone, entry.consumer_city]
+        : entry.module === "pdkt"
+          ? [entry.consumer_type, entry.recipient || entry.contact]
+          : [entry.consumer_phone, entry.consumer_city, entry.consumer_gender];
+    const usefulContext = context.filter(Boolean).join(" · ");
+
+    return (
+      <div className="min-w-[150px]">
+        <div className="font-semibold text-foreground">{name}</div>
+        <div className="mt-0.5 break-words text-xs font-medium text-muted-foreground">
+          {usefulContext || "Tidak tersedia"}
+        </div>
+        <div className="mt-0.5 break-words text-xs font-medium text-muted-foreground/90">
+          {entry.user_email || "-"}
+        </div>
+      </div>
+    );
+  };
+
   const renderScoresAndMetrics = (entry: UnifiedHistoryEntry) => {
     if (entry.review_status !== "completed") {
       return (
-        <div className="text-xs text-muted-foreground/60 italic font-medium">
+        <div className="text-xs text-muted-foreground italic font-medium">
           Menunggu Penilaian AI...
         </div>
       );
@@ -340,7 +337,7 @@ export function HistoryTab({
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-0.5">
+            <span className="text-[9px] text-muted-foreground ml-0.5">
               /100
             </span>
           </div>
@@ -351,7 +348,7 @@ export function HistoryTab({
           >
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
-                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                   {label}
                 </span>
                 <span className="text-xs font-semibold text-foreground mt-0.5">
@@ -394,7 +391,7 @@ export function HistoryTab({
             }}
           >
             <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-0.5">
+            <span className="text-[9px] text-muted-foreground ml-0.5">
               /100
             </span>
           </div>
@@ -403,7 +400,7 @@ export function HistoryTab({
           <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
             {submetrics.map(({ label, val }) => (
               <div key={label} className="flex flex-col">
-                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                   {label}
                 </span>
                 <span className="text-xs font-semibold text-foreground mt-0.5">
@@ -417,48 +414,48 @@ export function HistoryTab({
     }
 
     if (entry.module === "telefun") {
-      const finalVal = entry.score ?? 0;
-      const sub = getTelefunSubmetrics(finalVal);
-      const submetrics = [
-        { label: "Kepatuhan", val: sub.kepatuhan },
-        { label: "Empati", val: sub.empati },
-        { label: "Kejelasan", val: sub.kejelasan },
-        { label: "Solusi", val: sub.solusi },
-      ];
+      const finalVal = entry.score;
+      const assessment = entry.telefun_assessment;
+      const submetrics = assessment
+        ? [
+            { label: "WPM", val: assessment.speaking_rate_wpm },
+            { label: "Intonasi", val: assessment.intonation_score },
+            { label: "Artikulasi", val: assessment.articulation_score },
+            { label: "Filler", val: assessment.filler_words_count },
+            { label: "Tone", val: assessment.emotional_tone },
+          ]
+        : [];
 
       return (
         <div className="flex items-center gap-6">
-          {/* Main Score Badge */}
           <div
             className="flex items-baseline justify-center px-2 py-1 rounded-lg border text-sm font-semibold h-9 min-w-[70px] bg-card border-border/50"
             style={{
               color:
-                finalVal >= 8.0
-                  ? "var(--chart-green)"
-                  : finalVal >= 6.0
-                    ? "var(--chart-amber)"
-                    : "var(--chart-red)",
+                finalVal === null
+                  ? "var(--fg3)"
+                  : finalVal >= 8
+                    ? "var(--chart-green)"
+                    : finalVal >= 6
+                      ? "var(--chart-amber)"
+                      : "var(--chart-red)",
             }}
           >
-            <span>{finalVal}</span>
-            <span className="text-[9px] text-muted-foreground/50 ml-0.5">
-              /10
-            </span>
+            <span>{finalVal ?? "-"}</span>
+            <span className="text-[9px] text-muted-foreground ml-0.5">/10</span>
           </div>
-
-          {/* Submetrics Grid */}
-          <div className="grid grid-cols-4 gap-x-4 min-w-[280px]">
-            {submetrics.map(({ label, val }) => (
-              <div key={label} className="flex flex-col">
-                <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
-                  {label}
-                </span>
-                <span className="text-xs font-semibold text-foreground mt-0.5">
-                  {val}
-                </span>
-              </div>
-            ))}
-          </div>
+          {assessment ? (
+            <div className="grid grid-cols-5 gap-x-4 min-w-[360px]">
+              {submetrics.map(({ label, val }) => (
+                <div key={label} className="flex flex-col">
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+                  <span className="text-xs font-semibold text-foreground mt-0.5">{val}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs italic text-muted-foreground">Penilaian suara tidak tersedia</span>
+          )}
         </div>
       );
     }
@@ -586,7 +583,7 @@ export function HistoryTab({
                 }}
                 className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
+                    ? "bg-foreground text-background shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
                 }`}
               >
@@ -600,6 +597,7 @@ export function HistoryTab({
         <div className="flex items-center gap-3 flex-wrap md:flex-nowrap">
           {/* Status Dropdown */}
           <select
+            aria-label="Status riwayat"
             value={historyStatus}
             onChange={(e) => {
               setHistoryStatus(e.target.value as ReviewStatus | "");
@@ -626,7 +624,7 @@ export function HistoryTab({
                   ? `${startDate ? formatDateString(startDate) : "Awal"} - ${endDate ? formatDateString(endDate) : "Akhir"}`
                   : "Semua Tanggal"}
               </span>
-              <ChevronDown size={12} className="text-muted-foreground/60" />
+              <ChevronDown size={12} className="text-muted-foreground" />
             </button>
             {showDatePicker && (
               <div className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3">
@@ -688,6 +686,7 @@ export function HistoryTab({
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
+              aria-label="Cari riwayat monitoring"
               value={historySearch}
               onChange={(e) => {
                 setHistorySearch(e.target.value);
@@ -745,9 +744,9 @@ export function HistoryTab({
                     </div>
                   </td>
 
-                  {/* Pengguna email */}
-                  <td className="py-4 px-4 align-middle font-medium text-muted-foreground/90">
-                    {entry.user_email || "-"}
+                  {/* Served consumer plus agent account email */}
+                  <td className="px-4 py-4 align-middle">
+                    {renderConsumerContext(entry)}
                   </td>
 
                   {/* Waktu & Durasi */}
@@ -882,7 +881,7 @@ export function HistoryTab({
                   onClick={() => handlePageChange(num as number)}
                   className={`px-3 py-1 rounded transition-colors cursor-pointer min-h-[26px] ${
                     isCurrent
-                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
+                      ? "bg-foreground text-background shadow-sm"
                       : "border border-border bg-background hover:bg-muted"
                   }`}
                 >

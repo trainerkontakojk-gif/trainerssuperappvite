@@ -8,6 +8,10 @@ const mockKetikData = [
     user_id: "user-1",
     date: "2026-05-20T10:00:00Z",
     scenario_title: "Pinjol Ilegal",
+    consumer_name: "Budi",
+    consumer_phone: "0812",
+    consumer_city: "Bandung",
+    simulation_duration: 90,
     messages: [
       { role: "user", text: "Halo", timestamp: "2026-05-20T10:00:00Z" },
       { role: "ai", text: "Halo juga", timestamp: "2026-05-20T10:05:00Z" },
@@ -20,6 +24,24 @@ const mockKetikData = [
     compliance_score: 85,
     review_status: "completed",
   },
+  {
+    id: "ketik-zero",
+    user_id: "user-1",
+    date: "2026-05-19T10:00:00Z",
+    scenario_title: "Skor Nol",
+    consumer_name: "Budi",
+    consumer_phone: "0812",
+    consumer_city: "Bandung",
+    simulation_duration: 0,
+    messages: [],
+    final_score: 0,
+    empathy_score: 0,
+    probing_score: 0,
+    resolution_score: 0,
+    typo_score: 0,
+    compliance_score: 0,
+    review_status: "completed",
+  },
 ];
 
 const mockPdktData = [
@@ -27,7 +49,7 @@ const mockPdktData = [
     id: "pdkt-1",
     user_id: "user-2",
     timestamp: "2026-05-21T14:00:00Z",
-    config: { scenarios: [{ title: "Penipuan Undian" }] },
+    config: { scenarios: [{ id: "undian", category: "fraud", title: "Penipuan Undian", description: "Kasus undian", isActive: true }], consumerType: { id: "terburu-buru", name: "Terburu-buru", description: "Mendesak", difficulty: "Medium" }, identity: { name: "Sari", email: "sari@example.com", city: "Jakarta", bodyName: "OJK" }, recipientContext: { primaryRecipientType: "ojk", primaryRecipientAddress: "lapor@ojk.go.id", ccRecipients: [], replyIntent: "reply_to_ojk" } },
     emails: [{ type: "received", subject: "Undian", body: "Selamat!" }],
     evaluation: {
       score: 85,
@@ -59,6 +81,11 @@ const mockTelefunHistoryData = [
     user_id: "user-4",
     created_at: "2026-05-23T11:00:00Z",
     scenario_title: "Tagihan Kartu Kredit",
+    consumer_name: "Siti",
+    consumer_phone: "08123456789",
+    consumer_city: "Surabaya",
+    consumer_gender: "female",
+    persona_config: { consumerType: "Marah & Emosional" },
     duration_seconds: 240,
     recording_path: "https://storage.supabase.co/telefun/1.mp3",
     score: 7.5,
@@ -94,9 +121,31 @@ const mockTelefunHistoryData = [
     weaknesses: ["Perlu tingkatkan probing"],
     coaching_focus: ["Fokus pada probing"],
   },
+  {
+    id: "telefun-zero",
+    user_id: "user-4",
+    created_at: "2026-05-23T09:00:00Z",
+    scenario_title: "Skor Nol",
+    consumer_name: "Nina",
+    consumer_gender: "female",
+    duration_seconds: 1,
+    recording_path: null,
+    score: 0,
+    voice_assessment: null,
+    messages: [],
+  },
 ];
 
 const mockTelefunResultsData = [
+  {
+    id: "telefun-1",
+    user_id: "user-4",
+    module: "telefun",
+    score: 1,
+    details: { scenario: "Legacy duplicate", recordingUrl: "legacy.mp3" },
+    history: null,
+    created_at: "2026-05-23T10:00:00Z",
+  },
   {
     id: "result-1",
     user_id: "user-5",
@@ -126,6 +175,7 @@ vi.mock("../lib/supabase", () => ({
       const chain: any = {
         select: () => chain,
         order: () => chain,
+        range: () => chain,
         limit: () => chain,
         eq: () => chain,
         in: () => chain,
@@ -159,10 +209,11 @@ describe("getMonitoringHistory — enriched data", () => {
     expect(modules).toContain("telefun");
   });
 
-  it("includes KETIK scores in the unified entry", async () => {
+  it("includes KETIK simulation duration and resolution score in the unified entry", async () => {
     const result = await getMonitoringHistory();
-    const ketik = result.find((e) => e.module === "ketik");
+    const ketik = result.find((e) => e.id === "ketik-1");
     expect(ketik).toBeDefined();
+    expect(ketik!.duration_seconds).toBe(90);
     expect(ketik!.scores).toBeDefined();
     expect(ketik!.scores!.final).toBe(82);
     expect(ketik!.scores!.empathy).toBe(80);
@@ -193,10 +244,19 @@ describe("getMonitoringHistory — enriched data", () => {
     expect(pdkt!.pdkt_evaluation).toBeUndefined();
   });
 
+  it("prefers canonical Telefun rows by ID, retains distinct legacy sessions, and completes score zero", async () => {
+    const result = await getMonitoringHistory();
+    expect(result.filter((entry) => entry.id === "telefun-1")).toHaveLength(1);
+    expect(result.find((entry) => entry.id === "telefun-1")?.scenario_title).toBe("Tagihan Kartu Kredit");
+    expect(result.find((entry) => entry.id === "result-1")?.telefun_legacy).toBe(true);
+    expect(result.find((entry) => entry.id === "telefun-zero")).toMatchObject({ score: 0, review_status: "completed" });
+  });
+
   it("includes telefun_assessment for telefun_history entries with voice_assessment", async () => {
     const result = await getMonitoringHistory();
     const telefun = result.find((e) => e.id === "telefun-1");
     expect(telefun).toBeDefined();
+    expect(telefun!.duration_seconds).toBe(240);
     expect(telefun!.telefun_assessment).toBeDefined();
     expect(telefun!.telefun_assessment!.overall_score).toBe(7.5);
     expect(telefun!.telefun_assessment!.speaking_rate_wpm).toBe(142);
@@ -220,6 +280,46 @@ describe("getMonitoringHistory — enriched data", () => {
     const result = await getMonitoringHistory();
     // All entries should exist without throwing
     expect(result.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps missing KETIK consumer names null and normalizes coaching recommendations", async () => {
+    mockKetikData.push({ id: "ketik-missing-name", user_id: "user-1", date: "2026-05-18T10:00:00Z", messages: [], simulation_duration: 0, resolution_score: 0 } as any);
+    try {
+      const result = await getMonitoringHistory();
+      expect(result.find((e) => e.id === "ketik-missing-name")?.consumer_name).toBeNull();
+    } finally {
+      mockKetikData.pop();
+    }
+  });
+
+  it("sorts equal timestamps by module and id deterministically", async () => {
+    const original = mockKetikData.splice(0, mockKetikData.length);
+    mockKetikData.push({ id: "z", user_id: "user-1", date: "2026-05-23T11:00:00Z", messages: [] } as any);
+    try {
+      const result = await getMonitoringHistory();
+      const equal = result.filter((entry) => entry.created_at === "2026-05-23T11:00:00Z");
+      expect(equal.map((entry) => `${entry.module}:${entry.id}`)).toEqual(["ketik:z", "telefun:telefun-1"]);
+    } finally {
+      mockKetikData.push(...original);
+    }
+  });
+
+  it("preserves consumer metadata and the complete PDKT evaluation", async () => {
+    const result = await getMonitoringHistory();
+    const ketik = result.find((e) => e.id === "ketik-1");
+    const pdkt = result.find((e) => e.id === "pdkt-1");
+    const telefun = result.find((e) => e.id === "telefun-1");
+    expect(ketik).toMatchObject({ consumer_name: "Budi", consumer_phone: "0812", consumer_city: "Bandung" });
+    expect(pdkt).toMatchObject({ consumer_name: "Sari", consumer_type: "Terburu-buru", recipient: "lapor@ojk.go.id" });
+    expect(pdkt!.pdkt_evaluation).toMatchObject({ feedback: "Jawaban sudah relevan dan jelas", typos: ["salah satu"], contentGaps: ["Perlu tambahkan referensi"] });
+    expect(telefun).toMatchObject({ consumer_name: "Siti", consumer_phone: "08123456789", consumer_city: "Surabaya", consumer_gender: "female", consumer_type: "Marah & Emosional" });
+  });
+
+  it("preserves zero-valued KETIK duration and resolution scores", async () => {
+    const result = await getMonitoringHistory();
+    const ketikZero = result.find((e) => e.id === "ketik-zero");
+    expect(ketikZero).toMatchObject({ duration_seconds: 0, score: 0, review_status: "completed" });
+    expect(ketikZero!.scores).toMatchObject({ final: 0, empathy: 0, probing: 0, resolution: 0, typo: 0, compliance: 0 });
   });
 
   it("resolves user profiles correctly", async () => {

@@ -19,14 +19,14 @@ Dashboard tunggal yang berfungsi sebagai pusat informasi bagi semua tingkatan us
 - **Fitur Utama**:
   - **KPI Cards**: Ringkasan Total Temuan, Average Findings, Fatal Error Rate, dsb.
   - **Quick Shortcuts**: Navigasi cepat ke modul kerja sesuai role.
-  - **Monitoring**: (Trainer/Leader/Admin) Memantau histori simulasi lintas akun, agregasi penggunaan token bulanan, dan editor harga/kurs untuk role yang diizinkan.
+  - **Monitoring**: (Trainer/Leader/Admin) Memantau histori simulasi lintas akun yang dipaginasi penuh dari source canonical KETIK/PDKT/Telefun tanpa cap tersembunyi, agregasi penggunaan token bulanan, dan editor harga/kurs untuk role yang diizinkan; detail menampilkan metadata served-consumer dan assessment native per modul, sedangkan row Telefun legacy hanya kompatibilitas bila tidak ada row canonical.
   - **User Management**: (Hanya Admin) Menyetujui pendaftaran, mengubah role, atau menghapus akun.
 - **Sub-pages**:
   - `/dashboard/access-approval`: Approval akses leader ke data KTP dan SIDAK.
   - `/dashboard/access-groups`: Manajemen access groups untuk leader scope.
   - `/dashboard/activities`: Log aktivitas sistem (search/filter/pagination/CSV export/delete). Admin dan Trainer dapat melihat semua aktivitas lintas modul (SIDAK, Profiler, User Management).
   - `/dashboard/users`: Manajemen user (admin only).
-- **Catatan Teknis**: Halaman `/monitoring` adalah permukaan terproteksi utama untuk monitoring AI usage dengan 3 tab: `Riwayat Simulasi`, `Penggunaan Token`, `Harga & Kurs`. Periode default penggunaan token selalu mengikuti WIB / `Asia/Jakarta`, bukan timezone browser. Hanya trainer/admin yang dapat mengedit pricing/kurs; leader hanya read-only untuk history + usage.
+- **Catatan Teknis**: Halaman `/monitoring` adalah permukaan terproteksi utama untuk monitoring AI usage dengan 3 tab: `Riwayat Simulasi`, `Penggunaan Token`, `Harga & Kurs`. Riwayat Simulasi membaca source sampai habis lewat paging offset-range deterministik, fail-closed dengan 500 jika source/page/profile/coaching read gagal, urutan equal timestamp memakai tie-breaker `id`, memuat metadata served-consumer KETIK/PDKT/Telefun, assessment native lengkap, thread/transcript penuh, dan Telefun coaching recommendations runtime-normalized dari `telefun_coaching_summary`. Periode default penggunaan token selalu mengikuti WIB / `Asia/Jakarta`, bukan timezone browser. Hanya trainer/admin yang dapat mengedit pricing/kurs; leader hanya read-only untuk history + usage.
 
 ## 2. KETIK (Kelas Etika & Trik Komunikasi)
 
@@ -39,6 +39,7 @@ Ruang simulasi untuk melatih kemampuan komunikasi tertulis melalui media chat.
   - **Roleplay Konsumen**: Balasan AI difokuskan sebagai konsumen chat natural, bukan evaluator.
   - **Riwayat Sesi**: Peserta bisa meninjau kembali percakapan sebelumnya.
   - **AI Review**: Evaluasi AI menggunakan rubrik Bahasa Indonesia dengan skala `0-100`.
+  - **Monitoring detail**: `/monitoring` menampilkan `consumer_name`, `consumer_phone`, `consumer_city`, `simulationDuration`, transcript lengkap, dan score native; jika `consumer_name` hilang, API tetap null dan UI menampilkan unavailable, bukan placeholder buatan.
   - **Usage Bulanan**: Quick-view `Usage Bulan Ini` dengan indikator kenaikan biaya sesi (`+Rp`).
   - **Scenario Image Safety**: Lampiran gambar diakumulasi secara functional; FileReader yang terlambat, pending, atau gagal tidak bisa menimpa draft yang sudah ditutup atau dibuka ulang.
 - **Akses**: `admin`, `trainer`, `leader`, `qa`, `tl`, `spv`, `om`, dan `agent` dapat memakai simulasi KETIK; analisis AI tetap dibatasi `admin`, `trainer`, dan `qa`.
@@ -80,6 +81,7 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
   - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.
+  - **Monitoring detail**: `/monitoring` menampilkan `identity`, `consumer_type`, `recipient/contact`, snapshot config yang allow-list normalized, email thread penuh, evaluasi lengkap, error, dan timing; tidak ada kontrol delete/reply di permukaan monitoring.
 - **Catatan Teknis**:
   - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
   - Settings disimpan di `user_settings.settings.pdkt` agar tidak menimpa namespace modul lain, dengan fallback baca ke bentuk legacy top-level bila diperlukan. Settings response API selalu mengikuti kontrak `{ success, data }`.
@@ -125,6 +127,7 @@ Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon tele
   - **Realistic Mode**: Mode realistik dengan hold consent, rude hold penalty, dan WPM analysis.
   - **Simulation Challenges**: Skenario tantangan simulasi (max 3) yang diintegrasikan ke dalam Gemini Live system prompt. Tantangan didefinisikan di settings dan diterapkan secara dinamis selama sesi.
   - **Expanded Voices**: Opsi suara Gemini Live dinamis dengan gender consistency guards.
+  - **Monitoring detail**: `/monitoring` memakai `parseVoiceQualityAssessment`, `telefun_coaching_summary.recommendations` yang runtime-normalized, `HoldAssessmentCard`, dan metrik sumber apa adanya (score, WPM, intonasi, artikulasi, filler, tone); row `telefun_history` canonical menang atas row legacy `results` dengan ID yang sama, sedangkan legacy-only tetap incomplete dan recording path hanya disigning dari path owned yang aman.
   - **Maintenance Warning Gate**: Entry to Telefun dari sidebar, dashboard card, atau URL direct `/telefun` dilindungi oleh role-based access gate. User dengan role admin/trainer di-auto-grant akses langsung tanpa modal warning. User dengan role lain (leader, agent) melihat modal "Akses Terbatas" dengan pesan "Modul Telefun hanya dapat diakses oleh Trainer" dan hanya bisa kembali ke dashboard. Status akses di-reset otomatis saat meninggalkan modul Telefun.
   - **Gemini Live JSON Protocol**: Menggunakan format JSON terstruktur untuk setup dan pengiriman chunk audio base64 (MIME `audio/pcm;rate=16000`), menggantikan transfer data binary mentah yang rentan force close. Output suara dari Gemini Live didecode dari JSON inline base64 PCM secara real-time pada sample rate output (default 24 kHz).
   - **Setup Complete Gating**: Pengiriman audio microphone ke WebSocket ditahan (gated) di sisi client dan proxy sampai pesan `setupComplete` dikonfirmasi oleh Gemini.

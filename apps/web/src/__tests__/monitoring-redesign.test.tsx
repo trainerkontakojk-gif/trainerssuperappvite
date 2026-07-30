@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { parseVoiceQualityAssessment } from "@trainers/types";
 import { HistoryCard } from "../routes/monitoring/components/HistoryCard";
 import { HistoryTab } from "../routes/monitoring/components/HistoryTab";
 import { PdktEvaluationPanel } from "../routes/monitoring/components/PdktEvaluationPanel";
@@ -66,6 +67,27 @@ const pdktEntry: UnifiedHistoryEntry = {
   },
 };
 
+const telefunAssessment = parseVoiceQualityAssessment({
+  overallScore: 7.5,
+  speakingRate: {
+    score: 7.5,
+    wordsPerMinute: 142,
+    verdict: "Baik",
+    feedback: "Artikulasi jelas",
+  },
+  intonation: { score: 7, verdict: "Baik", feedback: "Stabil" },
+  articulation: { score: 8, verdict: "Baik", feedback: "Artikulasi jelas" },
+  fillerWords: { score: 8, count: 3, examples: [], verdict: "Baik", feedback: "Sedikit" },
+  emotionalTone: { score: 8, dominant: "Empati", verdict: "Baik", feedback: "Empatik" },
+  transcript: "",
+  strengths: ["Artikulasi jelas"],
+  highlights: ["De-eskalasi berhasil"],
+});
+
+if (!telefunAssessment) {
+  throw new Error("Invalid canonical Telefun assessment fixture");
+}
+
 const telefunEntry: UnifiedHistoryEntry = {
   id: "telefun-1",
   user_id: "user-3",
@@ -78,14 +100,14 @@ const telefunEntry: UnifiedHistoryEntry = {
   user_email: "agent3@test.com",
   review_status: "completed",
   telefun_assessment: {
-    overall_score: 7.5,
-    speaking_rate_wpm: 142,
-    intonation_score: 7,
-    articulation_score: 8,
-    filler_words_count: 3,
-    emotional_tone: "Empati",
-    strengths: ["Artikulasi jelas"],
-    highlights: ["De-eskalasi berhasil"],
+    ...telefunAssessment,
+    overall_score: telefunAssessment.overallScore,
+    speaking_rate_wpm: telefunAssessment.speakingRate.wordsPerMinute,
+    intonation_score: telefunAssessment.intonation.score,
+    articulation_score: telefunAssessment.articulation.score,
+    filler_words_count: telefunAssessment.fillerWords.count,
+    emotional_tone: telefunAssessment.emotionalTone.dominant,
+    highlights: telefunAssessment.highlights,
   },
 };
 
@@ -100,6 +122,19 @@ const noAssessmentEntry: UnifiedHistoryEntry = {
   history: [],
   user_email: "agent4@test.com",
   review_status: "not_started",
+};
+
+const searchableMetadataEntry: UnifiedHistoryEntry = {
+  ...pdktEntry,
+  id: "pdkt-searchable",
+  scenario_title: "Skenario Metadata",
+  consumer_name: "Sari",
+  consumer_phone: "08123456789",
+  consumer_city: "Bandung",
+  consumer_gender: "Perempuan",
+  consumer_type: "Nasabah",
+  recipient: "lapor@ojk.go.id",
+  contact: "sari@example.com",
 };
 
 // ─── HistoryCard Tests ─────────────────────────────────────────────────────────
@@ -351,7 +386,7 @@ describe("HistoryTab — per-module KPI and pill filter", () => {
     expect(screen.getByText("Belum ada riwayat simulasi.")).toBeTruthy();
   });
 
-  it("renders search input", () => {
+  it("renders labeled filter controls", () => {
     render(
       <HistoryTab
         historyData={allEntries}
@@ -359,22 +394,32 @@ describe("HistoryTab — per-module KPI and pill filter", () => {
         onViewDetail={onViewDetail}
       />,
     );
-    expect(screen.getByPlaceholderText("Cari riwayat...")).toBeTruthy();
+    expect(screen.getByLabelText("Status riwayat")).toBeTruthy();
+    expect(screen.getByLabelText("Cari riwayat monitoring")).toBeTruthy();
   });
 
-  it("filters by search text", () => {
+  it("filters by search text and consumer metadata fields", () => {
     render(
       <HistoryTab
-        historyData={allEntries}
+        historyData={[searchableMetadataEntry, ...allEntries]}
         loading={false}
         onViewDetail={onViewDetail}
       />,
     );
 
-    const searchInput = screen.getByPlaceholderText("Cari riwayat...");
-    fireEvent.change(searchInput, { target: { value: "Undian" } });
+    const searchInput = screen.getByLabelText("Cari riwayat monitoring");
 
-    // Only PDKT entry "Penipuan Undian" should appear
-    expect(screen.getByText("Penipuan Undian")).toBeTruthy();
+    for (const query of [
+      "Sari",
+      "08123456789",
+      "Bandung",
+      "Perempuan",
+      "Nasabah",
+      "lapor@ojk.go.id",
+      "sari@example.com",
+    ]) {
+      fireEvent.change(searchInput, { target: { value: query } });
+      expect(screen.getByText("Skenario Metadata")).toBeTruthy();
+    }
   });
 });

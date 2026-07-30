@@ -21,7 +21,7 @@ Tujuan utamanya:
 
 Halaman monitoring dengan tiga tab:
 
-- `Riwayat Simulasi` (Redesigned to replace crowded cards with a spacious, premium data table featuring client-side pagination, 4 dynamic growth KPI cards, inline date-range popover, and modular submetric columns to eliminate overstimulation)
+- `Riwayat Simulasi` (complete deterministic offset-range cross-module history for KETIK, PDKT, dan Telefun; backend terus membaca halaman sumber sampai habis, fail-closed dengan 500 jika source/page/profile/coaching read gagal, urutan equal timestamp memakai tie-breaker `id`, row Telefun canonical `telefun_history` selalu menang atas row legacy `results` dengan ID yang sama, dan detail menampilkan metadata served-consumer plus assessment native tanpa submetric Telefun fabrikasi)
 - `Penggunaan Token`
 - `Harga & Kurs`
 
@@ -39,6 +39,14 @@ Tab `Harga & Kurs`:
 - hanya tersedia untuk `trainer` dan `admin`
 - menampilkan editor harga input/output per model
 - menampilkan editor kurs USD/IDR
+
+Riwayat Simulasi menampilkan histori penuh per modul dengan detail served-consumer yang relevan:
+
+- KETIK: nama konsumen, telepon, kota, durasi simulasi, transcript lengkap, dan score review native. Jika nama konsumen tidak ada, API menjaga nilainya null dan UI menampilkan unavailable, bukan placeholder buatan.
+- PDKT: identity, consumer type, recipient/contact context, snapshot config yang sudah allow-list normalized, email thread penuh, evaluasi lengkap, error, dan timing.
+- TELEFUN: consumer metadata, parsed voice assessment, communication profile, hold assessment, transcript, recording metadata, dan coaching recommendations runtime-normalized dari `telefun_coaching_summary`; legacy-only rows tetap explicit/incomplete dan recording path yang disigning harus aman serta dimiliki sistem.
+- Row Telefun canonical `telefun_history` menang atas row legacy `results` dengan ID yang sama; row legacy-only tetap ditandai sebagai incomplete/legacy dan detailnya tidak mengarang assessment/coaching canonical.
+- Daftar Telefun memakai metrik sumber apa adanya (score, WPM, intonasi, artikulasi, filler, tone) dan tidak mengarang submetric dari score.
 
 ### 2. Quick-view Modul
 
@@ -110,15 +118,16 @@ Untuk Telefun Live, `usageMetadata` diakumulasi per turn karena Gemini Live mena
 Paragraf di atas adalah **behavior Gemini saat ini**. Fallback per-menit tersebut tidak boleh diterapkan ke provider OpenAI.
 
 Kolom tambahan untuk audit:
+
 - `live_turn_count` — jumlah turn yang di-bill
 - `latest_input_tokens`, `latest_output_tokens`, `latest_total_tokens` — snapshot terakhir dari Gemini
 - `context_rebilled_cost_usd`, `context_rebilled_cost_idr` — biaya token dari context-window re-billing
 - `raw_usage_metadata` — JSON detail semua turn
 
 Referensi:
+
 - https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing
 - https://ai.google.dev/api/live
-
 
 Aturan penting:
 
@@ -254,7 +263,7 @@ Catatan:
 
 ## Transport Auth & Error Handling (v35 hardening)
 
-Semua API call monitoring di frontend (`apps/web/src/routes/monitoring.tsx`) menggunakan helper `getApi`/`putApi`/`postApi` dari `apps/web/src/hooks/useApi.ts` yang otomatis menginjeksi `Authorization: Bearer <token>` dari `localStorage.auth_token`. Tidak ada raw `fetch()` tanpa auth header.
+Semua API call monitoring di frontend (`apps/web/src/routes/monitoring/*.tsx`) memakai Hono RPC melalui `aiClient` dari `apps/web/src/lib/api/rpc-client.ts` dan `unwrapResponse()`. Transport ini tetap menginjeksi `Authorization: Bearer <token>` dari `localStorage.auth_token`; tidak ada raw `fetch()` tanpa auth header dan tidak ada ketergantungan pada helper legacy `getApi`/`putApi`/`postApi`/`deleteApi`.
 
 ### Error Mapping
 
@@ -284,7 +293,7 @@ Operasi save pricing dan billing memberikan feedback via sonner toast:
 
 - `apps/api/src/lib/ai-models.ts` — Model registry
 - `apps/api/src/lib/ai-usage.ts` — Usage logging
-- `apps/web/src/hooks/useApi.ts` — Authenticated API helper (inject bearer token)
+- `apps/web/src/lib/api/rpc-client.ts` — Authenticated Hono RPC client (`aiClient` + `unwrapResponse`, inject bearer token)
 - `apps/web/src/routes/monitoring.tsx` — Monitoring page (3 tab, legacy visual parity)
 - `apps/web/src/__tests__/monitoring-unauthorized-parity.test.tsx` — Regression tests
 - `docs/modules.md`

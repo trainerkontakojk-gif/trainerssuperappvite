@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Heart,
@@ -51,7 +51,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchReview = async () => {
+  const fetchReview = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -66,25 +66,56 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [entryId]);
 
   useEffect(() => {
     fetchReview();
-  }, [entryId]);
+  }, [fetchReview]);
+
+  const session = data?.session;
+  const transcriptMessages = session?.messages?.length ? session.messages : messages;
 
   return (
     <div className="space-y-6">
+      <dl className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-3">
+        <div>
+          <dt className="text-[10px] font-bold uppercase text-muted-foreground">
+            Nama konsumen
+          </dt>
+          <dd className="break-words text-sm font-semibold">
+            {session?.consumerName || "Tidak tersedia"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[10px] font-bold uppercase text-muted-foreground">
+            Telepon / Kota
+          </dt>
+          <dd className="break-words text-sm font-semibold">
+            {session?.consumerPhone || "Tidak tersedia"} · {session?.consumerCity || "Tidak tersedia"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[10px] font-bold uppercase text-muted-foreground">
+            Durasi simulasi
+          </dt>
+          <dd className="text-sm font-semibold">
+            {session?.simulationDuration != null
+              ? `${session.simulationDuration} detik`
+              : "Tidak tersedia"}
+          </dd>
+        </div>
+      </dl>
       {/* ── Chat Transcript — Primary ─────────────────────────── */}
-      {messages && messages.length > 0 && (
+      {transcriptMessages && transcriptMessages.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-module-ketik" />
             <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-              Transcript Chat ({messages.length} pesan)
+              Transcript Chat ({transcriptMessages.length} pesan)
             </h3>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {messages.map((msg, i) => {
+            {transcriptMessages.map((msg, i) => {
               const isUser =
                 msg.sender === "agent" ||
                 msg.role === "user" ||
@@ -140,8 +171,8 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
 
       {error && (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <AlertTriangle className="w-6 h-6 text-red-500" />
-          <p className="text-xs text-red-500 font-medium">{error}</p>
+          <AlertTriangle className="w-6 h-6 text-destructive" />
+          <p className="text-xs text-destructive font-medium">{error}</p>
           <button
             onClick={fetchReview}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
@@ -157,12 +188,12 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
         (!data || data.review_status !== "completed" || !data.review) && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center">
-              <MessageSquare className="w-7 h-7 text-muted-foreground/40" />
+              <MessageSquare className="w-7 h-7 text-muted-foreground" />
             </div>
             <p className="text-sm font-bold text-muted-foreground">
               Review AI belum tersedia
             </p>
-            <p className="text-xs text-muted-foreground/60">
+            <p className="text-xs text-muted-foreground">
               Status: {data?.review_status || "belum dimulai"}
             </p>
           </div>
@@ -250,7 +281,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                         {grade.label}
                       </div>
                       <ScoreBar score={card.score} />
-                      <div className="text-[10px] text-foreground/75 leading-snug mt-1">
+                      <div className="text-[10px] text-foreground leading-snug mt-1">
                         {card.description}
                       </div>
                     </div>
@@ -266,7 +297,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                   <TrendingUp className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/60">
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
                     Skor Akhir
                   </div>
                   <div
@@ -354,7 +385,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                   {data.review.strengths.map((str, i) => (
                     <div
                       key={i}
-                      className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-muted border border-border"
+                      className="flex gap-3 text-sm text-foreground p-3 rounded-xl bg-muted border border-border"
                     >
                       <div
                         className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full"
@@ -376,7 +407,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                   {data.review.weaknesses.map((weak, i) => (
                     <div
                       key={i}
-                      className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10"
+                      className="flex gap-3 text-sm text-foreground p-3 rounded-xl bg-orange-500/5 border border-orange-500/10"
                     >
                       <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500" />
                       {weak}

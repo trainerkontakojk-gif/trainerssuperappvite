@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Phone,
@@ -6,15 +6,11 @@ import {
   AlertTriangle,
   RefreshCw,
   Gauge,
-  Volume2,
-  Mic,
   Ban,
-  Smile,
   CheckCircle2,
   Sparkles,
   MessageSquare,
   Target,
-  Info,
   ChevronDown,
   ChevronUp,
   PhoneOff,
@@ -30,7 +26,6 @@ import {
   unwrapResponse,
   type TelefunMonitoringReview,
 } from "../../../lib/api";
-import { getScoreGrade } from "../utils/formatting";
 import {
   validateAssessment,
   getCommunicationProfileFromAssessment,
@@ -40,6 +35,7 @@ import { CommunicationProfileZoomModal } from "../../telefun/components/Communic
 import { VoiceMetricCards } from "../../telefun/components/VoiceMetricCards";
 import { TelefunTranscript } from "../../telefun/components/TelefunTranscript";
 import { parseTelefunTranscript } from "@trainers/types";
+import { HoldAssessmentCard } from "../../telefun/components/HoldAssessmentCard";
 
 export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   const [data, setData] = useState<TelefunMonitoringReview | null>(null);
@@ -66,13 +62,14 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
 
   const hasVoiceAssessment = va !== null;
   const hasScore = data ? typeof data.score === "number" : false;
+  const isLegacyReview = data?.telefun_legacy === true;
   const recordingUrl = data?.recording_url ?? null;
   const hasStoredRecording = data
     ? !!data.recording_path || !!data.agent_recording_path
     : false;
   const canPlayRecording = !!recordingUrl;
 
-  const fetchReview = async () => {
+  const fetchReview = useCallback(async () => {
     setLoading(true);
     setError(null);
     setAudioError(false);
@@ -88,11 +85,11 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [entryId]);
 
   useEffect(() => {
     fetchReview();
-  }, [entryId]);
+  }, [fetchReview]);
 
   if (loading) {
     return (
@@ -108,8 +105,8 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <AlertTriangle className="w-6 h-6 text-red-500" />
-        <p className="text-xs text-red-500 font-medium">{error}</p>
+        <AlertTriangle className="w-6 h-6 text-destructive" />
+        <p className="text-xs text-destructive font-medium">{error}</p>
         <button
           onClick={fetchReview}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-telefun/10 text-module-telefun text-[10px] font-bold hover:bg-module-telefun/20 transition-all"
@@ -124,7 +121,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   if (!data) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-        <PhoneOff className="w-8 h-8 text-muted-foreground/40" />
+        <PhoneOff className="w-8 h-8 text-muted-foreground" />
         <p className="text-sm font-bold text-muted-foreground">
           Data sesi tidak ditemukan
         </p>
@@ -213,12 +210,12 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
               </>
             ) : (
               <div className="flex flex-col items-center gap-3 py-4">
-                <XCircle className="w-8 h-8 text-muted-foreground/40" />
+                <XCircle className="w-8 h-8 text-muted-foreground" />
                 <div className="text-center">
                   <p className="text-sm font-bold text-muted-foreground">
                     Rekaman tidak dapat diputar
                   </p>
-                  <p className="text-[10px] text-muted-foreground/60 mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-1">
                     File rekaman sudah dihapus atau tidak tersedia.
                   </p>
                 </div>
@@ -235,12 +232,12 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
             </h3>
           </div>
           <div className="p-5 rounded-2xl bg-muted border border-border flex flex-col items-center gap-3">
-            <PhoneOff className="w-8 h-8 text-muted-foreground/30" />
+            <PhoneOff className="w-8 h-8 text-muted-foreground" />
             <div className="text-center">
               <p className="text-sm font-bold text-muted-foreground">
                 Rekaman tidak dapat diputar
               </p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 Rekaman hanya dapat diputar oleh admin dan trainer.
               </p>
             </div>
@@ -255,12 +252,12 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
             </h3>
           </div>
           <div className="p-5 rounded-2xl bg-muted border border-border flex flex-col items-center gap-3">
-            <PhoneOff className="w-8 h-8 text-muted-foreground/30" />
+            <PhoneOff className="w-8 h-8 text-muted-foreground" />
             <div className="text-center">
               <p className="text-sm font-bold text-muted-foreground">
                 Tidak ada rekaman
               </p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 Sesi ini tidak memiliki file rekaman audio.
               </p>
             </div>
@@ -278,7 +275,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 <Phone className="w-7 h-7 text-white" />
               </div>
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-module-telefun/60">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-module-telefun">
                   Skor Sesi
                 </div>
                 <div className="text-3xl font-black text-module-telefun">
@@ -291,14 +288,13 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 </div>
               </div>
             </div>
-            {data.duration_seconds && (
+            {data.duration_seconds != null && (
               <div className="text-right">
                 <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   Durasi
                 </div>
                 <div className="text-lg font-black">
-                  {Math.floor(data.duration_seconds / 60)}m{" "}
-                  {data.duration_seconds % 60}d
+                  {Math.floor(data.duration_seconds / 60)}m {data.duration_seconds % 60}d
                 </div>
               </div>
             )}
@@ -308,24 +304,36 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
         <>
           <div className="border-t border-border" />
           <div className="text-center py-4">
-            <p className="text-xs text-muted-foreground/60 font-medium">
+            <p className="text-xs text-muted-foreground font-medium">
               Sesi belum memiliki skor.
             </p>
           </div>
         </>
       )}
 
+      {isLegacyReview && (
+        <div className="rounded-2xl border border-border bg-muted/30 p-4 text-sm text-foreground">
+          <div className="flex items-center gap-2 font-bold text-foreground">
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <span>Riwayat Telefun lama</span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Penilaian dan coaching mungkin tidak tersedia untuk sesi ini.
+          </p>
+        </div>
+      )}
+
       {/* ── Voice Assessment Metrics ────────────────────────── */}
       {hasVoiceAssessment && va ? (
         <>
           {/* Profil Komunikasi Card */}
-          <div className="rounded-2xl border border-slate-950/10 bg-white p-6 dark:border-white/10 dark:bg-slate-900 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-white/45">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Profil Komunikasi
                 </h3>
-                <p className="text-[11px] text-slate-400 dark:text-white/35 mt-0.5">
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   Semakin sesuai dengan area target, semakin baik
                 </p>
               </div>
@@ -347,29 +355,47 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                     setZoomOpen(true);
                   }
                 }}
-                className="group relative cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-950/[0.02] dark:hover:bg-white/[0.02]"
+                className="group relative cursor-pointer rounded-xl p-2 transition-colors hover:bg-muted/30"
               >
                 <VoiceRadarChart profile={communicationProfile} compact />
                 <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="flex items-center gap-1.5 rounded-lg bg-slate-950/80 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm dark:bg-white/20">
+                  <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1 text-[10px] font-bold text-foreground shadow-sm">
                     <Maximize2 className="h-3 w-3" />
                     Klik untuk memperbesar
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-[240px] rounded-xl bg-slate-950/[0.02] dark:bg-white/[0.02]">
+              <div className="flex items-center justify-center h-[240px] rounded-xl border border-border bg-muted/20">
                 <div className="text-center">
-                  <AlertCircle className="mx-auto h-8 w-8 text-slate-300 dark:text-white/20 mb-2" />
-                  <p className="text-sm text-slate-400 dark:text-white/40">
+                  <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
                     Analisis komunikasi belum tersedia untuk sesi ini
                   </p>
                 </div>
               </div>
             )}
 
+            {communicationProfile?.overallSummary && (
+              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4 text-sm leading-relaxed">
+                {communicationProfile.overallSummary}
+              </div>
+            )}
+            {communicationProfile?.improvementPriorities?.length ? (
+              <section className="mt-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Prioritas perbaikan
+                </h4>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                  {communicationProfile.improvementPriorities.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             {/* Legend */}
-            <div className="flex flex-wrap justify-center gap-4 text-[10px] font-bold mt-3 text-slate-500 dark:text-white/45">
+            <div className="flex flex-wrap justify-center gap-4 text-[10px] font-bold mt-3 text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-0 border border-dashed border-emerald-500" />
                 Target QA
@@ -408,6 +434,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           </div>
 
           <div className="border-t border-border mt-6 pt-6" />
+          <HoldAssessmentCard assessment={va.holdManagement} />
 
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -456,7 +483,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 {va.strengths.map((str, i) => (
                   <div
                     key={i}
-                    className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-module-telefun/5 border border-module-telefun/10"
+                    className="flex gap-3 text-sm text-foreground p-3 rounded-xl bg-module-telefun/5 border border-module-telefun/10"
                   >
                     <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-module-telefun" />
                     {str}
@@ -479,7 +506,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 {va.highlights.map((hl, i) => (
                   <div
                     key={i}
-                    className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-primary/5 border border-primary/10"
+                    className="flex gap-3 text-sm text-foreground p-3 rounded-xl bg-primary/5 border border-primary/10"
                   >
                     <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary" />
                     {hl}
@@ -492,6 +519,8 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           {/* Voice Transcript (collapsible) */}
           <div className="border-t border-border pt-4">
             <button
+              aria-expanded={showTranscript}
+              aria-controls="telefun-transcript"
               onClick={() => setShowTranscript(!showTranscript)}
               className="flex items-center gap-2 text-xs font-black text-muted-foreground uppercase tracking-widest hover:text-foreground transition-colors cursor-pointer"
             >
@@ -506,6 +535,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
+                id="telefun-transcript"
                 className="mt-4"
               >
                 <TelefunTranscript
@@ -519,12 +549,12 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
       ) : (
         <div className="text-center py-6">
           <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <Gauge className="w-7 h-7 text-muted-foreground/30" />
+            <Gauge className="w-7 h-7 text-muted-foreground" />
           </div>
           <p className="text-sm font-bold text-muted-foreground">
             Penilaian suara AI belum tersedia
           </p>
-          <p className="text-[10px] text-muted-foreground/60 mt-1">
+          <p className="text-[10px] text-muted-foreground mt-1">
             Metrik suara (kecepatan, intonasi, artikulasi, dll.) akan muncul
             setelah AI selesai menganalisis rekaman.
           </p>
@@ -545,7 +575,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
               {data.strengths.map((str, i) => (
                 <div
                   key={i}
-                  className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10"
+                  className="flex gap-3 text-sm text-foreground p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10"
                 >
                   <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   {str}
@@ -565,7 +595,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 {data.weaknesses.map((weak, i) => (
                   <div
                     key={i}
-                    className="flex gap-3 text-sm text-foreground/70 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10"
+                    className="flex gap-3 text-sm text-foreground p-3 rounded-xl bg-orange-500/5 border border-orange-500/10"
                   >
                     <div className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500" />
                     {weak}
@@ -593,6 +623,29 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           </div>
         </section>
       )}
+
+      {/* Canonical coaching recommendations */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+          Rekomendasi Coaching
+        </h3>
+        {data.coaching_recommendations?.length > 0 ? (
+          <div className="space-y-2">
+            {data.coaching_recommendations.map((recommendation, i) => (
+              <div key={i} className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                <span className="mr-2 text-xs font-bold text-muted-foreground">
+                  Prioritas {recommendation.priority}
+                </span>
+                {recommendation.text}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+            Rekomendasi coaching belum tersedia.
+          </div>
+        )}
+      </section>
 
       {/* Coaching Focus */}
       {data.coaching_focus && data.coaching_focus.length > 0 && (

@@ -5,54 +5,22 @@ import type {
   AccessGroupItemRow,
   AccessGroupRow,
   ApiResponse,
+  MonitoringHistoryEntry,
+  MonitoringReviewByModule,
+} from "@trainers/types";
+
+export type {
+  MonitoringHistoryEntry,
+  KetikMonitoringReview,
+  PdktMonitoringReview,
+  TelefunMonitoringReview,
 } from "@trainers/types";
 
 type RpcResponse<T> = ClientResponse<ApiResponse<T>, number, "json">;
 type MonitoringModule = "ketik" | "pdkt" | "telefun";
 
-export type MonitoringHistoryEntry = {
-  id: string;
-  user_id: string;
-  module: MonitoringModule;
-  scenario_title: string;
-  created_at: string;
-  duration_seconds: number;
-  score: number | null;
-  history: unknown;
-  user_email?: string;
-  user_role?: string;
-  review_status:
-    | "not_started"
-    | "pending"
-    | "processing"
-    | "completed"
-    | "failed";
-  scores?: {
-    final?: number;
-    empathy?: number;
-    probing?: number;
-    resolution?: number;
-    typo?: number;
-    compliance?: number;
-  };
-  pdkt_evaluation?: {
-    score: number;
-    feedback: string;
-    typos_count: number;
-    clarity_issues_count: number;
-    content_gaps_count: number;
-  };
-  telefun_assessment?: {
-    overall_score: number;
-    speaking_rate_wpm: number;
-    intonation_score: number;
-    articulation_score: number;
-    filler_words_count: number;
-    emotional_tone: string;
-    strengths: string[];
-    highlights: string[];
-  };
-};
+export type { MonitoringReviewByModule } from "@trainers/types";
+
 
 export type UsageAggregation = {
   user_id: string;
@@ -92,86 +60,6 @@ export type PricingEntry = {
   cached_input_audio_price_usd_per_million: number | null;
   output_text_price_usd_per_million: number | null;
   output_audio_price_usd_per_million: number | null;
-};
-
-export type KetikMonitoringReview = {
-  module: "ketik";
-  review_status: string;
-  scores?: {
-    final?: number;
-    empathy?: number;
-    probing?: number;
-    resolution?: number;
-    typo?: number;
-    compliance?: number;
-  };
-  review?: {
-    id: string;
-    sessionId: string;
-    aiSummary: string;
-    strengths: string[];
-    weaknesses: string[];
-    coachingFocus: string[];
-    createdAt: string;
-  } | null;
-  typos?: Array<{
-    id: string;
-    originalWord: string;
-    correctedWord: string;
-    severity: string;
-  }>;
-};
-
-export type PdktMonitoringReview = {
-  module: "pdkt";
-  review_status: string;
-  evaluation: {
-    score: number;
-    feedback: string;
-    typos: string[];
-    clarityIssues: string[];
-    contentGaps: string[];
-    scoreBreakdown?: {
-      recipientDirectionScore: number;
-      normativeResponseScore: number;
-      clarityScore: number;
-      typoScore: number;
-      templateComplianceScore: number;
-    };
-  } | null;
-  evaluation_error: string | null;
-  time_taken: number | null;
-  emails: Array<{
-    type?: string;
-    subject?: string;
-    body?: string;
-    content?: string;
-    timestamp?: string;
-    isAgent?: boolean;
-  }>;
-};
-
-export type TelefunMonitoringReview = {
-  module: "telefun";
-  review_status: string;
-  score: number | null;
-  recording_path: string | null;
-  agent_recording_path: string | null;
-  recording_url: string | null;
-  scenario_title: string | null;
-  duration_seconds: number | null;
-  voice_assessment: unknown;
-  transcript?: unknown;
-  ai_summary: string | null;
-  strengths: string[] | null;
-  weaknesses: string[] | null;
-  coaching_focus: string[] | null;
-};
-
-type MonitoringReviewByModule = {
-  ketik: KetikMonitoringReview;
-  pdkt: PdktMonitoringReview;
-  telefun: TelefunMonitoringReview;
 };
 
 type AdminClient = {

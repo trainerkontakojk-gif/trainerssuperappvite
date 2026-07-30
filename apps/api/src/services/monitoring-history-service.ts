@@ -1,4 +1,25 @@
+import {
+  chatMessageSchema,
+  emailMessageSchema,
+  pdktEvaluationAiOutputSchema,
+  pdktSessionConfigSchema,
+  parseTelefunTranscript,
+  parseVoiceQualityAssessment,
+} from "@trainers/types";
+import type {
+  ChatMessage,
+  EmailMessage,
+  MonitoringHistoryEntry,
+  MonitoringTelefunAssessment,
+  PdktEvaluationResult,
+  PdktSessionConfig,
+  VoiceQualityAssessment,
+} from "@trainers/types";
 import { createAdminClient } from "../lib/supabase";
+import {
+  evaluateTelefunHoldAssessment,
+  normalizeTelefunHoldMetrics,
+} from "../lib/telefun-hold-assessment";
 
 export type ReviewStatus =
   | "not_started"
@@ -7,320 +28,337 @@ export type ReviewStatus =
   | "completed"
   | "failed";
 
-export interface UnifiedHistoryEntry {
-  id: string;
-  user_id: string;
-  module: "ketik" | "pdkt" | "telefun";
-  scenario_title: string;
-  created_at: string;
-  duration_seconds: number;
-  score: number | null;
-  history: unknown;
-  user_email?: string;
-  user_role?: string;
-  review_status: ReviewStatus;
-  scores?: {
-    final?: number;
-    empathy?: number;
-    probing?: number;
-    resolution?: number;
-    typo?: number;
-    compliance?: number;
-  };
-  pdkt_evaluation?: {
-    score: number;
-    feedback: string;
-    typos_count: number;
-    clarity_issues_count: number;
-    content_gaps_count: number;
-  };
-  telefun_assessment?: {
-    overall_score: number;
-    speaking_rate_wpm: number;
-    intonation_score: number;
-    articulation_score: number;
-    filler_words_count: number;
-    emotional_tone: string;
-    strengths: string[];
-    highlights: string[];
-  };
+type JsonObject = Record<string, unknown>;
+type SourceRow = JsonObject & { id?: string; user_id?: string };
+type QueryResult = { data: unknown; error: { message?: string } | null };
+type Query = PromiseLike<QueryResult> & {
+  select(columns: string): Query;
+  order(column: string, options: { ascending: boolean }): Query;
+  range(from: number, to: number): Query;
+  eq(column: string, value: unknown): Query;
+  in(column: string, values: string[]): Query;
+};
+
+type ConsumerMetadata = {
+  consumer_name?: string | null;
+  consumer_phone?: string | null;
+  consumer_city?: string | null;
+  consumer_gender?: string | null;
+  consumer_type?: string | null;
+  recipient?: string | null;
+  contact?: string | null;
+};
+
+export type UnifiedHistoryEntry = MonitoringHistoryEntry;
+
+const PAGE_SIZE = 200;
+const BATCH_SIZE = 100;
+function object(value: unknown): JsonObject {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonObject
+    : {};
 }
 
-function safeString(value: unknown, fallback = ""): string {
+function string(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
-function safeNumber(value: unknown, fallback = 0): number {
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function number(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function createTelefunSignature(
-  entry: Pick<
-    UnifiedHistoryEntry,
-    "user_id" | "scenario_title" | "created_at" | "history"
-  >,
-): string {
-  const recordingUrl = typeof entry.history === "string" ? entry.history : "";
-  return [
-    entry.user_id,
-    entry.scenario_title,
-    recordingUrl || entry.created_at,
-  ].join("::");
+function safeRecordingPath(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 && !/^https?:\/\//i.test(value)
+    && !value.startsWith("/") && !value.includes("..") && !value.includes("\\") && !value.includes("//")
+    ? value
+    : null;
+}
+
+function array(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+export type TelefunCoachingRecommendation = { text: string; priority: number };
+
+export function normalizeTelefunCoachingRecommendations(value: unknown): TelefunCoachingRecommendation[] {
+  return array(value).flatMap((item) => {
+    const candidate = object(item);
+    const text = candidate.text;
+    const priority = candidate.priority;
+    return typeof text === "string" && text.trim().length > 0
+      && typeof priority === "number" && Number.isFinite(priority) && priority >= 1 && priority <= 5
+      ? [{ text: text.trim(), priority }]
+      : [];
+  });
+}
+
+export function normalizePdktConfig(value: unknown): PdktSessionConfig | null {
+  const parsed = pdktSessionConfigSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export function normalizeKetikMessages(value: unknown): ChatMessage[] {
+  return array(value).flatMap((item) => {
+    const parsed = chatMessageSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+export function normalizePdktEmails(value: unknown): EmailMessage[] {
+  return array(value).flatMap((item) => {
+    const parsed = emailMessageSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+export function normalizePdktEvaluation(value: unknown): PdktEvaluationResult | null {
+  const full = pdktEvaluationAiOutputSchema.safeParse(value);
+  const raw = object(value);
+  const { scoreBreakdown: _scoreBreakdown, ...legacyInput } = raw;
+  const legacy = pdktEvaluationAiOutputSchema.omit({ scoreBreakdown: true }).safeParse(legacyInput);
+  const parsed = full.success ? full.data : legacy.success ? legacy.data : null;
+  return parsed ? parsed : null;
+}
+
+export function normalizeTelefunAssessmentWithHold(value: unknown, sessionMetrics: unknown): VoiceQualityAssessment | null {
+  const assessment = parseVoiceQualityAssessment(value);
+  if (!assessment) return null;
+  const metrics = object(sessionMetrics);
+  const hold = evaluateTelefunHoldAssessment(normalizeTelefunHoldMetrics(metrics.hold));
+  return parseVoiceQualityAssessment({ ...assessment, holdManagement: hold });
+}
+
+function status(value: unknown): ReviewStatus {
+  return value === "pending" || value === "processing" || value === "completed" || value === "failed"
+    ? value
+    : "not_started";
+}
+
+function batches(values: string[]): string[][] {
+  const result: string[][] = [];
+  for (let index = 0; index < values.length; index += BATCH_SIZE) {
+    result.push(values.slice(index, index + BATCH_SIZE));
+  }
+  return result;
+}
+
+function sourceError(table: string, error: { message?: string }): Error {
+  return new Error(`Monitoring source ${table} failed: ${error.message || "database error"}`);
+}
+
+async function readComplete(
+  client: { from(table: string): Query },
+  table: string,
+  columns: string,
+  filter?: (query: Query) => Query,
+): Promise<SourceRow[]> {
+  const rows: SourceRow[] = [];
+  const orderColumn = table === "ketik_history" ? "date" : table === "pdkt_history" ? "timestamp" : "created_at";
+
+  for (let page = 0; ; page += 1) {
+    let query = client.from(table).select(columns);
+    query = filter ? filter(query) : query;
+    const result = await query.order(orderColumn, { ascending: false })
+      .order("id", { ascending: false })
+      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+    if (result.error) throw sourceError(table, result.error);
+    const pageRows = Array.isArray(result.data) ? result.data as SourceRow[] : [];
+    rows.push(...pageRows);
+    if (pageRows.length < PAGE_SIZE) return rows;
+  }
+}
+
+async function readProfiles(client: { from(table: string): Query }, userIds: string[]): Promise<Map<string, SourceRow>> {
+  const profiles = new Map<string, SourceRow>();
+  for (const ids of batches(userIds)) {
+    const result = await client.from("profiles").select("id, email, role").in("id", ids);
+    if (result.error) throw sourceError("profiles", result.error);
+    for (const profile of (result.data || []) as SourceRow[]) {
+      if (profile.id) profiles.set(profile.id, profile);
+    }
+  }
+  return profiles;
+}
+
+async function readCoaching(client: { from(table: string): Query }, sessionIds: string[]): Promise<Map<string, SourceRow>> {
+  const summaries = new Map<string, SourceRow>();
+  for (const ids of batches(sessionIds)) {
+    const result = await client.from("telefun_coaching_summary")
+      .select("id, session_id, recommendations, generated_at").in("session_id", ids);
+    if (result.error) throw sourceError("telefun_coaching_summary", result.error);
+    const candidates = ((result.data || []) as SourceRow[]).filter((summary) => string(summary.session_id));
+    candidates.sort((left, right) => {
+      const generated = string(right.generated_at).localeCompare(string(left.generated_at));
+      return generated || string(right.id).localeCompare(string(left.id));
+    });
+    for (const summary of candidates) {
+      const sessionId = string(summary.session_id);
+      if (sessionId && !summaries.has(sessionId)) summaries.set(sessionId, summary);
+    }
+  }
+  return summaries;
+}
+
+function emailValue(email: JsonObject, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = nullableString(email[key]);
+    if (value) return value;
+  }
+  return null;
+}
+
+export function normalizePdktMetadata(configValue: unknown, emails: EmailMessage[]): ConsumerMetadata {
+  const config = object(configValue);
+  const identity = object(config.identity);
+  const consumerType = object(config.consumerType);
+  const recipientContext = object(config.recipientContext);
+  const firstEmail = object(emails.find((email) => object(email).type === "received") || emails[0]);
+  const recipient = nullableString(recipientContext.primaryRecipientAddress)
+    || emailValue(firstEmail, ["to", "recipient"]);
+  const contact = emailValue(firstEmail, ["from", "sender", "senderEmail"])
+    || nullableString(identity.email);
+  return {
+    consumer_name: nullableString(identity.name) || nullableString(identity.bodyName),
+    consumer_city: nullableString(identity.city),
+    consumer_type: nullableString(consumerType.name || consumerType.id),
+    recipient,
+    contact,
+  };
+}
+
+function userFields(row: SourceRow, profiles: Map<string, SourceRow>): Pick<UnifiedHistoryEntry, "user_email" | "user_role"> {
+  const profile = row.user_id ? profiles.get(row.user_id) : undefined;
+  return { user_email: nullableString(profile?.email) || undefined, user_role: nullableString(profile?.role) || undefined };
+}
+
+function telefunAssessment(value: unknown, sessionMetrics: unknown): MonitoringTelefunAssessment | undefined {
+  const assessment = normalizeTelefunAssessmentWithHold(value, sessionMetrics);
+  if (!assessment) return undefined;
+  return {
+    ...assessment,
+    overall_score: assessment.overallScore,
+    speaking_rate_wpm: assessment.speakingRate.wordsPerMinute,
+    intonation_score: assessment.intonation.score,
+    articulation_score: assessment.articulation.score,
+    filler_words_count: assessment.fillerWords.count,
+    emotional_tone: assessment.emotionalTone.dominant,
+    highlights: assessment.highlights,
+  } satisfies MonitoringTelefunAssessment;
 }
 
 export async function getMonitoringHistory(): Promise<UnifiedHistoryEntry[]> {
-  const admin = createAdminClient();
+  const admin = createAdminClient() as unknown as { from(table: string): Query };
+  const [ketikRows, pdktRows, telefunRows, legacyRows] = await Promise.all([
+    readComplete(admin, "ketik_history", "id, user_id, date, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status"),
+    readComplete(admin, "pdkt_history", "id, user_id, timestamp, config, emails, evaluation, evaluation_status, evaluation_error, time_taken, created_at"),
+    readComplete(admin, "telefun_history", "id, user_id, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, consumer_gender, duration_seconds, recording_path, score, messages, voice_assessment, session_metrics, ai_summary, strengths, weaknesses, coaching_focus, persona_config"),
+    readComplete(admin, "results", "id, user_id, module, score, details, history, created_at", (query) => query.eq("module", "telefun")),
+  ]);
 
-  const [ketikRes, pdktRes, telefunHistoryRes, telefunResultsRes] =
-    await Promise.all([
-      admin
-        .from("ketik_history")
-        .select(
-          "id, user_id, date, scenario_title, messages, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status",
-        )
-        .order("date", { ascending: false })
-        .limit(200),
-      admin
-        .from("pdkt_history")
-        .select(
-          "id, user_id, timestamp, config, emails, evaluation, evaluation_status, evaluation_error, time_taken",
-        )
-        .order("timestamp", { ascending: false })
-        .limit(200),
-      admin
-        .from("telefun_history")
-        .select(
-          "id, user_id, created_at, scenario_title, duration_seconds, recording_path, score, voice_assessment, ai_summary, strengths, weaknesses",
-        )
-        .order("created_at", { ascending: false })
-        .limit(200),
-      admin
-        .from("results")
-        .select("id, user_id, module, score, details, history, created_at")
-        .eq("module", "telefun")
-        .order("created_at", { ascending: false })
-        .limit(200),
-    ]);
+  const userIds = [...new Set([...ketikRows, ...pdktRows, ...telefunRows, ...legacyRows]
+    .map((row) => row.user_id).filter((id): id is string => Boolean(id)))];
+  const profiles = await readProfiles(admin, userIds);
+  const coaching = await readCoaching(admin, telefunRows.map((row) => row.id).filter((id): id is string => Boolean(id)));
+  const entries: UnifiedHistoryEntry[] = [];
 
-  if (ketikRes.error)
-    console.error("[monitoring] Failed to read ketik_history:", ketikRes.error);
-  if (pdktRes.error)
-    console.error("[monitoring] Failed to read pdkt_history:", pdktRes.error);
-  if (telefunHistoryRes.error)
-    console.error(
-      "[monitoring] Failed to read telefun_history:",
-      telefunHistoryRes.error,
-    );
-  if (telefunResultsRes.error)
-    console.error(
-      "[monitoring] Failed to read telefun results:",
-      telefunResultsRes.error,
-    );
-
-  const allUserIds = new Set<string>();
-  (ketikRes.data || []).forEach((row) => allUserIds.add(row.user_id));
-  (pdktRes.data || []).forEach((row) => allUserIds.add(row.user_id));
-  (telefunHistoryRes.data || []).forEach((row) => allUserIds.add(row.user_id));
-  (telefunResultsRes.data || []).forEach((row) => allUserIds.add(row.user_id));
-
-  const profilesMap: Record<
-    string,
-    { email: string | null; role: string | null }
-  > = {};
-  if (allUserIds.size > 0) {
-    const { data: profilesData, error: profilesError } = await admin
-      .from("profiles")
-      .select("id, email, role")
-      .in("id", [...allUserIds]);
-
-    if (profilesError) {
-      console.error("[monitoring] Failed to read profiles:", profilesError);
-    } else {
-      (profilesData || []).forEach((profile) => {
-        profilesMap[profile.id] = profile;
-      });
-    }
+  for (const row of ketikRows) {
+    const messages = normalizeKetikMessages(row.messages);
+    entries.push({
+      id: string(row.id), user_id: string(row.user_id), module: "ketik",
+      scenario_title: string(row.scenario_title, "Simulasi Chat"), created_at: string(row.date),
+      duration_seconds: number(row.simulation_duration), score: typeof row.final_score === "number" ? row.final_score : null,
+      history: messages, ...userFields(row, profiles), consumer_name: nullableString(row.consumer_name),
+      consumer_phone: nullableString(row.consumer_phone), consumer_city: nullableString(row.consumer_city),
+      review_status: status(row.review_status), scores: {
+        final: typeof row.final_score === "number" ? row.final_score : undefined,
+        empathy: typeof row.empathy_score === "number" ? row.empathy_score : undefined,
+        probing: typeof row.probing_score === "number" ? row.probing_score : undefined,
+        resolution: typeof row.resolution_score === "number" ? row.resolution_score : undefined,
+        typo: typeof row.typo_score === "number" ? row.typo_score : undefined,
+        compliance: typeof row.compliance_score === "number" ? row.compliance_score : undefined,
+      },
+      ketik_session: { consumer_name: nullableString(row.consumer_name), consumer_phone: nullableString(row.consumer_phone), consumer_city: nullableString(row.consumer_city), messages, simulation_duration: typeof row.simulation_duration === "number" ? row.simulation_duration : null },
+    });
   }
 
-  const unified: UnifiedHistoryEntry[] = [];
-
-  (ketikRes.data || []).forEach((row) => {
-    const messages = Array.isArray(row.messages) ? row.messages : [];
-    const timestamps = messages
-      .map((msg: { timestamp?: string }) =>
-        new Date(msg.timestamp || "").getTime(),
-      )
-      .filter((t: number) => Number.isFinite(t));
-    const durationSeconds =
-      timestamps.length >= 2
-        ? Math.floor((Math.max(...timestamps) - Math.min(...timestamps)) / 1000)
-        : 0;
-
-    unified.push({
-      id: row.id,
-      user_id: row.user_id,
-      module: "ketik",
-      scenario_title: safeString(row.scenario_title, "Simulasi Chat"),
-      created_at: safeString(row.date, ""),
-      duration_seconds: durationSeconds,
-      score: typeof row.final_score === "number" ? row.final_score : null,
-      history: row.messages,
-      user_email: profilesMap[row.user_id]?.email ?? undefined,
-      user_role: profilesMap[row.user_id]?.role ?? undefined,
-      review_status: (row.review_status as ReviewStatus) || "not_started",
-      scores:
-        typeof row.final_score === "number"
-          ? {
-              final: row.final_score ?? undefined,
-              empathy: row.empathy_score ?? undefined,
-              probing: row.probing_score ?? undefined,
-              resolution: row.resolution_score ?? undefined,
-              typo: row.typo_score ?? undefined,
-              compliance: row.compliance_score ?? undefined,
-            }
-          : undefined,
-    });
-  });
-
-  (pdktRes.data || []).forEach((row) => {
-    const config =
-      row.config && typeof row.config === "object" ? row.config : {};
-    const evaluation =
-      row.evaluation && typeof row.evaluation === "object"
-        ? row.evaluation
-        : {};
-
-    const pdkt_evaluation =
-      typeof evaluation?.score === "number"
-        ? {
-            score: evaluation.score,
-            feedback: safeString(evaluation.feedback, "").slice(0, 150),
-            typos_count: Array.isArray(evaluation.typos)
-              ? evaluation.typos.length
-              : 0,
-            clarity_issues_count: Array.isArray(evaluation.clarityIssues)
-              ? evaluation.clarityIssues.length
-              : 0,
-            content_gaps_count: Array.isArray(evaluation.contentGaps)
-              ? evaluation.contentGaps.length
-              : 0,
-          }
-        : undefined;
-
-    unified.push({
-      id: row.id,
-      user_id: row.user_id,
-      module: "pdkt",
-      scenario_title: safeString(
-        config?.scenarios?.[0]?.title,
-        "Simulasi Email",
-      ),
-      created_at: safeString(row.timestamp, ""),
-      duration_seconds: safeNumber(row.time_taken, 0),
+  for (const row of pdktRows) {
+    const config = normalizePdktConfig(row.config);
+    const emails = normalizePdktEmails(row.emails);
+    const evaluation = normalizePdktEvaluation(row.evaluation);
+    const metadata = normalizePdktMetadata(row.config, emails);
+    const summary = evaluation ? {
+      ...evaluation,
+      typos_count: array(evaluation.typos).length,
+      clarity_issues_count: array(evaluation.clarityIssues).length,
+      content_gaps_count: array(evaluation.contentGaps).length,
+    } : undefined;
+    entries.push({
+      id: string(row.id), user_id: string(row.user_id), module: "pdkt",
+      scenario_title: string(object(array(config?.scenarios)[0]).title, "Simulasi Email"),
+      created_at: string(row.timestamp || row.created_at), duration_seconds: number(row.time_taken),
       score: typeof evaluation?.score === "number" ? evaluation.score : null,
-      history: Array.isArray(row.emails) ? row.emails : [],
-      user_email: profilesMap[row.user_id]?.email ?? undefined,
-      user_role: profilesMap[row.user_id]?.role ?? undefined,
-      review_status: (row.evaluation_status as ReviewStatus) || "not_started",
-      pdkt_evaluation,
+      history: emails, ...userFields(row, profiles), ...metadata,
+      review_status: status(row.evaluation_status), pdkt_evaluation: summary,
+      pdkt_session: {
+        consumer_name: metadata.consumer_name ?? null,
+        consumer_phone: null,
+        consumer_city: metadata.consumer_city ?? null,
+        consumer_gender: null,
+        consumer_type: metadata.consumer_type ?? null,
+        recipient: metadata.recipient ?? null,
+        contact: metadata.contact ?? null,
+        config,
+        emails,
+        evaluation,
+        evaluation_error: nullableString(row.evaluation_error),
+        evaluation_status: status(row.evaluation_status),
+        time_taken: typeof row.time_taken === "number" ? row.time_taken : null,
+      },
     });
-  });
+  }
 
-  const telefunSeen = new Set<string>();
-
-  (telefunResultsRes.data || []).forEach((row) => {
-    const payload =
-      row.details || row.history
-        ? typeof row.details === "object"
-          ? row.details
-          : {}
-        : {};
-    const entry: UnifiedHistoryEntry = {
-      id: row.id,
-      user_id: row.user_id,
-      module: "telefun",
-      scenario_title: safeString(
-        payload.scenario || payload.scenario_title,
-        "Simulasi Telepon",
-      ),
-      created_at: safeString(row.created_at, ""),
-      duration_seconds: safeNumber(payload.duration, 0),
-      score: typeof row.score === "number" ? row.score : null,
-      history: safeString(payload.recordingUrl, ""),
-      user_email: profilesMap[row.user_id]?.email ?? undefined,
-      user_role: profilesMap[row.user_id]?.role ?? undefined,
-      review_status:
-        typeof row.score === "number" ? "completed" : "not_started",
+  const canonicalIds = new Set<string>();
+  for (const row of telefunRows) {
+    const id = string(row.id);
+    canonicalIds.add(id);
+    const assessment = telefunAssessment(row.voice_assessment, row.session_metrics);
+    const metadata: ConsumerMetadata = {
+      consumer_name: nullableString(row.consumer_name),
+      consumer_phone: nullableString(row.consumer_phone),
+      consumer_city: nullableString(row.consumer_city),
+      consumer_gender: nullableString(row.consumer_gender),
+      consumer_type: nullableString(object(row.persona_config).consumerType),
     };
+    const score = assessment?.overallScore ?? (typeof row.score === "number" ? row.score : null);
+    const summary = coaching.get(id);
+    entries.push({
+      id, user_id: string(row.user_id), module: "telefun", scenario_title: string(row.scenario_title, "Simulasi Telepon"),
+      created_at: string(row.created_at), duration_seconds: number(row.duration_seconds), score,
+      history: parseTelefunTranscript(row.messages).length
+        ? parseTelefunTranscript(row.messages)
+        : safeRecordingPath(row.recording_path), ...userFields(row, profiles), ...metadata,
+      review_status: score !== null ? "completed" : "not_started", telefun_assessment: assessment || undefined,
+      telefun_coaching: { recommendations: normalizeTelefunCoachingRecommendations(summary?.recommendations), generated_at: summary ? nullableString(summary.generated_at) : null },
+    });
+  }
 
-    telefunSeen.add(createTelefunSignature(entry));
-    unified.push(entry);
+  for (const row of legacyRows) {
+    const id = string(row.id);
+    if (canonicalIds.has(id)) continue;
+    const details = object(row.details);
+    entries.push({
+      id, user_id: string(row.user_id), module: "telefun", scenario_title: string(details.scenario || details.scenario_title, "Simulasi Telepon"),
+      created_at: string(row.created_at), duration_seconds: number(details.duration), score: typeof row.score === "number" ? row.score : null,
+      history: safeRecordingPath(details.recordingUrl) || parseTelefunTranscript(row.history), ...userFields(row, profiles), review_status: typeof row.score === "number" ? "completed" : "not_started", telefun_legacy: true,
+    });
+  }
+
+  return entries.sort((left, right) => {
+    const created = new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+    return created || left.module.localeCompare(right.module) || left.id.localeCompare(right.id);
   });
-
-  (telefunHistoryRes.data || []).forEach((row) => {
-    const va =
-      row.voice_assessment && typeof row.voice_assessment === "object"
-        ? row.voice_assessment
-        : null;
-
-    const entry: UnifiedHistoryEntry = {
-      id: row.id,
-      user_id: row.user_id,
-      module: "telefun",
-      scenario_title: safeString(row.scenario_title, "Simulasi Telepon"),
-      created_at: safeString(row.created_at, ""),
-      duration_seconds: safeNumber(row.duration_seconds, 0),
-      // Use voice_assessment.overallScore (0-10) when available, otherwise fall back to score
-      score: va
-        ? safeNumber(
-            va.overallScore,
-            typeof row.score === "number" ? row.score : 0,
-          )
-        : typeof row.score === "number"
-          ? row.score
-          : null,
-      history: safeString(row.recording_path, ""),
-      user_email: profilesMap[row.user_id]?.email ?? undefined,
-      user_role: profilesMap[row.user_id]?.role ?? undefined,
-      review_status:
-        typeof row.score === "number" ? "completed" : "not_started",
-      telefun_assessment: va
-        ? {
-            overall_score: safeNumber(va.overallScore, 0),
-            speaking_rate_wpm: safeNumber(va.speakingRate?.wordsPerMinute, 0),
-            intonation_score: safeNumber(va.intonation?.score, 0),
-            articulation_score: safeNumber(va.articulation?.score, 0),
-            filler_words_count: safeNumber(va.fillerWords?.count, 0),
-            emotional_tone: safeString(va.emotionalTone?.dominant, ""),
-            strengths: Array.isArray(va.strengths)
-              ? va.strengths.slice(0, 3)
-              : [],
-            highlights: Array.isArray(va.highlights)
-              ? va.highlights.slice(0, 3)
-              : [],
-          }
-        : undefined,
-    };
-
-    const signature = createTelefunSignature(entry);
-    if (!telefunSeen.has(signature)) {
-      telefunSeen.add(signature);
-      unified.push(entry);
-    } else if (va) {
-      // If telefun_history has voice_assessment but results table entry doesn't,
-      // merge the assessment into the existing entry
-      const existing = unified.find(
-        (e) =>
-          e.module === "telefun" && createTelefunSignature(e) === signature,
-      );
-      if (existing && !existing.telefun_assessment) {
-        existing.telefun_assessment = entry.telefun_assessment;
-      }
-    }
-  });
-
-  return unified.sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
 }

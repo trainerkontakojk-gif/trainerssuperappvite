@@ -1,4 +1,5 @@
 import { MessageCircle, Mail, Phone } from "lucide-react";
+import type { MonitoringHistoryEntry } from "../../../lib/api/rpc-client";
 
 export type ReviewStatus =
   | "not_started"
@@ -7,44 +8,7 @@ export type ReviewStatus =
   | "completed"
   | "failed";
 
-export type UnifiedHistoryEntry = {
-  id: string;
-  user_id: string;
-  module: "ketik" | "pdkt" | "telefun";
-  scenario_title: string;
-  created_at: string;
-  duration_seconds: number;
-  score: number | null;
-  history: unknown;
-  user_email?: string;
-  user_role?: string;
-  review_status: ReviewStatus;
-  scores?: {
-    final?: number;
-    empathy?: number;
-    probing?: number;
-    resolution?: number;
-    typo?: number;
-    compliance?: number;
-  };
-  pdkt_evaluation?: {
-    score: number;
-    feedback: string;
-    typos_count: number;
-    clarity_issues_count: number;
-    content_gaps_count: number;
-  };
-  telefun_assessment?: {
-    overall_score: number;
-    speaking_rate_wpm: number;
-    intonation_score: number;
-    articulation_score: number;
-    filler_words_count: number;
-    emotional_tone: string;
-    strengths: string[];
-    highlights: string[];
-  };
-};
+export type UnifiedHistoryEntry = MonitoringHistoryEntry;
 
 export function formatIdr(value: number): string {
   return `Rp ${Math.round(value).toLocaleString()}`;
@@ -168,18 +132,4 @@ export function getScenarioDescription(title: string, module: string): string {
   if (module === "telefun")
     return "Percakapan telepon interaktif dengan pelanggan";
   return "Simulasi interaktif";
-}
-
-export function getTelefunSubmetrics(score: number | null) {
-  const s = score || 0;
-  const kepatuhan = Math.round(s * 0.65 * 10) / 10;
-  const empati = Math.round(s * 0.625 * 10) / 10;
-  const kejelasan = Math.round(s * 0.9375 * 10) / 10;
-  const solusi = Math.min(10, Math.round(s * 1.3125 * 10) / 10);
-  return {
-    kepatuhan: kepatuhan.toFixed(1),
-    empati: empati.toFixed(1),
-    kejelasan: kejelasan.toFixed(1),
-    solusi: solusi.toFixed(1),
-  };
 }

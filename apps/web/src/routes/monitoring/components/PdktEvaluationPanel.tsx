@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   AlertCircle,
   Loader2,
@@ -25,12 +25,25 @@ function formatTime(seconds: number) {
   return `${mins} menit ${secs} detik`;
 }
 
+function Meta({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-bold uppercase text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm font-semibold">
+        {value || "Tidak tersedia"}
+      </dd>
+    </div>
+  );
+}
+
 export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   const [data, setData] = useState<PdktMonitoringReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEvaluation = async () => {
+  const fetchEvaluation = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -45,11 +58,11 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [entryId]);
 
   useEffect(() => {
     fetchEvaluation();
-  }, [entryId]);
+  }, [fetchEvaluation]);
 
   if (loading) {
     return (
@@ -65,8 +78,8 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <AlertTriangle className="w-6 h-6 text-red-500" />
-        <p className="text-xs text-red-500 font-medium">{error}</p>
+        <AlertTriangle className="w-6 h-6 text-destructive" />
+        <p className="text-xs text-destructive font-medium">{error}</p>
         <button
           onClick={fetchEvaluation}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-pdkt/10 text-module-pdkt text-[10px] font-bold hover:bg-module-pdkt/20 transition-all"
@@ -81,6 +94,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   const emails = data?.emails || [];
   const hasEmails = emails.length > 0;
   const evaluation = data?.evaluation;
+  const session = data?.session;
   const scoreBreakdown = evaluation?.scoreBreakdown;
   const breakdownItems = scoreBreakdown
     ? [
@@ -103,6 +117,16 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
   return (
     <div className="space-y-6">
+      <dl
+        className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4"
+        aria-label="Konteks email konsumen"
+      >
+        <Meta label="Nama konsumen" value={session?.consumer_name} />
+        <Meta label="Tipe konsumen" value={session?.consumer_type} />
+        <Meta label="Penerima" value={session?.recipient} />
+        <Meta label="Kontak" value={session?.contact} />
+        <Meta label="Dibuat" value={session?.created_at} />
+      </dl>
       {/* ── Email Thread — Primary ─────────────────────────── */}
       {hasEmails && (
         <section className="space-y-3">
@@ -172,7 +196,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               <h3 className="text-sm font-bold text-foreground">
                 Hasil Evaluasi
               </h3>
-              {data?.time_taken && (
+              {data?.time_taken != null && (
                 <p className="text-[10px] text-muted-foreground font-bold mt-1">
                   Selesai dikerjakan dalam{" "}
                   <span className="text-foreground">{formatTime(data.time_taken)}</span>
@@ -209,15 +233,15 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
           {/* 4-Card Evaluation Grid */}
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="p-4 rounded-xl border border-red-100 bg-red-50/30">
-              <h4 className="text-[10px] font-black text-red-700 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <div className="p-4 rounded-xl border border-border bg-muted/20">
+              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-chart-red">
                 <AlertCircle size={12} />
                 Typo / Salah Ketik
               </h4>
               {evaluation.typos && evaluation.typos.length > 0 ? (
                 <ul className="space-y-1.5 list-disc list-inside">
                   {evaluation.typos.map((typo, idx) => (
-                    <li key={idx} className="text-xs text-foreground/70 leading-relaxed font-medium">
+                    <li key={idx} className="text-xs text-foreground leading-relaxed font-medium">
                       {typo}
                     </li>
                   ))}
@@ -230,15 +254,15 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               )}
             </div>
 
-            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/30">
-              <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <div className="p-4 rounded-xl border border-border bg-muted/20">
+              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
                 <MessageSquare size={12} />
                 Kejelasan Kalimat
               </h4>
               {evaluation.clarityIssues && evaluation.clarityIssues.length > 0 ? (
                 <ul className="space-y-1.5 list-disc list-inside">
                   {evaluation.clarityIssues.map((issue, idx) => (
-                    <li key={idx} className="text-xs text-foreground/70 leading-relaxed font-medium">
+                    <li key={idx} className="text-xs text-foreground leading-relaxed font-medium">
                       {issue}
                     </li>
                   ))}
@@ -251,15 +275,15 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               )}
             </div>
 
-            <div className="p-4 rounded-xl border border-sky-100 bg-sky-50/30">
-              <h4 className="text-[10px] font-black text-sky-700 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <div className="p-4 rounded-xl border border-border bg-muted/20">
+              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-module-pdkt">
                 <BookOpen size={12} />
                 Relevansi Solusi
               </h4>
               {evaluation.contentGaps && evaluation.contentGaps.length > 0 ? (
                 <ul className="space-y-1.5 list-disc list-inside">
                   {evaluation.contentGaps.map((gap, idx) => (
-                    <li key={idx} className="text-xs text-foreground/70 leading-relaxed font-medium">
+                    <li key={idx} className="text-xs text-foreground leading-relaxed font-medium">
                       {gap}
                     </li>
                   ))}
@@ -272,12 +296,12 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               )}
             </div>
 
-            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/30">
-              <h4 className="text-[10px] font-black text-gray-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <div className="p-4 rounded-xl border border-border bg-muted/20">
+              <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
                 <MessageSquare size={12} />
                 Masukan
               </h4>
-              <p className="text-xs text-foreground/70 font-medium leading-relaxed italic">
+              <p className="text-xs text-foreground font-medium leading-relaxed italic">
                 &quot;{evaluation.feedback}&quot;
               </p>
             </div>
@@ -287,16 +311,16 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
         !loading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center">
-              <BookOpen className="w-7 h-7 text-muted-foreground/40" />
+              <BookOpen className="w-7 h-7 text-muted-foreground" />
             </div>
             <p className="text-sm font-bold text-muted-foreground">
               Evaluasi AI belum tersedia
             </p>
-            <p className="text-xs text-muted-foreground/60">
+            <p className="text-xs text-muted-foreground">
               Status: {data?.review_status || "belum dimulai"}
             </p>
             {data?.evaluation_error && (
-              <p className="text-xs text-red-500 max-w-xs">
+              <p className="text-xs text-destructive max-w-xs">
                 {data.evaluation_error}
               </p>
             )}
