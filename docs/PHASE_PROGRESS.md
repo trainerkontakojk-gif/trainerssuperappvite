@@ -392,6 +392,8 @@
 
 209.  **AI Provider Gemini/OpenAI Docs Sync** — Updated canonical docs and contributor summaries to reflect direct Gemini/OpenAI runtime only, direct OpenAI Responses API wrapper, API-side `OPENAI_API_KEY` boundary, legacy model normalization, Gemini-native PDKT image generation, and Gemini→OpenAI KETIK review fallback. Historical logs preserved. (DONE)
 
+210.  **Test Suite Hygiene** — Fixed 20 test failures (API fast 2, Web fast 12, Web full 6 pre-existing): stale assertions vs optimistic-concurrency settings versioning dan keputusan desain `34fff97` (folder filter tidak membatasi availableServices), env mismatch (`DOMParser`/`window` di env node → pragma jsdom + `globalThis`), dan sinkronisasi test access-approval/agent-temuan ke UI redesign. Dihapus 3 test transien (database-parity-post-sync, dashboard-post-login-parity, sidak-input-parity) dan di-rename 9 file `*-parity`/`*-legacy` ke nama kontrak. Konsolidasi 11 file API → 3 (`telefun-scoring-migration-contracts`, `sidak-migration-contracts`, `sidak-dashboard-utils`). Perbaikan gate: `test:core` web kini benar-benar mengeksekusi 8 file daftar (137 test, sebelumnya 56 karena config fast men-skip `.tsx`). Aturan permanen Test Hygiene ditambahkan ke AGENTS.md §6. Jumlah file test 313 → 289; API fast 1251 pass, Web fast 603 pass, Web full 1151 pass, tsc/lint bersih. (DONE)
+
 ---
 
 ### Historical — Migration & Pagination Records

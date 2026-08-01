@@ -36,7 +36,11 @@ vi.mock("../components/sidak/KpiCard", () => ({
   }) => (
     <div data-testid={`kpi-${label}`}>
       <span>{value}</span>
-      <span>{delta ? `${delta.text} ${delta.comparisonLabel}` : "Belum ada pembanding"}</span>
+      <span>
+        {delta
+          ? `${delta.text} ${delta.comparisonLabel}`
+          : "Belum ada pembanding"}
+      </span>
     </div>
   ),
 }));
@@ -198,8 +202,12 @@ describe("SIDAK dashboard legacy parity", () => {
       screen.getByRole("heading", { name: "Top Agen (Temuan)" }),
     ).toBeInTheDocument();
 
-    expect(screen.getByTestId("kpi-Rata-rata Skor")).toHaveTextContent("99.5%Naik 0.2 poin vs Apr 26");
-    expect(screen.getByTestId("kpi-Rata-rata Kepatuhan")).toHaveTextContent("100.0%Naik 1.4 poin vs Apr 26");
+    expect(screen.getByTestId("kpi-Rata-rata Skor")).toHaveTextContent(
+      "99.5%Naik 0.2 poin vs Apr 26",
+    );
+    expect(screen.getByTestId("kpi-Rata-rata Kepatuhan")).toHaveTextContent(
+      "100.0%Naik 1.4 poin vs Apr 26",
+    );
   });
 
   it("renders a legacy-style loading skeleton on initial load", () => {
@@ -215,7 +223,9 @@ describe("SIDAK dashboard legacy parity", () => {
     expect(
       screen.queryByText("Memuat data dashboard..."),
     ).not.toBeInTheDocument();
-    expect(container.querySelector('[data-testid="sidak-dashboard-skeleton"]')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="sidak-dashboard-skeleton"]'),
+    ).toBeInTheDocument();
   });
 
   it("passes full RCA parameter names and insight from builder to ParetoChart", async () => {

@@ -142,10 +142,20 @@ describe("Sidak settings page legacy parity", () => {
   it("renders the sticky header and buttons properly for a draft version", () => {
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockVersions,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
@@ -154,19 +164,33 @@ describe("Sidak settings page legacy parity", () => {
 
     // Active version should be the draft version by default rules
     expect(screen.getByText("Draft Rules v2")).toBeInTheDocument();
-    
+
     // Draft version should show Publish and Hapus Draft buttons
-    expect(screen.getByRole("button", { name: /^Publish$/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Hapus Draft$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Publish$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Hapus Draft$/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders the sticky header and buttons properly for a published version when selected", () => {
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockVersions,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
@@ -174,18 +198,26 @@ describe("Sidak settings page legacy parity", () => {
     render(<SidakSettingsPage />);
 
     // Click on the published version card in history list
-    const pubCard = screen.getAllByRole("button").find(
-      (btn) => btn.textContent?.includes("v1") && btn.textContent?.includes("published")
-    );
+    const pubCard = screen
+      .getAllByRole("button")
+      .find(
+        (btn) =>
+          btn.textContent?.includes("v1") &&
+          btn.textContent?.includes("published"),
+      );
     expect(pubCard).toBeDefined();
     fireEvent.click(pubCard!);
 
     // Active version should change to published
     expect(screen.getByText("Versi Aktif (Published) v1")).toBeInTheDocument();
-    
+
     // Published version should show Create Revision button
-    expect(screen.getByRole("button", { name: /Create Revision/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Hapus Draft$/i })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Create Revision/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Hapus Draft$/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders legacy parity fields (threshold, sort_order, linked) in indicator list", async () => {
@@ -194,19 +226,32 @@ describe("Sidak settings page legacy parity", () => {
 
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockVersions,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
 
     render(<SidakSettingsPage />);
 
-    const draftCard = screen.getAllByRole("button").find(
-      (btn) => btn.textContent?.includes("v2") && btn.textContent?.includes("draft")
-    );
+    const draftCard = screen
+      .getAllByRole("button")
+      .find(
+        (btn) =>
+          btn.textContent?.includes("v2") && btn.textContent?.includes("draft"),
+      );
     expect(draftCard).toBeDefined();
 
     fireEvent.click(draftCard!);
@@ -228,10 +273,20 @@ describe("Sidak settings page legacy parity", () => {
 
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockVersions,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
@@ -239,11 +294,17 @@ describe("Sidak settings page legacy parity", () => {
     render(<SidakSettingsPage />);
 
     // Draft is selected by default; indicators are empty
-    await screen.findByText("Belum ada parameter di versi ini.", {}, { timeout: 3000 });
+    await screen.findByText(
+      "Belum ada parameter di versi ini.",
+      {},
+      { timeout: 3000 },
+    );
 
     // CTA should appear because published version exists and has indicators in mock data
     expect(screen.getByText(/Versi published/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Create Revision dari Published/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Create Revision dari Published/i }),
+    ).toBeInTheDocument();
 
     vi.useFakeTimers();
   });
@@ -260,7 +321,12 @@ describe("Sidak settings page legacy parity", () => {
 
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
         return { data: [], loading: false, error: null, refetch: vi.fn() };
@@ -270,7 +336,11 @@ describe("Sidak settings page legacy parity", () => {
 
     render(<SidakSettingsPage />);
 
-    await screen.findByText(/Baseline tersedia: 12 parameter/, {}, { timeout: 3000 });
+    await screen.findByText(
+      /Baseline tersedia: 12 parameter/,
+      {},
+      { timeout: 3000 },
+    );
     expect(screen.getByText("Buat Baseline")).toBeInTheDocument();
 
     vi.useFakeTimers();
@@ -288,7 +358,12 @@ describe("Sidak settings page legacy parity", () => {
 
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
         return { data: [], loading: false, error: null, refetch: vi.fn() };
@@ -298,7 +373,11 @@ describe("Sidak settings page legacy parity", () => {
 
     render(<SidakSettingsPage />);
 
-    await screen.findByText("Belum ada parameter baseline untuk service ini.", {}, { timeout: 3000 });
+    await screen.findByText(
+      "Belum ada parameter baseline untuk service ini.",
+      {},
+      { timeout: 3000 },
+    );
     expect(screen.getByText("Buat Baseline")).toBeInTheDocument();
 
     vi.useFakeTimers();
@@ -309,10 +388,20 @@ describe("Sidak settings page legacy parity", () => {
     const refetchVersionsMock = vi.fn();
     useApiMock.mockImplementation((path: string) => {
       if (path.includes("/sidak/periods")) {
-        return { data: mockPeriods, loading: false, error: null, refetch: vi.fn() };
+        return {
+          data: mockPeriods,
+          loading: false,
+          error: null,
+          refetch: vi.fn(),
+        };
       }
       if (path.includes("/sidak/rule-versions")) {
-        return { data: mockVersions, loading: false, error: null, refetch: refetchVersionsMock };
+        return {
+          data: mockVersions,
+          loading: false,
+          error: null,
+          refetch: refetchVersionsMock,
+        };
       }
       return { data: [], loading: false, error: null, refetch: vi.fn() };
     });
@@ -325,8 +414,10 @@ describe("Sidak settings page legacy parity", () => {
     const deleteBtn = screen.getByRole("button", { name: /^Hapus Draft$/i });
     fireEvent.click(deleteBtn);
 
-    expect(window.confirm).toHaveBeenCalledWith("Hapus draft v2 untuk Call efektif Mei 2026? Versi published tidak akan berubah.");
-    
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Hapus draft v2 untuk Call efektif Mei 2026? Versi published tidak akan berubah.",
+    );
+
     // Wait for the async call to resolve and trigger refetch
     await vi.waitFor(() => {
       expect(refetchVersionsMock).toHaveBeenCalled();

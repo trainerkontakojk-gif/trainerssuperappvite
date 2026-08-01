@@ -61,10 +61,11 @@ async function requestJson(
   path: string,
   method: "PUT" | "POST",
   body: unknown,
+  extraHeaders?: Record<string, string>,
 ) {
   return app.request(path, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...extraHeaders },
     body: JSON.stringify(body),
   });
 }
@@ -85,10 +86,48 @@ describe("KETIK settings and history input validation", () => {
     );
 
     expect(response.status).toBe(200);
+    // Route meneruskan expectedVersion (dari header x-settings-version) —
+    // absent header berarti undefined (optimistic concurrency opsional).
     expect(mockSaveSettings).toHaveBeenCalledWith(
       "user-1",
       DEFAULT_KETIK_SETTINGS,
+      undefined,
     );
+  });
+
+  it("passes x-settings-version through for optimistic concurrency", async () => {
+    mockSaveSettings.mockResolvedValue("v2");
+
+    const response = await requestJson(
+      buildApp(),
+      "/settings",
+      "PUT",
+      DEFAULT_KETIK_SETTINGS,
+      { "x-settings-version": "v1" },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSaveSettings).toHaveBeenCalledWith(
+      "user-1",
+      DEFAULT_KETIK_SETTINGS,
+      "v1",
+    );
+  });
+
+  it("maps settings conflict errors to 409", async () => {
+    mockSaveSettings.mockRejectedValue({
+      code: "SETTINGS_CONFLICT",
+      message: "stale version",
+    });
+
+    const response = await requestJson(
+      buildApp(),
+      "/settings",
+      "PUT",
+      DEFAULT_KETIK_SETTINGS,
+    );
+
+    expect(response.status).toBe(409);
   });
 
   it.each([
@@ -196,7 +235,10 @@ describe("KETIK settings and history input validation", () => {
     ],
     [
       "message above prompt limit",
-      { ...validMessage, text: "x".repeat(KETIK_PROMPT_LIMITS.chatMessageText + 1) },
+      {
+        ...validMessage,
+        text: "x".repeat(KETIK_PROMPT_LIMITS.chatMessageText + 1),
+      },
     ],
   ])("rejects %s without persisting history", async (_label, message) => {
     const response = await requestJson(buildApp(), "/history", "POST", {

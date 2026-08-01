@@ -36,29 +36,21 @@ describe("AgentTemuanTab parity tests", () => {
       ketidaksesuaian: "Medium issue",
       sebaiknya: "Improve",
       no_tiket: "T-200",
-    }
+    },
   ];
 
   it("renders empty state correctly with legacy copy when items list is empty", () => {
-    render(
-      <AgentTemuanTab
-        items={[]}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
+    render(<AgentTemuanTab items={[]} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
     expect(screen.getByText("Tidak ada data audit")).toBeInTheDocument();
-    expect(screen.getByText(/Belum ditemukan data temuan untuk konteks layanan/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Belum ditemukan data temuan untuk konteks layanan/),
+    ).toBeInTheDocument();
   });
 
   it("groups findings by month, collapses/expands correctly, and displays month label", () => {
     render(
-      <AgentTemuanTab
-        items={mockItems}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
+      <AgentTemuanTab items={mockItems} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
 
     expect(screen.getByText("MEI 2026")).toBeInTheDocument();
@@ -69,31 +61,28 @@ describe("AgentTemuanTab parity tests", () => {
 
     // Click on MEI 2026 accordion to expand it
     fireEvent.click(screen.getByText("MEI 2026"));
-    
+
     // Now ticket info and details for MEI 2026 should be visible
     expect(screen.getByText("T-100")).toBeInTheDocument();
     expect(screen.getByText("AUDIT INTERNAL")).toBeInTheDocument();
   });
 
-  it("renders NilaiBadge with exact numeric score and label", () => {
+  it("renders exact numeric score with Poin label and category (redesign: badge label diganti kategori)", () => {
     render(
-      <AgentTemuanTab
-        items={mockItems}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
+      <AgentTemuanTab items={mockItems} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
 
     // Expand MEI 2026
     fireEvent.click(screen.getByText("MEI 2026"));
 
-    // For nilai 0: text contains '0', and label 'KRITIS'
+    // Untuk nilai 0: score '0' + label 'Poin' + kategori critical
     expect(screen.getByText("0")).toBeInTheDocument();
-    expect(screen.getByText("KRITIS")).toBeInTheDocument();
+    expect(screen.getAllByText("Poin").length).toBeGreaterThan(0);
+    expect(screen.getByText("critical")).toBeInTheDocument();
 
-    // For nilai 3: text contains '3', and label 'SESUAI'
+    // Untuk nilai 3: score '3' + kategori non_critical
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("SESUAI")).toBeInTheDocument();
+    expect(screen.getByText("non_critical")).toBeInTheDocument();
   });
 
   it("enforces edit permission visibility based on canEdit prop", () => {
@@ -107,14 +96,16 @@ describe("AgentTemuanTab parity tests", () => {
         canEdit={false}
         onEdit={handleEdit}
         onDelete={handleDelete}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText("MEI 2026"));
 
     // Edit/delete buttons should not be present in the container
     // Let's verify by finding elements that contain the edit/delete icon button classes
-    const editButtons = screen.queryAllByRole("button").filter(btn => btn.querySelector(".w-3\\.5.h-3\\.5"));
+    const editButtons = screen
+      .queryAllByRole("button")
+      .filter((btn) => btn.querySelector(".w-3\\.5.h-3\\.5"));
     // Since canEdit is false, there shouldn't be any Pencil/Trash icons inside finding rows
     expect(editButtons.length).toBe(0);
 
@@ -125,11 +116,13 @@ describe("AgentTemuanTab parity tests", () => {
         canEdit={true}
         onEdit={handleEdit}
         onDelete={handleDelete}
-      />
+      />,
     );
 
     // Now edit/delete actions should exist
-    const editButtonsWithIcons = screen.getAllByRole("button").filter(btn => btn.querySelector("svg"));
+    const editButtonsWithIcons = screen
+      .getAllByRole("button")
+      .filter((btn) => btn.querySelector("svg"));
     expect(editButtonsWithIcons.length).toBeGreaterThan(0);
   });
 });

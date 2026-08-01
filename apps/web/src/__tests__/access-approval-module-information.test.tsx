@@ -173,6 +173,8 @@ describe("AccessApprovalPage - module labels on pending tab", () => {
     await user.click(screen.getByRole("button", { name: "Telah Disetujui" }));
 
     expect(screen.getByLabelText("Modul akses: KTP")).toBeInTheDocument();
+    // Detail pane butuh seleksi leader terlebih dahulu.
+    await user.click(screen.getByText("Leader KTP"));
     expect(screen.getByText("Tim Call Anis")).toBeInTheDocument();
   });
 
@@ -183,7 +185,7 @@ describe("AccessApprovalPage - module labels on pending tab", () => {
 
     const user = userEvent.setup();
     await user.type(
-      screen.getByPlaceholderText("Cari nama, email, atau modul..."),
+      screen.getByPlaceholderText("Cari nama, email..."),
       "SIDAK",
     );
 
@@ -198,7 +200,7 @@ describe("AccessApprovalPage - module labels on pending tab", () => {
 
     const user = userEvent.setup();
     await user.type(
-      screen.getByPlaceholderText("Cari nama, email, atau modul..."),
+      screen.getByPlaceholderText("Cari nama, email..."),
       "semua modul",
     );
 

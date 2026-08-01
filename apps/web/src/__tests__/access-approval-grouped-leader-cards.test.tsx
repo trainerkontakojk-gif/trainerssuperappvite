@@ -111,7 +111,8 @@ describe("AccessApprovalPage - grouped leader cards", () => {
     expect(
       screen.getByLabelText("Modul akses: KTP + SIDAK"),
     ).toBeInTheDocument();
-    expect(screen.getByText("2 permintaan")).toBeInTheDocument();
+    // UI redesign (phase 197) menghapus teks counter "N permintaan" —
+    // jumlah request kini terlihat via module switcher setelah klik kartu.
   });
 
   it("shows module switcher after clicking a grouped card", async () => {
@@ -189,7 +190,7 @@ describe("AccessApprovalPage - grouped leader cards", () => {
     );
     await user.type(noteInput, "Alasan penolakan");
 
-    const rejectBtn = screen.getByRole("button", { name: /Tolak KTP/i });
+    const rejectBtn = screen.getByRole("button", { name: "Tolak" });
     await user.click(rejectBtn);
   });
 

@@ -38,7 +38,14 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 - `docs/forecasting-sidak.md`: Evaluasi metode forecasting SIDAK (regresi linear, MA-3, WMA-3) dan rekomendasi pengembangan.
 - `docs/LEADER_APPROVAL_ACCESS.md`: Leader approval-based data access untuk KTP dan SIDAK.
 - `docs/qa_report_guidelines.md`: Panduan standar untuk pelaporan AI QA Analyzer (Path to Zero).
+- `docs/telefun.md`: Panduan kanonik modul Telefun, termasuk Phase 1 OpenAI WebRTC POC default-off.
 - `docs/TELEFUN_ASSESSMENT_CONTRACT.md`: Kontrak penilaian suara Telefun — trust boundary, skala nilai, parser kanonik.
+- `docs/telefun-openai-webrtc-technical-audit.md`: Audit teknis read-only untuk Phase 1 OpenAI WebRTC POC.
+- `docs/adr/telefun-realtime-provider-adapters.md`: ADR baseline provider adapter Telefun.
+- `docs/adr/telefun-openai-webrtc-poc.md`: ADR khusus Phase 1 OpenAI WebRTC POC.
+- `docs/rebuild-logs/phase-telefun-openai-webrtc-poc.md`: Catatan implementasi dan verifikasi Phase 1.
+- `docs/rebuild-logs/phase-telefun-openai-webrtc-shared-observer.md`: Catatan sinkronisasi Phase 2 shared observer.
+- `docs/rebuild-logs/phase-telefun-openai-webrtc-browser-integration.md`: Catatan repair lifecycle, rollout fail-closed, dan browser integration Phase 3.
 - `docs/deployment.md`: Panduan deployment aplikasi.
 - `docs/checklist-audit-trainers-superapp.md`: Checklist audit parity Next.js vs Vite.
 - `docs/integration-tests.md`: PDKT Mailbox RPC integration tests (Docker + local Supabase).
@@ -51,7 +58,8 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 - Jalankan `pnpm test` untuk menjalankan seluruh test suite (1056+ API + 500+ web tests).
 - Jalankan `pnpm test:fast` untuk test cepat (exclude .tsx, ~1-2 menit).
 - Jalankan `pnpm audit --prod` untuk memantau advisory dependensi; overrides keamanan (brace-expansion, fast-uri, dompurify, protobufjs) terpusat di `pnpm-workspace.yaml` — update di sana, bukan di `package.json` app.
-- Jalankan `pnpm test:core` untuk test kontrak kritis lintas modul (~30-60s). Daftar file yang digate diatur terpusat di [`scripts/test-core.json`](../scripts/test-core.json) (runner: `scripts/test-core.mjs`) — tambahkan test kritis baru ke daftar itu, bukan ke `package.json`.
+- Jalankan `pnpm test:core` untuk test kontrak kritis lintas modul (~30-60s). Daftar file yang digate diatur terpusat di [`scripts/test-core.json`](../scripts/test-core.json) (runner: `scripts/test-core.mjs`) — tambahkan test kritis baru ke daftar itu, bukan ke `package.json`. Catatan: sejak konsolidasi Juli 2026, web `test:core` berjalan dengan config default (jsdom) agar file `.tsx` di daftar benar-benar tereksekusi (sebelumnya diam-diam di-skip oleh config fast).
+- **Hygiene test (2026-07)**: test `parity/legacy` transisi sudah dibersihkan/di-rename ke nama kontrak (lihat `AGENTS.md` §6 Test Hygiene); konsolidasi fragmentasi API (11 file → 3: `telefun-scoring-migration-contracts`, `sidak-migration-contracts`, `sidak-dashboard-utils`).
 - Jalankan `pnpm --filter @trainers/api test` untuk test API service saja.
 - Jalankan `pnpm --filter @trainers/web test` untuk test frontend saja.
 - Jalankan `pnpm build` untuk validasi build production.
@@ -59,11 +67,11 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 
 ### Test Tiering
 
-| Tier | Command | Duration | Coverage |
-|------|---------|----------|----------|
-| Targeted | `pnpm test:targeted` | 10-30s | Changed files only (vitest --changed) |
-| Core | `pnpm test:core` | 30-60s | Kontrak kritis lintas modul |
-| Fast | `pnpm test:fast` | 1-2min | Seluruh unit test ringan (no .tsx) |
-| Full | `pnpm test` | ~5min | Semua tests (unit + component rendering) |
+| Tier     | Command              | Duration | Coverage                                 |
+| -------- | -------------------- | -------- | ---------------------------------------- |
+| Targeted | `pnpm test:targeted` | 10-30s   | Changed files only (vitest --changed)    |
+| Core     | `pnpm test:core`     | 30-60s   | Kontrak kritis lintas modul              |
+| Fast     | `pnpm test:fast`     | 1-2min   | Seluruh unit test ringan (no .tsx)       |
+| Full     | `pnpm test`          | ~5min    | Semua tests (unit + component rendering) |
 
 > **Catatan:** Beberapa file dokumentasi legacy (`TELEFUN_OPERATIONAL_RUNBOOK.md`, `QA_SMOKE_TEST_VERSIONED_RULES.md`, `master-backlog.md`, known issues, dan changelog files) belum di-port dari `reference-repo/docs/`. Jika diperlukan, file-file tersebut dapat di-port dengan adaptasi ke arsitektur monorepo.

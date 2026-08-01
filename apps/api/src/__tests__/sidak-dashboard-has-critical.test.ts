@@ -56,7 +56,10 @@ vi.mock("../lib/supabase", () => ({
         return mockBuildQuery(tableName, () => ({ data: null, error: null }));
       }
       if (tableName === "qa_temuan") {
-        return mockBuildQuery(tableName, () => ({ data: mockTemuan, error: null }));
+        return mockBuildQuery(tableName, () => ({
+          data: mockTemuan,
+          error: null,
+        }));
       }
 
       return mockBuildQuery(tableName, () => ({ data: [], error: null }));

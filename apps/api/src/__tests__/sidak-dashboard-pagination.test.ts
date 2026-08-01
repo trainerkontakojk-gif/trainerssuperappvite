@@ -23,13 +23,16 @@ function parseNotInValues(raw: string): string[] {
     .filter(Boolean);
 }
 
-function applyQueryFilters(rows: any[], state: {
-  eq: Array<{ column: string; value: unknown }>;
-  in: Array<{ column: string; values: unknown[] }>;
-  not: Array<{ column: string; operator: string; value: unknown }>;
-  rangeFrom: number;
-  rangeTo: number;
-}) {
+function applyQueryFilters(
+  rows: any[],
+  state: {
+    eq: Array<{ column: string; value: unknown }>;
+    in: Array<{ column: string; values: unknown[] }>;
+    not: Array<{ column: string; operator: string; value: unknown }>;
+    rangeFrom: number;
+    rangeTo: number;
+  },
+) {
   let filtered = rows;
 
   for (const { column, value } of state.eq) {
@@ -55,13 +58,16 @@ function applyQueryFilters(rows: any[], state: {
   return filtered.slice(state.rangeFrom, state.rangeTo + 1);
 }
 
-function buildQueryResult(tableName: string, state: {
-  eq: Array<{ column: string; value: unknown }>;
-  in: Array<{ column: string; values: unknown[] }>;
-  not: Array<{ column: string; operator: string; value: unknown }>;
-  rangeFrom: number;
-  rangeTo: number;
-}) {
+function buildQueryResult(
+  tableName: string,
+  state: {
+    eq: Array<{ column: string; value: unknown }>;
+    in: Array<{ column: string; values: unknown[] }>;
+    not: Array<{ column: string; operator: string; value: unknown }>;
+    rangeFrom: number;
+    rangeTo: number;
+  },
+) {
   if (tableName === "qa_periods") {
     return { data: mockPeriods, error: null };
   }
@@ -236,7 +242,7 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
     expect(result.availableServices).toContain("chat");
   });
 
-  it("applies folderNames filter to distinct services query", async () => {
+  it("folder filter limits dashboard data but not available services (regression: 34fff97)", async () => {
     mockTemuanRows = [
       ...Array.from({ length: 15 }, (_, i) => ({
         id: `call-folder-a-${i + 1}`,
@@ -280,7 +286,12 @@ describe("SIDAK Dashboard pagination (>1000 rows)", () => {
       folder_ids: ["folder-1"],
     });
 
-    expect(result.availableServices).toEqual(["call"]);
+    // Data dibatasi folder: hanya 15 baris Folder A (call) yang dihitung.
+    expect(result.summary!.totalDefects).toBe(15);
+    // Dropdown service tetap menampilkan semua tipe yang punya data,
+    // tidak dibatasi folder (keputusan desain commit 34fff97).
+    expect(result.availableServices).toContain("call");
+    expect(result.availableServices).toContain("chat");
   });
 
   it("handles empty result set gracefully", async () => {

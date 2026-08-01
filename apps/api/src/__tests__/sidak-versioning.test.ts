@@ -27,7 +27,6 @@ vi.mock("../lib/supabase", () => ({
 import { supabaseAdmin } from "../lib/supabase";
 import * as sidakService from "../services/sidak-service";
 
-
 describe("sidak-service versioning parity", () => {
   beforeEach(() => {
     pendingResolve = () => ({ data: [], error: null });
@@ -76,7 +75,10 @@ describe("sidak-service versioning parity", () => {
         }
         // Fourth query: from("qa_service_rule_versions").insert({...})
         if (queryCount === 4) {
-          return { data: { ...sourceVersion, id: "new-version-id", version_number: 2 }, error: null };
+          return {
+            data: { ...sourceVersion, id: "new-version-id", version_number: 2 },
+            error: null,
+          };
         }
         // Fifth query: from("qa_service_rule_indicators").insert([...])
         if (queryCount === 5) {
@@ -108,7 +110,6 @@ describe("sidak-service versioning parity", () => {
         version_number: 1,
       };
 
-
       let queryCount = 0;
       pendingResolve = () => {
         queryCount++;
@@ -127,7 +128,10 @@ describe("sidak-service versioning parity", () => {
         }
         // Fourth query: from("qa_service_rule_versions").update({ status: "published" }).eq("id", "draft-mei-id").single()
         if (queryCount === 4) {
-          return { data: { ...draftVersion, status: "published" }, error: null };
+          return {
+            data: { ...draftVersion, status: "published" },
+            error: null,
+          };
         }
         return { data: [], error: null };
       };
@@ -136,7 +140,12 @@ describe("sidak-service versioning parity", () => {
       // Wait, we can mock the supabaseAdmin.from call to record the filters used.
       const fromSpy = vi.spyOn(supabaseAdmin, "from");
 
-      const result = await sidakService.publishRuleVersion("draft-mei-id", "user-id", "reason", "p-mei");
+      const result = await sidakService.publishRuleVersion(
+        "draft-mei-id",
+        "user-id",
+        "reason",
+        "p-mei",
+      );
       expect(result).toBeDefined();
       expect(result.status).toBe("published");
 
@@ -144,7 +153,7 @@ describe("sidak-service versioning parity", () => {
       // Wait, since supabaseAdmin.from is mocked to return the Proxy/Proxy chain, let's verify if the test compiles and runs.
       // Let's assert on the spy if needed, or simply make sure the chain works.
       expect(fromSpy).toHaveBeenCalledWith("qa_service_rule_versions");
-      
+
       fromSpy.mockRestore();
     });
   });
@@ -157,7 +166,10 @@ describe("sidak-service versioning parity", () => {
         queryCount++;
         // First query: from("qa_service_rule_versions").select("id, status").eq("id", ...).maybeSingle()
         if (queryCount === 1) {
-          return { data: { id: "draft-version-id", status: "draft" }, error: null };
+          return {
+            data: { id: "draft-version-id", status: "draft" },
+            error: null,
+          };
         }
         // Second query: from("qa_service_rule_versions").delete().eq("id", ...).eq("status", "draft")
         if (queryCount === 2) {
@@ -167,7 +179,9 @@ describe("sidak-service versioning parity", () => {
         return { data: [], error: null };
       };
 
-      await expect(sidakService.deleteRuleVersionDraft("draft-version-id")).resolves.not.toThrow();
+      await expect(
+        sidakService.deleteRuleVersionDraft("draft-version-id"),
+      ).resolves.not.toThrow();
       expect(deleteCalled).toBe(true);
     });
 
@@ -176,14 +190,17 @@ describe("sidak-service versioning parity", () => {
       pendingResolve = () => {
         queryCount++;
         if (queryCount === 1) {
-          return { data: { id: "pub-version-id", status: "published" }, error: null };
+          return {
+            data: { id: "pub-version-id", status: "published" },
+            error: null,
+          };
         }
         return { data: [], error: null };
       };
 
-      await expect(sidakService.deleteRuleVersionDraft("pub-version-id")).rejects.toThrow(
-        "Hanya versi draft yang bisa dihapus"
-      );
+      await expect(
+        sidakService.deleteRuleVersionDraft("pub-version-id"),
+      ).rejects.toThrow("Hanya versi draft yang bisa dihapus");
     });
 
     it("throws an error when version is not found", async () => {
@@ -191,9 +208,9 @@ describe("sidak-service versioning parity", () => {
         return { data: null, error: null };
       };
 
-      await expect(sidakService.deleteRuleVersionDraft("non-existent-id")).rejects.toThrow(
-        "Versi aturan tidak ditemukan"
-      );
+      await expect(
+        sidakService.deleteRuleVersionDraft("non-existent-id"),
+      ).rejects.toThrow("Versi aturan tidak ditemukan");
     });
   });
 
@@ -244,7 +261,10 @@ describe("sidak-service versioning parity", () => {
         return { data: [], error: null };
       };
 
-      const result = await sidakService.resolveEffectiveRuleVersionForPeriod("call", "p-mei");
+      const result = await sidakService.resolveEffectiveRuleVersionForPeriod(
+        "call",
+        "p-mei",
+      );
       expect(result).toBeDefined();
       expect(result?.id).toBe("v-mei");
       expect(result?.critical_weight).toBe(0.5);
@@ -263,7 +283,10 @@ describe("sidak-service versioning parity", () => {
         return { data: [], error: null };
       };
 
-      const result = await sidakService.resolveEffectiveRuleVersionForPeriod("call", "p-apr");
+      const result = await sidakService.resolveEffectiveRuleVersionForPeriod(
+        "call",
+        "p-apr",
+      );
       expect(result).toBeDefined();
       expect(result?.id).toBe("v-jan");
       expect(result?.critical_weight).toBe(0.6);
@@ -282,7 +305,10 @@ describe("sidak-service versioning parity", () => {
         return { data: [], error: null };
       };
 
-      const result = await sidakService.resolveEffectiveRuleVersionForPeriod("call", "p-pre");
+      const result = await sidakService.resolveEffectiveRuleVersionForPeriod(
+        "call",
+        "p-pre",
+      );
       expect(result).toBeNull();
     });
   });

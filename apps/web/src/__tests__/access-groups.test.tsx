@@ -45,11 +45,26 @@ const mockScopeOptions = {
   ],
   agentsByTeam: {
     "Tim Alpha": [
-      { id: "agent-1", name: "Agent Alpha 1", team: "Tim Alpha", batch_name: "Batch A" },
-      { id: "agent-2", name: "Agent Alpha 2", team: "Tim Alpha", batch_name: "Batch B" },
+      {
+        id: "agent-1",
+        name: "Agent Alpha 1",
+        team: "Tim Alpha",
+        batch_name: "Batch A",
+      },
+      {
+        id: "agent-2",
+        name: "Agent Alpha 2",
+        team: "Tim Alpha",
+        batch_name: "Batch B",
+      },
     ],
     "Tim Beta": [
-      { id: "agent-3", name: "Agent Beta 1", team: "Tim Beta", batch_name: "Batch C" },
+      {
+        id: "agent-3",
+        name: "Agent Beta 1",
+        team: "Tim Beta",
+        batch_name: "Batch C",
+      },
     ],
   },
 };
@@ -96,9 +111,8 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
 
   describe("ruleValueOptions contract", () => {
     it("disables agent dropdown and shows placeholder when no team selected", async () => {
-      const { default: AccessGroupsPage } = await import(
-        "../routes/dashboard/access-groups"
-      );
+      const { default: AccessGroupsPage } =
+        await import("../routes/dashboard/access-groups");
       const { render } = await import("@testing-library/react");
       const userEvent = await import("@testing-library/user-event");
 
@@ -110,7 +124,10 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
       const selects = container.querySelectorAll("select");
       let agentSelect: HTMLSelectElement | null = null;
       for (const sel of selects) {
-        if (sel.options.length === 1 && sel.options[0].textContent?.includes("Pilih Team terlebih dahulu")) {
+        if (
+          sel.options.length === 1 &&
+          sel.options[0].textContent?.includes("Pilih Team terlebih dahulu")
+        ) {
           agentSelect = sel as HTMLSelectElement;
           break;
         }
@@ -122,9 +139,8 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
     }, 30000);
 
     it("enables agent dropdown after team is selected and shows correct agents", async () => {
-      const { default: AccessGroupsPage } = await import(
-        "../routes/dashboard/access-groups"
-      );
+      const { default: AccessGroupsPage } =
+        await import("../routes/dashboard/access-groups");
       const { render } = await import("@testing-library/react");
       const userEvent = await import("@testing-library/user-event");
 
@@ -137,7 +153,12 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
       let teamFilterSelect: HTMLSelectElement | null = null;
       for (const sel of selectsAfterMode) {
         const opts = Array.from(sel.options);
-        if (opts.length > 1 && opts.some((o) => o.textContent?.includes("Pilih Team terlebih dahulu"))) {
+        if (
+          opts.length > 1 &&
+          opts.some((o) =>
+            o.textContent?.includes("Pilih Team terlebih dahulu"),
+          )
+        ) {
           teamFilterSelect = sel as HTMLSelectElement;
           break;
         }
@@ -169,9 +190,8 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
     }, 30000);
 
     it("shows subfolder options under the Team rule type", async () => {
-      const { default: AccessGroupsPage } = await import(
-        "../routes/dashboard/access-groups"
-      );
+      const { default: AccessGroupsPage } =
+        await import("../routes/dashboard/access-groups");
       const { render } = await import("@testing-library/react");
 
       const { container } = render(<AccessGroupsPage />);
@@ -179,8 +199,11 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
       const tipeSelect = findSelectContainingOption(container, "Team");
       expect(tipeSelect.value).toBe("tim");
 
-      const teamSelect = Array.from(container.querySelectorAll("select")).find((sel) =>
-        Array.from(sel.options).some((option) => option.textContent?.includes("Batch B")),
+      const teamSelect = Array.from(container.querySelectorAll("select")).find(
+        (sel) =>
+          Array.from(sel.options).some((option) =>
+            option.textContent?.includes("Batch B"),
+          ),
       ) as HTMLSelectElement | undefined;
       expect(teamSelect).toBeDefined();
       if (!teamSelect) return;
@@ -195,15 +218,17 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
     }, 30000);
 
     it("saves a Team subfolder option as a batch_name rule", async () => {
-      const { default: AccessGroupsPage } = await import(
-        "../routes/dashboard/access-groups"
-      );
+      const { default: AccessGroupsPage } =
+        await import("../routes/dashboard/access-groups");
       const { render } = await import("@testing-library/react");
       const userEvent = await import("@testing-library/user-event");
 
       const { container } = render(<AccessGroupsPage />);
-      const teamSelect = Array.from(container.querySelectorAll("select")).find((sel) =>
-        Array.from(sel.options).some((option) => option.textContent?.includes("Batch B")),
+      const teamSelect = Array.from(container.querySelectorAll("select")).find(
+        (sel) =>
+          Array.from(sel.options).some((option) =>
+            option.textContent?.includes("Batch B"),
+          ),
       ) as HTMLSelectElement | undefined;
       expect(teamSelect).toBeDefined();
       if (!teamSelect) return;
@@ -230,9 +255,8 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
     }, 30000);
 
     it("shows cross-team agents not available via ruleValueOptions", async () => {
-      const { default: AccessGroupsPage } = await import(
-        "../routes/dashboard/access-groups"
-      );
+      const { default: AccessGroupsPage } =
+        await import("../routes/dashboard/access-groups");
       const { render } = await import("@testing-library/react");
       const userEvent = await import("@testing-library/user-event");
 
@@ -245,7 +269,12 @@ describe("access-groups-parity", { timeout: 30000 }, () => {
       let teamFilterSelect: HTMLSelectElement | null = null;
       for (const sel of selects) {
         const opts = Array.from(sel.options);
-        if (opts.length > 1 && opts.some((o) => o.textContent?.includes("Pilih Team terlebih dahulu"))) {
+        if (
+          opts.length > 1 &&
+          opts.some((o) =>
+            o.textContent?.includes("Pilih Team terlebih dahulu"),
+          )
+        ) {
           teamFilterSelect = sel as HTMLSelectElement;
           break;
         }

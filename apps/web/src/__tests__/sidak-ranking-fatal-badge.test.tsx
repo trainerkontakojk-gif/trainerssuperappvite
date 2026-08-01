@@ -45,12 +45,8 @@ const mockRankingResponse = {
       hasCritical: true,
     },
   ],
-  periods: [
-    { id: "period-1", month: 5, year: 2026, label: "05/2026" },
-  ],
-  folders: [
-    { id: "ALL", name: "Semua Tim" },
-  ],
+  periods: [{ id: "period-1", month: 5, year: 2026, label: "05/2026" }],
+  folders: [{ id: "ALL", name: "Semua Tim" }],
   availableYears: [2025, 2026],
 };
 
@@ -86,7 +82,7 @@ describe("Sidak Ranking Fatal Parity", () => {
     // "Fatal" badge should be present for agent-fatal but NOT for agent-normal
     const fatalBadges = screen.getAllByText("Fatal");
     expect(fatalBadges).toHaveLength(1);
-    
+
     // Verify that the Fatal badge is closer to Agent Fatal
     const agentFatalRow = screen.getByText("Agent Fatal").closest("tr");
     expect(agentFatalRow).toHaveTextContent("Fatal");

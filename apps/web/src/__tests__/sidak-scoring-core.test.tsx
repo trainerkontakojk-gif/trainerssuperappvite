@@ -1,10 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   resolveServiceTypeFromTeam,
   calculateQAScoreFromTemuan,
+  scoreColor,
+  scoreBg,
+  scoreLabel,
   NILAI_LABELS,
   NILAI_BADGE_COLORS,
-  DEFAULT_SERVICE_WEIGHTS,
 } from "../lib/scoring";
 import type { QAIndicator, ServiceWeight } from "@trainers/types";
 
@@ -56,12 +58,30 @@ describe("NILAI_BADGE_COLORS", () => {
 });
 
 // ── calculateQAScoreFromTemuan ────────────────────────────
-function makeInd(id: string, cat: "critical" | "non_critical", bobot: number): QAIndicator {
-  return { id, service_type: "call", name: id, category: cat, bobot, has_na: false };
+function makeInd(
+  id: string,
+  cat: "critical" | "non_critical",
+  bobot: number,
+): QAIndicator {
+  return {
+    id,
+    service_type: "call",
+    name: id,
+    category: cat,
+    bobot,
+    has_na: false,
+  };
 }
 
-function makeWeight(mode: "weighted" | "flat" | "no_category" = "weighted"): ServiceWeight {
-  return { service_type: "call", critical_weight: 0.5, non_critical_weight: 0.5, scoring_mode: mode };
+function makeWeight(
+  mode: "weighted" | "flat" | "no_category" = "weighted",
+): ServiceWeight {
+  return {
+    service_type: "call",
+    critical_weight: 0.5,
+    non_critical_weight: 0.5,
+    scoring_mode: mode,
+  };
 }
 
 describe("calculateQAScoreFromTemuan", () => {
@@ -81,10 +101,12 @@ describe("calculateQAScoreFromTemuan", () => {
       makeInd("i1", "non_critical", 0.5),
       makeInd("i2", "critical", 0.5),
     ];
-    const temuan = [
-      { indicator_id: "i1", nilai: 3, no_tiket: "TKT001" },
-    ];
-    const result = calculateQAScoreFromTemuan(inds, temuan, makeWeight("weighted"));
+    const temuan = [{ indicator_id: "i1", nilai: 3, no_tiket: "TKT001" }];
+    const result = calculateQAScoreFromTemuan(
+      inds,
+      temuan,
+      makeWeight("weighted"),
+    );
     expect(result).not.toBeNull();
     expect(result!.mode).toBe("weighted");
     expect(result!.sessionCount).toBe(1);
@@ -97,9 +119,7 @@ describe("calculateQAScoreFromTemuan", () => {
       makeInd("i1", "non_critical", 0.5),
       makeInd("i2", "critical", 0.5),
     ];
-    const temuan = [
-      { indicator_id: "i1", nilai: 2, no_tiket: "TKT001" },
-    ];
+    const temuan = [{ indicator_id: "i1", nilai: 2, no_tiket: "TKT001" }];
     const result = calculateQAScoreFromTemuan(inds, temuan, makeWeight("flat"));
     expect(result).not.toBeNull();
     expect(result!.mode).toBe("flat");
@@ -111,10 +131,12 @@ describe("calculateQAScoreFromTemuan", () => {
       makeInd("i1", "non_critical", 0.5),
       makeInd("i2", "critical", 0.5),
     ];
-    const temuan = [
-      { indicator_id: "i1", nilai: 2, no_tiket: "TKT001" },
-    ];
-    const result = calculateQAScoreFromTemuan(inds, temuan, makeWeight("no_category"));
+    const temuan = [{ indicator_id: "i1", nilai: 2, no_tiket: "TKT001" }];
+    const result = calculateQAScoreFromTemuan(
+      inds,
+      temuan,
+      makeWeight("no_category"),
+    );
     expect(result).not.toBeNull();
     expect(result!.mode).toBe("no_category");
     expect(result!.nonCriticalScore).toBe(result!.criticalScore);
@@ -177,4 +199,31 @@ describe("Sesi Tanpa Temuan — hasBadFindings logic", () => {
   });
 });
 
+describe("scoring color/label helpers (moved from sidak-input-parity)", () => {
+  it("scoreColor returns green for high scores", () => {
+    expect(scoreColor(85)).toContain("green");
+    expect(scoreColor(100)).toContain("green");
+  });
 
+  it("scoreColor returns amber for medium scores", () => {
+    expect(scoreColor(70)).toContain("amber");
+    expect(scoreColor(84)).toContain("amber");
+  });
+
+  it("scoreColor returns red for low scores", () => {
+    expect(scoreColor(0)).toContain("red");
+    expect(scoreColor(69)).toContain("red");
+  });
+
+  it("scoreBg returns appropriate background colors", () => {
+    expect(scoreBg(90)).toContain("green");
+    expect(scoreBg(75)).toContain("amber");
+    expect(scoreBg(50)).toContain("red");
+  });
+
+  it("scoreLabel returns correct Indonesian labels", () => {
+    expect(scoreLabel(85)).toBe("Baik");
+    expect(scoreLabel(72)).toBe("Cukup");
+    expect(scoreLabel(0)).toBe("Perlu Perhatian");
+  });
+});

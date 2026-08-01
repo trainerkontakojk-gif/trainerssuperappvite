@@ -199,5 +199,10 @@ Cek ulang setelah selesai. Kegagalan mematuhi → redesign.
 - **Supabase Hybrid Client**: User JWT (default, hormati RLS) / Admin Service Role (backend-only untuk AI logging, background jobs, reports). **NEVER** query data sensitif langsung dari frontend.
 - **Error Handling**: Jangan expose error database mentah ke user. Berikan pesan manusiawi.
 - **Linting**: ESLint 9 flat config (`eslint.config.mjs` root). `typescript-eslint` recommended, `react-hooks`, `react-refresh`. Unused vars prefix `_` (warning). `no-explicit-any` dimatikan. Format via Prettier (`pnpm format`).
+- **Test Hygiene**:
+  - Test "parity/legacy" bersifat transisi: setelah migrasi landing, test tsb WAJIB dihapus di commit yang sama (bukan dipertahankan selamanya). Jika kontennya masih kontrak aktif, rename ke nama kontrak (tanpa sufiks `-parity`/`-legacy`).
+  - Konsolidasi per modul: jangan buat file test baru per bug/commit — perluas `describe` di file modul yang ada. File 1-test hanya untuk kontrak yang benar-benar terpisah.
+  - File test dengan harness mock berbeda (mis. `FakeWebSocket`) sebaiknya berbagi helper di `src/__tests__/helpers/`, bukan duplikasi per file.
+  - `scripts/test-core.json` adalah daftar gate kritis: file `.tsx` di daftar ini WAJIB benar-benar tereksekusi (jangan pakai config yang exclude `.tsx`); hapus/update entri saat test dihapus/di-rename.
 - **Scope dokumentasi**: Hanya `docs/`, `AGENTS.md`, dan Wiki yang boleh disentuh untuk perubahan dokumentasi/instruksi. Jangan modifikasi product code, tests, config, migrasi, plans, package files, commit, atau push tanpa otorisasi eksplisit. Jangan expose secret/credentials.
 - **Docs + Wiki sync**: Setelah update docs, sync ke Wiki jika summary/navigasi/public contract Wiki terpengaruh.
