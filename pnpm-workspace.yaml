@@ -4,6 +4,12 @@ packages:
 
 overrides:
   uuid: ^11.1.1
+  # Security: force patched transitives (pnpm audit --prod)
+  brace-expansion@<2: 1.1.18
+  brace-expansion@^2.0.1: 2.1.4
+  fast-uri: 3.1.5
+  dompurify: ^3.4.12
+  protobufjs: ^7.6.5
 
 allowBuilds:
   "@google/genai": true
@@ -11,3 +17,6 @@ allowBuilds:
   "ecc-universal": true
   "esbuild": true
   "protobufjs": true
+
+minimumReleaseAgeExclude:
+  - fast-uri@3.1.5

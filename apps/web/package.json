@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "test": "vitest run",
     "test:targeted": "vitest run --config vitest.config.fast.ts --changed",
-    "test:core": "vitest run --config vitest.config.fast.ts src/__tests__/logout-redirect.test.ts src/__tests__/route-guards.test.ts src/__tests__/sidak-input-legacy-refresh.test.tsx src/__tests__/top-tickets-legacy-parity.test.ts src/__tests__/telefun-session-finalizer.test.ts src/__tests__/telefun-communication-profile.test.tsx src/__tests__/pdkt-mailbox.test.tsx src/__tests__/ketik-review-progress.test.tsx",
+    "test:core": "node ../../scripts/test-core.mjs web",
     "test:fast": "vitest run --config vitest.config.fast.ts",
     "test:full": "vitest run",
     "test:e2e": "playwright test",

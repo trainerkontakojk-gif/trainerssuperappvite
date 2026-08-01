@@ -50,7 +50,8 @@ Gunakan dokumen spesifik di bawah ini saat memodifikasi modul untuk memastikan k
 - Jalankan `pnpm lint` untuk validasi lint cepat.
 - Jalankan `pnpm test` untuk menjalankan seluruh test suite (1056+ API + 500+ web tests).
 - Jalankan `pnpm test:fast` untuk test cepat (exclude .tsx, ~1-2 menit).
-- Jalankan `pnpm test:core` untuk test kontrak kritis lintas modul (~30-60s).
+- Jalankan `pnpm audit --prod` untuk memantau advisory dependensi; overrides keamanan (brace-expansion, fast-uri, dompurify, protobufjs) terpusat di `pnpm-workspace.yaml` — update di sana, bukan di `package.json` app.
+- Jalankan `pnpm test:core` untuk test kontrak kritis lintas modul (~30-60s). Daftar file yang digate diatur terpusat di [`scripts/test-core.json`](../scripts/test-core.json) (runner: `scripts/test-core.mjs`) — tambahkan test kritis baru ke daftar itu, bukan ke `package.json`.
 - Jalankan `pnpm --filter @trainers/api test` untuk test API service saja.
 - Jalankan `pnpm --filter @trainers/web test` untuk test frontend saja.
 - Jalankan `pnpm build` untuk validasi build production.

@@ -73,7 +73,7 @@ Gunakan skill Pi dengan instruksi spesifik. Untuk audit mendalam multi-worker, g
 | `pnpm lint`                        | ESLint 9 flat config (`eslint.config.mjs` root)   |
 | `pnpm format`                      | Prettier                                          |
 | `pnpm test:targeted`               | 10-30s — development (`vitest --changed`)         |
-| `pnpm test:core`                   | 30-60s — kontrak kritis lintas modul (pre-push)   |
+| `pnpm test:core`                   | 30-60s — kontrak kritis lintas modul (pre-push). Daftar file terpusat di `scripts/test-core.json` — tambah test kritis baru di sana |
 | `pnpm test:fast`                   | 1-2min — unit test ringan (pre-merge)             |
 | `pnpm test`                        | ~5min — full suite (CI/release)                   |
 | `pnpm --filter @trainers/api test` | API only                                          |
