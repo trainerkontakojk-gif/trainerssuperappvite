@@ -206,10 +206,10 @@ export default function SidakInputImportPanel({
                   </div>
                   {invalidRows.length > 0 && (
                     <div className="bg-red-500/5 rounded-lg p-3 text-center border border-red-500/20">
-                      <p className="text-xl font-bold text-red-650">
+                      <p className="text-xl font-bold text-red-600">
                         {invalidRows.length}
                       </p>
-                      <p className="text-[10px] text-red-650 font-semibold uppercase tracking-wide">
+                      <p className="text-[10px] text-red-600 font-semibold uppercase tracking-wide">
                         Error
                       </p>
                     </div>

@@ -34,7 +34,7 @@ Ikuti hierarki instruksi dan urutan kerja di [`docs/AGENT_WORKFLOW.md`](docs/AGE
 ## 3. Agent & Subagent Execution
 
 - **Pi skills** — gunakan skill yang relevan untuk eksplorasi, implementasi, debugging, testing.
-- **Pi orchestrator-mode** — opt-in untuk task kompleks; worker dijalankan sebagai proses Pi terpisah via tmux.
+- **Pi orchestrator-mode** — opt-in untuk task kompleks (min. 2–3 scope independen atau multi-phase gate; task 1-worker dikerjakan langsung di session utama). Worker dijalankan sebagai proses Pi terpisah via tmux. WAJIB ikuti aturan efisiensi di skill `orchestrator-mode`: contract-first (`contract.md`) sebelum implementasi paralel lintas modul, batasi gate ≤ 2 iterasi, batched discovery, bundle repair per gate round.
 - Instruksi ke worker Pi WAJIB sertakan konteks monorepo (`apps/web`, `apps/api`, `packages/types`).
 
 ### Kode — Wajib Semua Perubahan Kode Non-Docs
@@ -47,7 +47,7 @@ Ikuti hierarki instruksi dan urutan kerja di [`docs/AGENT_WORKFLOW.md`](docs/AGE
 Dua skill saling melengkapi:
 
 - **UI/UX Pro Max** (`ui-ux-pro-max`) — Referensi design: cari style, palette, font, guideline sebelum memulai fitur UI baru.
-- **Impeccable** (`impeccable`) — Quality checker: `audit`/`polish` wajib sebelum PR dengan perubahan UI. Hooks auto-run setelah edit file UI — perhatikan outputnya.
+- **Impeccable** (`impeccable`) — Quality checker: `audit`/`polish` wajib sebelum PR dengan perubahan UI. **Catatan: design hook (auto-run setelah edit file UI) TIDAK aktif di harness Pi** — tidak ada hook manifest terpasang di repo ini untuk Pi. Audit harus dijalankan secara eksplisit dengan skill `impeccable` setelah implementasi UI.
 
 Urutan: UI/UX Pro Max → Coding → Impeccable audit/polish → critique jika perlu.
 Agent WAJIB load/use skill `ui-ux-pro-max` dan `impeccable` by name (`skill_view`) lalu ikuti instruksi masing-masing.

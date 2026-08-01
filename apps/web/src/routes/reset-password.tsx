@@ -85,24 +85,24 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-fg">
             Trainers SuperApp
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Workspace internal</p>
+          <p className="text-sm text-fg2 mt-1">Workspace internal</p>
         </div>
-        <div className="bg-white rounded-2xl border shadow-sm p-6">
+        <div className="bg-surface rounded-2xl border shadow-sm p-6">
           {sessionError ? (
             <div className="py-8 text-center">
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600">
                 <X className="h-8 w-8" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-fg">
                 Tautan tidak valid
               </h2>
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-fg2">
                 Tautan pemulihan mungkin sudah kedaluwarsa atau tidak valid.
               </p>
               <button
@@ -115,10 +115,10 @@ export default function ResetPasswordPage() {
           ) : !sessionReady ? (
             <div className="py-12 text-center">
               <Loader2 className="mx-auto mb-5 h-10 w-10 animate-spin text-indigo-600" />
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-fg">
                 Memvalidasi tautan reset
               </h2>
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-fg2">
                 Mohon tunggu sebentar, kami sedang memastikan sesi pemulihan
                 Anda aktif.
               </p>
@@ -128,10 +128,10 @@ export default function ResetPasswordPage() {
               <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
                 <CheckCircle className="h-8 w-8" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-fg">
                 Password berhasil diubah
               </h2>
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="mt-3 text-sm text-fg2">
                 Anda akan diarahkan kembali ke dashboard dalam beberapa detik.
               </p>
             </div>
@@ -140,15 +140,15 @@ export default function ResetPasswordPage() {
               <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
                 <KeyRound className="h-6 w-6" />
               </div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-fg">
                 Buat password baru
               </h2>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-fg2">
                 Gunakan password yang kuat agar akses ke platform tetap aman.
               </p>
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-fg2">
                     Password baru
                   </span>
                   <input
@@ -156,12 +156,12 @@ export default function ResetPasswordPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 transition"
+                    className="w-full rounded-xl border border-border px-4 py-2.5 text-sm outline-none focus:border-fg transition"
                     placeholder="••••••••"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-fg2">
                     Konfirmasi password
                   </span>
                   <input
@@ -169,7 +169,7 @@ export default function ResetPasswordPage() {
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     required
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 transition"
+                    className="w-full rounded-xl border border-border px-4 py-2.5 text-sm outline-none focus:border-fg transition"
                     placeholder="••••••••"
                   />
                 </label>

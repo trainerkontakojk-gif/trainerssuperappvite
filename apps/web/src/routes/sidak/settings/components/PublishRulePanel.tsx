@@ -63,7 +63,7 @@ export function PublishRulePanel({
             Anda dapat mengubah parameter dan bobot pada draft ini. Publish draft ini untuk menjadikannya rule efektif mulai bulan tertentu.
           </p>
           <div className="flex items-center gap-2 mt-2">
-            <Clock className="w-3.5 h-3.5 text-amber-650" />
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
             <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">
               Target: {getPeriodLabel(selectedVersion.effective_period_id)}
             </span>

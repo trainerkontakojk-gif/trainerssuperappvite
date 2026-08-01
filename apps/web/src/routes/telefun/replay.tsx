@@ -155,7 +155,7 @@ export default function TelefunReplay() {
   if (!session) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-500">Sesi tidak ditemukan.</p>
+        <p className="text-fg2">Sesi tidak ditemukan.</p>
         <Link
           to="/telefun"
           className="text-indigo-600 hover:underline mt-4 inline-block"
@@ -171,13 +171,13 @@ export default function TelefunReplay() {
       <div className="flex items-center justify-between">
         <Link
           to="/telefun"
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+          className="flex items-center gap-1 text-sm text-fg2 hover:text-fg"
         >
           <ChevronLeft size={16} /> Kembali
         </Link>
         <div className="text-right">
           <h1 className="text-xl font-bold">Replay Sesi Telefun</h1>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-fg3">
             {new Date(session.created_at).toLocaleString()}
           </p>
         </div>
@@ -186,9 +186,9 @@ export default function TelefunReplay() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Player Area */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border shadow-sm p-8 space-y-8">
+          <div className="bg-surface rounded-2xl border shadow-sm p-8 space-y-8">
             {/* Audio Visualizer Placeholder */}
-            <div className="h-24 bg-gray-50 rounded-xl relative overflow-hidden flex items-center justify-center">
+            <div className="h-24 bg-surface-sunken rounded-xl relative overflow-hidden flex items-center justify-center">
               <div className="flex items-end gap-0.5 h-12 w-full px-4">
                 {Array.from({ length: 100 }).map((_, i) => (
                   <div
@@ -196,7 +196,7 @@ export default function TelefunReplay() {
                     className={`flex-1 rounded-full transition-all ${
                       (i / 100) * duration <= currentTime
                         ? "bg-indigo-500"
-                        : "bg-gray-200"
+                        : "bg-border"
                     }`}
                     style={{ height: `${barHeights[i]}%` }}
                   />
@@ -227,10 +227,10 @@ export default function TelefunReplay() {
                   )}
                 </button>
                 <div className="text-sm font-mono">
-                  <span className="font-bold text-gray-900">
+                  <span className="font-bold text-fg">
                     {formatTime(currentTime)}
                   </span>
-                  <span className="text-gray-400">
+                  <span className="text-fg3">
                     {" "}
                     / {formatTime(duration)}
                   </span>
@@ -240,13 +240,13 @@ export default function TelefunReplay() {
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => handleSeek(0)}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-2 text-fg3 hover:text-fg2 transition-colors"
                 >
                   <RotateCcw size={20} />
                 </button>
                 <div className="flex items-center gap-2">
-                  <Volume2 size={18} className="text-gray-400" />
-                  <div className="w-24 h-1 bg-gray-200 rounded-full">
+                  <Volume2 size={18} className="text-fg3" />
+                  <div className="w-24 h-1 bg-border rounded-full">
                     <div className="w-3/4 h-full bg-indigo-500 rounded-full" />
                   </div>
                 </div>
@@ -263,8 +263,8 @@ export default function TelefunReplay() {
           </div>
 
           {/* Coaching Summary */}
-          <div className="bg-white rounded-2xl border shadow-sm p-6">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+          <div className="bg-surface rounded-2xl border shadow-sm p-6">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-fg3 mb-4 flex items-center gap-2">
               <Lightbulb size={16} className="text-amber-500" />
               AI Coaching Recommendations
             </h2>
@@ -288,7 +288,7 @@ export default function TelefunReplay() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-gray-400 italic">
+                <p className="text-sm text-fg3 italic">
                   Belum ada ringkasan coaching.
                 </p>
               )}
@@ -298,13 +298,13 @@ export default function TelefunReplay() {
 
         {/* Annotations Sidebar */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border shadow-sm flex flex-col h-full max-h-[600px]">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <div className="bg-surface rounded-2xl border shadow-sm flex flex-col h-full max-h-[600px]">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-sm font-bold text-fg flex items-center gap-2">
                 <MessageSquare size={16} className="text-indigo-600" />
                 Annotations
               </h2>
-              <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+              <span className="text-[10px] font-bold text-fg3 bg-surface px-2 py-1 rounded-lg">
                 {annotations?.length || 0}
               </span>
             </div>
@@ -313,7 +313,7 @@ export default function TelefunReplay() {
               {annotations?.map((anno) => (
                 <div
                   key={anno.id}
-                  className="group relative p-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all"
+                  className="group relative p-3 rounded-xl border border-border hover:border-indigo-200 hover:bg-indigo-50/30 transition-all"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <button
@@ -338,18 +338,18 @@ export default function TelefunReplay() {
                       {anno.category === "critical_moment" && (
                         <Zap size={12} className="text-red-500 fill-red-500" />
                       )}
-                      <span className="text-[9px] font-bold uppercase tracking-wide text-gray-400">
+                      <span className="text-[9px] font-bold uppercase tracking-wide text-fg3">
                         {anno.category.replace("_", " ")}
                       </span>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-700 leading-relaxed">
+                  <p className="text-xs text-fg2 leading-relaxed">
                     {anno.text}
                   </p>
                   {anno.is_manual && (
                     <button
                       onClick={() => handleDeleteAnnotation(anno.id)}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-fg3 hover:text-red-500 transition-all"
                     >
                       <Trash2 size={12} />
                     </button>
@@ -357,13 +357,13 @@ export default function TelefunReplay() {
                 </div>
               ))}
               {(!annotations || annotations.length === 0) && (
-                <div className="text-center py-8 text-xs text-gray-400 italic">
+                <div className="text-center py-8 text-xs text-fg3 italic">
                   Belum ada anotasi.
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-gray-100 space-y-3">
+            <div className="p-4 border-t border-border space-y-3">
               <div className="flex gap-2">
                 {(
                   [
@@ -381,7 +381,7 @@ export default function TelefunReplay() {
                     className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold uppercase transition-all ${
                       newAnnotation.category === cat
                         ? "bg-indigo-600 text-white shadow-sm"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        : "bg-surface text-fg2 hover:bg-surface-sunken"
                     }`}
                   >
                     {cat[0]}
@@ -397,7 +397,7 @@ export default function TelefunReplay() {
                   }))
                 }
                 placeholder="Tambah catatan di menit ini..."
-                className="w-full p-3 text-xs border border-gray-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none h-20"
+                className="w-full p-3 text-xs border border-border rounded-xl focus:ring-1 focus:ring-fg focus:border-fg outline-none resize-none h-20"
               />
               <button
                 onClick={handleAddAnnotation}

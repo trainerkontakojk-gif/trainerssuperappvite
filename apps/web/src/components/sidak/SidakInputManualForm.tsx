@@ -126,7 +126,7 @@ export default function SidakInputManualForm({
                 {entries.length > 1 && (
                   <button
                     onClick={() => onRemoveEntry(entry.uid)}
-                    className="text-muted-foreground hover:text-red-500 p-1.5 rounded-lg hover:bg-red-550/10"
+                    className="text-muted-foreground hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

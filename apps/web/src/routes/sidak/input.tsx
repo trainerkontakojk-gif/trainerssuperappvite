@@ -488,7 +488,7 @@ export default function SidakInputPage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="p-3.5 rounded-lg bg-red-500/5 border border-red-500/25 text-red-650 text-sm flex items-center gap-2"
+                className="p-3.5 rounded-lg bg-red-500/5 border border-red-500/25 text-red-600 text-sm flex items-center gap-2"
               >
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {errorMsg}

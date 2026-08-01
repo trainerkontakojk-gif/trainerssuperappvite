@@ -129,13 +129,13 @@ export default function AccountPage() {
   return (
     <div className="mx-auto w-full max-w-3xl">
       <header className="mb-8">
-        <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        <p className="text-xs font-bold uppercase tracking-wider text-fg2">
           Akun
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">
+        <h1 className="mt-2 text-2xl font-bold text-fg">
           Pengaturan profil
         </h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-fg2">
           Kelola nama tampilan dan password akun Anda dari satu halaman.
         </p>
       </header>
@@ -146,16 +146,16 @@ export default function AccountPage() {
         </p>
       )}
 
-      <section className="rounded-2xl border bg-white p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-900">
+      <section className="rounded-2xl border bg-surface p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-fg">
           Profil pengguna
         </h2>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-fg2">
           Email login: {loadingProfile ? "Memuat..." : email || "-"}
         </p>
         <form onSubmit={handleSaveName} className="mt-5 space-y-4">
           <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg2">
               Nama tampil
             </span>
             <input
@@ -163,7 +163,7 @@ export default function AccountPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Masukkan nama"
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500"
+              className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none transition focus:border-fg"
             />
           </label>
           <button
@@ -179,16 +179,16 @@ export default function AccountPage() {
         </form>
       </section>
 
-      <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-900">
+      <section className="mt-6 rounded-2xl border bg-surface p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-fg">
           Ganti password
         </h2>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-fg2">
           Gunakan minimal 6 karakter agar akun tetap aman.
         </p>
         <form onSubmit={handleSavePassword} className="mt-5 space-y-4">
           <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg2">
               Password baru
             </span>
             <input
@@ -196,11 +196,11 @@ export default function AccountPage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500"
+              className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none transition focus:border-fg"
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg2">
               Konfirmasi password
             </span>
             <input
@@ -208,7 +208,7 @@ export default function AccountPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-indigo-500"
+              className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm outline-none transition focus:border-fg"
             />
           </label>
           <button
@@ -224,11 +224,11 @@ export default function AccountPage() {
         </form>
       </section>
 
-      <section className="mt-6 rounded-2xl border bg-white p-6 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-900">
+      <section className="mt-6 rounded-2xl border bg-surface p-6 shadow-sm">
+        <h2 className="text-base font-semibold text-fg">
           Keamanan sesi
         </h2>
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-fg2">
           Keluar dari browser ini sekarang. Perangkat lain akan diminta login
           ulang saat sesi mereka dipakai kembali.
         </p>
