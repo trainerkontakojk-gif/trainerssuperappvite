@@ -1,8 +1,8 @@
 # Audit Teknis Migrasi Telefun OpenAI Realtime dari WebSocket ke WebRTC
 
-**Status:** Audit read-only selesai  
-**Tanggal audit:** 28 Juli 2026  
-**Ruang lingkup:** Telefun frontend, API, proxy realtime, Railway, Supabase, recording, transcript, evaluasi, dan usage logging  
+**Status:** Audit read-only selesai
+**Tanggal audit:** 28 Juli 2026
+**Ruang lingkup:** Telefun frontend, API, proxy realtime, Railway, Supabase, recording, transcript, evaluasi, dan usage logging
 **Keputusan:** WebRTC dapat diimplementasikan, tetapi membutuhkan refactor besar pada jalur OpenAI. Jalur Gemini dapat dipertahankan melalui WebSocket lama.
 
 ## Ringkasan Eksekutif

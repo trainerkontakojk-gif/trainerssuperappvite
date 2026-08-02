@@ -26,7 +26,11 @@ dist
 opencode.json
 .superpowers
 docs/superpowers/
-plan/
+# Plans: ignore all untracked plan artifacts except the explicitly reviewed migration plan.
+/plan/*
+!/plan/markdown/
+/plan/markdown/*
+!/plan/markdown/telefun-openai-webrtc-migration.md
 .agents/
 .codex/
 skills-lock.json

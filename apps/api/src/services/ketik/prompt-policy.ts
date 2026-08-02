@@ -103,15 +103,13 @@ export function compactChatHistory(
 
   // Cari indeks awal yang muat dalam budget
   let startIndex = chatHistory.length - 1;
-  let current = chatHistory.slice(startIndex);
-  let currentSize = serializedSize(current);
+  let currentSize = serializedSize(chatHistory.slice(startIndex));
 
   while (currentSize <= budget && startIndex > 0) {
     startIndex -= 1;
     const candidate = chatHistory.slice(startIndex);
     const candidateSize = serializedSize(candidate);
     if (candidateSize <= budget) {
-      current = candidate;
       currentSize = candidateSize;
     } else {
       startIndex += 1;

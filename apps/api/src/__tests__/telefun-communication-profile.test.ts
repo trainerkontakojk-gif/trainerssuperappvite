@@ -841,7 +841,7 @@ describe("getMetricStatus — absolute deviation symmetry", () => {
 
   it("speakingRate target 70: builder produces symmetric status via getMetricStatus", () => {
     // WPM 140 → displayScore 70 (exact target) → distance 0 → good
-    let profile = buildCommunicationProfileFromAssessment({
+    const profile = buildCommunicationProfileFromAssessment({
       overallScore: 8,
       speakingRate: { score: 7, wordsPerMinute: 140, verdict: "Baik", feedback: "" },
       intonation: { score: 8, verdict: "Baik", feedback: "" },
@@ -852,14 +852,14 @@ describe("getMetricStatus — absolute deviation symmetry", () => {
       highlights: [],
       strengths: [],
     });
-    let sr = profile!.metrics.find(m => m.key === "speakingRate")!;
+    const sr = profile!.metrics.find(m => m.key === "speakingRate")!;
     expect(sr.displayScore).toBe(70);
     expect(sr.status).toBe("good");
   });
 
   it("speakingRate target 70: needs_improvement when far from target through builder", () => {
     // WPM 118 → displayScore ~56 (distance 14 from target 70) → needs_improvement
-    let profile = buildCommunicationProfileFromAssessment({
+    const profile = buildCommunicationProfileFromAssessment({
       overallScore: 8,
       speakingRate: { score: 4, wordsPerMinute: 118, verdict: "Cukup", feedback: "" },
       intonation: { score: 8, verdict: "Baik", feedback: "" },
@@ -870,7 +870,7 @@ describe("getMetricStatus — absolute deviation symmetry", () => {
       highlights: [],
       strengths: [],
     });
-    let sr = profile!.metrics.find(m => m.key === "speakingRate")!;
+    const sr = profile!.metrics.find(m => m.key === "speakingRate")!;
     expect(sr.displayScore).toBe(56);
     expect(sr.status).toBe("needs_improvement");
   });

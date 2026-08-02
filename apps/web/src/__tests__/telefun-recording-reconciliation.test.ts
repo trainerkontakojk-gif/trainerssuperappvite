@@ -494,7 +494,7 @@ describe("Telefun recording reconciliation", () => {
         .fn()
         .mockRejectedValueOnce(Object.assign(new Error("bad path"), { code: "400" }))
         .mockRejectedValueOnce(Object.assign(new Error("conflict"), { code: "409" }))
-        .mockRejectedValueOnce(Object.assign(new Error("conflict"), { code: "409" })), 
+        .mockRejectedValueOnce(Object.assign(new Error("conflict"), { code: "409" })),
     });
     const reconciliation = createRecordingReconciliation({
       store: state.store,
