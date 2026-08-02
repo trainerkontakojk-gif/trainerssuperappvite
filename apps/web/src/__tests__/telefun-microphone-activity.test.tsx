@@ -51,11 +51,7 @@ describe("MicrophoneActivityWaveform", () => {
 
   it("renders quiet bars when inactive", () => {
     render(
-      <MicrophoneActivityWaveform
-        bars={[]}
-        active={false}
-        tone="silent"
-      />,
+      <MicrophoneActivityWaveform bars={[]} active={false} tone="silent" />,
     );
 
     expect(screen.getByTestId("telefun-mic-waveform")).toHaveAttribute(
@@ -66,11 +62,7 @@ describe("MicrophoneActivityWaveform", () => {
 
   it("renders fallback quiet bars when bars array is empty", () => {
     render(
-      <MicrophoneActivityWaveform
-        bars={[]}
-        active={true}
-        tone="silent"
-      />,
+      <MicrophoneActivityWaveform bars={[]} active={true} tone="silent" />,
     );
 
     const bars = screen.getAllByTestId("telefun-mic-waveform-bar");
@@ -103,7 +95,9 @@ describe("MicrophoneActivityWaveform", () => {
   });
 });
 
-function createMockMediaDevices(stream: { getTracks: () => { stop: () => void }[] } | null) {
+function createMockMediaDevices(
+  stream: { getTracks: () => { stop: () => void }[] } | null,
+) {
   const mock = {
     getUserMedia: vi.fn().mockResolvedValue(stream),
   };
@@ -188,6 +182,32 @@ describe("useMicrophoneActivity", () => {
 
     expect(result.current.isListening).toBe(true);
     expect(result.current.isSupported).toBe(true);
+  });
+
+  it("reuses an injected transport stream and never stops its tracks", async () => {
+    const { mockSource, mockAnalyser, mockAudioContext } = setupWebAudioMock();
+    const stop = vi.fn();
+    const injectedStream = {
+      getTracks: () => [{ stop }],
+    } as unknown as MediaStream;
+    const mediaDevices = createMockMediaDevices(null);
+    mediaDevices.getUserMedia.mockRejectedValue(new Error("second capture"));
+
+    const { result, unmount } = renderHook(() =>
+      useMicrophoneActivity({
+        active: true,
+        muted: false,
+        stream: injectedStream,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.isListening).toBe(true));
+    expect(mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    unmount();
+    expect(stop).not.toHaveBeenCalled();
+    expect(mockSource.disconnect).toHaveBeenCalled();
+    expect(mockAnalyser.disconnect).toHaveBeenCalled();
+    expect(mockAudioContext.close).toHaveBeenCalled();
   });
 
   it("stops microphone resources on unmount", async () => {

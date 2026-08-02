@@ -1,4 +1,4 @@
-import { createServer } from "http";
+import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { randomUUID } from "crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { env } from "./env.js";
@@ -14,8 +14,16 @@ import {
   summarizeOpenAIUsageAccumulator,
   getOpenAIUsageDiagnostics,
   flushOpenAIRealtimeUsage,
+  recordFailedOpenAIRealtimeUsage,
 } from "./usage.js";
-import { createSession, updateSession, getOwnedSessionId } from "./db.js";
+import {
+  createSession,
+  updateSession,
+  createTelefunWebRtcDb,
+  getOwnedSessionId,
+  getWebRtcProfile,
+  getWebRtcSession,
+} from "./db.js";
 import { TurnManager } from "./turn-taking.js";
 import { TranscriptCollector } from "./transcript.js";
 import {
@@ -48,20 +56,170 @@ import {
   handleInternalScoringRequest,
   INTERNAL_SCORING_PATH,
 } from "./internal-scoring-http.js";
+import {
+  createOpenAIWebRtcHttpHandler,
+  isOpenAIWebRtcRequest,
+} from "./realtime-webrtc/http-broker.js";
+import { createWebRtcCallManager } from "./realtime-webrtc/call-manager.js";
+import { createOpenAiCallsClient } from "./realtime-webrtc/openai-calls-client.js";
+import { createSidebandClient } from "./realtime-webrtc/sideband-client.js";
+import { POC_MODEL_ID } from "./realtime-webrtc/contracts.js";
+import { createDistributedWebRtcLeaseCoordinator } from "./realtime-webrtc/distributed-lease.js";
+import { createOrphanCleanupWorker } from "./realtime-webrtc/orphan-cleanup.js";
+import {
+  decryptProviderCallReference,
+  encryptProviderCallReference,
+} from "./realtime-webrtc/provider-reference.js";
+import {
+  createWebRtcMetricRecorder,
+  redactProviderDiagnostic,
+} from "./realtime-webrtc/observability.js";
+import { createShutdownCoordinator } from "./shutdown-coordinator.js";
 
-process.on("uncaughtException", (err) =>
-  console.error("[Telefun] Uncaught:", err),
+process.on("uncaughtException", () =>
+  console.error("[Telefun] Uncaught:", redactProviderDiagnostic(undefined)),
 );
-process.on("unhandledRejection", (reason) =>
-  console.error("[Telefun] Unhandled Rejection:", reason),
+process.on("unhandledRejection", () =>
+  console.error(
+    "[Telefun] Unhandled Rejection:",
+    redactProviderDiagnostic(undefined),
+  ),
 );
+
+const openAIWebRtcDb = createTelefunWebRtcDb();
+const webRtcMetricRecorder = createWebRtcMetricRecorder(async (metric) => {
+  await openAIWebRtcDb.recordMetric?.(metric);
+});
+const WEBRTC_SHUTDOWN_TIMEOUT_MS = 30_000;
+const openAICallsClient = createOpenAiCallsClient({
+  apiKey: env.OPENAI_API_KEY ?? "",
+  timeoutMs: env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS,
+});
+const openAIWebRtcLease = createDistributedWebRtcLeaseCoordinator(
+  {
+    acquire: (input) => openAIWebRtcDb.acquireLease!(input),
+    renew: (input) => openAIWebRtcDb.renewLease!(input),
+    release: (input) => openAIWebRtcDb.releaseLease!(input),
+  },
+  {
+    heartbeatMs: env.TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS,
+    onLost: (input) =>
+      webRtcMetricRecorder.record({
+        name: "orphan",
+        userId: input.userId,
+        sessionId: input.sessionId,
+        attemptId: input.attemptId,
+        metadata: { reason: "lease_lost" },
+      }),
+  },
+);
+
+const openAIWebRtcManager = createWebRtcCallManager({
+  db: openAIWebRtcDb,
+  callsClient: openAICallsClient,
+  lease: openAIWebRtcLease,
+  leaseTtlMs: env.TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS,
+  maxUserSessions: env.TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS,
+  maxProviderSessions: env.TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS,
+  onMetric: (metric) => webRtcMetricRecorder.record(metric),
+  encryptProviderCallReference: (callId) =>
+    encryptProviderCallReference(
+      callId,
+      env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY ?? "",
+    ),
+  providerHangupTimeoutMs: env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS,
+  shutdownTimeoutMs: WEBRTC_SHUTDOWN_TIMEOUT_MS,
+  createSideband: (callId, callbacks) =>
+    createSidebandClient({
+      callId,
+      apiKey: env.OPENAI_API_KEY ?? "",
+      createSocket: (url, options) => new WebSocket(url, options),
+      onEvent: callbacks.onEvent,
+      onDiagnostic: callbacks.onDiagnostic,
+      onClose: callbacks.onClose,
+      timeoutMs: env.TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS,
+    }),
+  onSidebandDiagnostic: (diagnostic) => {
+    // Diagnostic payloads can originate from a provider frame. Keep logs to a
+    // closed, non-secret type set; raw provider errors never reach stdout.
+    console.warn("[Telefun] OpenAI WebRTC sideband diagnostic", {
+      type: diagnostic.type,
+    });
+  },
+  flushUsage: async ({ usageRequestId, userId, aggregate, durationMs }) =>
+    flushOpenAIRealtimeUsage(
+      usageRequestId,
+      userId,
+      aggregate,
+      POC_MODEL_ID,
+      durationMs,
+    ),
+  auditFailedUsage: ({ usageRequestId, userId, modelId, errorMessage }) =>
+    recordFailedOpenAIRealtimeUsage(
+      usageRequestId,
+      userId,
+      modelId,
+      errorMessage,
+    ),
+});
+
+const orphanCleanupWorker = createOrphanCleanupWorker({
+  store: {
+    claim: (limit) =>
+      openAIWebRtcDb.claimOrphans?.(limit) ?? Promise.resolve([]),
+    complete: (input) => openAIWebRtcDb.completeOrphan!(input),
+  },
+  closeProvider: async (encryptedReference) => {
+    const key = env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY;
+    const callId = key
+      ? decryptProviderCallReference(encryptedReference, key)
+      : null;
+    if (!callId || !openAICallsClient.closeCall) return false;
+    return openAICallsClient.closeCall(callId);
+  },
+  // A provider hangup closes the server-side sideband after restart; there is
+  // no process-local socket to reuse.
+  closeSideband: async () => true,
+  onOrphan: ({ candidate, completed }) =>
+    webRtcMetricRecorder.record({
+      name: "orphan",
+      userId: candidate.userId,
+      sessionId: candidate.sessionId,
+      attemptId: candidate.attemptId,
+      metadata: { cleanup: completed ? "completed" : "retryable" },
+    }),
+  intervalMs: env.TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS,
+});
+if (env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY) orphanCleanupWorker.start();
+
+const openAIWebRtcHandler = createOpenAIWebRtcHttpHandler({
+  enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+  allowedOrigins: env.ALLOWED_ORIGINS,
+  requestTimeoutMs:
+    env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS +
+    env.TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS +
+    5_000,
+  rollout: {
+    enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+    nodeEnv: env.NODE_ENV,
+    allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+  },
+  verifyToken,
+  getProfile: getWebRtcProfile,
+  getSession: getWebRtcSession,
+  manager: openAIWebRtcManager,
+});
 
 const server = createServer((req, res) => {
+  if (isOpenAIWebRtcRequest(req)) {
+    runHttpHandler(openAIWebRtcHandler, req, res);
+    return;
+  }
   if (
     new URL(req.url ?? "/", "http://telefun.internal").pathname ===
     INTERNAL_SCORING_PATH
   ) {
-    void handleInternalScoringRequest(req, res);
+    runHttpHandler(handleInternalScoringRequest, req, res);
     return;
   }
   if (req.url === "/health") {
@@ -108,6 +266,18 @@ const server = createServer((req, res) => {
   res.writeHead(404);
   res.end();
 });
+
+function runHttpHandler(
+  handler: (req: IncomingMessage, res: ServerResponse) => Promise<unknown>,
+  req: IncomingMessage,
+  res: ServerResponse,
+): void {
+  void handler(req, res).catch(() => {
+    if (res.headersSent || res.writableEnded) return;
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Internal server error" }));
+  });
+}
 
 const wss = new WebSocketServer({
   server,
@@ -529,32 +699,54 @@ server.listen(env.PORT, "0.0.0.0", () => {
   );
 });
 
-function gracefulShutdown(signal: string) {
-  console.log(`\n[Telefun] Received ${signal}. Starting graceful shutdown...`);
-
-  // Stop accepting new connections
-  wss.close(() => {
-    console.log("[Telefun] WebSocket server closed");
-  });
-
-  // Close all existing WebSocket connections
-  for (const ws of wss.clients) {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.close(1001, "Server shutting down");
+function closeHttpServer(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    try {
+      server.close((error?: Error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        console.log("[Telefun] HTTP server closed");
+        resolve();
+      });
+    } catch (error) {
+      reject(error);
     }
-  }
-
-  // Close HTTP server with 10s timeout
-  server.close(() => {
-    console.log("[Telefun] HTTP server closed");
-    process.exit(0);
   });
-
-  setTimeout(() => {
-    console.error("[Telefun] Graceful shutdown timeout, forcing exit");
-    process.exit(1);
-  }, 10_000);
 }
 
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+const gracefulShutdown = createShutdownCoordinator({
+  timeoutMs: WEBRTC_SHUTDOWN_TIMEOUT_MS,
+  stopAccepting: () => {
+    console.log("[Telefun] Stopping new HTTP/WebSocket work");
+    orphanCleanupWorker.stop();
+    wss.close(() => {
+      console.log("[Telefun] WebSocket server closed");
+    });
+    for (const ws of wss.clients) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1001, "Server shutting down");
+      }
+    }
+  },
+  closeHttp: closeHttpServer,
+  shutdownManager: () => openAIWebRtcManager.shutdown(),
+  exit: (code) => process.exit(code),
+  logFailure: (metadata) => {
+    if (metadata.reason === "deadline") {
+      console.error("[Telefun] Graceful shutdown timeout", metadata);
+    } else {
+      console.error("[Telefun] Graceful shutdown failed", metadata);
+    }
+  },
+});
+
+process.on("SIGTERM", () => {
+  console.log("\n[Telefun] Received SIGTERM. Starting graceful shutdown...");
+  void gracefulShutdown("SIGTERM");
+});
+process.on("SIGINT", () => {
+  console.log("\n[Telefun] Received SIGINT. Starting graceful shutdown...");
+  void gracefulShutdown("SIGINT");
+});

@@ -5,13 +5,22 @@ import { DurationSelector } from "../DurationSelector";
 import { TelefunAppSettings as AppSettings } from "../../telefunSettings";
 import { SIMULATION_CHALLENGES } from "../../services/simulationChallenges";
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
+import {
+  isAllowedTelefunWebRtc,
+  type TelefunWebRtcCapability,
+} from "../../services/telefunWebRtcCapability";
 
 interface TelefunSystemTabProps {
   localSettings: AppSettings;
   setLocalSettings: React.Dispatch<React.SetStateAction<AppSettings>>;
   selectedTelefunModel: string;
   setSelectedTelefunModel: (modelId: string) => void;
+  selectedTelefunTransport?: AppSettings["telefunTransport"];
+  setSelectedTelefunTransport?: (
+    transport: AppSettings["telefunTransport"],
+  ) => void;
   providerReadiness: TelefunProviderReadinessState;
+  webRtcCapability?: TelefunWebRtcCapability | null;
 }
 
 export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
@@ -19,7 +28,10 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
   setLocalSettings,
   selectedTelefunModel,
   setSelectedTelefunModel,
+  selectedTelefunTransport,
+  setSelectedTelefunTransport,
   providerReadiness,
+  webRtcCapability = null,
 }) => {
   const openAIReady =
     providerReadiness.status === "ready" &&
@@ -30,8 +42,8 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
     <div className="space-y-8 mt-4">
       {/* AI Model Selection for Telefun */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl">
-          <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
+        <div className="relative group overflow-hidden rounded-xl border border-border bg-primary/5 p-4">
+          <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-primary/5 transition-transform group-hover:scale-110">
             <Zap className="w-24 h-24" />
           </div>
           <div className="relative z-10 max-w-2xl flex gap-4 items-start">
@@ -53,7 +65,10 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
           {TELEFUN_LIVE_MODELS.map((model) => {
             const isSelected = selectedTelefunModel === model.id;
             const isOpenAI = model.provider === "openai";
-            const isDisabled = isOpenAI && !openAIReady;
+            const isWebRtcPilot =
+              model.id === webRtcCapability?.modelId &&
+              isAllowedTelefunWebRtc(webRtcCapability);
+            const isDisabled = isOpenAI && !openAIReady && !isWebRtcPilot;
             return (
               <button
                 type="button"
@@ -112,6 +127,41 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
             );
           })}
         </div>
+        {isAllowedTelefunWebRtc(webRtcCapability) &&
+        selectedTelefunModel === webRtcCapability?.modelId ? (
+          <div className="space-y-2 rounded-xl border border-border bg-card/30 p-4">
+            <p className="text-xs font-semibold text-foreground">
+              Transport panggilan (pilot non-produksi)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["openai-audio", "openai-webrtc"] as const).map((transport) => (
+                <button
+                  key={transport}
+                  type="button"
+                  aria-pressed={
+                    (selectedTelefunTransport ??
+                      localSettings.telefunTransport) === transport
+                  }
+                  onClick={() => setSelectedTelefunTransport?.(transport)}
+                  className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors ${
+                    (selectedTelefunTransport ??
+                      localSettings.telefunTransport) === transport
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground hover:bg-foreground/[0.03]"
+                  }`}
+                >
+                  {transport === "openai-webrtc"
+                    ? "OpenAI WebRTC"
+                    : "OpenAI WebSocket"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              WebRTC tidak dipilih otomatis dan belum menyediakan rekaman atau
+              fallback di tengah panggilan.
+            </p>
+          </div>
+        ) : null}
         {localSettings.telefunModelWarningReason ? (
           <p
             role="status"
@@ -132,8 +182,8 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
 
       {/* Simulation Duration Selection */}
       <section className="space-y-3">
-        <div className="bg-primary/5 border border-border p-4 rounded-xl">
-          <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
+        <div className="relative group overflow-hidden rounded-xl border border-border bg-primary/5 p-4">
+          <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-primary/5 transition-transform group-hover:scale-110">
             <Clock className="w-24 h-24" />
           </div>
           <div className="relative z-10 max-w-2xl flex gap-4 items-start">
@@ -181,78 +231,64 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div
-            onClick={() =>
-              setLocalSettings((prev: AppSettings) => ({
-                ...prev,
-                responsePacingMode: "realistic",
-              }))
-            }
-            className={`cursor-pointer p-5 rounded-xl border transition-all flex flex-col justify-between h-36 relative group ${
-              (localSettings.responsePacingMode || "realistic") === "realistic"
-                ? "border-primary bg-primary/5"
-                : "border-border bg-card/45 hover:bg-foreground/[0.02]"
-            }`}
-          >
-            <div className="flex justify-between items-start w-full">
-              <span
-                className={`text-sm font-bold tracking-tight ${(localSettings.responsePacingMode || "realistic") === "realistic" ? "text-primary" : "text-foreground"}`}
-              >
-                Natural
-              </span>
-              <div className="flex items-center shrink-0">
-                {(localSettings.responsePacingMode || "realistic") ===
-                "realistic" ? (
-                  <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                  </div>
-                ) : (
-                  <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
-                )}
-              </div>
-            </div>
-            <span className="text-xs text-muted-foreground font-medium mt-2 leading-relaxed">
-              Kecepatan bicara normal dengan jeda natural.
-            </span>
-          </div>
-
-          <div
-            onClick={() =>
-              setLocalSettings((prev: AppSettings) => ({
-                ...prev,
-                responsePacingMode: "training_fast",
-              }))
-            }
-            className={`cursor-pointer p-5 rounded-xl border transition-all flex flex-col justify-between h-36 relative group ${
+        <div
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+          role="radiogroup"
+          aria-label="Tempo respons konsumen"
+        >
+          {[
+            {
+              value: "realistic" as const,
+              label: "Natural",
+              description: "Kecepatan bicara normal dengan jeda natural.",
+            },
+            {
+              value: "training_fast" as const,
+              label: "Cepat",
+              description:
+                "Respons lebih cepat tanpa jeda panjang. Cocok untuk latihan intensif.",
+            },
+          ].map((option) => {
+            const selected =
               (localSettings.responsePacingMode || "realistic") ===
-              "training_fast"
-                ? "border-primary bg-primary/5"
-                : "border-border bg-card/45 hover:bg-foreground/[0.02]"
-            }`}
-          >
-            <div className="flex justify-between items-start w-full">
-              <span
-                className={`text-sm font-bold tracking-tight ${(localSettings.responsePacingMode || "realistic") === "training_fast" ? "text-primary" : "text-foreground"}`}
+              option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() =>
+                  setLocalSettings((prev: AppSettings) => ({
+                    ...prev,
+                    responsePacingMode: option.value,
+                  }))
+                }
+                className={`relative flex h-36 flex-col justify-between rounded-xl border p-5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  selected
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-card/45 hover:bg-foreground/[0.02]"
+                }`}
               >
-                Cepat
-              </span>
-              <div className="flex items-center shrink-0">
-                {(localSettings.responsePacingMode || "realistic") ===
-                "training_fast" ? (
-                  <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center">
-                    <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                  </div>
-                ) : (
-                  <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
-                )}
-              </div>
-            </div>
-            <span className="text-xs text-muted-foreground font-medium mt-2 leading-relaxed">
-              Respons lebih cepat tanpa jeda panjang. Cocok untuk latihan
-              intensif.
-            </span>
-          </div>
+                <span
+                  className={`text-sm font-bold tracking-tight ${selected ? "text-primary" : "text-foreground"}`}
+                >
+                  {option.label}
+                </span>
+                <span className="text-xs font-medium leading-relaxed text-muted-foreground">
+                  {option.description}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`absolute right-5 top-5 flex h-4 w-4 items-center justify-center rounded-full border ${selected ? "border-primary" : "border-border"}`}
+                >
+                  {selected && (
+                    <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                  )}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 

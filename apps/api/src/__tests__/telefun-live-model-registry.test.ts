@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { TelefunSessionConfigure } from "@trainers/types";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   TELEFUN_LIVE_MODELS,
@@ -44,6 +45,7 @@ describe("canonical Telefun live model registry", () => {
         provider: "openai",
         realtime: {
           transport: "openai-audio",
+          supportedTransports: ["openai-audio", "openai-webrtc"],
           inputSampleRateHz: 24_000,
           outputSampleRateHz: 24_000,
           voiceProvider: "openai",
@@ -56,6 +58,7 @@ describe("canonical Telefun live model registry", () => {
         provider: "openai",
         realtime: {
           transport: "openai-audio",
+          supportedTransports: ["openai-audio"],
           inputSampleRateHz: 24_000,
           outputSampleRateHz: 24_000,
           voiceProvider: "openai",
@@ -64,6 +67,51 @@ describe("canonical Telefun live model registry", () => {
         },
       },
     ]);
+  });
+
+  it("keeps an explicit openai-webrtc request stable for OpenAI realtime models", () => {
+    const explicitOpenAiWebRtcConfigure = {
+      type: "telefun_session_configure",
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+      voice: "marin",
+      instructions: "Gunakan jalur WebRTC.",
+      inputAudio: { format: "pcm16", sampleRate: 24000 },
+      responsePacingMode: "training_fast",
+    } satisfies TelefunSessionConfigure;
+
+    expect(explicitOpenAiWebRtcConfigure.transport).toBe("openai-webrtc");
+    expect(
+      isValidTelefunModelTransportPair("gpt-realtime-2.1", "openai-webrtc"),
+    ).toBe(true);
+    expect(
+      isValidTelefunModelTransportPair(
+        "gpt-realtime-2.1-mini",
+        "openai-webrtc",
+      ),
+    ).toBe(false);
+    expect(
+      normalizeTelefunLiveModelSelection(
+        "gpt-realtime-2.1",
+        "openai-webrtc",
+      ),
+    ).toMatchObject({
+      model: getTelefunLiveModel("gpt-realtime-2.1"),
+      transport: "openai-webrtc",
+      didFallback: false,
+      warningReason: undefined,
+    });
+    expect(
+      normalizeTelefunLiveModelSelection(
+        "gpt-realtime-2.1-mini",
+        "openai-webrtc",
+      ),
+    ).toMatchObject({
+      model: getTelefunLiveModel("gpt-realtime-2.1-mini"),
+      transport: "openai-audio",
+      didFallback: false,
+      warningReason: "transport-mismatch",
+    });
   });
 
   it("validates only canonical model and transport pairs", () => {
@@ -76,6 +124,9 @@ describe("canonical Telefun live model registry", () => {
     expect(
       isValidTelefunModelTransportPair("gpt-realtime-2.1-mini", "openai-audio"),
     ).toBe(true);
+    expect(
+      isValidTelefunModelTransportPair("gpt-realtime-2.1-mini", "openai-webrtc"),
+    ).toBe(false);
     expect(
       isValidTelefunModelTransportPair("gpt-realtime-2.1", "gemini-live"),
     ).toBe(false);
@@ -99,6 +150,18 @@ describe("canonical Telefun live model registry", () => {
       transport: "openai-audio",
       didFallback: false,
       warningReason: undefined,
+    });
+
+    expect(
+      normalizeTelefunLiveModelSelection(
+        "gpt-realtime-2.1-mini",
+        "openai-webrtc",
+      ),
+    ).toMatchObject({
+      model: getTelefunLiveModel("gpt-realtime-2.1-mini"),
+      transport: "openai-audio",
+      didFallback: false,
+      warningReason: "transport-mismatch",
     });
 
     expect(

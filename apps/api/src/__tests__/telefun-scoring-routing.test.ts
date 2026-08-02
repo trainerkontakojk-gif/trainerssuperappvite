@@ -78,7 +78,11 @@ vi.mock("../lib/supabase", () => ({
   createAdminClient: vi.fn(() => ({
     rpc: vi.fn((name: string, args: any) => {
       mockRpcs.push({ name, args });
-      return Promise.resolve(mockRpcResult);
+      return Promise.resolve(
+        name === "complete_telefun_scoring"
+          ? { data: true, error: null }
+          : mockRpcResult,
+      );
     }),
     from: vi.fn(() => {
       const allRows = Array.from(mockRows.values());

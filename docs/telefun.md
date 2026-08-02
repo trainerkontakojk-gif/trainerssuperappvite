@@ -2,7 +2,7 @@
 
 > **TELEFUN** = **Tele**phone **Fun**
 > Modul simulasi panggilan suara untuk melatih agen menangani telepon.
-> Mendukung **dua provider realtime**: **Gemini Live API** (default) dan **OpenAI Realtime API** (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`).
+> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off/non-production (`gpt-realtime-2.1` / voice `marin`); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Gate P5 tetap partial sampai migration/RLS/rollback, deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
 
 Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 
@@ -87,6 +87,82 @@ Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 
 ---
 
+### Phase 3 OpenAI WebRTC integration (default off)
+
+```text
+Browser WebRTC media ──> OpenAI Realtime
+Browser SDP offer/answer ──> Telefun broker (POST/DELETE raw application/sdp)
+Telefun broker ──> OpenAI /v1/realtime/calls (multipart sdp + session)
+Telefun broker ──> sideband wss://api.openai.com/v1/realtime?call_id=...
+```
+
+- Canonical model: `gpt-realtime-2.1`
+- Canonical voice: `marin`
+- Broker/session authority: active admin/trainer profile + owned pre-created `telefun_history` session only
+- Baseline Gemini Live dan OpenAI WebSocket tetap unchanged
+- No production UI cutover; Phase 3 memakai adapter WebRTC capability-gated di PhoneInterface, sementara LiveSession tetap baseline Gemini/openai-audio
+
+### Phase 2 shared OpenAI observer (internal extraction)
+
+- `openai-realtime-event-observer.ts` menjadi sumber kebenaran event OpenAI-only untuk jalur OpenAI Realtime WS dan WebRTC sideband.
+- `openai-realtime-tool-coordinator.ts` menjaga eksekusi tool tetap di jalur WS; sideband hanya observasi/control server-side.
+- Dedupe mengikuti scope aktif per item/response/call dengan kapasitas bounded; `sideband-client.ts` menolak frame terlalu besar lewat `SIDEBAND_MAX_FRAME_BYTES` sebelum parsing.
+- Tidak ada UI cutover, default transport change, atau route change; `openai-webrtc` sekarang berjalan melalui PhoneInterface yang capability-gated, sementara LiveSession tetap baseline Gemini/openai-audio.
+
+### Phase 4 durable lifecycle (implementation reality; rollout tetap off)
+
+Phase 4 menambahkan lifecycle durable untuk jalur WebRTC tanpa mengubah Gemini atau OpenAI WebSocket legacy. Attempt memakai state `claimed → brokered → sideband_connected → ending → ended`; transcript checkpoint memiliki dedupe key dan sequence; usage memakai request ID stabil dan tidak mensintesis token/cost ketika metadata tidak lengkap.
+
+Untuk end normal maupun failed, manager menjalankan barrier yang sama:
+
+```text
+beginFinalization
+  → provider hangup saat admission sideband masih open
+  → sealAdmission (synchronous)
+  → bounded drain (default 5 detik)
+  → close sideband
+  → flush + checkpoint transcript
+  → persist usage atau audit incomplete
+  → finalizeAttempt / terminalisasi durable
+```
+
+Frame yang masuk sebelum seal tetap dapat diproses. Timeout/failure pada hangup, drain, checkpoint, usage, atau terminal RPC mempertahankan attempt pada state retryable dan tidak boleh menghasilkan sukses palsu. `DELETE /telefun/realtime/openai/webrtc/sessions/:sessionId/call` mengembalikan `204` hanya setelah kontrak terminal durable (atau terminalisasi no-attempt yang idempotent) terbukti; kegagalan durable yang dapat dicoba ulang mengembalikan `503`, sehingga browser mempertahankan owner dan dapat mengulang request dengan key yang sama. Konflik mengembalikan `409`; detail provider/database tidak dikirim ke client.
+
+Graceful shutdown menolak WebRTC start baru, mengambil snapshot binding yang sedang berjalan, dan memberi setiap binding paling banyak dua percobaan finalisasi bounded dengan finalization key yang sama. HTTP close dan manager drain harus sama-sama selesai sebelum `process.exit(0)`; penolakan manager, kegagalan HTTP close, atau deadline terbatas berakhir pada `process.exit(1)`. Default manager: sideband drain 5 detik, provider hangup 15 detik, persistence 10 detik, dan shutdown 30 detik; timeout tetap fail-closed.
+
+#### Recording readiness dan scoring
+
+- Remux memproses semua sibling lebih dahulu. Untuk WebRTC, `mark_telefun_recording_ready` dipanggil **sekali** dengan seluruh output seekable yang berhasil, bukan sekali per file.
+- Output diklasifikasikan sebagai `created`, `preexisting`, `unknown`, atau `none`; readiness sebagai `persisted`, `confirmed-unpersisted`, atau `ambiguous`. Jika RPC error/empty, route membaca kembali `id`, `user_id`, `status`, `telefun_transport`, kedua path recording, status/error recording, dan field scoring sebelum membersihkan objek.
+- Hanya output `created + confirmed-unpersisted` yang boleh dihapus. Output `preexisting`, `unknown`, atau `ambiguous` dipertahankan. Raw original dihapus hanya setelah field DB yang tepat terbukti menunjuk ke path seekable. Hasil yang tidak dapat direkonsiliasi mengembalikan `503 RECORDING_RECONCILIATION_AMBIGUOUS`; state yang diketahui belum tersimpan mengembalikan `503 RECORDING_STATE_UNAVAILABLE`.
+- Completion scoring mengunci row `telefun_history` dengan `FOR UPDATE`. Capture gagal pada WebRTC mengubah `recording_status` menjadi `failed`, membersihkan claim/retry/readiness, dan bila scoring sedang `processing` mengubahnya menjadi `failed`. Completion yang kalah race membaca row terkunci dan mengembalikan `false`; API/worker mengklasifikasikannya sebagai `SCORING_NOT_READY` tanpa menimpa failed-capture latch atau melakukan re-enqueue.
+
+#### Reconciliation recording di browser
+
+Queue browser memakai key `telefun_recording_reconciliation:v1` dan hanya menyimpan path Storage deterministic serta metadata bounded. Queue bersifat owner-scoped oleh UUID user aktif, maksimal **32** entry, TTL **7 hari** (`604800000` ms), dedupe satu entry per `telefun-recording:<userId>:<sessionId>`, dan tidak pernah menyimpan blob, access token, prompt, SDP, provider ID, object URL, atau raw exception.
+
+Dua fase queue adalah `recording_transition_pending` (ditulis sebelum request transition pertama) dan `remux_pending` (setelah response transition valid `200`). Drain hanya menjalankan entry user yang sedang login, satu drain per halaman, dipicu oleh enqueue, load/auth readiness, `online`, halaman visible, dan timer due. Retry otomatis dibatasi **8** percobaan dengan delay `1s, 2s, 5s, 10s, 30s, 60s, 300s, 900s`; setelah percobaan ke-8 entry menjadi exhausted dan tetap disimpan sampai sukses, penghapusan non-retryable yang eksplisit, atau TTL. Queue tidak menghapus objek Storage dan tidak menggantikan server-side orphan recovery Phase 5; sifatnya per-device dan reload-safe.
+
+#### Ownership cleanup WebRTC
+
+Setup WebRTC mendaftarkan in-memory cleanup owner sebelum transport dibuat. Owner hanya memanggil DELETE session-bound `?outcome=failed`; hanya status `204` yang mengonfirmasi cleanup. Jika request gagal, component tetap mounted, guard end dibuka kembali, dan tombol existing **“Coba lagi mengakhiri panggilan”** melakukan satu retry bounded per klik tanpa navigasi sebelum konfirmasi.
+
+Object URL full-call memiliki satu owner halaman (`retainedObjectUrlRef`). Session hanya boleh mengembalikan `retainObjectUrl: true` jika callback sudah mentransfer URL non-null ke owner tersebut; owner revoke satu kali saat review ditutup, record dihapus/diganti, unmount, atau abandoned flow. URL tidak masuk ke queue durable.
+
+Recording capture/reconciliation dan scoring readiness tersebut adalah behavior aktual pada source saat ini; fake/static Phase 4 verification lulus, tetapi ini bukan bukti paid provider, remote database, deployment, atau real-browser runtime.
+
+### Phase 5 distributed hardening (implementation reality; Gate P5 partial)
+
+- Lease dan session cap lintas replica memakai RPC atomic dengan TTL/heartbeat. Kehilangan lease sekarang memicu finalisasi `network_lost` dan provider hangup segera; release bertoken tetap dicoba setelah finalisasi agar lease terminal tidak menunggu orphan sweep.
+- Rate limit session create/write dan broker start memakai window database per user/session/provider dan fail-closed ketika RPC unavailable.
+- Worker orphan meng-claim lease expired, mendekripsi opaque provider reference server-only, menutup provider/sideband secara bounded, lalu menulis outcome `orphaned`; cleanup yang belum lengkap kembali retryable.
+- Browser mengklasifikasikan network/ICE/data-channel failure sebagai `network_lost` dan device track end sebagai `device_unplugged`. UI tidak melakukan silent recreate; recovery membutuhkan session boundary baru dan discontinuity yang eksplisit.
+- Production origin harus exact HTTPS, provider URL fixed server-side, request/response body dan timeout bounded, serta CSP/Permissions Policy dibatasi. `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY` minimal 32 karakter dan tidak boleh menjadi `VITE_*`.
+- Metrics yang diizinkan hanya cost reconciliation, sideband disconnect, duplicate write, missing usage, orphan, dan session cap. User dikorelasikan dengan SHA-256 `user_id_hash`, bukan UUID mentah; missing usage tetap audit state, bukan zero sintetis.
+- `/health` tetap non-billable dan tidak claim lease, consume quota, membuka provider/sideband, atau menulis usage.
+
+Implementasi lokal ini tetap default-off. Fake/unit/static tests bukan bukti migration/RLS hosted, Railway restart, load lintas replica, real-browser/device/network matrix, external security review, rollback drill, atau paid provider call.
+
 ## 📁 Struktur File
 
 ### 🖥️ Frontend (apps/web)
@@ -109,8 +185,16 @@ routes/telefun/
 │   ├── promptBuilder.ts         # ★ Build system instruction prompt untuk Gemini
 │   ├── liveProtocol.ts          # Format setup message Gemini Live JSON
 │   ├── telefun-recording-remux-service.ts  # Client-side recording remux (dipanggil sessionFinalizer)
+│   ├── telefun-recording-reconciliation.ts # Queue controller/triggers for path-only retries
+│   ├── telefun-recording-reconciliation-queue.ts # Queue schema, validation, storage, retry helpers
 │   ├── simulationChallenges.ts              # Registry ID, label, dan instruksi prompt
-│   └── reviewTypes.ts                       # Tipe aktif voice dashboard dan replay
+│   ├── reviewTypes.ts                       # Tipe aktif voice dashboard dan replay
+│   └── openaiWebRtc/                        # Adapter WebRTC capability-gated Phase 3 (default-off)
+│       ├── brokerApi.ts                     # SDP broker call/delete ke Telefun
+│       ├── cleanup.ts                       # Cleanup peer, data channel, audio
+│       ├── contracts.ts                     # Contract browser POC + timeout
+│       ├── events.ts                        # Parser data-channel event
+│       └── openaiWebRtcSession.ts           # Orkestrasi WebRTC adapter capability-gated
 │
 ├── hooks/
 │   └── useTelefunHoldClock.ts   # Hook timer untuk hold
@@ -202,7 +286,8 @@ apps/telefun/
 │   ├── server.ts              # ★ Entrypoint — HTTP + WebSocket server
 │   ├── server-protocol.ts     # Protocol detection & message helpers
 │   ├── server-close.ts        # Close-code sanitizer
-│   ├── session-drain.ts       # Graceful drain coordinator
+│   ├── session-drain.ts       # Legacy WebSocket graceful drain coordinator
+│   ├── shutdown-coordinator.ts # Bounded HTTP/manager shutdown seam
 │   ├── turn-taking.ts         # Turn state machine
 │   ├── transcript.ts          # Real-time transcript collector
 │   ├── usage.ts               # Token usage tracking & billing (dual-provider)
@@ -213,10 +298,30 @@ apps/telefun/
 │   ├── openai-voice-assessment.ts # Isolated GPT Realtime evaluator
 │   ├── auth.ts                # JWT token verification
 │   ├── env.ts                 # Environment validation (Zod) — Gemini + OpenAI key
-│   └── providers/             # ★ Provider adapter pattern
+│   └── providers/             # ★ Provider adapter + OpenAI observer/tool coordination
 │       ├── ProviderAdapter.ts     # Interface
+│       ├── openai-realtime-event-observer.ts # Shared OpenAI-only observer
+│       ├── openai-realtime-tool-coordinator.ts # WS-only tool execution/follow-up
 │       ├── GeminiLiveAdapter.ts   # Gemini Live implementation
 │       └── OpenAIRealtimeAdapter.ts # gpt-realtime-2.1 / mini implementation
+├── realtime-webrtc/          # Broker + durable lifecycle WebRTC, default-off
+│   ├── broker-auth.ts        # Profile/session gate admin/trainer + owned active session
+│   ├── call-manager.ts       # Durable lifecycle facade and provider binding
+│   ├── call-manager-types.ts # Public manager contracts + binding state factory
+│   ├── call-manager-finalization-barrier.ts # Provider hangup → sideband seal/drain/close
+│   ├── call-manager-legacy-finalizer.ts # Legacy callback finalization and usage persistence
+│   ├── call-manager-shutdown.ts # Bounded shutdown retries and failure aggregation
+│   ├── call-manager-utils.ts  # Shared bounded timeout/duration helpers
+│   ├── durable-db.ts         # Attempt/transcript/usage/finalization/Phase 5 RPC boundary
+│   ├── distributed-lease.ts  # Atomic lease heartbeat/loss/release coordinator
+│   ├── orphan-cleanup.ts     # Restart-safe orphan claim/provider cleanup worker
+│   ├── observability.ts      # Bounded metric/redaction + hashed user correlation
+│   ├── provider-reference.ts # AES-GCM opaque provider reference
+│   ├── contracts.ts          # Canonical POC session/model/voice contract
+│   ├── http-broker.ts        # POST/DELETE application/sdp endpoint
+│   ├── openai-calls-client.ts # Multipart /v1/realtime/calls + Location/call_id parsing
+│   ├── sideband-client.ts    # OpenAI sideband control socket + frame cap
+│   └── sideband-event-observer.ts # Observation-only transcript/usage observer with scoped dedupe
 ├── package.json
 ├── tsconfig.json
 └── vitest.config.ts
@@ -272,6 +377,8 @@ apps/telefun/
 | **QA**      | ❌ Diblokir — backend `requireRole("admin","trainer")` + frontend gate |
 | **Leader**  | ❌ Diblokir — maintenance modal "Akses Terbatas"                       |
 | **Agent**   | ❌ Diblokir — maintenance modal "Akses Terbatas"                       |
+
+Catatan Phase 3–5: browser adapter `openaiWebRtc/` terintegrasi lewat `PhoneInterface` sebagai jalur capability-gated default-off; `LiveSession` tetap baseline Gemini/openai-audio. Lifecycle/recording/scoring Phase 4 dan distributed hardening Phase 5 sudah ada di source, tetapi Gate P5 masih partial dan tidak mengubah status non-production/default-off. Barge-in parity serta bukti deployment/load/real-browser tetap lanjutan.
 
 ### Session States
 
@@ -496,6 +603,24 @@ Semua route membutuhkan role `admin` atau `trainer`.
 | `/internal/telefun/scoring` | HTTP      | Assessment OpenAI internal; bearer token, tanpa CORS |
 | `/` atau `/ws`              | WebSocket | Koneksi real-time dengan Gemini                      |
 
+#### OpenAI WebRTC integration (Phase 3 transport + Phase 4/5 durable hardening, default off)
+
+| Method   | Endpoint                                                   | Deskripsi                                                |
+| -------- | ---------------------------------------------------------- | -------------------------------------------------------- |
+| `POST`   | `/telefun/realtime/openai/webrtc/sessions/:sessionId/call` | Raw `application/sdp`; body hanya SDP offer browser      |
+| `DELETE` | `/telefun/realtime/openai/webrtc/sessions/:sessionId/call` | Idempotent hangup; `?outcome=failed` untuk cleanup gagal |
+
+Catatan kontrak:
+
+- `sessionId` wajib dari path UUID; broker menolak session foreign, terminal, pending, mismatch, atau auto-create fallback.
+- Caller harus admin/trainer dengan profile ternormalisasi `active`, `is_deleted != true`, dan session owned/`active` yang sudah pre-created.
+- Broker membangun session JSON server-side dengan model `gpt-realtime-2.1`, voice `marin`, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON.
+- `Location` dari upstream diparse menjadi `call_id` opaque; sideband `wss://api.openai.com/v1/realtime?call_id=...` adalah authority untuk transcript/usage/control server-side.
+- Cleanup upstream memakai official OpenAI POST hangup; browser tetap hanya melihat DELETE broker yang idempotent.
+- Transcript/usage failure diaudit; usage yang tidak lengkap tidak disintesis.
+- Cleanup idempotent: browser close, DELETE berulang, atau `?outcome=failed` tidak menggandakan finalization. `204` berarti lifecycle durable sudah terminal; kegagalan persistence/barrier yang retryable menjadi `503` dan owner tetap dipertahankan.
+- Phase 4 recording/scoring dan Phase 5 distributed lease/rate-limit/orphan/network hardening sudah dideskripsikan oleh implementation saat ini. Ini bukan bukti rollout produksi; barge-in, fallback provider, production UI cutover, hosted migration, deployment/load, dan real-browser evidence tetap deferred.
+
 #### WebSocket Protocol (Client → Proxy → Gemini)
 
 **Setup:**
@@ -599,6 +724,36 @@ pnpm --filter @trainers/telefun test
 pnpm --filter @trainers/telefun test:core
 ```
 
+### Phase 3 OpenAI WebRTC Verification (fake upstream/browser only)
+
+```bash
+pnpm --filter @trainers/telefun test -- realtime-webrtc
+pnpm --filter @trainers/web test -- telefun-openai-webrtc telefun-live-session-auth telefun-live-session-openai telefun-live-session-drain telefun-live-session-playback telefun-openai-live-protocol
+```
+
+- Suite di atas memakai fake upstream dan fake browser harness; tidak ada paid/manual OpenAI call.
+- `LiveSession` tetap baseline WebSocket untuk Gemini/openai-audio; `openai-webrtc` berjalan melalui adapter capability-gated di PhoneInterface dan diuji lewat fake-boundary coverage.
+
+### Phase 2 OpenAI Realtime Shared Observer Verification
+
+```bash
+pnpm --dir apps/telefun exec vitest run src/providers/openai-realtime-event-observer.test.ts src/providers/openai-realtime-tool-coordinator.test.ts src/providers/OpenAIRealtimeAdapter.test.ts src/realtime-webrtc/sideband-event-observer.test.ts src/realtime-webrtc/sideband-client.test.ts src/realtime-webrtc/call-manager.test.ts src/server-openai-wiring.test.ts src/providers/GeminiLiveAdapter.test.ts src/transcript.test.ts src/session-drain.test.ts src/__tests__/usage-modality.test.ts src/server-protocol.test.ts
+pnpm --dir apps/telefun exec vitest run src/realtime-webrtc/http-broker.test.ts src/realtime-webrtc/openai-calls-client.test.ts src/realtime-webrtc/broker-auth.test.ts src/realtime-webrtc/contracts.test.ts src/realtime-webrtc/sideband-client.test.ts src/realtime-webrtc/sideband-event-observer.test.ts src/realtime-webrtc/call-manager.test.ts src/db-webrtc.test.ts
+pnpm --dir apps/web exec vitest run src/__tests__/telefun-openai-webrtc-client.test.ts src/__tests__/telefun-live-session-auth.test.ts src/__tests__/telefun-live-session-openai.test.ts src/__tests__/telefun-live-session-drain.test.ts src/__tests__/telefun-live-session-playback.test.ts src/__tests__/telefun-openai-live-protocol.test.ts
+pnpm test:core
+```
+
+- Suite ini memverifikasi shared observer parity, WS-only tool coordination, sideband observation-only behavior, bounded diagnostics/frame max, dan browser non-authority.
+- `LiveSession` tetap baseline WebSocket; tidak ada paid/manual OpenAI call.
+
+### Phase 4 evidence boundary
+
+Bukti implementasi Phase 4 berupa fake-upstream/fake-browser tests, static migration-contract tests, typecheck, lint, build, dan diff hygiene dicatat pada [`rebuild-logs/phase-telefun-openai-webrtc-durable-lifecycle.md`](rebuild-logs/phase-telefun-openai-webrtc-durable-lifecycle.md). Verifikasi final setelah direct fix, independent audit, dan F6 RED→GREEN lulus untuk scope tersebut. Tidak ada paid/provider call, remote migration, local Postgres execution, deployment, atau browser visual/audio check yang diklaim.
+
+### Phase 5 evidence boundary
+
+Bukti distributed hardening dan batas verifikasinya dicatat pada [`rebuild-logs/phase-telefun-openai-webrtc-production-hardening.md`](rebuild-logs/phase-telefun-openai-webrtc-production-hardening.md). Gate P5 tetap partial: fake/unit/static evidence tidak menggantikan hosted migration/RLS, rollback drill, Railway restart, load lintas replica, external security review, atau real-browser/device/network matrix.
+
 ### Test Files Penting
 
 | Layer   | File                                  | Coverage                            |
@@ -622,34 +777,49 @@ pnpm --filter @trainers/telefun test:core
 
 ### Proxy (apps/telefun) — dari `.env.local` root
 
-| Variable                    | Required          | Default         | Deskripsi                                                                 |
-| --------------------------- | ----------------- | --------------- | ------------------------------------------------------------------------- |
-| `PORT`                      | ❌                | `3002`          | Port server                                                               |
-| `SUPABASE_URL`              | ✅                | —               | Supabase URL                                                              |
-| `SUPABASE_ANON_KEY`         | ✅                | —               | Anon key (auth)                                                           |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅                | —               | Service role (DB)                                                         |
-| `GEMINI_API_KEY`            | ✅                | —               | Gemini Live API key                                                       |
-| `OPENAI_API_KEY`            | Jika OpenAI realtime aktif | —       | Khusus service Telefun untuk OpenAI Realtime; tidak pernah ke Frontend     |
-| `TELEFUN_OPENAI_ENABLED`    | ❌                | `false`         | Kill switch OpenAI realtime                                               |
-| `TELEFUN_INTERNAL_TOKEN`    | Jika OpenAI aktif | —               | Shared server-only token; nilai sama dengan API                            |
-| `ALLOWED_ORIGINS`           | ❌                | `"*"`           | CORS origins                                                              |
-| `NODE_ENV`                  | ❌                | `"development"` | Mode                                                                      |
+| Variable                                    | Required                   | Default         | Deskripsi                                                               |
+| ------------------------------------------- | -------------------------- | --------------- | ----------------------------------------------------------------------- |
+| `PORT`                                      | ❌                         | `3002`          | Port server                                                             |
+| `SUPABASE_URL`                              | ✅                         | —               | Supabase URL                                                            |
+| `SUPABASE_ANON_KEY`                         | ✅                         | —               | Anon key (auth)                                                         |
+| `SUPABASE_SERVICE_ROLE_KEY`                 | ✅                         | —               | Service role (DB)                                                       |
+| `GEMINI_API_KEY`                            | ✅                         | —               | Gemini Live API key                                                     |
+| `OPENAI_API_KEY`                            | Jika OpenAI realtime aktif | —               | Khusus service Telefun untuk OpenAI Realtime; tidak pernah ke Frontend  |
+| `TELEFUN_OPENAI_ENABLED`                    | ❌                         | `false`         | Kill switch OpenAI realtime                                             |
+| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`         | ❌                         | `false`         | Phase 3 capability-gated broker/adapter + Phase 4 durable lifecycle; POST tetap off sampai gate terpisah |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`    | ❌                         | kosong          | CSV UUID exact; harus sama dengan API, development/staging saja; kosong = deny-all |
+| `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS` | ❌                         | `15000`         | Timeout upstream `POST /v1/realtime/calls`                              |
+| `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS` | ❌                         | `10000`         | Timeout koneksi sideband `wss://api.openai.com/v1/realtime?call_id=...` |
+| `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`          | Jika WebRTC aktif          | —               | Secret server-only minimal 32 karakter untuk opaque provider reference  |
+| `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`        | ❌                         | `30000`         | TTL distributed lease                                                   |
+| `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS`  | ❌                         | `10000`         | Heartbeat lease; harus lebih kecil dari TTL                              |
+| `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`   | ❌                         | `1`             | Atomic active-session cap per user                                       |
+| `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS` | ❌                       | `100`           | Atomic active-session cap provider                                       |
+| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | ❌                       | `10`            | Distributed rate limit window                                            |
+| `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` | ❌                 | `30000`         | Interval orphan cleanup                                                  |
+| `TELEFUN_INTERNAL_TOKEN`                    | Jika OpenAI aktif          | —               | Shared server-only token; nilai sama dengan API                         |
+| `ALLOWED_ORIGINS`                           | ❌                         | exact allowlist | Exact origin list; wildcard ditolak oleh broker POC                     |
+| `NODE_ENV`                                  | ❌                         | `"development"` | Mode                                                                    |
+
+Untuk broker Phase 3, `ALLOWED_ORIGINS` harus berisi origin web yang persis sama; `*` tidak diterima.
+
+Rollout WebRTC fail-closed: `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` hanya menerima CSV UUID yang valid dan harus identik di API serta Telefun. Flag dan allowlist berlaku hanya di development/staging; production default deny-all. Flag off menolak POST dan tidak membuka provider, tetapi authenticated DELETE yang session-bound tetap diizinkan sebagai exception cleanup untuk menandai session pre-created sebagai `failed`. DELETE bukan jalur start. Test otomatis dan smoke deployment tidak melakukan paid/provider call; paid smoke memerlukan approval terpisah.
 
 ### Frontend — dari `VITE_*` env (via `.env.local` root)
 
-| Variable                 | Required | Deskripsi                                                                                               |
-| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`      | ✅       | Supabase URL                                                                                            |
-| `VITE_SUPABASE_ANON_KEY` | ✅       | Supabase anon key                                                                                       |
+| Variable                 | Required | Deskripsi                                                                                                |
+| ------------------------ | -------- | -------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`      | ✅       | Supabase URL                                                                                             |
+| `VITE_SUPABASE_ANON_KEY` | ✅       | Supabase anon key                                                                                        |
 | `VITE_TELEFUN_WS_URL`    | ✅       | WebSocket URL proxy (biasanya `ws://localhost:3002`) — dipakai di `liveProtocol.ts` & `geminiService.ts` |
 
 ### Backend API — server-only
 
-| Variable                 | Required                 | Deskripsi                                                                 |
-| ------------------------ | ------------------------ | ------------------------------------------------------------------------- |
-| `OPENAI_API_KEY`         | Wajib untuk text generation | Key server-only API untuk direct text generation                           |
-| `TELEFUN_INTERNAL_URL`   | Jika OpenAI aktif        | Origin privat service Telefun; hanya di API                                |
-| `TELEFUN_INTERNAL_TOKEN` | Jika OpenAI aktif        | Shared token yang sama dengan service Telefun                              |
+| Variable                 | Required                    | Deskripsi                                        |
+| ------------------------ | --------------------------- | ------------------------------------------------ |
+| `OPENAI_API_KEY`         | Wajib untuk text generation | Key server-only API untuk direct text generation |
+| `TELEFUN_INTERNAL_URL`   | Jika OpenAI aktif           | Origin privat service Telefun; hanya di API      |
+| `TELEFUN_INTERNAL_TOKEN` | Jika OpenAI aktif           | Shared token yang sama dengan service Telefun    |
 
 `OPENAI_API_KEY` bersifat server-only. API memakai key-nya sendiri untuk
 text generation direct, sedangkan Telefun memakai `OPENAI_API_KEY` terpisah
@@ -678,9 +848,16 @@ menerima request server-to-server terautentikasi.
 
 ## 📄 Dokumen Terkait
 
-| Dokumen                                                            | Isi                                                                     |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| [`TELEFUN_ASSESSMENT_CONTRACT.md`](TELEFUN_ASSESSMENT_CONTRACT.md) | Kontrak penilaian suara: skala, target sistem, status, radar, staleness |
-| [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md)                           | Workflow pengembangan untuk AI agent                                    |
-| [`architecture.md`](architecture.md)                               | Arsitektur monorepo dan modul                                           |
-| [`deployment.md`](deployment.md)                                   | Konfigurasi deployment Railway                                          |
+| Dokumen                                                                                                                      | Isi                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [`TELEFUN_ASSESSMENT_CONTRACT.md`](TELEFUN_ASSESSMENT_CONTRACT.md)                                                           | Kontrak penilaian suara: skala, target sistem, status, radar, staleness |
+| [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md)                                                                                     | Workflow pengembangan untuk AI agent                                    |
+| [`architecture.md`](architecture.md)                                                                                         | Arsitektur monorepo dan modul                                           |
+| [`deployment.md`](deployment.md)                                                                                             | Konfigurasi deployment Railway                                          |
+| [`telefun-openai-webrtc-technical-audit.md`](telefun-openai-webrtc-technical-audit.md)                                       | Audit teknis Phase 1 OpenAI WebRTC POC                                  |
+| [`adr/telefun-realtime-provider-adapters.md`](adr/telefun-realtime-provider-adapters.md)                                     | ADR baseline provider adapter Telefun                                   |
+| [`adr/telefun-openai-webrtc-poc.md`](adr/telefun-openai-webrtc-poc.md)                                                       | ADR Phase 1 OpenAI WebRTC POC                                           |
+| [`rebuild-logs/phase-telefun-openai-webrtc-poc.md`](rebuild-logs/phase-telefun-openai-webrtc-poc.md)                         | Catatan implementasi POC Phase 1                                        |
+| [`rebuild-logs/phase-telefun-openai-webrtc-shared-observer.md`](rebuild-logs/phase-telefun-openai-webrtc-shared-observer.md) | Catatan sinkronisasi Phase 2 shared observer                            |
+| [`rebuild-logs/phase-telefun-openai-webrtc-durable-lifecycle.md`](rebuild-logs/phase-telefun-openai-webrtc-durable-lifecycle.md) | Catatan Phase 4 durable lifecycle dan evidence boundary               |
+| [`rebuild-logs/phase-telefun-openai-webrtc-production-hardening.md`](rebuild-logs/phase-telefun-openai-webrtc-production-hardening.md) | Catatan Phase 5 distributed hardening dan evidence boundary          |

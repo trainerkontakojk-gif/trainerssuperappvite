@@ -11,6 +11,8 @@ export interface MicrophoneActivityState {
 interface UseMicrophoneActivityInput {
   active: boolean;
   muted: boolean;
+  /** A transport-owned stream. The hook observes it but never stops its tracks. */
+  stream?: MediaStream | null;
   barCount?: number;
   smoothing?: number;
 }
@@ -37,6 +39,7 @@ function getMicrophoneErrorMessage(err: unknown): string {
 export function useMicrophoneActivity({
   active,
   muted,
+  stream: injectedStream = null,
   barCount = 24,
   smoothing = 0.4,
 }: UseMicrophoneActivityInput): MicrophoneActivityState {
@@ -51,9 +54,13 @@ export function useMicrophoneActivity({
   useEffect(() => {
     const AudioContextCtor =
       window.AudioContext ||
-      (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      (window as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
 
-    if (!AudioContextCtor || !navigator.mediaDevices?.getUserMedia) {
+    if (
+      !AudioContextCtor ||
+      (!injectedStream && !navigator.mediaDevices?.getUserMedia)
+    ) {
       setState((prev) => ({ ...prev, isSupported: false, isListening: false }));
       return;
     }
@@ -71,19 +78,23 @@ export function useMicrophoneActivity({
     let cancelled = false;
     const frameRef: { current: number | null } = { current: null };
     let audioContext: AudioContext | null = null;
-    let stream: MediaStream | null = null;
+    let stream: MediaStream | null = injectedStream;
+    let ownsStream = false;
     let source: MediaStreamAudioSourceNode | null = null;
     let analyser: AnalyserNode | null = null;
 
     async function start() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
-        });
+        if (!stream) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+          ownsStream = true;
+        }
 
         if (cancelled) {
           cleanup();
@@ -121,7 +132,8 @@ export function useMicrophoneActivity({
             Math.round(Math.sqrt(sumSquares / barCount) * 180),
           );
 
-          smoothedLevel = smoothedLevel * smoothing + rawLevel * (1 - smoothing);
+          smoothedLevel =
+            smoothedLevel * smoothing + rawLevel * (1 - smoothing);
 
           if (!cancelled) {
             setState({
@@ -168,10 +180,10 @@ export function useMicrophoneActivity({
         analyser.disconnect();
         analyser = null;
       }
-      if (stream) {
+      if (stream && ownsStream) {
         stream.getTracks().forEach((track) => track.stop());
-        stream = null;
       }
+      stream = null;
       if (audioContext) {
         audioContext.close().catch(() => {});
         audioContext = null;
@@ -184,7 +196,7 @@ export function useMicrophoneActivity({
       cancelled = true;
       cleanup();
     };
-  }, [active, muted, barCount, smoothing]);
+  }, [active, muted, injectedStream, barCount, smoothing]);
 
   return state;
 }

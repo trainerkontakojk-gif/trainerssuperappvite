@@ -137,6 +137,8 @@ export class LiveSession {
   public onVolumeChange: (volume: number) => void = () => {};
   public onTimelineEvent: (event: TelefunTimelineEvent) => void = () => {};
   public onSessionCreated: (sessionId: string) => void = () => {};
+  public onLocalStream: (stream: MediaStream | null) => void = () => {};
+  public onPlaybackBlocked: () => void = () => {};
   public onRecordingComplete: (
     url: string | null,
     fullBlob: Blob | null,
@@ -161,6 +163,12 @@ export class LiveSession {
   }
 
   public async connect(accessToken: string) {
+    if (this.config.telefunTransport === "openai-webrtc") {
+      throw new Error(
+        "Transport openai-webrtc harus menggunakan OpenAIWebRtcSession, bukan LiveSession.",
+      );
+    }
+
     try {
       this.setSessionState("connecting");
       this.onStatusChange("Menghubungkan...");
@@ -179,6 +187,7 @@ export class LiveSession {
           sampleRate: this.audioConfiguration.inputSampleRateHz,
         },
       });
+      this.onLocalStream(this.stream);
 
       // 2. Setup Audio Context
       const AudioContextCtor =
@@ -327,7 +336,7 @@ export class LiveSession {
       this.hasConfigured = true;
       if (this.config.telefunTransport === "openai-audio") {
         this.completeSetup();
-      } else {
+      } else if (this.config.telefunTransport === "gemini-live") {
         this.sendSetup();
       }
       return;
@@ -337,6 +346,9 @@ export class LiveSession {
 
     if (this.config.telefunTransport === "openai-audio") {
       this.handleOpenAiMessage(msg);
+      return;
+    }
+    if (this.config.telefunTransport !== "gemini-live") {
       return;
     }
 
@@ -703,10 +715,13 @@ export class LiveSession {
     const audioMessage =
       this.config.telefunTransport === "openai-audio"
         ? buildOpenAiInputAudioAppend(frame.pcm16Buffer)
-        : buildRealtimeAudioMessage(
-            frame.pcm16Buffer,
-            this.audioConfiguration.inputSampleRateHz,
-          );
+        : this.config.telefunTransport === "gemini-live"
+          ? buildRealtimeAudioMessage(
+              frame.pcm16Buffer,
+              this.audioConfiguration.inputSampleRateHz,
+            )
+          : null;
+    if (!audioMessage) return;
     this.ws!.send(JSON.stringify(audioMessage));
     if (!this.hasSentFirstUserAudio) {
       this.hasSentFirstUserAudio = true;
@@ -1212,6 +1227,11 @@ export class LiveSession {
     if (this.inputSource) this.inputSource.disconnect();
     if (this.audioContext) void this.audioContext.close().catch(() => {});
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
+    this.onLocalStream(null);
+  }
+
+  public retryPlayback(): Promise<boolean> {
+    return Promise.resolve(false);
   }
 
   public sendTimeCue(remainingSeconds: number) {

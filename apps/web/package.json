@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node ../../scripts/deployment/guard-no-railway-dev.mjs && vite",
     "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:targeted": "vitest run --config vitest.config.fast.ts --changed",
     "test:core": "node ../../scripts/test-core.mjs web",

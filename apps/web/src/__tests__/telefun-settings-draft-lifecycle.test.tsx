@@ -136,6 +136,29 @@ describe("Telefun settings draft model/voice synchronization", () => {
     });
   });
 
+  it("does not discard a persisted WebRTC pilot while capability is still loading", async () => {
+    const persistedWebRtcSettings: TelefunAppSettings = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1",
+      telefunTransport: "openai-webrtc",
+    };
+    const { result } = renderHook(() =>
+      useTelefunSettingsDraft({
+        settings: persistedWebRtcSettings,
+        isOpen: true,
+        onSave: vi.fn(),
+        onClose: vi.fn(),
+        providerReadiness: unavailable,
+        webRtcCapability: null,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1");
+      expect(result.current.selectedTelefunTransport).toBe("openai-webrtc");
+    });
+  });
+
   it("blocks direct OpenAI selection while unavailable without affecting Gemini", () => {
     const { result } = renderHook(() =>
       useTelefunSettingsDraft({

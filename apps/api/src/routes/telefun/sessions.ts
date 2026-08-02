@@ -3,6 +3,12 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
+import { env, isTelefunOpenAiWebRtcEligible } from "../../lib/env";
+import {
+  consumeTelefunDistributedRateLimit,
+  TelefunDistributedRateLimitError,
+  type TelefunDistributedRateLimitClient,
+} from "../../middleware/rateLimit";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   getTelefunLiveModel,
@@ -17,6 +23,37 @@ import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
 type Variables = { user: User; profile: any };
 
 const telefunSessions = new Hono<{ Variables: Variables }>();
+
+function isActiveWebRtcDeleteError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const value = error as { code?: unknown; message?: unknown };
+  return (
+    value.code === "55006" ||
+    (typeof value.message === "string" &&
+      value.message.includes("Active WebRTC sessions must be terminalized"))
+  );
+}
+
+function activeWebRtcDeleteResponse(c: {
+  json: (body: unknown, status: 409) => Response;
+}) {
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: "ACTIVE_WEBRTC_SESSION",
+        message: "Akhiri panggilan WebRTC sebelum menghapus riwayat.",
+      },
+    },
+    409,
+  );
+}
+
+function retryAfterSeconds(resetAt: string): string {
+  const resetMs = Date.parse(resetAt);
+  if (!Number.isFinite(resetMs)) return "1";
+  return String(Math.max(1, Math.ceil((resetMs - Date.now()) / 1_000)));
+}
 
 export class TelefunSessionValidationError extends Error {}
 
@@ -222,7 +259,6 @@ telefunSessions.post(
   zValidator("json", telefunSessionCreatePayloadSchema),
   async (c) => {
     const user = c.get("user");
-    const adminClient = createAdminClient();
     const body = c.req.valid("json");
 
     try {
@@ -230,6 +266,42 @@ telefunSessions.post(
         userId: user.id,
         body,
       });
+      if (
+        insertPayload.telefun_transport === "openai-webrtc" &&
+        !isTelefunOpenAiWebRtcEligible(user.id)
+      ) {
+        throw new TelefunSessionValidationError(
+          "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
+        );
+      }
+      const adminClient = createAdminClient();
+      if (insertPayload.telefun_transport === "openai-webrtc") {
+        const rateLimitClient =
+          adminClient as unknown as Partial<TelefunDistributedRateLimitClient>;
+        if (typeof rateLimitClient.rpc !== "function") {
+          throw new TelefunDistributedRateLimitError();
+        }
+        const rate = await consumeTelefunDistributedRateLimit({
+          client: rateLimitClient as TelefunDistributedRateLimitClient,
+          userId: user.id,
+          provider: "openai-webrtc",
+          scope: "session-create",
+          requestLimit: env.TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE,
+        });
+        if (!rate.allowed) {
+          c.header("Retry-After", retryAfterSeconds(rate.resetAt));
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: "RATE_LIMITED",
+                message: "Terlalu banyak sesi WebRTC. Coba lagi nanti.",
+              },
+            },
+            429,
+          );
+        }
+      }
       const { data, error } = await adminClient
         .from("telefun_history")
         .insert(insertPayload)
@@ -239,6 +311,18 @@ telefunSessions.post(
       if (error) throw error;
       return c.json({ success: true, data });
     } catch (error: any) {
+      if (error instanceof TelefunDistributedRateLimitError) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "RATE_LIMIT_UNAVAILABLE",
+              message: "Pembatasan sesi belum tersedia. Coba lagi nanti.",
+            },
+          },
+          503,
+        );
+      }
       if (error instanceof TelefunSessionValidationError) {
         return c.json(
           {
@@ -380,10 +464,117 @@ telefunSessions.patch(
     const body = c.req.valid("json");
 
     try {
+      if (
+        body.telefun_transport === "openai-webrtc" &&
+        !isTelefunOpenAiWebRtcEligible(user.id)
+      ) {
+        throw new TelefunSessionValidationError(
+          "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
+        );
+      }
+
+      const { data: existingSession, error: existingSessionError } =
+        await adminClient
+          .from("telefun_history")
+          .select("user_id, telefun_transport")
+          .eq("id", id)
+          .maybeSingle();
+
+      if (existingSessionError) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "DATABASE_ERROR",
+              message: "Sesi belum dapat diperiksa.",
+            },
+          },
+          503,
+        );
+      }
+      if (!existingSession) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Sesi tidak ditemukan." },
+          },
+          404,
+        );
+      }
+      if (existingSession.user_id !== user.id) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "UNAUTHORIZED",
+              message: "Anda tidak memiliki akses.",
+            },
+          },
+          403,
+        );
+      }
+
+      const webRtcLifecycleFields = [
+        "status",
+        "messages",
+        "duration_seconds",
+        "recording_path",
+        "agent_recording_path",
+        "score",
+        "feedback",
+      ] as const;
+      const isWebRtcSession =
+        existingSession.telefun_transport === "openai-webrtc" ||
+        body.telefun_transport === "openai-webrtc";
+      if (
+        isWebRtcSession &&
+        webRtcLifecycleFields.some((field) => body[field] !== undefined)
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SERVER_OWNED_LIFECYCLE",
+              message: "Lifecycle WebRTC dikelola oleh server.",
+            },
+          },
+          400,
+        );
+      }
+
       const updatePayload = buildTelefunSessionUpdatePayload(body, {
         userId: user.id,
         sessionId: id,
       });
+      if (isWebRtcSession) {
+        const rateLimitClient =
+          adminClient as unknown as Partial<TelefunDistributedRateLimitClient>;
+        if (typeof rateLimitClient.rpc !== "function") {
+          throw new TelefunDistributedRateLimitError();
+        }
+        const rate = await consumeTelefunDistributedRateLimit({
+          client: rateLimitClient as TelefunDistributedRateLimitClient,
+          userId: user.id,
+          sessionId: id,
+          provider: "openai-webrtc",
+          scope: "session-write",
+          requestLimit: env.TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE,
+        });
+        if (!rate.allowed) {
+          c.header("Retry-After", retryAfterSeconds(rate.resetAt));
+          return c.json(
+            {
+              success: false,
+              error: {
+                code: "RATE_LIMITED",
+                message:
+                  "Terlalu banyak perubahan sesi WebRTC. Coba lagi nanti.",
+              },
+            },
+            429,
+          );
+        }
+      }
       const { error } = await adminClient
         .from("telefun_history")
         .update(updatePayload)
@@ -393,6 +584,18 @@ telefunSessions.patch(
       if (error) throw error;
       return c.json({ success: true, message: "Sesi diperbarui." });
     } catch (error: any) {
+      if (error instanceof TelefunDistributedRateLimitError) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "RATE_LIMIT_UNAVAILABLE",
+              message: "Pembatasan sesi belum tersedia. Coba lagi nanti.",
+            },
+          },
+          503,
+        );
+      }
       if (
         error?.message === "Invalid recording path ownership" ||
         error?.message === "Invalid agent recording path ownership" ||
@@ -486,7 +689,9 @@ telefunSessions.delete("/history/:id", async (c) => {
   try {
     const { data: session, error: fetchError } = await adminClient
       .from("telefun_history")
-      .select("user_id, recording_path, agent_recording_path")
+      .select(
+        "user_id, status, telefun_transport, recording_path, agent_recording_path",
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -513,26 +718,37 @@ telefunSessions.delete("/history/:id", async (c) => {
         403,
       );
     }
+    if (
+      session.telefun_transport === "openai-webrtc" &&
+      (session.status === "active" || session.status === "pending")
+    ) {
+      return activeWebRtcDeleteResponse(c);
+    }
 
-    // Delete files from storage
     const filesToDelete = [
       session.recording_path,
       session.agent_recording_path,
     ].filter(Boolean) as string[];
+
+    // Delete the guarded history row first. The database trigger is the final
+    // race check; storage cleanup must never run after a rejected live delete.
+    const { error: deleteError } = await adminClient
+      .from("telefun_history")
+      .delete()
+      .eq("id", id);
+    if (deleteError) throw deleteError;
+
     if (filesToDelete.length > 0) {
       await adminClient.storage
         .from("telefun-recordings")
         .remove(filesToDelete);
     }
 
-    const { error: deleteError } = await adminClient
-      .from("telefun_history")
-      .delete()
-      .eq("id", id);
-
-    if (deleteError) throw deleteError;
     return c.json({ success: true, message: "Riwayat berhasil dihapus." });
   } catch (error: any) {
+    if (isActiveWebRtcDeleteError(error)) {
+      return activeWebRtcDeleteResponse(c);
+    }
     return c.json(
       {
         success: false,
@@ -553,10 +769,18 @@ telefunSessions.delete("/history", async (c) => {
   try {
     const { data: sessions, error: fetchError } = await adminClient
       .from("telefun_history")
-      .select("recording_path, agent_recording_path")
+      .select(
+        "id, status, telefun_transport, recording_path, agent_recording_path",
+      )
       .eq("user_id", user.id);
 
     if (fetchError) throw fetchError;
+    const activeWebRtcSession = (sessions ?? []).find(
+      (session) =>
+        session.telefun_transport === "openai-webrtc" &&
+        (session.status === "active" || session.status === "pending"),
+    );
+    if (activeWebRtcSession) return activeWebRtcDeleteResponse(c);
 
     const filesToDelete = Array.from(
       new Set(
@@ -568,6 +792,14 @@ telefunSessions.delete("/history", async (c) => {
       ),
     ) as string[];
 
+    // The guarded bulk DELETE performs the final active-session race check
+    // before any storage object is removed.
+    const { error } = await adminClient
+      .from("telefun_history")
+      .delete()
+      .eq("user_id", user.id);
+    if (error) throw error;
+
     for (let index = 0; index < filesToDelete.length; index += 1000) {
       const batch = filesToDelete.slice(index, index + 1000);
       const { error: storageError } = await adminClient.storage
@@ -577,17 +809,14 @@ telefunSessions.delete("/history", async (c) => {
       if (storageError) throw storageError;
     }
 
-    const { error } = await adminClient
-      .from("telefun_history")
-      .delete()
-      .eq("user_id", user.id);
-
-    if (error) throw error;
     return c.json({
       success: true,
       message: "Semua riwayat berhasil dihapus.",
     });
   } catch (error: any) {
+    if (isActiveWebRtcDeleteError(error)) {
+      return activeWebRtcDeleteResponse(c);
+    }
     return c.json(
       {
         success: false,

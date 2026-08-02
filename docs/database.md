@@ -38,7 +38,7 @@ erDiagram
 
 ## Tabel Utama
 
-**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/` (44 files, fully idempotent):
+**Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/`. Migration Phase 4 di bawah adalah artifact repository yang additive dan transactional; keberadaannya di tree tidak berarti sudah diterapkan ke database remote.
 
 **Core Migrations (000–017):**
 - `000_profiles_core.sql` — Profiles & auth tables
@@ -60,7 +60,7 @@ erDiagram
 - `016_harden_profiles_rls.sql` — Profiles RLS hardening
 - `017_harden_mv_qa_period_summary.sql` — MV hardening (revokes from non-service_role)
 
-**Timestamp Migrations (20260520–20260630):**
+**Timestamp Migrations (20260520–20260801):**
 
 | Migration | Purpose |
 |-----------|---------|
@@ -96,6 +96,8 @@ erDiagram
 | `20260619090000_telefun_live_per_minute_billing.sql` | Telefun live per-minute billing columns |
 | `20260622150000_repair_telefun_scoring_lifecycle_contract.sql` | Repair telefun scoring lifecycle contract |
 | `20260630003553_add_current_sidak_profiler_lookup_indexes.sql` | SIDAK profiler lookup indexes |
+| `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` | Additive Telefun WebRTC attempt/transcript/usage/finalization, recording readiness, scoring lock, and service-role RPCs |
+| `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql` | Distributed WebRTC lease/quota, rate-limit windows, orphan cleanup, hashed-user metrics, and precise network/orphan outcomes |
 
 ### 1. `public.profiles`
 
@@ -126,9 +128,33 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`ketik_session_reviews`**: Hasil review AI per sesi KETIK. Berisi skor, rubrik, dan feedback dalam format JSONB.
 - **`pdkt_history`**: Riwayat sesi PDKT per user, email thread, config, dan hasil evaluasi async.
 - **`pdkt_mailbox_items`**: Kotak masuk simulasi PDKT yang persisten. Menyimpan inbound email, status (`open`, `replied`, `deleted`).
-- **`telefun_history`**: Riwayat sesi TELEFUN per user, termasuk skenario, durasi, URL rekaman, skor, dan feedback.
+- **`telefun_history`**: Riwayat sesi TELEFUN per user, termasuk skenario, durasi, URL/path rekaman, skor, feedback, dan Phase 4 recording/scoring readiness state.
 - **`telefun_replay_annotations`**: Anotasi AI dan manual untuk fitur Replay Telefun.
 - **`user_settings`**: Settings modul yang disimpan per user untuk KETIK, PDKT, dan TELEFUN.
+
+#### Phase 4 Telefun WebRTC durable schema (repository artifact)
+
+Migration `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` menambahkan kontrak additive berikut:
+
+- `telefun_history.recording_status`, `recording_ready_at`, `recording_error`, dan `scoring_ready_at`. Capture failure diberi error bounded; WebRTC readiness hanya membuka scoring setelah session terminal dan path agent seekable yang exact.
+- `telefun_realtime_attempts`: satu attempt per session melalui `UNIQUE(session_id)`, finalization key dan usage request ID unik, state `claimed/brokered/sideband_connected/ending/ended`, hashed provider reference, usage status, dan transcript checkpoint sequence.
+- `telefun_realtime_transcript_events`: checkpoint transcript per attempt dengan `UNIQUE(attempt_id, dedupe_key)` dan `UNIQUE(attempt_id, sequence)`, speaker/text/start-time bounded, serta partial-update semantics.
+- Trigger/function mencegah penghapusan history atau attempt WebRTC yang masih aktif. Attempt dan transcript tables mengaktifkan RLS, mencabut akses `public`, `anon`, dan `authenticated`, lalu hanya memberi grant ke `service_role`.
+- RPC server-only meliputi claim/bind/sideband/checkpoint/finalization/usage, `mark_telefun_recording_uploaded`, `mark_telefun_recording_ready`, `complete_telefun_scoring`, `claim_telefun_scoring`, dan `enqueue_telefun_scoring`. Migration mengirim `NOTIFY pgrst, 'reload schema'` di dalam transaction.
+- `complete_telefun_scoring(UUID, NUMERIC, JSONB DEFAULT NULL) RETURNS BOOLEAN` mengambil row lock `FOR UPDATE`. Branch WebRTC memerlukan status `completed`, recording state non-failed, `scoring_ready_at`, dan exact `<user>/<session>/agent_only.seekable.webm`; branch Gemini/legacy OpenAI WebSocket mempertahankan gate lama. Capture failure yang beradu dengan scoring `processing` mengubah scoring WebRTC menjadi `failed`, sehingga completion stale mengembalikan `false`.
+
+Rollback artifact `supabase/rollbacks/rollback_20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` memulihkan body/signature/grant pre-Phase-4 untuk completion/claim/enqueue sebelum menghapus function/trigger/table dan empat kolom Phase 4. Rollback juga transactional dan mengirim schema reload notification. Tidak ada migration/rollback yang dijalankan pada remote database dalam sinkronisasi ini; local Postgres tidak tersedia sehingga SQL evidence tetap static contract/fake RPC evidence.
+
+#### Phase 5 Telefun WebRTC distributed schema (repository artifact)
+
+Migration `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql` menambahkan:
+
+- `telefun_realtime_leases` dengan claim/renew/release atomic, advisory locks untuk cap user/provider, TTL, token hash, dan state cleanup orphan. Lease hilang memicu finalisasi `network_lost`; release bertoken tetap dicoba setelah provider ditutup agar row terminal tidak menunggu sweep.
+- `telefun_realtime_rate_limits` dan RPC window atomic untuk scope user/session/provider. Semua RPC/table hanya untuk `service_role`; `public`, `anon`, dan `authenticated` dicabut dan RLS diaktifkan.
+- Opaque provider call reference terenkripsi untuk cleanup restart, outcome `network_lost`/`orphaned`, counter duplicate/sideband/missing-usage, serta RPC claim/complete orphan yang mengembalikan cleanup gagal ke state retryable.
+- `telefun_realtime_metrics` dengan nama metric allowlisted dan SHA-256 `user_id_hash`; UUID user mentah tidak disimpan di row metric. Missing/unpriceable usage tetap audit state dan tidak dibuat menjadi zero sintetis.
+
+Rollback Phase 5 bersifat transactional dan fail-closed jika row outcome `network_lost`/`orphaned` belum didrain. Artifact ini belum dijalankan pada hosted/local PostgreSQL dalam task ini; bukti yang tersedia tetap static migration contract dan fake RPC tests.
 
 ### 4. Modul Profiler (KTP)
 
@@ -206,7 +232,7 @@ Berdasarkan mitigasi keamanan terbaru, seluruh hak akses bawaan yang luas (`GRAN
 
 - **Peran `anon` dan `public`:** Tidak memiliki akses `SELECT`, `INSERT`, `UPDATE`, atau `DELETE` pada tabel aplikasi apa pun, termasuk materialized views (`mv_qa_period_summary`).
 - **Peran `authenticated`:** Diberikan hak akses secara terperinci (granular) hanya pada tabel-tabel yang berinteraksi dengan pengguna aktif. Tabel internal tingkat sistem seperti `ai_usage_logs`, `ai_pricing_settings`, dan `ai_billing_settings`, serta materialized view `mv_qa_period_summary` (setelah terminal re-hardening migration `20260526090000`) sepenuhnya **tertutup** dari akses client (_zero client-side grants_) dan hanya dapat dimanipulasi/dibaca melalui klien admin di sisi backend (Hono API menggunakan `service_role`).
-- **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) fungsi dibatasi secara ketat ke peran `authenticated` atau `service_role`. Fungsi refresh materialized view `refresh_mv_qa_period_summary()` dibatasi khusus untuk `service_role` (dipertegas setelah contract restore oleh migration `20260526090000`).
+- **Remote Procedure Calls (RPC):** Hak eksekusi (`EXECUTE`) fungsi dibatasi secara ketat ke peran `authenticated` atau `service_role`. Fungsi refresh materialized view `refresh_mv_qa_period_summary()` dibatasi khusus untuk `service_role` (dipertegas setelah contract restore oleh migration `20260526090000`). Seluruh Phase 4 lifecycle/recording/scoring RPC di migration `20260801120000` secara eksplisit revoke dari `public`, `anon`, dan `authenticated`, lalu grant hanya ke `service_role`.
 
 ### 🛡️ Lapisan 2: Row Level Security (RLS)
 

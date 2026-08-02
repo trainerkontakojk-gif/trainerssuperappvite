@@ -14,7 +14,18 @@ import {
   TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS,
 } from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
-import { LiveSession } from "../services/liveSession";
+import type { OpenAIWebRtcRecordingCallbackResult } from "../services/openaiWebRtc/contracts";
+import type { WebRtcRecoveryPlan } from "../services/openaiWebRtc/recovery-policy";
+import {
+  cleanupOpenAIWebRtcSession,
+  createTelefunTransport,
+  mapTelefunTransportError,
+  type TelefunTransportSession,
+} from "../services/telefunTransport";
+import {
+  createWebRtcCleanupOwner,
+  type WebRtcCleanupOwner,
+} from "../services/openaiWebRtc/cleanup-owner";
 import {
   getTelefunTimeCueThreshold,
   type TelefunTimeCue,
@@ -29,6 +40,9 @@ import { HoldStatusDisplay } from "./HoldStatusDisplay";
 interface PhoneInterfaceProps {
   config: TelefunAppSettings;
   accessToken: string;
+  isObjectUrlRetained?: (url: string) => boolean;
+  canRetainObjectUrl?: boolean;
+  retainObjectUrl?: (url: string | null) => boolean;
   onEndSession: (reason?: string) => void;
   onRecordingReady?: (
     url: string | null,
@@ -37,8 +51,12 @@ interface PhoneInterfaceProps {
     fullCallBlob: Blob | null,
     agentBlob: Blob | null,
     metrics: SessionMetrics,
-  ) => void;
+    captureStatus?: "ready" | "failed",
+  ) =>
+    | OpenAIWebRtcRecordingCallbackResult
+    | Promise<OpenAIWebRtcRecordingCallbackResult>;
   onSessionCreated?: (sessionId: string) => void;
+  onRecoveryRequired?: (plan: WebRtcRecoveryPlan) => void;
 }
 
 interface ActiveHoldUi {
@@ -47,6 +65,8 @@ interface ActiveHoldUi {
   limitMs: number;
 }
 
+const CLEANUP_PENDING_MESSAGE =
+  "Panggilan belum tersimpan. Coba lagi untuk mengakhiri.";
 function getInitials(name: string): string {
   return name
     .split(/\s+/)
@@ -59,9 +79,13 @@ function getInitials(name: string): string {
 export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   config,
   accessToken,
+  isObjectUrlRetained,
+  canRetainObjectUrl,
+  retainObjectUrl,
   onEndSession,
   onRecordingReady,
   onSessionCreated,
+  onRecoveryRequired,
 }) => {
   const [connectionState, setConnectionState] = useState("Memanggil...");
   const [callDuration, setCallDuration] = useState(0);
@@ -73,16 +97,24 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const [activeHold, setActiveHold] = useState<ActiveHoldUi | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [cleanupRetryable, setCleanupRetryable] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
+  const [terminalFailure, setTerminalFailure] = useState(false);
 
   const sentTimeCues = useRef<Set<TelefunTimeCue>>(new Set());
   const holdSequenceRef = useRef(0);
 
-  const sessionRef = useRef<LiveSession | null>(null);
+  const sessionRef = useRef<TelefunTransportSession | null>(null);
+  const cleanupOwnerRef = useRef<WebRtcCleanupOwner | null>(null);
+  const cleanupConfirmedRef = useRef(false);
+  const terminalFailureRef = useRef(false);
   const mountedRef = useRef(true);
 
   // End-call idempotency refs
   const isDisconnectingRef = useRef(false);
   const endCallStartedRef = useRef(false);
+  const cleanupRetryButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const uiAudioContextRef = useRef<AudioContext | null>(null);
   const holdMusicOscillators = useRef<OscillatorNode[]>([]);
@@ -101,6 +133,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
+
+  useEffect(() => {
+    if (cleanupRetryable && !isDisconnecting) {
+      cleanupRetryButtonRef.current?.focus();
+    }
+  }, [cleanupRetryable, isDisconnecting]);
 
   const getUiContext = () => {
     if (
@@ -235,87 +273,236 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
 
     const startCallSequence = async () => {
       sentTimeCues.current = new Set();
+      terminalFailureRef.current = false;
+      cleanupConfirmedRef.current = false;
+      cleanupOwnerRef.current = null;
+      setTerminalFailure(false);
+      setCleanupRetryable(false);
+      setPlaybackBlocked(false);
 
-      if (isActive) {
-        console.log("[Telefun] Starting ringtone sequence");
-        setIsRinging(true);
-        setConnectionState("Memanggil...");
-        await playIncomingRing();
-      }
-
-      if (!isActive) {
-        console.log(
-          "[Telefun] Component unmounted during ringtone, aborting connection",
-        );
-        return;
-      }
-
-      console.log("[Telefun] Ringtone finished, connecting to AI...");
-      setIsRinging(false);
-      setConnectionState("Menghubungkan...");
+      const setupCleanupOwner =
+        config.telefunTransport === "openai-webrtc" && config.sessionId
+          ? createWebRtcCleanupOwner({
+              sessionId: config.sessionId,
+              accessToken,
+              requestCleanup: () =>
+                cleanupOpenAIWebRtcSession({
+                  websocketUrl: import.meta.env.VITE_TELEFUN_WS_URL,
+                  sessionId: config.sessionId!,
+                  accessToken,
+                  fetch,
+                }),
+            })
+          : null;
+      cleanupOwnerRef.current = setupCleanupOwner;
 
       try {
-        const session = new LiveSession(config);
-        sessionRef.current = session;
+        let session: TelefunTransportSession | null = null;
+        const bindSession = (nextSession: TelefunTransportSession) => {
+          const session = nextSession;
+          session.onLocalStream = (stream) => {
+            if (isActive) setLocalStream(stream);
+          };
 
-        session.onSessionCreated = (sessionId) => {
-          if (onSessionCreated) onSessionCreated(sessionId);
-        };
+          session.onSessionCreated = (sessionId) => {
+            if (onSessionCreated) onSessionCreated(sessionId);
+          };
 
-        session.onStatusChange = (s) => {
-          if (isActive) setConnectionState(s);
-        };
-        session.onError = (e) => {
-          if (isActive)
-            setError(
-              e instanceof Error ? e.message : "Terjadi kesalahan koneksi.",
-            );
-        };
-        session.onAiSpeaking = (speaking) => {
-          if (isActive) setIsAiSpeaking(speaking);
-        };
-        session.onVolumeChange = (vol) => {
-          if (isActive) setAgentVolume(vol);
-        };
-        session.onRecordingComplete = async (
-          url,
-          fullBlob,
-          agentBlob,
-          metrics,
-        ) => {
-          if (onRecordingReadyRef.current) {
-            const measuredDuration =
-              Number.isFinite(metrics.sessionDurationMs) &&
-              metrics.sessionDurationMs > 0
-                ? Math.round(metrics.sessionDurationMs / 1000)
-                : callDurationRef.current;
-            try {
-              await onRecordingReadyRef.current(
-                url,
-                config.consumerName,
-                measuredDuration,
-                fullBlob,
-                agentBlob,
-                metrics,
+          session.onStatusChange = (s) => {
+            if (s === "Gagal" || s.startsWith("Error")) {
+              terminalFailureRef.current = true;
+              if (isActive) setTerminalFailure(true);
+            }
+            if (isActive) setConnectionState(s);
+          };
+          session.onStateChange = (state) => {
+            if (!isActive) return;
+            if (state === "ready") setConnectionState("Tersambung");
+            if (state === "ended" && !terminalFailureRef.current) {
+              setConnectionState("Selesai");
+            }
+          };
+          session.onCleanupConfirmed = () => {
+            cleanupConfirmedRef.current = true;
+          };
+          session.onError = (e) => {
+            terminalFailureRef.current = true;
+            if (isActive) {
+              setTerminalFailure(true);
+              setError(mapTelefunTransportError(e));
+            }
+          };
+          session.onRecoveryRequired = (plan) => {
+            if (isActive) {
+              setTerminalFailure(plan.outcome === "failed");
+              setError(
+                plan.outcome === "network_lost"
+                  ? "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan."
+                  : mapTelefunTransportError(new Error("provider error")),
               );
-            } catch (err) {
-              console.error("onRecordingReady failed:", err);
+            }
+            onRecoveryRequired?.(plan);
+          };
+          session.onPlaybackBlocked = () => {
+            if (isActive) setPlaybackBlocked(true);
+          };
+          session.onAiSpeaking = (speaking) => {
+            if (isActive) setIsAiSpeaking(speaking);
+          };
+          session.onVolumeChange = (vol) => {
+            if (isActive) setAgentVolume(vol);
+          };
+          if (session.onRecordingComplete) {
+            session.onRecordingComplete = async (
+              url,
+              fullBlob,
+              agentBlob,
+              metrics,
+              captureStatus,
+            ) => {
+              // Transfer the page owner synchronously before upload/transition/
+              // remux work can outlive the session callback deadline.
+              if (
+                mountedRef.current &&
+                config.telefunTransport === "openai-webrtc" &&
+                url &&
+                onRecordingReadyRef.current &&
+                canRetainObjectUrl !== false
+              ) {
+                retainObjectUrl?.(url);
+              }
+              let callbackResult:
+                | OpenAIWebRtcRecordingCallbackResult
+                | undefined;
+              if (onRecordingReadyRef.current) {
+                const measuredDuration =
+                  Number.isFinite(metrics.sessionDurationMs) &&
+                  metrics.sessionDurationMs > 0
+                    ? Math.round(metrics.sessionDurationMs / 1000)
+                    : callDurationRef.current;
+                try {
+                  callbackResult = captureStatus
+                    ? await onRecordingReadyRef.current(
+                        url,
+                        config.consumerName,
+                        measuredDuration,
+                        fullBlob,
+                        agentBlob,
+                        metrics,
+                        captureStatus,
+                      )
+                    : await onRecordingReadyRef.current(
+                        url,
+                        config.consumerName,
+                        measuredDuration,
+                        fullBlob,
+                        agentBlob,
+                        metrics,
+                      );
+                } catch (err) {
+                  console.error("onRecordingReady failed:", err);
+                  callbackResult = undefined;
+                }
+              }
+              // If disconnect (end call) is in progress, handleEndCall will navigate home.
+              // Otherwise a WebRTC callback may navigate only after the authenticated
+              // cleanup owner has observed the broker's 204.
+              if (
+                mountedRef.current &&
+                !isDisconnectingRef.current &&
+                (config.telefunTransport !== "openai-webrtc" ||
+                  cleanupConfirmedRef.current)
+              ) {
+                onEndSessionRef.current(
+                  config.telefunTransport === "openai-webrtc" &&
+                    terminalFailureRef.current
+                    ? "provider_error"
+                    : "completed",
+                );
+              }
+              return callbackResult;
+            };
+          }
+        };
+
+        if (config.telefunTransport === "openai-webrtc") {
+          session = createTelefunTransport(config, {
+            accessToken,
+            isObjectUrlRetained,
+          });
+          sessionRef.current = session;
+          // The WebRTC owner closes the pre-created session if construction
+          // fails. Once construction succeeds, the transport owns cleanup.
+          cleanupOwnerRef.current = null;
+          bindSession(session);
+        }
+
+        if (isActive) {
+          console.log("[Telefun] Starting ringtone sequence");
+          setIsRinging(true);
+          setConnectionState("Memanggil...");
+          await playIncomingRing();
+        }
+
+        if (!isActive || endCallStartedRef.current) {
+          console.log(
+            "[Telefun] Call ended or component unmounted during ringtone, aborting connection",
+          );
+          return;
+        }
+
+        if (!session) {
+          // Legacy transports are intentionally constructed after the ringtone.
+          // Cancelling during the ringtone must not create an empty recording.
+          session = createTelefunTransport(config, {
+            accessToken,
+            isObjectUrlRetained,
+          });
+          sessionRef.current = session;
+          bindSession(session);
+        }
+
+        console.log("[Telefun] Ringtone finished, connecting to AI...");
+        setIsRinging(false);
+        setConnectionState("Menghubungkan...");
+        void session.connect(accessToken).catch((connectError: unknown) => {
+          terminalFailureRef.current = true;
+          if (isActive) {
+            setTerminalFailure(true);
+            setError(mapTelefunTransportError(connectError));
+          }
+        });
+      } catch (err: unknown) {
+        terminalFailureRef.current = true;
+        setTerminalFailure(true);
+        setIsRinging(false);
+        let cleanupPending = false;
+        if (setupCleanupOwner) {
+          try {
+            await setupCleanupOwner.request();
+            cleanupConfirmedRef.current = true;
+            if (isActive) setCleanupRetryable(false);
+          } catch {
+            cleanupPending = true;
+            console.warn(
+              "[Telefun] Failed to clean up WebRTC session setup failure",
+            );
+            if (isActive) {
+              setCleanupRetryable(true);
+              setIsDisconnecting(false);
+              isDisconnectingRef.current = false;
+              endCallStartedRef.current = false;
             }
           }
-          // If disconnect (end call) is in progress, handleEndCall will navigate home.
-          // Otherwise (session ended by server/error), navigate home here.
-          if (mountedRef.current && !isDisconnectingRef.current) {
-            onEndSessionRef.current("completed");
-          }
-        };
-
-        session.connect(accessToken);
-      } catch (err: unknown) {
+        }
         console.error("[Telefun] Failed to initialize session:", err);
-        if (isActive)
+        if (isActive) {
           setError(
-            err instanceof Error ? err.message : "Gagal memulai panggilan.",
+            cleanupPending
+              ? CLEANUP_PENDING_MESSAGE
+              : mapTelefunTransportError(err),
           );
+        }
       }
     };
 
@@ -327,10 +514,32 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       mountedRef.current = false;
       stopHoldMusic();
       if (!endCallStartedRef.current) {
-        (async () => {
-          await sessionRef.current?.disconnect("cleanup");
-        })();
+        const disconnect = sessionRef.current?.disconnect("cleanup");
+        if (disconnect) {
+          void disconnect
+            .then(() => {
+              if (config.telefunTransport === "openai-webrtc") {
+                cleanupConfirmedRef.current = true;
+              }
+            })
+            .catch((cleanupError: unknown) => {
+              console.warn(
+                "[Telefun] cleanup disconnect failed:",
+                cleanupError,
+              );
+            });
+        } else if (cleanupOwnerRef.current?.state === "pending") {
+          void cleanupOwnerRef.current
+            .request()
+            .catch((cleanupError: unknown) => {
+              console.warn(
+                "[Telefun] setup cleanup failed during unmount:",
+                cleanupError,
+              );
+            });
+        }
       }
+      setLocalStream(null);
       if (
         uiAudioContextRef.current &&
         uiAudioContextRef.current.state !== "closed"
@@ -362,6 +571,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   // No countdown decrement effect needed — duration is from timestamps.
 
   const isOnHold = activeHold !== null;
+
+  const retryAudioPlayback = async () => {
+    if (isDisconnectingRef.current) return;
+    const didPlay = await sessionRef.current?.retryPlayback();
+    if (didPlay) setPlaybackBlocked(false);
+  };
 
   const toggleHold = () => {
     if (isDisconnectingRef.current) return;
@@ -414,19 +629,46 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       }
 
       try {
-        await sessionRef.current?.disconnect(
-          reason === "timeout" ? "timeout" : "user",
-        );
+        const session = sessionRef.current;
+        if (session) {
+          await session.disconnect(reason === "timeout" ? "timeout" : "user");
+          if (config.telefunTransport === "openai-webrtc") {
+            cleanupConfirmedRef.current = true;
+          }
+        } else if (config.telefunTransport === "openai-webrtc") {
+          const cleanupOwner = cleanupOwnerRef.current;
+          if (!cleanupOwner) {
+            throw new Error("OpenAI WebRTC cleanup owner is unavailable.");
+          }
+          await cleanupOwner.request();
+          cleanupConfirmedRef.current = true;
+        }
       } catch (err) {
         console.error("[Telefun] disconnect error:", err);
+        if (mountedRef.current) {
+          // A 503 means the same durable finalization key still owns the
+          // attempt. Keep this component mounted and let the trainer retry.
+          setIsDisconnecting(false);
+          isDisconnectingRef.current = false;
+          endCallStartedRef.current = false;
+          setCleanupRetryable(true);
+          setError(CLEANUP_PENDING_MESSAGE);
+        }
+        return;
       }
 
+      setCleanupRetryable(false);
       // Navigate home only after disconnect + recording finalization complete
-      if (mountedRef.current) {
+      // and, for WebRTC, an authenticated 204 confirmation.
+      if (
+        mountedRef.current &&
+        (config.telefunTransport !== "openai-webrtc" ||
+          cleanupConfirmedRef.current)
+      ) {
         onEndSessionRef.current(reason);
       }
     },
-    [stopHoldMusic],
+    [config.telefunTransport, stopHoldMusic],
   );
 
   useEffect(() => {
@@ -448,7 +690,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       });
       if (cue) {
         sentTimeCues.current.add(cue);
-        sessionRef.current?.sendTimeCue(remaining);
+        sessionRef.current?.sendTimeCue?.(remaining);
       }
     }
   }, [callDuration, config.maxCallDuration, connectionState]);
@@ -480,6 +722,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const micActivity = useMicrophoneActivity({
     active: connectionState === "Tersambung" && !isOnHold,
     muted: isMuted,
+    stream: localStream,
   });
   const displayVolume = isMuted ? 0 : Math.max(agentVolume, micActivity.level);
   const volStatus = getVolumeStatus(displayVolume);
@@ -517,7 +760,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     statusBg = "bg-blue-900/40";
     statusTextColor = "text-blue-400";
     statusBorder = "border-blue-500/30";
-  } else if (connectionState === "Tersambung") {
+  } else if (connectionState === "Tersambung" && !terminalFailure && !error) {
     if (isAiSpeaking) {
       statusText = "Konsumen sedang berbicara...";
       statusBg = "bg-green-900/40";
@@ -529,8 +772,13 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       statusTextColor = "text-[#4ade80]";
       statusBorder = "border-[#4ade80]/20";
     }
-  } else if (connectionState.startsWith("Error") || error) {
-    statusText = error || connectionState;
+  } else if (connectionState === "Selesai") {
+    statusText = "Selesai";
+    statusBg = "bg-gray-800";
+    statusTextColor = "text-gray-300";
+    statusBorder = "border-white/10";
+  } else if (terminalFailure || connectionState === "Gagal" || error) {
+    statusText = error || connectionState || "Gagal";
     statusBg = "bg-red-900/50";
     statusTextColor = "text-red-400";
     statusBorder = "border-red-500/30";
@@ -647,10 +895,34 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               className={`w-full max-w-md rounded-3xl border px-8 py-6 text-center shadow-lg backdrop-blur-md transition-all duration-300 md:max-w-2xl ${statusBg} ${statusBorder}`}
             >
               <p
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
                 className={`text-base md:text-xl font-semibold ${statusTextColor} animate-pulse`}
               >
                 {statusText}
               </p>
+              {playbackBlocked && !isDisconnecting && (
+                <button
+                  type="button"
+                  onClick={() => void retryAudioPlayback()}
+                  className="mt-3 rounded-md border border-current px-3 py-2 text-sm font-semibold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+                >
+                  Aktifkan audio
+                </button>
+              )}
+              {cleanupRetryable && (
+                <button
+                  ref={cleanupRetryButtonRef}
+                  type="button"
+                  onClick={() => void handleEndCall()}
+                  disabled={isDisconnecting}
+                  aria-busy={isDisconnecting}
+                  className="mt-3 min-h-11 rounded-md border border-current px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Coba lagi mengakhiri panggilan
+                </button>
+              )}
             </div>
 
             {/* Hold warnings are handled by HoldStatusDisplay phase */}
@@ -680,6 +952,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             }`}
             title={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
             aria-label={isOnHold ? "Kembali ke konsumen" : "Aktifkan hold"}
+            aria-pressed={isOnHold}
           >
             {isOnHold ? (
               <Play className="h-6 w-6 fill-current md:h-7 md:w-7" />
@@ -707,6 +980,8 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
                 : "border-slate-950/10 bg-slate-950/5 text-slate-900 hover:bg-slate-950/10 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
             }`}
             title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+            aria-label={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+            aria-pressed={isMuted}
           >
             {isMuted ? (
               <MicOff className="h-6 w-6 md:h-7 md:w-7" />

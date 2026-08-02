@@ -122,11 +122,13 @@ describe("Telefun scoring lifecycle migration contract", () => {
     }
   });
 
-  it("only P1.6 retry queue and terminal repair migration re-define the lifecycle RPCs", () => {
+  it("only retry, terminal repair, and Phase 4 migration re-define lifecycle RPCs", () => {
     const retryFile = "20260611201000_telefun_scoring_retry_queue.sql";
     const terminalFile =
       "20260622150000_repair_telefun_scoring_lifecycle_contract.sql";
-    const allowed = new Set([retryFile, terminalFile]);
+    const phase4File =
+      "20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql";
+    const allowed = new Set([retryFile, terminalFile, phase4File]);
     const allFiles = readdirSync(migrationsDir)
       .filter((f) => f.endsWith(".sql") && f > migrationName && !allowed.has(f))
       .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
@@ -406,12 +408,18 @@ describe("Telefun scoring retry migration contract", () => {
     expect(authGrants).toBeNull();
   });
 
-  it("no later migration except terminal repair re-defines the same RPCs", () => {
+  it("no later migration except terminal repair and Phase 4 re-defines the same RPCs", () => {
     const terminalFile =
       "20260622150000_repair_telefun_scoring_lifecycle_contract.sql";
+    const phase4File =
+      "20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql";
     const allFiles = readdirSync(migrationsDir)
       .filter(
-        (f) => f.endsWith(".sql") && f > p16Migration && f !== terminalFile,
+        (f) =>
+          f.endsWith(".sql") &&
+          f > p16Migration &&
+          f !== terminalFile &&
+          f !== phase4File,
       )
       .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
       .join("\n");

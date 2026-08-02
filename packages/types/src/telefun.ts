@@ -1,11 +1,12 @@
 import type { JsonObject, JsonValue } from "./common";
+import type { TelefunTransport } from "./ai-models";
 import type { VoiceQualityAssessment } from "./telefun-assessment";
 import type { TelefunTranscriptEntry } from "./telefun-transcript";
 
 export interface TelefunSessionConfigure {
   type: "telefun_session_configure";
   modelId: string;
-  transport: "gemini-live" | "openai-audio";
+  transport: "gemini-live" | "openai-audio" | "openai-webrtc";
   voice: string;
   instructions: string;
   inputAudio: {
@@ -16,6 +17,40 @@ export interface TelefunSessionConfigure {
 }
 
 export const TELEFUN_CONFIGURATION_CLOSE_CODE = 4002;
+
+export type TelefunRecordingStatus =
+  | "pending"
+  | "uploaded"
+  | "partial"
+  | "ready"
+  | "failed";
+
+export type TelefunScoringStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export type TelefunRealtimeAttemptState =
+  | "claimed"
+  | "brokered"
+  | "sideband_connected"
+  | "ending"
+  | "ended";
+
+export type TelefunRealtimeUsageStatus =
+  | "pending"
+  | "persisted"
+  | "incomplete"
+  | "failed";
+
+export interface TelefunRecordingReadiness {
+  recordingStatus: TelefunRecordingStatus;
+  recordingReady: boolean;
+  scoringReady: boolean;
+  scoringReadyAt?: string | null;
+  scoringStatus: TelefunScoringStatus;
+}
 
 export interface SpeechSegment {
   startMs: number;
@@ -82,6 +117,16 @@ export interface TelefunHistory {
   coaching_focus?: string[] | null;
   recording_path?: string | null;
   agent_recording_path?: string | null;
+  recording_status?: TelefunRecordingStatus;
+  recording_ready_at?: string | null;
+  recording_error?: string | null;
+  scoring_ready_at?: string | null;
+  scoring_status?: TelefunScoringStatus;
+  scoring_claimed_at?: string | null;
+  scoring_completed_at?: string | null;
+  scoring_attempt_count?: number | null;
+  scoring_last_error?: string | null;
+  scoring_next_attempt_at?: string | null;
   voice_assessment?: VoiceQualityAssessment | null;
   session_metrics?: SessionMetrics | null;
   voice_dashboard_metrics?: JsonObject | null;
@@ -92,7 +137,7 @@ export interface TelefunHistory {
   configured_duration?: number | null;
   response_pacing_mode?: string | null;
   telefun_model_id?: string | null;
-  telefun_transport?: string | null;
+  telefun_transport?: TelefunTransport | null;
   created_at: string;
 }
 

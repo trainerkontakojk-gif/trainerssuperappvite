@@ -120,6 +120,29 @@ describe("Telefun local history parsing", () => {
     expect(startScoringIndex).toBeGreaterThan(navigateHomeIndex);
   });
 
+  it("abandons only an untransferred URL and blocks a late review reclaim", () => {
+    const handlerStart = landingSource.indexOf("const handleEndCall");
+    const handlerEnd = landingSource.indexOf(
+      "const handleRecordingReady",
+      handlerStart,
+    );
+    const handlerSource = landingSource.slice(handlerStart, handlerEnd);
+
+    expect(handlerSource).toContain("releaseIfNotTransferredToReview()");
+    expect(landingSource).toContain("createRetainedObjectUrlOwner");
+  });
+
+  it("returns a missing-session URL to the recording session for one revoke", () => {
+    const handlerStart = landingSource.indexOf("const handleRecordingReady");
+    const missingSessionEnd = landingSource.indexOf(
+      "if (!sessionId)",
+      handlerStart + 1,
+    );
+    const handlerSource = landingSource.slice(handlerStart, missingSessionEnd);
+
+    expect(handlerSource).toContain("returnToSession(url)");
+  });
+
   it("captures the usage run and baseline before background scoring can finish", () => {
     const handlerStart = landingSource.indexOf("const handleRecordingReady");
     const handlerEnd = landingSource.indexOf(

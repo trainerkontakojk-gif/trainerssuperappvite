@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  lazy,
+  Suspense,
+} from "react";
 import { Phone, Settings, History, Play, BarChart3 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { TelefunAppSettings } from "./telefunSettings";
@@ -39,7 +46,18 @@ import {
   deleteTelefunSession,
   clearTelefunHistory,
   mapTelefunSessionRow,
+  getTelefunWebRtcCapability,
 } from "./telefunApi";
+import {
+  isAllowedTelefunWebRtc,
+  OPENAI_WEBRTC_MODEL_ID,
+  OPENAI_WEBRTC_TRANSPORT,
+} from "./services/telefunWebRtcCapability";
+import { createRetainedObjectUrlOwner } from "./services/openaiWebRtc/cleanup";
+import {
+  installTelefunRecordingReconciliation,
+  reconcileTelefunRecordingQueue,
+} from "./services/telefun-recording-reconciliation";
 
 const accentClassName = "text-violet-600";
 const accentSoftClassName = "bg-violet-100";
@@ -92,7 +110,37 @@ export default function TelefunLanding() {
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const optimisticRecordIdRef = useRef<string | null>(null);
+  const [retainedObjectUrlOwner] = useState(() =>
+    createRetainedObjectUrlOwner(),
+  );
+  const pageMountedRef = useRef(true);
   const localHistoryIsCorruptRef = useRef(false);
+
+  const releaseRetainedObjectUrl = useCallback(
+    () => retainedObjectUrlOwner.release(),
+    [retainedObjectUrlOwner],
+  );
+
+  const retainObjectUrl = useCallback(
+    (url: string | null): boolean =>
+      pageMountedRef.current && retainedObjectUrlOwner.retain(url),
+    [retainedObjectUrlOwner],
+  );
+
+  const isObjectUrlRetained = useCallback(
+    (url: string) => retainedObjectUrlOwner.isRetained(url),
+    [retainedObjectUrlOwner],
+  );
+
+  useEffect(() => {
+    pageMountedRef.current = true;
+    return () => {
+      pageMountedRef.current = false;
+      releaseRetainedObjectUrl();
+    };
+  }, [releaseRetainedObjectUrl]);
+
+  useEffect(() => installTelefunRecordingReconciliation(), []);
 
   // Auto-sync reviewRecord when history updates
   useEffect(() => {
@@ -124,6 +172,7 @@ export default function TelefunLanding() {
       } finally {
         if (!cancelled) {
           setSettingsLoading(false);
+          void reconcileTelefunRecordingQueue();
         }
       }
     };
@@ -152,6 +201,7 @@ export default function TelefunLanding() {
         if (shouldPersistTelefunLocalHistory(merged, localHistoryIsCorrupt)) {
           localStorage.setItem("telefun_history", JSON.stringify(merged));
         }
+        void reconcileTelefunRecordingQueue();
       } catch {
         // ignore
       }
@@ -208,8 +258,36 @@ export default function TelefunLanding() {
     );
     const voiceName = identity.voiceName || settings.voiceName;
 
+    const requestedTransport = settings.telefunTransport ?? "gemini-live";
+    const requestsWebRtc = requestedTransport === OPENAI_WEBRTC_TRANSPORT;
+    if (requestsWebRtc) {
+      if (settings.telefunModelId !== OPENAI_WEBRTC_MODEL_ID) {
+        notify.error("OpenAI WebRTC hanya tersedia untuk GPT Realtime 2.1.");
+        setActiveScenario(null);
+        return;
+      }
+      try {
+        const capability = await getTelefunWebRtcCapability();
+        if (!isAllowedTelefunWebRtc(capability)) {
+          notify.error(
+            "Transport OpenAI WebRTC belum tersedia untuk akun ini.",
+          );
+          setActiveScenario(null);
+          return;
+        }
+      } catch {
+        notify.error("Gagal memeriksa ketersediaan OpenAI WebRTC.");
+        setActiveScenario(null);
+        return;
+      }
+    }
+
     const sessionConfig: TelefunAppSettings = {
       ...settings,
+      telefunModelId: requestsWebRtc
+        ? OPENAI_WEBRTC_MODEL_ID
+        : settings.telefunModelId,
+      telefunTransport: requestedTransport,
       activeScenario: randomScenario,
       activeConsumerType: consumerType,
       scenarioTitle: randomScenario.title,
@@ -244,14 +322,23 @@ export default function TelefunLanding() {
         disruption_config: settings.simulationChallengeTypes,
         configured_duration: settings.maxCallDuration * 60,
         response_pacing_mode: settings.responsePacingMode,
-        telefun_model_id: settings.telefunModelId,
-        telefun_transport: settings.telefunTransport,
+        telefun_model_id: sessionConfig.telefunModelId,
+        telefun_transport: sessionConfig.telefunTransport,
       });
       if (res?.id) {
         setActiveSessionId(res.id);
         sessionConfig.sessionId = res.id;
+      } else if (requestsWebRtc) {
+        throw new Error("Sesi OpenAI WebRTC tidak berhasil dibuat.");
       }
     } catch (e) {
+      if (requestsWebRtc) {
+        notify.error(
+          e instanceof Error ? e.message : "Gagal membuat sesi OpenAI WebRTC.",
+        );
+        setActiveScenario(null);
+        return;
+      }
       console.warn("Failed to create session upfront", e);
     }
 
@@ -261,7 +348,12 @@ export default function TelefunLanding() {
   };
 
   const handleEndCall = () => {
+    // A timed-out callback may settle after navigation. Retire its URL so the
+    // late callback cannot reclaim media that parent navigation abandoned.
+    retainedObjectUrlOwner.releaseIfNotTransferredToReview();
     setView("home");
+    setActiveSessionId(null);
+    setActiveScenario(null);
     setActiveSessionConfig(null);
     setActiveAccessToken(null);
   };
@@ -273,10 +365,26 @@ export default function TelefunLanding() {
     fullBlob: Blob | null,
     agentBlob: Blob | null,
     metrics: any,
+    captureStatus?: "ready" | "failed",
   ) => {
     let sessionId = activeSessionId;
     const finalScenario = activeScenario;
     const sessionConfig = activeSessionConfig;
+    const isWebRtcSession =
+      sessionConfig?.telefunTransport === "openai-webrtc";
+
+    if (!sessionId && isWebRtcSession) {
+      notify.error("Sesi OpenAI WebRTC tidak tersedia untuk disimpan.");
+      // Return the synchronous page handoff without revoking; the recording
+      // session sees the callback reject retention and performs the one revoke.
+      retainedObjectUrlOwner.returnToSession(url);
+      setActiveSessionId(null);
+      setActiveScenario(null);
+      setView("home");
+      setActiveSessionConfig(null);
+      setActiveAccessToken(null);
+      return undefined;
+    }
 
     if (!sessionId) {
       console.warn(
@@ -315,6 +423,7 @@ export default function TelefunLanding() {
     const optimisticId = optimisticRecordIdRef.current || finalSessionId;
     optimisticRecordIdRef.current = optimisticId;
     let savedSession: SavedTelefunSession | null = null;
+    let usedFallbackRecord = false;
 
     try {
       savedSession = await saveTelefunSession({
@@ -323,6 +432,7 @@ export default function TelefunLanding() {
         agentBlob,
         duration,
         metrics,
+        captureStatus,
         localUrl: url,
         sessionConfig,
         scenarioTitle: finalScenario?.title || "Custom",
@@ -359,6 +469,7 @@ export default function TelefunLanding() {
       setReviewRecord(record);
       setIsReviewOpen(true);
     } catch (e) {
+      usedFallbackRecord = true;
       console.error("Failed to finalize session", e);
       if (e instanceof Error && e.message === "Save session failed") {
         // Already handled by toast above
@@ -435,11 +546,13 @@ export default function TelefunLanding() {
 
     const savedSessionForScoring =
       savedSession && !savedSession.saveFailed ? savedSession : null;
-    const scoringTask = savedSessionForScoring?.agentRecordingPath
-      ? scoreTelefunSession({
-          sessionId: finalSessionId,
-          agentRecordingPath: savedSessionForScoring.agentRecordingPath,
-        })
+    const scoringTask =
+      !isWebRtcSession && savedSessionForScoring?.agentRecordingPath
+        ? scoreTelefunSession({
+            sessionId: finalSessionId,
+            agentRecordingPath: savedSessionForScoring.agentRecordingPath,
+            transport: sessionConfig?.telefunTransport,
+          })
           .then((scoring) => {
             if (scoring.scoringStatus === "failed") {
               notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
@@ -484,9 +597,26 @@ export default function TelefunLanding() {
       : Promise.resolve();
 
     void scoringTask.finally(startUsagePolling).catch(() => {});
+
+    if (sessionConfig?.telefunTransport === "openai-webrtc") {
+      const shouldRetainObjectUrl = usedFallbackRecord || !savedSession?.remuxed;
+      if (!shouldRetainObjectUrl) {
+        retainedObjectUrlOwner.returnToSession(url);
+        return undefined;
+      }
+      const retained = retainObjectUrl(url);
+      const transferred =
+        retained && url
+          ? retainedObjectUrlOwner.transferToReview(url)
+          : false;
+      return transferred ? { retainObjectUrl: true } : undefined;
+    }
   };
 
   const handleDeleteSession = async (id: string) => {
+    if (reviewRecord?.id === id) {
+      releaseRetainedObjectUrl();
+    }
     try {
       await deleteTelefunSession(id);
       setHistory((prev) => {
@@ -515,6 +645,7 @@ export default function TelefunLanding() {
   };
 
   const handleReviewSession = (record: CallRecord) => {
+    if (reviewRecord?.id !== record.id) releaseRetainedObjectUrl();
     setReviewRecord(record);
     setIsReviewOpen(true);
   };
@@ -557,7 +688,10 @@ export default function TelefunLanding() {
       <Suspense fallback={isReviewOpen ? <TelefunReviewModalFallback /> : null}>
         <ReviewModal
           isOpen={isReviewOpen}
-          onClose={() => setIsReviewOpen(false)}
+          onClose={() => {
+            setIsReviewOpen(false);
+            releaseRetainedObjectUrl();
+          }}
           record={reviewRecord}
           onAssessmentComplete={handleAssessmentComplete}
         />
@@ -658,6 +792,8 @@ export default function TelefunLanding() {
             <PhoneInterface
               config={activeSessionConfig}
               accessToken={activeAccessToken}
+              isObjectUrlRetained={isObjectUrlRetained} canRetainObjectUrl={activeSessionId !== null}
+              retainObjectUrl={retainObjectUrl}
               onEndSession={handleEndCall}
               onRecordingReady={handleRecordingReady}
               onSessionCreated={(id) => {

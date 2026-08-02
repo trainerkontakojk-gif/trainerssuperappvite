@@ -10,7 +10,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' blob: data:; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.up.railway.app https://*.vercel.app https://*.supabase.co wss://*.up.railway.app wss://*.vercel.app; media-src 'self' blob:; worker-src 'self' blob:; form-action 'self'; upgrade-insecure-requests"
         },
         {
           "key": "X-Content-Type-Options",

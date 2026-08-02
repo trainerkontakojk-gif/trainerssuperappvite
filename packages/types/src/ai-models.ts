@@ -4,10 +4,11 @@ export interface AiModelCapabilities {
   imageGenerationMode?: "native" | "none";
 }
 
-export type TelefunTransport = "gemini-live" | "openai-audio";
+export type TelefunTransport = "gemini-live" | "openai-audio" | "openai-webrtc";
 
 export interface AiModelRealtimeMetadata {
   transport: TelefunTransport;
+  supportedTransports?: readonly TelefunTransport[];
   inputSampleRateHz: number;
   outputSampleRateHz: number;
   voiceProvider: Extract<AIProvider, "gemini" | "openai">;
@@ -93,6 +94,7 @@ export const TELEFUN_LIVE_MODELS = [
     availableModules: ["telefun"],
     realtime: {
       transport: "openai-audio",
+      supportedTransports: ["openai-audio", "openai-webrtc"],
       inputSampleRateHz: 24_000,
       outputSampleRateHz: 24_000,
       voiceProvider: "openai",
@@ -113,6 +115,7 @@ export const TELEFUN_LIVE_MODELS = [
     availableModules: ["telefun"],
     realtime: {
       transport: "openai-audio",
+      supportedTransports: ["openai-audio"],
       inputSampleRateHz: 24_000,
       outputSampleRateHz: 24_000,
       voiceProvider: "openai",
@@ -141,12 +144,32 @@ export function getTelefunLiveModel(
   return TELEFUN_LIVE_MODELS.find((model) => model.id === modelId);
 }
 
+function getTelefunLiveModelSupportedTransports(
+  model: TelefunLiveModel | undefined,
+): readonly TelefunTransport[] {
+  if (!model?.realtime) return [];
+
+  const supportedTransports =
+    "supportedTransports" in model.realtime
+      ? model.realtime.supportedTransports ?? []
+      : [];
+
+  return Array.from(
+    new Set([model.realtime.transport, ...supportedTransports]),
+  );
+}
+
 export function isValidTelefunModelTransportPair(
   modelId: string,
   transport: unknown,
 ): transport is TelefunTransport {
   const model = getTelefunLiveModel(modelId);
-  return model?.realtime.transport === transport;
+  return (
+    typeof transport === "string" &&
+    getTelefunLiveModelSupportedTransports(model).includes(
+      transport as TelefunTransport,
+    )
+  );
 }
 
 export function normalizeTelefunLiveModelSelection(
@@ -159,10 +182,21 @@ export function normalizeTelefunLiveModelSelection(
   const model =
     requestedModel ?? getTelefunLiveModel(DEFAULT_TELEFUN_LIVE_MODEL_ID)!;
   const canonicalTransport = model.realtime.transport;
+  const supportedTransports = getTelefunLiveModelSupportedTransports(model);
 
   let warningReason: TelefunLiveModelWarningReason | undefined;
   if (didFallback) {
     warningReason = "unknown-model";
+  } else if (
+    typeof transport === "string" &&
+    supportedTransports.includes(transport as TelefunTransport)
+  ) {
+    return {
+      model,
+      transport: transport as TelefunTransport,
+      didFallback,
+      warningReason,
+    };
   } else if (transport !== undefined && transport !== canonicalTransport) {
     warningReason = "transport-mismatch";
   }

@@ -9,6 +9,7 @@ import type {
   TelefunScoreResult,
   VoiceQualityAssessment,
 } from "@trainers/types";
+import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 
 // Mock remuxRecording so tests don't hit the actual API
 vi.mock("../routes/telefun/services/telefun-recording-remux-service", () => ({
@@ -69,6 +70,284 @@ describe("Telefun Session Finalizer", () => {
     strengths: [],
     communicationProfile: null,
   };
+
+  it("keeps WebRTC lifecycle server-owned and does not start client scoring", async () => {
+    const metrics = baseMetrics();
+    const patchSession = vi.fn(async () => {});
+    const finalizeRecording = vi.fn(async () => {});
+    const remuxRecording = vi.fn(async () => ({
+      success: true,
+      data: {
+        remuxed: true,
+        recordings: {
+          "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.webm": {
+            originalPath:
+              "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.webm",
+            seekablePath:
+              "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.seekable.webm",
+            remuxed: true,
+          },
+          "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/agent_only.webm": {
+            originalPath:
+              "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/agent_only.webm",
+            seekablePath:
+              "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/agent_only.seekable.webm",
+            remuxed: true,
+          },
+        },
+        recordingStatus: "ready" as const,
+        recordingReady: true,
+        scoringReady: true,
+      },
+    }));
+    const scoreSession = vi.fn(async () => ({
+      score: 9,
+      feedback: "should not be called",
+      assessment: mockAssessment,
+    }));
+
+    const result = await finalizeTelefunSession({
+      sessionId: "550e8400-e29b-41d4-a716-446655440000",
+      fullBlob: new Blob(["full"]),
+      agentBlob: new Blob(["agent"]),
+      duration: 12,
+      metrics,
+      localUrl: "blob:local",
+      sessionConfig: {
+        telefunTransport: "openai-webrtc",
+      } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "550e8400-e29b-41d4-a716-446655440001"),
+        uploadRecording: vi.fn(async ({ type }) =>
+          `550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/${type}.webm`,
+        ),
+        patchSession,
+        finalizeRecording,
+        remuxRecording,
+        scoreSession,
+      },
+    });
+
+    expect(patchSession).toHaveBeenCalledTimes(1);
+    expect(patchSession).toHaveBeenCalledWith(
+      "550e8400-e29b-41d4-a716-446655440000",
+      { session_metrics: metrics },
+    );
+    expect(finalizeRecording).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "550e8400-e29b-41d4-a716-446655440000",
+        captureStatus: "ready",
+      }),
+    );
+    expect(remuxRecording).toHaveBeenCalledOnce();
+    expect(scoreSession).not.toHaveBeenCalled();
+    expect(result.scoringStatus).toBe("skipped");
+  });
+
+  it("retries a failed WebRTC recording transition with deterministic paths", async () => {
+    const finalizeRecording = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("recording state unavailable"))
+      .mockResolvedValueOnce({
+        recordingStatus: "uploaded" as const,
+        recordingReady: false,
+        scoringReady: false,
+      });
+    const remuxRecording = vi.fn(async () => ({
+      success: true,
+      data: {
+        remuxed: true,
+        recordingReady: true,
+        recordings: {
+          "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.webm": {
+            originalPath:
+              "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.webm",
+            seekablePath:
+              "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.seekable.webm",
+            remuxed: true,
+          },
+        },
+      },
+    }));
+    const result = await saveTelefunSession({
+      sessionId: "550e8400-e29b-41d4-a716-446655440000",
+      fullBlob: new Blob(["full"]),
+      agentBlob: null,
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: { telefunTransport: "openai-webrtc" } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "550e8400-e29b-41d4-a716-446655440001"),
+        uploadRecording: vi.fn(async () =>
+          "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.webm",
+        ),
+        patchSession: vi.fn(async () => undefined),
+        finalizeRecording,
+        remuxRecording,
+        scoreSession: vi.fn(),
+      },
+    });
+
+    expect(finalizeRecording).toHaveBeenCalledTimes(2);
+    expect(finalizeRecording).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        recordingPath:
+          "550e8400-e29b-41d4-a716-446655440001/550e8400-e29b-41d4-a716-446655440000/full_call.webm",
+      }),
+    );
+    expect(result.saveFailed).toBe(false);
+    expect(remuxRecording).toHaveBeenCalledOnce();
+  });
+
+  it("marks a persistent recording transition failure as unsaved and does not remux an unpersisted upload", async () => {
+    const finalizeRecording = vi.fn(async () => {
+      throw new Error("recording state unavailable");
+    });
+    const remuxRecording = vi.fn();
+    const result = await saveTelefunSession({
+      sessionId: "session-recording-transition-fails",
+      fullBlob: new Blob(["full"]),
+      agentBlob: null,
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: { telefunTransport: "openai-webrtc" } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "user-1/session-recording-transition-fails/full_call.webm"),
+        patchSession: vi.fn(async () => undefined),
+        finalizeRecording,
+        remuxRecording,
+        scoreSession: vi.fn(),
+      },
+    });
+
+    expect(result.saveFailed).toBe(true);
+    expect(result.recordingPath).toBe(
+      "user-1/session-recording-transition-fails/full_call.webm",
+    );
+    expect(remuxRecording).not.toHaveBeenCalled();
+  });
+
+  it("reports explicit non-retryable recording removal as a save failure", async () => {
+    const result = await saveTelefunSession({
+      sessionId: "session-non-retryable-recording",
+      fullBlob: new Blob(["full"]),
+      agentBlob: null,
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: { telefunTransport: "openai-webrtc" } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "user-1/session-non-retryable-recording/full_call.webm"),
+        patchSession: vi.fn(async () => undefined),
+        finalizeRecording: vi.fn(async () => {
+          throw Object.assign(new Error("ownership rejected"), { code: "400" });
+        }),
+        remuxRecording: vi.fn(),
+        scoreSession: vi.fn(),
+      },
+    });
+
+    expect(result.saveFailed).toBe(true);
+    expect(result.remuxed).toBe(false);
+  });
+
+  it("keeps scoring unavailable when full capture fails but agent upload succeeds", async () => {
+    const finalizeRecording = vi.fn(async () => ({
+      recordingStatus: "failed" as const,
+      recordingReady: false,
+      scoringReady: false,
+      scoringStatus: "pending" as const,
+    }));
+    const remuxRecording = vi.fn(async () => ({
+      success: false,
+      error: "capture latch",
+    }));
+
+    const result = await saveTelefunSession({
+      sessionId: "session-full-capture-fails",
+      fullBlob: new Blob(["full"]),
+      agentBlob: new Blob(["agent"]),
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      captureStatus: "ready",
+      sessionConfig: { telefunTransport: "openai-webrtc" } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async ({ type }) => {
+          if (type === "full_call") throw new Error("full upload failed");
+          return "user-1/session-full-capture-fails/agent_only.webm";
+        }),
+        patchSession: vi.fn(async () => undefined),
+        finalizeRecording,
+        remuxRecording,
+        scoreSession: vi.fn(),
+      },
+    });
+
+    expect(finalizeRecording).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentRecordingPath:
+          "user-1/session-full-capture-fails/agent_only.webm",
+        captureStatus: "failed",
+      }),
+    );
+    expect(result.uploadFailed).toBe(true);
+    expect(result.scoringReady).toBe(false);
+    expect(result.saveFailed).toBe(true);
+  });
+
+  it("reports failed WebRTC capture without mutating server-owned lifecycle fields", async () => {
+    const patchSession = vi.fn(async () => {});
+    const finalizeRecording = vi.fn(async () => {});
+    const scoreSession = vi.fn();
+
+    await saveTelefunSession({
+      sessionId: "550e8400-e29b-41d4-a716-446655440000",
+      fullBlob: null,
+      agentBlob: null,
+      duration: 0,
+      metrics: baseMetrics(),
+      localUrl: null,
+      sessionConfig: {
+        telefunTransport: "openai-webrtc",
+      } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "550e8400-e29b-41d4-a716-446655440001"),
+        uploadRecording: vi.fn(),
+        patchSession,
+        finalizeRecording,
+        remuxRecording: vi.fn(),
+        scoreSession,
+      },
+    });
+
+    expect(patchSession).toHaveBeenCalledWith(
+      "550e8400-e29b-41d4-a716-446655440000",
+      { session_metrics: expect.any(Object) },
+    );
+    expect(finalizeRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ captureStatus: "failed" }),
+    );
+    expect(scoreSession).not.toHaveBeenCalled();
+  });
 
   it("uploads, finalizes, remuxes then scores in correct order", async () => {
     const calls: string[] = [];
@@ -162,7 +441,7 @@ describe("Telefun Session Finalizer", () => {
     const remuxMock = (
       await import("../routes/telefun/services/telefun-recording-remux-service")
     ).remuxRecording as any;
-    remuxMock.mockResolvedValueOnce({
+    remuxMock.mockResolvedValue({
       success: false,
       error: "FFmpeg not available",
     });
@@ -191,6 +470,7 @@ describe("Telefun Session Finalizer", () => {
     });
 
     expect(result.remuxed).toBe(false);
+    expect(result.saveFailed).toBe(false);
     expect(result.record.url).toBe("blob:fallback");
   });
 

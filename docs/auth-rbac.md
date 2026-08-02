@@ -26,7 +26,7 @@ Aplikasi memiliki 4 role utama dengan hierarki akses sebagai berikut:
 | **Admin**   | Pengelola Sistem  | Akses penuh seluruh modul, manajemen user (approve/reject/delete), audit logs, & konfigurasi sistem.                       |
 | **Trainer** | Operasional Utama | Manajemen data Profiler, input & setting QA (SIDAK), monitoring, editor pricing/kurs usage billing, & audit logs terbatas. |
 | **Leader**  | Pengawas Tim      | Melihat dashboard tim, monitoring aktivitas tim, monitoring usage billing lintas akun, melihat data Profiler.              |
-| **Agent**   | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT, Telefun), melihat dashboard pribadi. `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK, TELEFUN). PDKT dibatasi untuk trainer/qa/admin saja. |
+| **Agent**   | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT) dan dashboard pribadi. Telefun produksi dan POC WebRTC tetap admin/trainer only. `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK). PDKT dibatasi untuk trainer/qa/admin saja. |
 
 ## Alur Pendaftaran & Approval
 

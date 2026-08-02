@@ -7,6 +7,7 @@ import {
   isValidTelefunModelTransportPair,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
+import { isTelefunOpenAiWebRtcEligible } from "../../lib/env";
 
 type Variables = { user: User; profile: any };
 
@@ -64,7 +65,9 @@ export const telefunSettingsPayloadSchema = z
     preferredConsumerTypeId: z.string().optional(),
     identitySettings: z.any().optional(),
     telefunModelId: z.string().optional(),
-    telefunTransport: z.enum(["gemini-live", "openai-audio"]).optional(),
+    telefunTransport: z
+      .enum(["gemini-live", "openai-audio", "openai-webrtc"])
+      .optional(),
   })
   .passthrough()
   .superRefine((body, ctx) => {
@@ -156,8 +159,23 @@ telefunSettings.put(
   zValidator("json", telefunSettingsPayloadSchema),
   async (c) => {
     const user = c.get("user");
-    const adminClient = createAdminClient();
     const body = c.req.valid("json");
+    if (
+      body.telefunTransport === "openai-webrtc" &&
+      !isTelefunOpenAiWebRtcEligible(user.id)
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
+          },
+        },
+        400,
+      );
+    }
+    const adminClient = createAdminClient();
 
     try {
       const { data: existing } = await adminClient

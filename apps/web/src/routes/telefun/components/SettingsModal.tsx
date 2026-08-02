@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { X, Save, FileText, Users, User, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TelefunAppSettings as AppSettings } from "../telefunSettings";
@@ -8,6 +8,7 @@ import { TelefunConsumersTab } from "./settings/TelefunConsumersTab";
 import { TelefunIdentityTab } from "./settings/TelefunIdentityTab";
 import { TelefunSystemTab } from "./settings/TelefunSystemTab";
 import { useTelefunProviderReadiness } from "../hooks/useTelefunProviderReadiness";
+import { useTelefunWebRtcCapability } from "../hooks/useTelefunWebRtcCapability";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -23,13 +24,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave,
 }) => {
   const providerReadiness = useTelefunProviderReadiness(isOpen);
+  const webRtcCapabilityState = useTelefunWebRtcCapability(isOpen);
   const {
     activeTab,
     setActiveTab,
     localSettings,
     setLocalSettings,
     selectedTelefunModel,
+    selectedTelefunTransport,
     setSelectedTelefunModel,
+    setSelectedTelefunTransport,
     scenarioForm,
     consumerForm,
     handleSelectAll,
@@ -46,7 +50,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onSave,
     onClose,
     providerReadiness,
+    webRtcCapability:
+      webRtcCapabilityState.status === "ready"
+        ? webRtcCapabilityState.capability
+        : null,
   });
+
+  const handleCloseRef = useRef(handleClose);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    handleCloseRef.current = handleClose;
+  }, [handleClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusFrame = requestAnimationFrame(() => dialogRef.current?.focus());
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        handleCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled"));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -69,15 +124,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
           />
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="telefun-settings-title"
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border"
+            className="relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border outline-none"
           >
             {/* Modal Header */}
             <div className="px-5 py-4 sm:px-6 border-b flex justify-between items-center shrink-0 bg-card">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+                <h2
+                  id="telefun-settings-title"
+                  className="text-lg sm:text-xl font-bold text-foreground tracking-tight"
+                >
                   Pengaturan Simulasi
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5">
@@ -87,7 +150,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={handleClose}
+                aria-label="Tutup pengaturan simulasi"
                 className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border"
               >
                 <X className="w-4 h-4" />
@@ -164,8 +229,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         localSettings={localSettings}
                         setLocalSettings={setLocalSettings}
                         selectedTelefunModel={selectedTelefunModel}
+                        selectedTelefunTransport={selectedTelefunTransport}
                         setSelectedTelefunModel={setSelectedTelefunModel}
+                        setSelectedTelefunTransport={
+                          setSelectedTelefunTransport
+                        }
                         providerReadiness={providerReadiness}
+                        webRtcCapability={
+                          webRtcCapabilityState.status === "ready"
+                            ? webRtcCapabilityState.capability
+                            : null
+                        }
                       />
                     )}
                   </motion.div>

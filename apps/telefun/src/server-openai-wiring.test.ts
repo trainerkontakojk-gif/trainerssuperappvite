@@ -3,12 +3,47 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const serverSource = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), "server.ts"),
-  "utf8",
-);
+const sourceDir = dirname(fileURLToPath(import.meta.url));
+const serverSource = readFileSync(join(sourceDir, "server.ts"), "utf8");
+const dbSource = readFileSync(join(sourceDir, "db.ts"), "utf8");
 
 describe("Telefun OpenAI server wiring", () => {
+  it("registers the additive, default-off WebRTC broker without replacing the WS adapter", () => {
+    expect(serverSource).toContain("createOpenAIWebRtcHttpHandler({");
+    expect(serverSource).toContain("TELEFUN_OPENAI_WEBRTC_POC_ENABLED");
+    expect(serverSource).toContain("TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS");
+    expect(serverSource).toContain("nodeEnv: env.NODE_ENV");
+    expect(serverSource).toContain("isOpenAIWebRtcRequest(req)");
+    expect(serverSource).toContain("createWebRtcCallManager({");
+    expect(serverSource).toContain("createTelefunWebRtcDb()");
+    expect(serverSource).toContain("db: openAIWebRtcDb");
+    expect(serverSource).toContain("createOpenAiCallsClient({");
+    expect(serverSource).toContain("createSidebandClient({");
+    expect(serverSource).toContain("openAIWebRtcManager.shutdown()");
+    expect(serverSource).not.toContain("webRtcShutdown.finally");
+    expect(serverSource).toContain("onDiagnostic: callbacks.onDiagnostic");
+    expect(serverSource).toContain("onSidebandDiagnostic: (diagnostic)");
+    expect(serverSource).toContain("new OpenAIRealtimeAdapter({");
+    expect(serverSource).toContain("runHttpHandler(openAIWebRtcHandler, req, res)");
+    expect(serverSource).toContain('"Internal server error"');
+  });
+
+  it("wires strict WebRTC persistence with the authenticated owner", () => {
+    expect(serverSource).not.toContain("updateSession: updateWebRtcSession");
+    expect(dbSource).toContain("createTelefunWebRtcDb");
+    expect(dbSource).toContain("updateWebRtcSessionWithClient");
+    expect(dbSource).toContain('eq("id", sessionId)');
+    expect(dbSource).toContain('eq("user_id", userId)');
+    expect(dbSource).toContain('eq("status", "active")');
+    expect(dbSource).toContain('select("id, status")');
+    expect(dbSource).toContain('if (data?.id === sessionId) return;');
+    expect(dbSource).toContain('current.data?.id === sessionId');
+    expect(dbSource).toContain(
+      '(current.data.status === "completed" || current.data.status === "failed")',
+    );
+    expect(dbSource).not.toContain('updateSession(sessionId, userId');
+  });
+
   it("routes OpenAI only through its adapter using authenticated user context", () => {
     expect(serverSource).toContain("new OpenAIRealtimeAdapter({");
     expect(serverSource).toContain("apiKey: openAIKey");
@@ -51,9 +86,11 @@ describe("Telefun OpenAI server wiring", () => {
   });
 
   it("wires the authenticated internal assessment route before public health handling", () => {
-    expect(serverSource).toContain("handleInternalScoringRequest(req, res)");
+    expect(serverSource).toContain(
+      "runHttpHandler(handleInternalScoringRequest, req, res)",
+    );
     expect(
-      serverSource.indexOf("handleInternalScoringRequest(req, res)"),
+      serverSource.indexOf("runHttpHandler(handleInternalScoringRequest, req, res)"),
     ).toBeLessThan(serverSource.indexOf('if (req.url === "/health")'));
   });
 });
