@@ -2,10 +2,19 @@ import { createHash } from "node:crypto";
 import type { ValidatedTelefunSessionConfigure } from "../server-protocol.js";
 import {
   createProductionRealtimeToolDispatcher,
-  serializeRealtimeToolResult,
   type RealtimeToolDispatcher,
-  type RealtimeToolExecutionResult,
 } from "../tools/RealtimeToolDispatcher.js";
+import {
+  createOpenAIRealtimeEventObserver,
+  isOpenAIRealtimeEventType,
+  type OpenAIRealtimeEventObserver,
+  type OpenAIRealtimeResponseDone,
+  type OpenAIRealtimeToolEvent,
+} from "./openai-realtime-event-observer.js";
+import {
+  OpenAIRealtimeToolCoordinator,
+  type OpenAIRealtimeToolCoordinatorDiagnostic,
+} from "./openai-realtime-tool-coordinator.js";
 import type {
   RealtimeProviderAdapter,
   RealtimeProviderLifecycleCallbacks,
@@ -20,6 +29,10 @@ const DEFAULT_MAX_TOOL_ARGUMENT_BYTES = 64 * 1024;
 const DEFAULT_MAX_PENDING_TOOL_CALLS = 32;
 const DEFAULT_MAX_TOOL_CALLS_PER_RESPONSE = 32;
 const DEFAULT_MAX_TOOL_CALLS_PER_SESSION = 256;
+// Speaking response IDs are terminal WS media state. Keep them independently
+// bounded with 60-minute headroom; do not reuse the observer's per-scope limit.
+const DEFAULT_MAX_SPEAKING_RESPONSE_ENTRIES = 4_096;
+const DEFAULT_MAX_OUTPUT_AUDIO_BYTES = 3 * 1024 * 1024;
 
 export const OPENAI_REALTIME_CONNECT_TIMEOUT_MS = 10_000;
 export const OPENAI_REALTIME_KEEPALIVE_MS = 30_000;
@@ -85,15 +98,10 @@ export type OpenAIAdapterDiagnostic =
         resetSeconds: number;
       }>;
     }
+  | OpenAIRealtimeToolCoordinatorDiagnostic
   | {
-      type: "function_call_event";
-      eventType: string;
-      callId?: string;
-    }
-  | { type: "tool_argument_queue_overflow"; pendingCalls: number }
-  | {
-      type: "tool_call_capacity_exceeded";
-      scope: "response" | "session";
+      type: "observer_capacity_exceeded";
+      scope: string;
       limit: number;
     }
   | { type: "transcription_failed"; itemId?: string; code?: string }
@@ -108,6 +116,8 @@ export type OpenAIAdapterDiagnostic =
 export interface OpenAIRealtimeAdapterCallbacks extends RealtimeProviderLifecycleCallbacks {
   observeUsage(observation: OpenAIUsageObservation, observedAtMs: number): void;
   onDiagnostic(diagnostic: OpenAIAdapterDiagnostic): void;
+  onResponseDone?(event: OpenAIRealtimeResponseDone): void;
+  onToolEvent?(event: OpenAIRealtimeToolEvent): void;
 }
 
 export interface OpenAIRealtimeAdapterOptions {
@@ -126,6 +136,10 @@ export interface OpenAIRealtimeAdapterOptions {
   maxPendingToolCalls?: number;
   maxToolCallsPerResponse?: number;
   maxToolCallsPerSession?: number;
+  maxObserverDedupeEntries?: number;
+  maxSpeakingResponseEntries?: number;
+  maxOutputAudioBytes?: number;
+  now?: () => number;
   toolDispatcher?: RealtimeToolDispatcher;
   connectTimeoutMs?: number;
   setTimeout?: typeof setTimeout;
@@ -137,17 +151,6 @@ export interface OpenAIRealtimeAdapterOptions {
 interface QueuedClientMessage {
   raw: string;
   bytes: number;
-}
-
-interface PendingToolArguments {
-  chunks: string[];
-  bytes: number;
-  overflow: boolean;
-}
-
-interface PendingToolExecution {
-  callId: string;
-  result: Promise<RealtimeToolExecutionResult>;
 }
 
 type NormalizedClientMessage = Record<string, unknown> & { type: string };
@@ -171,7 +174,8 @@ export function buildSafeOpenAIDiagnosticLogMetadata(
 
 export function buildOpenAIRealtimeSessionUpdate(
   configuration: ValidatedTelefunSessionConfigure,
-  toolDispatcher = createProductionRealtimeToolDispatcher(),
+  toolDispatcher: Pick<RealtimeToolDispatcher, "getDefinitions"> =
+    createProductionRealtimeToolDispatcher(),
 ) {
   const sampleRate = configuration.model.realtime.inputSampleRateHz;
   const tools = toolDispatcher.getDefinitions().map((definition) => ({
@@ -218,12 +222,16 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
   private readonly maxPendingToolCalls: number;
   private readonly maxToolCallsPerResponse: number;
   private readonly maxToolCallsPerSession: number;
-  private readonly toolDispatcher: RealtimeToolDispatcher;
+  private readonly maxOutputAudioBytes: number;
+  private readonly maxSpeakingResponseEntries: number;
+  private readonly toolCoordinator: OpenAIRealtimeToolCoordinator;
+  private readonly outputAudioResponses = new Set<string>();
   private readonly connectTimeoutMs: number;
   private readonly setTimeoutFn: typeof setTimeout;
   private readonly clearTimeoutFn: typeof clearTimeout;
   private readonly setIntervalFn: typeof setInterval;
   private readonly clearIntervalFn: typeof clearInterval;
+  private readonly eventObserver: OpenAIRealtimeEventObserver;
   private socket: OpenAIRealtimeSocketLike | null = null;
   private connectionPromise: Promise<void> | null = null;
   private resolveConnection: (() => void) | null = null;
@@ -238,23 +246,6 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
   private awaitingPong = false;
   private closed = false;
   private terminated = false;
-  private readonly inputTranscriptItems = new Set<string>();
-  private readonly outputTranscriptEvents = new Set<string>();
-  private readonly outputTranscriptItemsWithDeltas = new Set<string>();
-  private readonly outputTranscriptDoneItems = new Set<string>();
-  private readonly completedResponses = new Set<string>();
-  private readonly interruptedResponses = new Set<string>();
-  private readonly speakingResponses = new Set<string>();
-  private readonly pendingToolArguments = new Map<
-    string,
-    PendingToolArguments
-  >();
-  private readonly completedToolCalls = new Set<string>();
-  private readonly handledToolResponses = new Set<string>();
-  private readonly pendingToolExecutions = new Map<
-    string,
-    PendingToolExecution[]
-  >();
 
   constructor(private readonly options: OpenAIRealtimeAdapterOptions) {
     this.maxQueuedMessages =
@@ -270,8 +261,81 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
       options.maxToolCallsPerResponse ?? DEFAULT_MAX_TOOL_CALLS_PER_RESPONSE;
     this.maxToolCallsPerSession =
       options.maxToolCallsPerSession ?? DEFAULT_MAX_TOOL_CALLS_PER_SESSION;
-    this.toolDispatcher =
-      options.toolDispatcher ?? createProductionRealtimeToolDispatcher();
+    this.maxSpeakingResponseEntries =
+      options.maxSpeakingResponseEntries ?? DEFAULT_MAX_SPEAKING_RESPONSE_ENTRIES;
+    this.maxOutputAudioBytes =
+      options.maxOutputAudioBytes ?? DEFAULT_MAX_OUTPUT_AUDIO_BYTES;
+    this.toolCoordinator = new OpenAIRealtimeToolCoordinator({
+      dispatcher:
+        options.toolDispatcher ?? createProductionRealtimeToolDispatcher(),
+      maxToolArgumentBytes: this.maxToolArgumentBytes,
+      maxPendingToolCalls: this.maxPendingToolCalls,
+      maxToolCallsPerResponse: this.maxToolCallsPerResponse,
+      maxToolCallsPerSession: this.maxToolCallsPerSession,
+      onDiagnostic: (diagnostic) => options.callbacks.onDiagnostic(diagnostic),
+      onCapacityExceeded: (scope, limit) => {
+        const message =
+          scope === "pending"
+            ? "OpenAI Realtime tool-call buffer exceeded safe limit"
+            : "OpenAI Realtime tool-call capacity exceeded safe limit";
+        this.finishReadySession(1011, message, true);
+        void limit;
+      },
+      canSend: () => {
+        const socket = this.socket;
+        return Boolean(
+          socket &&
+            this.isCurrentSocket(socket) &&
+            socket.readyState === SOCKET_OPEN,
+        );
+      },
+      send: (message) => this.socket?.send(message),
+    });
+    this.eventObserver = createOpenAIRealtimeEventObserver({
+      ...(options.maxObserverDedupeEntries === undefined
+        ? {}
+        : { maxDedupeEntries: options.maxObserverDedupeEntries }),
+      maxToolCallsPerSession: this.maxToolCallsPerSession,
+      callbacks: {
+        appendTranscript: (entry) => options.callbacks.appendTranscript(entry),
+        observeUsage: (observation, observedAtMs) =>
+          options.callbacks.observeUsage(observation, observedAtMs),
+        completeTurn: () => options.callbacks.completeTurn(),
+        interruptTurn: () => options.callbacks.interruptTurn(),
+        notifyActivity: () => options.callbacks.notifyActivity(),
+        notifyTurnComplete: () => options.callbacks.notifyTurnComplete(),
+        notifyInterrupted: () => options.callbacks.notifyInterrupted(),
+        onToolEvent: (event) => {
+          options.callbacks.onToolEvent?.(event);
+          this.toolCoordinator.handleEvent(event);
+        },
+        onResponseDone: (event) => {
+          options.callbacks.onResponseDone?.(event);
+          return this.toolCoordinator.handleResponseDone(event);
+        },
+        onResponseNotCompleted: ({ responseId, status }) =>
+          options.callbacks.onDiagnostic({
+            type: "response_not_completed",
+            responseId,
+            status: sanitizeShortText(status),
+          }),
+        onMalformedEvent: () =>
+          options.callbacks.onDiagnostic({ type: "malformed_event" }),
+        onUnknownEvent: (eventType) =>
+          options.callbacks.onDiagnostic({
+            type: "unknown_event",
+            eventType: sanitizeEventType(eventType),
+          }),
+        onCapacityExceeded: (capacity) => {
+          options.callbacks.onDiagnostic(capacity);
+          this.finishReadySession(
+            1011,
+            "OpenAI Realtime event observer exceeded safe capacity",
+            true,
+          );
+        },
+      },
+    });
     this.connectTimeoutMs =
       options.connectTimeoutMs ?? OPENAI_REALTIME_CONNECT_TIMEOUT_MS;
     this.setTimeoutFn = options.setTimeout ?? setTimeout;
@@ -368,7 +432,7 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
         JSON.stringify(
           buildOpenAIRealtimeSessionUpdate(
             this.options.configuration,
-            this.toolDispatcher,
+            this.toolCoordinator,
           ),
         ),
       );
@@ -428,37 +492,33 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
     }
 
     const type = typeof event.type === "string" ? event.type : "";
-    const observedAtMs = Date.now();
+    const observedAtMs = this.options.now?.() ?? Date.now();
 
     if (type === "session.updated") {
       if (!this.ready) this.markReady();
       this.options.callbacks.forwardToClient(raw);
       return;
     }
-    if (type === "session.created") {
+    if (type === "session.created" || type === "response.created") {
       this.options.callbacks.forwardToClient(raw);
       return;
     }
-    if (type === "input_audio_buffer.speech_started") {
-      this.options.callbacks.notifyActivity();
-      this.options.callbacks.interruptTurn();
-      this.options.callbacks.notifyInterrupted();
-      this.options.callbacks.forwardToClient(raw);
+    if (type === "response.output_audio.delta") {
+      this.handleOutputAudioEvent(event, raw);
       return;
     }
-    if (type === "input_audio_buffer.speech_stopped") {
-      this.options.callbacks.notifyActivity();
-      this.options.callbacks.forwardToClient(raw);
+    if (type === "error") {
+      this.handleErrorEvent(event);
+      if (!this.ready) {
+        this.failBeforeReady("OpenAI Realtime session setup failed");
+      }
       return;
     }
-    if (type === "conversation.item.input_audio_transcription.delta") {
-      this.options.callbacks.notifyActivity();
-      this.options.callbacks.forwardToClient(raw);
-      return;
-    }
-    if (type === "conversation.item.input_audio_transcription.completed") {
-      this.handleInputTranscriptCompleted(event, observedAtMs);
-      this.options.callbacks.forwardToClient(raw);
+    if (isOpenAIRealtimeEventType(type)) {
+      const result = this.eventObserver.observe(event, observedAtMs);
+      if (result && !result.suppressClientForward) {
+        this.options.callbacks.forwardToClient(raw);
+      }
       return;
     }
     if (type === "conversation.item.input_audio_transcription.failed") {
@@ -471,72 +531,10 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
       this.options.callbacks.forwardToClient(raw);
       return;
     }
-    if (type === "response.created") {
-      this.options.callbacks.forwardToClient(raw);
-      return;
-    }
-    if (type === "response.output_audio.delta") {
-      if (typeof event.delta !== "string" || !isValidBase64(event.delta)) {
-        this.options.callbacks.onDiagnostic({ type: "malformed_event" });
-        return;
-      }
-      const responseId = stringValue(event.response_id) ?? "unknown";
-      if (!this.speakingResponses.has(responseId)) {
-        this.speakingResponses.add(responseId);
-        this.options.callbacks.startAiSpeaking();
-      }
-      this.options.callbacks.forwardToClient(raw);
-      return;
-    }
-    if (type === "response.output_audio_transcript.delta") {
-      this.handleOutputTranscriptDelta(event, observedAtMs);
-      this.options.callbacks.forwardToClient(raw);
-      return;
-    }
-    if (type === "response.output_audio_transcript.done") {
-      this.handleOutputTranscriptDone(event, observedAtMs);
-      this.options.callbacks.forwardToClient(raw);
-      return;
-    }
-    if (type === "response.done") {
-      const handledToolCalls = this.handleResponseDone(event, observedAtMs);
-      if (!handledToolCalls) this.options.callbacks.forwardToClient(raw);
-      return;
-    }
-    if (type === "response.cancelled") {
-      this.handleResponseCancellation(stringValue(event.response_id));
-      this.options.callbacks.forwardToClient(raw);
-      return;
-    }
     if (type === "rate_limits.updated") {
       this.handleRateLimits(event);
       return;
     }
-    if (type === "error") {
-      this.handleErrorEvent(event);
-      if (!this.ready) {
-        this.failBeforeReady("OpenAI Realtime session setup failed");
-      }
-      return;
-    }
-    if (
-      type === "response.function_call_arguments.delta" ||
-      type === "response.function_call_arguments.done"
-    ) {
-      const callId = stringValue(event.call_id);
-      this.options.callbacks.onDiagnostic({
-        type: "function_call_event",
-        eventType: type,
-        ...(callId ? { callId } : {}),
-      });
-      if (type === "response.function_call_arguments.delta") {
-        this.accumulateToolArguments(event);
-      } else {
-        this.completeToolCall(event);
-      }
-      return;
-    }
-
     this.options.callbacks.onDiagnostic({
       type: "unknown_event",
       eventType: type ? sanitizeEventType(type) : "missing",
@@ -555,135 +553,44 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
     this.flushQueue();
   }
 
-  private accumulateToolArguments(event: Record<string, unknown>): void {
-    const callId = stringValue(event.call_id);
-    const delta = stringValue(event.delta);
-    if (!callId || delta === null || this.completedToolCalls.has(callId)) {
+  private handleOutputAudioEvent(
+    event: Record<string, unknown>,
+    raw: string,
+  ): void {
+    const delta = typeof event.delta === "string" ? event.delta : null;
+    const maxEncodedAudioLength = Math.ceil(this.maxOutputAudioBytes / 3) * 4;
+    if (
+      !delta ||
+      delta.length > maxEncodedAudioLength ||
+      !isValidBase64(delta)
+    ) {
       this.options.callbacks.onDiagnostic({ type: "malformed_event" });
       return;
     }
-
-    let pending = this.pendingToolArguments.get(callId);
-    if (!pending) {
-      if (this.pendingToolArguments.size >= this.maxPendingToolCalls) {
+    const decoded = Buffer.from(delta, "base64");
+    if (decoded.byteLength > this.maxOutputAudioBytes) {
+      this.options.callbacks.onDiagnostic({ type: "malformed_event" });
+      return;
+    }
+    const responseId = boundedStringValue(event.response_id, 256) ?? "unknown";
+    if (!this.outputAudioResponses.has(responseId)) {
+      if (this.outputAudioResponses.size >= this.maxSpeakingResponseEntries) {
         this.options.callbacks.onDiagnostic({
-          type: "tool_argument_queue_overflow",
-          pendingCalls: this.pendingToolArguments.size,
+          type: "observer_capacity_exceeded",
+          scope: "output_audio_responses",
+          limit: this.maxSpeakingResponseEntries,
         });
         this.finishReadySession(
           1011,
-          "OpenAI Realtime tool-call buffer exceeded safe limit",
+          "OpenAI Realtime event observer exceeded safe capacity",
           true,
         );
         return;
       }
-      pending = { chunks: [], bytes: 0, overflow: false };
+      this.outputAudioResponses.add(responseId);
+      this.options.callbacks.startAiSpeaking();
     }
-    const nextBytes = pending.bytes + Buffer.byteLength(delta, "utf8");
-    pending.bytes = nextBytes;
-    if (nextBytes > this.maxToolArgumentBytes) {
-      pending.overflow = true;
-      pending.chunks = [];
-    } else if (!pending.overflow) {
-      pending.chunks.push(delta);
-    }
-    this.pendingToolArguments.set(callId, pending);
-  }
-
-  private completeToolCall(event: Record<string, unknown>): void {
-    const callId = stringValue(event.call_id);
-    const name = stringValue(event.name);
-    const responseId = stringValue(event.response_id);
-    if (!callId || !name || !responseId) {
-      this.options.callbacks.onDiagnostic({ type: "malformed_event" });
-      return;
-    }
-    if (this.completedToolCalls.has(callId)) return;
-
-    const executions = this.pendingToolExecutions.get(responseId) ?? [];
-    if (this.completedToolCalls.size >= this.maxToolCallsPerSession) {
-      this.failToolCallCapacity("session", this.maxToolCallsPerSession);
-      return;
-    }
-    if (executions.length >= this.maxToolCallsPerResponse) {
-      this.failToolCallCapacity("response", this.maxToolCallsPerResponse);
-      return;
-    }
-    this.completedToolCalls.add(callId);
-
-    const pending = this.pendingToolArguments.get(callId);
-    this.pendingToolArguments.delete(callId);
-    const finalArguments = stringValue(event.arguments);
-    const finalArgumentsTooLarge =
-      finalArguments !== null &&
-      Buffer.byteLength(finalArguments, "utf8") > this.maxToolArgumentBytes;
-    const result =
-      pending?.overflow || finalArgumentsTooLarge
-        ? Promise.resolve<RealtimeToolExecutionResult>({
-            ok: false,
-            error: {
-              code: "invalid_arguments",
-              message: "Tool arguments exceeded the safe size limit",
-            },
-          })
-        : this.toolDispatcher.execute({
-            callId,
-            name,
-            arguments: finalArguments ?? pending?.chunks.join("") ?? "",
-          });
-    executions.push({ callId, result });
-    this.pendingToolExecutions.set(responseId, executions);
-  }
-
-  private failToolCallCapacity(
-    scope: "response" | "session",
-    limit: number,
-  ): void {
-    this.options.callbacks.onDiagnostic({
-      type: "tool_call_capacity_exceeded",
-      scope,
-      limit,
-    });
-    this.finishReadySession(
-      1011,
-      "OpenAI Realtime tool-call capacity exceeded safe limit",
-      true,
-    );
-  }
-
-  private async sendToolResults(
-    executions: PendingToolExecution[],
-  ): Promise<void> {
-    const results = await Promise.all(
-      executions.map(async ({ callId, result }) => ({
-        callId,
-        result: await result,
-      })),
-    );
-    const socket = this.socket;
-    if (
-      !socket ||
-      !this.isCurrentSocket(socket) ||
-      socket.readyState !== SOCKET_OPEN ||
-      this.closed ||
-      this.terminated
-    ) {
-      return;
-    }
-
-    for (const { callId, result } of results) {
-      socket.send(
-        JSON.stringify({
-          type: "conversation.item.create",
-          item: {
-            type: "function_call_output",
-            call_id: callId,
-            output: serializeRealtimeToolResult(result),
-          },
-        }),
-      );
-    }
-    socket.send(JSON.stringify({ type: "response.create" }));
+    this.options.callbacks.forwardToClient(raw);
   }
 
   private startSessionTimers(): void {
@@ -802,131 +709,6 @@ export class OpenAIRealtimeAdapter implements RealtimeProviderAdapter {
 
     this.rejectClientEvent(eventType, "unsupported_type");
     return null;
-  }
-
-  private handleInputTranscriptCompleted(
-    event: Record<string, unknown>,
-    observedAtMs: number,
-  ): void {
-    const itemId = stringValue(event.item_id);
-    const transcript = stringValue(event.transcript);
-    if (itemId && transcript && !this.inputTranscriptItems.has(itemId)) {
-      this.inputTranscriptItems.add(itemId);
-      this.options.callbacks.appendTranscript({
-        speaker: "agent",
-        text: transcript,
-        observedAtMs,
-      });
-    }
-    if (itemId && isRecord(event.usage)) {
-      const usageId = `transcription:${itemId}`;
-      if (!this.completedResponses.has(usageId)) {
-        this.completedResponses.add(usageId);
-        this.options.callbacks.observeUsage(
-          {
-            source: "openai_input_transcription",
-            id: itemId,
-            usage: event.usage,
-          },
-          observedAtMs,
-        );
-      }
-    }
-  }
-
-  private handleOutputTranscriptDelta(
-    event: Record<string, unknown>,
-    observedAtMs: number,
-  ): void {
-    const text = stringValue(event.delta);
-    if (!text) return;
-    const eventId = stringValue(event.event_id);
-    if (eventId && this.outputTranscriptEvents.has(eventId)) return;
-    if (eventId) this.outputTranscriptEvents.add(eventId);
-    const itemId = stringValue(event.item_id);
-    if (itemId) this.outputTranscriptItemsWithDeltas.add(itemId);
-    this.options.callbacks.appendTranscript({
-      speaker: "consumer",
-      text,
-      observedAtMs,
-    });
-  }
-
-  private handleOutputTranscriptDone(
-    event: Record<string, unknown>,
-    observedAtMs: number,
-  ): void {
-    const itemId = stringValue(event.item_id);
-    if (!itemId || this.outputTranscriptDoneItems.has(itemId)) return;
-    this.outputTranscriptDoneItems.add(itemId);
-
-    const transcript = stringValue(event.transcript);
-    if (!transcript || this.outputTranscriptItemsWithDeltas.has(itemId)) return;
-    this.options.callbacks.appendTranscript({
-      speaker: "consumer",
-      text: transcript,
-      observedAtMs,
-    });
-  }
-
-  private handleResponseDone(
-    event: Record<string, unknown>,
-    observedAtMs: number,
-  ): boolean {
-    const response = isRecord(event.response) ? event.response : null;
-    if (!response) return false;
-    const responseId = stringValue(response.id);
-    if (!responseId) return false;
-    if (this.completedResponses.has(responseId)) {
-      return this.handledToolResponses.has(responseId);
-    }
-    this.completedResponses.add(responseId);
-    const toolExecutions = this.pendingToolExecutions.get(responseId) ?? [];
-    this.pendingToolExecutions.delete(responseId);
-    if (toolExecutions.length > 0) {
-      this.handledToolResponses.add(responseId);
-    }
-
-    if (isRecord(response.usage)) {
-      this.options.callbacks.observeUsage(
-        {
-          source: "openai_realtime_response",
-          id: responseId,
-          usage: response.usage,
-        },
-        observedAtMs,
-      );
-    }
-
-    const status = stringValue(response.status) ?? "unknown";
-    if (status === "cancelled") {
-      this.handleResponseCancellation(responseId);
-      return toolExecutions.length > 0;
-    }
-    if (status !== "completed") {
-      this.options.callbacks.onDiagnostic({
-        type: "response_not_completed",
-        responseId,
-        status: sanitizeShortText(status),
-      });
-      this.handleResponseCancellation(responseId);
-      return toolExecutions.length > 0;
-    }
-    if (toolExecutions.length > 0) {
-      void this.sendToolResults(toolExecutions);
-      return true;
-    }
-    this.options.callbacks.completeTurn();
-    this.options.callbacks.notifyTurnComplete();
-    return false;
-  }
-
-  private handleResponseCancellation(responseId: string | null): void {
-    const dedupeId = responseId ?? "active";
-    if (this.interruptedResponses.has(dedupeId)) return;
-    this.interruptedResponses.add(dedupeId);
-    this.options.callbacks.interruptTurn();
-    this.options.callbacks.notifyInterrupted();
   }
 
   private handleRateLimits(event: Record<string, unknown>): void {
@@ -1132,6 +914,12 @@ function isValidBase64(value: string): boolean {
 
 function stringValue(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function boundedStringValue(value: unknown, maxLength: number): string | null {
+  return typeof value === "string" && value.length > 0 && value.length <= maxLength
+    ? value
+    : null;
 }
 
 function numberValue(value: unknown): number | null {

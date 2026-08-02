@@ -95,6 +95,7 @@ vi.mock("../lib/telefun-analysis", () => ({
 
 vi.mock("../services/telefun-scoring-service", () => ({
   enqueueScoring: vi.fn(),
+  isWebRtcScoringReady: vi.fn(() => true),
 }));
 
 import { telefunRecordings } from "../routes/telefun/recordings";

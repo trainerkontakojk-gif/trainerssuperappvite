@@ -16,6 +16,17 @@ import { requestOpenAITelefunAssessment } from "./telefun-openai-assessment";
 
 export type { VoiceQualityAssessment };
 
+export function isTelefunWebRtcSeekableAgentPath(params: {
+  path: unknown;
+  userId: string;
+  sessionId: string;
+}): boolean {
+  return (
+    typeof params.path === "string" &&
+    params.path === `${params.userId}/${params.sessionId}/agent_only.seekable.webm`
+  );
+}
+
 export async function analyzeVoiceQuality(
   sessionId: string,
   userId: string,
@@ -30,13 +41,26 @@ export async function analyzeVoiceQuality(
   const { data: row, error: fetchError } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, scenario_title, agent_recording_path, voice_assessment, session_metrics, telefun_model_id",
+      "id, user_id, status, scenario_title, agent_recording_path, voice_assessment, session_metrics, telefun_model_id, telefun_transport, scoring_ready_at",
     )
     .eq("id", sessionId)
     .maybeSingle();
 
   if (fetchError || !row) return { success: false, error: "Session not found" };
   if (row.user_id !== userId) return { success: false, error: "Unauthorized" };
+  const isWebRtc = row.telefun_transport === "openai-webrtc";
+  if (
+    isWebRtc &&
+    (row.status !== "completed" ||
+      !row.scoring_ready_at ||
+      !isTelefunWebRtcSeekableAgentPath({
+        path: row.agent_recording_path,
+        userId,
+        sessionId,
+      }))
+  ) {
+    return { success: false, error: "Scoring not ready" };
+  }
 
   // Compute hold assessment from session_metrics (shared by both providers)
   const sessionMetrics =
@@ -121,21 +145,23 @@ export async function analyzeVoiceQuality(
       return { success: false, error: "Format hasil analisis tidak valid." };
     }
 
-    const { error: updateError } = await adminClient
-      .from("telefun_history")
-      .update({
-        voice_assessment: synchronizedAssessment,
-        score: synchronizedAssessment.overallScore,
-        scoring_status: "completed",
-        scoring_completed_at: new Date().toISOString(),
-      })
-      .eq("id", sessionId);
-    if (updateError) {
-      console.error("[Telefun] Failed to save OpenAI assessment:", updateError);
-      return {
-        success: false,
-        error: "Gagal menyimpan hasil penilaian suara.",
-      };
+    if (!isWebRtc) {
+      const { error: updateError } = await adminClient
+        .from("telefun_history")
+        .update({
+          voice_assessment: synchronizedAssessment,
+          score: synchronizedAssessment.overallScore,
+          scoring_status: "completed",
+          scoring_completed_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId);
+      if (updateError) {
+        console.error("[Telefun] Failed to save OpenAI assessment:", updateError);
+        return {
+          success: false,
+          error: "Gagal menyimpan hasil penilaian suara.",
+        };
+      }
     }
     return { success: true, assessment: synchronizedAssessment };
   }
@@ -223,32 +249,36 @@ export async function analyzeVoiceQuality(
         throw new Error("Invalid assessment after hold normalization");
       }
 
-      // Save to DB with lifecycle status
-      const { error: updateError } = await adminClient
-        .from("telefun_history")
-        .update({
-          voice_assessment: assessment,
-          score: assessment.overallScore,
-          scoring_status: "completed",
-          scoring_completed_at: new Date().toISOString(),
-        })
-        .eq("id", sessionId);
-      if (updateError) {
-        console.error("[Telefun] Failed to save assessment:", updateError);
-        return {
-          success: false,
-          error: "Gagal menyimpan hasil penilaian suara.",
-        };
+      // Legacy scoring persists its assessment here. WebRTC persists it in
+      // complete_telefun_scoring after the readiness/claim boundary.
+      if (!isWebRtc) {
+        const { error: updateError } = await adminClient
+          .from("telefun_history")
+          .update({
+            voice_assessment: assessment,
+            score: assessment.overallScore,
+            scoring_status: "completed",
+            scoring_completed_at: new Date().toISOString(),
+          })
+          .eq("id", sessionId);
+        if (updateError) {
+          console.error("[Telefun] Failed to save assessment:", updateError);
+          return {
+            success: false,
+            error: "Gagal menyimpan hasil penilaian suara.",
+          };
+        }
       }
 
       return { success: true, assessment };
     } catch (err) {
       console.error("[Telefun] Parse error for assessment:", err);
-      // Mark scoring as failed
+      // Legacy scoring keeps its existing direct failure marker. WebRTC
+      // terminal state is owned by the atomic scoring RPC caller.
       await adminClient
         .from("telefun_history")
         .update({
-          scoring_status: "failed",
+          ...(isWebRtc ? {} : { scoring_status: "failed" }),
           scoring_last_error:
             err instanceof Error ? err.message : "Parse error",
         })
@@ -262,7 +292,7 @@ export async function analyzeVoiceQuality(
   await adminClient
     .from("telefun_history")
     .update({
-      scoring_status: "failed",
+      ...(isWebRtc ? {} : { scoring_status: "failed" }),
       scoring_last_error: response.error || "Gemini assessment failed",
     })
     .eq("id", sessionId)

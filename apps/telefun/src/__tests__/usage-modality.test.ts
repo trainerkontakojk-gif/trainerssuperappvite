@@ -41,6 +41,7 @@ import {
   observeOpenAIUsage,
   parseOpenAIRealtimeUsage,
   summarizeOpenAIUsageAccumulator,
+  recordFailedOpenAIRealtimeUsage,
 } from "../usage";
 
 // ── parseUsageMetadata — modality breakdown ──────────────
@@ -520,6 +521,64 @@ describe("OpenAI Realtime response usage", () => {
       audio_tokens: 200_000,
     },
   };
+
+  it("persists an idempotent failed audit row for incomplete usage", async () => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockImplementation((table: string) =>
+      table === "ai_usage_logs"
+        ? {
+            insert: vi.fn(async (payload: Record<string, unknown>) => {
+              insertedUsagePayloads.push(payload);
+              return { error: null };
+            }),
+          }
+        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+    );
+
+    await expect(
+      recordFailedOpenAIRealtimeUsage(
+        "attempt-incomplete",
+        "user-1",
+        "gpt-realtime-2.1",
+        "missing usage details ".repeat(100),
+      ),
+    ).resolves.toBe(true);
+    expect(insertedUsagePayloads[0]).toMatchObject({
+      request_id: "attempt-incomplete",
+      status: "failed",
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+      estimated_cost_usd: 0,
+      estimated_cost_idr: 0,
+      final_cost_usd: 0,
+      final_cost_idr: 0,
+    });
+    expect(String(insertedUsagePayloads[0]?.error_message).length).toBeLessThanOrEqual(240);
+  });
+
+  it("treats an existing request ID as an idempotent failed audit", async () => {
+    mockFrom.mockImplementation((table: string) =>
+      table === "ai_usage_logs"
+        ? { insert: vi.fn(async () => ({ error: { code: "23505", message: "duplicate" } })) }
+        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+    );
+    await expect(
+      recordFailedOpenAIRealtimeUsage("attempt-duplicate", "user-1", "gpt-realtime-2.1", "missing usage"),
+    ).resolves.toBe(true);
+  });
+
+  it("returns false when the failed usage audit cannot be persisted", async () => {
+    mockFrom.mockImplementation((table: string) =>
+      table === "ai_usage_logs"
+        ? { insert: vi.fn(async () => ({ error: { code: "PGRST500", message: "db down" } })) }
+        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+    );
+
+    await expect(
+      recordFailedOpenAIRealtimeUsage("attempt-db-failure", "user-1", "gpt-realtime-2.1", "missing usage"),
+    ).resolves.toBe(false);
+  });
 
   it("persists assessment usage under telefun/voice_assessment", async () => {
     insertedUsagePayloads.length = 0;

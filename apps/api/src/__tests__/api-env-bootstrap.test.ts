@@ -40,6 +40,30 @@ describe("API Env Bootstrap", () => {
     expect(path.normalize(resolvedPath)).toBe(path.normalize(expectedPath));
   });
 
+  it("parses staging and trims the exact WebRTC rollout UUID allowlist", async () => {
+    process.env.NODE_ENV = "staging";
+    process.env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = "true";
+    process.env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS =
+      " 019f45e3-5fac-7cd2-afeb-8069c2f813b3,invalid,019f45e3-5fac-7cd2-afeb-8069c2f813b4 ";
+
+    const { env, isTelefunOpenAiWebRtcAllowed } = await import("../lib/env");
+
+    expect(env.NODE_ENV).toBe("staging");
+    expect(env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED).toBe(true);
+    expect(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS).toEqual([
+      "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+      "019f45e3-5fac-7cd2-afeb-8069c2f813b4",
+    ]);
+    expect(
+      isTelefunOpenAiWebRtcAllowed({
+        nodeEnv: env.NODE_ENV,
+        enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+        allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+        userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+      }),
+    ).toBe(true);
+  });
+
   it("does not crash when .env.local is missing", async () => {
     const loadEnvFileSpy = vi.fn(() => {
       throw new Error("ENOENT: no such file");

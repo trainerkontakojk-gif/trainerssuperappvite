@@ -1,12 +1,24 @@
-import { telefunClient, unwrapResponse } from "../../../lib/api";
+import {
+  ApiError,
+  telefunClient,
+  unwrapResponse,
+} from "../../../lib/api";
 
 export interface RemuxRecordingResult {
   remuxed: boolean;
-  recordings: Record<string, {
-    originalPath: string;
-    seekablePath?: string;
-    remuxed: boolean;
-  }>;
+  recordings: Record<
+    string,
+    {
+      originalPath: string;
+      seekablePath?: string;
+      remuxed: boolean;
+    }
+  >;
+  recordingStatus?: "uploaded" | "partial" | "ready" | "failed";
+  recordingReady?: boolean;
+  scoringReady?: boolean;
+  scoringReadyAt?: string | null;
+  scoringStatus?: "pending" | "processing" | "completed" | "failed";
 }
 
 /**
@@ -24,7 +36,12 @@ export interface RemuxRecordingResult {
  */
 export async function remuxRecording(
   sessionId: string,
-): Promise<{ success: boolean; data?: RemuxRecordingResult; error?: string }> {
+): Promise<{
+  success: boolean;
+  data?: RemuxRecordingResult;
+  error?: string;
+  errorCode?: string;
+}> {
   try {
     console.log(`[remux] Starting remux for session ${sessionId}`);
 
@@ -46,6 +63,10 @@ export async function remuxRecording(
 
     console.warn(`[remux] Session ${sessionId} — failed:`, message);
 
-    return { success: false, error: message };
+    return {
+      success: false,
+      error: message,
+      errorCode: err instanceof ApiError ? err.code : "NETWORK_ERROR",
+    };
   }
 }

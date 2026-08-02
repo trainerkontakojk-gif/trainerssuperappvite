@@ -6,10 +6,20 @@ const update = vi.fn(() => ({
     eq: vi.fn(() => Promise.resolve({ error: null })),
   })),
 }));
+const select = vi.fn(() => ({
+  eq: vi.fn(() => ({
+    maybeSingle: vi.fn(() =>
+      Promise.resolve({
+        data: { user_id: "user-1", telefun_transport: "openai-audio" },
+        error: null,
+      }),
+    ),
+  })),
+}));
 
 vi.mock("../lib/supabase", () => ({
   createAdminClient: () => ({
-    from: vi.fn(() => ({ update })),
+    from: vi.fn(() => ({ update, select })),
   }),
 }));
 

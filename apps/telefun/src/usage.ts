@@ -912,6 +912,48 @@ function readPricingRate(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+export async function recordFailedOpenAIRealtimeUsage(
+  requestId: string,
+  userId: string,
+  modelId: string,
+  errorMessage: string,
+  action: "voice_live" | "voice_assessment" = "voice_live",
+): Promise<boolean> {
+  const model = getTelefunLiveModel(modelId);
+  if (model?.provider !== "openai") return false;
+  const boundedError =
+    errorMessage.replace(/\s+/g, " ").trim().slice(0, 240) ||
+    "incomplete OpenAI usage";
+  try {
+    const { error } = await admin.from("ai_usage_logs").insert({
+      request_id: requestId,
+      user_id: userId,
+      provider: model.provider,
+      model_id: model.id,
+      module: "telefun",
+      action,
+      status: "failed",
+      error_message: boundedError,
+      input_tokens: 0,
+      output_tokens: 0,
+      total_tokens: 0,
+      estimated_cost_usd: 0,
+      estimated_cost_idr: 0,
+      final_cost_usd: 0,
+      final_cost_idr: 0,
+      raw_usage_metadata: { billing_model: "openai_realtime_per_response_v1", status: "failed" },
+    });
+    if (error && error.code !== "23505") {
+      console.error("[Telefun Usage] Failed to insert OpenAI failure audit:", error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("[Telefun Usage] OpenAI failure audit exception:", error);
+    return false;
+  }
+}
+
 export async function flushOpenAIRealtimeUsage(
   requestId: string,
   userId: string,

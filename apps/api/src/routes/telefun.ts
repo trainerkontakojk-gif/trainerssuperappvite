@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { User } from "@supabase/supabase-js";
 import { requireRole } from "../middleware/role";
 import { telefunSessions } from "./telefun/sessions";
+import { telefunCapabilities } from "./telefun/capabilities";
 import { telefunRecordings } from "./telefun/recordings";
 import { telefunSettings } from "./telefun/settings";
 import { telefunAnnotations } from "./telefun/annotations";
@@ -13,6 +14,7 @@ const telefun = new Hono<{ Variables: Variables }>();
 // Semua route Telefun hanya untuk admin/trainer — agent & leader tidak diizinkan
 telefun.use("*", requireRole("admin", "trainer"));
 
+telefun.route("/", telefunCapabilities);
 telefun.route("/", telefunSessions);
 telefun.route("/", telefunRecordings);
 telefun.route("/", telefunSettings);

@@ -130,6 +130,7 @@ import {
   checkCachedAssessment,
   enqueueScoring,
   fetchPendingJobs,
+  persistScoringAssessment,
   processScoringJob,
 } from "../services/telefun-scoring-service";
 import type { VoiceQualityAssessment } from "@trainers/types";
@@ -264,6 +265,31 @@ describe("fetchPendingJobs", () => {
     });
   });
 
+  it("does not return not-ready WebRTC rows to the polling worker", async () => {
+    seedSession("webrtc-not-ready", {
+      user_id: "u1",
+      scoring_status: "pending",
+      telefun_transport: "openai-webrtc",
+      status: "completed",
+      scoring_ready_at: null,
+      agent_recording_path: null,
+    });
+    seedSession("webrtc-ready", {
+      user_id: "u2",
+      scoring_status: "pending",
+      telefun_transport: "openai-webrtc",
+      status: "completed",
+      scoring_ready_at: "2026-06-11T00:00:00.000Z",
+      agent_recording_path: "u2/webrtc-ready/agent_only.seekable.webm",
+    });
+
+    const result = await fetchPendingJobs(5);
+
+    expect(result).toEqual([
+      { sessionId: "webrtc-ready", userId: "u2" },
+    ]);
+  });
+
   it("returns empty array when no jobs", async () => {
     const result = await fetchPendingJobs(5);
     expect(result).toEqual([]);
@@ -298,10 +324,65 @@ describe("processScoringJob", () => {
       success: true,
       text: JSON.stringify(VALID_ASSESSMENT),
     });
+    mockRpcResult = { data: true, error: null };
 
     const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
     expect(result.success).toBe(true);
     expect(result.status).toBe("completed");
+  });
+
+  it("does not re-enqueue a WebRTC job after a failed-capture completion race", async () => {
+    seedSession("webrtc-failed", {
+      user_id: "u1",
+      status: "completed",
+      telefun_transport: "openai-webrtc",
+      recording_status: "failed",
+      recording_error: "Recording capture failed",
+      scoring_ready_at: "2026-08-01T00:00:00.000Z",
+      agent_recording_path: "u1/webrtc-failed/agent_only.seekable.webm",
+      scoring_status: "processing",
+      scoring_attempt_count: 1,
+      voice_assessment: null,
+      session_metrics: null,
+    });
+    mockRpcResult = { data: false, error: null };
+    const geminiMock = (await import("../lib/gemini")).generateGeminiContent as any;
+    geminiMock.mockResolvedValue({
+      success: true,
+      text: JSON.stringify(VALID_ASSESSMENT),
+    });
+
+    const result = await processScoringJob({
+      sessionId: "webrtc-failed",
+      userId: "u1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      status: "failed",
+      error: "SCORING_NOT_READY",
+    });
+    expect(mockRpcs.map((rpc) => rpc.name)).toEqual([
+      "complete_telefun_scoring",
+    ]);
+  });
+
+  it("reads the complete RPC state with the full readiness snapshot", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      telefun_transport: "openai-webrtc",
+      status: "completed",
+      recording_status: "failed",
+      recording_error: "Recording capture failed",
+      scoring_ready_at: null,
+      agent_recording_path: null,
+      scoring_status: "processing",
+    });
+    mockRpcResult = { data: false, error: null };
+
+    await expect(persistScoringAssessment("s1", VALID_ASSESSMENT)).rejects.toThrow(
+      "SCORING_NOT_READY",
+    );
   });
 
   it("reschedules transient failures", async () => {

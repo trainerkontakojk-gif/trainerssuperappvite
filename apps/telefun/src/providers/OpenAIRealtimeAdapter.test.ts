@@ -104,6 +104,8 @@ function createHarness(
     maxPendingToolCalls?: number;
     maxToolCallsPerResponse?: number;
     maxToolCallsPerSession?: number;
+    maxObserverDedupeEntries?: number;
+    maxSpeakingResponseEntries?: number;
     toolDispatcher?: RealtimeToolDispatcher;
   } = {},
 ) {
@@ -131,6 +133,8 @@ function createHarness(
     maxPendingToolCalls: options.maxPendingToolCalls,
     maxToolCallsPerResponse: options.maxToolCallsPerResponse,
     maxToolCallsPerSession: options.maxToolCallsPerSession,
+    maxObserverDedupeEntries: options.maxObserverDedupeEntries,
+    maxSpeakingResponseEntries: options.maxSpeakingResponseEntries,
     toolDispatcher: options.toolDispatcher,
   });
   return { adapter, sockets, socketRequests, callbacks };
@@ -514,6 +518,10 @@ describe("OpenAIRealtimeAdapter normalized events", () => {
       item_id: "in_1",
     });
     socket.receive({
+      type: "input_audio_buffer.speech_started",
+      item_id: "in_2",
+    });
+    socket.receive({
       type: "input_audio_buffer.speech_stopped",
       item_id: "in_1",
     });
@@ -560,8 +568,8 @@ describe("OpenAIRealtimeAdapter normalized events", () => {
       transcript: "Selamat siang",
     });
 
-    expect(harness.callbacks.interruptTurn).toHaveBeenCalledOnce();
-    expect(harness.callbacks.notifyInterrupted).toHaveBeenCalledOnce();
+    expect(harness.callbacks.interruptTurn).toHaveBeenCalledTimes(2);
+    expect(harness.callbacks.notifyInterrupted).toHaveBeenCalledTimes(2);
     expect(harness.callbacks.notifyActivity).toHaveBeenCalled();
     expect(harness.callbacks.startAiSpeaking).toHaveBeenCalledOnce();
     expect(harness.callbacks.appendTranscript).toHaveBeenCalledWith({
@@ -583,6 +591,56 @@ describe("OpenAIRealtimeAdapter normalized events", () => {
     expect(harness.callbacks.forwardToClient).toHaveBeenCalledWith(
       expect.stringContaining("response.output_audio.delta"),
     );
+  });
+
+  it("fails closed at a configured speaking-response capacity", async () => {
+    const harness = createHarness({ maxSpeakingResponseEntries: 1 });
+    const socket = await connectReady(harness);
+
+    socket.receive({
+      type: "response.output_audio.delta",
+      response_id: "response-speaking-1",
+      delta: "AA==",
+    });
+    socket.receive({
+      type: "response.output_audio.delta",
+      response_id: "response-speaking-2",
+      delta: "AA==",
+    });
+
+    expect(harness.callbacks.onDiagnostic).toHaveBeenCalledWith({
+      type: "observer_capacity_exceeded",
+      scope: "output_audio_responses",
+      limit: 1,
+    });
+    expect(harness.callbacks.onFinalClose).toHaveBeenCalledWith(
+      1011,
+      "OpenAI Realtime event observer exceeded safe capacity",
+    );
+  });
+
+  it("forwards valid output audio larger than transcript text bounds and starts speaking once", async () => {
+    const harness = createHarness();
+    const socket = await connectReady(harness);
+    vi.mocked(harness.callbacks.forwardToClient).mockClear();
+    const audio = "A".repeat(65_540);
+
+    socket.receive({
+      type: "response.output_audio.delta",
+      response_id: "resp_large_audio",
+      delta: audio,
+    });
+    socket.receive({
+      type: "response.output_audio.delta",
+      response_id: "resp_large_audio",
+      delta: audio,
+    });
+
+    expect(harness.callbacks.startAiSpeaking).toHaveBeenCalledOnce();
+    expect(harness.callbacks.forwardToClient).toHaveBeenCalledTimes(2);
+    expect(harness.callbacks.onDiagnostic).not.toHaveBeenCalledWith({
+      type: "malformed_event",
+    });
   });
 
   it("dedupes response.done usage and identifies transcription usage separately", async () => {
@@ -824,6 +882,15 @@ describe("OpenAIRealtimeAdapter normalized events", () => {
     expect(handler).toHaveBeenCalledOnce();
 
     socket.receive({
+      type: "response.function_call_arguments.delta",
+      response_id: "resp_tool_1",
+      call_id: "call_1",
+      delta: "stale-after-done",
+    });
+    expect(socket.sent).toHaveLength(3);
+    expect(handler).toHaveBeenCalledOnce();
+
+    socket.receive({
       type: "response.done",
       response: { id: "resp_tool_1", status: "completed" },
     });
@@ -975,6 +1042,7 @@ describe("OpenAIRealtimeAdapter normalized events", () => {
     const harness = createHarness({
       maxToolCallsPerResponse: 2,
       maxToolCallsPerSession: 1,
+      maxObserverDedupeEntries: 256,
     });
     const socket = await connectReady(harness);
 
@@ -1022,6 +1090,59 @@ describe("OpenAIRealtimeAdapter normalized events", () => {
       code: "invalid_event",
     });
     expect(JSON.stringify(safeLog)).not.toContain("echoed prompt");
+  });
+
+  it("fails closed when shared observer dedupe capacity is exceeded", async () => {
+    const harness = createHarness({ maxObserverDedupeEntries: 1 });
+    const socket = await connectReady(harness);
+
+    socket.receive({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: "input-1",
+      transcript: "Satu",
+    });
+    socket.receive({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: "input-2",
+      transcript: "Dua",
+    });
+
+    expect(harness.callbacks.onDiagnostic).toHaveBeenCalledWith({
+      type: "observer_capacity_exceeded",
+      scope: "input_transcript_items",
+      limit: 1,
+    });
+    expect(harness.callbacks.onFinalClose).toHaveBeenCalledWith(
+      1011,
+      "OpenAI Realtime event observer exceeded safe capacity",
+    );
+    const appendCount = vi.mocked(harness.callbacks.appendTranscript).mock.calls.length;
+    socket.receive({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: "input-3",
+      transcript: "Tidak boleh diproses",
+    });
+    expect(harness.callbacks.appendTranscript).toHaveBeenCalledTimes(appendCount);
+  });
+
+  it("keeps 3600 unique completed response.done events under the production observer defaults", async () => {
+    const harness = createHarness();
+    const socket = await connectReady(harness);
+
+    for (let index = 0; index < 3_600; index += 1) {
+      socket.receive({
+        type: "response.done",
+        response: {
+          id: `resp_${index}`,
+          status: "completed",
+        },
+      });
+    }
+
+    expect(harness.callbacks.completeTurn).toHaveBeenCalledTimes(3_600);
+    expect(harness.callbacks.notifyTurnComplete).toHaveBeenCalledTimes(3_600);
+    expect(harness.callbacks.onDiagnostic).not.toHaveBeenCalled();
+    expect(harness.callbacks.onFinalClose).not.toHaveBeenCalled();
   });
 
   it("drops malformed and unknown upstream events with bounded diagnostics", async () => {

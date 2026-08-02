@@ -4,6 +4,10 @@ import type { CallRecord } from "./types";
 import { validateAssessment } from "../../lib/voiceAssessmentUtils";
 import type { SessionMetrics } from "@trainers/types";
 import { parseTelefunTranscript } from "@trainers/types";
+import {
+  fetchTelefunWebRtcCapability,
+  type TelefunWebRtcCapability,
+} from "./services/telefunWebRtcCapability";
 
 export interface TelefunSessionRow {
   id: string;
@@ -49,10 +53,20 @@ export interface CreateTelefunSessionInput {
   telefun_transport?: string;
 }
 
-export async function getTelefunSettings(): Promise<Record<string, unknown> | null> {
-  return (await unwrapResponse(
-    await telefunClient.settings.$get(),
-  )) as Record<string, unknown> | null;
+export async function getTelefunWebRtcCapability(options?: {
+  signal?: AbortSignal;
+}): Promise<TelefunWebRtcCapability> {
+  return fetchTelefunWebRtcCapability(options);
+}
+
+export async function getTelefunSettings(): Promise<Record<
+  string,
+  unknown
+> | null> {
+  return (await unwrapResponse(await telefunClient.settings.$get())) as Record<
+    string,
+    unknown
+  > | null;
 }
 
 export async function saveTelefunSettings(
@@ -76,7 +90,9 @@ export async function createTelefunSession(
 }
 
 export async function deleteTelefunSession(id: string): Promise<void> {
-  await unwrapResponse(await telefunClient.history[":id"].$delete({ param: { id } }));
+  await unwrapResponse(
+    await telefunClient.history[":id"].$delete({ param: { id } }),
+  );
 }
 
 export async function clearTelefunHistory(): Promise<void> {

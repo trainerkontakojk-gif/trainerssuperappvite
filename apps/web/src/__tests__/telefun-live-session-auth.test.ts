@@ -240,6 +240,47 @@ describe("LiveSession first-message authentication", () => {
     expect(onError).toHaveBeenCalledTimes(errorCountAfterClose);
   });
 
+  it("publishes the exact legacy capture stream and clears it during cleanup", async () => {
+    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+    const onLocalStream = vi.fn();
+    session = new LiveSession(createMockConfig());
+    session.onLocalStream = onLocalStream;
+
+    await session.connect("test-access-token");
+
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(onLocalStream).toHaveBeenLastCalledWith(stream);
+
+    vi.useFakeTimers();
+    const disconnect = session.disconnect("cleanup");
+    await vi.advanceTimersByTimeAsync(500);
+    await disconnect;
+    expect(onLocalStream).toHaveBeenLastCalledWith(null);
+  });
+
+  it("rejects openai-webrtc before microphone or legacy WebSocket setup", async () => {
+    const config = {
+      ...createMockConfig(),
+      telefunTransport: "openai-webrtc",
+    } as unknown as TelefunAppSettings;
+    const onError = vi.fn();
+    session = new LiveSession(config);
+    session.onError = onError;
+
+    await expect(session.connect("test-access-token")).rejects.toThrow(
+      /OpenAIWebRtcSession/,
+    );
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(sockets).toHaveLength(0);
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+  });
+
   it("does not send configure when auth_ok arrives after disconnect begins", async () => {
     session = new LiveSession(createMockConfig());
     await session.connect("test-access-token");

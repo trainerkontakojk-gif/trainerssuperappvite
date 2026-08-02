@@ -18,6 +18,10 @@ import {
 } from "./telefunDraftNormalizers";
 import { normalizeSimulationChallengeTypes } from "../../services/simulationChallenges";
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
+import {
+  isAllowedTelefunWebRtc,
+  type TelefunWebRtcCapability,
+} from "../../services/telefunWebRtcCapability";
 
 interface UseTelefunSettingsDraftProps {
   settings: AppSettings;
@@ -25,6 +29,7 @@ interface UseTelefunSettingsDraftProps {
   onSave: (newSettings: AppSettings) => void;
   onClose: () => void;
   providerReadiness?: TelefunProviderReadinessState;
+  webRtcCapability?: TelefunWebRtcCapability | null;
 }
 
 const UNAVAILABLE_PROVIDER_READINESS: TelefunProviderReadinessState = {
@@ -50,14 +55,23 @@ function resolveAvailableModel(
     modelId?: string;
     transport?: AppSettings["telefunTransport"];
   },
+  webRtcCapability?: TelefunWebRtcCapability | null,
 ) {
-  const selectedModel = normalizeTelefunLiveModelSelection(modelId);
+  const selectedModel = normalizeTelefunLiveModelSelection(
+    modelId,
+    persistedSelection?.transport,
+  );
+  const isAllowedWebRtcPilot =
+    selectedModel.model.id === "gpt-realtime-2.1" &&
+    selectedModel.transport === "openai-webrtc" &&
+    isAllowedTelefunWebRtc(webRtcCapability);
   const isPersistedOpenAISelection =
     persistedSelection?.modelId === selectedModel.model.id &&
     persistedSelection.transport === selectedModel.transport;
   if (
     selectedModel.model.provider === "openai" &&
     !isOpenAIReady(providerReadiness) &&
+    !isAllowedWebRtcPilot &&
     !(providerReadiness.status === "loading" && isPersistedOpenAISelection)
   ) {
     return normalizeTelefunLiveModelSelection(DEFAULT_TELEFUN_LIVE_MODEL_ID);
@@ -71,21 +85,37 @@ export function buildTelefunSettingsForSave(params: {
   consumerTypes: ConsumerType[];
   selectedTelefunModel: string;
   providerReadiness?: TelefunProviderReadinessState;
+  selectedTelefunTransport?: AppSettings["telefunTransport"];
+  webRtcCapability?: TelefunWebRtcCapability | null;
 }): AppSettings {
   const selectedModel = resolveAvailableModel(
     params.selectedTelefunModel,
     params.providerReadiness ?? UNAVAILABLE_PROVIDER_READINESS,
     {
       modelId: params.localSettings.telefunModelId,
-      transport: params.localSettings.telefunTransport,
+      transport:
+        params.selectedTelefunTransport ??
+        params.localSettings.telefunTransport,
     },
+    params.webRtcCapability,
   );
+  const selectedTransport =
+    params.selectedTelefunTransport ?? selectedModel.transport;
+  const canPersistWebRtc =
+    selectedTransport === "openai-webrtc" &&
+    selectedModel.model.id === "gpt-realtime-2.1" &&
+    isAllowedTelefunWebRtc(params.webRtcCapability);
+  const persistedTransport = canPersistWebRtc
+    ? "openai-webrtc"
+    : selectedModel.transport === "openai-webrtc"
+      ? normalizeTelefunLiveModelSelection(selectedModel.model.id).transport
+      : selectedModel.transport;
 
   const settingsToSave = {
     ...params.localSettings,
     scenarios: params.scenarios,
     consumerTypes: params.consumerTypes.map(normalizeTelefunConsumerDifficulty),
-    telefunTransport: selectedModel.transport,
+    telefunTransport: persistedTransport,
     telefunModelId: selectedModel.model.id,
     identitySettings: {
       ...params.localSettings.identitySettings,
@@ -115,6 +145,7 @@ export function useTelefunSettingsDraft({
   onSave,
   onClose,
   providerReadiness = UNAVAILABLE_PROVIDER_READINESS,
+  webRtcCapability = null,
 }: UseTelefunSettingsDraftProps) {
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system"
@@ -123,6 +154,9 @@ export function useTelefunSettingsDraft({
 
   const selectedTelefunModel =
     localSettings.telefunModelId || DEFAULT_TELEFUN_LIVE_MODEL_ID;
+  const selectedTelefunTransport =
+    localSettings.telefunTransport ||
+    normalizeTelefunLiveModelSelection(selectedTelefunModel).transport;
 
   const scenarioForm = useCrudForm<Scenario>({
     generateId: () => `s-${Date.now()}`,
@@ -188,6 +222,12 @@ export function useTelefunSettingsDraft({
         prev.telefunTransport,
       );
       if (currentModel.model.provider !== "openai") return prev;
+      if (
+        currentModel.transport === "openai-webrtc" &&
+        (webRtcCapability === null || isAllowedTelefunWebRtc(webRtcCapability))
+      ) {
+        return prev;
+      }
 
       const fallback = normalizeTelefunLiveModelSelection(
         DEFAULT_TELEFUN_LIVE_MODEL_ID,
@@ -207,13 +247,30 @@ export function useTelefunSettingsDraft({
         },
       };
     });
-  }, [isOpen, providerReadiness.status]);
+  }, [isOpen, providerReadiness.status, webRtcCapability]);
+
+  const setSelectedTelefunTransport = (
+    transport: AppSettings["telefunTransport"],
+  ) => {
+    if (
+      transport === "openai-webrtc" &&
+      (selectedTelefunModel !== "gpt-realtime-2.1" ||
+        !isAllowedTelefunWebRtc(webRtcCapability))
+    ) {
+      return;
+    }
+    setLocalSettings((prev) => ({ ...prev, telefunTransport: transport }));
+  };
 
   const setSelectedTelefunModel = (modelId: string) => {
     const selectedModel = normalizeTelefunLiveModelSelection(modelId);
+    const isAllowedWebRtcPilot =
+      selectedModel.model.id === "gpt-realtime-2.1" &&
+      isAllowedTelefunWebRtc(webRtcCapability);
     if (
       selectedModel.model.provider === "openai" &&
-      !isOpenAIReady(providerReadiness)
+      !isOpenAIReady(providerReadiness) &&
+      !isAllowedWebRtcPilot
     ) {
       return;
     }
@@ -306,8 +363,10 @@ export function useTelefunSettingsDraft({
     const original = JSON.stringify(settings);
 
     // Construct hypothetical settings with current selections
-    const selectedModel =
-      normalizeTelefunLiveModelSelection(selectedTelefunModel);
+    const selectedModel = normalizeTelefunLiveModelSelection(
+      selectedTelefunModel,
+      selectedTelefunTransport,
+    );
     const currentSettings = {
       ...localSettings,
       telefunModelId: selectedModel.model.id,
@@ -361,7 +420,9 @@ export function useTelefunSettingsDraft({
       scenarios: nextScenarios,
       consumerTypes: nextConsumerTypes,
       selectedTelefunModel,
+      selectedTelefunTransport,
       providerReadiness,
+      webRtcCapability,
     });
 
     if (scenarioDirty) {
@@ -389,7 +450,9 @@ export function useTelefunSettingsDraft({
     localSettings,
     setLocalSettings,
     selectedTelefunModel,
+    selectedTelefunTransport,
     setSelectedTelefunModel,
+    setSelectedTelefunTransport,
     scenarioForm,
     consumerForm,
     handleSelectAll,

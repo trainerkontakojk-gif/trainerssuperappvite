@@ -40,9 +40,57 @@ graph TD
 3. **Hono RPC**: Frontend mengonsumsi API via `hc<AppType>` dari Hono RPC — full type-safety tanpa perlu definisi API terpisah.
 4. **Supabase**: Menangani autentikasi user, penyimpanan data persisten, RLS, dan media Storage.
 5. **RLS (Row Level Security)**: Memastikan keamanan data di tingkat database berdasarkan role user (Admin, Trainer, Leader, Agent).
-6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio ke provider live API (Gemini Live atau OpenAI Realtime) melalui **provider adapter pattern**.
+6. **Telefun Proxy (`apps/telefun`)**: Service Node terpisah untuk memvalidasi token Supabase lalu meneruskan audio ke provider live API (Gemini Live atau OpenAI Realtime) melalui **provider adapter pattern**; Phase 2 mengekstrak shared OpenAI-only observer dan WS-only tool coordinator, lalu Phase 3 mengintegrasikan transport WebRTC secara capability-gated ke `PhoneInterface` tanpa mengubah default transport.
 7. **AI Providers**: Modul simulasi dan laporan memakai provider abstraction server-side di backend (Hono) yang aktifnya hanya Gemini dan OpenAI direct. Semua AI calls dicatat ke `ai_usage_logs`.
 8. **Shared Types (`packages/types`)**: Zod schemas dan TypeScript interfaces yang dipakai bersama oleh frontend dan backend.
+
+### Telefun realtime split (Phase 3 integration + Phase 4 durability, default off)
+
+- **Baseline produksi tetap unchanged**: `LiveSession`/`GeminiLiveAdapter` dan jalur OpenAI WebSocket legacy tetap menjadi baseline UI; `openai-audio` tidak disamarkan sebagai WebRTC.
+- **Phase 3 capability-gated integration**: `apps/web/src/routes/telefun/services/openaiWebRtc/` menyediakan transport yang dipilih oleh `PhoneInterface` hanya ketika capability gate, feature flag, dan allowlist mengizinkan. Transport dibangun sebelum ringtone agar end/unmount memiliki cleanup session-bound; `connect()` dan media/provider work baru dimulai setelah ringtone, tanpa mid-call fallback.
+- **Phase 2 internal extraction**: shared OpenAI-only event observer dipakai oleh WS adapter dan sideband observer; tool execution tetap WS-only lewat `openai-realtime-tool-coordinator.ts`, sideband bersifat observation-only dengan bounded diagnostics/frame cap.
+- **Data/control flow POC**: browser WebRTC media → OpenAI; browser SDP offer/answer → Telefun broker; Telefun → `POST https://api.openai.com/v1/realtime/calls` multipart `sdp` + `session`; Telefun → sideband `wss://api.openai.com/v1/realtime?call_id=...`.
+- **Guardrail rollout**: `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` by default, allowlist kosong berarti deny-all, dan integrasi tetap non-production sampai gate terpisah disetujui. API dan Telefun harus memakai flag/UUID cohort yang sama; POST tetap kill-switched, sedangkan authenticated owner-bound DELETE cleanup tetap diizinkan saat flag start false. Tidak ada paid/manual smoke yang diklaim dari automated verification.
+
+### Telefun Phase 4 durable lifecycle boundary
+
+Jalur WebRTC memisahkan media browser dari control/persistence plane, tetapi server tetap menjadi pemilik lifecycle:
+
+```text
+Browser DELETE (session-bound)
+  → Telefun HTTP broker
+  → WebRtcCallManager.beginFinalization
+  → provider hangup saat sideband admission open
+  → seal admission → bounded drain → close sideband
+  → transcript flush/checkpoint → usage persist/audit
+  → durable terminal RPC
+  → HTTP 204 atau retryable 503
+```
+
+`204` hanya berarti attempt/history sudah terminal secara durable (atau cleanup no-attempt sudah membuktikan state terminal). Timeout atau kegagalan persistence mempertahankan binding/attempt retryable dan menghasilkan `503`; conflict tetap `409`. Sideband menjadi owner event server: transcript memakai checkpoint sequence/dedupe key, usage memakai request ID stabil, dan metadata yang hilang/unpriceable dicatat sebagai audit incomplete, bukan token/cost sintetis.
+
+Graceful shutdown menghentikan penerimaan start WebRTC baru, menunggu manager drain dan HTTP server close secara bersamaan, serta hanya keluar `0` jika keduanya berhasil dalam deadline. Failure/rejection/deadline keluar `1`. Ini tidak mengubah `LiveSession`, `GeminiLiveAdapter`, atau legacy OpenAI WebSocket.
+
+Recording dan evaluasi mempunyai boundary durable terpisah:
+
+- Browser menyimpan queue `telefun_recording_reconciliation:v1` yang path-only, owner-scoped, dua fase (`recording_transition_pending` dan `remux_pending`), maksimal 32 entry, TTL 7 hari, dan maksimal 8 retry bounded. Blob, token, SDP, provider ID, dan object URL tidak disimpan.
+- API remux memproses semua sibling sebelum satu panggilan atomic `mark_telefun_recording_ready` untuk output seekable yang berhasil. Read-back ambiguous diperlakukan konservatif; hanya output yang dibuat invocation ini dan terbukti belum dipersist yang boleh dibersihkan.
+- Scoring WebRTC memakai row lock pada completion dan exact owned `agent_only.seekable.webm` gate. Failed capture menginvalidasi row `processing` secara atomic; completion yang kalah race mengembalikan false/not-ready dan tidak di-requeue.
+
+Implementasi ini memperbaiki lifecycle Phase 4 pada source saat ini; scoped fake/static verification lulus, tetapi bukan bukti migration remote, provider/paid smoke, deployment, atau real-browser runtime.
+
+### Telefun Phase 5 production-hardening boundary
+
+Phase 5 menambahkan additive distributed control-plane state untuk jalur OpenAI WebRTC:
+
+- `telefun_realtime_leases` menjadi authority quota/concurrency lintas replica. Claim, renew, release, expiry cleanup, dan provider/user cap dijalankan melalui RPC atomic; binding in-memory hanya cache untuk routing provider. Kehilangan lease memicu provider hangup/finalisasi `network_lost`, lalu release bertoken tetap dicoba agar row terminal tidak menunggu orphan sweep.
+- `telefun_realtime_rate_limits` memakai scope user/session/provider dan window atomic di database. Kegagalan RPC limiter bersifat fail-closed untuk jalur WebRTC.
+- Orphan cleanup worker meng-claim lease stale setelah restart, menutup provider reference dan sideband secara bounded, lalu menulis outcome `orphaned`. Outcome lifecycle yang didukung adalah `completed`, `failed`, `network_lost`, dan `orphaned`.
+- Recovery browser/network tidak melakukan silent recreate. Recreate yang disetujui harus menghasilkan attempt/session boundary baru dan `discontinuity` yang dapat direkonsiliasi; kegagalan network dikirim sebagai `network_lost`.
+- Provider call ID disimpan sebagai encrypted opaque reference server-side. Browser hanya menerima session/attempt boundary dan pesan aman; OpenAI key, provider secret, sideband URL, canonical config, SDP diagnostics, dan raw provider error tidak pernah diteruskan ke browser/log.
+- Metric names dibatasi untuk cost reconciliation, sideband disconnect, duplicate write, missing usage, orphan, dan session cap. UUID user diubah menjadi SHA-256 `user_id_hash` sebelum persistence; missing/unpriceable usage tetap audit state, bukan biaya sintetis.
+
+Production masih default-off/non-production. `GET /health` hanya membaca liveness dan readiness non-sensitive; ia tidak claim lease, consume quota, membuka provider, atau menulis billing/usage. Deployment mengharuskan exact HTTPS `ALLOWED_ORIGINS`, WSS untuk browser transport, fixed upstream OpenAI URL di server, bounded request body/timeout, preflight allowlist, dan CSP/Permissions Policy yang diselaraskan dengan deployment domain yang disetujui. Migration Phase 5 dan rollback artifact belum diaplikasikan ke database pada run ini.
 
 ## Directory Structure
 
@@ -92,8 +140,9 @@ Struktur folder monorepo:
 │   │   │   ├── middleware/      # auth, role, rate-limit middleware
 │   │   │   └── index.ts        # Hono app entry point + AppType export
 │   │   └── vitest.config.ts    # API test config
-│   └── telefun/                # WebSocket proxy server untuk Gemini Live
-│       └── src/                # Server, auth, usage, env handling
+│   └── telefun/                # WebSocket proxy server untuk Gemini Live + additive OpenAI POC + shared OpenAI observer/tool coordination
+│       ├── src/                # Server, auth, usage, env handling
+│       └── src/realtime-webrtc/ # Additive broker + durable attempt/transcript/sideband lifecycle modules
 ├── packages/
 │   └── types/                  # Shared Zod schemas & TypeScript interfaces
 │       └── src/                # 8 domain files + barrel index.ts (common, sidak, ketik, pdkt, telefun, ai, profiler, admin)
@@ -168,6 +217,16 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - `GEMINI_API_KEY`
 - `OPENAI_API_KEY` (khusus Telefun Realtime; diset terpisah dari API service)
 - `TELEFUN_OPENAI_ENABLED` (opsional — feature flag untuk mengaktifkan model GPT Realtime)
+- `TELEFUN_OPENAI_WEBRTC_POC_ENABLED` (default `false`; Phase 3 capability-gated integration and Phase 4 durable lifecycle remain off for new starts; POST kill switch)
+- `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` (CSV UUID exact, sama di API dan Telefun; development/staging only; kosong = deny-all; cleanup DELETE exception)
+- `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS` (default `15000`; upstream provider timeout and manager hangup bound)
+- `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS` (default `10000`; sideband connect timeout; finalization drain uses bounded manager default)
+- `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY` (server-only encryption key; wajib jika POC aktif; tidak pernah dibundle ke Web)
+- `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`, `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS` (distributed lease expiry/renewal bounds)
+- `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`, `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS` (atomic per-user/provider caps)
+- `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` (distributed WebRTC session/write limit)
+- `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` (bounded stale-lease cleanup interval)
+- `ALLOWED_ORIGINS` (exact HTTPS allowlist in production; wildcard tidak diterima oleh broker POC; required for WebRTC endpoint)
 
 ### MCP / Tools:
 

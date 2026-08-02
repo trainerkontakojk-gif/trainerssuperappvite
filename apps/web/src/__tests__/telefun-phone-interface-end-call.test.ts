@@ -83,6 +83,28 @@ describe("PhoneInterface end-call finalization", () => {
     vi.restoreAllMocks();
   });
 
+  it("does not construct or finalize a legacy session when cancelled during the ringtone", async () => {
+    vi.useFakeTimers();
+    const onEndSession = vi.fn();
+    render(
+      React.createElement(PhoneInterface, {
+        config,
+        accessToken: "test-access-token",
+        onEndSession,
+        onRecordingReady: vi.fn(),
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Akhiri panggilan" }));
+    expect(onEndSession).toHaveBeenCalledOnce();
+    expect(liveSessionState.instances).toHaveLength(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+    expect(liveSessionState.instances).toHaveLength(0);
+  });
+
   it("memanggil disconnect sekali dan menunda navigasi sampai finalization resolve", async () => {
     const finalization = createDeferred();
     const onEndSession = vi.fn();

@@ -219,6 +219,89 @@ describe("settings draft commit helpers", () => {
     expect(original.telefunTransport).toBe("gemini-live");
   });
 
+  it("persists an explicitly allowed WebRTC transport without promoting it by default", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1",
+      telefunTransport: "openai-audio" as const,
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      selectedTelefunTransport: "openai-webrtc",
+      providerReadiness: {
+        status: "ready",
+        openai: { enabled: true, configured: true, ready: true },
+      },
+      webRtcCapability: {
+        enabled: true,
+        allowed: true,
+        modelId: "gpt-realtime-2.1",
+        transport: "openai-webrtc",
+      },
+    });
+
+    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
+    expect(result.telefunTransport).toBe("openai-webrtc");
+    expect(original.telefunTransport).toBe("openai-audio");
+  });
+
+  it("keeps an allowed WebRTC pilot selectable when legacy OpenAI readiness is unavailable", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gemini-3.1-flash-live-preview",
+      telefunTransport: "gemini-live" as const,
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      selectedTelefunTransport: "openai-webrtc",
+      providerReadiness: {
+        status: "unavailable",
+        openai: { enabled: true, configured: false, ready: false },
+      },
+      webRtcCapability: {
+        enabled: true,
+        allowed: true,
+        modelId: "gpt-realtime-2.1",
+        transport: "openai-webrtc",
+      },
+    });
+
+    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
+    expect(result.telefunTransport).toBe("openai-webrtc");
+  });
+
+  it("falls back from an unavailable explicit WebRTC transport", () => {
+    const original = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1",
+      telefunTransport: "openai-audio" as const,
+    };
+
+    const result = buildTelefunSettingsForSave({
+      localSettings: original,
+      scenarios: original.scenarios,
+      consumerTypes: original.consumerTypes,
+      selectedTelefunModel: "gpt-realtime-2.1",
+      selectedTelefunTransport: "openai-webrtc",
+      providerReadiness: {
+        status: "ready",
+        openai: { enabled: true, configured: true, ready: true },
+      },
+      webRtcCapability: null,
+    });
+
+    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
+    expect(result.telefunTransport).toBe("openai-audio");
+  });
+
   it("coerces an incompatible Gemini voice when switching to OpenAI", () => {
     const original = {
       ...DEFAULT_TELEFUN_SETTINGS,
