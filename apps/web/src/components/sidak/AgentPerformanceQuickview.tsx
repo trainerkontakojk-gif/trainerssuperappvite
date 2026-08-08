@@ -16,7 +16,7 @@ import type {
 } from "@trainers/types";
 
 const RANKING_BASIS_NOTE =
-  "Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.";
+  "Semakin tinggi peringkat, semakin sedikit temuan sepanjang tahun. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah temuan yang sama mendapat peringkat yang sama.";
 
 const FORECAST_PRESENTATION: Record<
   SidakAgentForecastQuickview["status"],
@@ -131,14 +131,14 @@ function RankMetric({
 }: RankMetricProps) {
   const hasRank = metric?.rank !== null && metric?.rank !== undefined;
   const supportingText = !metric
-    ? "Ranking belum tersedia"
+    ? "Peringkat belum tersedia"
     : sameAsCombined
-      ? "Cohort yang sama dengan Tim Gabungan"
+      ? "Cakupan sama dengan Tim Gabungan"
       : hasRank
         ? metric.scopeLabel
         : metric.total > 0
-          ? "Agent belum masuk ranking pada konteks ini"
-          : "Belum ada agent pembanding";
+          ? "Belum masuk peringkat pada cakupan ini"
+          : "Belum ada agen pembanding";
 
   // ── Tie info ──
   const tiedAgents = metric?.tiedAgents ?? null;

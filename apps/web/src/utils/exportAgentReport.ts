@@ -77,10 +77,10 @@ function computeTenure(bergabungDate: string | null): string {
   const months =
     (now.getFullYear() - start.getFullYear()) * 12 +
     (now.getMonth() - start.getMonth());
-  if (months < 12) return months + " bln";
+  if (months < 12) return months + " bulan";
   const years = Math.floor(months / 12);
   const rem = months % 12;
-  return rem > 0 ? years + " thn " + rem + " bln" : years + " thn";
+  return rem > 0 ? years + " tahun " + rem + " bulan" : years + " tahun";
 }
 
 function nilaiLabel(nilai: number): string {
@@ -159,7 +159,7 @@ export function generateCSV(
   rows.push(csvRow(["Tahun Laporan", String(selectedYear)]));
 
   // Monthly Summaries
-  csvSection(rows, "Ringkasan Skor per Bulan", [
+  csvSection(rows, "Ringkasan Skor Bulanan", [
     "Bulan", "Skor Final", "NC Score", "CR Score", "Sesi", "Temuan",
   ]);
   for (const s of monthlySummaries) {
@@ -188,7 +188,7 @@ export function generateCSV(
   }
 
   // Top Tickets
-  csvSection(rows, "Top 5 Pengurang Skor Terbesar", [
+  csvSection(rows, "Tiket Pengurang Skor Terbesar", [
     "No Tiket", "Score Deduction", "Jumlah Temuan", "Parameter Terberat",
   ]);
   for (const ticket of topTickets) {
@@ -203,7 +203,7 @@ export function generateCSV(
   }
 
   // Root Causes
-  csvSection(rows, "Analisis Akar Masalah (Root Causes)", [
+  csvSection(rows, "Akar Masalah", [
     "Label", "Prioritas", "Jumlah Temuan", "Tiket Terdampak",
     "Temuan Critical", "Rata-rata Nilai", "Rekomendasi",
   ]);
@@ -223,7 +223,7 @@ export function generateCSV(
 
   // Trend Data
   if (data.personalTrend && data.personalTrend.labels.length > 0) {
-    csvSection(rows, "Data Tren", [
+    csvSection(rows, "Perkembangan Skor", [
       "Periode",
       ...data.personalTrend.datasets.map((ds) => ds.label),
     ]);
@@ -239,7 +239,7 @@ export function generateCSV(
 
   // Comparison Table
   if (data.comparisonTable && data.comparisonTable.rows.length > 0) {
-    csvSection(rows, "Benchmark Temuan (Comparison Table)", [
+    csvSection(rows, "Perbandingan Temuan", [
       "Parameter", "Agent Ini", "Rata-rata Tim", "Rata-rata Service",
     ]);
     for (const row of data.comparisonTable.rows) {
@@ -309,7 +309,7 @@ export function generateMD(
   );
 
   // Monthly Summaries
-  lines.push("\n## Ringkasan Skor per Bulan\n");
+  lines.push("\n## Ringkasan Skor Bulanan\n");
   if (monthlySummaries.length === 0) {
     lines.push("_Tidak ada data ringkasan untuk periode ini._\n");
   } else {
@@ -351,7 +351,7 @@ export function generateMD(
   }
 
   // Top Tickets
-  lines.push("\n## Top 5 Pengurang Skor Terbesar\n");
+  lines.push("\n## Tiket Pengurang Skor Terbesar\n");
   if (topTickets.length === 0) {
     lines.push("_Tidak ada tiket yang menurunkan skor._\n");
   } else {
@@ -370,9 +370,9 @@ export function generateMD(
   }
 
   // Root Causes
-  lines.push("\n## Analisis Akar Masalah (Root Causes)\n");
+  lines.push("\n## Akar Masalah\n");
   if (activeRootCauses.length === 0) {
-    lines.push("_Belum ada pola akar masalah yang dominan._\n");
+    lines.push("_Belum ditemukan pola akar masalah yang dominan._\n");
   } else {
     for (const cause of activeRootCauses) {
       lines.push("### " + cause.label + "\n");
@@ -388,7 +388,7 @@ export function generateMD(
 
   // Trend Data
   if (data.personalTrend && data.personalTrend.labels.length > 0) {
-    lines.push("\n## Data Tren\n");
+    lines.push("\n## Perkembangan Skor\n");
     lines.push(
       mdTable(
         ["Periode", ...data.personalTrend.datasets.map((ds) => ds.label)],
@@ -408,7 +408,7 @@ export function generateMD(
     const scope = data.comparisonTable.scope;
     const startLabel = MONTHS_SHORT[(scope.startMonth ?? 1) - 1];
     const endLabel = MONTHS_SHORT[(scope.endMonth ?? 12) - 1];
-    lines.push("\n## Benchmark Temuan\n");
+    lines.push("\n## Perbandingan Temuan\n");
     lines.push(
       "_" + startLabel + "-" + endLabel + " " + scope.year +
       " • Layanan " + (scope.serviceLabel || scope.serviceType) +
@@ -514,11 +514,11 @@ function buildProfileHtml(
     '    <div class="profile-actions" aria-label="Aksi laporan">',
     '      <span class="profile-action profile-action-secondary" aria-hidden="true">',
     '        <span class="profile-action-icon">' + downloadIcon + '</span>',
-    '        <span>UNDUH LAPORAN</span>',
+    '        <span>Unduh Laporan</span>',
     '        <span class="profile-action-icon">' + chevronIcon + '</span>',
     '      </span>',
     isStaff
-      ? '      <span class="profile-action profile-action-primary" aria-hidden="true"><span class="profile-action-icon">' + plusIcon + '</span><span>INPUT AUDIT</span></span>'
+      ? '      <span class="profile-action profile-action-primary" aria-hidden="true"><span class="profile-action-icon">' + plusIcon + '</span><span>Input Audit</span></span>'
       : '',
     '    </div>',
     '  </div>',
@@ -532,7 +532,7 @@ function buildQuickviewHtml(quickview: SidakAgentQuickviewResponse | null | unde
   const sameScope = quickview.combinedTeam?.scopeId != null && quickview.combinedTeam.scopeId === quickview.leaderTeam?.scopeId;
   const rankMetric = (label: string, metric: SidakAgentQuickviewResponse["combinedTeam"], sameAsCombined = false): string => {
     const hasRank = metric?.rank != null;
-    const supportingText = !metric ? "Ranking belum tersedia" : sameAsCombined ? "Cohort yang sama dengan Tim Gabungan" : hasRank ? metric.scopeLabel : finiteNumber(metric.total) > 0 ? "Agent belum masuk ranking pada konteks ini" : "Belum ada agent pembanding";
+    const supportingText = !metric ? "Peringkat belum tersedia" : sameAsCombined ? "Cakupan sama dengan Tim Gabungan" : hasRank ? metric.scopeLabel : finiteNumber(metric.total) > 0 ? "Belum masuk peringkat pada cakupan ini" : "Belum ada agen pembanding";
     const peers = metric?.tiedAgents ?? null;
     const tie = peers?.length && metric?.rank != null
       ? peers.length <= 2
@@ -609,7 +609,7 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
   // Build root causes HTML
   let causesHtml: string;
   if (activeRootCauses.length === 0) {
-    causesHtml = '<p style="text-align:center;padding:1.5rem 0;color:#6b7280;font-size:0.75rem;font-weight:700;text-transform:uppercase;">Belum ada pola akar masalah yang dominan</p>';
+    causesHtml = '<p style="text-align:center;padding:1.5rem 0;color:#6b7280;font-size:0.75rem;font-weight:700;text-transform:uppercase;">Belum ditemukan pola akar masalah yang dominan</p>';
   } else {
     causesHtml = activeRootCauses
       .map(function (cause) {
@@ -663,7 +663,7 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
     '      <span class="stat-value">' + numberText(latest.findingsCount) + '</span>',
     '    </div>',
     '    <div class="stat-cell">',
-    '      <span class="stat-label">Delta</span>',
+    '      <span class="stat-label">Selisih</span>',
     '      <span class="stat-value" style="' + deltaStyle(delta) + '">' + deltaText + '</span>',
     '    </div>',
     '  </div>',
@@ -673,7 +673,7 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
     '  <div class="dossier-lower-row">',
     '<div class="score-section dossier-ticket-column">',
     '  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:0.625rem;margin-bottom:0.5rem;">',
-    '    <h4 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#111827;">Top 5 Pengurang Skor Terbesar</h4>',
+    '    <h4 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#111827;">Tiket Pengurang Skor Terbesar</h4>',
     '    <span style="font-size:0.5625rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280;">' + topTickets.length + ' Tiket</span>',
     '  </div>',
     '  ' + ticketsHtml,
@@ -682,7 +682,7 @@ function buildDossierHtml(monthlySummaries: AgentPeriodSummary[],
     '<div class="score-section dossier-root-cause-column">',
     '  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5e7eb;padding-bottom:0.625rem;margin-bottom:1rem;">',
     '    <div>',
-    '      <h4 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#111827;">Diagnosis Akar Masalah</h4>',
+    '      <h4 style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#111827;">Akar Masalah</h4>',
     '      <p style="font-size:0.75rem;font-weight:500;color:#6b7280;margin-top:0.125rem;">Berdasarkan temuan periode aktif</p>',
     '    </div>',
     '    <span style="font-size:0.625rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;">' + activeRootCauses.length + ' Pola</span>',
@@ -706,8 +706,8 @@ function buildComparisonHtml(data: AgentDetailData): string {
   const scopeLine = startLabel + "-" + endLabel + " " + yearText(scope.year) +
     " &#8226; Layanan " + escHtml(scope.serviceLabel || scope.serviceType) +
     " &#8226; " + escHtml(scope.teamLabel) +
-    " &#8226; " + numberText(totalRow?.teamAgentCount) + " agent tim / " +
-    numberText(totalRow?.serviceAgentCount) + " agent service sama";
+    " &#8226; " + numberText(totalRow?.teamAgentCount) + " agen tim / " +
+    numberText(totalRow?.serviceAgentCount) + " agen layanan sama";
 
   const tableRows = rows.map(function (row) {
     const cls = row.key === "total" ? ' class="total-row"' : "";
@@ -733,7 +733,7 @@ function buildComparisonHtml(data: AgentDetailData): string {
   return [
     '<div class="card">',
     '  <div class="section-header">',
-    '    <h4>Benchmark Temuan</h4>',
+    '    <h4>Perbandingan Temuan</h4>',
     '    <p class="section-subtitle">' + scopeLine + '</p>',
     '  </div>',
     '  <div class="table-scroll">',
@@ -741,11 +741,11 @@ function buildComparisonHtml(data: AgentDetailData): string {
     '    <thead>',
     '      <tr>',
     '        <th>Parameter</th>',
-    '        <th class="num">Agent ini</th>',
+    '        <th class="num">Agen ini</th>',
     '        <th class="num">Rata-rata tim</th>',
-    '        <th class="num">Rata-rata service sama</th>',
+    '        <th class="num">Rata-rata layanan sama</th>',
     '        <th class="num">% vs tim</th>',
-    '        <th class="num">% vs service sama</th>',
+    '        <th class="num">% vs layanan sama</th>',
     '      </tr>',
     '    </thead>',
     '    <tbody>',
@@ -872,8 +872,8 @@ function buildFindingsHtml(
 
 function buildLiveShellHtml(data: AgentDetailData): string {
   return `<header class="page-header">
-    <div class="back-heading"><span class="back-button" aria-hidden="true">←</span><div><p>SIDAK PERSONAL AUDIT</p><h1>${escHtml(data.peserta.nama)}</h1></div></div>
-    <span class="shell-refresh" aria-hidden="true">↻ Refresh</span>
+    <div class="back-heading"><span class="back-button" aria-hidden="true">←</span><div><p>SIDAK · Profil Agen</p><h1>${escHtml(data.peserta.nama)}</h1></div></div>
+    <span class="shell-refresh" aria-hidden="true">↻ Muat ulang</span>
   </header>`;
 }
 
@@ -943,7 +943,7 @@ export function generateHTML(
   const liveContextHtml = buildLiveContextHtml(data, selectedYear, selectedService, context);
   const monthRailHtml = buildMonthRailHtml(monthlySummaries, context.selectedMonth ?? null);
   const summaryEmptyHtml = monthlySummaries.length === 0
-    ? '<div class="summary-empty"><strong>Data belum tersedia</strong><p>Belum ada ringkasan skor untuk layanan ' + escHtml(selectedService.toUpperCase()) + ' di tahun ' + yearText(selectedYear) + '.</p></div>'
+    ? '<div class="summary-empty"><strong>Data belum tersedia</strong><p>Belum ada ringkasan skor untuk layanan ' + escHtml(selectedService.toUpperCase()) + ' pada tahun ' + yearText(selectedYear) + '.</p></div>'
     : '';
 
   return [
@@ -1205,7 +1205,7 @@ export function generateHTML(
     '<section class="report-section" data-report-section="performance" id="section-summary">',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>',
-    '<div><h2>Analisis Performa Bulanan</h2><p>Tahun ' + yearText(selectedYear) + ' &bull; Layanan ' + escHtml(selectedService.toUpperCase()) + '</p></div>',
+    '<div><h2>Ringkasan Skor Bulanan</h2><p>Tahun ' + yearText(selectedYear) + ' &bull; Layanan ' + escHtml(selectedService.toUpperCase()) + '</p></div>',
     '</div>',
     '<div class="card">',
     '  ' + monthRailHtml,
@@ -1221,7 +1221,7 @@ export function generateHTML(
     '<section class="report-section" data-report-section="findings" id="section-temuan">',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>',
-    '<div><h2>Riwayat Temuan Detil</h2><p>Dikelompokkan per bulan audit</p></div>',
+    '<div><h2>Riwayat Temuan</h2><p>Temuan dikelompokkan per bulan penilaian</p></div>',
     '</div>',
     '<div class="card">',
     '  ' + findingsHtml,

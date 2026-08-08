@@ -194,7 +194,7 @@ export function buildTrendReportHtml(
       '<section class="report-section">',
       '<div class="report-section-heading">',
       '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16l4-5 4 3 5-7"/></svg></span>',
-      '<div><h2>Tren Pergerakan Skor</h2><p>Data Tren &bull; Performa per periode audit</p></div>',
+      '<div><h2>Perkembangan Skor</h2><p>Skor per periode penilaian</p></div>',
       "</div>",
       '<div class="card"><p class="empty-state">Data tren belum tersedia untuk konteks ini.</p></div>',
       "</section>",
@@ -306,7 +306,7 @@ export function buildTrendReportHtml(
     '<section class="report-section" data-report-section="trend">',
     '<div class="report-section-heading">',
     '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 16l4-5 4 3 5-7"/></svg></span>',
-    '<div><h2>Tren Pergerakan Skor</h2><p>Data Tren &bull; Rentang Statistik: ' +
+    '<div><h2>Perkembangan Skor</h2><p>Periode: ' +
       escHtml(trendRangeLabel) + " " + escHtml(selectedYear) + "</p></div>",
     "</div>",
     '<div class="card trend-card">',
@@ -314,7 +314,7 @@ export function buildTrendReportHtml(
     '<p class="trend-kicker">Tren Kinerja' +
       (trendRangeLabel ? " &bull; " + escHtml(trendRangeLabel) : "") + "</p>",
     '<h3 id="trend-title">Pergerakan skor per periode audit</h3>',
-    '<p>Pantau tren temuan agent pada setiap periode evaluasi di tahun aktif.</p>',
+    '<p>Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih.</p>',
     "</div>",
     controls,
     '<figure class="trend-figure trend-chart-shell" aria-labelledby="trend-title">',
@@ -330,9 +330,9 @@ export function buildTrendReportHtml(
     '<div class="chart-legend">' + legend + "</div>",
     '<table class="trend-data-table sr-only"><caption>Data tren lengkap untuk konteks tahun ' + escHtml(selectedYear) + '</caption><thead><tr><th>Periode</th>' + series.map((item) => '<th>' + escHtml(item.label) + '</th>').join('') + '</tr></thead><tbody>' + labels.map((label, index) => '<tr><th>' + escHtml(label) + '</th>' + series.map((item) => '<td>' + (item.data[index] === null ? '—' : finiteText(item.data[index])) + '</td>').join('') + '</tr>').join('') + '</tbody></table>',
     '<div class="trend-stats">',
-    '<div class="trend-stat"><span>Volume Periode</span><strong>' +
-      labels.length + '</strong><small>Periode Aktif</small></div>',
-    '<div class="trend-insight"><span>Insight Tren</span><p>Gunakan pola naik-turun per parameter untuk menentukan fokus coaching pada periode berikutnya.</p></div>',
+    '<div class="trend-stat"><span>Total Periode</span><strong>' +
+      labels.length + '</strong><small>periode aktif</small></div>',
+    '<div class="trend-insight"><span>Ringkasan Tren</span><p>Gunakan pola naik-turun setiap parameter untuk menentukan fokus coaching pada periode berikutnya.</p></div>',
     "</div>",
     "</div>",
     "</section>",

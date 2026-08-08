@@ -37,7 +37,7 @@ describe("AgentCard Component", () => {
     renderWithRouter(<AgentCard agent={mockAgent} index={0} />);
 
     expect(await screen.findByText("Adhitya Wisnuwadhana")).toBeInTheDocument();
-    expect(screen.getByText("TELEPON \u00B7 TIM CALL")).toBeInTheDocument();
+    expect(screen.getByText("Telepon · Tim Call")).toBeInTheDocument();
     expect(screen.getByText("97.8%")).toBeInTheDocument();
   });
 

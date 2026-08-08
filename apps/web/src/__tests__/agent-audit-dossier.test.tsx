@@ -97,7 +97,7 @@ describe("AgentAuditDossier", () => {
     expect(screen.getByText("92.0")).toBeInTheDocument();
     expect(screen.getByText("Sesi")).toBeInTheDocument();
     expect(screen.getByText("Temuan")).toBeInTheDocument();
-    expect(screen.getByText("Delta")).toBeInTheDocument();
+    expect(screen.getByText("Selisih")).toBeInTheDocument();
     // delta positive
     expect(screen.getByText("+2.0%")).toBeInTheDocument();
   });
@@ -141,12 +141,12 @@ describe("AgentAuditDossier", () => {
     );
 
     expect(
-      screen.getByText("Top 5 Pengurang Skor Terbesar"),
+      screen.getByText("Tiket Pengurang Skor Terbesar"),
     ).toBeInTheDocument();
     expect(screen.getByText("T-001")).toBeInTheDocument();
     expect(screen.getByText(/Akurasi Jawaban/i)).toBeInTheDocument();
     expect(screen.getByText("12.5")).toBeInTheDocument();
-    expect(screen.getByText("3 Temuan")).toBeInTheDocument();
+    expect(screen.getAllByText("3 temuan").length).toBeGreaterThan(0);
   });
 
   it("renders the populated root-cause diagnosis panel", () => {
@@ -162,14 +162,14 @@ describe("AgentAuditDossier", () => {
       />,
     );
 
-    expect(screen.getByText("Diagnosis Akar Masalah")).toBeInTheDocument();
+    expect(screen.getByText("Akar Masalah")).toBeInTheDocument();
     expect(
       screen.getByText(/Berdasarkan temuan Jan-Mei 2026/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("Pola Lanjutan")).toBeInTheDocument();
+    expect(screen.getByText("Pola Temuan Lainnya")).toBeInTheDocument();
     expect(screen.getByText("Jawaban salah/tidak akurat")).toBeInTheDocument();
     expect(screen.getByText("Kurang menggali kebutuhan")).toBeInTheDocument();
-    expect(screen.getByText("1 temuan")).toBeInTheDocument();
+    expect(screen.getAllByText("1 temuan").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1 tiket")).toHaveLength(1);
     expect(screen.queryByText("T-ADV-2 (Juli)")).not.toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: "Tampilkan tiket" })[1]);
@@ -190,7 +190,7 @@ describe("AgentAuditDossier", () => {
     );
 
     expect(
-      screen.getByText("Belum ada pola akar masalah yang dominan"),
+      screen.getByText("Belum ditemukan pola akar masalah yang dominan"),
     ).toBeInTheDocument();
   });
 });

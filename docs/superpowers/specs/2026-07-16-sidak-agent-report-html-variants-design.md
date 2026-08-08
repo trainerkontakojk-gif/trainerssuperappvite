@@ -63,11 +63,11 @@ The variants differ only in trend behavior and print-oriented presentation. This
 Both variants follow the live page order:
 
 1. Agent profile
-2. Analisis Performa Bulanan
+2. Ringkasan Skor Bulanan
 3. Active-period score dossier
-4. Tren Pergerakan Skor
+4. Perkembangan Skor
 5. Benchmark Temuan
-6. Riwayat Temuan Detil
+6. Riwayat Temuan
 7. Report generation footer
 
 The report uses the existing restrained SIDAK light palette, system sans-serif typography, tabular numerals, clear section spacing, and visible borders. It does not introduce decorative gradients, heavy shadows, or unrelated dashboard cards.

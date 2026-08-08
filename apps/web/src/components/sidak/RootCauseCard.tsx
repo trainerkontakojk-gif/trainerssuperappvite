@@ -41,37 +41,37 @@ export default function RootCauseCard({
               <SearchCheck className="h-4 w-4" />
             </span>
             <h4 className="truncate text-sm font-black tracking-tight text-foreground">
-              Diagnosis Akar Masalah
+              Akar Masalah
             </h4>
           </div>
           <p className="mt-1 pl-9 text-xs font-medium text-muted-foreground">
             {monthLabel
               ? `Berdasarkan temuan ${monthLabel}`
-              : "Berdasarkan temuan bulan aktif"}
+              : "Berdasarkan temuan bulan yang dipilih"}
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-bold tracking-wider text-muted-foreground">
           {causes.length} pola
         </span>
       </div>
 
       {!primary ? (
         <div className="rounded-xl border border-dashed border-border bg-background/40 px-4 py-8 text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-            Belum ada pola akar masalah yang dominan
+          <p className="text-xs font-bold tracking-widest text-muted-foreground">
+            Belum ditemukan pola akar masalah yang dominan
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-background/70 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-foreground">
+              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-black tracking-wider text-foreground">
                 Utama
               </span>
               {primary.criticalFindingsCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold tracking-wider text-rose-600">
                   <AlertCircle className="h-3 w-3" />
-                  {primary.criticalFindingsCount} critical
+                  {primary.criticalFindingsCount} kritis
                 </span>
               )}
             </div>
@@ -83,7 +83,7 @@ export default function RootCauseCard({
                 <span>{primary.findingsCount} temuan</span>
                 <span>{primary.affectedTickets} tiket</span>
                 {primary.matchedKeywords[0] && (
-                  <span>Keyword: {primary.matchedKeywords[0]}</span>
+                  <span>Kata kunci: {primary.matchedKeywords[0]}</span>
                 )}
               </div>
             </div>

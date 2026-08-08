@@ -61,7 +61,7 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
     return (
       <div className="rounded-2xl border border-border bg-surface p-8">
         <p className="text-sm text-muted-foreground">
-          Belum ada data pembanding untuk range ini
+          Belum ada data pembanding untuk periode ini
         </p>
       </div>
     );
@@ -76,13 +76,13 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
     scope.serviceLabel || scope.serviceType
   } • ${scope.teamLabel} • ${
     totalRow?.teamAgentCount ?? 0
-  } agent tim / ${totalRow?.serviceAgentCount ?? 0} agent service sama`;
+  } agen tim / ${totalRow?.serviceAgentCount ?? 0} agen layanan sama`;
 
   return (
     <div className="rounded-2xl border border-border bg-surface">
       <div className="border-b border-border px-5 py-4">
         <h4 className="font-outfit text-sm font-bold tracking-tight text-foreground">
-          Benchmark Temuan
+          Perbandingan Temuan
         </h4>
         <p className="mt-1 text-[11px] font-medium text-muted-foreground">
           {scopeLine}
@@ -91,22 +91,22 @@ export default function AgentComparisonTable({ comparisonTable }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <tr className="border-b border-border text-left text-[10px] font-bold tracking-widest text-muted-foreground">
               <th className="px-5 py-3 font-bold">Parameter</th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
-                Agent ini
+                Agen ini
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
                 Rata-rata tim
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
-                Rata-rata service sama
+                Rata-rata layanan sama
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
                 % vs tim
               </th>
               <th className="px-5 py-3 text-right font-bold tabular-nums">
-                % vs service sama
+                % vs layanan sama
               </th>
             </tr>
           </thead>

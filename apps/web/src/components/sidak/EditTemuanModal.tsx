@@ -18,10 +18,10 @@ interface Props {
 }
 
 const NILAI_OPTIONS = [
-  { value: 3, label: "SESUAI", desc: "Memenuhi ekspektasi", color: "emerald" },
-  { value: 2, label: "PERBAIKAN", desc: "Minor issue", color: "blue" },
-  { value: 1, label: "TIDAK SESUAI", desc: "Mayor issue", color: "amber" },
-  { value: 0, label: "KRITIS", desc: "Critical failure", color: "rose" },
+  { value: 3, label: "Sesuai", desc: "Memenuhi ekspektasi", color: "emerald" },
+  { value: 2, label: "Perbaikan", desc: "Perbaikan kecil", color: "blue" },
+  { value: 1, label: "Tidak Sesuai", desc: "Perbaikan besar", color: "amber" },
+  { value: 0, label: "Kritis", desc: "Kegagalan kritis", color: "rose" },
 ];
 
 export default function EditTemuanModal({ open, indicatorName, form, submitting, onFormChange, onSave, onClose }: Props) {
@@ -44,7 +44,7 @@ export default function EditTemuanModal({ open, indicatorName, form, submitting,
           >
             <div className="flex items-center justify-between p-5 border-b border-border">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Edit Temuan</p>
+                <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">Edit temuan</p>
                 <h3 className="text-sm font-semibold mt-0.5">{indicatorName}</h3>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
@@ -55,7 +55,7 @@ export default function EditTemuanModal({ open, indicatorName, form, submitting,
             <div className="p-5 space-y-5">
               {/* Nilai Selector */}
               <div>
-                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Nilai</p>
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 tracking-wide">Nilai</p>
                 <div className="grid grid-cols-4 gap-2">
                   {NILAI_OPTIONS.map((opt) => {
                     const isActive = form.nilai === opt.value;
@@ -77,7 +77,7 @@ export default function EditTemuanModal({ open, indicatorName, form, submitting,
                           isActive ? colorMap[opt.color] : `${inactiveMap[opt.color]} bg-transparent`
                         }`}>
                         <span className="text-lg font-bold">{opt.value}</span>
-                        <span className="text-[8px] font-semibold uppercase tracking-wider">{opt.label}</span>
+                        <span className="text-[8px] font-semibold tracking-wider">{opt.label}</span>
                       </button>
                     );
                   })}
@@ -86,7 +86,7 @@ export default function EditTemuanModal({ open, indicatorName, form, submitting,
 
               {/* Ketidaksesuaian */}
               <div>
-                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Ketidaksesuaian</p>
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 tracking-wide">Ketidaksesuaian</p>
                 <textarea value={form.ketidaksesuaian} onChange={(e) => onFormChange("ketidaksesuaian", e.target.value)}
                   rows={3} placeholder="Deskripsi ketidaksesuaian..."
                   className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-foreground text-foreground resize-none" />
@@ -94,7 +94,7 @@ export default function EditTemuanModal({ open, indicatorName, form, submitting,
 
               {/* Sebaiknya */}
               <div>
-                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Sebaiknya</p>
+                <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 tracking-wide">Sebaiknya</p>
                 <textarea value={form.sebaiknya} onChange={(e) => onFormChange("sebaiknya", e.target.value)}
                   rows={3} placeholder="Saran perbaikan..."
                   className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-foreground text-foreground resize-none" />
@@ -102,10 +102,10 @@ export default function EditTemuanModal({ open, indicatorName, form, submitting,
             </div>
 
             <div className="flex items-center justify-end gap-2 p-5 border-t border-border bg-muted/10">
-              <button onClick={onClose} disabled={submitting} className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide bg-transparent border border-border hover:bg-muted text-muted-foreground transition">
+              <button onClick={onClose} disabled={submitting} className="px-4 py-2 rounded-lg text-xs font-semibold tracking-wide bg-transparent border border-border hover:bg-muted text-muted-foreground transition">
                 Batal
               </button>
-              <button onClick={onSave} disabled={submitting} className="px-4 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide bg-foreground text-background hover:opacity-90 disabled:opacity-50 transition-all inline-flex items-center gap-2">
+              <button onClick={onSave} disabled={submitting} className="px-4 py-2 rounded-lg text-xs font-semibold tracking-wide bg-foreground text-background hover:opacity-90 disabled:opacity-50 transition-all inline-flex items-center gap-2">
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 Simpan Perubahan
               </button>

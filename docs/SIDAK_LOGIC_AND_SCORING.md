@@ -495,7 +495,7 @@ Container ranking juga memiliki `aria-label` per cohort: `"Tim Gabungan: peringk
 - **Loading skeleton**: `QuickviewSkeleton` — 3 kolom dengan efek `animate-pulse`, muncul saat `loading === true && !data`.
 - **Error state**: Pesan ringkas "Quickview belum dapat dimuat" + "Data ranking dan forecast tidak tersedia untuk sementara." — tanpa menampilkan error teknis mentah.
 - **Stale context suppression** (`useAgentQuickview`): Saat `agentId`, `year`, atau `serviceType` berubah, hook memvalidasi `data.context` cocok dengan parameter. Data lama disembunyikan (`suppressRetainedState`) sampai response konteks aktif tersedia. Error dari konteks lama juga disembunyikan.
-- **Refresh**: Tombol Refresh memicu `refetch()` dossier dan `refetchQuickview()` secara bersamaan (baris 54–57 di halaman agent).
+- **Muat ulang**: Tombol Muat ulang memicu `refetch()` dossier dan `refetchQuickview()` secara bersamaan (baris 54–57 di halaman agent).
 
 ### Security Scoping
 

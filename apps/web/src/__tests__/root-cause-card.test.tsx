@@ -72,7 +72,7 @@ describe("RootCauseCard", () => {
   it("renders header with title and subtitle", () => {
     render(<RootCauseCard causes={causes} monthLabel="Mei 2026" />);
 
-    expect(screen.getByText("Diagnosis Akar Masalah")).toBeInTheDocument();
+    expect(screen.getByText("Akar Masalah")).toBeInTheDocument();
     expect(
       screen.getByText(/Berdasarkan temuan Mei 2026/i),
     ).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe("RootCauseCard", () => {
   it("renders critical count badge when present", () => {
     render(<RootCauseCard causes={causes} />);
 
-    expect(screen.getByText(/1 critical/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 kritis/i)).toBeInTheDocument();
   });
 
   it("renders secondary causes in compact rows", () => {
@@ -106,7 +106,7 @@ describe("RootCauseCard", () => {
     render(<RootCauseCard causes={[]} />);
 
     expect(
-      screen.getByText("Belum ada pola akar masalah yang dominan"),
+      screen.getByText("Belum ditemukan pola akar masalah yang dominan"),
     ).toBeInTheDocument();
     expect(screen.getByText(/0 pola/i)).toBeInTheDocument();
   });

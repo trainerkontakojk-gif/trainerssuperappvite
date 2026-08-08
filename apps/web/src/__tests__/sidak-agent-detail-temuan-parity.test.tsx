@@ -42,9 +42,9 @@ describe("AgentTemuanTab parity tests", () => {
   it("renders empty state correctly with legacy copy when items list is empty", () => {
     render(<AgentTemuanTab items={[]} onEdit={vi.fn()} onDelete={vi.fn()} />);
 
-    expect(screen.getByText("Tidak ada data audit")).toBeInTheDocument();
+    expect(screen.getByText("Belum ada temuan")).toBeInTheDocument();
     expect(
-      screen.getByText(/Belum ditemukan data temuan untuk konteks layanan/),
+      screen.getByText(/Belum ada temuan untuk layanan/),
     ).toBeInTheDocument();
   });
 
@@ -53,14 +53,14 @@ describe("AgentTemuanTab parity tests", () => {
       <AgentTemuanTab items={mockItems} onEdit={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    expect(screen.getByText("MEI 2026")).toBeInTheDocument();
-    expect(screen.getByText("APRIL 2026")).toBeInTheDocument();
+    expect(screen.getByText("Mei 2026")).toBeInTheDocument();
+    expect(screen.getByText("April 2026")).toBeInTheDocument();
 
     // Accordions are collapsed initially (isOpen is false by default in state)
     expect(screen.queryByText("No Tiket")).not.toBeInTheDocument();
 
     // Click on MEI 2026 accordion to expand it
-    fireEvent.click(screen.getByText("MEI 2026"));
+    fireEvent.click(screen.getByText("Mei 2026"));
 
     // Now ticket info and details for MEI 2026 should be visible
     expect(screen.getByText("T-100")).toBeInTheDocument();
@@ -73,16 +73,16 @@ describe("AgentTemuanTab parity tests", () => {
     );
 
     // Expand MEI 2026
-    fireEvent.click(screen.getByText("MEI 2026"));
+    fireEvent.click(screen.getByText("Mei 2026"));
 
     // Untuk nilai 0: score '0' + label 'Poin' + kategori critical
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getAllByText("Poin").length).toBeGreaterThan(0);
-    expect(screen.getByText("critical")).toBeInTheDocument();
+    expect(screen.getByText("Kritis")).toBeInTheDocument();
 
     // Untuk nilai 3: score '3' + kategori non_critical
     expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByText("non_critical")).toBeInTheDocument();
+    expect(screen.getByText("Non-kritis")).toBeInTheDocument();
   });
 
   it("enforces edit permission visibility based on canEdit prop", () => {
@@ -99,7 +99,7 @@ describe("AgentTemuanTab parity tests", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("MEI 2026"));
+    fireEvent.click(screen.getByText("Mei 2026"));
 
     // Edit/delete buttons should not be present in the container
     // Let's verify by finding elements that contain the edit/delete icon button classes

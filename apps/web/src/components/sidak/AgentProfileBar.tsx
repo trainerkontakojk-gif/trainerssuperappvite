@@ -29,7 +29,7 @@ function computeTenure(bergabungDate: string | null): string {
     years--;
     months += 12;
   }
-  return years > 0 ? `${years} thn ${months} bln` : `${months} bln`;
+  return years > 0 ? `${years} tahun ${months} bulan` : `${months} bulan`;
 }
 
 export default function AgentProfileBar({
@@ -108,13 +108,13 @@ export default function AgentProfileBar({
       format: "csv",
       label: "CSV",
       icon: <Table className="h-4 w-4" />,
-      description: "Comma-Separated Values",
+      description: "Format tabel sederhana",
     },
     {
       format: "md",
       label: "Markdown (.md)",
       icon: <FileText className="h-4 w-4" />,
-      description: "Markdown documentasi",
+      description: "Dokumentasi Markdown",
     },
     {
       format: "html-interactive",
@@ -168,7 +168,7 @@ export default function AgentProfileBar({
                 </div>
                 <span className="hidden text-muted-foreground/30 sm:inline">•</span>
                 <div className="flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5" /> {jabatan || "Agent"}
+                  <Briefcase className="h-3.5 w-3.5" /> {jabatan || "Agen"}
                 </div>
                 <span className="hidden text-muted-foreground/30 sm:inline">•</span>
                 <div className="flex items-center gap-1.5">
@@ -187,10 +187,10 @@ export default function AgentProfileBar({
                 onKeyDown={handleTriggerKeyDown}
                 aria-haspopup="true"
                 aria-expanded={dropdownOpen}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 text-[11px] font-semibold uppercase tracking-wide text-foreground transition-all hover:bg-muted active:scale-95 sm:w-auto"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-transparent px-4 text-[11px] font-semibold tracking-wide text-foreground transition-all hover:bg-muted active:scale-95 sm:w-auto"
               >
                 <Download className="h-4 w-4" />
-                UNDUH LAPORAN
+                Unduh Laporan
                 <ChevronDown
                   className={`h-3.5 w-3.5 transition-transform ${
                     dropdownOpen ? "rotate-180" : ""
@@ -236,10 +236,10 @@ export default function AgentProfileBar({
             {isStaff && (
               <button
                 onClick={onInputAudit}
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground px-5 text-[11px] font-semibold uppercase tracking-wide text-background transition-all hover:opacity-90 active:scale-95 sm:w-auto"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-foreground px-5 text-[11px] font-semibold tracking-wide text-background transition-all hover:opacity-90 active:scale-95 sm:w-auto"
               >
                 <Plus className="h-4 w-4" />
-                INPUT AUDIT
+                Input Audit
               </button>
             )}
           </div>

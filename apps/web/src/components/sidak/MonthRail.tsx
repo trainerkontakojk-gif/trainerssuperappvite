@@ -43,7 +43,7 @@ export default function MonthRail({ summaries, selectedMonth, onMonthSelect }: P
                   : "border-transparent text-muted-foreground hover:text-foreground/80"
               }`}
             >
-              <div className={`text-[10px] font-black uppercase tracking-[0.18em] mb-1 ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+              <div className={`text-[10px] font-black tracking-[0.18em] mb-1 ${isActive ? "text-primary" : "text-muted-foreground"}`}>
                 {MONTHS_SHORT[p.month - 1]}
               </div>
 

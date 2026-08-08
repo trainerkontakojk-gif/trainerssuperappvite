@@ -56,7 +56,7 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
         <QaStatePanel
           type="empty"
           title="Data tren belum tersedia"
-          description="Tren akan muncul setelah audit pada periode yang dipilih memiliki data penilaian."
+          description="Tren akan muncul setelah ada penilaian pada periode yang dipilih."
         />
       </div>
     );
@@ -96,7 +96,7 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
     <div className="bg-card/50 backdrop-blur-sm rounded-[2rem] border border-border/50 p-5 sm:p-8 shadow-sm">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
         <div>
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground mb-2">
+          <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.24em] text-muted-foreground mb-2">
             <TrendingUp className="w-3.5 h-3.5" />
             Tren Kinerja {trendRangeLabel ? `• ${trendRangeLabel}` : ""}
           </div>
@@ -104,7 +104,7 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
             Pergerakan skor per periode audit
           </h3>
           <p className="text-[11px] text-muted-foreground font-medium mt-2">
-            Pantau tren temuan agen pada setiap periode evaluasi di tahun aktif.
+            Pantau tren temuan agen setiap periode penilaian pada tahun yang dipilih.
           </p>
         </div>
       </div>
@@ -113,7 +113,7 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
       <div className="flex flex-wrap gap-2 mb-8">
         <button
           onClick={() => setActiveFilter(null)}
-          className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 border-2 ${
+          className={`px-4 py-2 rounded-xl text-[9px] font-black tracking-widest transition-all duration-500 border-2 ${
             activeFilter === null
               ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
               : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
@@ -123,7 +123,7 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
         </button>
         <button
           onClick={() => setActiveFilter(activeFilter === "TOTAL_ONLY" ? null : "TOTAL_ONLY")}
-          className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
+          className={`px-4 py-2 rounded-xl text-[9px] font-black tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
             activeFilter === "TOTAL_ONLY"
               ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
               : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
@@ -142,7 +142,7 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
             <button
               key={ds.label}
               onClick={() => setActiveFilter(isActive ? null : ds.label)}
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-xl text-[9px] font-black tracking-widest transition-all duration-500 border-2 flex items-center gap-2 ${
                 isActive
                   ? "bg-primary border-primary text-white shadow-xl shadow-primary/20 scale-105"
                   : "bg-card/40 border-border/50 text-muted-foreground hover:border-foreground/20 hover:text-muted-foreground"
@@ -175,15 +175,15 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
       {/* Stats Footer */}
       <div className="mt-8 pt-8 border-t border-border/50 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-5 rounded-2xl bg-foreground/[0.02] border border-border/30">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-3">
-            Volume Periode
+          <p className="text-[10px] font-black tracking-widest text-muted-foreground mb-3">
+            Total Periode
           </p>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black tracking-tight">
               {labels.length}
             </span>
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-              Periode Aktif
+            <span className="text-[10px] font-bold text-muted-foreground tracking-widest">
+              periode aktif
             </span>
           </div>
         </div>
@@ -192,11 +192,11 @@ export default function AgentTrendTab({ labels, datasets, loading }: Props) {
             <Zap className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/40 mb-1">
-              Insight Tren
+            <p className="text-[10px] font-black tracking-widest text-primary/40 mb-1">
+              Ringkasan Tren
             </p>
             <p className="text-sm font-medium text-foreground/70 leading-relaxed">
-              Gunakan pola naik-turun per parameter untuk menentukan fokus
+              Gunakan pola naik-turun setiap parameter untuk menentukan fokus
               coaching pada periode berikutnya.
             </p>
           </div>

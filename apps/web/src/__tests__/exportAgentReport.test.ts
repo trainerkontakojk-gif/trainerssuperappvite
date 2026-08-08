@@ -285,11 +285,11 @@ describe("generateCSV", () => {
     // Should contain monthly summaries header
     expect(csv).toContain("Skor Final");
     // Should contain section headers
-    expect(csv).toContain("Ringkasan Skor per Bulan");
+    expect(csv).toContain("Ringkasan Skor Bulanan");
     expect(csv).toContain("Detail Temuan");
-    expect(csv).toContain("Top 5 Pengurang Skor Terbesar");
-    expect(csv).toContain("Analisis Akar Masalah");
-    expect(csv).toContain("Benchmark Temuan");
+    expect(csv).toContain("Tiket Pengurang Skor Terbesar");
+    expect(csv).toContain("Akar Masalah");
+    expect(csv).toContain("Perbandingan Temuan");
   });
 
   it("escapes commas, quotes, and newlines in values", () => {
@@ -366,7 +366,7 @@ describe("generateCSV", () => {
       sampleRootCauses,
       2026,
     );
-    expect(csv).toContain("Data Tren");
+    expect(csv).toContain("Perkembangan Skor");
     expect(csv).toContain("Skor Final");
     expect(csv).toContain("NC Score");
     expect(csv).toContain("90");
@@ -400,10 +400,10 @@ describe("generateMD", () => {
     );
     expect(md).toContain("# Laporan Audit Agent: Noor Qodiri Mobarok");
     expect(md).toContain("## Profil Agent");
-    expect(md).toContain("## Ringkasan Skor per Bulan");
+    expect(md).toContain("## Ringkasan Skor Bulanan");
     expect(md).toContain("## Detail Temuan");
-    expect(md).toContain("## Top 5 Pengurang Skor Terbesar");
-    expect(md).toContain("## Analisis Akar Masalah");
+    expect(md).toContain("## Tiket Pengurang Skor Terbesar");
+    expect(md).toContain("## Akar Masalah");
     expect(md).toContain("|"); // Tables
     expect(md).toContain("---"); // Table separators
   });
@@ -460,9 +460,9 @@ describe("generateMD", () => {
       sampleRootCauses,
       2026,
     );
-    expect(md).toContain("## Data Tren");
+    expect(md).toContain("## Perkembangan Skor");
     expect(md).toContain("Skor Final");
-    expect(md).toContain("## Benchmark Temuan");
+    expect(md).toContain("## Perbandingan Temuan");
     expect(md).toContain("Total Temuan");
   });
 
@@ -471,7 +471,7 @@ describe("generateMD", () => {
     expect(md).toContain("Tidak ada data ringkasan");
     expect(md).toContain("Tidak ada temuan");
     expect(md).toContain("Tidak ada tiket");
-    expect(md).toContain("Belum ada pola akar masalah");
+    expect(md).toContain("Belum ditemukan pola akar masalah");
   });
 });
 
@@ -650,8 +650,8 @@ describe("generateHTML", () => {
 
     expect(html).toContain("Tren Kinerja");
     expect(html).toContain("Pergerakan skor per periode audit");
-    expect(html).toContain("Volume Periode");
-    expect(html).toContain("Insight Tren");
+    expect(html).toContain("Total Periode");
+    expect(html).toContain("Ringkasan Tren");
     expect(html).toContain('class="findings-period"');
   });
 
@@ -731,7 +731,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Analisis Performa Bulanan");
+    expect(html).toContain("Ringkasan Skor Bulanan");
     expect(html).toContain("Jan");
     expect(html).toContain("Mei");
   });
@@ -746,7 +746,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Riwayat Temuan Detil");
+    expect(html).toContain("Riwayat Temuan");
     expect(html).toContain("Penyampaian Informasi");
     expect(html).toContain("Sapaan Pembuka");
     expect(html).toContain("SESUAI");
@@ -793,7 +793,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Top 5 Pengurang Skor Terbesar");
+    expect(html).toContain("Tiket Pengurang Skor Terbesar");
     expect(html).toContain("T-001");
     expect(html).toContain("8.5");
   });
@@ -808,7 +808,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Diagnosis Akar Masalah");
+    expect(html).toContain("Akar Masalah");
     expect(html).toContain("Jawaban salah/tidak akurat");
     expect(html).toContain("Fokuskan coaching");
   });
@@ -823,7 +823,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Data Tren");
+    expect(html).toContain("Perkembangan Skor");
     expect(html).toContain("Jan");
     expect(html).toContain("Feb");
     expect(html).toContain("Skor Final");
@@ -839,8 +839,8 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Rentang Statistik: Jan - Mar 2026");
-    expect(html).not.toContain("Rentang Statistik: Jan - Mar 2025");
+    expect(html).toContain("Periode: Jan - Mar 2026");
+    expect(html).not.toContain("Periode: Jan - Mar 2025");
   });
 
   it("keeps every trend series and value in a hidden accessible table", () => {
@@ -1130,7 +1130,7 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("Benchmark Temuan");
+    expect(html).toContain("Perbandingan Temuan");
     expect(html).toContain("Total Temuan");
     expect(html).toContain("Penyampaian Informasi");
   });
@@ -1187,14 +1187,14 @@ describe("generateHTML", () => {
       "static",
     );
 
-    expect(html).toContain("Rata-rata service sama");
+    expect(html).toContain("Rata-rata layanan sama");
     expect(html).toContain("% vs tim");
-    expect(html).toContain("% vs service sama");
+    expect(html).toContain("% vs layanan sama");
     expect(html).toContain("+50%");
     expect(html).toContain("-50%");
     expect(html).toContain("0%");
     expect(html).toContain("n/a");
-    expect(html).toContain("3 agent tim / 10 agent service sama");
+    expect(html).toContain("3 agen tim / 10 agen layanan sama");
   });
 
   it("handles empty state gracefully", () => {
@@ -1269,7 +1269,7 @@ describe("generateHTML", () => {
     );
     expect(html).toContain("+2.0%");
     expect(html).not.toContain(
-      'Delta</span><span class="stat-value" style="color: #6b7280;">-</span>',
+      'Selisih</span><span class="stat-value" style="color: #6b7280;">-</span>',
     );
   });
 
@@ -1283,10 +1283,10 @@ describe("generateHTML", () => {
       2026,
       "call",
     );
-    expect(html).toContain("agent service sama");
-    expect(html).toContain("% vs service sama");
-    expect(html).not.toContain("agent layanan sama");
-    expect(html).not.toContain("% vs layanan sama");
+    expect(html).toContain("agen layanan sama");
+    expect(html).toContain("% vs layanan sama");
+    expect(html).not.toContain("agent service sama");
+    expect(html).not.toContain("% vs service sama");
   });
 
   it("keeps interactive trend filters aligned with live series semantics", () => {
@@ -1356,13 +1356,13 @@ describe("generateHTML", () => {
       ),
     ).toHaveLength(0);
     expect(parsed.querySelector(".service-pills .service-pill")).not.toBeNull();
-    expect(html).toContain("Refresh");
-    expect(html).toContain("UNDUH LAPORAN");
-    expect(html).toContain("INPUT AUDIT");
+    expect(html).toContain("Muat ulang");
+    expect(html).toContain("Unduh Laporan");
+    expect(html).toContain("Input Audit");
     expect(html).not.toContain(
       "Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir",
     );
-    expect(html).toContain("agent service sama");
+    expect(html).toContain("agen layanan sama");
     expect(html).not.toContain("snapshot-badge");
     expect(html).not.toContain('<details class="findings-period" open');
   });
@@ -1381,7 +1381,7 @@ describe("generateHTML", () => {
         isStaff: false,
       } as AgentHtmlExportContext,
     );
-    expect(html).not.toContain("INPUT AUDIT");
+    expect(html).not.toContain("Input Audit");
   });
 
   it("matches the live MonthRail first-paint chip treatment", () => {
@@ -1520,14 +1520,14 @@ describe("generateHTML", () => {
       expect(
         parsed.querySelector(".profile-bar > .quickview-rail[role='region']"),
       ).not.toBeNull();
-      expect(html).toContain("SIDAK PERSONAL AUDIT");
+      expect(html).toContain("SIDAK · Profil Agen");
       expect(html).toContain("Ringkasan Skor");
       expect(html).toContain("Grafik Tren");
       expect(html).toContain("Daftar Temuan");
       expect(html).toContain("Tim Gabungan");
       expect(html).toContain("Mei");
-      expect(html.indexOf("SIDAK PERSONAL AUDIT")).toBeLessThan(
-        html.indexOf("Analisis Performa Bulanan"),
+      expect(html.indexOf("SIDAK · Profil Agen")).toBeLessThan(
+        html.indexOf("Ringkasan Skor Bulanan"),
       );
     }
   });

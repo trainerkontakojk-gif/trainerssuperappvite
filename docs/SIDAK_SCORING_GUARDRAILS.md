@@ -89,8 +89,8 @@ Checklist review:
 ### 7) Historical Agent Input Harus Lewat Toggle All-Data
 
 - Default `/sidak/agents` dan `/sidak/input` tetap filtered.
-- Kebutuhan input periode lama untuk agent yang sudah promosi/pindah jabatan wajib memakai toggle `Tampilkan Data Keseluruhan`.
-- Tombol `INPUT AUDIT` dari detail agent wajib menuju `/sidak/input`.
+- Kebutuhan input periode lama untuk agent yang sudah promosi/pindah jabatan wajib memakai toggle `Tampilkan semua data`.
+- Tombol `Input Audit` dari detail agent wajib menuju `/sidak/input`.
 
 Checklist review:
 
@@ -125,6 +125,6 @@ Checklist review:
 - Fokus smoke tambahan:
   - ranking tetap lengkap saat dataset besar
   - toggle parameter dashboard mengikuti urutan total temuan
-  - toggle `Tampilkan Data Keseluruhan` di `/sidak/agents` dan `/sidak/input`
-  - tombol `INPUT AUDIT` dari detail agent menuju `/sidak/input`
+  - toggle `Tampilkan semua data` di `/sidak/agents` dan `/sidak/input`
+  - tombol `Input Audit` dari detail agent menuju `/sidak/input`
   - report data tidak menampilkan phantom padding di tabel/export

@@ -66,7 +66,7 @@ export default function ContextControlBar({
                 <button
                   key={svc}
                   onClick={() => onServiceChange(svc)}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-black tracking-widest transition-all ${
                     selectedService === svc
                       ? "bg-card text-primary shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -80,7 +80,7 @@ export default function ContextControlBar({
 
           {/* Trend Range */}
           <div className="flex items-center gap-2 h-9 px-3 bg-muted/50 border border-border/60 rounded-lg">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Trend</span>
+            <span className="text-[10px] font-bold text-muted-foreground tracking-widest">Tren</span>
             <div className="flex items-center gap-1">
               <select
                 value={trendStartMonth}
@@ -113,7 +113,7 @@ export default function ContextControlBar({
               onChange={(e) => onTeamChange(e.target.value)}
               className="h-9 bg-muted/50 border border-border/60 rounded-lg px-3 text-[11px] font-black focus:ring-1 focus:ring-primary outline-none min-w-[120px]"
             >
-              <option value="">Folder...</option>
+              <option value="">Pilih folder…</option>
               {teams.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
             </select>
             <select
@@ -123,7 +123,7 @@ export default function ContextControlBar({
               className="h-9 bg-muted/50 border border-border/60 rounded-lg px-3 text-[11px] font-black focus:ring-1 focus:ring-primary outline-none min-w-[160px]"
             >
               {loadingAgents ? (
-                <option>Memuat...</option>
+                <option>Memuat…</option>
               ) : (
                 agentsInTeam.map((a) => <option key={a.id} value={a.id}>{a.nama}</option>)
               )}

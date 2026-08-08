@@ -16,12 +16,12 @@ export default function TopTicketsCard({ tickets }: Props) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between border-b border-border pb-2.5">
-        <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-foreground">
+        <h4 className="flex items-center gap-2 text-xs font-bold tracking-wider text-foreground">
           <Ticket className="h-4 w-4 text-foreground" />
-          Top 5 Pengurang Skor Terbesar
+          Tiket Pengurang Skor Terbesar
         </h4>
-        <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
-          {tickets.length} Tiket
+        <span className="text-[9px] font-semibold tracking-widest text-muted-foreground">
+          {tickets.length} tiket
         </span>
       </div>
 
@@ -46,8 +46,8 @@ export default function TopTicketsCard({ tickets }: Props) {
 
               <div className="min-w-0 flex-1">
                 <div className="mb-0.5 flex items-center gap-1.5">
-                  <span className="text-[8px] font-black uppercase tracking-[0.18em] text-muted-foreground/60">ID</span>
-                  <span className="truncate font-mono text-[11px] font-black uppercase tracking-wider">
+                  <span className="text-[8px] font-black tracking-[0.18em] text-muted-foreground/60">No. Tiket</span>
+                  <span className="truncate font-mono text-[11px] font-black tracking-wider">
                     {ticketLabel}
                   </span>
                 </div>
@@ -62,16 +62,16 @@ export default function TopTicketsCard({ tickets }: Props) {
                   <span className="whitespace-nowrap tabular-nums text-[12px] font-black leading-none tracking-tight">
                     {ticket.scoreDeduction.toFixed(1)}
                   </span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider">Poin</span>
+                  <span className="text-[9px] font-bold tracking-wider">Poin</span>
                 </div>
-                <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground">{ticket.findingCount} Temuan</span>
+                <span className="text-[8px] font-black tracking-widest text-muted-foreground">{ticket.findingCount} temuan</span>
               </div>
             </div>
           );
         })}
         {tickets.length === 0 && (
           <div className="py-10 text-center">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Tidak ada tiket yang menurunkan skor</p>
+            <p className="text-xs font-bold tracking-widest text-muted-foreground">Belum ada tiket yang menurunkan skor</p>
           </div>
         )}
       </div>

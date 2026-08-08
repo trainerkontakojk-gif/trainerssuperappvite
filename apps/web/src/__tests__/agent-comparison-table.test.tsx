@@ -49,16 +49,16 @@ describe("AgentComparisonTable", () => {
 
     // Scope line
     expect(
-      screen.getByText(/Jan-Mei 2026 • Layanan Call • Tim Siti Nur Anisa • 4 agent tim \/ 20 agent service sama/),
+      screen.getByText(/Jan-Mei 2026 • Layanan Call • Tim Siti Nur Anisa • 4 agen tim \/ 20 agen layanan sama/),
     ).toBeInTheDocument();
 
     // Column headers
     expect(screen.getByText("Parameter")).toBeInTheDocument();
-    expect(screen.getByText("Agent ini")).toBeInTheDocument();
+    expect(screen.getByText("Agen ini")).toBeInTheDocument();
     expect(screen.getByText("Rata-rata tim")).toBeInTheDocument();
-    expect(screen.getByText("Rata-rata service sama")).toBeInTheDocument();
+    expect(screen.getByText("Rata-rata layanan sama")).toBeInTheDocument();
     expect(screen.getByText("% vs tim")).toBeInTheDocument();
-    expect(screen.getByText("% vs service sama")).toBeInTheDocument();
+    expect(screen.getByText("% vs layanan sama")).toBeInTheDocument();
 
     // Total row
     expect(screen.getByText("Total Temuan")).toBeInTheDocument();
@@ -92,7 +92,7 @@ describe("AgentComparisonTable", () => {
 
     render(<AgentComparisonTable comparisonTable={emptyTable} />);
     expect(
-      screen.getByText("Belum ada data pembanding untuk range ini"),
+      screen.getByText("Belum ada data pembanding untuk periode ini"),
     ).toBeInTheDocument();
   });
 

@@ -68,7 +68,7 @@ describe("AgentPerformanceQuickview", () => {
     expect(screen.getByText("Temuan diproyeksikan turun")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Semakin tinggi peringkat, semakin sedikit temuan YTD. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah yang sama mendapat peringkat yang sama.",
+        "Semakin tinggi peringkat, semakin sedikit temuan sepanjang tahun. Peringkat terakhir menunjukkan jumlah temuan terbanyak. Jumlah temuan yang sama mendapat peringkat yang sama.",
       ),
     ).toBeInTheDocument();
   });
@@ -95,7 +95,7 @@ describe("AgentPerformanceQuickview", () => {
     });
 
     expect(screen.getByText("—")).toBeInTheDocument();
-    expect(screen.getByText("Belum ada agent pembanding")).toBeInTheDocument();
+    expect(screen.getByText("Belum ada agen pembanding")).toBeInTheDocument();
   });
 
   it.each([
@@ -115,10 +115,10 @@ describe("AgentPerformanceQuickview", () => {
         name: `${label}: belum tersedia`,
       });
       expect(
-        within(metric).getByText("Ranking belum tersedia"),
+        within(metric).getByText("Peringkat belum tersedia"),
       ).toBeInTheDocument();
       expect(
-        within(metric).queryByText("Belum ada agent pembanding"),
+        within(metric).queryByText("Belum ada agen pembanding"),
       ).not.toBeInTheDocument();
     },
   );
@@ -140,10 +140,10 @@ describe("AgentPerformanceQuickview", () => {
     });
     expect(within(metric).getByText("—")).toBeInTheDocument();
     expect(
-      within(metric).getByText("Agent belum masuk ranking pada konteks ini"),
+      within(metric).getByText("Belum masuk peringkat pada cakupan ini"),
     ).toBeInTheDocument();
     expect(
-      within(metric).queryByText("Belum ada agent pembanding"),
+      within(metric).queryByText("Belum ada agen pembanding"),
     ).not.toBeInTheDocument();
   });
 
@@ -216,7 +216,7 @@ describe("AgentPerformanceQuickview", () => {
     });
 
     expect(
-      screen.getByText("Cohort yang sama dengan Tim Gabungan"),
+      screen.getByText("Cakupan sama dengan Tim Gabungan"),
     ).toBeInTheDocument();
   });
 
@@ -417,7 +417,7 @@ describe("AgentPerformanceQuickview", () => {
   it("tie info renders alongside the ranking-basis footnote", () => {
     renderQuickview({ data: tiedQuickview1 });
     expect(
-      screen.getByText(/Jumlah yang sama mendapat peringkat yang sama/),
+      screen.getByText(/Jumlah temuan yang sama mendapat peringkat yang sama/),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Berbagi peringkat 1 dengan Tania"),

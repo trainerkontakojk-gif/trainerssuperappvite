@@ -58,12 +58,12 @@ export default function AgentAuditDossier({
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             {monthLabel && (
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              <span className="text-[10px] font-black tracking-widest text-muted-foreground">
                 {monthLabel}
               </span>
             )}
             <span
-              className={`text-[10px] font-black uppercase tracking-widest ${colors.text}`}
+              className={`text-[10px] font-black tracking-widest ${colors.text}`}
             >
               {label}
             </span>
@@ -106,7 +106,7 @@ export default function AgentAuditDossier({
                 ) : null
               ) : null
             }
-            label="Delta"
+            label="Selisih"
             value={
               delta !== null
                 ? `${delta > 0 ? "+" : ""}${delta.toFixed(1)}%`
@@ -169,9 +169,9 @@ function RootCausePatternBand({ causes }: { causes: RootCauseResult[] }) {
       <div className="mb-3 flex items-center justify-between gap-4">
         <h4 className="flex items-center gap-2 text-sm font-black tracking-tight text-foreground">
           <ListChecks className="h-4 w-4 text-muted-foreground" />
-          Pola Lanjutan
+          Pola Temuan Lainnya
         </h4>
-        <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1 text-[10px] font-bold tracking-wider text-muted-foreground">
           {causes.length} pola
         </span>
       </div>
@@ -242,7 +242,7 @@ function StatCell({
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1 text-muted-foreground">
         {icon}
-        <span className="text-[9px] font-black uppercase tracking-widest">
+        <span className="text-[9px] font-black tracking-widest">
           {label}
         </span>
       </div>

@@ -73,7 +73,7 @@ export default function TemuanGroupCard({
         ) : (
           <span className="text-xs text-muted-foreground italic">Tanpa no. tiket</span>
         )}
-        <span className="text-[10px] text-muted-foreground ml-auto font-semibold uppercase tracking-wide">
+        <span className="text-[10px] text-muted-foreground ml-auto font-semibold tracking-wide">
           {group.items.length} temuan
         </span>
       </div>
@@ -87,9 +87,9 @@ export default function TemuanGroupCard({
             <div key={item.id} className="p-5">
               {isEditing ? (
                 <div className="mt-0 p-4 rounded-xl bg-background/50 border border-border space-y-4">
-                  <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Edit Temuan</p>
+                  <p className="text-xs font-semibold text-foreground tracking-wide">Edit temuan</p>
                   <div>
-                    <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wide">Nilai</label>
+                    <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide">Nilai</label>
                     <div className="grid grid-cols-4 gap-2">
                       {NILAI_OPTIONS.map((opt) => (
                         <button
@@ -105,7 +105,7 @@ export default function TemuanGroupCard({
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wide">Ketidaksesuaian</label>
+                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide">Ketidaksesuaian</label>
                       <textarea
                         value={editKetidaksesuaian}
                         onChange={(e) => setEditKetidaksesuaian(e.target.value)}
@@ -114,7 +114,7 @@ export default function TemuanGroupCard({
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wide">Sebaiknya</label>
+                      <label className="text-[11px] font-semibold text-muted-foreground mb-1.5 block tracking-wide">Sebaiknya</label>
                       <textarea
                         value={editSebaiknya}
                         onChange={(e) => setEditSebaiknya(e.target.value)}
@@ -127,14 +127,14 @@ export default function TemuanGroupCard({
                     <button
                       type="button"
                       onClick={() => onSaveEdit(item.id)}
-                      className="flex-1 py-2 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold uppercase tracking-wide transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-2 bg-foreground hover:opacity-90 disabled:opacity-50 text-background rounded-lg text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2"
                     >
                       <Check className="w-4 h-4" /> Simpan
                     </button>
                     <button
                       type="button"
                       onClick={onCancelEdit}
-                      className="px-4 py-2 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-lg text-xs font-semibold uppercase tracking-wide transition"
+                      className="px-4 py-2 bg-transparent border border-border hover:bg-muted text-muted-foreground rounded-lg text-xs font-semibold tracking-wide transition"
                     >
                       Batal
                     </button>
@@ -173,7 +173,7 @@ export default function TemuanGroupCard({
                       <div className={`w-10 h-10 rounded-lg border flex items-center justify-center font-semibold ${NILAI_BADGE_STYLE[item.nilai]}`}>
                         {item.nilai}
                       </div>
-                      <p className={`text-[9px] font-semibold uppercase mt-1 ${NILAI_LABEL_COLOR[item.nilai]}`}>
+                      <p className={`text-[9px] font-semibold mt-1 ${NILAI_LABEL_COLOR[item.nilai]}`}>
                         {NILAI_LABELS[item.nilai]}
                       </p>
                     </div>

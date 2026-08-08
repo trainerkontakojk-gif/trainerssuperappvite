@@ -128,4 +128,31 @@ describe("initAuth", () => {
     expect(localStorage.getItem("auth_token")).toBeNull();
     expect(localStorage.getItem("auth_profile")).toBeNull();
   });
+
+  it("treats an undefined getUser response as a clean sign-out instead of crashing", async () => {
+    localStorage.setItem("auth_token", "bad-token");
+    mockGetUser.mockResolvedValue(undefined);
+
+    await expect(initAuth()).resolves.toBeUndefined();
+
+    expect(localStorage.getItem("auth_token")).toBeNull();
+    expect(localStorage.getItem("auth_profile")).toBeNull();
+    expect(useAuthStore.getState().session).toBeNull();
+  });
+
+  it("treats an undefined getSession response as a fallback session instead of crashing", async () => {
+    localStorage.setItem("auth_token", "tok1");
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: "u1" } },
+      error: null,
+    });
+    mockGetSession.mockResolvedValue(undefined);
+
+    await initAuth();
+
+    expect(useAuthStore.getState().session).toEqual({
+      access_token: "tok1",
+      user: { id: "u1" },
+    });
+  });
 });

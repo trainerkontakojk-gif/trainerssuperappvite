@@ -50,19 +50,17 @@ export async function initAuth() {
   const token = localStorage.getItem("auth_token");
   if (!token) return;
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
+  const userResponse = await supabase.auth.getUser(token);
+  const user = userResponse?.data?.user ?? null;
+  const error = userResponse?.error ?? null;
   if (error || !user) {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_profile");
     return;
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const sessionResponse = await supabase.auth.getSession();
+  const session = sessionResponse?.data?.session ?? null;
   if (session) {
     useAuthStore.getState().setSession(session);
   } else {

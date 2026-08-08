@@ -8,7 +8,7 @@
 
 ## Latar Belakang
 
-Halaman `/sidak/agents/$id` saat ini memiliki tombol **"UNDUH LAPORAN"** di `AgentProfileBar` yang memicu `handleExport()` di `useAgentDetail.ts`.
+Halaman `/sidak/agents/$id` saat ini memiliki tombol **"Unduh Laporan"** di `AgentProfileBar` yang memicu `handleExport()` di `useAgentDetail.ts`.
 
 **Masalah:** Export saat ini hanya:
 - Format **XLSX** (Excel) via library `xlsx`
@@ -31,7 +31,7 @@ Mekanisme export tersedia melalui dropdown **4 format**:
 
 ### 3. HTML Statis / 4. HTML Interaktif
 - Snapshot dari shell halaman live saat ini: header, profile identity + action affordances, quickview, context, tabs, MonthRail, dossier, trend, benchmark, dan findings.
-- Action affordances export dirender sebagai elemen visual non-focusable; `INPUT AUDIT` hanya muncul saat konteks staff/role memang visible di layar live.
+- Action affordances export dirender sebagai elemen visual non-focusable; `Input Audit` hanya muncul saat konteks staff/role memang visible di layar live.
 - MonthRail pada export hanya snapshot state terpilih; bukan disclosure interaktif.
 - Kedua varian memakai markup/CSS dan dataset yang sama; interaktif menambahkan anchor tabs, filter trend, dan tiket root cause.
 - Snapshot parity targets the AgentDetailPage content surfaces in light mode; global application chrome (sidebar, global header, route shell) is intentionally excluded from the standalone file. This is a structural/visual parity target, not a claim of exact pixel identity across browsers.

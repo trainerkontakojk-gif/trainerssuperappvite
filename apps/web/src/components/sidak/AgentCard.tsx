@@ -7,6 +7,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { AgentDirectoryEntry } from "@trainers/types";
+import { humanizeRiskStatus, humanizeTrend, titleize } from "../../lib/humanize";
 
 const DOT_CLASSES = {
   atRisk: "bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]",
@@ -57,22 +58,26 @@ function trendIcon(
   if (trend === "up" && trendValue !== null)
     return {
       icon: TrendingUp,
-      label: `+${trendValue.toFixed(1)}%`,
+      label: `${humanizeTrend("up")} ${trendValue.toFixed(1)}%`,
       className: "text-emerald-500",
     };
   if (trend === "down" && trendValue !== null)
     return {
       icon: TrendingDown,
-      label: `${trendValue.toFixed(1)}%`,
+      label: `${humanizeTrend("down")} ${trendValue.toFixed(1)}%`,
       className: "text-rose-500",
     };
   if (trend === "same")
     return {
       icon: Minus,
-      label: "Steady",
+      label: humanizeTrend("same"),
       className: "text-muted-foreground",
     };
-  return { icon: Minus, label: "No Trend", className: "text-muted-foreground" };
+  return {
+    icon: Minus,
+    label: humanizeTrend("none"),
+    className: "text-muted-foreground",
+  };
 }
 
 interface AgentCardProps {
@@ -123,10 +128,10 @@ export default function AgentCard({ agent, index }: AgentCardProps) {
           >
             <span className="text-[10px] font-black uppercase tracking-wider">
               {riskKey === "atRisk"
-                ? "At Risk"
+                ? humanizeRiskStatus("atRisk")
                 : riskKey === "compliant"
-                  ? "Compliant"
-                  : "Not Audited"}
+                  ? humanizeRiskStatus("compliant")
+                  : humanizeRiskStatus("none")}
             </span>
           </div>
           <div className="flex items-baseline gap-1">
@@ -148,11 +153,11 @@ export default function AgentCard({ agent, index }: AgentCardProps) {
 
       <div className="mt-4 min-w-0">
         <p className="truncate text-base font-black text-foreground transition-colors group-hover:text-primary">
-          {agent.nama}
+          {titleize(agent.nama)}
         </p>
         <p className="mt-0.5 truncate text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-          {agent.tim}
-          {agent.batch ? ` \u00B7 ${agent.batch}` : ""}
+          {titleize(agent.tim)}
+          {agent.batch ? ` \u00B7 ${titleize(agent.batch)}` : ""}
         </p>
       </div>
 

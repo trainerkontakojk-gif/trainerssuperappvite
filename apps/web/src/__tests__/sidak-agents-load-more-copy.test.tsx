@@ -59,7 +59,7 @@ describe("Sidak agents load-more copy", () => {
     render(<SidakAgentsPage />);
 
     expect(
-      screen.getByRole("button", { name: "Muat 6 Agent Lagi" }),
+      screen.getByRole("button", { name: "Muat 6 agen lagi" }),
     ).toBeInTheDocument();
   });
 
@@ -77,7 +77,7 @@ describe("Sidak agents load-more copy", () => {
     render(<SidakAgentsPage />);
 
     expect(
-      screen.queryByRole("button", { name: /Muat \d+ Agent Lagi/ }),
+      screen.queryByRole("button", { name: /Muat \d+ agen lagi/ }),
     ).not.toBeInTheDocument();
   });
 });

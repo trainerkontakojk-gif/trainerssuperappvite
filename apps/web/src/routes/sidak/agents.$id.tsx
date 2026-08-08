@@ -100,10 +100,10 @@ export default function SidakAgentDetailPage() {
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
           <AlertTriangle className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h2 className="mb-2 text-lg font-bold">Agent Tidak Ditemukan</h2>
-        <p className="mb-6 text-sm text-muted-foreground">Data agent tidak tersedia atau telah dihapus.</p>
+        <h2 className="mb-2 text-lg font-bold">Agen tidak ditemukan</h2>
+        <p className="mb-6 text-sm text-muted-foreground">Data agen ini tidak tersedia atau sudah tidak ada.</p>
         <Link to="/sidak/agents" className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">
-          <ArrowLeft className="h-4 w-4" /> Kembali ke Direktori
+          <ArrowLeft className="h-4 w-4" /> Kembali ke daftar agen
         </Link>
       </div>
     );
@@ -127,13 +127,13 @@ export default function SidakAgentDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">SIDAK PERSONAL AUDIT</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">SIDAK · Profil Agen</p>
             <h1 className="font-outfit text-sm font-bold tracking-tight text-foreground">{data.peserta.nama}</h1>
           </div>
         </div>
         <button onClick={handleRefresh} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted text-foreground">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "Memuat..." : "Refresh"}
+          {loading ? "Memuat…" : "Muat ulang"}
         </button>
       </div>
 
@@ -194,7 +194,7 @@ export default function SidakAgentDetailPage() {
                   const ref = sec.id === "summary" ? summaryRef : sec.id === "trend" ? trendRef : temuanRef;
                   ref.current?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className={`border-b-2 py-3 text-[11px] font-semibold uppercase tracking-wide whitespace-nowrap transition-all ${
+                className={`border-b-2 py-3 text-[11px] font-semibold tracking-wide whitespace-nowrap transition-all ${
                   activeSection === sec.id
                     ? "border-foreground text-foreground font-bold"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
@@ -215,7 +215,7 @@ export default function SidakAgentDetailPage() {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Analisis Performa Bulanan</h3>
+              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Ringkasan Skor Bulanan</h3>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Tahun {selectedYear} &bull; Layanan {selectedService.toUpperCase()}
               </p>
@@ -227,7 +227,7 @@ export default function SidakAgentDetailPage() {
               <QaStatePanel
                 type="empty"
                 title="Data belum tersedia"
-                description={`Belum ada ringkasan skor untuk layanan ${selectedService.toUpperCase()} di tahun ${selectedYear}.`}
+                description={`Belum ada ringkasan skor untuk layanan ${selectedService.toUpperCase()} pada tahun ${selectedYear}.`}
                 className="mx-auto max-w-lg"
               />
             </div>
@@ -260,9 +260,9 @@ export default function SidakAgentDetailPage() {
               <BarChart2 className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Tren Pergerakan Skor</h3>
+              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Perkembangan Skor</h3>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Rentang Statistik: {monthsFull[trendStartMonth - 1]?.slice(0, 3)} &ndash; {monthsFull[trendEndMonth - 1]?.slice(0, 3)} {selectedYear}
+                Periode: {monthsFull[trendStartMonth - 1]?.slice(0, 3)} &ndash; {monthsFull[trendEndMonth - 1]?.slice(0, 3)} {selectedYear}
               </p>
             </div>
           </div>
@@ -288,8 +288,8 @@ export default function SidakAgentDetailPage() {
               <Activity className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Riwayat Temuan Detil</h3>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dikelompokkan per bulan audit</p>
+              <h3 className="font-outfit text-lg font-bold leading-tight tracking-tight text-foreground">Riwayat Temuan</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Temuan dikelompokkan per bulan penilaian</p>
             </div>
           </div>
           {temuanMounted ? (

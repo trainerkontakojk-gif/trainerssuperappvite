@@ -3,6 +3,7 @@ import {
   BarChart2, ShieldCheck, Pencil, Trash2, Loader2, 
   AlertCircle, ChevronDown, ChevronUp, Ticket 
 } from "lucide-react";
+import { titleize } from "../../lib/humanize";
 
 interface TemuanItem {
   id: string;
@@ -55,8 +56,8 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
         <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center mx-auto mb-5 text-slate-300">
           <Ticket className="w-8 h-8" />
         </div>
-        <h4 className="text-lg font-black text-slate-400 uppercase tracking-tight">Tidak ada data audit</h4>
-        <p className="text-sm text-slate-500 mt-2">Belum ditemukan data temuan untuk konteks layanan atau tahun yang dipilih.</p>
+        <h4 className="text-lg font-black text-slate-400 tracking-tight">Belum ada temuan</h4>
+        <p className="text-sm text-slate-500 mt-2">Belum ada temuan untuk layanan atau tahun yang dipilih.</p>
       </div>
     );
   }
@@ -120,8 +121,8 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                   <BarChart2 className="h-4 w-4" />
                 </div>
                 <div className="text-left">
-                  <h4 className="text-base font-black tracking-tight text-foreground uppercase transition-colors">{monthLabel}</h4>
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{monthItems.length} Temuan • {Object.keys(tickets).length} Tiket</p>
+                  <h4 className="text-base font-black tracking-tight text-foreground transition-colors">{titleize(monthLabel)}</h4>
+                  <p className="text-[10px] font-bold text-muted-foreground tracking-widest">{monthItems.length} temuan · {Object.keys(tickets).length} tiket</p>
                 </div>
               </div>
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-transparent transition-colors group-hover:bg-background">
@@ -138,13 +139,13 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                         <span className="text-sm font-black italic text-muted-foreground/40 w-6">#{ticketIndex + 1}</span>
                         <Ticket className="w-4 h-4 text-muted-foreground" />
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[8px] font-black text-muted-foreground/60 uppercase tracking-[0.18em]">No Tiket</span>
-                          <span className="text-[11px] font-black font-mono text-foreground uppercase tracking-wider">
+                          <span className="text-[8px] font-black text-muted-foreground/60 tracking-[0.18em]">No. Tiket</span>
+                          <span className="text-[11px] font-black font-mono text-foreground tracking-wider">
                             {ticket.label}
                           </span>
                         </div>
                       </div>
-                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">{ticket.items.length} PARAMETER</span>
+                      <span className="text-[9px] font-black text-muted-foreground tracking-[0.2em]">{ticket.items.length} parameter</span>
                     </div>
 
                     <div className="space-y-8 pl-9">
@@ -155,15 +156,15 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                           <div key={t.id} className="flex gap-6 items-start relative group/item">
                             <div className="flex flex-col items-center gap-1 shrink-0 w-12 pt-1">
                               <span className="text-xl font-black text-foreground">{t.nilai}</span>
-                              <span className="text-[8px] font-bold uppercase text-muted-foreground tracking-widest">Poin</span>
+                              <span className="text-[8px] font-bold text-muted-foreground tracking-widest">Poin</span>
                             </div>
                             
                             <div className="flex-1 min-w-0 space-y-4">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${isCritical ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
-                                      {t.category}
+                                    <span className={`px-2 py-0.5 rounded text-[8px] font-black tracking-widest ${isCritical ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'}`}>
+                                      {isCritical ? "Kritis" : "Non-kritis"}
                                     </span>
                                   </div>
                                   <h5 className="text-base font-black text-foreground leading-snug">{t.indicatorName}</h5>
@@ -183,7 +184,7 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-1.5 text-muted-foreground">
                                     <AlertCircle className="w-3 h-3" />
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Ketidaksesuaian</span>
+                                    <span className="text-[9px] font-bold tracking-widest">Ketidaksesuaian</span>
                                   </div>
                                   <p className="text-xs text-muted-foreground leading-relaxed font-medium">
                                     {t.ketidaksesuaian || '—'}
@@ -192,7 +193,7 @@ export default function AgentTemuanTab({ items, loading, deletingId, canEdit, on
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-1.5 text-primary">
                                     <ShieldCheck className="w-3 h-3" />
-                                    <span className="text-[9px] font-bold uppercase tracking-widest">Rekomendasi</span>
+                                    <span className="text-[9px] font-bold tracking-widest">Rekomendasi</span>
                                   </div>
                                   <p className="text-xs text-foreground leading-relaxed font-bold italic">
                                     {t.sebaiknya || '—'}

@@ -4,6 +4,7 @@ import { Search, Eye, EyeOff, RotateCcw } from "lucide-react";
 import type { AgentDirectoryResponse } from "@trainers/types";
 import AgentCard from "../../components/sidak/AgentCard";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import { titleize } from "../../lib/humanize";
 
 const INITIAL_VISIBLE = 24;
 
@@ -52,10 +53,10 @@ export default function SidakAgentsPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              SIDAK / DIRECTORY AGENT
+              SIDAK · Daftar Agen
             </p>
             <h1 className="font-outfit text-xl font-black tracking-tight sm:text-2xl text-foreground">
-              Direktori Agent
+              Daftar Agen
             </h1>
           </div>
           <button
@@ -63,14 +64,14 @@ export default function SidakAgentsPage() {
               setShowAll((s) => !s);
               setVisibleCount(INITIAL_VISIBLE);
             }}
-            className="inline-flex items-center gap-1.5 bg-transparent text-[11px] font-bold uppercase tracking-wider transition-all hover:opacity-75 text-foreground"
+            className="inline-flex items-center gap-1.5 bg-transparent text-[11px] font-bold tracking-wider transition-all hover:opacity-75 text-foreground"
           >
             {showAll ? (
               <EyeOff size={14} className="text-amber-500" />
             ) : (
               <Eye size={14} />
             )}
-            {showAll ? "Data Terfilter" : "Tampilkan Data Keseluruhan"}
+            {showAll ? "Data terfilter" : "Tampilkan semua data"}
           </button>
         </div>
       </header>
@@ -83,7 +84,7 @@ export default function SidakAgentsPage() {
           />
           <input
             className="w-full rounded-xl border border-border bg-transparent py-2.5 pl-11 pr-4 text-sm outline-none transition-all focus:border-foreground"
-            placeholder="Cari agent..."
+            placeholder="Cari agen..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -96,13 +97,13 @@ export default function SidakAgentsPage() {
                 setSelectedBatch(null);
                 setVisibleCount(INITIAL_VISIBLE);
               }}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-all ${
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-wide transition-all ${
                 selectedBatch === null
                   ? "border-foreground bg-foreground text-background"
                   : "border-border bg-transparent text-muted-foreground hover:border-foreground/20"
               }`}
             >
-              Semua Batch
+              Semua batch
             </button>
             {batches.map((b) => (
               <button
@@ -111,13 +112,13 @@ export default function SidakAgentsPage() {
                   setSelectedBatch(b === selectedBatch ? null : b);
                   setVisibleCount(INITIAL_VISIBLE);
                 }}
-                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-all ${
+                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-wide transition-all ${
                   selectedBatch === b
                     ? "border-foreground bg-foreground text-background"
                     : "border-border bg-transparent text-muted-foreground hover:border-foreground/20"
                 }`}
               >
-                {b}
+                {titleize(b)}
               </button>
             ))}
           </div>
@@ -162,10 +163,10 @@ export default function SidakAgentsPage() {
                     setShowAll(false);
                     setVisibleCount(INITIAL_VISIBLE);
                   }}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition-all hover:bg-muted"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-transparent px-3.5 py-1.5 text-[11px] font-semibold tracking-wide transition-all hover:bg-muted"
                 >
                   <RotateCcw size={12} />
-                  Reset Filter
+                  Reset filter
                 </button>
               }
             />
@@ -181,9 +182,9 @@ export default function SidakAgentsPage() {
               <div className="flex justify-center pt-2">
                 <button
                   onClick={() => setVisibleCount((s) => s + INITIAL_VISIBLE)}
-                  className="rounded-xl border border-border bg-transparent px-8 py-2.5 text-[11px] font-semibold uppercase tracking-wide transition-all hover:bg-muted"
+                  className="rounded-xl border border-border bg-transparent px-8 py-2.5 text-[11px] font-semibold tracking-wide transition-all hover:bg-muted"
                 >
-                  Muat {nextLoadCount} Agent Lagi
+                  Muat {nextLoadCount} agen lagi
                 </button>
               </div>
             )}
