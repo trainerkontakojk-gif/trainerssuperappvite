@@ -343,6 +343,164 @@ describe("OpenAIWebRtcSession", () => {
     expect(session.state).toBe("failed");
   });
 
+  it("tags microphone acquisition failures and logs the pre-ending stage", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe("DELETE");
+      return new Response(null, { status: 204 });
+    });
+    const mediaError = new Error("Microphone access failed.");
+    mediaError.name = "NotReadableError";
+    mediaDevices.getUserMedia = vi.fn(async () => {
+      throw mediaError;
+    });
+    const errors: Error[] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const session = new OpenAIWebRtcSession(
+      {
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        brokerHttpBaseUrl: "https://broker.example/base",
+      },
+      {
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        onError: (error) => errors.push(error),
+      },
+    );
+
+    await expect(session.connect()).rejects.toThrow("Microphone access failed.");
+
+    expect(errors[0]).toMatchObject({
+      code: "microphone_access_failed",
+      cause: mediaError,
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: "get_user_media",
+        name: "NotReadableError",
+        code: "microphone_access_failed",
+        message: "Microphone access failed.",
+      }),
+    );
+  });
+
+  it("tags broker fetch failures as network errors while preserving the cause", async () => {
+    const networkError = new TypeError("Failed to fetch");
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") throw networkError;
+      expect(init?.method).toBe("DELETE");
+      return new Response(null, { status: 204 });
+    });
+    const errors: Error[] = [];
+    const session = new OpenAIWebRtcSession(
+      {
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        brokerHttpBaseUrl: "https://broker.example/base",
+      },
+      {
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        onError: (error) => errors.push(error),
+      },
+    );
+
+    await expect(session.connect()).rejects.toThrow("Failed to fetch");
+
+    expect(errors[0]).toMatchObject({
+      code: "broker_network_failed",
+      cause: networkError,
+    });
+  });
+
+  it("tags offer creation failures with the offer category", async () => {
+    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.method).toBe("DELETE");
+      return new Response(null, { status: 204 });
+    });
+    const offerError = new Error("createOffer failed");
+    peer.createOffer.mockRejectedValueOnce(offerError);
+    const errors: Error[] = [];
+    const session = new OpenAIWebRtcSession(
+      {
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        brokerHttpBaseUrl: "https://broker.example/base",
+      },
+      {
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        onError: (error) => errors.push(error),
+      },
+    );
+
+    await expect(session.connect()).rejects.toThrow("createOffer failed");
+    expect(errors[0]).toMatchObject({
+      code: "webrtc_offer_failed",
+      cause: offerError,
+    });
+  });
+
+  it("logs broker request and response stages without request payloads", async () => {
+    const fetch = createFetch();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const session = new OpenAIWebRtcSession(
+      {
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        brokerHttpBaseUrl: "https://broker.example/base",
+      },
+      {
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+      },
+    );
+
+    await resolveConnection(session, peer);
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "broker_request_started" }),
+    );
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: "broker_response" }),
+    );
+    expect(warn.mock.calls.flat().join(" ")).not.toContain("supabase-access-token");
+    expect(warn.mock.calls.flat().join(" ")).not.toContain("v=0");
+    await session.end();
+  });
+
   it("cleans up a broker binding when POST returns a non-2xx response", async () => {
     const fetch = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {

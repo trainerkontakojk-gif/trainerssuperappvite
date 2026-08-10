@@ -39,6 +39,17 @@ export function buildOpenAIWebRtcBrokerCallUrl(
   return baseUrl;
 }
 
+function createBrokerNetworkError(error: unknown): Error {
+  const sourceMessage =
+    error instanceof Error ? error.message : "OpenAI WebRTC broker request failed.";
+  const wrapped = new Error(sourceMessage, { cause: error }) as Error & {
+    code: string;
+  };
+  if (error instanceof Error) wrapped.name = error.name;
+  wrapped.code = "broker_network_failed";
+  return wrapped;
+}
+
 function assertAnswerSdp(answerSdp: string): string {
   const trimmed = answerSdp.trim();
   if (!trimmed.startsWith("v=0")) {
@@ -80,15 +91,20 @@ export async function createOpenAIWebRtcBrokerCall(input: {
   );
 
   input.onBrokerRequestStarted?.();
-  const response = await input.fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/sdp",
-    },
-    body: offerSdp,
-    signal: input.signal,
-  });
+  let response: Response;
+  try {
+    response = await input.fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/sdp",
+      },
+      body: offerSdp,
+      signal: input.signal,
+    });
+  } catch (error) {
+    throw createBrokerNetworkError(error);
+  }
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!response.ok) {
