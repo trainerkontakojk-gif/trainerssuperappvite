@@ -1,4 +1,5 @@
 import {
+  POC_MAX_SESSION_JSON_BYTES,
   POC_MAX_SDP_RESPONSE_BYTES,
   type CanonicalPocSession,
   isBoundedSdpAnswer,
@@ -80,9 +81,13 @@ export function createOpenAiCallsClient(
 
   return {
     async createCall({ offerSdp, session, signal }) {
+      const sessionJson = JSON.stringify(session);
+      if (Buffer.byteLength(sessionJson, "utf8") > POC_MAX_SESSION_JSON_BYTES) {
+        throw new OpenAiCallCreationError("provider call failed");
+      }
       const form = new FormData();
       form.set("sdp", offerSdp);
-      form.set("session", JSON.stringify(session));
+      form.set("session", sessionJson);
       let callId: string | undefined;
 
       try {

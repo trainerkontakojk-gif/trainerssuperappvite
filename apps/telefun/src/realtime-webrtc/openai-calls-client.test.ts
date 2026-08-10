@@ -88,6 +88,23 @@ describe("OpenAI unified calls client", () => {
     expect(JSON.stringify(init)).not.toContain("rtc_fake_123");
   });
 
+  it("rejects an oversized serialized session before creating FormData or fetching", async () => {
+    const fetch = vi.fn(async () => response(ANSWER, "/v1/realtime/calls/rtc_never"));
+    const client = createOpenAiCallsClient({
+      apiKey: "server-secret",
+      fetch,
+    });
+    const session = {
+      ...buildCanonicalPocSession(),
+      instructions: "x".repeat(70_000),
+    };
+
+    await expect(client.createCall({ offerSdp: OFFER, session })).rejects.toThrow(
+      "provider call failed",
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("aborts a provider fetch that never resolves", async () => {
     vi.useFakeTimers();
     try {

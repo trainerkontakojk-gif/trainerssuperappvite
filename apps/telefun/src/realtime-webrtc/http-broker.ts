@@ -108,6 +108,24 @@ export function createOpenAIWebRtcHttpHandler(
       return true;
     }
 
+    const requestStartedAtMs = Date.now();
+    let authOutcome = "not_attempted";
+    const logOutcome = (httpStatus: number): void => {
+      try {
+        console.warn("[Telefun] OpenAI WebRTC broker request", {
+          method: req.method,
+          sessionId,
+          requestedOutcome:
+            req.method === "DELETE" ? requestedOutcome ?? "completed" : "start",
+          authOutcome,
+          httpStatus,
+          durationMs: Math.max(0, Date.now() - requestStartedAtMs),
+        });
+      } catch {
+        // Observability is non-authoritative for lifecycle.
+      }
+    };
+
     let requestedOutcome: AttemptOutcome | undefined;
     if (req.method === "DELETE") {
       const outcomeValues = requestUrl.searchParams.getAll("outcome");
@@ -200,12 +218,14 @@ export function createOpenAIWebRtcHttpHandler(
       if (requestAbort.signal.aborted) return true;
       if (!auth.ok && auth.reason === "aborted") return true;
       if (!auth.ok) {
+        authOutcome = auth.reason;
         const status =
           auth.reason === "unauthorized"
             ? 401
             : auth.reason === "forbidden"
               ? 403
               : 404;
+        logOutcome(status);
         sendJson(
           res,
           status,
@@ -215,6 +235,7 @@ export function createOpenAIWebRtcHttpHandler(
         return true;
       }
 
+      authOutcome = "success";
       if (req.method === "DELETE") {
         try {
           if (requestAbort.signal.aborted) return true;
@@ -232,6 +253,7 @@ export function createOpenAIWebRtcHttpHandler(
           if (requestAbort.signal.aborted) return true;
           res.writeHead(204, cors);
           res.end();
+          logOutcome(204);
         } catch (error) {
           const status =
             error instanceof WebRtcDurabilityError
@@ -243,6 +265,7 @@ export function createOpenAIWebRtcHttpHandler(
                   : error instanceof WebRtcCallConflictError
                     ? 409
                     : 500;
+          logOutcome(status);
           sendJson(
             res,
             status,
@@ -265,6 +288,7 @@ export function createOpenAIWebRtcHttpHandler(
 
       const offerSdp = parseRawSdp(body);
       if (!offerSdp) {
+        logOutcome(400);
         sendJson(res, 400, { error: "Invalid request" }, cors);
         return true;
       }
@@ -274,12 +298,14 @@ export function createOpenAIWebRtcHttpHandler(
         userId: auth.userId,
         sessionId,
         offerSdp,
+        livePromptInstructions: auth.session.live_prompt_instructions,
         signal: requestAbort.signal,
       });
       if (res.headersSent || res.writableEnded || requestAbort.signal.aborted)
         return true;
       res.writeHead(201, { ...cors, "Content-Type": "application/sdp" });
       res.end(result.answerSdp);
+      logOutcome(201);
     } catch (error) {
       if (
         !requestAbort.signal.aborted &&
@@ -296,6 +322,7 @@ export function createOpenAIWebRtcHttpHandler(
                 : error instanceof WebRtcDurabilityError
                   ? 503
                   : 502;
+        logOutcome(status);
         sendJson(
           res,
           status,

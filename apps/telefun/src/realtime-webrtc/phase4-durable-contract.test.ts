@@ -211,9 +211,21 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
       createAttemptId: vi.fn(() => attemptId),
     });
 
-    await manager.startCall({ userId, sessionId, offerSdp: offer });
+    await manager.startCall({
+      userId,
+      sessionId,
+      offerSdp: offer,
+      livePromptInstructions: "Scenario: Kartu kredit jatuh tempo.",
+    });
 
     expect(db.claimAttempt).toHaveBeenCalledOnce();
+    expect(callsClient.createCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          instructions: "Scenario: Kartu kredit jatuh tempo.",
+        }),
+      }),
+    );
     expect(order).toEqual(["claim", "provider-create", "sideband-connect"]);
     expect(db.bindProviderCall).toHaveBeenCalledWith(
       attemptId,
@@ -301,6 +313,27 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     );
   });
 
+  it("rejects row-drift prompt overflow before provider work", async () => {
+    const db = durableDb();
+    const createCall = vi.fn(async () => ({ answerSdp: answer, callId }));
+    const manager = createWebRtcCallManager({
+      db,
+      callsClient: { createCall, closeCall: vi.fn(async () => true) },
+      createSideband: vi.fn(),
+      createAttemptId: vi.fn(() => attemptId),
+    });
+
+    await expect(
+      manager.startCall({
+        userId,
+        sessionId,
+        offerSdp: offer,
+        livePromptInstructions: "x".repeat(16_001),
+      }),
+    ).rejects.toBeInstanceOf(WebRtcDurabilityError);
+    expect(createCall).not.toHaveBeenCalled();
+  });
+
   it("audits missing usage without synthesizing billable tokens", async () => {
     const db = durableDb();
     const auditFailedUsage = vi.fn(async (input: { usageRequestId: string }) => {
@@ -370,13 +403,20 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     expect(closeCall).toHaveBeenCalledOnce();
   });
 
-  it("durably fails an active pre-created session when no attempt exists", async () => {
+  it("returns successfully for a second no-attempt finalization after already_terminal", async () => {
     const db = durableDb();
-    const failSessionWithoutAttempt = vi.fn(async () => ({
-      applied: true,
-      terminal: true,
-      reason: "failed_without_attempt",
-    }));
+    const failSessionWithoutAttempt = vi
+      .fn()
+      .mockResolvedValueOnce({
+        applied: true,
+        terminal: true,
+        reason: "failed_without_attempt",
+      })
+      .mockResolvedValueOnce({
+        applied: false,
+        terminal: true,
+        reason: "already_terminal",
+      });
     vi.mocked(db.getAttempt).mockResolvedValue(null);
     const manager = createWebRtcCallManager({
       db: { ...db, failSessionWithoutAttempt },
@@ -386,9 +426,84 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
 
     await expect(manager.failCall(sessionId, userId)).resolves.toBeUndefined();
     await expect(manager.endCall(sessionId, userId)).resolves.toBeUndefined();
-    expect(failSessionWithoutAttempt).toHaveBeenCalledWith(sessionId, userId);
+    expect(failSessionWithoutAttempt).toHaveBeenNthCalledWith(1, sessionId, userId);
+    expect(failSessionWithoutAttempt).toHaveBeenNthCalledWith(2, sessionId, userId);
     expect(failSessionWithoutAttempt).toHaveBeenCalledTimes(2);
     expect(db.finalizeAttempt).not.toHaveBeenCalled();
+  });
+
+  it("resolves for a no-attempt finalization when a terminal attempt exists", async () => {
+    const db = durableDb();
+    const failSessionWithoutAttempt = vi.fn(async () => ({
+      applied: false,
+      terminal: true,
+      reason: "attempt_exists_terminal",
+    }));
+    vi.mocked(db.getAttempt).mockResolvedValue({
+      attemptId: "00000000-0000-4000-8000-000000000001",
+      finalizationKey: "00000000-0000-4000-8000-000000000002",
+      state: "ended",
+      usageRequestId: `telefun-webrtc:${sessionId}`,
+      providerCallIdHash: null,
+    });
+    const manager = createWebRtcCallManager({
+      db: { ...db, failSessionWithoutAttempt },
+      callsClient: { createCall: vi.fn(), closeCall: vi.fn() },
+      createSideband: vi.fn(),
+    });
+
+    await expect(manager.endCall(sessionId, userId)).resolves.toBeUndefined();
+    await expect(manager.failCall(sessionId, userId)).resolves.toBeUndefined();
+    expect(failSessionWithoutAttempt).toHaveBeenCalledTimes(2);
+    expect(db.finalizeAttempt).not.toHaveBeenCalled();
+    expect(db.claimAttempt).not.toHaveBeenCalled();
+  });
+
+  it("records non-secret no-attempt finalization observability", async () => {
+    const db = durableDb();
+    const failSessionWithoutAttempt = vi.fn(async () => ({
+      applied: true,
+      terminal: true,
+      reason: "failed_without_attempt",
+    }));
+    vi.mocked(db.getAttempt).mockResolvedValue(null);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const manager = createWebRtcCallManager({
+        db: { ...db, failSessionWithoutAttempt },
+        callsClient: { createCall: vi.fn(), closeCall: vi.fn() },
+        createSideband: vi.fn(),
+      });
+
+      await manager.failCall(sessionId, userId);
+
+      expect(warn).toHaveBeenCalledWith(
+        "[Telefun] OpenAI WebRTC no-attempt finalization",
+        expect.objectContaining({
+          sessionId,
+          requestedOutcome: "failed",
+          applied: true,
+          terminal: true,
+          reason: "failed_without_attempt",
+          durationMs: expect.any(Number),
+        }),
+      );
+      const serialized = JSON.stringify(warn.mock.calls);
+      expect(serialized).not.toContain("SENTINEL-PROMPT");
+      expect(serialized).not.toContain("SENTINEL-SDP");
+      expect(serialized).not.toContain("rtc_SENTINEL");
+      expect(serialized).not.toContain("SENTINEL-RAW-ERROR");
+      expect(Object.keys(warn.mock.calls[0]?.[1] ?? {}).sort()).toEqual([
+        "applied",
+        "durationMs",
+        "reason",
+        "requestedOutcome",
+        "sessionId",
+        "terminal",
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("returns a conflict when an attempt appears during no-attempt failure", async () => {
