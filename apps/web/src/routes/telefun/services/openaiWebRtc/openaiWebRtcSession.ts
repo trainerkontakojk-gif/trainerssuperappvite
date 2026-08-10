@@ -87,6 +87,17 @@ function wrapCodedError(
 }
 
 const RECORDING_CALLBACK_TIMEOUT_MS = 10_000;
+const MAX_CONNECT_DIAGNOSTIC_MESSAGE_LENGTH = 200;
+const SESSION_DESCRIPTION_DIAGNOSTIC_PATTERN =
+  /(?:\bsdp\b|\bsession\s*description\b|\bset(?:local|remote)description\b|\bice-(?:pwd|ufrag)\b|\b(?:candidate|fingerprint)\s*:|(?:^|[\r\n])[ \t]*(?:v|o|s|t|c|m|a)=)/im;
+
+function getSafeConnectDiagnosticMessage(message: unknown): string | undefined {
+  if (typeof message !== "string") return undefined;
+  if (SESSION_DESCRIPTION_DIAGNOSTIC_PATTERN.test(message)) {
+    return "session_description_parse_failed";
+  }
+  return message.slice(0, MAX_CONNECT_DIAGNOSTIC_MESSAGE_LENGTH);
+}
 
 export class OpenAIWebRtcSession {
   private peer: OpenAIWebRtcPeerConnectionLike | null = null;
@@ -520,7 +531,7 @@ export class OpenAIWebRtcSession {
         stage,
         name: typeof value?.name === "string" ? value.name : undefined,
         code: typeof value?.code === "string" ? value.code : undefined,
-        message: typeof value?.message === "string" ? value.message : undefined,
+        message: getSafeConnectDiagnosticMessage(value?.message),
       });
     } catch {
       // Observability must never block connect failure handling.

@@ -41,7 +41,9 @@ export function buildOpenAIWebRtcBrokerCallUrl(
 
 function createBrokerNetworkError(error: unknown): Error {
   const sourceMessage =
-    error instanceof Error ? error.message : "OpenAI WebRTC broker request failed.";
+    error instanceof Error
+      ? error.message
+      : "OpenAI WebRTC broker request failed.";
   const wrapped = new Error(sourceMessage, { cause: error }) as Error & {
     code: string;
   };
@@ -51,14 +53,15 @@ function createBrokerNetworkError(error: unknown): Error {
 }
 
 function assertAnswerSdp(answerSdp: string): string {
-  const trimmed = answerSdp.trim();
-  if (!trimmed.startsWith("v=0")) {
+  const canonical =
+    answerSdp.replace(/\r\n?/g, "\n").trim().replace(/\n/g, "\r\n") + "\r\n";
+  if (!canonical.startsWith("v=0")) {
     throw new Error("Broker answer must be SDP.");
   }
-  if (trimmed.length > OPENAI_WEBRTC_MAX_SDP_CHARS) {
+  if (canonical.length > OPENAI_WEBRTC_MAX_SDP_CHARS) {
     throw new Error("Broker answer is too large.");
   }
-  return trimmed;
+  return canonical;
 }
 
 export async function createOpenAIWebRtcBrokerCall(input: {

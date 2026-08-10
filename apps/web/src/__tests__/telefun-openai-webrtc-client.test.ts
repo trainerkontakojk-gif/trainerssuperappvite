@@ -212,6 +212,33 @@ function createFetch(
   });
 }
 
+function createDiagnosticTestSession(
+  peer: FakePeerConnection,
+  mediaDevices: { getUserMedia: ReturnType<typeof vi.fn> },
+  audio: ReturnType<typeof createAudioElement>,
+  fetch: OpenAIWebRtcDependencies["fetch"],
+): OpenAIWebRtcSession {
+  return new OpenAIWebRtcSession(
+    {
+      sessionId: SESSION_ID,
+      accessToken: "supabase-access-token",
+      brokerHttpBaseUrl: "https://broker.example/base",
+    },
+    {
+      RTCPeerConnection: class {
+        constructor() {
+          return peer as unknown as RTCPeerConnection;
+        }
+      } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+      fetch,
+      mediaDevices:
+        mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+      audioElement:
+        audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+    },
+  );
+}
+
 describe("OpenAI WebRTC broker fetch receiver binding", () => {
   it("creates a broker call without binding fetch to the input object", async () => {
     const { fetch, receivers } = createReceiverSensitiveFetch(
@@ -230,9 +257,30 @@ describe("OpenAI WebRTC broker fetch receiver binding", () => {
         offerSdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
       }),
     ).resolves.toEqual({
-      answerSdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0",
+      answerSdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
     });
     expect(receivers).toEqual([undefined]);
+  });
+
+  it("normalizes LF-only broker answers to one terminal CRLF", async () => {
+    const { fetch } = createReceiverSensitiveFetch(
+      new Response("v=0\no=- 2 2 IN IP4 127.0.0.1\ns=-\nt=0 0\n", {
+        status: 200,
+        headers: { "Content-Type": "application/sdp" },
+      }),
+    );
+
+    await expect(
+      createOpenAIWebRtcBrokerCall({
+        fetch,
+        brokerHttpBaseUrl: "https://broker.example/base",
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        offerSdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
+      }),
+    ).resolves.toEqual({
+      answerSdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
+    });
   });
 
   it("deletes a broker call without binding fetch to the input object", async () => {
@@ -578,6 +626,127 @@ describe("OpenAIWebRtcSession", () => {
     await session.end();
   });
 
+  it("redacts raw SDP from set-remote-description diagnostics", async () => {
+    const fetch = createFetch(undefined, true);
+    const remoteDescriptionError = new Error("a=ice-pwd:ICE_SECRET_SENTINEL");
+    remoteDescriptionError.name = "OperationError";
+    peer.setRemoteDescription = vi.fn(async () => {
+      throw remoteDescriptionError;
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const session = new OpenAIWebRtcSession(
+      {
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        brokerHttpBaseUrl: "https://broker.example/base",
+      },
+      {
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+      },
+    );
+
+    await expect(session.connect()).rejects.toThrow(remoteDescriptionError);
+
+    const serializedWarnings = JSON.stringify(warn.mock.calls);
+    expect(serializedWarnings).toContain("set_remote_description");
+    expect(serializedWarnings).toContain("OperationError");
+    expect(serializedWarnings).toContain("session_description_parse_failed");
+    expect(serializedWarnings).not.toContain("ICE_SECRET_SENTINEL");
+    expect(serializedWarnings).not.toContain("a=ice-pwd");
+    expect(serializedWarnings).not.toContain(
+      "Failed to set remote SessionDescription",
+    );
+    expect(serializedWarnings).not.toContain("Invalid SDP line.");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(session.state).toBe("failed");
+  });
+
+  it.each([
+    "SDP:DIAGNOSTIC_SENTINEL",
+    "SessionDescription:DIAGNOSTIC_SENTINEL",
+    "setLocalDescription:DIAGNOSTIC_SENTINEL",
+    "setRemoteDescription:DIAGNOSTIC_SENTINEL",
+    "ice-pwd:ICE_PWD_SENTINEL",
+    "ice-ufrag:ICE_UFRAG_SENTINEL",
+    "candidate:CANDIDATE_SENTINEL",
+    "fingerprint:FINGERPRINT_SENTINEL",
+    "v=LINE_SENTINEL",
+    "o=LINE_SENTINEL",
+    "s=LINE_SENTINEL",
+    "t=LINE_SENTINEL",
+    "c=LINE_SENTINEL",
+    "m=LINE_SENTINEL",
+    "a=LINE_SENTINEL",
+  ])(
+    "redacts raw session-description indicator %s without failure wording",
+    async (message) => {
+      const fetch = createFetch(undefined, true);
+      const remoteDescriptionError = new Error(message);
+      remoteDescriptionError.name = "OperationError";
+      peer.setRemoteDescription = vi.fn(async () => {
+        throw remoteDescriptionError;
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const session = createDiagnosticTestSession(
+        peer,
+        mediaDevices,
+        audio,
+        fetch,
+      );
+
+      await expect(session.connect()).rejects.toThrow(remoteDescriptionError);
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stage: "set_remote_description",
+          name: "OperationError",
+          message: "session_description_parse_failed",
+        }),
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(message);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(session.state).toBe("failed");
+    },
+  );
+
+  it("truncates non-SDP connect diagnostics to 200 characters", async () => {
+    const message = `ordinary-connect-diagnostic-${"x".repeat(240)}`;
+    const fetch = createFetch(undefined, true);
+    const remoteDescriptionError = new Error(message);
+    remoteDescriptionError.name = "OperationError";
+    peer.setRemoteDescription = vi.fn(async () => {
+      throw remoteDescriptionError;
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const session = createDiagnosticTestSession(
+      peer,
+      mediaDevices,
+      audio,
+      fetch,
+    );
+
+    await expect(session.connect()).rejects.toThrow(remoteDescriptionError);
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: "set_remote_description",
+        message: message.slice(0, 200),
+      }),
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(message);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(session.state).toBe("failed");
+  });
+
   it("cleans up a broker binding when POST returns a non-2xx response", async () => {
     const fetch = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -756,6 +925,10 @@ describe("OpenAIWebRtcSession", () => {
     expect(mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
     expect(peer.createDataChannel).toHaveBeenCalledWith("oai-events");
     expect(peer.addTrack).toHaveBeenCalledWith(localTrack, localStream);
+    expect(peer.setRemoteDescription).toHaveBeenCalledWith({
+      type: "answer",
+      sdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
+    });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(states).toEqual([
       "acquiring_media",
