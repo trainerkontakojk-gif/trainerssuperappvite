@@ -57,6 +57,29 @@ function retryAfterSeconds(resetAt: string): string {
 
 export class TelefunSessionValidationError extends Error {}
 
+export const LIVE_PROMPT_INSTRUCTIONS_MAX_LENGTH = 16_000;
+
+const livePromptInstructionsSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .superRefine((value, ctx) => {
+    if (value === undefined || value === null) return;
+    if (value.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Instruksi prompt tidak boleh kosong.",
+      });
+      return;
+    }
+    if (value.length > LIVE_PROMPT_INSTRUCTIONS_MAX_LENGTH) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Instruksi prompt maksimum ${LIVE_PROMPT_INSTRUCTIONS_MAX_LENGTH} karakter.`,
+      });
+    }
+  });
+
 function resolveTelefunSessionModelPair(params: {
   modelId?: string;
   transport?: string;
@@ -112,6 +135,7 @@ export const telefunSessionCreatePayloadSchema = z
     response_pacing_mode: z.string().optional(),
     telefun_model_id: z.string().optional(),
     telefun_transport: z.string().optional(),
+    live_prompt_instructions: livePromptInstructionsSchema,
   })
   .superRefine((body, ctx) => {
     try {
@@ -228,6 +252,7 @@ export function buildTelefunSessionInsertPayload(params: {
     response_pacing_mode?: string;
     telefun_model_id?: string;
     telefun_transport?: string;
+    live_prompt_instructions?: string | null;
   };
 }) {
   const pair = resolveTelefunSessionModelPair({
@@ -251,6 +276,7 @@ export function buildTelefunSessionInsertPayload(params: {
     response_pacing_mode: params.body.response_pacing_mode || null,
     telefun_model_id: pair.model.id,
     telefun_transport: pair.transport,
+    live_prompt_instructions: params.body.live_prompt_instructions ?? null,
   };
 }
 

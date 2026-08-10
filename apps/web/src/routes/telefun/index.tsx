@@ -53,6 +53,7 @@ import {
   OPENAI_WEBRTC_MODEL_ID,
   OPENAI_WEBRTC_TRANSPORT,
 } from "./services/telefunWebRtcCapability";
+import { buildTelefunLiveSystemInstruction } from "./services/promptBuilder";
 import { createRetainedObjectUrlOwner } from "./services/openaiWebRtc/cleanup";
 import {
   installTelefunRecordingReconciliation,
@@ -297,6 +298,16 @@ export default function TelefunLanding() {
       resolvedIdentity: identity,
     };
 
+    const livePromptInstructions = requestsWebRtc
+      ? buildTelefunLiveSystemInstruction({
+          identity: sessionConfig.resolvedIdentity!,
+          scenario: sessionConfig.activeScenario!,
+          consumerType: sessionConfig.activeConsumerType!,
+          responsePacingMode: sessionConfig.responsePacingMode,
+          simulationChallengeTypes: sessionConfig.simulationChallengeTypes,
+        })
+      : undefined;
+
     const runId = ++sessionRunIdRef.current;
     setSessionDelta(null);
     sessionBaselineRef.current = null;
@@ -324,6 +335,9 @@ export default function TelefunLanding() {
         response_pacing_mode: settings.responsePacingMode,
         telefun_model_id: sessionConfig.telefunModelId,
         telefun_transport: sessionConfig.telefunTransport,
+        ...(requestsWebRtc
+          ? { live_prompt_instructions: livePromptInstructions }
+          : {}),
       });
       if (res?.id) {
         setActiveSessionId(res.id);

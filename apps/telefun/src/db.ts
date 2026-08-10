@@ -167,7 +167,9 @@ export async function getWebRtcSession(
 ): Promise<WebRtcSession | null> {
   const { data, error } = await admin
     .from("telefun_history")
-    .select("id, user_id, status, telefun_model_id, telefun_transport")
+    .select(
+      "id, user_id, status, telefun_model_id, telefun_transport, live_prompt_instructions",
+    )
     .eq("id", sessionId)
     .eq("user_id", userId)
     .maybeSingle();

@@ -465,6 +465,7 @@ describe("telefun API payload and security validators", () => {
       configured_duration: null,
       response_pacing_mode: null,
       telefun_model_id: "gemini-3.1-flash-live-preview",
+      live_prompt_instructions: null,
       telefun_transport: "gemini-live",
     });
   });

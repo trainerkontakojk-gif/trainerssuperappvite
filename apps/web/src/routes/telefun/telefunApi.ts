@@ -35,6 +35,7 @@ export interface TelefunSessionRow {
   response_pacing_mode?: string | null;
   telefun_model_id?: string | null;
   telefun_transport?: string | null;
+  live_prompt_instructions?: string | null;
   messages?: unknown;
 }
 
@@ -51,6 +52,7 @@ export interface CreateTelefunSessionInput {
   response_pacing_mode?: string;
   telefun_model_id?: string;
   telefun_transport?: string;
+  live_prompt_instructions?: string | null;
 }
 
 export async function getTelefunWebRtcCapability(options?: {

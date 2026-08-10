@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   POC_MODEL_ID,
+  POC_SERVER_INSTRUCTIONS,
   POC_TRANSPORT,
   buildCanonicalPocSession,
   parseRawSdp,
@@ -33,6 +34,25 @@ describe("OpenAI WebRTC POC contracts", () => {
     expect(POC_MODEL_ID).toBe("gpt-realtime-2.1");
     expect(POC_TRANSPORT).toBe("openai-webrtc");
   });
+
+  it("passes through a nonblank live prompt without changing server-owned fields", () => {
+    const instructions = "Scenario: Kartu kredit jatuh tempo.";
+    const session = buildCanonicalPocSession(instructions);
+
+    expect(session.instructions).toBe(instructions);
+    expect(session.model).toBe(POC_MODEL_ID);
+    expect(session.output_modalities).toEqual(["audio"]);
+    expect(session.audio.output.voice).toBe("marin");
+  });
+
+  it.each([undefined, null, "", "   "]) (
+    "uses the server fallback for blank instructions (%j)",
+    (instructions) => {
+      expect(buildCanonicalPocSession(instructions).instructions).toBe(
+        POC_SERVER_INSTRUCTIONS,
+      );
+    },
+  );
 
   it("accepts a bounded raw SDP offer and UUID path only", () => {
     expect(parseSessionId("019f45e3-5fac-7cd2-afeb-8069c2f813b3")).toBe(
