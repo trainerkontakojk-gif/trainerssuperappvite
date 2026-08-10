@@ -91,9 +91,10 @@ export async function createOpenAIWebRtcBrokerCall(input: {
   );
 
   input.onBrokerRequestStarted?.();
+  const brokerFetch = input.fetch;
   let response: Response;
   try {
-    response = await input.fetch(url, {
+    response = await brokerFetch(url, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -146,7 +147,8 @@ export async function deleteOpenAIWebRtcBrokerCall(input: {
     url.searchParams.set("outcome", input.outcome);
   }
 
-  const response = await input.fetch(url, {
+  const brokerFetch = input.fetch;
+  const response = await brokerFetch(url, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${accessToken}`,

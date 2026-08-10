@@ -3,6 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenAIWebRtcSession } from "../routes/telefun/services/openaiWebRtc/openaiWebRtcSession";
+import {
+  createOpenAIWebRtcBrokerCall,
+  deleteOpenAIWebRtcBrokerCall,
+} from "../routes/telefun/services/openaiWebRtc/brokerApi";
 import type {
   OpenAIWebRtcDependencies,
   OpenAIWebRtcStreamLike,
@@ -149,6 +153,22 @@ function createAudioElement() {
   };
 }
 
+function createReceiverSensitiveFetch(response: Response) {
+  const receivers: unknown[] = [];
+  const fetch = async function (
+    this: unknown,
+    _input: RequestInfo | URL,
+    _init?: RequestInit,
+  ): Promise<Response> {
+    receivers.push(this);
+    if (this !== undefined && this !== globalThis) {
+      throw new TypeError("Illegal invocation");
+    }
+    return response;
+  } as typeof globalThis.fetch;
+  return { fetch, receivers };
+}
+
 function createFetch(
   answerSdp = "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
   allowFailedOutcome = false,
@@ -184,6 +204,46 @@ function createFetch(
     return new Response(null, { status: 204 });
   });
 }
+
+describe("OpenAI WebRTC broker fetch receiver binding", () => {
+  it("creates a broker call without binding fetch to the input object", async () => {
+    const { fetch, receivers } = createReceiverSensitiveFetch(
+      new Response("v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n", {
+        status: 200,
+        headers: { "Content-Type": "application/sdp" },
+      }),
+    );
+
+    await expect(
+      createOpenAIWebRtcBrokerCall({
+        fetch,
+        brokerHttpBaseUrl: "https://broker.example/base",
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+        offerSdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n",
+      }),
+    ).resolves.toEqual({
+      answerSdp: "v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0",
+    });
+    expect(receivers).toEqual([undefined]);
+  });
+
+  it("deletes a broker call without binding fetch to the input object", async () => {
+    const { fetch, receivers } = createReceiverSensitiveFetch(
+      new Response(null, { status: 204 }),
+    );
+
+    await expect(
+      deleteOpenAIWebRtcBrokerCall({
+        fetch,
+        brokerHttpBaseUrl: "https://broker.example/base",
+        sessionId: SESSION_ID,
+        accessToken: "supabase-access-token",
+      }),
+    ).resolves.toBeUndefined();
+    expect(receivers).toEqual([undefined]);
+  });
+});
 
 describe("OpenAIWebRtcSession", () => {
   let peer: FakePeerConnection;
