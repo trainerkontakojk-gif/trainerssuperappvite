@@ -67,6 +67,12 @@ interface ActiveHoldUi {
 
 const CLEANUP_PENDING_MESSAGE =
   "Panggilan belum tersimpan. Coba lagi untuk mengakhiri.";
+const MIC_ERROR_MESSAGE =
+  "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.";
+const NETWORK_ERROR_MESSAGE =
+  "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan.";
+const PROVIDER_ERROR_MESSAGE =
+  "Terjadi kesalahan pada layanan suara. Silakan coba lagi.";
 function getInitials(name: string): string {
   return name
     .split(/\s+/)
@@ -336,9 +342,13 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
             if (isActive) {
               setTerminalFailure(plan.outcome === "failed");
               setError(
-                plan.outcome === "network_lost"
-                  ? "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan."
-                  : mapTelefunTransportError(new Error("provider error")),
+                plan.reason === "device_unplugged"
+                  ? MIC_ERROR_MESSAGE
+                  : plan.outcome === "network_lost"
+                    ? NETWORK_ERROR_MESSAGE
+                    : plan.reason === "provider_error"
+                      ? PROVIDER_ERROR_MESSAGE
+                      : mapTelefunTransportError({ code: plan.reason }),
               );
             }
             onRecoveryRequired?.(plan);

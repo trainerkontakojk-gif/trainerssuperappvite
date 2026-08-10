@@ -21,8 +21,10 @@ const transportState = vi.hoisted(() => ({
 vi.mock("../routes/telefun/services/telefunTransport", () => ({
   createTelefunTransport: transportState.create,
   cleanupOpenAIWebRtcSession: transportState.cleanup,
-  mapTelefunTransportError: () =>
-    "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.",
+  mapTelefunTransportError: (error: unknown) =>
+    (error as { code?: string } | null)?.code === "provider_error"
+      ? "Terjadi kesalahan pada layanan suara. Silakan coba lagi."
+      : "Panggilan belum dapat dimulai. Silakan coba lagi.",
 }));
 vi.mock("../routes/telefun/components/useMicrophoneActivity", () => ({
   useMicrophoneActivity: (input: { stream?: MediaStream | null }) => {
@@ -450,7 +452,7 @@ describe("PhoneInterface OpenAI WebRTC transport", () => {
     session.onError(new Error("Koneksi gagal"));
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent(
-        "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.",
+        "Panggilan belum dapat dimulai. Silakan coba lagi.",
       ),
     );
   });
@@ -493,6 +495,36 @@ describe("PhoneInterface OpenAI WebRTC transport", () => {
       ),
     );
     expect(session.connect).toHaveBeenCalledOnce();
+  });
+
+  it("uses microphone copy for a device-unplugged recovery", async () => {
+    const session = createSession();
+    transportState.create.mockReturnValueOnce(session);
+    render(
+      React.createElement(PhoneInterface, {
+        config,
+        accessToken: "token",
+        onEndSession: vi.fn(),
+      }),
+    );
+
+    await waitFor(() => expect(session.connect).toHaveBeenCalled());
+    session.onRecoveryRequired?.({
+      outcome: "network_lost",
+      requiresNewSessionBoundary: true,
+      newAttemptId: "attempt-new",
+      newSessionBoundaryId: "boundary-new",
+      discontinuityId: "discontinuity-device",
+      previousSessionId: config.sessionId ?? "session-previous",
+      reason: "device_unplugged",
+      createdAtMs: 123,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.",
+      ),
+    );
   });
 
   it("uses cleanup on unmount and suppresses a rejected disconnect", async () => {

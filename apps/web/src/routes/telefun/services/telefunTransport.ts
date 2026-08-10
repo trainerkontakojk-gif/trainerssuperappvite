@@ -117,7 +117,12 @@ export async function cleanupOpenAIWebRtcSession(input: {
   const deadline = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(() => {
       controller.abort();
-      reject(new Error("OpenAI WebRTC cleanup timed out."));
+      reject(
+        createTransportError(
+          "OpenAI WebRTC cleanup timed out.",
+          "cleanup_pending",
+        ),
+      );
     }, timeoutMs);
   });
 
@@ -178,15 +183,175 @@ function mapWebRtcState(state: OpenAIWebRtcState): {
   }
 }
 
+export const TELEFUN_MIC_ERROR_MESSAGE =
+  "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.";
 export const OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE =
   "Terjadi kesalahan pada layanan suara. Silakan coba lagi.";
+export const TELEFUN_NETWORK_ERROR_MESSAGE =
+  "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan.";
+export const TELEFUN_CLEANUP_ERROR_MESSAGE =
+  "Panggilan belum tersimpan. Coba lagi untuk mengakhiri.";
+export const TELEFUN_CONNECTION_TIMEOUT_MESSAGE =
+  "Waktu menghubungkan panggilan habis. Periksa koneksi internet dan coba lagi.";
+export const TELEFUN_UNKNOWN_ERROR_MESSAGE =
+  "Panggilan belum dapat dimulai. Silakan coba lagi.";
 
-export function mapTelefunTransportError(_error: unknown): string {
-  return "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.";
+type TelefunTransportErrorCategory =
+  | "mic"
+  | "provider"
+  | "network"
+  | "cleanup"
+  | "timeout"
+  | "unknown";
+
+type TransportErrorDetails = {
+  code?: unknown;
+  name?: unknown;
+  message?: unknown;
+  status?: unknown;
+  cause?: unknown;
+};
+
+function createTransportError(message: string, code: string): Error {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
+function getErrorDetails(error: unknown): TransportErrorDetails[] {
+  const details: TransportErrorDetails[] = [];
+  const seen = new Set<object>();
+  let current: unknown = error;
+
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const value = current as TransportErrorDetails;
+    details.push(value);
+    current = value.cause;
+  }
+
+  return details;
+}
+
+function hasCode(
+  details: TransportErrorDetails[],
+  ...codes: string[]
+): boolean {
+  return details.some(
+    (value) => typeof value.code === "string" && codes.includes(value.code),
+  );
+}
+
+function hasName(
+  details: TransportErrorDetails[],
+  ...names: string[]
+): boolean {
+  return details.some(
+    (value) => typeof value.name === "string" && names.includes(value.name),
+  );
+}
+
+function hasSafeMessage(
+  details: TransportErrorDetails[],
+  predicate: (message: string) => boolean,
+): boolean {
+  return details.some(
+    (value) =>
+      typeof value.message === "string" && predicate(value.message.toLowerCase()),
+  );
+}
+
+function classifyTelefunTransportError(
+  error: unknown,
+): TelefunTransportErrorCategory {
+  const details = getErrorDetails(error);
+
+  // Cleanup wins over generic timeout/network markers because it is a
+  // finalization context and remains retryable in the UI.
+  if (
+    hasCode(details, "cleanup_pending", "broker_finalization") ||
+    hasSafeMessage(
+      details,
+      (message) =>
+        message.includes("cleanup request failed") ||
+        message.includes("cleanup timed out") ||
+        message.includes("broker delete failed") ||
+        message.includes("broker finalization"),
+    )
+  ) {
+    return "cleanup";
+  }
+
+  if (
+    hasCode(details, "device_unplugged") ||
+    hasName(details, "NotAllowedError", "NotFoundError") ||
+    hasSafeMessage(details, (message) =>
+      message.includes("microphone track ended"),
+    )
+  ) {
+    return "mic";
+  }
+
+  if (
+    hasCode(details, "provider_error") ||
+    hasSafeMessage(
+      details,
+      (message) =>
+        message === OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE.toLowerCase() ||
+        message.includes("broker request failed"),
+    )
+  ) {
+    return "provider";
+  }
+
+  if (
+    hasCode(details, "network_lost") ||
+    hasSafeMessage(
+      details,
+      (message) =>
+        message.includes("peer connection failed") ||
+        message.includes("ice connection failed") ||
+        message.includes("data channel closed") ||
+        message === "network lost",
+    )
+  ) {
+    return "network";
+  }
+
+  if (
+    hasCode(details, "connection_timeout") ||
+    hasSafeMessage(details, (message) =>
+      message.includes("webrtc connection timed out"),
+    )
+  ) {
+    return "timeout";
+  }
+
+  return "unknown";
+}
+
+export function mapTelefunTransportError(error: unknown): string {
+  switch (classifyTelefunTransportError(error)) {
+    case "mic":
+      return TELEFUN_MIC_ERROR_MESSAGE;
+    case "provider":
+      return OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE;
+    case "network":
+      return TELEFUN_NETWORK_ERROR_MESSAGE;
+    case "cleanup":
+      return TELEFUN_CLEANUP_ERROR_MESSAGE;
+    case "timeout":
+      return TELEFUN_CONNECTION_TIMEOUT_MESSAGE;
+    default:
+      return TELEFUN_UNKNOWN_ERROR_MESSAGE;
+  }
 }
 
 function safeProviderError(_event: OpenAIWebRtcEvent): Error {
-  return new Error(OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE);
+  return createTransportError(
+    OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE,
+    "provider_error",
+  );
 }
 
 export function mapOpenAIWebRtcSpeakingEvent(type: string): boolean | null {
@@ -351,8 +516,31 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
     }
   }
 
-  private boundError(_error: Error): Error {
-    return new Error(OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE);
+  private boundError(error: Error): Error {
+    const category = classifyTelefunTransportError(error);
+    switch (category) {
+      case "mic":
+        return createTransportError(TELEFUN_MIC_ERROR_MESSAGE, "device_unplugged");
+      case "provider":
+        return createTransportError(
+          OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE,
+          "provider_error",
+        );
+      case "network":
+        return createTransportError(TELEFUN_NETWORK_ERROR_MESSAGE, "network_lost");
+      case "cleanup":
+        return createTransportError(
+          TELEFUN_CLEANUP_ERROR_MESSAGE,
+          "cleanup_pending",
+        );
+      case "timeout":
+        return createTransportError(
+          TELEFUN_CONNECTION_TIMEOUT_MESSAGE,
+          "connection_timeout",
+        );
+      default:
+        return createTransportError(TELEFUN_UNKNOWN_ERROR_MESSAGE, "unknown");
+    }
   }
 }
 

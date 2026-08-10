@@ -5,6 +5,7 @@ import {
   createTelefunTransport,
   deriveTelefunBrokerHttpBaseUrl,
   mapOpenAIWebRtcSpeakingEvent,
+  mapTelefunTransportError,
   OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE,
   OpenAIWebRtcTransport,
   type TelefunWebRtcFactoryEnvironment,
@@ -15,6 +16,81 @@ const baseConfig = {
   telefunModelId: "gpt-realtime-2.1",
   sessionId: "550e8400-e29b-41d4-a716-446655440000",
 } as unknown as TelefunAppSettings;
+
+describe("Telefun transport error mapping", () => {
+  it("uses microphone copy only for a denied or missing microphone", () => {
+    expect(
+      mapTelefunTransportError({ name: "NotAllowedError" }),
+    ).toBe("Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.");
+    expect(
+      mapTelefunTransportError({ name: "NotFoundError" }),
+    ).toBe("Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.");
+  });
+
+  it("maps an unplugged device to microphone copy", () => {
+    expect(
+      mapTelefunTransportError({ cause: { code: "device_unplugged" } }),
+    ).toBe("Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.");
+  });
+
+  it("maps provider failures to safe upstream copy", () => {
+    expect(
+      mapTelefunTransportError({ code: "provider_error" }),
+    ).toBe(OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE);
+  });
+
+  it("maps network failures to connection copy", () => {
+    const expected =
+      "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan.";
+    expect(mapTelefunTransportError({ code: "network_lost" })).toBe(expected);
+    expect(mapTelefunTransportError(new Error("Peer connection failed."))).toBe(
+      expected,
+    );
+    expect(mapTelefunTransportError(new Error("Data channel closed."))).toBe(
+      expected,
+    );
+  });
+
+  it("maps connection timeout separately from generic failures", () => {
+    expect(
+      mapTelefunTransportError({ code: "connection_timeout" }),
+    ).toBe(
+      "Waktu menghubungkan panggilan habis. Periksa koneksi internet dan coba lagi.",
+    );
+    expect(
+      mapTelefunTransportError(new Error("WebRTC connection timed out.")),
+    ).toBe(
+      "Waktu menghubungkan panggilan habis. Periksa koneksi internet dan coba lagi.",
+    );
+  });
+
+  it("maps cleanup finalization failures without blaming the microphone", () => {
+    expect(
+      mapTelefunTransportError({ code: "cleanup_pending" }),
+    ).toBe("Panggilan belum tersimpan. Coba lagi untuk mengakhiri.");
+    expect(
+      mapTelefunTransportError({ code: "broker_finalization", status: 503 }),
+    ).toBe("Panggilan belum tersimpan. Coba lagi untuk mengakhiri.");
+    expect(
+      mapTelefunTransportError(new Error("OpenAI WebRTC broker delete failed.")),
+    ).toBe("Panggilan belum tersimpan. Coba lagi untuk mengakhiri.");
+  });
+
+  it("does not treat a provider or bare 503 as cleanup", () => {
+    expect(
+      mapTelefunTransportError({ status: 503, code: "provider_error" }),
+    ).toBe(OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE);
+    expect(mapTelefunTransportError({ status: 503 })).toBe(
+      "Panggilan belum dapat dimulai. Silakan coba lagi.",
+    );
+  });
+
+  it("uses a generic safe fallback for unknown failures", () => {
+    expect(mapTelefunTransportError(new Error("secret provider payload"))).toBe(
+      "Panggilan belum dapat dimulai. Silakan coba lagi.",
+    );
+  });
+});
 
 describe("Telefun transport selection", () => {
   it("derives the broker origin from the configured websocket URL", () => {
