@@ -9,9 +9,16 @@ import {
 } from "../routes/telefun/services/openaiWebRtc/brokerApi";
 import type {
   OpenAIWebRtcDependencies,
+  OpenAIWebRtcEvent,
   OpenAIWebRtcStreamLike,
   OpenAIWebRtcTrackLike,
 } from "../routes/telefun/services/openaiWebRtc/contracts";
+import {
+  buildSafeProviderDiagnostic,
+  OpenAIWebRtcTransport,
+  type TelefunWebRtcFactoryEnvironment,
+} from "../routes/telefun/services/telefunTransport";
+import type { TelefunAppSettings } from "../routes/telefun/telefunSettings";
 
 const openAiWebRtcSessionSource = readFileSync(
   join(
@@ -404,10 +411,12 @@ describe("OpenAIWebRtcSession", () => {
   });
 
   it("tags microphone acquisition failures and logs the pre-ending stage", async () => {
-    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(init?.method).toBe("DELETE");
-      return new Response(null, { status: 204 });
-    });
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        expect(init?.method).toBe("DELETE");
+        return new Response(null, { status: 204 });
+      },
+    );
     const mediaError = new Error("Microphone access failed.");
     mediaError.name = "NotReadableError";
     mediaDevices.getUserMedia = vi.fn(async () => {
@@ -436,7 +445,9 @@ describe("OpenAIWebRtcSession", () => {
       },
     );
 
-    await expect(session.connect()).rejects.toThrow("Microphone access failed.");
+    await expect(session.connect()).rejects.toThrow(
+      "Microphone access failed.",
+    );
 
     expect(errors[0]).toMatchObject({
       code: "microphone_access_failed",
@@ -454,11 +465,13 @@ describe("OpenAIWebRtcSession", () => {
 
   it("tags broker fetch failures as network errors while preserving the cause", async () => {
     const networkError = new TypeError("Failed to fetch");
-    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "POST") throw networkError;
-      expect(init?.method).toBe("DELETE");
-      return new Response(null, { status: 204 });
-    });
+    const fetch = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "POST") throw networkError;
+        expect(init?.method).toBe("DELETE");
+        return new Response(null, { status: 204 });
+      },
+    );
     const errors: Error[] = [];
     const session = new OpenAIWebRtcSession(
       {
@@ -490,10 +503,12 @@ describe("OpenAIWebRtcSession", () => {
   });
 
   it("tags offer creation failures with the offer category", async () => {
-    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(init?.method).toBe("DELETE");
-      return new Response(null, { status: 204 });
-    });
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        expect(init?.method).toBe("DELETE");
+        return new Response(null, { status: 204 });
+      },
+    );
     const offerError = new Error("createOffer failed");
     peer.createOffer.mockRejectedValueOnce(offerError);
     const errors: Error[] = [];
@@ -556,7 +571,9 @@ describe("OpenAIWebRtcSession", () => {
     expect(warn).toHaveBeenCalledWith(
       expect.objectContaining({ stage: "broker_response" }),
     );
-    expect(warn.mock.calls.flat().join(" ")).not.toContain("supabase-access-token");
+    expect(warn.mock.calls.flat().join(" ")).not.toContain(
+      "supabase-access-token",
+    );
     expect(warn.mock.calls.flat().join(" ")).not.toContain("v=0");
     await session.end();
   });
@@ -1732,5 +1749,380 @@ describe("OpenAIWebRtcSession", () => {
     await expect(session.connect()).rejects.toThrow(/OpenAI/);
     expect(fetch).not.toHaveBeenCalled();
     expect(mediaDevices.getUserMedia).not.toHaveBeenCalled();
+  });
+
+  describe("OpenAI WebRTC termination source observability", () => {
+    type TerminationCase = {
+      name: string;
+      expected: string;
+      connectFirst: boolean;
+      trigger: (
+        session: OpenAIWebRtcSession,
+        peer: FakePeerConnection,
+        localTrack: FakeTrack,
+      ) => void | Promise<void>;
+    };
+
+    const terminationCases: TerminationCase[] = [
+      {
+        name: "user end",
+        expected: "user",
+        connectFirst: true,
+        trigger: (session) => session.end(),
+      },
+      {
+        name: "timeout end",
+        expected: "timeout",
+        connectFirst: true,
+        trigger: (session) => session.end(undefined, "timeout"),
+      },
+      {
+        name: "cleanup unmount",
+        expected: "unmount",
+        connectFirst: true,
+        trigger: (session) => session.cleanup(),
+      },
+      {
+        name: "provider error",
+        expected: "provider_error",
+        connectFirst: true,
+        trigger: (session) => session.end("failed", "provider_error"),
+      },
+      {
+        name: "peer connection state",
+        expected: "peer_state",
+        connectFirst: true,
+        trigger: (_session, connection) => {
+          connection.emitConnectionState("failed");
+        },
+      },
+      {
+        name: "ice connection state",
+        expected: "ice_state",
+        connectFirst: true,
+        trigger: (_session, connection) => {
+          connection.emitIceState("failed");
+        },
+      },
+      {
+        name: "data channel close",
+        expected: "data_channel_close",
+        connectFirst: true,
+        trigger: (_session, connection) => {
+          connection.dataChannel.emitClose();
+        },
+      },
+      {
+        name: "microphone ended",
+        expected: "microphone_ended",
+        connectFirst: true,
+        trigger: (_session, _connection, track) => {
+          track.onended?.();
+        },
+      },
+      {
+        name: "connect timeout",
+        expected: "connect_timeout",
+        connectFirst: false,
+        trigger: () => undefined,
+      },
+      {
+        name: "connect failure",
+        expected: "connect_failure",
+        connectFirst: false,
+        trigger: () => undefined,
+      },
+    ];
+
+    it.each(terminationCases)(
+      "logs $expected once before the broker DELETE ($name)",
+      async ({ connectFirst, expected, trigger }) => {
+        const fetch =
+          expected === "connect_failure"
+            ? vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+                if (init?.method === "POST") {
+                  throw new TypeError("Failed to fetch");
+                }
+                expect(init?.method).toBe("DELETE");
+                return new Response(null, { status: 204 });
+              })
+            : createFetch();
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const session = new OpenAIWebRtcSession(
+          {
+            sessionId: SESSION_ID,
+            accessToken: "supabase-access-token",
+            brokerHttpBaseUrl: "https://broker.example/base",
+            connectTimeoutMs: expected === "connect_timeout" ? 10 : 1000,
+          },
+          {
+            RTCPeerConnection: class {
+              constructor() {
+                return peer as unknown as RTCPeerConnection;
+              }
+            } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+            fetch,
+            mediaDevices:
+              mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+            audioElement:
+              audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+          },
+        );
+
+        if (connectFirst) {
+          await resolveConnection(session, peer);
+        } else {
+          const connection = session.connect();
+          if (expected === "connect_timeout") {
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
+            const settled = expect(connection).rejects.toThrow(/timed out/i);
+            await new Promise<void>((resolve) => setTimeout(resolve, 20));
+            await settled;
+          } else {
+            await expect(connection).rejects.toThrow(/failed to fetch/i);
+          }
+        }
+        await trigger(session, peer, localTrack);
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+        const terminationCalls = warn.mock.calls.filter(
+          (call) => call[0] === "[Telefun] OpenAI WebRTC termination",
+        );
+        expect(terminationCalls).toHaveLength(1);
+        expect(terminationCalls[0][1]).toMatchObject({
+          terminationSource: expected,
+          hasConnected: connectFirst,
+        });
+        const terminationOrder =
+          warn.mock.invocationCallOrder[
+            warn.mock.calls.indexOf(terminationCalls[0])
+          ];
+        const deleteCallIndex = fetch.mock.calls.findIndex(
+          (call) => (call[1] as RequestInit | undefined)?.method === "DELETE",
+        );
+        expect(deleteCallIndex).toBeGreaterThanOrEqual(0);
+        expect(terminationOrder).toBeLessThan(
+          fetch.mock.invocationCallOrder[deleteCallIndex],
+        );
+      },
+    );
+
+    it("captures the truthful pre-terminal state and stage for a connected call", async () => {
+      const fetch = createFetch();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const session = new OpenAIWebRtcSession(
+        {
+          sessionId: SESSION_ID,
+          accessToken: "supabase-access-token",
+          brokerHttpBaseUrl: "https://broker.example/base",
+        },
+        {
+          RTCPeerConnection: class {
+            constructor() {
+              return peer as unknown as RTCPeerConnection;
+            }
+          } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+          fetch,
+          mediaDevices:
+            mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+          audioElement:
+            audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        },
+      );
+
+      await resolveConnection(session, peer);
+      await session.end();
+
+      const terminationCalls = warn.mock.calls.filter(
+        (call) => call[0] === "[Telefun] OpenAI WebRTC termination",
+      );
+      expect(terminationCalls).toHaveLength(1);
+      expect(terminationCalls[0][1]).toMatchObject({
+        terminationSource: "user",
+        state: "connected",
+        stage: "connected",
+        hasConnected: true,
+      });
+    });
+
+    it("persists the pre-terminal connect stage while connecting", async () => {
+      const fetch = createFetch();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const session = new OpenAIWebRtcSession(
+        {
+          sessionId: SESSION_ID,
+          accessToken: "supabase-access-token",
+          brokerHttpBaseUrl: "https://broker.example/base",
+        },
+        {
+          RTCPeerConnection: class {
+            constructor() {
+              return peer as unknown as RTCPeerConnection;
+            }
+          } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+          fetch,
+          mediaDevices:
+            mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+          audioElement:
+            audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        },
+      );
+
+      const connection = session.connect();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      expect(session.state).toBe("connecting");
+      // The session is suspended while waiting for the remote peer.
+      await session.end();
+      await connection.catch(() => undefined);
+
+      const terminationCalls = warn.mock.calls.filter(
+        (call) => call[0] === "[Telefun] OpenAI WebRTC termination",
+      );
+      expect(terminationCalls).toHaveLength(1);
+      expect(terminationCalls[0][1]).toMatchObject({
+        terminationSource: "user",
+        state: "connecting",
+        stage: "wait_for_peer",
+        hasConnected: false,
+      });
+    });
+
+    it("does not let a throwing termination logger block broker DELETE or final cleanup", async () => {
+      const fetch = createFetch();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {
+        throw new Error("logging backend unavailable");
+      });
+      const session = new OpenAIWebRtcSession(
+        {
+          sessionId: SESSION_ID,
+          accessToken: "supabase-access-token",
+          brokerHttpBaseUrl: "https://broker.example/base",
+        },
+        {
+          RTCPeerConnection: class {
+            constructor() {
+              return peer as unknown as RTCPeerConnection;
+            }
+          } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+          fetch,
+          mediaDevices:
+            mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+          audioElement:
+            audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        },
+      );
+
+      await resolveConnection(session, peer);
+      await expect(session.end()).resolves.toBeUndefined();
+
+      expect(session.state).toBe("ended");
+      expect(
+        fetch.mock.calls.some(
+          (call) => (call[1] as RequestInit | undefined)?.method === "DELETE",
+        ),
+      ).toBe(true);
+      expect(warn).toHaveBeenCalled();
+    });
+  });
+
+  describe("OpenAI WebRTC provider error observability", () => {
+    function createProviderEventHandler(fetch: ReturnType<typeof vi.fn>): {
+      handleProviderEvent: (event: OpenAIWebRtcEvent) => void;
+    } {
+      const transport = new OpenAIWebRtcTransport(
+        { sessionId: SESSION_ID } as unknown as TelefunAppSettings,
+        "supabase-access-token",
+        {
+          websocketUrl: "wss://broker.example/base/ws",
+          RTCPeerConnection: class {
+            constructor() {
+              return peer as unknown as RTCPeerConnection;
+            }
+          } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+          fetch,
+          mediaDevices:
+            mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+          audioElement:
+            audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+          mediaRecorderIsTypeSupported: vi.fn(() => false),
+          createObjectURL: vi.fn(),
+          revokeObjectURL: vi.fn(),
+        } as unknown as TelefunWebRtcFactoryEnvironment,
+      );
+      return transport as unknown as {
+        handleProviderEvent: (event: OpenAIWebRtcEvent) => void;
+      };
+    }
+
+    it("logs a bounded, redacted provider diagnostic and never the raw event", async () => {
+      const fetch = vi.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit) => {
+          expect(init?.method).toBe("DELETE");
+          return new Response(null, { status: 204 });
+        },
+      );
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const handler = createProviderEventHandler(fetch);
+
+      const accessToken = "sk-secret-token-12345";
+      const sdp = "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\n";
+      const prompt = "system: never leak this prompt";
+      const longMessage = "upstream failure ".repeat(30);
+      handler.handleProviderEvent({
+        kind: "event",
+        type: "error",
+        payload: {
+          type: "error",
+          error: {
+            code: "server_error",
+            message: longMessage,
+          },
+          response: { output: [{ content: [{ text: prompt }] }] },
+          sdp,
+          access_token: accessToken,
+        },
+      });
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+      const diagnosticCalls = warn.mock.calls.filter(
+        (call) => call[0] === "[Telefun] OpenAI WebRTC provider error",
+      );
+      expect(diagnosticCalls).toHaveLength(1);
+      const diagnostic = diagnosticCalls[0][1] as Record<string, unknown>;
+      expect(Object.keys(diagnostic).sort()).toEqual([
+        "code",
+        "message",
+        "type",
+      ]);
+      expect(diagnostic).toMatchObject({
+        type: "error",
+        code: "server_error",
+      });
+      expect(typeof diagnostic.message).toBe("string");
+      expect((diagnostic.message as string).length).toBeLessThanOrEqual(200);
+      expect(diagnostic.message).toBe(longMessage.slice(0, 200));
+
+      const serialized = JSON.stringify(diagnosticCalls[0]);
+      expect(serialized).not.toContain(accessToken);
+      expect(serialized).not.toContain("v=0");
+      expect(serialized).not.toContain("never leak this prompt");
+      expect(serialized).not.toContain(longMessage);
+    });
+
+    it("keeps the diagnostic empty or type-only for malformed provider events", () => {
+      expect(
+        buildSafeProviderDiagnostic({
+          kind: "invalid",
+          reason: "malformed_json",
+        }),
+      ).toEqual({});
+      expect(
+        buildSafeProviderDiagnostic({
+          kind: "event",
+          type: "error",
+          payload: { type: "error", error: "not an object" },
+        }),
+      ).toEqual({ type: "error" });
+    });
   });
 });

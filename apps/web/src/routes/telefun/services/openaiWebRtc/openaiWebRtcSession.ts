@@ -39,6 +39,20 @@ import {
 
 type DataChannelMessageEvent = { data: string };
 type TerminalState = "ended" | "failed";
+type TerminationSource =
+  | "user"
+  | "timeout"
+  | "unmount"
+  | "provider_error"
+  | "peer_state"
+  | "ice_state"
+  | "data_channel_close"
+  | "microphone_ended"
+  | "connect_timeout"
+  | "connect_failure"
+  | "broker_cleanup";
+
+export type { TerminationSource };
 type ConnectErrorStage =
   | "get_user_media"
   | "recording_start"
@@ -46,7 +60,7 @@ type ConnectErrorStage =
   | "set_local_description"
   | "broker_request"
   | "set_remote_description"
-  | "peer_connect";
+  | "wait_for_peer";
 
 type CodedError = Error & { code?: string };
 
@@ -105,6 +119,8 @@ export class OpenAIWebRtcSession {
   private hasConnected = false;
   private recoveryNotified = false;
   private _state: OpenAIWebRtcState = "idle";
+  private terminationSource: TerminationSource | null = null;
+  private connectStageField: ConnectErrorStage | null = null;
 
   constructor(
     private readonly config: OpenAIWebRtcSessionConfig,
@@ -127,6 +143,7 @@ export class OpenAIWebRtcSession {
     }
 
     let connectStage: ConnectErrorStage = "get_user_media";
+    this.connectStageField = connectStage;
     try {
       this.setState("acquiring_media");
       let localStream: OpenAIWebRtcStreamLike;
@@ -163,6 +180,7 @@ export class OpenAIWebRtcSession {
         (volume) => this.notify(this.deps.onVolumeChange, volume),
       );
       connectStage = "recording_start";
+      this.connectStageField = connectStage;
       await this.recordingGraph.start(activeLocalStream);
       for (const track of getTracksFromStream(this.localStream)) {
         this.localTracks.add(track);
@@ -182,6 +200,7 @@ export class OpenAIWebRtcSession {
       }
 
       connectStage = "create_offer";
+      this.connectStageField = connectStage;
       this.setState("creating_offer");
       const peer = this.peer;
       if (!peer) {
@@ -207,6 +226,7 @@ export class OpenAIWebRtcSession {
       }
 
       connectStage = "set_local_description";
+      this.connectStageField = connectStage;
       try {
         await peer.setLocalDescription(offer);
       } catch (error) {
@@ -225,8 +245,10 @@ export class OpenAIWebRtcSession {
       this.assertActive();
 
       connectStage = "broker_request";
+      this.connectStageField = connectStage;
       const { answerSdp } = await createOpenAIWebRtcBrokerCall({
-        onBrokerRequestStarted: () => this.warnConnectStage("broker_request_started"),
+        onBrokerRequestStarted: () =>
+          this.warnConnectStage("broker_request_started"),
         onBrokerResponse: () => {
           this.warnConnectStage("broker_response");
           // A POST can resolve after DELETE has already terminalized the
@@ -260,16 +282,19 @@ export class OpenAIWebRtcSession {
         throw this.createShutdownError();
       }
       connectStage = "set_remote_description";
+      this.connectStageField = connectStage;
       await activePeer.setRemoteDescription({
         type: "answer",
         sdp: answerSdp,
       });
       this.assertActive();
-      connectStage = "peer_connect";
+      connectStage = "wait_for_peer";
+      this.connectStageField = connectStage;
       await this.waitForPeerConnected(activePeer);
     } catch (error) {
       const normalizedError =
         error instanceof Error ? error : new Error("WebRTC connection failed.");
+      this.connectStageField = connectStage;
       if (
         this.state !== "ending" &&
         this.state !== "ended" &&
@@ -277,14 +302,22 @@ export class OpenAIWebRtcSession {
       ) {
         this.warnConnectStage(connectStage, normalizedError);
       }
-      await this.fail(normalizedError);
+      await this.fail(
+        normalizedError,
+        "failed",
+        "provider_error",
+        "connect_failure",
+      );
       throw normalizedError;
     } finally {
       this.clearConnectTimeout();
     }
   }
 
-  public end(outcome?: OpenAIWebRtcCallOutcome): Promise<void> {
+  public end(
+    outcome?: OpenAIWebRtcCallOutcome,
+    terminationSource?: TerminationSource,
+  ): Promise<void> {
     return this.finalize(
       outcome === "failed" ||
         outcome === "network_lost" ||
@@ -293,11 +326,19 @@ export class OpenAIWebRtcSession {
         : "ended",
       undefined,
       outcome,
+      "provider_error",
+      terminationSource ?? (outcome === undefined ? "user" : "provider_error"),
     );
   }
 
   public cleanup(): Promise<void> {
-    return this.finalize("ended");
+    return this.finalize(
+      "ended",
+      undefined,
+      undefined,
+      "provider_error",
+      "unmount",
+    );
   }
 
   public async retryPlayback(): Promise<boolean> {
@@ -340,6 +381,7 @@ export class OpenAIWebRtcSession {
       this.handleAsyncFailure(
         createCodedError("Microphone track ended.", "device_unplugged"),
         "device_unplugged",
+        "microphone_ended",
       );
     };
   }
@@ -420,6 +462,7 @@ export class OpenAIWebRtcSession {
         this.handleAsyncFailure(
           new Error("Peer connection failed."),
           "network_lost",
+          "peer_state",
         );
       }
     };
@@ -432,6 +475,7 @@ export class OpenAIWebRtcSession {
         this.handleAsyncFailure(
           new Error("ICE connection failed."),
           "network_lost",
+          "ice_state",
         );
       }
     };
@@ -458,6 +502,7 @@ export class OpenAIWebRtcSession {
       this.handleAsyncFailure(
         new Error("Data channel closed."),
         "network_lost",
+        "data_channel_close",
       );
     };
   }
@@ -470,12 +515,16 @@ export class OpenAIWebRtcSession {
       error && typeof error === "object"
         ? (error as { name?: unknown; code?: unknown; message?: unknown })
         : undefined;
-    console.warn({
-      stage,
-      name: typeof value?.name === "string" ? value.name : undefined,
-      code: typeof value?.code === "string" ? value.code : undefined,
-      message: typeof value?.message === "string" ? value.message : undefined,
-    });
+    try {
+      console.warn({
+        stage,
+        name: typeof value?.name === "string" ? value.name : undefined,
+        code: typeof value?.code === "string" ? value.code : undefined,
+        message: typeof value?.message === "string" ? value.message : undefined,
+      });
+    } catch {
+      // Observability must never block connect failure handling.
+    }
   }
 
   private setState(state: OpenAIWebRtcState): void {
@@ -519,7 +568,11 @@ export class OpenAIWebRtcSession {
   private startConnectTimeout(): void {
     this.clearConnectTimeout();
     this.connectTimeoutId = setTimeout(() => {
-      this.handleAsyncFailure(new Error("WebRTC connection timed out."));
+      this.handleAsyncFailure(
+        new Error("WebRTC connection timed out."),
+        "provider_error",
+        "connect_timeout",
+      );
     }, this.connectTimeoutMs);
   }
 
@@ -568,11 +621,13 @@ export class OpenAIWebRtcSession {
   private handleAsyncFailure(
     error: Error,
     cause: WebRtcRecoveryCause = "provider_error",
+    terminationSource: TerminationSource = "provider_error",
   ): void {
     void this.fail(
       error,
       cause === "provider_error" ? "failed" : "network_lost",
       cause,
+      terminationSource,
     ).catch(() => {
       /* fail is best effort and must never become an unhandled rejection */
     });
@@ -582,8 +637,9 @@ export class OpenAIWebRtcSession {
     error: Error,
     outcome: OpenAIWebRtcCallOutcome = "failed",
     cause: WebRtcRecoveryCause = "provider_error",
+    terminationSource?: TerminationSource,
   ): Promise<void> {
-    await this.finalize("failed", error, outcome, cause);
+    await this.finalize("failed", error, outcome, cause, terminationSource);
   }
 
   private finalize(
@@ -591,6 +647,7 @@ export class OpenAIWebRtcSession {
     failureError?: Error,
     cleanupOutcome?: OpenAIWebRtcCallOutcome,
     recoveryCause: WebRtcRecoveryCause = "provider_error",
+    terminationSource?: TerminationSource,
   ): Promise<void> {
     if (this.finalizationPromise) {
       return this.finalizationPromise;
@@ -601,6 +658,12 @@ export class OpenAIWebRtcSession {
       this.requestedTerminalState = terminalState;
     }
     const requestedTerminalState = this.requestedTerminalState;
+    // Capture pre-terminal evidence before any state mutation so the
+    // observability log stays truthful about where the session was.
+    const preTerminalState = this._state;
+    const preTerminalStage = this.hasConnected
+      ? "connected"
+      : (this.connectStageField ?? this._state);
     if (this._state !== "ended" && this._state !== "failed") {
       this.setState("ending");
     }
@@ -642,6 +705,29 @@ export class OpenAIWebRtcSession {
 
     const outcome: OpenAIWebRtcCallOutcome | undefined =
       this.brokerCleanupOutcome;
+
+    if (this.terminationSource === null) {
+      this.terminationSource =
+        terminationSource ??
+        (terminalState === "ended" ? "user" : "provider_error");
+      try {
+        // One bounded client-side log at the first terminalization owner,
+        // before the broker DELETE is issued. Observability only; never
+        // lifecycle.
+        console.warn("[Telefun] OpenAI WebRTC termination", {
+          terminationSource: this.terminationSource,
+          stage: preTerminalStage,
+          state: preTerminalState,
+          hasConnected: this.hasConnected,
+          peerState: this.peer?.connectionState ?? null,
+          iceState: this.peer?.iceConnectionState ?? null,
+          dataChannelState: this.dataChannel?.readyState ?? null,
+          requestedOutcome: this.brokerCleanupOutcome,
+        });
+      } catch {
+        // Loggers are observers, never lifecycle authorities.
+      }
+    }
 
     const finalizationPromise = (async () => {
       await this.requestBrokerDelete(outcome);
