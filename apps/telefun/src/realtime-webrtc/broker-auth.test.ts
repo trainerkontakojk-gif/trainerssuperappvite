@@ -57,6 +57,28 @@ describe("WebRTC broker authorization", () => {
     ).resolves.toMatchObject({ ok: false, reason: "forbidden" });
   });
 
+  it("preserves the owned session live prompt for the broker handoff", async () => {
+    const instructions = "Konsumen menghadapi tagihan kartu kredit.";
+    const dependencies = deps(
+      { role: "trainer", status: "active", is_deleted: false },
+      {
+        id: sessionId,
+        user_id: "user-1",
+        status: "active",
+        telefun_model_id: "gpt-realtime-2.1",
+        telefun_transport: "openai-webrtc",
+        live_prompt_instructions: instructions,
+      },
+    );
+
+    await expect(
+      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
+    ).resolves.toMatchObject({
+      ok: true,
+      session: { live_prompt_instructions: instructions },
+    });
+  });
+
   it("requires active admin/trainer profile and an owned active canonical session", async () => {
     const dependencies = deps(
       { id: "user-1", role: "trainer", status: "approved", is_deleted: false },

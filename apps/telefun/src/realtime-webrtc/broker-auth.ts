@@ -17,6 +17,7 @@ export interface WebRtcSession {
   status: string;
   telefun_model_id?: string | null;
   telefun_transport?: string | null;
+  live_prompt_instructions?: string | null;
 }
 
 export interface BrokerAuthDependencies {
