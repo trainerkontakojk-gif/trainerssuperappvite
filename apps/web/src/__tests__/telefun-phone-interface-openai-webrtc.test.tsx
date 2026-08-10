@@ -457,6 +457,32 @@ describe("PhoneInterface OpenAI WebRTC transport", () => {
     );
   });
 
+  it("does not let a rejected connect overwrite an error already reported by onError", async () => {
+    const session = createSession();
+    session.connect.mockImplementationOnce(async () => {
+      session.onError({ code: "provider_error" } as unknown as Error);
+      throw { code: "unknown" };
+    });
+    transportState.create.mockReturnValueOnce(session);
+
+    render(
+      React.createElement(PhoneInterface, {
+        config,
+        accessToken: "token",
+        onEndSession: vi.fn(),
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Terjadi kesalahan pada layanan suara. Silakan coba lagi.",
+      ),
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent(
+      "Panggilan belum dapat dimulai. Silakan coba lagi.",
+    );
+  });
+
   it("surfaces a network recovery discontinuity without silently recreating the call", async () => {
     const session = createSession();
     transportState.create.mockReturnValueOnce(session);

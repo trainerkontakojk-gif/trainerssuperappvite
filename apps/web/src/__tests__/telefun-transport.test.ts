@@ -27,10 +27,36 @@ describe("Telefun transport error mapping", () => {
     ).toBe("Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.");
   });
 
+  it("maps all browser microphone access failures to microphone copy", () => {
+    for (const name of ["NotReadableError", "OverconstrainedError"]) {
+      expect(mapTelefunTransportError({ name })).toBe(
+        "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.",
+      );
+    }
+    expect(mapTelefunTransportError({ code: "microphone_access_failed" })).toBe(
+      "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.",
+    );
+  });
+
   it("maps an unplugged device to microphone copy", () => {
     expect(
       mapTelefunTransportError({ cause: { code: "device_unplugged" } }),
     ).toBe("Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.");
+  });
+
+  it("keeps browser and offer failures on the unknown fallback", () => {
+    expect(mapTelefunTransportError({ code: "browser_webrtc_unavailable" })).toBe(
+      "Panggilan belum dapat dimulai. Silakan coba lagi.",
+    );
+    expect(mapTelefunTransportError({ code: "webrtc_offer_failed" })).toBe(
+      "Panggilan belum dapat dimulai. Silakan coba lagi.",
+    );
+  });
+
+  it("maps broker fetch failures to network copy", () => {
+    expect(mapTelefunTransportError({ code: "broker_network_failed" })).toBe(
+      "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan.",
+    );
   });
 
   it("maps provider failures to safe upstream copy", () => {
@@ -74,6 +100,15 @@ describe("Telefun transport error mapping", () => {
     expect(
       mapTelefunTransportError(new Error("OpenAI WebRTC broker delete failed.")),
     ).toBe("Panggilan belum tersimpan. Coba lagi untuk mengakhiri.");
+  });
+
+  it("does not let broker network code become provider from its message", () => {
+    expect(
+      mapTelefunTransportError({
+        code: "broker_network_failed",
+        message: "OpenAI WebRTC broker request failed.",
+      }),
+    ).toBe("Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan.");
   });
 
   it("does not treat a provider or bare 503 as cleanup", () => {

@@ -476,6 +476,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         setIsRinging(false);
         setConnectionState("Menghubungkan...");
         void session.connect(accessToken).catch((connectError: unknown) => {
+          if (terminalFailureRef.current) return;
           terminalFailureRef.current = true;
           if (isActive) {
             setTerminalFailure(true);
@@ -483,8 +484,11 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           }
         });
       } catch (err: unknown) {
-        terminalFailureRef.current = true;
-        setTerminalFailure(true);
+        const failureAlreadyReported = terminalFailureRef.current;
+        if (!failureAlreadyReported) {
+          terminalFailureRef.current = true;
+          setTerminalFailure(true);
+        }
         setIsRinging(false);
         let cleanupPending = false;
         if (setupCleanupOwner) {
@@ -506,7 +510,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           }
         }
         console.error("[Telefun] Failed to initialize session:", err);
-        if (isActive) {
+        if (isActive && !failureAlreadyReported) {
           setError(
             cleanupPending
               ? CLEANUP_PENDING_MESSAGE

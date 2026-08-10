@@ -140,10 +140,16 @@ function getDefaultEnvironment(): TelefunWebRtcFactoryEnvironment {
     throw new Error("VITE_TELEFUN_WS_URL is required for OpenAI WebRTC.");
   }
   if (typeof RTCPeerConnection === "undefined") {
-    throw new Error("Browser WebRTC is unavailable.");
+    throw createTransportError(
+      "Browser WebRTC is unavailable.",
+      "browser_webrtc_unavailable",
+    );
   }
   if (!navigator.mediaDevices) {
-    throw new Error("Browser microphone access is unavailable.");
+    throw createTransportError(
+      "Browser microphone access is unavailable.",
+      "browser_webrtc_unavailable",
+    );
   }
   const audioElement = document.createElement("audio");
   audioElement.autoplay = true;
@@ -212,8 +218,12 @@ type TransportErrorDetails = {
   cause?: unknown;
 };
 
-function createTransportError(message: string, code: string): Error {
-  const error = new Error(message) as Error & { code: string };
+function createTransportError(
+  message: string,
+  code: string,
+  cause?: unknown,
+): Error {
+  const error = new Error(message, { cause }) as Error & { code: string };
   error.code = code;
   return error;
 }
@@ -283,8 +293,14 @@ function classifyTelefunTransportError(
   }
 
   if (
-    hasCode(details, "device_unplugged") ||
-    hasName(details, "NotAllowedError", "NotFoundError") ||
+    hasCode(details, "microphone_access_failed", "device_unplugged") ||
+    hasName(
+      details,
+      "NotAllowedError",
+      "NotFoundError",
+      "NotReadableError",
+      "OverconstrainedError",
+    ) ||
     hasSafeMessage(details, (message) =>
       message.includes("microphone track ended"),
     )
@@ -294,18 +310,19 @@ function classifyTelefunTransportError(
 
   if (
     hasCode(details, "provider_error") ||
-    hasSafeMessage(
-      details,
-      (message) =>
-        message === OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE.toLowerCase() ||
-        message.includes("broker request failed"),
-    )
+    (!hasCode(details, "broker_network_failed") &&
+      hasSafeMessage(
+        details,
+        (message) =>
+          message === OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE.toLowerCase() ||
+          message.includes("broker request failed"),
+      ))
   ) {
     return "provider";
   }
 
   if (
-    hasCode(details, "network_lost") ||
+    hasCode(details, "network_lost", "broker_network_failed") ||
     hasSafeMessage(
       details,
       (message) =>
@@ -520,26 +537,39 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
     const category = classifyTelefunTransportError(error);
     switch (category) {
       case "mic":
-        return createTransportError(TELEFUN_MIC_ERROR_MESSAGE, "device_unplugged");
+        return createTransportError(
+          TELEFUN_MIC_ERROR_MESSAGE,
+          hasCode(getErrorDetails(error), "device_unplugged")
+            ? "device_unplugged"
+            : "microphone_access_failed",
+          error,
+        );
       case "provider":
         return createTransportError(
           OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE,
           "provider_error",
+          error,
         );
       case "network":
-        return createTransportError(TELEFUN_NETWORK_ERROR_MESSAGE, "network_lost");
+        return createTransportError(
+          TELEFUN_NETWORK_ERROR_MESSAGE,
+          "network_lost",
+          error,
+        );
       case "cleanup":
         return createTransportError(
           TELEFUN_CLEANUP_ERROR_MESSAGE,
           "cleanup_pending",
+          error,
         );
       case "timeout":
         return createTransportError(
           TELEFUN_CONNECTION_TIMEOUT_MESSAGE,
           "connection_timeout",
+          error,
         );
       default:
-        return createTransportError(TELEFUN_UNKNOWN_ERROR_MESSAGE, "unknown");
+        return createTransportError(TELEFUN_UNKNOWN_ERROR_MESSAGE, "unknown", error);
     }
   }
 }

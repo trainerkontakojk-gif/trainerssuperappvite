@@ -39,6 +39,39 @@ import {
 
 type DataChannelMessageEvent = { data: string };
 type TerminalState = "ended" | "failed";
+type ConnectErrorStage =
+  | "get_user_media"
+  | "recording_start"
+  | "create_offer"
+  | "set_local_description"
+  | "broker_request"
+  | "set_remote_description"
+  | "peer_connect";
+
+type CodedError = Error & { code?: string };
+
+function createCodedError(
+  message: string,
+  code: string,
+  cause?: unknown,
+): CodedError {
+  const error = new Error(message, { cause }) as CodedError;
+  error.code = code;
+  return error;
+}
+
+function wrapCodedError(
+  error: unknown,
+  code: string,
+  fallbackMessage: string,
+): CodedError {
+  const sourceMessage =
+    error instanceof Error ? error.message : fallbackMessage;
+  const wrapped = createCodedError(sourceMessage, code, error);
+  if (error instanceof Error) wrapped.name = error.name;
+  return wrapped;
+}
+
 const RECORDING_CALLBACK_TIMEOUT_MS = 10_000;
 
 export class OpenAIWebRtcSession {
@@ -93,16 +126,26 @@ export class OpenAIWebRtcSession {
       throw new Error("WebRTC session is already running.");
     }
 
+    let connectStage: ConnectErrorStage = "get_user_media";
     try {
       this.setState("acquiring_media");
-      const localStream = await this.deps.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1,
-        },
-      });
+      let localStream: OpenAIWebRtcStreamLike;
+      try {
+        localStream = await this.deps.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1,
+          },
+        });
+      } catch (error) {
+        throw wrapCodedError(
+          error,
+          "microphone_access_failed",
+          "Microphone access failed.",
+        );
+      }
       if (this.shutdownRequested) {
         stopTracksOnce(getTracksFromStream(localStream));
         throw this.createShutdownError();
@@ -119,6 +162,7 @@ export class OpenAIWebRtcSession {
         this.deps,
         (volume) => this.notify(this.deps.onVolumeChange, volume),
       );
+      connectStage = "recording_start";
       await this.recordingGraph.start(activeLocalStream);
       for (const track of getTracksFromStream(this.localStream)) {
         this.localTracks.add(track);
@@ -137,19 +181,42 @@ export class OpenAIWebRtcSession {
         this.peer.addTrack(track, activeLocalStream);
       }
 
+      connectStage = "create_offer";
       this.setState("creating_offer");
       const peer = this.peer;
       if (!peer) {
         throw this.createShutdownError();
       }
-      const offer = await peer.createOffer();
-      this.assertActive();
-      await peer.setLocalDescription(offer);
+      let offer: RTCSessionDescriptionInit;
+      try {
+        offer = await peer.createOffer();
+      } catch (error) {
+        throw wrapCodedError(
+          error,
+          "webrtc_offer_failed",
+          "Browser offer creation failed.",
+        );
+      }
       this.assertActive();
 
       if (!offer.sdp) {
-        throw new Error("Browser offer SDP is missing.");
+        throw createCodedError(
+          "Browser offer SDP is missing.",
+          "webrtc_offer_failed",
+        );
       }
+
+      connectStage = "set_local_description";
+      try {
+        await peer.setLocalDescription(offer);
+      } catch (error) {
+        throw wrapCodedError(
+          error,
+          "webrtc_offer_failed",
+          "Browser local description failed.",
+        );
+      }
+      this.assertActive();
 
       this.setState("brokering_sdp");
       this.abortController = new AbortController();
@@ -157,14 +224,11 @@ export class OpenAIWebRtcSession {
       this.setState("connecting");
       this.assertActive();
 
+      connectStage = "broker_request";
       const { answerSdp } = await createOpenAIWebRtcBrokerCall({
-        fetch: this.deps.fetch,
-        brokerHttpBaseUrl: this.config.brokerHttpBaseUrl,
-        sessionId: this.config.sessionId,
-        accessToken: this.config.accessToken,
-        offerSdp: offer.sdp,
-        signal: this.abortController.signal,
+        onBrokerRequestStarted: () => this.warnConnectStage("broker_request_started"),
         onBrokerResponse: () => {
+          this.warnConnectStage("broker_response");
           // A POST can resolve after DELETE has already terminalized the
           // browser session. It may need one broker-only cleanup retry, but it
           // must never restart recording callback/resource finalization.
@@ -182,6 +246,12 @@ export class OpenAIWebRtcSession {
             );
           }
         },
+        fetch: this.deps.fetch,
+        brokerHttpBaseUrl: this.config.brokerHttpBaseUrl,
+        sessionId: this.config.sessionId,
+        accessToken: this.config.accessToken,
+        offerSdp: offer.sdp,
+        signal: this.abortController.signal,
       });
 
       this.assertActive();
@@ -189,15 +259,24 @@ export class OpenAIWebRtcSession {
       if (!activePeer) {
         throw this.createShutdownError();
       }
+      connectStage = "set_remote_description";
       await activePeer.setRemoteDescription({
         type: "answer",
         sdp: answerSdp,
       });
       this.assertActive();
+      connectStage = "peer_connect";
       await this.waitForPeerConnected(activePeer);
     } catch (error) {
       const normalizedError =
         error instanceof Error ? error : new Error("WebRTC connection failed.");
+      if (
+        this.state !== "ending" &&
+        this.state !== "ended" &&
+        this.state !== "failed"
+      ) {
+        this.warnConnectStage(connectStage, normalizedError);
+      }
       await this.fail(normalizedError);
       throw normalizedError;
     } finally {
@@ -259,7 +338,7 @@ export class OpenAIWebRtcSession {
     track.onended = () => {
       if (this.shutdownRequested) return;
       this.handleAsyncFailure(
-        new Error("Microphone track ended."),
+        createCodedError("Microphone track ended.", "device_unplugged"),
         "device_unplugged",
       );
     };
@@ -381,6 +460,22 @@ export class OpenAIWebRtcSession {
         "network_lost",
       );
     };
+  }
+
+  private warnConnectStage(
+    stage: ConnectErrorStage | "broker_request_started" | "broker_response",
+    error?: unknown,
+  ): void {
+    const value =
+      error && typeof error === "object"
+        ? (error as { name?: unknown; code?: unknown; message?: unknown })
+        : undefined;
+    console.warn({
+      stage,
+      name: typeof value?.name === "string" ? value.name : undefined,
+      code: typeof value?.code === "string" ? value.code : undefined,
+      message: typeof value?.message === "string" ? value.message : undefined,
+    });
   }
 
   private setState(state: OpenAIWebRtcState): void {
