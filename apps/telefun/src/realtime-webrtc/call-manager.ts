@@ -5,6 +5,7 @@ import {
 } from "../usage.js";
 import {
   buildCanonicalPocSession,
+  POC_MAX_INSTRUCTIONS_LENGTH,
   POC_MODEL_ID,
   POC_TRANSPORT,
 } from "./contracts.js";
@@ -706,22 +707,93 @@ export function createWebRtcCallManager(
   const failSessionWithoutAttempt = async (
     sessionId: string,
     userId: string | undefined,
+    requestedOutcome: AttemptOutcome,
   ): Promise<void> => {
+    const startedAtMs = now();
+    let outcomeLogged = false;
+    const logOutcome = (input: {
+      applied: boolean;
+      terminal: boolean;
+      reason: string;
+      errorClass?: "durability" | "conflict";
+    }): void => {
+      if (outcomeLogged) return;
+      outcomeLogged = true;
+      try {
+        console.warn("[Telefun] OpenAI WebRTC no-attempt finalization", {
+          sessionId,
+          requestedOutcome,
+          applied: input.applied,
+          terminal: input.terminal,
+          reason: input.reason.slice(0, 128),
+          durationMs: Math.max(0, now() - startedAtMs),
+          ...(input.errorClass ? { errorClass: input.errorClass } : {}),
+        });
+      } catch {
+        // Observability is non-authoritative for lifecycle.
+      }
+    };
     if (!options.db || !userId || !options.db.failSessionWithoutAttempt) {
+      logOutcome({
+        applied: false,
+        terminal: false,
+        reason: "persistence_unavailable",
+        errorClass: "durability",
+      });
       throw new WebRtcDurabilityError("fail_session_without_attempt");
     }
-    const result = await persist("fail_session_without_attempt", () =>
-      options.db!.failSessionWithoutAttempt!(sessionId, userId),
-    );
-    if (result.applied || result.terminal) return;
-    if (result.reason.startsWith("attempt_exists")) {
-      throw new WebRtcCallConflictError();
+    try {
+      const result = await persist("fail_session_without_attempt", () =>
+        options.db!.failSessionWithoutAttempt!(sessionId, userId),
+      );
+      if (result.applied || result.terminal) {
+        logOutcome(result);
+        return;
+      }
+      if (result.reason.startsWith("attempt_exists")) {
+        logOutcome({
+          applied: false,
+          terminal: false,
+          reason: result.reason,
+          errorClass: "conflict",
+        });
+        throw new WebRtcCallConflictError();
+      }
+      logOutcome({
+        applied: false,
+        terminal: false,
+        reason: result.reason,
+        errorClass: "durability",
+      });
+      throw new WebRtcDurabilityError("fail_session_without_attempt");
+    } catch (error) {
+      if (error instanceof WebRtcCallConflictError) {
+        logOutcome({
+          applied: false,
+          terminal: false,
+          reason: "attempt_exists_active",
+          errorClass: "conflict",
+        });
+      } else if (error instanceof WebRtcDurabilityError) {
+        logOutcome({
+          applied: false,
+          terminal: false,
+          reason: "persistence_unavailable",
+          errorClass: "durability",
+        });
+      }
+      throw error;
     }
-    throw new WebRtcDurabilityError("fail_session_without_attempt");
   };
 
   return {
-    async startCall({ userId, sessionId, offerSdp, signal }) {
+    async startCall({
+      userId,
+      sessionId,
+      offerSdp,
+      livePromptInstructions,
+      signal,
+    }) {
       if (shuttingDown) {
         throw new WebRtcShutdownError(bindings.size);
       }
@@ -783,9 +855,16 @@ export function createWebRtcCallManager(
           throw new Error("provider call aborted");
         }
 
+        if (
+          livePromptInstructions !== null &&
+          livePromptInstructions !== undefined &&
+          livePromptInstructions.length > POC_MAX_INSTRUCTIONS_LENGTH
+        ) {
+          throw new WebRtcDurabilityError("invalid_live_prompt_instructions");
+        }
         const created = await options.callsClient.createCall({
           offerSdp,
-          session: buildCanonicalPocSession(),
+          session: buildCanonicalPocSession(livePromptInstructions),
           signal: binding.startController.signal,
         });
         await bindProvider(binding, created.callId);
@@ -928,7 +1007,13 @@ export function createWebRtcCallManager(
       const binding =
         bindings.get(sessionId) ?? (await recoverForEnd(sessionId, userId));
       if (!binding) {
-        if (options.db) await failSessionWithoutAttempt(sessionId, userId);
+        if (options.db) {
+          await failSessionWithoutAttempt(
+            sessionId,
+            userId,
+            requestedOutcome ?? "completed",
+          );
+        }
         return;
       }
       if (userId && binding.userId !== userId) {
@@ -956,7 +1041,7 @@ export function createWebRtcCallManager(
         return;
       }
       if (options.db) {
-        await failSessionWithoutAttempt(sessionId, userId);
+        await failSessionWithoutAttempt(sessionId, userId, requestedOutcome);
         return;
       }
       if (!userId || !options.updateSession) return;

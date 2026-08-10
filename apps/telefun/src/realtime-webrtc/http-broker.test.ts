@@ -5,7 +5,8 @@ import {
   createOpenAIWebRtcHttpHandler as createHttpHandler,
   type OpenAIWebRtcHttpHandlerDependencies,
 } from "./http-broker.js";
-import { WebRtcRateLimitError } from "./call-manager.js";
+import { createWebRtcCallManager, WebRtcRateLimitError } from "./call-manager.js";
+import type { TelefunWebRtcDb } from "../db.js";
 
 vi.mock("../env.js", () => ({
   env: {
@@ -341,8 +342,27 @@ describe("OpenAI WebRTC HTTP broker", () => {
     expect(endCall).not.toHaveBeenCalled();
   });
 
-  it("keeps duplicate failed cleanup terminal only after the manager proves the attempt state", async () => {
-    const failCall = vi.fn(async () => undefined);
+  it("returns 204 for a second failed cleanup after already_terminal", async () => {
+    const db = {
+      getAttempt: vi.fn(async () => null),
+      failSessionWithoutAttempt: vi
+        .fn()
+        .mockResolvedValueOnce({
+          applied: true,
+          terminal: true,
+          reason: "failed_without_attempt",
+        })
+        .mockResolvedValueOnce({
+          applied: false,
+          terminal: true,
+          reason: "already_terminal",
+        }),
+    } as unknown as TelefunWebRtcDb;
+    const manager = createWebRtcCallManager({
+      db,
+      callsClient: { createCall: vi.fn(), closeCall: vi.fn() },
+      createSideband: vi.fn(),
+    });
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
@@ -363,17 +383,139 @@ describe("OpenAI WebRTC HTTP broker", () => {
         telefun_model_id: "gpt-realtime-2.1",
         telefun_transport: "openai-webrtc",
       })),
-      manager: { startCall: vi.fn(), endCall: vi.fn(), failCall },
+      manager,
     });
-    const res = response();
-
+    const first = response();
     await handler(
       request("DELETE", "", { "content-type": "" }, "?outcome=failed"),
-      res,
+      first,
+    );
+    const second = response();
+    await handler(
+      request("DELETE", "", { "content-type": "" }, "?outcome=failed"),
+      second,
     );
 
-    expect(res.status).toBe(204);
-    expect(failCall).toHaveBeenCalledWith(sessionId, "user-1");
+    expect(first.status).toBe(204);
+    expect(second.status).toBe(204);
+    expect(db.failSessionWithoutAttempt).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns 204 for a second cleanup when a terminal attempt exists", async () => {
+    const db = {
+      getAttempt: vi.fn(async () => ({
+        attemptId: "00000000-0000-4000-8000-000000000001",
+        finalizationKey: "00000000-0000-4000-8000-000000000002",
+        state: "ended",
+        usageRequestId: `telefun-webrtc:${sessionId}`,
+        providerCallIdHash: null,
+      })),
+      failSessionWithoutAttempt: vi.fn(async () => ({
+        applied: false,
+        terminal: true,
+        reason: "attempt_exists_terminal",
+      })),
+    } as unknown as TelefunWebRtcDb;
+    const manager = createWebRtcCallManager({
+      db,
+      callsClient: { createCall: vi.fn(), closeCall: vi.fn() },
+      createSideband: vi.fn(),
+    });
+    const handler = createOpenAIWebRtcHttpHandler({
+      enabled: false,
+      allowedOrigins: origin,
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      verifyToken: vi.fn(async () => ({
+        success: true,
+        user: { id: "user-1" },
+      })),
+      getProfile: vi.fn(async () => ({
+        role: "trainer",
+        status: "active",
+        is_deleted: false,
+      })),
+      getSession: vi.fn(async () => ({
+        id: sessionId,
+        user_id: "user-1",
+        status: "failed",
+        telefun_model_id: "gpt-realtime-2.1",
+        telefun_transport: "openai-webrtc",
+      })),
+      manager,
+    });
+    const first = response();
+    await handler(
+      request("DELETE", "", { "content-type": "" }, "?outcome=failed"),
+      first,
+    );
+    const second = response();
+    await handler(
+      request("DELETE", "", { "content-type": "" }, "?outcome=failed"),
+      second,
+    );
+
+    expect(first.status).toBe(204);
+    expect(second.status).toBe(204);
+    expect(db.failSessionWithoutAttempt).toHaveBeenCalledTimes(2);
+  });
+
+  it("records non-secret broker request and outcome observability", async () => {
+    const endCall = vi.fn(async () => undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const handler = createOpenAIWebRtcHttpHandler({
+        enabled: true,
+        allowedOrigins: origin,
+        verifyToken: vi.fn(async () => ({
+          success: true,
+          user: { id: "user-1" },
+        })),
+        getProfile: vi.fn(async () => ({
+          role: "trainer",
+          status: "active",
+          is_deleted: false,
+        })),
+        getSession: vi.fn(async () => ({
+          id: sessionId,
+          user_id: "user-1",
+          status: "active",
+          telefun_model_id: "gpt-realtime-2.1",
+          telefun_transport: "openai-webrtc",
+        })),
+        manager: { startCall: vi.fn(), endCall, failCall: vi.fn() },
+      });
+      const res = response();
+
+      await handler(request("DELETE"), res);
+
+      expect(res.status).toBe(204);
+      expect(warn).toHaveBeenCalledWith(
+        "[Telefun] OpenAI WebRTC broker request",
+        expect.objectContaining({
+          method: "DELETE",
+          sessionId,
+          requestedOutcome: "completed",
+          authOutcome: "success",
+          httpStatus: 204,
+          durationMs: expect.any(Number),
+        }),
+      );
+      const serialized = JSON.stringify(warn.mock.calls);
+      expect(serialized).not.toContain("SENTINEL-PROMPT");
+      expect(serialized).not.toContain("SENTINEL-SDP");
+      expect(serialized).not.toContain("rtc_SENTINEL");
+      expect(serialized).not.toContain("SENTINEL-RAW-ERROR");
+      expect(Object.keys(warn.mock.calls[0]?.[1] ?? {}).sort()).toEqual([
+        "authOutcome",
+        "durationMs",
+        "httpStatus",
+        "method",
+        "requestedOutcome",
+        "sessionId",
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("routes terminal history cleanup through the manager instead of trusting history alone", async () => {
@@ -588,6 +730,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
         status: "active",
         telefun_model_id: "gpt-realtime-2.1",
         telefun_transport: "openai-webrtc",
+        live_prompt_instructions: "Scenario: Kartu kredit jatuh tempo.",
       })),
       manager: {
         startCall,
@@ -612,6 +755,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
       userId: "user-1",
       sessionId,
       offerSdp: offer,
+      livePromptInstructions: "Scenario: Kartu kredit jatuh tempo.",
       signal: expect.any(AbortSignal),
     });
   });
