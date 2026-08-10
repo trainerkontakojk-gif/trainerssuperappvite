@@ -61,6 +61,20 @@ export function hashProviderCallId(callId: string): string {
   return createHash("sha256").update(callId, "utf8").digest("hex");
 }
 
+/**
+ * Truthful first-owner source for server-side WebRTC finalization. Every
+ * internal path supplies its real source when it can be determined; never a
+ * guess derived from the requested outcome.
+ */
+type FinalizationSource =
+  | "browser_delete"
+  | "provider_error"
+  | "sideband_close"
+  | "lease_lost"
+  | "shutdown"
+  | "start_failure"
+  | "unknown";
+
 const DEFAULT_SIDEBAND_DRAIN_TIMEOUT_MS = 5_000;
 const DEFAULT_PROVIDER_HANGUP_TIMEOUT_MS = 15_000;
 const DEFAULT_PERSISTENCE_TIMEOUT_MS = 10_000;
@@ -116,6 +130,34 @@ export function createWebRtcCallManager(
   );
   let shuttingDown = false;
   let shutdownPromise: Promise<void> | null = null;
+
+  // First-owner finalization-source bookkeeping. WeakSet keeps it per binding
+  // object, so retries and concurrent events never emit a contradictory
+  // second source log for the same attempt.
+  const finalizationSourceLogged = new WeakSet<ActiveBinding>();
+
+  const logFirstFinalizationSource = (input: {
+    binding: ActiveBinding;
+    source: FinalizationSource;
+    reason: string;
+    requestedOutcome: AttemptOutcome;
+  }): void => {
+    if (finalizationSourceLogged.has(input.binding)) return;
+    finalizationSourceLogged.add(input.binding);
+    try {
+      console.warn("[Telefun] OpenAI WebRTC finalization", {
+        source: input.source,
+        reason: input.reason.slice(0, 128),
+        sessionId: input.binding.sessionId,
+        attemptId: input.binding.attemptId,
+        requestedOutcome: input.requestedOutcome,
+        state: input.binding.state,
+        sidebandConnected: input.binding.state === "sideband_connected",
+      });
+    } catch {
+      // Observability is deliberately non-authoritative for lifecycle.
+    }
+  };
 
   const emitMetric = (metric: WebRtcMetricInput): void => {
     try {
@@ -607,7 +649,18 @@ export function createWebRtcCallManager(
   const finalize = (
     binding: ActiveBinding,
     requestedStatus: AttemptOutcome,
+    source: FinalizationSource,
+    reason: string,
   ): Promise<void> => {
+    // First-owner observability: emit the truthful source exactly once,
+    // before any terminal mutation so `state` reflects the pre-finalization
+    // evidence this feature exists to capture.
+    logFirstFinalizationSource({
+      binding,
+      source,
+      reason,
+      requestedOutcome: requestedStatus,
+    });
     if (requestedStatus !== "completed")
       binding.terminalStatus = requestedStatus;
     else if (!binding.terminalStatus) {
@@ -826,7 +879,12 @@ export function createWebRtcCallManager(
             if (binding.state === "ended") return;
             binding.terminalStatus = "network_lost";
             if (binding.state === "ending") return;
-            void finalize(binding, "network_lost").catch(() => undefined);
+            void finalize(
+              binding,
+              "network_lost",
+              "lease_lost",
+              "distributed_lease_lost",
+            ).catch(() => undefined);
           });
         })
         .catch(() => undefined);
@@ -836,7 +894,12 @@ export function createWebRtcCallManager(
         // by the browser start signal; finalization owns the hangup barrier.
         if (!binding.callId) binding.startController.abort();
         binding.terminalStatus = "failed";
-        void finalize(binding, "failed").catch(() => undefined);
+        void finalize(
+          binding,
+          "failed",
+          "start_failure",
+          "request_aborted",
+        ).catch(() => undefined);
       };
       if (signal?.aborted) abortStart();
       else signal?.addEventListener("abort", abortStart, { once: true });
@@ -889,19 +952,29 @@ export function createWebRtcCallManager(
               () => undefined,
             );
           },
-          onProviderError: () => {
+          onProviderError: (signal) => {
             if (binding.state === "ended" || binding.sidebandAdmissionSealed)
               return;
             binding.terminalStatus = "failed";
             if (binding.state === "ending") return;
-            void finalize(binding, "failed").catch(() => undefined);
+            void finalize(
+              binding,
+              "failed",
+              "provider_error",
+              signal?.code || "provider_error",
+            ).catch(() => undefined);
           },
           onCapacityExceeded: () => {
             if (binding.state === "ended" || binding.sidebandAdmissionSealed)
               return;
             binding.terminalStatus = "failed";
             if (binding.state === "ending") return;
-            void finalize(binding, "failed").catch(() => undefined);
+            void finalize(
+              binding,
+              "failed",
+              "unknown",
+              "observer_capacity_exceeded",
+            ).catch(() => undefined);
           },
         });
         if (binding.terminalStatus !== null || isEndingOrEnded(binding)) {
@@ -929,7 +1002,12 @@ export function createWebRtcCallManager(
               metadata: { unexpected: true },
             });
             if (binding.state === "ending") return;
-            void finalize(binding, "network_lost").catch(() => undefined);
+            void finalize(
+              binding,
+              "network_lost",
+              "sideband_close",
+              "unexpected_disconnect",
+            ).catch(() => undefined);
           },
         });
         if (binding.terminalStatus !== null || isEndingOrEnded(binding)) {
@@ -974,7 +1052,7 @@ export function createWebRtcCallManager(
         // setup/provider error path. Never close it before finalize().
         let finalizationError: unknown = null;
         try {
-          await finalize(binding, "failed");
+          await finalize(binding, "failed", "start_failure", "start_exception");
         } catch (finalizationFailure) {
           finalizationError = finalizationFailure;
         }
@@ -1027,6 +1105,8 @@ export function createWebRtcCallManager(
       await finalize(
         binding,
         requestedOutcome ?? (normalEnd ? "completed" : "failed"),
+        "browser_delete",
+        "authenticated_delete_end",
       );
     },
 
@@ -1037,7 +1117,12 @@ export function createWebRtcCallManager(
         if (userId && binding.userId !== userId) {
           throw new WebRtcCallConflictError();
         }
-        await finalize(binding, requestedOutcome);
+        await finalize(
+          binding,
+          requestedOutcome,
+          "browser_delete",
+          "authenticated_delete_fail",
+        );
         return;
       }
       if (options.db) {
@@ -1079,7 +1164,8 @@ export function createWebRtcCallManager(
           now,
           isPending: (binding) =>
             bindings.get(binding.sessionId) === binding && !isEnded(binding),
-          finalize: (binding) => finalize(binding, "failed"),
+          finalize: (binding) =>
+            finalize(binding, "failed", "shutdown", "service_shutdown"),
         });
         if (failureCount > 0 || pendingCount > 0) {
           throw new WebRtcShutdownError(Math.max(pendingCount, failureCount));

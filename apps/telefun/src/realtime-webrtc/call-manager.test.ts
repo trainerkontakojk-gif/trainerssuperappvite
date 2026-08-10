@@ -523,4 +523,249 @@ describe("WebRTC call manager", () => {
     expect(flushUsage).not.toHaveBeenCalled();
     expect(createOpenAIUsageAccumulator).toBeDefined();
   });
+
+  describe("first-owner finalization-source observability", () => {
+    const finalizationTag = "[Telefun] OpenAI WebRTC finalization";
+
+    function finalizationLogs(warn: ReturnType<typeof vi.spyOn>) {
+      return warn.mock.calls.filter(
+        (call: unknown[]) => call[0] === finalizationTag,
+      ) as unknown as [string, Record<string, unknown>][];
+    }
+
+    it("logs browser_delete when the browser DELETE finalizes a connected call", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      try {
+        const manager = createWebRtcCallManager({
+          callsClient: {
+            createCall: vi.fn(async () => ({
+              answerSdp: answer,
+              callId: "rtc_obs_delete",
+            })),
+            closeCall: vi.fn(async () => true),
+          },
+          createSideband: vi.fn(() => sideband()),
+          updateSession: vi.fn(async () => undefined),
+          createAttemptId: vi.fn(() => "attempt-obs-delete"),
+          now: () => 1_000,
+        });
+        await manager.startCall({
+          userId: "user-1",
+          sessionId,
+          offerSdp: offer,
+        });
+        await manager.endCall(sessionId, "user-1");
+
+        const logs = finalizationLogs(warn);
+        expect(logs).toHaveLength(1);
+        expect(logs[0]![1]).toEqual(
+          expect.objectContaining({
+            source: "browser_delete",
+            reason: "authenticated_delete_end",
+            sessionId,
+            attemptId: "attempt-obs-delete",
+            requestedOutcome: "completed",
+            state: "sideband_connected",
+            sidebandConnected: true,
+          }),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("logs provider_error with the bounded provider code and never the raw payload", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      try {
+        let sidebandCallbacks:
+          | { onEvent: (event: unknown) => void }
+          | undefined;
+        const updateSession = vi.fn(async () => undefined);
+        const manager = createWebRtcCallManager({
+          callsClient: {
+            createCall: vi.fn(async () => ({
+              answerSdp: answer,
+              callId: "rtc_obs_provider_error",
+            })),
+            closeCall: vi.fn(async () => true),
+          },
+          createSideband: vi.fn((_callId, callbacks) => {
+            sidebandCallbacks = callbacks;
+            return sideband();
+          }),
+          updateSession,
+        });
+        await manager.startCall({
+          userId: "user-1",
+          sessionId,
+          offerSdp: offer,
+        });
+        sidebandCallbacks!.onEvent({
+          type: "error",
+          error: {
+            type: "server_error",
+            code: "internal_error",
+            message: "provider secret must not escape",
+          },
+        });
+
+        await vi.waitFor(() => {
+          const logs = finalizationLogs(warn);
+          expect(logs).toHaveLength(1);
+          expect(logs[0]![1]).toEqual(
+            expect.objectContaining({
+              source: "provider_error",
+              reason: "internal_error",
+              requestedOutcome: "failed",
+            }),
+          );
+        });
+        expect(JSON.stringify(warn.mock.calls)).not.toContain(
+          "provider secret",
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("logs sideband_close when the sideband closes unexpectedly", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      try {
+        let sidebandCallbacks:
+          | {
+              onClose: (unexpected: boolean) => void;
+            }
+          | undefined;
+        const updateSession = vi.fn(async () => undefined);
+        const manager = createWebRtcCallManager({
+          callsClient: {
+            createCall: vi.fn(async () => ({
+              answerSdp: answer,
+              callId: "rtc_obs_sideband_close",
+            })),
+            closeCall: vi.fn(async () => true),
+          },
+          createSideband: vi.fn((_callId, callbacks) => {
+            sidebandCallbacks = callbacks;
+            return sideband();
+          }),
+          updateSession,
+        });
+        await manager.startCall({
+          userId: "user-1",
+          sessionId,
+          offerSdp: offer,
+        });
+        sidebandCallbacks!.onClose(true);
+
+        await vi.waitFor(() => {
+          const logs = finalizationLogs(warn);
+          expect(logs).toHaveLength(1);
+          expect(logs[0]![1]).toEqual(
+            expect.objectContaining({
+              source: "sideband_close",
+              reason: "unexpected_disconnect",
+              requestedOutcome: "network_lost",
+            }),
+          );
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("keeps the first finalization source without a contradictory second log", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => undefined);
+      try {
+        let sidebandCallbacks:
+          | {
+              onClose: (unexpected: boolean) => void;
+            }
+          | undefined;
+        const updateSession = vi.fn(async () => undefined);
+        const manager = createWebRtcCallManager({
+          callsClient: {
+            createCall: vi.fn(async () => ({
+              answerSdp: answer,
+              callId: "rtc_obs_first_wins",
+            })),
+            closeCall: vi.fn(async () => true),
+          },
+          createSideband: vi.fn((_callId, callbacks) => {
+            sidebandCallbacks = callbacks;
+            return sideband();
+          }),
+          updateSession,
+        });
+        await manager.startCall({
+          userId: "user-1",
+          sessionId,
+          offerSdp: offer,
+        });
+
+        const ending = manager.endCall(sessionId, "user-1");
+        sidebandCallbacks!.onClose(true);
+        await ending;
+
+        const logs = finalizationLogs(warn);
+        expect(logs).toHaveLength(1);
+        expect(logs[0]![1]).toEqual(
+          expect.objectContaining({
+            source: "browser_delete",
+            reason: "authenticated_delete_end",
+          }),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it("treats the observability logger as non-authoritative: a throwing logger does not block finalization", async () => {
+      const warn = vi
+        .spyOn(console, "warn")
+        .mockImplementation((tag: unknown) => {
+          if (tag === finalizationTag) throw new Error("logger exploded");
+        });
+      try {
+        const socket = sideband();
+        const closeCall = vi.fn(async () => true);
+        const updateSession = vi.fn(async () => undefined);
+        const manager = createWebRtcCallManager({
+          callsClient: {
+            createCall: vi.fn(async () => ({
+              answerSdp: answer,
+              callId: "rtc_obs_logger",
+            })),
+            closeCall,
+          },
+          createSideband: vi.fn(() => socket),
+          updateSession,
+        });
+        await manager.startCall({
+          userId: "user-1",
+          sessionId,
+          offerSdp: offer,
+        });
+        await expect(
+          manager.endCall(sessionId, "user-1"),
+        ).resolves.toBeUndefined();
+        expect(closeCall).toHaveBeenCalledWith("rtc_obs_logger");
+        expect(updateSession).toHaveBeenCalledWith(
+          sessionId,
+          "user-1",
+          expect.objectContaining({ status: "completed" }),
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  });
 });

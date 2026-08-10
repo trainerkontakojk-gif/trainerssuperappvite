@@ -267,7 +267,8 @@ function hasSafeMessage(
 ): boolean {
   return details.some(
     (value) =>
-      typeof value.message === "string" && predicate(value.message.toLowerCase()),
+      typeof value.message === "string" &&
+      predicate(value.message.toLowerCase()),
   );
 }
 
@@ -369,6 +370,46 @@ function safeProviderError(_event: OpenAIWebRtcEvent): Error {
     OPENAI_WEBRTC_PROVIDER_ERROR_MESSAGE,
     "provider_error",
   );
+}
+
+const PROVIDER_DIAGNOSTIC_MAX_LENGTH = 200;
+
+export type OpenAIWebRtcProviderDiagnostic = {
+  type?: string;
+  code?: string;
+  message?: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Fail-safe, bounded diagnostic for a provider error event. Only `type`,
+ * `code`, and `message` are extracted defensively, each capped at
+ * PROVIDER_DIAGNOSTIC_MAX_LENGTH characters. The raw event payload — tokens,
+ * SDP, prompts, or any other field — is never included.
+ */
+export function buildSafeProviderDiagnostic(
+  event: OpenAIWebRtcEvent,
+): OpenAIWebRtcProviderDiagnostic {
+  const payload =
+    event.kind === "event" && isRecord(event.payload) ? event.payload : null;
+  const error = payload && isRecord(payload.error) ? payload.error : null;
+  const bounded = (value: unknown): string | undefined => {
+    if (typeof value !== "string" || value.length === 0) return undefined;
+    return value.length > PROVIDER_DIAGNOSTIC_MAX_LENGTH
+      ? value.slice(0, PROVIDER_DIAGNOSTIC_MAX_LENGTH)
+      : value;
+  };
+  const diagnostic: OpenAIWebRtcProviderDiagnostic = {};
+  const type = bounded(event.kind === "event" ? event.type : undefined);
+  const code = bounded(error?.code);
+  const message = bounded(error?.message);
+  if (type !== undefined) diagnostic.type = type;
+  if (code !== undefined) diagnostic.code = code;
+  if (message !== undefined) diagnostic.message = message;
+  return diagnostic;
 }
 
 export function mapOpenAIWebRtcSpeakingEvent(type: string): boolean | null {
@@ -484,10 +525,16 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
 
   public disconnect(reason: TelefunEndReason): Promise<void> {
     if (reason === "provider_error" || reason === "cleanup") {
-      return this.session.end("failed");
+      return this.session.end(
+        "failed",
+        reason === "cleanup" ? "unmount" : "provider_error",
+      );
     }
-    if (reason === "network_lost") return this.session.end("network_lost");
-    return this.session.end();
+    if (reason === "network_lost") {
+      return this.session.end("network_lost", "peer_state");
+    }
+    if (reason === "timeout") return this.session.end(undefined, "timeout");
+    return this.session.end(undefined, "user");
   }
 
   private handleProviderEvent(event: OpenAIWebRtcEvent): void {
@@ -511,6 +558,16 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
       } catch {
         // UI observers are not lifecycle authorities.
       }
+      try {
+        // One fail-safe, bounded diagnostic; never the raw event payload,
+        // tokens, SDP, or prompts.
+        console.warn(
+          "[Telefun] OpenAI WebRTC provider error",
+          buildSafeProviderDiagnostic(event),
+        );
+      } catch {
+        // Observability is never a lifecycle authority.
+      }
       this.finalizeProviderFailure();
       return;
     }
@@ -526,7 +583,7 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
     if (this.providerFailureFinalization) return;
     try {
       this.providerFailureFinalization = this.session
-        .end("failed")
+        .end("failed", "provider_error")
         .catch(() => undefined);
     } catch {
       // Provider cleanup is best effort; the UI error has already been reported.
@@ -569,7 +626,11 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
           error,
         );
       default:
-        return createTransportError(TELEFUN_UNKNOWN_ERROR_MESSAGE, "unknown", error);
+        return createTransportError(
+          TELEFUN_UNKNOWN_ERROR_MESSAGE,
+          "unknown",
+          error,
+        );
     }
   }
 }
