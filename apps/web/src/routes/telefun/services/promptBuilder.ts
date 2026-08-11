@@ -107,7 +107,9 @@ IDENTITAS ANDA (WAJIB KONSISTEN):
 - LOKASI/DOMISILI: ${identity.city}
 - NOMOR HP: ${identity.phone}
 
-PENTING: Jika ditanya agen, sebutkan data di atas. JANGAN MENGARANG data identitas baru yang berbeda.
+KONTRAK VERIFIKASI IDENTITAS (WAJIB): Jika agen meminta verifikasi nama, domisili, atau nomor HP, ulangi nilai di atas PERSIS dan UTUH.
+Jangan memendekkan menjadi prefix/suffix, melakukan masking, mengganti nilai, atau menyubstitusi nilai dengan data lain. Nama, kota, dan nomor HP harus selalu persis sesuai konfigurasi di atas.
+Jangan mengarang fakta verifikasi yang tidak didukung. Untuk NIK/KTP, nomor rekening, nomor kartu, tanggal lahir, email, kode verifikasi, atau data lain yang tidak tercantum di atas, katakan tidak tahu atau tidak membawa data tersebut.
 
 KONTROL RUNTIME APLIKASI:
 - Teks yang diawali marker persis [TELEFUN_CONTROL:TIME_CUE] adalah kontrol waktu dari aplikasi, bukan ucapan agen dan bukan bagian roleplay.
@@ -188,13 +190,17 @@ export function getTimeCueInstruction(
 
 function sanitizeScenarioText(value: string | undefined): string {
   return (value ?? "")
-    .replace(/\[TELEFUN_CONTROL\s*:\s*TIME_CUE\]/gi, "[TELEFUN_CONTROL : TIME_CUE]")
+    .replace(
+      /\[TELEFUN_CONTROL\s*:\s*TIME_CUE\]/gi,
+      "[TELEFUN_CONTROL : TIME_CUE]",
+    )
     .replace(/\[(SYSTEM|DEVELOPER|ASSISTANT|USER)\]/gi, "[$1 DATA]");
 }
 
 function getEmotionInstruction(consumerType: TelefunConsumerType): string {
   const guidanceById: Record<string, string> = {
-    marah: "EMOSI: MARAH/KESAL. Nada tinggi dan cepat.",
+    marah:
+      "EMOSI: MARAH/KESAL. Nada tinggi dan cepat. Sejak respons konsumen pertama, bersikap tegas, tidak sabar, dan tegang dengan kata-kata pendek serta emfatis. Pada pembukaan gunakan minimal satu penanda keberatan natural yang relevan, seperti 'kok', 'masa', 'saya keberatan', atau 'ini tidak beres'. Jangan kasar, abusif, teatrikal, atau marah tanpa henti.",
     bingung: "EMOSI: BINGUNG/GAPTEK. Bicara lambat, banyak jeda 'eemm', 'anu'.",
     kritis:
       "EMOSI: KRITIS/TELITI. Bicara terstruktur dan minta kepastian yang relevan.",
@@ -209,15 +215,20 @@ function getEmotionInstruction(consumerType: TelefunConsumerType): string {
     guidanceById[consumerType.id] ??
     "EMOSI: Ikuti profil konsumen secara natural.";
   const ladderById: Record<string, string> = {
-    marah: "Mulai dengan ketahanan tinggi: keberatan tetap tegas. Respons baik dan konkret menurunkan resistensi satu tingkat demi satu tingkat; respons memotong atau mengambang mempertahankan keberatan, tanpa eskalasi tanpa batas.",
-    bingung: "Mulai ragu dan butuh penjelasan bertahap. Respons sabar menambah kepercayaan perlahan; istilah teknis tanpa penjelasan membuat Anda meminta klarifikasi lagi.",
-    kritis: "Mulai menuntut kepastian. Jawaban spesifik dan konsisten menurunkan keberatan bertahap; klaim tanpa dasar membuat Anda menguji detailnya.",
-    ramah: "Kooperatif sejak awal, tetapi tetap punya kebutuhan. Respons efektif menambah kepercayaan secara bertahap, bukan langsung mengakhiri masalah.",
-    "terburu-buru": "Tetap mendesak. Langkah praktis yang jelas menurunkan desakan sedikit demi sedikit; jawaban bertele-tele membuat Anda meminta inti jawaban.",
+    marah:
+      "Mulai dengan ketahanan tinggi: keberatan tetap tegas. Setelah agen menunjukkan empati dan solusi konkret, turunkan resistensi satu tingkat demi satu tingkat; respons memotong atau mengambang mempertahankan keberatan. De-eskalasi harus bertahap, tidak langsung lunak, tanpa eskalasi tanpa batas.",
+    bingung:
+      "Mulai ragu dan butuh penjelasan bertahap. Respons sabar menambah kepercayaan perlahan; istilah teknis tanpa penjelasan membuat Anda meminta klarifikasi lagi.",
+    kritis:
+      "Mulai menuntut kepastian. Jawaban spesifik dan konsisten menurunkan keberatan bertahap; klaim tanpa dasar membuat Anda menguji detailnya.",
+    ramah:
+      "Kooperatif sejak awal, tetapi tetap punya kebutuhan. Respons efektif menambah kepercayaan secara bertahap, bukan langsung mengakhiri masalah.",
+    "terburu-buru":
+      "Tetap mendesak. Langkah praktis yang jelas menurunkan desakan sedikit demi sedikit; jawaban bertele-tele membuat Anda meminta inti jawaban.",
     pasrah:
       "Mulai rendah energi dan sulit percaya. Setelah empati yang tepat dan tulus, Anda perlahan mau mendengar; yang lebih dulu diungkap adalah sedih, takut, dan beratnya kesulitan, bukan langsung pokok masalah. Empati membuka ruang, tetapi bukan solusi akhir; masalah substantif tetap butuh langkah konkret. Jangan tiba-tiba menjadi ceria atau langsung pulih.",
   };
-  return `${guidance} PROFIL LENGKAP: ${consumerType.description}\nTANGGA KESABARAN DAN KEBERATAN: ${ladderById[consumerType.id] ?? "Pertahankan keberatan secara wajar; respons baik menurunkan resistensi bertahap, respons buruk mempertahankannya."}`;
+  return `NAMA TIPE KONSUMEN: ${consumerType.name}\nTINGKAT KESULITAN: ${consumerType.difficulty ?? "Tidak ditentukan"}\n${guidance} PROFIL LENGKAP: ${consumerType.description}\nTANGGA KESABARAN DAN KEBERATAN: ${ladderById[consumerType.id] ?? "Pertahankan keberatan secara wajar; respons baik menurunkan resistensi bertahap, respons buruk mempertahankannya."}`;
 }
 
 function getMotivationInstruction(): string {
@@ -230,11 +241,16 @@ Motivasi tersembunyi bukan syarat skor atau keberhasilan sesi. Jangan mengarang 
 
 function getReactionInstruction(consumerTypeId: string): string {
   const reactions: Record<string, string> = {
-    marah: "Empati dan langkah konkret meredakan nada perlahan; dipotong atau dijawab mengambang membuat Anda menegaskan keberatan.",
-    bingung: "Penjelasan sederhana dan sabar membuat Anda lebih terbuka; terburu-buru atau istilah teknis membuat Anda meminta contoh.",
-    kritis: "Jawaban konsisten membuat Anda melunak bertahap; klaim tidak jelas membuat Anda meminta dasar dan kepastian.",
-    ramah: "Sikap efektif membuat Anda kooperatif; jawaban tidak mampu tetap membuat Anda meminta opsi realistis.",
-    "terburu-buru": "Jawaban ringkas dan praktis membantu; penundaan atau monolog membuat Anda mendesak inti solusi.",
+    marah:
+      "Empati dan solusi konkret meredakan nada perlahan; dipotong atau dijawab mengambang membuat Anda menegaskan keberatan. Tetap tegas dan singkat, bukan abusif atau teatrikal.",
+    bingung:
+      "Penjelasan sederhana dan sabar membuat Anda lebih terbuka; terburu-buru atau istilah teknis membuat Anda meminta contoh.",
+    kritis:
+      "Jawaban konsisten membuat Anda melunak bertahap; klaim tidak jelas membuat Anda meminta dasar dan kepastian.",
+    ramah:
+      "Sikap efektif membuat Anda kooperatif; jawaban tidak mampu tetap membuat Anda meminta opsi realistis.",
+    "terburu-buru":
+      "Jawaban ringkas dan praktis membantu; penundaan atau monolog membuat Anda mendesak inti solusi.",
     pasrah:
       "Empati yang tenang membuat Anda mau mendengar dan bercerita sedikit demi sedikit; dipotong membuat Anda makin tertutup dan pasif. Empati membantu membuka ruang, tetapi tidak menyelesaikan masalah.",
   };
@@ -242,11 +258,12 @@ function getReactionInstruction(consumerTypeId: string): string {
 }
 
 function getKnowledgeBoundaryInstruction(consumerTypeId: string): string {
-  const boundary = consumerTypeId === "kritis"
-    ? "Anda boleh mengetahui istilah umum yang pernah dibaca, tetapi bukan pakar; bedakan informasi yang Anda tahu dari dugaan."
-    : consumerTypeId === "bingung"
-      ? "Anda awam terhadap produk, prosedur, dan istilah teknis; akui jika tidak paham dan minta penjelasan sederhana."
-      : "Anda hanya tahu pengalaman dan fakta yang diberikan skenario; Anda boleh tidak tahu produk, prosedur, atau istilah teknis dan meminta klarifikasi.";
+  const boundary =
+    consumerTypeId === "kritis"
+      ? "Anda boleh mengetahui istilah umum yang pernah dibaca, tetapi bukan pakar; bedakan informasi yang Anda tahu dari dugaan."
+      : consumerTypeId === "bingung"
+        ? "Anda awam terhadap produk, prosedur, dan istilah teknis; akui jika tidak paham dan minta penjelasan sederhana."
+        : "Anda hanya tahu pengalaman dan fakta yang diberikan skenario; Anda boleh tidak tahu produk, prosedur, atau istilah teknis dan meminta klarifikasi.";
   return `BATAS PENGETAHUAN KONSUMEN:\n${boundary} Jangan memberi nasihat hukum/produk baru atau berubah menjadi pakar tanpa dasar skenario.`;
 }
 
@@ -255,7 +272,14 @@ function getPersonaSeed(
   scenario: TelefunScenario,
   consumerType: TelefunConsumerType,
 ): string {
-  const input = [identity.name, identity.phone, identity.city, scenario.id, scenario.title, consumerType.id].join("|");
+  const input = [
+    identity.name,
+    identity.phone,
+    identity.city,
+    scenario.id,
+    scenario.title,
+    consumerType.id,
+  ].join("|");
   let hash = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
     hash ^= input.charCodeAt(index);

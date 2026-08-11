@@ -116,7 +116,9 @@ export function createOpenAIWebRtcHttpHandler(
           method: req.method,
           sessionId,
           requestedOutcome:
-            req.method === "DELETE" ? requestedOutcome ?? "completed" : "start",
+            req.method === "DELETE"
+              ? (requestedOutcome ?? "completed")
+              : "start",
           authOutcome,
           httpStatus,
           durationMs: Math.max(0, Date.now() - requestStartedAtMs),
@@ -299,6 +301,7 @@ export function createOpenAIWebRtcHttpHandler(
         sessionId,
         offerSdp,
         livePromptInstructions: auth.session.live_prompt_instructions,
+        consumerGender: auth.session.consumer_gender,
         signal: requestAbort.signal,
       });
       if (res.headersSent || res.writableEnded || requestAbort.signal.aborted)

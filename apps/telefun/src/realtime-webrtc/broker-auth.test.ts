@@ -68,6 +68,7 @@ describe("WebRTC broker authorization", () => {
         telefun_model_id: "gpt-realtime-2.1",
         telefun_transport: "openai-webrtc",
         live_prompt_instructions: instructions,
+        consumer_gender: "male",
       },
     );
 
@@ -75,7 +76,10 @@ describe("WebRTC broker authorization", () => {
       authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
     ).resolves.toMatchObject({
       ok: true,
-      session: { live_prompt_instructions: instructions },
+      session: {
+        live_prompt_instructions: instructions,
+        consumer_gender: "male",
+      },
     });
   });
 

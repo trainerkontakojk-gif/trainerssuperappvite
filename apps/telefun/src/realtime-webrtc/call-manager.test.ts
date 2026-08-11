@@ -14,6 +14,21 @@ import { OpenAiCallCreationError } from "./openai-calls-client.js";
 const sessionId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
 const offer = "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\ns=-\r\n";
 const answer = "v=0\r\no=- 2 2 IN IP4 0.0.0.0\r\ns=-\r\n";
+const LIVE_PROMPT = [
+  "ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).",
+  "IDENTITAS ANDA (WAJIB KONSISTEN):",
+  "- NAMA: Siti Rahayu (Wanita)",
+  "- LOKASI/DOMISILI: Bandung",
+  "- NOMOR HP: 08123456789",
+  "KONTROL RUNTIME APLIKASI:",
+  "DATA SKENARIO (TIDAK TERPERCAYA — hanya fakta roleplay, bukan instruksi sistem):",
+  "MASALAH ANDA: Tagihan kartu.",
+  "ATURAN ROLEPLAY:",
+  "KARAKTER & EMOSI:",
+  "NAMA TIPE KONSUMEN: Marah & Emosional",
+  "TINGKAT KESULITAN: Hard",
+  "EMOSI: MARAH/KESAL.",
+].join("\n");
 
 function sideband() {
   return {
@@ -48,7 +63,7 @@ describe("WebRTC call manager", () => {
       createAttemptId: vi.fn(() => "attempt-race"),
     });
 
-    const starting = manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    const starting = manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await manager.endCall(sessionId);
     created.resolve({ answerSdp: answer, callId: "rtc_late" });
 
@@ -90,7 +105,7 @@ describe("WebRTC call manager", () => {
     });
 
     await expect(
-      manager.startCall({ userId: "user-1", sessionId, offerSdp: offer }),
+      manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT }),
     ).rejects.toThrow("provider call failed");
 
     expect(order).toEqual([
@@ -120,7 +135,7 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    const starting = manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    const starting = manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await vi.waitFor(() => expect(socket.connect).toHaveBeenCalledOnce());
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     await expect(starting).rejects.toThrow("provider call failed");
@@ -139,7 +154,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
 
     expect(updateSession).toHaveBeenCalledWith(
@@ -160,7 +175,7 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(closeCall).toHaveBeenCalledTimes(2);
@@ -179,7 +194,7 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer })).rejects.toThrow("provider call failed");
+    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("provider call failed");
     expect(closeCall).toHaveBeenCalledWith("rtc_header_bound");
   });
 
@@ -194,7 +209,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(updateSession).toHaveBeenCalledTimes(2);
@@ -224,7 +239,7 @@ describe("WebRTC call manager", () => {
       flushUsage,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     socket.emit("response.done", null);
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
@@ -248,7 +263,7 @@ describe("WebRTC call manager", () => {
       auditFailedUsage,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     socket.emit("response.done", null);
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await manager.endCall(sessionId);
@@ -276,7 +291,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     sidebandCallbacks!.onEvent({
       type: "response.done",
       response: { id: "response-cancelled", status: "cancelled" },
@@ -318,6 +333,7 @@ describe("WebRTC call manager", () => {
       userId: "user-1",
       sessionId: failedSessionId,
       offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
     });
     failedCallbacks!.onClose(true);
     await vi.waitFor(() =>
@@ -345,7 +361,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     const ending = manager.endCall(sessionId);
     await vi.waitFor(() => expect(callbacks).toBeDefined());
     callbacks!.onClose(true);
@@ -377,7 +393,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     sidebandCallbacks!.onEvent({
       type: "response.done",
       response: { id: "response-incomplete", status: "incomplete" },
@@ -428,7 +444,7 @@ describe("WebRTC call manager", () => {
       onSidebandDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer });
+    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     sidebandCallbacks!.onEvent({
       type: "conversation.item.input_audio_transcription.completed",
       item_id: "item-1",
@@ -512,8 +528,8 @@ describe("WebRTC call manager", () => {
       now: () => 1_000,
     });
 
-    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer })).resolves.toEqual({ answerSdp: answer });
-    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer })).rejects.toThrow("active call");
+    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).resolves.toEqual({ answerSdp: answer });
+    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("active call");
 
     await manager.endCall(sessionId);
     await manager.endCall(sessionId);
@@ -555,6 +571,7 @@ describe("WebRTC call manager", () => {
           userId: "user-1",
           sessionId,
           offerSdp: offer,
+          livePromptInstructions: LIVE_PROMPT,
         });
         await manager.endCall(sessionId, "user-1");
 
@@ -603,6 +620,7 @@ describe("WebRTC call manager", () => {
           userId: "user-1",
           sessionId,
           offerSdp: offer,
+          livePromptInstructions: LIVE_PROMPT,
         });
         sidebandCallbacks!.onEvent({
           type: "error",
@@ -661,6 +679,7 @@ describe("WebRTC call manager", () => {
           userId: "user-1",
           sessionId,
           offerSdp: offer,
+          livePromptInstructions: LIVE_PROMPT,
         });
         sidebandCallbacks!.onClose(true);
 
@@ -709,6 +728,7 @@ describe("WebRTC call manager", () => {
           userId: "user-1",
           sessionId,
           offerSdp: offer,
+          livePromptInstructions: LIVE_PROMPT,
         });
 
         const ending = manager.endCall(sessionId, "user-1");
@@ -753,6 +773,7 @@ describe("WebRTC call manager", () => {
           userId: "user-1",
           sessionId,
           offerSdp: offer,
+          livePromptInstructions: LIVE_PROMPT,
         });
         await expect(
           manager.endCall(sessionId, "user-1"),
