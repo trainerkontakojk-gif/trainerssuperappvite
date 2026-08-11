@@ -94,7 +94,7 @@ supabase/rollbacks/rollback_20260801120000_telefun_openai_webrtc_phase4_durable_
 
 Migration additive/transactional menambah recording readiness columns pada `telefun_history`, tables `telefun_realtime_attempts` dan `telefun_realtime_transcript_events`, active-delete guards, lifecycle/transcript/usage/recording/scoring RPC contract, dan schema reload notification. Durable tables mengaktifkan RLS, mencabut table grants dari `public`, `anon`, dan `authenticated`, serta hanya memberi akses table/RPC ke `service_role` melalui server boundary.
 
-Rollback memulihkan body/signature/grant pre-Phase-4 untuk `complete_telefun_scoring`, `claim_telefun_scoring`, dan `enqueue_telefun_scoring` sebelum menghapus Phase 4 functions/triggers/tables/columns. Artifact ini belum diaplikasikan ke remote atau local database pada run ini.
+Rollback memulihkan body/signature/grant pre-Phase-4 untuk `complete_telefun_scoring`, `claim_telefun_scoring`, dan `enqueue_telefun_scoring` sebelum menghapus Phase 4 functions/triggers/tables/columns. Pada follow-up 2026-08-10, hosted production inspection membuktikan forward migration Phase 4, RLS, dan service-role-only boundary terpasang. Standalone rollback Phase 4 tidak dijalankan; drill yang diotorisasi khusus rollback/reapply Phase 5.
 
 ## Verification evidence
 
@@ -178,4 +178,4 @@ pnpm --dir apps/web exec vitest run \
 
 ## Evidence limits and gate status
 
-F1–F8 lulus pada evidence lokal yang tersedia dan jalur tetap default-off/non-production. Tidak ada real provider call, paid/manual smoke, real browser/audio/visual check, deployment, migration application, commit, atau push. SQL behavior/RLS/rollback execution belum diverifikasi karena local PostgreSQL tidak tersedia. P3 conditional action-row/layout-shift tetap deferred dan bukan blocker durable lifecycle.
+F1–F8 lulus pada evidence lokal yang tersedia dan jalur tetap default-off/non-production. Follow-up hosted inspection membuktikan Phase 4 migration/RLS/security boundary terpasang, tetapi standalone Phase 4 rollback belum dijalankan. Tidak ada real provider call, paid/manual smoke, real browser/audio/visual check, application deployment, commit, atau push. P3 conditional action-row/layout-shift tetap deferred dan bukan blocker durable lifecycle.

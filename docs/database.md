@@ -41,6 +41,7 @@ erDiagram
 **Catatan Migration Baseline:** Schema aplikasi dikelola di `supabase/migrations/`. Migration Phase 4 di bawah adalah artifact repository yang additive dan transactional; keberadaannya di tree tidak berarti sudah diterapkan ke database remote.
 
 **Core Migrations (000–017):**
+
 - `000_profiles_core.sql` — Profiles & auth tables
 - `001_sidak_core.sql` — SIDAK core + Profiler tables (12 tables, all RLS-enabled)
 - `002_ketik_pdkt_core.sql` — KETIK, PDKT, AI usage tables
@@ -62,42 +63,42 @@ erDiagram
 
 **Timestamp Migrations (20260520–20260801):**
 
-| Migration | Purpose |
-|-----------|---------|
-| `20260520054101_add_is_deleted_to_profiles.sql` | Add `is_deleted` column to profiles |
-| `20260522093000_profiler_unique_constraints.sql` | Profiler unique constraints |
-| `20260523000000_telefun_parity_extensions.sql` | Telefun parity extensions |
-| `20260525000100_sidak_dashboard_summary_vite_schema_refresh.sql` | Target-schema-compatible `refresh_qa_dashboard_summary_for_period` |
-| `20260525000200_restore_mv_qa_period_summary_contract.sql` | Idempotent MV + refresh function contract repair |
-| `20260525000300_telefun_history_add_consumer_contact_columns.sql` | Add consumer_phone and consumer_city to telefun_history |
-| `20260525000400_telefun_history_add_feedback.sql` | Add feedback column to telefun_history |
-| `20260525000500_telefun_history_add_metadata_columns.sql` | Add metadata columns to telefun_history |
-| `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` | Terminal re-hardening: revoke all non-service_role access |
-| `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql` | Unique index on qa_temuan for duplicate prevention |
-| `20260527000001_add_simulation_duration_to_ketik_history.sql` | Add `simulation_duration` to ketik_history |
-| `20260527000002_add_unique_index_ketik_review_jobs_session_id.sql` | Unique index on ketik_review_jobs |
-| `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql` | Fix profiler reorder authorization |
-| `20260603090000_pdkt_shared_mailbox_policy.sql` | PDKT shared mailbox RLS + soft-delete RPC |
-| `20260603100000_pdkt_fix_soft_delete_rpc.sql` | Fix soft_delete_pdkt_mailbox_item RPC |
-| `20260604100000_restore_profiler_foto_bucket.sql` | Restore profiler-foto storage bucket |
-| `20260605100000_atomic_monitoring_history_delete.sql` | Atomic monitoring history delete RPC |
-| `20260611100000_fix_telefun_coaching_summary_rpc_contract.sql` | Fix telefun coaching summary RPC |
-| `20260611200000_telefun_scoring_lifecycle.sql` | Telefun scoring lifecycle contract |
-| `20260611201000_telefun_scoring_retry_queue.sql` | Telefun scoring retry queue |
-| `20260612000000_fix_profiles_rls_recursion.sql` | Fix profiles RLS recursion |
-| `20260614090000_sidak_dashboard_forecast_snapshots.sql` | SIDAK dashboard forecast snapshots table |
-| `20260618100000_add_get_profiler_folder_counts_rpc.sql` | RPC `get_profiler_folder_counts(uuid[])` |
-| `20260618101000_add_access_groups_count_view.sql` | View `v_access_groups_with_item_counts` |
-| `20260618102000_add_get_leader_scope_snapshot_rpc.sql` | RPC `get_leader_scope_snapshot(uuid, text)` |
-| `20260618110000_add_mimo_model_pricing.sql` | Add MiMo model pricing |
-| `20260618200000_fix_billing_singleton_upsert.sql` | Fix billing singleton upsert |
-| `20260618210000_ai_usage_modality_tokens.sql` | AI usage modality token columns |
-| `20260618220000_ai_usage_reconciliation_view.sql` | AI usage reconciliation view |
-| `20260619090000_telefun_live_per_minute_billing.sql` | Telefun live per-minute billing columns |
-| `20260622150000_repair_telefun_scoring_lifecycle_contract.sql` | Repair telefun scoring lifecycle contract |
-| `20260630003553_add_current_sidak_profiler_lookup_indexes.sql` | SIDAK profiler lookup indexes |
-| `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` | Additive Telefun WebRTC attempt/transcript/usage/finalization, recording readiness, scoring lock, and service-role RPCs |
-| `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql` | Distributed WebRTC lease/quota, rate-limit windows, orphan cleanup, hashed-user metrics, and precise network/orphan outcomes |
+| Migration                                                                 | Purpose                                                                                                                      |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `20260520054101_add_is_deleted_to_profiles.sql`                           | Add `is_deleted` column to profiles                                                                                          |
+| `20260522093000_profiler_unique_constraints.sql`                          | Profiler unique constraints                                                                                                  |
+| `20260523000000_telefun_parity_extensions.sql`                            | Telefun parity extensions                                                                                                    |
+| `20260525000100_sidak_dashboard_summary_vite_schema_refresh.sql`          | Target-schema-compatible `refresh_qa_dashboard_summary_for_period`                                                           |
+| `20260525000200_restore_mv_qa_period_summary_contract.sql`                | Idempotent MV + refresh function contract repair                                                                             |
+| `20260525000300_telefun_history_add_consumer_contact_columns.sql`         | Add consumer_phone and consumer_city to telefun_history                                                                      |
+| `20260525000400_telefun_history_add_feedback.sql`                         | Add feedback column to telefun_history                                                                                       |
+| `20260525000500_telefun_history_add_metadata_columns.sql`                 | Add metadata columns to telefun_history                                                                                      |
+| `20260526090000_reharden_mv_qa_period_summary_after_contract_restore.sql` | Terminal re-hardening: revoke all non-service_role access                                                                    |
+| `20260527000000_add_unique_index_qa_temuan_duplicate_input.sql`           | Unique index on qa_temuan for duplicate prevention                                                                           |
+| `20260527000001_add_simulation_duration_to_ketik_history.sql`             | Add `simulation_duration` to ketik_history                                                                                   |
+| `20260527000002_add_unique_index_ketik_review_jobs_session_id.sql`        | Unique index on ketik_review_jobs                                                                                            |
+| `20260602000000_fix_bulk_reorder_profiler_peserta_auth.sql`               | Fix profiler reorder authorization                                                                                           |
+| `20260603090000_pdkt_shared_mailbox_policy.sql`                           | PDKT shared mailbox RLS + soft-delete RPC                                                                                    |
+| `20260603100000_pdkt_fix_soft_delete_rpc.sql`                             | Fix soft_delete_pdkt_mailbox_item RPC                                                                                        |
+| `20260604100000_restore_profiler_foto_bucket.sql`                         | Restore profiler-foto storage bucket                                                                                         |
+| `20260605100000_atomic_monitoring_history_delete.sql`                     | Atomic monitoring history delete RPC                                                                                         |
+| `20260611100000_fix_telefun_coaching_summary_rpc_contract.sql`            | Fix telefun coaching summary RPC                                                                                             |
+| `20260611200000_telefun_scoring_lifecycle.sql`                            | Telefun scoring lifecycle contract                                                                                           |
+| `20260611201000_telefun_scoring_retry_queue.sql`                          | Telefun scoring retry queue                                                                                                  |
+| `20260612000000_fix_profiles_rls_recursion.sql`                           | Fix profiles RLS recursion                                                                                                   |
+| `20260614090000_sidak_dashboard_forecast_snapshots.sql`                   | SIDAK dashboard forecast snapshots table                                                                                     |
+| `20260618100000_add_get_profiler_folder_counts_rpc.sql`                   | RPC `get_profiler_folder_counts(uuid[])`                                                                                     |
+| `20260618101000_add_access_groups_count_view.sql`                         | View `v_access_groups_with_item_counts`                                                                                      |
+| `20260618102000_add_get_leader_scope_snapshot_rpc.sql`                    | RPC `get_leader_scope_snapshot(uuid, text)`                                                                                  |
+| `20260618110000_add_mimo_model_pricing.sql`                               | Add MiMo model pricing                                                                                                       |
+| `20260618200000_fix_billing_singleton_upsert.sql`                         | Fix billing singleton upsert                                                                                                 |
+| `20260618210000_ai_usage_modality_tokens.sql`                             | AI usage modality token columns                                                                                              |
+| `20260618220000_ai_usage_reconciliation_view.sql`                         | AI usage reconciliation view                                                                                                 |
+| `20260619090000_telefun_live_per_minute_billing.sql`                      | Telefun live per-minute billing columns                                                                                      |
+| `20260622150000_repair_telefun_scoring_lifecycle_contract.sql`            | Repair telefun scoring lifecycle contract                                                                                    |
+| `20260630003553_add_current_sidak_profiler_lookup_indexes.sql`            | SIDAK profiler lookup indexes                                                                                                |
+| `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql`       | Additive Telefun WebRTC attempt/transcript/usage/finalization, recording readiness, scoring lock, and service-role RPCs      |
+| `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql`    | Distributed WebRTC lease/quota, rate-limit windows, orphan cleanup, hashed-user metrics, and precise network/orphan outcomes |
 
 ### 1. `public.profiles`
 
@@ -132,7 +133,7 @@ Menyimpan hasil simulasi legacy/kompatibilitas dari modul Ketik dan Telefun.
 - **`telefun_replay_annotations`**: Anotasi AI dan manual untuk fitur Replay Telefun.
 - **`user_settings`**: Settings modul yang disimpan per user untuk KETIK, PDKT, dan TELEFUN.
 
-#### Phase 4 Telefun WebRTC durable schema (repository artifact)
+#### Phase 4 Telefun WebRTC durable schema (hosted contract and repository artifact)
 
 Migration `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` menambahkan kontrak additive berikut:
 
@@ -143,9 +144,9 @@ Migration `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` me
 - RPC server-only meliputi claim/bind/sideband/checkpoint/finalization/usage, `mark_telefun_recording_uploaded`, `mark_telefun_recording_ready`, `complete_telefun_scoring`, `claim_telefun_scoring`, dan `enqueue_telefun_scoring`. Migration mengirim `NOTIFY pgrst, 'reload schema'` di dalam transaction.
 - `complete_telefun_scoring(UUID, NUMERIC, JSONB DEFAULT NULL) RETURNS BOOLEAN` mengambil row lock `FOR UPDATE`. Branch WebRTC memerlukan status `completed`, recording state non-failed, `scoring_ready_at`, dan exact `<user>/<session>/agent_only.seekable.webm`; branch Gemini/legacy OpenAI WebSocket mempertahankan gate lama. Capture failure yang beradu dengan scoring `processing` mengubah scoring WebRTC menjadi `failed`, sehingga completion stale mengembalikan `false`.
 
-Rollback artifact `supabase/rollbacks/rollback_20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` memulihkan body/signature/grant pre-Phase-4 untuk completion/claim/enqueue sebelum menghapus function/trigger/table dan empat kolom Phase 4. Rollback juga transactional dan mengirim schema reload notification. Tidak ada migration/rollback yang dijalankan pada remote database dalam sinkronisasi ini; local Postgres tidak tersedia sehingga SQL evidence tetap static contract/fake RPC evidence.
+Rollback artifact `supabase/rollbacks/rollback_20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql` memulihkan body/signature/grant pre-Phase-4 untuk completion/claim/enqueue sebelum menghapus function/trigger/table dan empat kolom Phase 4. Rollback juga transactional dan mengirim schema reload notification. Hosted production inspection pada 2026-08-10 membuktikan migration Phase 4 dan service-role-only boundary terpasang. Standalone rollback Phase 4 tidak dijalankan; operasi tersebut khusus rollback/reapply Phase 5.
 
-#### Phase 5 Telefun WebRTC distributed schema (repository artifact)
+#### Phase 5 Telefun WebRTC distributed schema (hosted contract and repository artifact)
 
 Migration `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql` menambahkan:
 
@@ -154,7 +155,7 @@ Migration `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql`
 - Opaque provider call reference terenkripsi untuk cleanup restart, outcome `network_lost`/`orphaned`, counter duplicate/sideband/missing-usage, serta RPC claim/complete orphan yang mengembalikan cleanup gagal ke state retryable.
 - `telefun_realtime_metrics` dengan nama metric allowlisted dan SHA-256 `user_id_hash`; UUID user mentah tidak disimpan di row metric. Missing/unpriceable usage tetap audit state dan tidak dibuat menjadi zero sintetis.
 
-Rollback Phase 5 bersifat transactional dan fail-closed jika row outcome `network_lost`/`orphaned` belum didrain. Artifact ini belum dijalankan pada hosted/local PostgreSQL dalam task ini; bukti yang tersedia tetap static migration contract dan fake RPC tests.
+Rollback Phase 5 bersifat transactional dan fail-closed jika row outcome `network_lost`/`orphaned` belum didrain. Pada 2026-08-10, setelah explicit operator authorization dan private backup, stale OpenAI WebRTC lifecycle di database production canonical direkonsiliasi lalu canonical rollback/reapply dijalankan dalam satu transaction. Snapshot row lease/rate-limit/metric dan kolom attempt pulih identik; RLS serta 10 function grant tetap service-role-only; migration-history row tetap tepat satu; baseline history/usage Gemini sebelum/sesudah identik. Bukti ini menutup hosted database subgate, bukan deployment/load/paid-provider gate.
 
 ### 4. Modul Profiler (KTP)
 

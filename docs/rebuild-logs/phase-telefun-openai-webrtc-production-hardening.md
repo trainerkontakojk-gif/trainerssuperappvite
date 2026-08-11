@@ -2,7 +2,7 @@
 
 ## Status dan scope
 
-Phase 5 sudah diimplementasikan pada boundary OpenAI WebRTC yang tetap **default-off dan non-production**. Gemini Live WebSocket, legacy OpenAI WebSocket, K/A/S scoring contract, dan provider fallback behavior tidak diubah. Perubahan ini menutup control-plane hardening yang dapat diverifikasi secara lokal; Gate P5 tetap **PARTIAL / BELUM LULUS** karena evidence deployment, database, load, dan review eksternal belum tersedia.
+Phase 5 sudah diimplementasikan pada boundary OpenAI WebRTC yang tetap **default-off dan non-production**. Gemini Live WebSocket, legacy OpenAI WebSocket, K/A/S scoring contract, dan provider fallback behavior tidak diubah. Local control-plane verification dan hosted database subgate sudah **PASS**; Gate P5 keseluruhan tetap **PARTIAL** karena evidence application deployment/restart, load, review eksternal, dan real-browser/device/network belum tersedia.
 
 ## Distributed quota, lease, dan rate limit
 
@@ -66,8 +66,34 @@ Canonical `docs/telefun.md` dan `docs/database.md` juga disinkronkan karena sebe
 - `git diff --check`: **exit 0**.
 - `pnpm validate-migrations`: **exit 1** karena `DATABASE_URL`/`SUPABASE_DB_URL` tidak tersedia; tidak diklaim sebagai SQL execution evidence.
 
+## Hosted database execution update — 2026-08-10
+
+Setelah operator menjelaskan bahwa tidak ada staging database dan memberi
+authorization eksplisit untuk database production canonical, operasi berikut
+dijalankan secara fail-close hanya pada boundary Telefun OpenAI WebRTC:
+
+- read-only preflight, exact-scope assertions, dan private backup mode `0600`;
+- rekonsiliasi lima stale active WebRTC histories, satu stale claimed attempt,
+  old orphan compatibility mapping, dan enam usage-audit requirements;
+- canonical Phase 5 rollback lalu reapply dalam satu PostgreSQL transaction
+  dengan advisory lock dan transactional DDL;
+- exact snapshot equality untuk lease/rate-limit/metric rows dan Phase 5 attempt
+  columns, serta assertions untuk RLS, 10 function grants, constraints, dan satu
+  migration-history row;
+- final state 0 active WebRTC history, 0 nonterminal attempt, 0 active/cleanup
+  lease, dan 0 Phase-5-only outcome;
+- before/after Gemini boundary tetap identik: 47 non-WebRTC histories, empat
+  active/pending histories, dan 854 Gemini usage rows dengan latest timestamps
+  yang sama;
+- local/remote migration list sinkron dan provider call count tetap 0.
+
+Ini menutup **hosted database subgate**. Tidak ada Railway/application deploy,
+environment mutation, WebRTC rollout activation, atau paid provider call.
+
 ## Evidence limits dan Gate P5
 
-Belum ada local PostgreSQL/Docker, sehingga `supabase db lint`, `supabase status`, dan `pnpm validate-migrations` tidak dapat mengeksekusi SQL; validator `tsx` juga dibatasi IPC sandbox. Migration/RLS belum diaplikasikan ke hosted database. Belum ada Railway restart/deployment smoke, disposable-database rollback drill, external security review, load test lintas replica, real browser/device/network matrix, atau paid OpenAI call. Semua provider/browser tests memakai fake upstream/fake browser dan tidak membuktikan provider availability atau production readiness.
+Hosted migration/RLS/grants dan rollback/reapply drill sekarang sudah dibuktikan pada PostgreSQL production canonical. Supabase security advisor masih melaporkan temuan project-wide pre-existing di luar Phase 5, termasuk satu non-WebRTC security-definer view; 10 function Phase 5 sendiri terbukti tidak executable oleh public/anon/authenticated. Belum ada Railway restart/deployment smoke, external security review, load test lintas replica, real browser/device/network matrix, atau paid OpenAI call. Semua provider/browser tests tetap memakai fake upstream/fake browser dan tidak membuktikan provider availability atau production readiness.
 
-`graphify update .` juga dicoba sesuai workflow repo tetapi extractor gagal `Operation not permitted` pada sandbox; ini dicatat sebagai limitation, bukan diklaim berhasil.
+Percobaan awal `graphify update .` gagal `Operation not permitted` pada sandbox;
+post-gap run yang dicatat di atas kemudian berhasil exit `0`, sehingga kegagalan
+awal hanya historical dan bukan limitation final.
