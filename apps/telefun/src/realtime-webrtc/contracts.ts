@@ -21,7 +21,7 @@ export interface CanonicalPocSession {
       turn_detection: {
         type: "server_vad";
         create_response: true;
-        interrupt_response: true;
+        interrupt_response: false;
       };
     };
     output: {
@@ -49,7 +49,7 @@ export function buildCanonicalPocSession(
         turn_detection: {
           type: "server_vad",
           create_response: true,
-          interrupt_response: true,
+          interrupt_response: false,
         },
       },
       output: {

@@ -603,7 +603,7 @@ Semua route membutuhkan role `admin` atau `trainer`.
 | `/internal/telefun/scoring` | HTTP      | Assessment OpenAI internal; bearer token, tanpa CORS |
 | `/` atau `/ws`              | WebSocket | Koneksi real-time dengan Gemini                      |
 
-#### OpenAI WebRTC integration (Phase 3 transport + Phase 4/5 durable hardening, default off)
+#### OpenAI WebRTC integration (Phase 3–6 + provider-free Phase 7 Full candidate, default off)
 
 | Method   | Endpoint                                                   | Deskripsi                                                |
 | -------- | ---------------------------------------------------------- | -------------------------------------------------------- |
@@ -614,12 +614,17 @@ Catatan kontrak:
 
 - `sessionId` wajib dari path UUID; broker menolak session foreign, terminal, pending, mismatch, atau auto-create fallback.
 - Caller harus admin/trainer dengan profile ternormalisasi `active`, `is_deleted != true`, dan session owned/`active` yang sudah pre-created.
-- Broker membangun session JSON server-side dengan model `gpt-realtime-2.1`, voice `marin`, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON.
+- Broker membangun session JSON server-side dengan model `gpt-realtime-2.1`, voice `marin`, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON. `interrupt_response=false` mempertahankan authority server config sambil membiarkan browser membatalkan hanya output yang benar-benar terdengar.
 - `Location` dari upstream diparse menjadi `call_id` opaque; sideband `wss://api.openai.com/v1/realtime?call_id=...` adalah authority untuk transcript/usage/control server-side.
 - Cleanup upstream memakai official OpenAI POST hangup; browser tetap hanya melihat DELETE broker yang idempotent.
 - Transcript/usage failure diaudit; usage yang tidak lengkap tidak disintesis.
 - Cleanup idempotent: browser close, DELETE berulang, atau `?outcome=failed` tidak menggandakan finalization. `204` berarti lifecycle durable sudah terminal; kegagalan persistence/barrier yang retryable menjadi `503` dan owner tetap dipertahankan.
-- Phase 4 recording/scoring dan Phase 5 distributed lease/rate-limit/orphan/network hardening sudah dideskripsikan oleh implementation saat ini. Ini bukan bukti rollout produksi; barge-in, fallback provider, production UI cutover, hosted migration, deployment/load, dan real-browser evidence tetap deferred.
+- Phase 7 Full candidate memisahkan response generation dari `output_audio_buffer.started`/`stopped` dan state HTML media. Barge-in hanya menargetkan response/item audible yang sudah mempunyai kemajuan playback; blocked autoplay, pause/stall/end, serta interval hold/muted-output tidak dihitung ke `audio_end_ms`.
+- Interruption memakai scoped `response.cancel(response_id)` hanya ketika response masih in progress, lalu WebRTC `output_audio_buffer.clear`, dan exact `conversation.item.truncate(item_id, content_index=0, audio_end_ms)`. Command dideduplikasi; error balapan yang berkorelasi melalui `event_id` tidak mengakhiri call, sedangkan provider error lain tetap fail-closed.
+- Server-VAD speech/hold/interruption metrics ditutup secara deterministik saat finalization. Mute mikrofon tetap berbeda dari hold: hold menonaktifkan input dan menyupresi output tanpa merusak peer/recording graph; unhold mencoba playback lagi.
+- Time cue memakai kontrak existing `[TELEFUN_CONTROL:TIME_CUE]` sebagai system item diikuti `response.create`; browser tetap tidak memperoleh `session.update` atau authority model/voice/instructions.
+- MediaRecorder mencoba MIME yang benar-benar didukung (WebM/Opus, WebM, MP4) sebelum constructor tanpa options. Blob memakai MIME recorder/variant yang benar-benar dipilih, bukan label WebM hardcoded.
+- Semua bukti Phase 7 pada candidate ini provider-free/unit/fake-browser dan lokal. Candidate belum dibuktikan di physical browser/device atau production Vercel, belum live/deployed dari change set ini, dan tidak menyelesaikan parity lintas browser. Mini, fallback policy, serta keputusan deprecation OpenAI WebSocket tetap deferred; Gemini dan legacy OpenAI WebSocket tidak berubah.
 
 #### WebSocket Protocol (Client → Proxy → Gemini)
 

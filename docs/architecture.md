@@ -20,6 +20,11 @@ Aplikasi ini dibangun menggunakan arsitektur monorepo modern dengan pemisahan fr
 
 ## High-Level Architecture
 
+Production host ownership is split: `apps/web` is canonical on Vercel, while
+`apps/api` and `apps/telefun` remain canonical Railway services. Railway Web is
+an allowed normal STAGING target; only a Railway Web PRODUCTION deployment is
+auxiliary/noncanonical and cannot by itself prove the Vercel Web release state.
+
 ```mermaid
 graph TD
     User((User)) -->|Browser| ViteApp[Vite React SPA]
@@ -92,6 +97,29 @@ Phase 5 menambahkan additive distributed control-plane state untuk jalur OpenAI 
 - Metric names dibatasi untuk cost reconciliation, sideband disconnect, duplicate write, missing usage, orphan, dan session cap. UUID user diubah menjadi SHA-256 `user_id_hash` sebelum persistence; missing/unpriceable usage tetap audit state, bukan biaya sintetis.
 
 Production masih default-off/non-production. `GET /health` hanya membaca liveness dan readiness non-sensitive; ia tidak claim lease, consume quota, membuka provider, atau menulis billing/usage. Deployment mengharuskan exact HTTPS `ALLOWED_ORIGINS`, WSS untuk browser transport, fixed upstream OpenAI URL di server, bounded request body/timeout, preflight allowlist, dan CSP/Permissions Policy yang diselaraskan dengan deployment domain yang disetujui. Migration Phase 5 dan rollback artifact belum diaplikasikan ke database pada run ini.
+
+### Telefun Phase 7 Full provider-free browser boundary
+
+Phase 7 candidate menambahkan controller browser khusus untuk lifecycle output
+OpenAI WebRTC. Controller membedakan response yang masih dibuat provider, output
+buffer yang sedang dimainkan, dan elapsed media yang benar-benar maju. Server
+tetap memiliki canonical session configuration (`server_vad` dengan
+`interrupt_response=false`); browser tidak mengirim `session.update`.
+
+Pada speech start, hanya response/item audible yang ditargetkan. Response yang
+masih in progress menerima scoped `response.cancel`, output WebRTC di-clear, dan
+assistant item di-truncate dengan elapsed played media. Event stale/duplicate dan
+rapid repeats dideduplikasi; autoplay block, pause/stall/end, serta hold tidak
+menambah elapsed. DataChannel browser tetap bukan persistence authority:
+transcript/usage/finalization server-side tetap dimiliki sideband dan lifecycle
+Phase 4–6.
+
+Metrics server-VAD, hold, dan interruption ditutup pada finalization. Time cue
+memakai system control item existing ditambah `response.create`. Recording
+memilih variant MediaRecorder yang didukung dan mempertahankan MIME output aktual.
+Ini baru bukti unit/fake-browser provider-free; physical browser/device,
+production Vercel, Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar
+evidence candidate ini. Gemini dan legacy OpenAI WebSocket tidak diubah.
 
 ## Directory Structure
 

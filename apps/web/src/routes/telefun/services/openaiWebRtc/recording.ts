@@ -10,6 +10,11 @@ const RECORDING_TIMESLICE_MS = 1_000;
 const RECORDING_STOP_TIMEOUT_MS = 5_000;
 const VOLUME_SAMPLE_INTERVAL_MS = 100;
 const MAX_VOLUME_SAMPLES = 1_000;
+const RECORDING_MIME_CANDIDATES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+] as const;
 
 export interface OpenAIWebRtcRecordingResult {
   fullBlob: Blob | null;
@@ -25,7 +30,8 @@ function getDefaultAudioContext(): OpenAIWebRtcAudioContextLike | null {
           AudioContext?: typeof AudioContext;
           webkitAudioContext?: typeof AudioContext;
         });
-  const AudioContextCtor = contextWindow?.AudioContext ??
+  const AudioContextCtor =
+    contextWindow?.AudioContext ??
     contextWindow?.webkitAudioContext ??
     (typeof AudioContext === "undefined" ? undefined : AudioContext);
   if (!AudioContextCtor) return null;
@@ -34,14 +40,14 @@ function getDefaultAudioContext(): OpenAIWebRtcAudioContextLike | null {
 
 function getDefaultMediaRecorder(
   stream: OpenAIWebRtcStreamLike,
-  options: { mimeType: string },
+  mimeType?: string,
 ): OpenAIWebRtcMediaRecorderLike {
   if (typeof MediaRecorder === "undefined") {
     throw new Error("Browser MediaRecorder is unavailable.");
   }
   return new MediaRecorder(
     stream as unknown as MediaStream,
-    options,
+    mimeType ? { mimeType } : undefined,
   ) as unknown as OpenAIWebRtcMediaRecorderLike;
 }
 
@@ -49,11 +55,15 @@ function isMimeTypeSupported(
   deps: OpenAIWebRtcDependencies,
   mimeType: string,
 ): boolean {
-  if (deps.mediaRecorderIsTypeSupported) {
-    return deps.mediaRecorderIsTypeSupported(mimeType);
+  try {
+    if (deps.mediaRecorderIsTypeSupported) {
+      return deps.mediaRecorderIsTypeSupported(mimeType);
+    }
+    if (typeof MediaRecorder === "undefined") return false;
+    return MediaRecorder.isTypeSupported(mimeType);
+  } catch {
+    return false;
   }
-  if (typeof MediaRecorder === "undefined") return false;
-  return MediaRecorder.isTypeSupported(mimeType);
 }
 
 function createObjectUrl(deps: OpenAIWebRtcDependencies, blob: Blob): string {
@@ -85,15 +95,19 @@ export class OpenAIWebRtcRecordingGraph {
   private context: OpenAIWebRtcAudioContextLike | null = null;
   private localSource: OpenAIWebRtcAudioNodeLike | null = null;
   private remoteSource: OpenAIWebRtcAudioNodeLike | null = null;
-  private analyser: OpenAIWebRtcAudioNodeLike & {
-    fftSize: number;
-    frequencyBinCount: number;
-    getByteTimeDomainData(data: Uint8Array): void;
-  } | null = null;
+  private analyser:
+    | (OpenAIWebRtcAudioNodeLike & {
+        fftSize: number;
+        frequencyBinCount: number;
+        getByteTimeDomainData(data: Uint8Array): void;
+      })
+    | null = null;
   private fullDestination: { stream: OpenAIWebRtcStreamLike } | null = null;
   private agentDestination: { stream: OpenAIWebRtcStreamLike } | null = null;
   private fullRecorder: OpenAIWebRtcMediaRecorderLike | null = null;
   private agentRecorder: OpenAIWebRtcMediaRecorderLike | null = null;
+  private fullRecordingMimeType = "";
+  private agentRecordingMimeType = "";
   private readonly fullChunks: Blob[] = [];
   private readonly agentChunks: Blob[] = [];
   private readonly volumeSamples: number[] = [];
@@ -112,7 +126,8 @@ export class OpenAIWebRtcRecordingGraph {
     this.started = true;
 
     try {
-      this.context = this.deps.audioContextFactory?.() ?? getDefaultAudioContext();
+      this.context =
+        this.deps.audioContextFactory?.() ?? getDefaultAudioContext();
       if (!this.context) {
         throw new Error("Browser AudioContext is unavailable.");
       }
@@ -136,22 +151,23 @@ export class OpenAIWebRtcRecordingGraph {
       this.localSource.connect(this.fullDestination);
       this.localSource.connect(this.agentDestination);
 
-      const mimeType = isMimeTypeSupported(
-        this.deps,
-        "audio/webm;codecs=opus",
-      )
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
-      this.fullRecorder = this.createRecorder(
+      const mimeTypes = RECORDING_MIME_CANDIDATES.filter((mimeType) =>
+        isMimeTypeSupported(this.deps, mimeType),
+      );
+      const fullRecording = this.createRecorder(
         this.fullDestination.stream,
-        mimeType,
+        mimeTypes,
         this.fullChunks,
       );
-      this.agentRecorder = this.createRecorder(
+      this.fullRecorder = fullRecording.recorder;
+      this.fullRecordingMimeType = fullRecording.mimeType;
+      const agentRecording = this.createRecorder(
         this.agentDestination.stream,
-        mimeType,
+        mimeTypes,
         this.agentChunks,
       );
+      this.agentRecorder = agentRecording.recorder;
+      this.agentRecordingMimeType = agentRecording.mimeType;
       this.fullRecorder.start(RECORDING_TIMESLICE_MS);
       this.agentRecorder.start(RECORDING_TIMESLICE_MS);
       this.startVolumeSampling();
@@ -161,6 +177,8 @@ export class OpenAIWebRtcRecordingGraph {
         error instanceof Error
           ? error
           : new Error("WebRTC recording setup failed.");
+      this.stopVolumeSampling();
+      this.stopActiveRecorders([this.fullRecorder, this.agentRecorder]);
       return false;
     }
   }
@@ -189,16 +207,27 @@ export class OpenAIWebRtcRecordingGraph {
 
     this.stopVolumeSampling();
     const recorders = [this.fullRecorder, this.agentRecorder].filter(
-      (recorder): recorder is OpenAIWebRtcMediaRecorderLike => recorder !== null,
+      (recorder): recorder is OpenAIWebRtcMediaRecorderLike =>
+        recorder !== null,
     );
     await this.awaitRecorderStops(recorders);
 
     return {
       fullBlob: this.fullChunks.length
-        ? new Blob(this.fullChunks, { type: "audio/webm" })
+        ? new Blob(this.fullChunks, {
+            type: this.resolveBlobMimeType(
+              this.fullRecordingMimeType,
+              this.fullChunks,
+            ),
+          })
         : null,
       agentBlob: this.agentChunks.length
-        ? new Blob(this.agentChunks, { type: "audio/webm" })
+        ? new Blob(this.agentChunks, {
+            type: this.resolveBlobMimeType(
+              this.agentRecordingMimeType,
+              this.agentChunks,
+            ),
+          })
         : null,
       recordingError: this.recordingError,
     };
@@ -255,16 +284,44 @@ export class OpenAIWebRtcRecordingGraph {
 
   private createRecorder(
     stream: OpenAIWebRtcStreamLike,
-    mimeType: string,
+    supportedMimeTypes: readonly string[],
     chunks: Blob[],
-  ): OpenAIWebRtcMediaRecorderLike {
-    const recorder = this.deps.mediaRecorderFactory
-      ? this.deps.mediaRecorderFactory(stream, { mimeType })
-      : getDefaultMediaRecorder(stream, { mimeType });
-    recorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) chunks.push(event.data);
-    };
-    return recorder;
+  ): { recorder: OpenAIWebRtcMediaRecorderLike; mimeType: string } {
+    const candidates: Array<string | undefined> = [
+      ...supportedMimeTypes,
+      undefined,
+    ];
+    let lastError: unknown = null;
+    for (const mimeType of candidates) {
+      try {
+        const recorder = this.deps.mediaRecorderFactory
+          ? this.deps.mediaRecorderFactory(
+              stream,
+              mimeType ? { mimeType } : undefined,
+            )
+          : getDefaultMediaRecorder(stream, mimeType);
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) chunks.push(event.data);
+        };
+        return {
+          recorder,
+          mimeType: recorder.mimeType?.trim() || mimeType || "",
+        };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("No supported MediaRecorder variant is available.");
+  }
+
+  private resolveBlobMimeType(
+    selectedMimeType: string,
+    chunks: Blob[],
+  ): string {
+    if (selectedMimeType) return selectedMimeType;
+    return chunks.find((chunk) => chunk.type)?.type ?? "";
   }
 
   private async awaitRecorderStops(
@@ -287,9 +344,10 @@ export class OpenAIWebRtcRecordingGraph {
           try {
             recorder.stop();
           } catch (error) {
-            this.recordingError ??= error instanceof Error
-              ? error
-              : new Error("WebRTC recorder stop failed.");
+            this.recordingError ??=
+              error instanceof Error
+                ? error
+                : new Error("WebRTC recorder stop failed.");
             finish();
           }
         }),
@@ -317,9 +375,10 @@ export class OpenAIWebRtcRecordingGraph {
       try {
         recorder.stop();
       } catch (error) {
-        this.recordingError ??= error instanceof Error
-          ? error
-          : new Error("WebRTC recorder stop failed.");
+        this.recordingError ??=
+          error instanceof Error
+            ? error
+            : new Error("WebRTC recorder stop failed.");
       }
     }
   }

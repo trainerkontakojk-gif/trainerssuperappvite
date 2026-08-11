@@ -23,8 +23,25 @@ export type OpenAIWebRtcEvent =
 /** Browser controls are intentionally a closed set. Server-owned session config
  * is never sent through this seam. */
 export type OpenAIWebRtcControlEvent =
-  | { type: "response.cancel" }
-  | { type: "response.create" };
+  | { type: "response.cancel"; response_id: string; event_id?: string }
+  | { type: "output_audio_buffer.clear"; event_id?: string }
+  | { type: "response.create"; event_id?: string }
+  | {
+      type: "conversation.item.truncate";
+      item_id: string;
+      content_index: 0;
+      audio_end_ms: number;
+      event_id?: string;
+    }
+  | {
+      type: "conversation.item.create";
+      event_id?: string;
+      item: {
+        type: "message";
+        role: "system";
+        content: Array<{ type: "input_text"; text: string }>;
+      };
+    };
 
 export interface OpenAIWebRtcSessionConfig {
   sessionId: string;
@@ -56,7 +73,18 @@ export interface OpenAIWebRtcAudioElementLike {
   srcObject: MediaProvider | null;
   muted?: boolean;
   autoplay?: boolean;
+  currentTime?: number;
+  paused?: boolean;
+  ended?: boolean;
+  readyState?: number;
+  onplaying?: ((event: Event) => void) | null;
+  onpause?: ((event: Event) => void) | null;
+  onended?: ((event: Event) => void) | null;
+  ontimeupdate?: ((event: Event) => void) | null;
+  onwaiting?: ((event: Event) => void) | null;
+  onstalled?: ((event: Event) => void) | null;
   play(): Promise<void>;
+  pause?(): void;
 }
 
 export interface OpenAIWebRtcAudioNodeLike {
@@ -85,6 +113,7 @@ export interface OpenAIWebRtcAudioContextLike {
 
 export interface OpenAIWebRtcMediaRecorderLike {
   state: string;
+  mimeType?: string;
   ondataavailable: ((event: { data: Blob }) => void) | null;
   onstop: (() => void) | null;
   start(timeslice?: number): void;
@@ -156,6 +185,7 @@ export interface OpenAIWebRtcDependencies {
   onError?: (error: Error) => void;
   onLocalStream?: (stream: OpenAIWebRtcStreamLike | null) => void;
   onPlaybackBlocked?: () => void;
+  onRemotePlaybackChange?: (audible: boolean) => void;
   onRecoveryRequired?: OpenAIWebRtcStateCallbacks["onRecoveryRequired"];
   onCleanupConfirmed?: () => void;
   isObjectUrlRetained?: (url: string) => boolean;

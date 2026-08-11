@@ -13,21 +13,23 @@
     ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐
     │  apps/web   │   │  apps/api   │   │ apps/telefun │
     │  Vite SPA   │──▶│  Hono HTTP  │   │ WS Server    │
-    │  (Railway/  │   │  (Railway)  │   │ (Railway)    │
-    │   Vercel)   │   │             │   │              │
+    │  (Vercel)   │   │  (Railway)  │   │ (Railway)    │
+    │ canonical   │   │             │   │              │
     └─────────────┘   └─────────────┘   └─────────────┘
 ```
 
-**Primary:** Web, API, dan Telefun dideploy di Railway sebagai service terpisah dari monorepo yang sama.
-**Alternative:** Web juga bisa dideploy di Vercel (static SPA) — lihat [Vercel Deployment](#vercel-deployment).
+**Canonical production ownership:** Web (`apps/web`) di Vercel; API dan Telefun di Railway.
+Railway Web dapat menjadi target staging normal. Hanya Railway Web PRODUCTION
+yang bersifat noncanonical/auxiliary dan bukan authority untuk status production
+Web; Vercel adalah Web PRODUCTION kanonik.
 
 ## Service Overview
 
-| Service        | Port    | Stack                   | Deploy Target (Primary) | Deploy Target (Alt) |
-| -------------- | ------- | ----------------------- | ----------------------- | ------------------- |
-| `apps/web`     | `$PORT` | Vite SPA → `serve dist` | Railway                 | **Vercel**          |
-| `apps/api`     | `$PORT` | Hono (Node.js HTTP)     | Railway                 | Railway             |
-| `apps/telefun` | `$PORT` | WebSocket (persistent)  | Railway                 | Railway             |
+| Service        | Port    | Stack                  | Deploy Target (Primary) | Deploy Target (Alt)                             |
+| -------------- | ------- | ---------------------- | ----------------------- | ----------------------------------------------- |
+| `apps/web`     | n/a     | Vite static SPA        | **Vercel**              | Railway staging; Railway PRODUCTION (auxiliary) |
+| `apps/api`     | `$PORT` | Hono (Node.js HTTP)    | Railway                 | —                                               |
+| `apps/telefun` | `$PORT` | WebSocket (persistent) | Railway                 | —                                               |
 
 ## Prerequisites
 
@@ -37,7 +39,10 @@
 
 ## Railway Service Settings (per service)
 
-Setiap service dideploy sebagai Railway service terpisah dengan konfigurasi build/start command eksplisit. **Jangan gunakan `pnpm start` default root untuk production** — script root sekarang mengunci ke web saja.
+API dan Telefun dideploy sebagai service Railway kanonik. Web staging Railway
+adalah target normal; catatan auxiliary di bawah hanya berlaku untuk Railway Web
+PRODUCTION. **Jangan gunakan `pnpm start` default root untuk production** — script
+root sekarang mengunci ke web saja.
 
 | Setting          | Web                  | API                  | Telefun                  |
 | ---------------- | -------------------- | -------------------- | ------------------------ |
@@ -178,28 +183,28 @@ Routine Railway healthcheck, CI, dan smoke test **tidak boleh membuka sesi provi
 
 ## Web Security Headers
 
-- Railway Web memakai `apps/web/public/serve.json`. File ini disalin Vite ke `apps/web/dist/serve.json`, lalu dibaca oleh `serve dist` saat `pnpm run start:web`.
+- Railway Web (staging atau auxiliary PRODUCTION) memakai `apps/web/public/serve.json`. File ini disalin Vite ke `apps/web/dist/serve.json`, lalu dibaca oleh `serve dist` saat `pnpm run start:web`.
 - Vercel Web memakai `headers` di root `vercel.json`.
 - Header yang dijaga: `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`, `Referrer-Policy`, dan `Permissions-Policy`.
 
 ### Telefun Production Smoke Test
 
 ```bash
-WEB_URL=https://<web-domain>.up.railway.app API_URL=https://<api-domain>.up.railway.app/api/v1 TELEFUN_WS_URL=wss://<telefun-domain>.up.railway.app node scripts/deployment/telefun-railway-smoke.mjs
+WEB_URL=https://<canonical-vercel-domain> API_URL=https://<api-domain>.up.railway.app/api/v1 TELEFUN_WS_URL=wss://<telefun-domain>.up.railway.app node scripts/deployment/telefun-railway-smoke.mjs
 ```
 
 Ekspektasi: `web, api, and telefun health return HTTP 200` and `All health checks passed!`.
 
 ### Telefun Production WebSocket Manual Smoke (Gemini baseline only)
 
-1. Web service env before build:
+1. Vercel Web production env before build:
    - `VITE_TELEFUN_WS_URL=wss://<telefun-service>.up.railway.app`
    - `VITE_API_URL=https://<api-service>.up.railway.app/api/v1`
 2. Telefun service env:
-   - `ALLOWED_ORIGINS=https://<web-service>.up.railway.app`
+   - `ALLOWED_ORIGINS=https://<canonical-vercel-domain>`
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`
    - Keep `TELEFUN_OPENAI_ENABLED=false` and `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false`; any OpenAI smoke needs a separate approval gate and isolated environment.
-3. Redeploy Web after changing any `VITE_*` value.
+3. Redeploy Vercel Web after changing any `VITE_*` value.
 4. Login, open `/telefun`, start call, allow mic, speak one sentence, wait for AI response, end call.
 5. Verify no close code `4001` (Unauthorized/Token invalid), `4003` (Forbidden Origin), `1006` (Connection drop), or `1011` (Gemini API error) in browser UI.
 6. Verify session appears in history and review opens.
@@ -333,19 +338,19 @@ supabase migration up
 
 ### Web Service OOM / Exit 137
 
-Jika log Railway menampilkan `@trainers/web dev`, `> vite`, atau `Exit status 137`, service masih menjalankan start command development (`vite`). Periksa Railway Web service settings (tabel di atas) — override manual Start Command ke `pnpm run start:web`.
+Jika log Railway Web PRODUCTION auxiliary menampilkan `@trainers/web dev`, `> vite`, atau `Exit status 137`, service masih menjalankan start command development (`vite`). Periksa auxiliary service settings (tabel di atas) — override manual Start Command ke `pnpm run start:web`.
 
 Repo memiliki guard (`scripts/deployment/guard-no-railway-dev.mjs`) yang memblokir `pnpm --filter @trainers/web dev` jika env Railway terdeteksi.
 
 ### CORS "Missing Allow Origin"
 
 1. **Pastikan `NODE_ENV=production`** di-set di API Railway service. Tanpa ini, CORS cuma allow `localhost:3000`.
-2. **Pastikan `ALLOWED_ORIGINS`** di-set di API Railway service (nilai: URL Web service).
+2. **Pastikan `ALLOWED_ORIGINS`** di-set di API Railway service (nilai utama: exact canonical Vercel Web URL; tambah auxiliary origin hanya bila dipakai).
 3. **Redeploy API** setelah mengubah env vars.
 
 ### API Returns 404
 
-Request dari browser menuju domain API tanpa prefix `/api/v1`. Pastikan `VITE_API_URL` di Web Railway service suffix-nya `/api/v1`. Contoh: `https://api-xxx.up.railway.app/api/v1`.
+Request dari browser menuju domain API tanpa prefix `/api/v1`. Pastikan `VITE_API_URL` pada Vercel Web kanonik (atau Railway Web staging / Railway Web PRODUCTION auxiliary) suffix-nya `/api/v1`. Contoh: `https://api-xxx.up.railway.app/api/v1`.
 
 ### Telefun WebSocket Tidak Connect
 
@@ -355,15 +360,19 @@ Request dari browser menuju domain API tanpa prefix `/api/v1`. Pastikan `VITE_AP
 
 ## Vercel Deployment
 
-Web (`apps/web`) dapat dideploy ke Vercel sebagai backup static SPA. API dan Telefun tetap di Railway. Vercel bukan pengganti Railway — hanya backup frontend.
+Web (`apps/web`) dideploy ke Vercel sebagai static SPA kanonik untuk
+PRODUCTION. API dan Telefun tetap service Railway; Vercel tidak menggantikan
+kedua backend tersebut. Railway Web staging tetap didukung sebagai target
+staging normal; hanya Railway Web PRODUCTION yang noncanonical/auxiliary.
 
 ### Deployment Policy
 
-| Environment        | Purpose                | Auth / API / Telefun |
-| ------------------ | ---------------------- | -------------------- |
-| Railway production | Primary frontend       | Supported            |
-| Vercel production  | Backup frontend        | Supported            |
-| Vercel preview     | Build + visual preview | **Not guaranteed**   |
+| Environment            | Purpose                | Auth / API / Telefun |
+| ---------------------- | ---------------------- | -------------------- |
+| Vercel production      | Canonical frontend     | Supported            |
+| Railway Web staging    | Normal staging target  | Supported            |
+| Railway Web PRODUCTION | Auxiliary/noncanonical | Supported            |
+| Vercel preview         | Build + visual preview | **Not guaranteed**   |
 
 Preview deployment hanya untuk visual/build smoke. Auth, API, dan Telefun tidak didukung di preview karena Railway origin check menggunakan exact string matching (tidak support wildcard Vercel preview URL).
 
@@ -459,10 +468,10 @@ Tambahkan exact production paths di Supabase Dashboard → Authentication → UR
 
 ```text
 Site URL:
-https://<railway-web>.up.railway.app
+https://<canonical-vercel-domain>
 
 Additional Redirect URLs:
-https://<railway-web>.up.railway.app/**
+https://<railway-web>.up.railway.app/**  # only if auxiliary Web is retained
 https://<canonical-vercel-domain>/
 https://<canonical-vercel-domain>/auth/callback
 https://<canonical-vercel-domain>/reset-password
@@ -514,27 +523,27 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 - `VITE_API_URL` di Vercel harus menunjuk ke Railway API, bukan Vercel. **Suffix `/api/v1` wajib.**
 - Setiap ganti `VITE_*` di Vercel Dashboard, **wajib redeploy** (Vite inline nilai saat build time, tidak runtime).
 - Hapus API-only vars (`GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) dari Vercel env.
-- Vercel adalah backup **frontend saja**. Jika Railway API atau Telefun down, Vercel web juga tidak berfungsi.
+- Vercel adalah frontend production kanonik. Jika Railway API atau Telefun down, Vercel Web juga tidak berfungsi.
 - Custom domain direkomendasikan untuk production yang stabil.
 
 ## Deployment Checklist
 
-### Railway (Primary)
+### Railway (Canonical API/Telefun; Normal Web STAGING; Auxiliary Web PRODUCTION)
 
 - [ ] Apply all Supabase migrations
-- [ ] Deploy 3 Railway service dari repo yang sama (Web, API, Telefun)
+- [ ] Deploy API dan Telefun sebagai service Railway kanonik; Railway Web staging adalah target normal, sedangkan Railway Web PRODUCTION hanya bila auxiliary host memang diperlukan
 - [ ] Set Railway custom build/start commands per service (lihat tabel Railway Service Settings)
 - [ ] Set Railway env vars per service (lihat tabel Railway Environment Variables)
 - [ ] Verifikasi koneksi: `VITE_API_URL` suffix `/api/v1`, `NODE_ENV=production`, `ALLOWED_ORIGINS` di-set
-- [ ] Run smoke test: `node scripts/deployment/railway-web-healthcheck-smoke.mjs`
-- [ ] Pastikan smoke header Web lulus dari Railway `serve dist`
+- [ ] Jika Railway Web PRODUCTION auxiliary dipertahankan, run `node scripts/deployment/railway-web-healthcheck-smoke.mjs`
+- [ ] Jika Railway Web PRODUCTION auxiliary dipertahankan, pastikan header `serve dist` lulus
 - [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
 - [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
 - [ ] Pastikan `TELEFUN_OPENAI_ENABLED=false` untuk rollout awal; jika diaktifkan, set `OPENAI_API_KEY` terpisah di Telefun service (API service tetap memerlukan key sendiri)
 - [ ] Verify liveness/readiness tanpa membuka koneksi provider berbayar
 - [ ] Set up monitoring / alerting
 
-### Vercel (Backup Web)
+### Vercel (Canonical Web)
 
 - [ ] Import repo ke Vercel, framework preset **Other** (`framework: null` di `vercel.json`)
 - [ ] Set Node.js Version ke **22.x** eksplisit di Project Settings
@@ -551,12 +560,11 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 - [ ] Verifikasi Google OAuth dari Vercel → redirect ke `/auth/callback` → masuk ke `/dashboard`
 - [ ] Verifikasi password reset dari Vercel → link kembali ke Vercel `/reset-password`
 - [ ] Verifikasi WebSocket Telefun dari Vercel → tidak ada close code `4003`
-- [ ] Verifikasi Railway Web masih berfungsi (regression check)
+- [ ] Jika Railway Web PRODUCTION auxiliary dipertahankan, verifikasi secara terpisah tanpa menganggapnya canonical
 
 ### Rollback Vercel
 
-1. Hapus atau stop auto-deploy Vercel project (jangan hapus Railway service)
-2. Hapus Vercel production origin dari Railway API `ALLOWED_ORIGINS`, redeploy
-3. Hapus Vercel production origin dari Railway Telefun `ALLOWED_ORIGINS`, redeploy
-4. Hapus Vercel redirect URLs dari Supabase
-5. Verifikasi Railway Web masih berfungsi normal
+1. Roll back deployment/alias Vercel ke release Web terakhir yang diketahui baik; jangan memindahkan canonical host secara diam-diam.
+2. Pertahankan exact Vercel production origin di Railway API/Telefun selama domain canonical tetap sama.
+3. Jika incident owner secara eksplisit mengaktifkan Railway Web PRODUCTION auxiliary sebagai fallback sementara, verifikasi origin dan Supabase redirect exact sebelum traffic dialihkan.
+4. Setelah Vercel canonical pulih, kembalikan routing sementara dan verifikasi auth, API, serta Telefun dari domain Vercel.
