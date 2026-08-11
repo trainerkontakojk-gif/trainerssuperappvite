@@ -1,6 +1,34 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { AttemptOutcome } from "./durable-db.js";
 
+const CLOSED_RENEWAL_REJECTION_REASONS = [
+  "lease_not_found",
+  "owner_mismatch",
+  "inactive",
+  "expired",
+  "invalid_ttl",
+] as const;
+
+type ClosedRenewalRejectionReason =
+  (typeof CLOSED_RENEWAL_REJECTION_REASONS)[number];
+
+export type DistributedWebRtcLeaseLossReason =
+  | "local_expiry"
+  | "rpc_error"
+  | "invalid_response"
+  | "renewal_rejected"
+  | ClosedRenewalRejectionReason;
+
+function normalizeRenewalRejectionReason(
+  reason: string,
+): DistributedWebRtcLeaseLossReason {
+  return (CLOSED_RENEWAL_REJECTION_REASONS as readonly string[]).includes(
+    reason,
+  )
+    ? (reason as ClosedRenewalRejectionReason)
+    : "renewal_rejected";
+}
+
 export interface DistributedWebRtcLeaseStore {
   acquire(input: {
     userId: string;
@@ -77,6 +105,7 @@ export function createDistributedWebRtcLeaseCoordinator(
       sessionId: string;
       attemptId: string;
       leaseId: string;
+      reason: DistributedWebRtcLeaseLossReason;
     }) => void;
   } = {},
 ): DistributedWebRtcLeaseCoordinator {
@@ -118,7 +147,7 @@ export function createDistributedWebRtcLeaseCoordinator(
         resolveLost = resolve;
       });
 
-      const markLost = () => {
+      const markLost = (reason: DistributedWebRtcLeaseLossReason) => {
         if (lost || released) return;
         lost = true;
         if (timer) clearIntervalFn(timer);
@@ -130,6 +159,7 @@ export function createDistributedWebRtcLeaseCoordinator(
             sessionId: input.sessionId,
             attemptId: input.attemptId,
             leaseId: acquired.leaseId!,
+            reason,
           });
         } catch {
           // Lease loss is authoritative even when the observer is unavailable.
@@ -137,8 +167,9 @@ export function createDistributedWebRtcLeaseCoordinator(
       };
 
       const renew = async (): Promise<boolean> => {
-        if (lost || released || now() >= expiresAtMs) {
-          markLost();
+        if (lost || released) return false;
+        if (now() >= expiresAtMs) {
+          markLost("local_expiry");
           return false;
         }
         let result: Awaited<ReturnType<DistributedWebRtcLeaseStore["renew"]>>;
@@ -152,11 +183,19 @@ export function createDistributedWebRtcLeaseCoordinator(
             ttlMs: input.ttlMs,
           });
         } catch {
-          markLost();
+          markLost("rpc_error");
           return false;
         }
-        if (!result.renewed || result.expiresAtMs === undefined) {
-          markLost();
+        if (!result.renewed) {
+          markLost(normalizeRenewalRejectionReason(result.reason));
+          return false;
+        }
+        if (
+          result.expiresAtMs === undefined ||
+          !Number.isFinite(result.expiresAtMs) ||
+          result.expiresAtMs <= now()
+        ) {
+          markLost("invalid_response");
           return false;
         }
         expiresAtMs = result.expiresAtMs;
@@ -195,7 +234,7 @@ export function createDistributedWebRtcLeaseCoordinator(
         void renew().catch(() => {
           // A rejected heartbeat is a lost lease, never an unhandled process
           // rejection. The orphan worker owns the later provider cleanup.
-          markLost();
+          markLost("rpc_error");
         });
       }, heartbeatMs);
       const unref = (timer as unknown as { unref?: () => void }).unref;

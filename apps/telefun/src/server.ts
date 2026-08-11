@@ -109,7 +109,7 @@ const openAIWebRtcLease = createDistributedWebRtcLeaseCoordinator(
         userId: input.userId,
         sessionId: input.sessionId,
         attemptId: input.attemptId,
-        metadata: { reason: "lease_lost" },
+        metadata: { reason: input.reason },
       }),
   },
 );

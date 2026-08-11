@@ -30,6 +30,72 @@ const SESSION_ID = "550e8400-e29b-41d4-a716-446655440000";
 const ATTEMPT_ID = "650e8400-e29b-41d4-a716-446655440000";
 const OFFER_SDP = "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\n";
 
+type LeaseRenewalResult = Awaited<
+  ReturnType<DistributedWebRtcLeaseStore["renew"]>
+>;
+
+function createLeaseRenewalHarness(input: {
+  acquiredExpiresAtMs?: number;
+  leaseId?: string;
+  now?: number;
+  renewal?: LeaseRenewalResult;
+  renewalError?: Error;
+}) {
+  let heartbeat: () => void = () => {};
+  const onLost = vi.fn();
+  const renew = vi.fn(async (): Promise<LeaseRenewalResult> => {
+    if (input.renewalError) throw input.renewalError;
+    return (
+      input.renewal ?? {
+        renewed: true,
+        expiresAtMs: 31_000,
+        reason: "renewed",
+      }
+    );
+  });
+  const coordinator = createDistributedWebRtcLeaseCoordinator(
+    {
+      acquire: vi.fn(async () => ({
+        granted: true,
+        leaseId: input.leaseId ?? "lease-renewal",
+        expiresAtMs: input.acquiredExpiresAtMs ?? 31_000,
+        activeCount: 1,
+        reason: "claimed",
+      })),
+      renew,
+      release: vi.fn(async () => ({
+        released: true,
+        idempotent: false,
+        reason: "released",
+      })),
+    },
+    {
+      now: () => input.now ?? 1_000,
+      heartbeatMs: 10_000,
+      setInterval: ((callback: () => void) => {
+        heartbeat = callback;
+        return 1 as unknown as ReturnType<typeof setInterval>;
+      }) as typeof setInterval,
+      clearInterval: vi.fn(),
+      onLost,
+    },
+  );
+
+  return {
+    acquire: () =>
+      coordinator.acquire({
+        userId: "user-1",
+        sessionId: SESSION_ID,
+        attemptId: ATTEMPT_ID,
+        provider: "openai-webrtc",
+        ttlMs: 30_000,
+      }),
+    heartbeat: () => heartbeat(),
+    onLost,
+    renew,
+  };
+}
+
 describe("Phase 5 distributed WebRTC hardening", () => {
   it("renews an atomic lease and treats a lost renewal as expired", async () => {
     const store: DistributedWebRtcLeaseStore = {
@@ -90,12 +156,137 @@ describe("Phase 5 distributed WebRTC hardening", () => {
       }),
     );
     expect(store.renew).toHaveBeenCalledTimes(2);
-    expect(onLost).toHaveBeenCalledOnce();
+    expect(onLost).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "expired" }),
+    );
     expect(result.handle?.lost).toBe(true);
     await result.handle?.release("orphaned");
     expect(store.release).toHaveBeenCalledWith(
       expect.objectContaining({ outcome: "orphaned" }),
     );
+  });
+
+  it("reports a bounded RPC renewal error without exposing the raw exception", async () => {
+    const harness = createLeaseRenewalHarness({
+      leaseId: "lease-rpc-error",
+      renewalError: new Error("Bearer sk-secret raw RPC payload"),
+    });
+    await harness.acquire();
+    harness.heartbeat();
+    await vi.waitFor(() => {
+      expect(harness.onLost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leaseId: "lease-rpc-error",
+          reason: "rpc_error",
+        }),
+      );
+    });
+    expect(JSON.stringify(harness.onLost.mock.calls)).not.toContain(
+      "sk-secret",
+    );
+    expect(JSON.stringify(harness.onLost.mock.calls)).not.toContain(
+      "raw RPC payload",
+    );
+  });
+
+  it.each([
+    "lease_not_found",
+    "owner_mismatch",
+    "inactive",
+    "expired",
+    "invalid_ttl",
+  ])("preserves the closed renewal rejection reason %s", async (reason) => {
+    const harness = createLeaseRenewalHarness({
+      leaseId: `lease-${reason}`,
+      renewal: { renewed: false, expiresAtMs: 31_000, reason },
+    });
+    await harness.acquire();
+    harness.heartbeat();
+    await vi.waitFor(() => {
+      expect(harness.onLost).toHaveBeenCalledWith(
+        expect.objectContaining({ reason }),
+      );
+    });
+  });
+
+  it("reports local expiry before issuing a renewal RPC", async () => {
+    const harness = createLeaseRenewalHarness({
+      acquiredExpiresAtMs: 1_000,
+      leaseId: "lease-local-expiry",
+      now: 1_000,
+    });
+    await harness.acquire();
+    harness.heartbeat();
+    expect(harness.renew).not.toHaveBeenCalled();
+    expect(harness.onLost).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "local_expiry" }),
+    );
+  });
+
+  it.each([
+    {
+      name: "invalid successful response",
+      renewal: { renewed: true, reason: "renewed" },
+      expected: "invalid_response",
+    },
+    {
+      name: "unknown rejection reason",
+      renewal: {
+        renewed: false,
+        expiresAtMs: 31_000,
+        reason: "Bearer sk-secret raw rejection",
+      },
+      expected: "renewal_rejected",
+    },
+  ])("bounds $name as $expected", async ({ renewal, expected }) => {
+    const harness = createLeaseRenewalHarness({ renewal });
+    await harness.acquire();
+    harness.heartbeat();
+    await vi.waitFor(() => {
+      expect(harness.onLost).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: expected }),
+      );
+    });
+    expect(JSON.stringify(harness.onLost.mock.calls)).not.toContain(
+      "sk-secret",
+    );
+  });
+
+  it("requires an additive renewal repair migration with qualified columns", () => {
+    const root = join(process.cwd(), "../../supabase");
+    const migrationName = readdirSync(join(root, "migrations")).find((file) =>
+      file.includes("fix_telefun_realtime_lease_renewal"),
+    );
+    expect(migrationName).toBeDefined();
+    const rollbackName = `rollback_${migrationName}`;
+    expect(readdirSync(join(root, "rollbacks"))).toContain(rollbackName);
+
+    const migration = readFileSync(
+      join(root, "migrations", migrationName!),
+      "utf8",
+    );
+    const rollback = readFileSync(
+      join(root, "rollbacks", rollbackName),
+      "utf8",
+    );
+    for (const sql of [migration, rollback]) {
+      expect(sql).toContain(
+        "CREATE OR REPLACE FUNCTION public.renew_telefun_realtime_lease",
+      );
+      expect(sql).toContain("UPDATE public.telefun_realtime_leases AS lease");
+      expect(sql).toContain("lease.expires_at > v_now");
+      expect(sql).not.toContain("AND expires_at > v_now");
+    }
+    for (const reason of [
+      "lease_not_found",
+      "owner_mismatch",
+      "inactive",
+      "expired",
+      "invalid_ttl",
+      "renewed",
+    ]) {
+      expect(migration).toContain(`'${reason}'::text`);
+    }
   });
 
   it("closes provider references after a restart and records orphaned outcome", async () => {

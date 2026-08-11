@@ -99,6 +99,7 @@ erDiagram
 | `20260630003553_add_current_sidak_profiler_lookup_indexes.sql`            | SIDAK profiler lookup indexes                                                                                                |
 | `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql`       | Additive Telefun WebRTC attempt/transcript/usage/finalization, recording readiness, scoring lock, and service-role RPCs      |
 | `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql`    | Distributed WebRTC lease/quota, rate-limit windows, orphan cleanup, hashed-user metrics, and precise network/orphan outcomes |
+| `20260811044655_fix_telefun_realtime_lease_renewal.sql`                   | Repair ambiguous lease-expiry reference and add bounded renewal rejection reasons; hosted production canonical verified      |
 
 ### 1. `public.profiles`
 
@@ -156,6 +157,20 @@ Migration `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql`
 - `telefun_realtime_metrics` dengan nama metric allowlisted dan SHA-256 `user_id_hash`; UUID user mentah tidak disimpan di row metric. Missing/unpriceable usage tetap audit state dan tidak dibuat menjadi zero sintetis.
 
 Rollback Phase 5 bersifat transactional dan fail-closed jika row outcome `network_lost`/`orphaned` belum didrain. Pada 2026-08-10, setelah explicit operator authorization dan private backup, stale OpenAI WebRTC lifecycle di database production canonical direkonsiliasi lalu canonical rollback/reapply dijalankan dalam satu transaction. Snapshot row lease/rate-limit/metric dan kolom attempt pulih identik; RLS serta 10 function grant tetap service-role-only; migration-history row tetap tepat satu; baseline history/usage Gemini sebelum/sesudah identik. Bukti ini menutup hosted database subgate, bukan deployment/load/paid-provider gate.
+
+Migration additive `20260811044655_fix_telefun_realtime_lease_renewal.sql`
+memperbaiki runtime ambiguity di Phase 5: output field `expires_at` dari
+`RETURNS TABLE` sebelumnya bentrok dengan referensi kolom yang tidak
+dikualifikasi pada `UPDATE`. Candidate baru memakai row lock dan alias tabel
+eksplisit, mempertahankan signature serta service-role-only grant, dan
+mengembalikan reason bounded `lease_not_found`, `owner_mismatch`, `inactive`,
+`expired`, `invalid_ttl`, atau `renewed`. Rollback companion mempertahankan alias
+qualification sambil mengembalikan reason contract lama, sehingga rollback tidak
+menghidupkan ambiguity. Forward/rollback/reapply dan privilege matrix lulus pada
+PostgreSQL 17 lokal. Pada 2026-08-11 migration diterapkan ke production canonical
+setelah fresh exact-function backup dan precondition. Hosted definition, owner,
+`SECURITY DEFINER`, empty search path, service-role-only grant, service-role RPC,
+anon denial, dan Gemini/non-WebRTC aggregate boundary terverifikasi.
 
 ### 4. Modul Profiler (KTP)
 
