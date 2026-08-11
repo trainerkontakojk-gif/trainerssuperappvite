@@ -110,6 +110,7 @@ export default function TelefunLanding() {
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
+  const startCallInFlightRef = useRef(false);
   const optimisticRecordIdRef = useRef<string | null>(null);
   const [retainedObjectUrlOwner] = useState(() =>
     createRetainedObjectUrlOwner(),
@@ -226,7 +227,7 @@ export default function TelefunLanding() {
     }
   };
 
-  const startCall = async () => {
+  const startCallOnce = async () => {
     const token = getToken();
     if (!token) {
       notify.error("Token tidak ditemukan. Silakan login terlebih dahulu.");
@@ -359,6 +360,16 @@ export default function TelefunLanding() {
     setActiveSessionConfig(sessionConfig);
     setActiveAccessToken(token);
     setView("chat");
+  };
+
+  const startCall = async () => {
+    if (startCallInFlightRef.current) return;
+    startCallInFlightRef.current = true;
+    try {
+      await startCallOnce();
+    } finally {
+      startCallInFlightRef.current = false;
+    }
   };
 
   const handleEndCall = () => {
