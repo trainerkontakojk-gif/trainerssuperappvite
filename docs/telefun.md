@@ -2,7 +2,7 @@
 
 > **TELEFUN** = **Tele**phone **Fun**
 > Modul simulasi panggilan suara untuk melatih agen menangani telepon.
-> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off/non-production (`gpt-realtime-2.1` / voice `marin`); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Gate P5 tetap partial sampai migration/RLS/rollback, deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
+> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off/non-production (`gpt-realtime-2.1`; voice server-owned: `cedar` untuk male, `marin` untuk female/default); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Gate P5 tetap partial sampai migration/RLS/rollback, deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
 
 Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 
@@ -97,7 +97,7 @@ Telefun broker ──> sideband wss://api.openai.com/v1/realtime?call_id=...
 ```
 
 - Canonical model: `gpt-realtime-2.1`
-- Canonical voice: `marin`
+- Canonical server-owned voice: `cedar` untuk consumer `male`; `marin` untuk `female`, null, atau blank
 - Broker/session authority: active admin/trainer profile + owned pre-created `telefun_history` session only
 - Baseline Gemini Live dan OpenAI WebSocket tetap unchanged
 - No production UI cutover; Phase 3 memakai adapter WebRTC capability-gated di PhoneInterface, sementara LiveSession tetap baseline Gemini/openai-audio
@@ -614,7 +614,8 @@ Catatan kontrak:
 
 - `sessionId` wajib dari path UUID; broker menolak session foreign, terminal, pending, mismatch, atau auto-create fallback.
 - Caller harus admin/trainer dengan profile ternormalisasi `active`, `is_deleted != true`, dan session owned/`active` yang sudah pre-created.
-- Broker membangun session JSON server-side dengan model `gpt-realtime-2.1`, voice `marin`, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON. `interrupt_response=false` mempertahankan authority server config sambil membiarkan browser membatalkan hanya output yang benar-benar terdengar.
+- Untuk `openai-webrtc`, API hanya membuat history setelah menerima `live_prompt_instructions` nonblank dari finalized simulation context. Snapshot itu dibangun oleh builder prompt yang sama dengan Gemini, memuat identity/verification facts, scenario/script data boundary, selected consumer name/description/difficulty/behavior, dan role rules; prompt kosong atau malformed ditolak sebelum provider call, tanpa generic identity/persona fallback.
+- Broker membangun session JSON server-side dengan model `gpt-realtime-2.1`, voice `cedar` untuk consumer `male` atau `marin` untuk `female`/missing, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON. `interrupt_response=false` mempertahankan authority server config sambil membiarkan browser membatalkan hanya output yang benar-benar terdengar.
 - `Location` dari upstream diparse menjadi `call_id` opaque; sideband `wss://api.openai.com/v1/realtime?call_id=...` adalah authority untuk transcript/usage/control server-side.
 - Cleanup upstream memakai official OpenAI POST hangup; browser tetap hanya melihat DELETE broker yang idempotent.
 - Transcript/usage failure diaudit; usage yang tidak lengkap tidak disintesis.

@@ -80,6 +80,7 @@ describe("telefun API payload and security validators", () => {
           consumer_name: "Consumer",
           telefun_model_id: "gpt-realtime-2.1",
           telefun_transport: "openai-webrtc",
+          live_prompt_instructions: "canonical prompt snapshot",
         }),
       });
 
@@ -139,6 +140,7 @@ describe("telefun API payload and security validators", () => {
           consumer_name: "Consumer",
           telefun_model_id: "gpt-realtime-2.1",
           telefun_transport: "openai-webrtc",
+          live_prompt_instructions: "canonical prompt snapshot",
         }),
       });
       expect(response.status).toBe(200);
@@ -482,6 +484,18 @@ describe("telefun API payload and security validators", () => {
     expect(
       telefunSessionCreatePayloadSchema.safeParse({
         ...base,
+        consumer_gender: "male",
+      }).success,
+    ).toBe(true);
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
+        consumer_gender: "random",
+      }).success,
+    ).toBe(false);
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse({
+        ...base,
         telefun_model_id: "gpt-realtime-2.1-mini",
       }).success,
     ).toBe(true);
@@ -497,6 +511,7 @@ describe("telefun API payload and security validators", () => {
         ...base,
         telefun_model_id: "gpt-realtime-2.1",
         telefun_transport: "openai-webrtc",
+        live_prompt_instructions: "canonical prompt snapshot",
       }).success,
     ).toBe(true);
     expect(
@@ -529,6 +544,7 @@ describe("telefun API payload and security validators", () => {
           ...base,
           telefun_model_id: "gpt-realtime-2.1",
           telefun_transport: "openai-webrtc",
+          live_prompt_instructions: "canonical prompt snapshot",
         },
       }),
     ).toMatchObject({

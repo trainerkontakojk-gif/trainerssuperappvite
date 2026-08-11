@@ -121,11 +121,26 @@ export function validateTelefunSessionDuration(
   }
 }
 
+function validateLivePromptForTransport(params: {
+  transport: TelefunTransport;
+  instructions?: string | null;
+}): void {
+  if (params.transport !== "openai-webrtc") return;
+  if (
+    typeof params.instructions !== "string" ||
+    params.instructions.trim().length === 0
+  ) {
+    throw new TelefunSessionValidationError(
+      "OpenAI WebRTC memerlukan prompt snapshot yang lengkap.",
+    );
+  }
+}
+
 export const telefunSessionCreatePayloadSchema = z
   .object({
     scenario_title: z.string(),
     consumer_name: z.string(),
-    consumer_gender: z.string().optional(),
+    consumer_gender: z.enum(["male", "female"]).optional(),
     consumer_phone: z.string().optional(),
     consumer_city: z.string().optional(),
     realistic_mode_enabled: z.boolean().default(false),
@@ -144,6 +159,10 @@ export const telefunSessionCreatePayloadSchema = z
         transport: body.telefun_transport,
       });
       validateTelefunSessionDuration(pair.model, body.configured_duration);
+      validateLivePromptForTransport({
+        transport: pair.transport,
+        instructions: body.live_prompt_instructions,
+      });
     } catch (error) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -260,6 +279,10 @@ export function buildTelefunSessionInsertPayload(params: {
     transport: params.body.telefun_transport,
   });
   validateTelefunSessionDuration(pair.model, params.body.configured_duration);
+  validateLivePromptForTransport({
+    transport: pair.transport,
+    instructions: params.body.live_prompt_instructions,
+  });
 
   return {
     user_id: params.userId,

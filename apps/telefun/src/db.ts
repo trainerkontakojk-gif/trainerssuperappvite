@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "./env.js";
 import type { TelefunTranscriptEntry } from "@trainers/types";
-import type { WebRtcProfile, WebRtcSession } from "./realtime-webrtc/broker-auth.js";
+import type {
+  WebRtcProfile,
+  WebRtcSession,
+} from "./realtime-webrtc/broker-auth.js";
 
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -75,9 +78,18 @@ type WebRtcQueryResult = {
 type WebRtcUpdateClient = {
   from(table: "telefun_history"): {
     update(updates: WebRtcSessionUpdates): {
-      eq(column: "id", value: string): {
-        eq(column: "user_id", value: string): {
-          eq(column: "status", value: "active"): {
+      eq(
+        column: "id",
+        value: string,
+      ): {
+        eq(
+          column: "user_id",
+          value: string,
+        ): {
+          eq(
+            column: "status",
+            value: "active",
+          ): {
             select(columns: "id, status"): {
               maybeSingle(): PromiseLike<WebRtcQueryResult>;
             };
@@ -86,8 +98,14 @@ type WebRtcUpdateClient = {
       };
     };
     select(columns: "id, status"): {
-      eq(column: "id", value: string): {
-        eq(column: "user_id", value: string): {
+      eq(
+        column: "id",
+        value: string,
+      ): {
+        eq(
+          column: "user_id",
+          value: string,
+        ): {
           maybeSingle(): PromiseLike<WebRtcQueryResult>;
         };
       };
@@ -168,7 +186,7 @@ export async function getWebRtcSession(
   const { data, error } = await admin
     .from("telefun_history")
     .select(
-      "id, user_id, status, telefun_model_id, telefun_transport, live_prompt_instructions",
+      "id, user_id, status, telefun_model_id, telefun_transport, live_prompt_instructions, consumer_gender",
     )
     .eq("id", sessionId)
     .eq("user_id", userId)

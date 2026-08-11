@@ -731,6 +731,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
         telefun_model_id: "gpt-realtime-2.1",
         telefun_transport: "openai-webrtc",
         live_prompt_instructions: "Scenario: Kartu kredit jatuh tempo.",
+        consumer_gender: "male",
       })),
       manager: {
         startCall,
@@ -756,6 +757,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
       sessionId,
       offerSdp: offer,
       livePromptInstructions: "Scenario: Kartu kredit jatuh tempo.",
+      consumerGender: "male",
       signal: expect.any(AbortSignal),
     });
   });

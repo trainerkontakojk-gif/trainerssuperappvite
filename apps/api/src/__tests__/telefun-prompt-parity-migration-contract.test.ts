@@ -51,6 +51,24 @@ describe("Telefun WebRTC prompt parity contract", () => {
     ).toBe(true);
   });
 
+  it("requires the canonical prompt snapshot for OpenAI WebRTC sessions", () => {
+    const webRtcBase = {
+      ...base,
+      telefun_model_id: "gpt-realtime-2.1",
+      telefun_transport: "openai-webrtc",
+    };
+
+    expect(
+      telefunSessionCreatePayloadSchema.safeParse(webRtcBase).success,
+    ).toBe(false);
+    expect(() =>
+      buildTelefunSessionInsertPayload({
+        userId: "user-1",
+        body: webRtcBase,
+      }),
+    ).toThrow("prompt snapshot");
+  });
+
   it.each(["", "   ", "\n\t"]) (
     "rejects a blank prompt %j",
     (live_prompt_instructions) => {

@@ -5,7 +5,6 @@ import {
 } from "../usage.js";
 import {
   buildCanonicalPocSession,
-  POC_MAX_INSTRUCTIONS_LENGTH,
   POC_MODEL_ID,
   POC_TRANSPORT,
 } from "./contracts.js";
@@ -845,12 +844,22 @@ export function createWebRtcCallManager(
       sessionId,
       offerSdp,
       livePromptInstructions,
+      consumerGender,
       signal,
     }) {
       if (shuttingDown) {
         throw new WebRtcShutdownError(bindings.size);
       }
       if (bindings.has(sessionId)) throw new WebRtcCallConflictError();
+      let canonicalSession;
+      try {
+        canonicalSession = buildCanonicalPocSession(
+          livePromptInstructions,
+          consumerGender,
+        );
+      } catch {
+        throw new WebRtcDurabilityError("invalid_live_prompt_instructions");
+      }
       const attemptId = createAttemptId();
       // Reserve the in-process session slot before awaiting distributed rate
       // limiting. A concurrent DELETE must see this binding and join the same
@@ -918,16 +927,9 @@ export function createWebRtcCallManager(
           throw new Error("provider call aborted");
         }
 
-        if (
-          livePromptInstructions !== null &&
-          livePromptInstructions !== undefined &&
-          livePromptInstructions.length > POC_MAX_INSTRUCTIONS_LENGTH
-        ) {
-          throw new WebRtcDurabilityError("invalid_live_prompt_instructions");
-        }
         const created = await options.callsClient.createCall({
           offerSdp,
-          session: buildCanonicalPocSession(livePromptInstructions),
+          session: canonicalSession,
           signal: binding.startController.signal,
         });
         await bindProvider(binding, created.callId);

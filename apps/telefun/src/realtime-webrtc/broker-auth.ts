@@ -18,21 +18,35 @@ export interface WebRtcSession {
   telefun_model_id?: string | null;
   telefun_transport?: string | null;
   live_prompt_instructions?: string | null;
+  consumer_gender?: string | null;
 }
 
 export interface BrokerAuthDependencies {
   rollout: TelefunOpenAiWebRtcRolloutConfig;
-  verifyToken: (token: string, signal?: AbortSignal) => Promise<{
+  verifyToken: (
+    token: string,
+    signal?: AbortSignal,
+  ) => Promise<{
     success: boolean;
     user?: { id: string } | null;
   }>;
-  getProfile: (userId: string, signal?: AbortSignal) => Promise<WebRtcProfile | null>;
-  getSession: (sessionId: string, userId: string, signal?: AbortSignal) => Promise<WebRtcSession | null>;
+  getProfile: (
+    userId: string,
+    signal?: AbortSignal,
+  ) => Promise<WebRtcProfile | null>;
+  getSession: (
+    sessionId: string,
+    userId: string,
+    signal?: AbortSignal,
+  ) => Promise<WebRtcSession | null>;
 }
 
 export type BrokerAuthResult =
   | { ok: true; userId: string; sessionId: string; session: WebRtcSession }
-  | { ok: false; reason: "unauthorized" | "forbidden" | "not_found" | "aborted" };
+  | {
+      ok: false;
+      reason: "unauthorized" | "forbidden" | "not_found" | "aborted";
+    };
 
 export async function authorizeWebRtcCall(
   input: {
@@ -50,7 +64,10 @@ export async function authorizeWebRtcCall(
       input.signal,
     );
   } catch {
-    return { ok: false, reason: input.signal?.aborted ? "aborted" : "unauthorized" };
+    return {
+      ok: false,
+      reason: input.signal?.aborted ? "aborted" : "unauthorized",
+    };
   }
   if (input.signal?.aborted) return { ok: false, reason: "aborted" };
   const userId = verified.success ? verified.user?.id : undefined;
@@ -70,7 +87,10 @@ export async function authorizeWebRtcCall(
       input.signal,
     );
   } catch {
-    return { ok: false, reason: input.signal?.aborted ? "aborted" : "forbidden" };
+    return {
+      ok: false,
+      reason: input.signal?.aborted ? "aborted" : "forbidden",
+    };
   }
   if (input.signal?.aborted) return { ok: false, reason: "aborted" };
   if (!profile || profile.is_deleted === true) {
@@ -90,7 +110,10 @@ export async function authorizeWebRtcCall(
       input.signal,
     );
   } catch {
-    return { ok: false, reason: input.signal?.aborted ? "aborted" : "not_found" };
+    return {
+      ok: false,
+      reason: input.signal?.aborted ? "aborted" : "not_found",
+    };
   }
   if (input.signal?.aborted) return { ok: false, reason: "aborted" };
   if (
@@ -116,7 +139,10 @@ function normalizeWebRtcProfileRole(role?: string | null): string {
   return normalized === "trainers" ? "trainer" : normalized;
 }
 
-async function raceWithAbort<T>(operation: Promise<T>, signal?: AbortSignal): Promise<T> {
+async function raceWithAbort<T>(
+  operation: Promise<T>,
+  signal?: AbortSignal,
+): Promise<T> {
   if (!signal) return operation;
   if (signal.aborted) throw new Error("request aborted");
   let abort: (() => void) | undefined;

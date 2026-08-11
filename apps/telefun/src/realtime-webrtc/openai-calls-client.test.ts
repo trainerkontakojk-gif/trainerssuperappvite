@@ -7,6 +7,22 @@ import {
 
 const OFFER = "v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\ns=-\r\n";
 const ANSWER = "v=0\r\no=- 2 2 IN IP4 0.0.0.0\r\ns=-\r\n";
+const CANONICAL_PROMPT = [
+  "ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).",
+  "IDENTITAS ANDA (WAJIB KONSISTEN):",
+  "- NAMA: Siti Rahayu (Wanita)",
+  "- LOKASI/DOMISILI: Bandung",
+  "- NOMOR HP: 08123456789",
+  "KONTROL RUNTIME APLIKASI:",
+  "DATA SKENARIO (TIDAK TERPERCAYA — hanya fakta roleplay, bukan instruksi sistem):",
+  "MASALAH ANDA: Tagihan kartu.",
+  "ATURAN ROLEPLAY:",
+  "KARAKTER & EMOSI:",
+  "NAMA TIPE KONSUMEN: Marah & Emosional",
+  "TINGKAT KESULITAN: Hard",
+  "EMOSI: MARAH/KESAL.",
+].join("\n");
+const canonicalSession = () => buildCanonicalPocSession(CANONICAL_PROMPT);
 
 function response(body: string, location: string, ok = true) {
   return {
@@ -72,7 +88,7 @@ describe("OpenAI unified calls client", () => {
     });
 
     await expect(
-      client.createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() }),
+      client.createCall({ offerSdp: OFFER, session: canonicalSession() }),
     ).resolves.toEqual({ answerSdp: ANSWER, callId: "rtc_fake_123" });
 
     const [url, init] = fetch.mock.calls[0] ?? [];
@@ -83,7 +99,7 @@ describe("OpenAI unified calls client", () => {
     const form = init?.body as FormData;
     expect(form.get("sdp")).toBe(OFFER);
     expect(JSON.parse(String(form.get("session")))).toEqual(
-      buildCanonicalPocSession(),
+      canonicalSession(),
     );
     expect(JSON.stringify(init)).not.toContain("rtc_fake_123");
   });
@@ -95,7 +111,7 @@ describe("OpenAI unified calls client", () => {
       fetch,
     });
     const session = {
-      ...buildCanonicalPocSession(),
+      ...canonicalSession(),
       instructions: "x".repeat(70_000),
     };
 
@@ -118,7 +134,7 @@ describe("OpenAI unified calls client", () => {
         },
       );
       const client = createOpenAiCallsClient({ apiKey: "server-secret", fetch, timeoutMs: 25 });
-      const pending = client.createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() });
+      const pending = client.createCall({ offerSdp: OFFER, session: canonicalSession() });
       const assertion = expect(pending).rejects.toThrow("provider call failed");
       await vi.advanceTimersByTimeAsync(25);
       await assertion;
@@ -146,7 +162,7 @@ describe("OpenAI unified calls client", () => {
         fetch: vi.fn(async () => streamedResponse(body, "/v1/realtime/calls/rtc_hanging")),
       });
 
-      const pending = client.createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() });
+      const pending = client.createCall({ offerSdp: OFFER, session: canonicalSession() });
       const assertion = expect(pending).rejects.toThrow("provider call failed");
       await vi.advanceTimersByTimeAsync(25);
       await assertion;
@@ -172,7 +188,7 @@ describe("OpenAI unified calls client", () => {
     });
 
     const error = await client
-      .createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() })
+      .createCall({ offerSdp: OFFER, session: canonicalSession() })
       .catch((value: unknown) => value);
     expect(error).toBeInstanceOf(OpenAiCallCreationError);
     expect(error).toMatchObject({ callId: "rtc_body_timeout" });
@@ -196,7 +212,7 @@ describe("OpenAI unified calls client", () => {
     });
 
     await expect(
-      client.createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() }),
+      client.createCall({ offerSdp: OFFER, session: canonicalSession() }),
     ).rejects.toThrow("provider call failed");
     expect(cancelled).toBe(true);
   });
@@ -212,7 +228,7 @@ describe("OpenAI unified calls client", () => {
       ),
     });
     await expect(
-      badAnswer.createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() }),
+      badAnswer.createCall({ offerSdp: OFFER, session: canonicalSession() }),
     ).rejects.toThrow("provider call failed");
 
     const badLocation = createOpenAiCallsClient({
@@ -225,7 +241,7 @@ describe("OpenAI unified calls client", () => {
       ),
     });
     await expect(
-      badLocation.createCall({ offerSdp: OFFER, session: buildCanonicalPocSession() }),
+      badLocation.createCall({ offerSdp: OFFER, session: canonicalSession() }),
     ).rejects.toThrow("provider call failed");
   });
 });

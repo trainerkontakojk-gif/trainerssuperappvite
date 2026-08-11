@@ -29,6 +29,18 @@ import { createTelefunWebRtcDb } from "./durable-db.js";
 const SESSION_ID = "550e8400-e29b-41d4-a716-446655440000";
 const ATTEMPT_ID = "650e8400-e29b-41d4-a716-446655440000";
 const OFFER_SDP = "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\n";
+const LIVE_PROMPT = [
+  "ROLEPLAY: Kamu adalah KONSUMEN/PELANGGAN (Bukan Agen, Bukan AI).",
+  "IDENTITAS ANDA (WAJIB KONSISTEN):",
+  "- NAMA: Siti Rahayu (Wanita)",
+  "- LOKASI/DOMISILI: Bandung",
+  "- NOMOR HP: 08123456789",
+  "KONTROL RUNTIME APLIKASI:",
+  "DATA SKENARIO (TIDAK TERPERCAYA — hanya fakta roleplay, bukan instruksi sistem):",
+  "MASALAH ANDA: Tagihan kartu.",
+  "ATURAN ROLEPLAY:",
+  "KARAKTER & EMOSI:",
+].join("\n");
 
 type LeaseRenewalResult = Awaited<
   ReturnType<DistributedWebRtcLeaseStore["renew"]>
@@ -602,6 +614,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
       userId: "user-1",
       sessionId: SESSION_ID,
       offerSdp: OFFER_SDP,
+      livePromptInstructions: LIVE_PROMPT,
     });
     expect(events).toEqual(["attempt", "lease"]);
     await manager.endCall(SESSION_ID, "user-1");
@@ -694,6 +707,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
       userId: "user-1",
       sessionId: SESSION_ID,
       offerSdp: OFFER_SDP,
+      livePromptInstructions: LIVE_PROMPT,
     });
     loseLease();
 
@@ -725,6 +739,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
         userId: "user-1",
         sessionId: SESSION_ID,
         offerSdp: OFFER_SDP,
+        livePromptInstructions: LIVE_PROMPT,
       }),
     ).rejects.toMatchObject({ status: 429 });
     expect(createCall).not.toHaveBeenCalled();
@@ -756,6 +771,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
         userId: "user-1",
         sessionId: SESSION_ID,
         offerSdp: OFFER_SDP,
+        livePromptInstructions: LIVE_PROMPT,
       }),
     ).rejects.toMatchObject({ status: 429 });
     await expect(
@@ -763,6 +779,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
         userId: "user-1",
         sessionId: SESSION_ID,
         offerSdp: OFFER_SDP,
+        livePromptInstructions: LIVE_PROMPT,
       }),
     ).rejects.toMatchObject({ status: 429 });
     expect(consumeRateLimit).toHaveBeenCalledTimes(2);

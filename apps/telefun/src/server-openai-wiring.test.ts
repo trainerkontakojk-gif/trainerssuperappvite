@@ -36,6 +36,7 @@ describe("Telefun OpenAI server wiring", () => {
     expect(dbSource).toContain('eq("user_id", userId)');
     expect(dbSource).toContain('eq("status", "active")');
     expect(dbSource).toContain('select("id, status")');
+    expect(dbSource).toContain("live_prompt_instructions, consumer_gender");
     expect(dbSource).toContain('if (data?.id === sessionId) return;');
     expect(dbSource).toContain('current.data?.id === sessionId');
     expect(dbSource).toContain(

@@ -132,6 +132,7 @@ export interface WebRtcCallManager {
     sessionId: string;
     offerSdp: string;
     livePromptInstructions?: string | null;
+    consumerGender?: string | null;
     signal?: AbortSignal;
   }): Promise<{ answerSdp: string }>;
   endCall(

@@ -17,7 +17,7 @@ For Phase 3, Telefun uses the additive broker in `apps/telefun/src/realtime-webr
 - Browser → Telefun: raw `application/sdp` only
 - Telefun → OpenAI: multipart `sdp` + canonical server-built `session`
 - Telefun → OpenAI sideband: control/event authority bound to parsed `call_id`
-- Canonical POC model/voice: `gpt-realtime-2.1` / `marin`
+- Canonical POC model/voice: `gpt-realtime-2.1`; voice is server-owned from persisted consumer gender: `cedar` for `male`, `marin` for `female` or missing/blank
 - Broker access: only authenticated admin/trainer profiles with owned, pre-created, active Telefun sessions
 - Rollout flag: `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` by default
 
