@@ -13,6 +13,7 @@
     "test:fast": "vitest run --config vitest.config.fast.ts",
     "test:full": "vitest run",
     "test:e2e": "playwright test",
+    "test:webrtc-sdp-chromium": "node --no-warnings scripts/verify-openai-webrtc-sdp-chromium.mjs",
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
     "start": "serve dist -s -l tcp://0.0.0.0:${PORT:-3005}"
