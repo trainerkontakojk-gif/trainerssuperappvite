@@ -2,6 +2,11 @@ import type { SessionMetrics, TelefunTransport } from "@trainers/types";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { TelefunAppSettings } from "../telefunSettings";
 import { LiveSession } from "./liveSession";
+import {
+  buildOpenAiResponseCreate,
+  buildOpenAiSystemInputItem,
+} from "./liveProtocol";
+import { getTimeCueInstruction } from "./promptBuilder";
 import { deleteOpenAIWebRtcBrokerCall } from "./openaiWebRtc/brokerApi";
 import {
   OpenAIWebRtcSession,
@@ -471,6 +476,7 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
         this.onLocalStream(stream as unknown as MediaStream | null);
       },
       onPlaybackBlocked: () => this.onPlaybackBlocked(),
+      onRemotePlaybackChange: (audible) => this.onAiSpeaking(audible),
       onCleanupConfirmed: () => this.onCleanupConfirmed(),
       onRecoveryRequired: (plan) => this.onRecoveryRequired(plan),
       isObjectUrlRetained: (url) => this.isObjectUrlRetained?.(url) ?? false,
@@ -516,8 +522,14 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
     this.session.setHold(held);
   }
 
-  // Browser time-cue prompt authority is intentionally deferred for WebRTC.
-  public sendTimeCue(_remainingSeconds: number): void {}
+  public sendTimeCue(remainingSeconds: number): void {
+    const activeConsumer =
+      this.config.activeConsumerType ?? this.config.consumerTypes[0];
+    const text = getTimeCueInstruction(activeConsumer, remainingSeconds);
+    const item = buildOpenAiSystemInputItem(text);
+    if (!this.session.sendControlEvent(item)) return;
+    this.session.sendControlEvent(buildOpenAiResponseCreate());
+  }
 
   public sendControlEvent(event: OpenAIWebRtcControlEvent): boolean {
     return this.session.sendControlEvent(event);
@@ -543,10 +555,19 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
       return;
     }
     if (event.type === "error") {
+      const recoverableControlError =
+        this.session.isRecoverableControlError(event);
       const safeEvent: OpenAIWebRtcEvent = {
         kind: "event",
         type: "error",
-        payload: { type: "error", error: { code: "provider_error" } },
+        payload: {
+          type: "error",
+          error: {
+            code: recoverableControlError
+              ? "interruption_control_rejected"
+              : "provider_error",
+          },
+        },
       };
       try {
         this.onProviderEvent(safeEvent);
@@ -554,7 +575,7 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
         // UI observers are not lifecycle authorities.
       }
       try {
-        this.onError(safeProviderError(event));
+        if (!recoverableControlError) this.onError(safeProviderError(event));
       } catch {
         // UI observers are not lifecycle authorities.
       }
@@ -568,15 +589,12 @@ export class OpenAIWebRtcTransport implements TelefunTransportSession {
       } catch {
         // Observability is never a lifecycle authority.
       }
+      if (recoverableControlError) return;
       this.finalizeProviderFailure();
       return;
     }
 
     this.onProviderEvent(event);
-    const speaking = mapOpenAIWebRtcSpeakingEvent(event.type);
-    if (speaking !== null) {
-      this.onAiSpeaking(speaking);
-    }
   }
 
   private finalizeProviderFailure(): void {

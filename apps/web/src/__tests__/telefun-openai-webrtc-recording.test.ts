@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenAIWebRtcSession } from "../routes/telefun/services/openaiWebRtc/openaiWebRtcSession";
-import {
-  OpenAIWebRtcRecordingGraph,
-} from "../routes/telefun/services/openaiWebRtc/recording";
+import { OpenAIWebRtcRecordingGraph } from "../routes/telefun/services/openaiWebRtc/recording";
 import {
   createRetainedObjectUrlOwner,
   revokeObjectUrlOnce,
@@ -55,7 +53,9 @@ function createPeer() {
     setLocalDescription: vi.fn(async () => undefined),
     setRemoteDescription: vi.fn(async () => undefined),
     close: vi.fn(),
-    ontrack: null as ((event: { track: FakeTrack; streams: FakeStream[] }) => void) | null,
+    ontrack: null as
+      | ((event: { track: FakeTrack; streams: FakeStream[] }) => void)
+      | null,
     onconnectionstatechange: null as (() => void) | null,
     oniceconnectionstatechange: null as (() => void) | null,
     connectionState: "new",
@@ -93,7 +93,8 @@ class FakeAudioContext {
 
   createMediaStreamSource(stream: FakeStream): FakeAudioNode {
     this.sourceCount += 1;
-    const source = this.sourceCount === 1 ? this.localSource : this.remoteSource;
+    const source =
+      this.sourceCount === 1 ? this.localSource : this.remoteSource;
     if (this.sourceCount === 1) expect(stream).toBe(this.localStream);
     return source;
   }
@@ -123,7 +124,10 @@ class FakeMediaRecorder {
     this.onstop?.();
   });
 
-  constructor(public readonly stream: FakeStream) {}
+  constructor(
+    public readonly stream: FakeStream,
+    public readonly mimeType = "",
+  ) {}
 }
 
 describe("OpenAI WebRTC recording graph", () => {
@@ -166,40 +170,49 @@ describe("OpenAI WebRTC recording graph", () => {
   it.each([
     { hasOwner: false, expectedRevokes: 1 },
     { hasOwner: true, expectedRevokes: 0 },
-  ])("requires a page owner before accepting object URL transfer", async ({ hasOwner, expectedRevokes }) => {
-    const revoke = vi.fn();
-    const graph = {
-      stop: vi.fn(async () => ({
-        fullBlob: new Blob(["full"]),
-        agentBlob: null,
-        recordingError: null,
-      })),
-      createFullObjectUrl: vi.fn(() => "blob:owned"),
-      revokeObjectUrl: revoke,
-      getVolumeSamples: vi.fn(() => []),
-    };
-    const session = new OpenAIWebRtcSession(
-      {
-        sessionId: SESSION_ID,
-        accessToken: "token",
-        brokerHttpBaseUrl: "https://broker.example",
-      },
-      {
-        RTCPeerConnection: class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
-        fetch: vi.fn(),
-        mediaDevices: { getUserMedia: vi.fn() },
-        audioElement: { srcObject: null, play: vi.fn() },
-        createObjectURL: vi.fn(() => "blob:owned"),
-        isObjectUrlRetained: hasOwner ? () => true : undefined,
-        onRecordingComplete: vi.fn(async () => ({ retainObjectUrl: true })),
-      },
-    );
-    Object.assign(session, { recordingGraph: graph, sessionStartTime: Date.now() });
+  ])(
+    "requires a page owner before accepting object URL transfer",
+    async ({ hasOwner, expectedRevokes }) => {
+      const revoke = vi.fn();
+      const graph = {
+        stop: vi.fn(async () => ({
+          fullBlob: new Blob(["full"]),
+          agentBlob: null,
+          recordingError: null,
+        })),
+        createFullObjectUrl: vi.fn(() => "blob:owned"),
+        revokeObjectUrl: revoke,
+        getVolumeSamples: vi.fn(() => []),
+      };
+      const session = new OpenAIWebRtcSession(
+        {
+          sessionId: SESSION_ID,
+          accessToken: "token",
+          brokerHttpBaseUrl: "https://broker.example",
+        },
+        {
+          RTCPeerConnection:
+            class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+          fetch: vi.fn(),
+          mediaDevices: { getUserMedia: vi.fn() },
+          audioElement: { srcObject: null, play: vi.fn() },
+          createObjectURL: vi.fn(() => "blob:owned"),
+          isObjectUrlRetained: hasOwner ? () => true : undefined,
+          onRecordingComplete: vi.fn(async () => ({ retainObjectUrl: true })),
+        },
+      );
+      Object.assign(session, {
+        recordingGraph: graph,
+        sessionStartTime: Date.now(),
+      });
 
-    await (session as unknown as { finalizeRecording: () => Promise<void> }).finalizeRecording();
+      await (
+        session as unknown as { finalizeRecording: () => Promise<void> }
+      ).finalizeRecording();
 
-    expect(revoke).toHaveBeenCalledTimes(expectedRevokes);
-  });
+      expect(revoke).toHaveBeenCalledTimes(expectedRevokes);
+    },
+  );
 
   it("does not revoke before a slow recording callback can publish its fallback owner", async () => {
     vi.useFakeTimers();
@@ -226,7 +239,8 @@ describe("OpenAI WebRTC recording graph", () => {
         brokerHttpBaseUrl: "https://broker.example",
       },
       {
-        RTCPeerConnection: class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        RTCPeerConnection:
+          class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
         fetch: vi.fn(),
         mediaDevices: { getUserMedia: vi.fn() },
         audioElement: { srcObject: null, play: vi.fn() },
@@ -238,9 +252,14 @@ describe("OpenAI WebRTC recording graph", () => {
         },
       },
     );
-    Object.assign(session, { recordingGraph: graph, sessionStartTime: Date.now() });
+    Object.assign(session, {
+      recordingGraph: graph,
+      sessionStartTime: Date.now(),
+    });
 
-    const finalizing = (session as unknown as { finalizeRecording: () => Promise<void> }).finalizeRecording();
+    const finalizing = (
+      session as unknown as { finalizeRecording: () => Promise<void> }
+    ).finalizeRecording();
     await vi.advanceTimersByTimeAsync(10_000);
     expect(revoke).not.toHaveBeenCalled();
 
@@ -262,9 +281,11 @@ describe("OpenAI WebRTC recording graph", () => {
   it("releases a timeout-abandoned page owner exactly once after late callback settlement", async () => {
     vi.useFakeTimers();
     let resolveCallback!: (value: { retainObjectUrl: true }) => void;
-    const callbackPromise = new Promise<{ retainObjectUrl: true }>((resolve) => {
-      resolveCallback = resolve;
-    });
+    const callbackPromise = new Promise<{ retainObjectUrl: true }>(
+      (resolve) => {
+        resolveCallback = resolve;
+      },
+    );
     const revoke = vi.fn();
     const graph = {
       stop: vi.fn(async () => ({
@@ -285,7 +306,8 @@ describe("OpenAI WebRTC recording graph", () => {
         brokerHttpBaseUrl: "https://broker.example",
       },
       {
-        RTCPeerConnection: class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        RTCPeerConnection:
+          class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
         fetch: vi.fn(),
         mediaDevices: { getUserMedia: vi.fn() },
         audioElement: { srcObject: null, play: vi.fn() },
@@ -298,9 +320,14 @@ describe("OpenAI WebRTC recording graph", () => {
         }),
       },
     );
-    Object.assign(session, { recordingGraph: graph, sessionStartTime: Date.now() });
+    Object.assign(session, {
+      recordingGraph: graph,
+      sessionStartTime: Date.now(),
+    });
 
-    const finalizing = (session as unknown as { finalizeRecording: () => Promise<void> }).finalizeRecording();
+    const finalizing = (
+      session as unknown as { finalizeRecording: () => Promise<void> }
+    ).finalizeRecording();
     await vi.advanceTimersByTimeAsync(10_000);
     await finalizing;
     expect(revoke).not.toHaveBeenCalled();
@@ -315,10 +342,52 @@ describe("OpenAI WebRTC recording graph", () => {
     vi.useRealTimers();
   });
 
+  it("falls back across supported MIME and no-options MediaRecorder variants", async () => {
+    const localStream = createStream([createTrack()]);
+    const audioContext = new FakeAudioContext(localStream);
+    const constructorOptions: Array<{ mimeType: string } | undefined> = [];
+    const recorders: FakeMediaRecorder[] = [];
+    const graph = new OpenAIWebRtcRecordingGraph({
+      audioContextFactory: () => audioContext,
+      mediaRecorderIsTypeSupported: (mimeType: string) =>
+        mimeType === "audio/mp4",
+      mediaRecorderFactory: (
+        stream: OpenAIWebRtcStreamLike,
+        options?: { mimeType: string },
+      ) => {
+        constructorOptions.push(options);
+        if (options) throw new TypeError("options are unsupported");
+        const recorder = new FakeMediaRecorder(
+          stream as unknown as FakeStream,
+          "audio/ogg",
+        );
+        recorders.push(recorder);
+        return recorder;
+      },
+    } as unknown as OpenAIWebRtcDependencies);
+
+    await expect(
+      graph.start(localStream as unknown as OpenAIWebRtcStreamLike),
+    ).resolves.toBe(true);
+    expect(constructorOptions).toEqual([
+      { mimeType: "audio/mp4" },
+      undefined,
+      { mimeType: "audio/mp4" },
+      undefined,
+    ]);
+    expect(recorders).toHaveLength(2);
+    const result = await graph.stop();
+    expect(result.fullBlob?.type).toBe("audio/ogg");
+    expect(result.agentBlob?.type).toBe("audio/ogg");
+    await graph.dispose();
+  });
+
   it("resumes a suspended recording context before starting recorders", async () => {
     const localTrack = createTrack();
     const localStream = createStream([localTrack]);
-    const audioContext = new FakeAudioContext(localStream) as FakeAudioContext & {
+    const audioContext = new FakeAudioContext(
+      localStream,
+    ) as FakeAudioContext & {
       state: string;
       resume: ReturnType<typeof vi.fn>;
     };
@@ -328,30 +397,36 @@ describe("OpenAI WebRTC recording graph", () => {
     });
     const recorders: FakeMediaRecorder[] = [];
 
-    const graph = new OpenAIWebRtcRecordingGraph(
-      {
-        audioContextFactory: () => audioContext,
-        mediaRecorderIsTypeSupported: () => true,
-        mediaRecorderFactory: (stream: OpenAIWebRtcStreamLike) => {
-          const recorder = new FakeMediaRecorder(stream as unknown as FakeStream);
-          recorders.push(recorder);
-          return recorder;
-        },
-      } as unknown as OpenAIWebRtcDependencies,
-    );
+    const graph = new OpenAIWebRtcRecordingGraph({
+      audioContextFactory: () => audioContext,
+      mediaRecorderIsTypeSupported: () => true,
+      mediaRecorderFactory: (stream: OpenAIWebRtcStreamLike) => {
+        const recorder = new FakeMediaRecorder(stream as unknown as FakeStream);
+        recorders.push(recorder);
+        return recorder;
+      },
+    } as unknown as OpenAIWebRtcDependencies);
 
     await expect(
       graph.start(localStream as unknown as OpenAIWebRtcStreamLike),
     ).resolves.toBe(true);
     expect(audioContext.resume).toHaveBeenCalledOnce();
     expect(recorders).toHaveLength(2);
-    expect(recorders.every((recorder) => recorder.start.mock.invocationCallOrder[0]! > audioContext.resume.mock.invocationCallOrder[0]!)).toBe(true);
+    expect(
+      recorders.every(
+        (recorder) =>
+          recorder.start.mock.invocationCallOrder[0]! >
+          audioContext.resume.mock.invocationCallOrder[0]!,
+      ),
+    ).toBe(true);
     await graph.dispose();
   });
 
   it("marks capture failed when recording context resume is rejected", async () => {
     const localStream = createStream([createTrack()]);
-    const audioContext = new FakeAudioContext(localStream) as FakeAudioContext & {
+    const audioContext = new FakeAudioContext(
+      localStream,
+    ) as FakeAudioContext & {
       state: string;
       resume: ReturnType<typeof vi.fn>;
     };
@@ -359,19 +434,47 @@ describe("OpenAI WebRTC recording graph", () => {
     audioContext.resume = vi.fn(async () => {
       throw new Error("resume denied");
     });
-    const graph = new OpenAIWebRtcRecordingGraph(
-      {
-        audioContextFactory: () => audioContext,
-        mediaRecorderIsTypeSupported: () => true,
-        mediaRecorderFactory: vi.fn(),
-      } as unknown as OpenAIWebRtcDependencies,
-    );
+    const graph = new OpenAIWebRtcRecordingGraph({
+      audioContextFactory: () => audioContext,
+      mediaRecorderIsTypeSupported: () => true,
+      mediaRecorderFactory: vi.fn(),
+    } as unknown as OpenAIWebRtcDependencies);
 
     await expect(
       graph.start(localStream as unknown as OpenAIWebRtcStreamLike),
     ).resolves.toBe(false);
     const result = await graph.stop();
     expect(result.recordingError).toEqual(new Error("resume denied"));
+    await graph.dispose();
+  });
+
+  it("stops a recorder that started before its paired recorder fails", async () => {
+    const localStream = createStream([createTrack()]);
+    const audioContext = new FakeAudioContext(localStream);
+    const recorders = [
+      new FakeMediaRecorder(createStream([])),
+      new FakeMediaRecorder(createStream([])),
+    ];
+    recorders[1]!.start.mockImplementation(() => {
+      throw new Error("agent recorder start failed");
+    });
+    let recorderIndex = 0;
+    const graph = new OpenAIWebRtcRecordingGraph({
+      audioContextFactory: () => audioContext,
+      mediaRecorderIsTypeSupported: () => true,
+      mediaRecorderFactory: () => recorders[recorderIndex++]!,
+    } as unknown as OpenAIWebRtcDependencies);
+
+    await expect(
+      graph.start(localStream as unknown as OpenAIWebRtcStreamLike),
+    ).resolves.toBe(false);
+    expect(recorders[0]!.stop).toHaveBeenCalledOnce();
+    expect(recorders[0]!.state).toBe("inactive");
+
+    const result = await graph.stop();
+    expect(result.recordingError).toEqual(
+      new Error("agent recorder start failed"),
+    );
     await graph.dispose();
   });
 
@@ -386,13 +489,11 @@ describe("OpenAI WebRTC recording graph", () => {
         start: vi.fn(),
         stop: vi.fn(),
       } as unknown as FakeMediaRecorder;
-      const graph = new OpenAIWebRtcRecordingGraph(
-        {
-          audioContextFactory: () => new FakeAudioContext(localStream),
-          mediaRecorderIsTypeSupported: () => true,
-          mediaRecorderFactory: vi.fn(() => recorder),
-        } as unknown as OpenAIWebRtcDependencies,
-      );
+      const graph = new OpenAIWebRtcRecordingGraph({
+        audioContextFactory: () => new FakeAudioContext(localStream),
+        mediaRecorderIsTypeSupported: () => true,
+        mediaRecorderFactory: vi.fn(() => recorder),
+      } as unknown as OpenAIWebRtcDependencies);
 
       await expect(
         graph.start(localStream as unknown as OpenAIWebRtcStreamLike),
@@ -432,16 +533,18 @@ describe("OpenAI WebRTC recording graph", () => {
       } | null,
     };
 
-    const fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "POST") {
-        return new Response("v=0 answer", {
-          status: 201,
-          headers: { "content-type": "application/sdp" },
-        });
-      }
-      order.push("delete");
-      return new Response(null, { status: 204 });
-    });
+    const fetch = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          return new Response("v=0 answer", {
+            status: 201,
+            headers: { "content-type": "application/sdp" },
+          });
+        }
+        order.push("delete");
+        return new Response(null, { status: 204 });
+      },
+    );
 
     const session = new OpenAIWebRtcSession(
       {
@@ -470,7 +573,9 @@ describe("OpenAI WebRTC recording graph", () => {
             NonNullable<OpenAIWebRtcDependencies["audioContextFactory"]>
           >,
         mediaRecorderFactory: (stream) => {
-          const recorder = new FakeMediaRecorder(stream as unknown as FakeStream);
+          const recorder = new FakeMediaRecorder(
+            stream as unknown as FakeStream,
+          );
           const originalStop = recorder.stop;
           recorder.stop = vi.fn(() => {
             order.push("recorder-stop");

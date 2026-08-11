@@ -22,7 +22,7 @@ describe("OpenAI WebRTC POC contracts", () => {
           turn_detection: {
             type: "server_vad",
             create_response: true,
-            interrupt_response: true,
+            interrupt_response: false,
           },
         },
         output: {
@@ -45,7 +45,7 @@ describe("OpenAI WebRTC POC contracts", () => {
     expect(session.audio.output.voice).toBe("marin");
   });
 
-  it.each([undefined, null, "", "   "]) (
+  it.each([undefined, null, "", "   "])(
     "uses the server fallback for blank instructions (%j)",
     (instructions) => {
       expect(buildCanonicalPocSession(instructions).instructions).toBe(

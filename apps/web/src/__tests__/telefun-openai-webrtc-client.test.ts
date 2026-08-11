@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { SessionMetrics } from "@trainers/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OpenAIWebRtcSession } from "../routes/telefun/services/openaiWebRtc/openaiWebRtcSession";
 import {
@@ -156,6 +157,16 @@ function createAudioElement() {
   return {
     srcObject: null as FakeStream | null,
     muted: false,
+    currentTime: 0,
+    paused: true,
+    ended: false,
+    readyState: 4,
+    onplaying: null as (() => void) | null,
+    onpause: null as (() => void) | null,
+    onended: null as (() => void) | null,
+    ontimeupdate: null as (() => void) | null,
+    onwaiting: null as (() => void) | null,
+    onstalled: null as (() => void) | null,
     play: vi.fn(async () => undefined),
   };
 }
@@ -336,10 +347,10 @@ describe("OpenAIWebRtcSession", () => {
     vi.useRealTimers();
   });
 
-  it("exposes one local stream and applies mute, hold, and narrow controls", async () => {
-    const fetch = createFetch();
-    const localStreams: unknown[] = [];
-    const session = new OpenAIWebRtcSession(
+  function createSession(
+    overrides: Partial<OpenAIWebRtcDependencies> = {},
+  ): OpenAIWebRtcSession {
+    return new OpenAIWebRtcSession(
       {
         sessionId: SESSION_ID,
         accessToken: "supabase-access-token",
@@ -351,14 +362,88 @@ describe("OpenAIWebRtcSession", () => {
             return peer as unknown as RTCPeerConnection;
           }
         } as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch: createFetch(),
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+        ...overrides,
+      },
+    );
+  }
+
+  async function connectRemoteSession(
+    session: OpenAIWebRtcSession,
+  ): Promise<void> {
+    await resolveConnection(session, peer);
+    peer.dataChannel.readyState = "open";
+    peer.emitTrack(remoteTrack, remoteStream);
+    await Promise.resolve();
+    audio.paused = false;
+  }
+
+  function createTransport(
+    fetch: OpenAIWebRtcDependencies["fetch"],
+  ): OpenAIWebRtcTransport {
+    return new OpenAIWebRtcTransport(
+      {
+        telefunTransport: "openai-webrtc",
+        telefunModelId: "gpt-realtime-2.1",
+        sessionId: SESSION_ID,
+        consumerTypes: [],
+      } as unknown as TelefunAppSettings,
+      "supabase-access-token",
+      {
+        websocketUrl: "wss://broker.example/base/ws",
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as TelefunWebRtcFactoryEnvironment["RTCPeerConnection"],
         fetch,
         mediaDevices:
           mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
         audioElement:
           audio as unknown as OpenAIWebRtcDependencies["audioElement"],
-        onLocalStream: (stream) => localStreams.push(stream),
       },
     );
+  }
+
+  function emitRemoteOutput(
+    responseId: string,
+    itemId: string,
+    started = true,
+  ): void {
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: responseId, status: "in_progress" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.output_item.added",
+        response_id: responseId,
+        item: { id: itemId, type: "message", role: "assistant" },
+      }),
+    );
+    if (started) {
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "output_audio_buffer.started",
+          response_id: responseId,
+        }),
+      );
+    }
+  }
+
+  it("exposes one local stream and applies mute, hold, and narrow controls", async () => {
+    const fetch = createFetch();
+    const localStreams: unknown[] = [];
+    const session = createSession({
+      fetch,
+      onLocalStream: (stream) => localStreams.push(stream),
+    });
 
     await resolveConnection(session, peer);
     expect(localStreams).toEqual([localStream]);
@@ -369,15 +454,667 @@ describe("OpenAIWebRtcSession", () => {
     expect(audio.muted).toBe(true);
     session.setHold(false);
     expect(audio.muted).toBe(false);
-    expect(session.sendControlEvent({ type: "response.cancel" })).toBe(false);
+    expect(
+      session.sendControlEvent({
+        type: "response.cancel",
+        response_id: "response-1",
+      }),
+    ).toBe(false);
     peer.dataChannel.readyState = "open";
-    expect(session.sendControlEvent({ type: "response.cancel" })).toBe(true);
-    expect(peer.dataChannel.send).toHaveBeenCalledWith(
-      JSON.stringify({ type: "response.cancel" }),
-    );
+    expect(
+      session.sendControlEvent({
+        type: "response.cancel",
+        response_id: "response-1",
+      }),
+    ).toBe(true);
+    expect(JSON.parse(peer.dataChannel.send.mock.calls[0][0])).toMatchObject({
+      type: "response.cancel",
+      response_id: "response-1",
+      event_id: expect.any(String),
+    });
 
     await session.end();
     expect(localStreams.at(-1)).toBeNull();
+  });
+
+  it("interrupts only the audible active remote response using media progress", async () => {
+    const fetch = createFetch();
+    const session = createSession({ fetch });
+
+    await connectRemoteSession(session);
+    audio.currentTime = 0;
+    emitRemoteOutput("response-1", "item-1");
+
+    audio.currentTime = 1.25;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 500,
+        item_id: "input-1",
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 510,
+        item_id: "input-1",
+      }),
+    );
+
+    const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls).toHaveLength(3);
+    expect(controls[0]).toMatchObject({
+      type: "response.cancel",
+      response_id: "response-1",
+      event_id: expect.any(String),
+    });
+    expect(controls[1]).toMatchObject({
+      type: "output_audio_buffer.clear",
+      event_id: expect.any(String),
+    });
+    expect(controls[2]).toMatchObject({
+      type: "conversation.item.truncate",
+      item_id: "item-1",
+      content_index: 0,
+      audio_end_ms: expect.any(Number),
+      event_id: expect.any(String),
+    });
+    expect(controls[2].audio_end_ms).toBeGreaterThanOrEqual(1_200);
+    expect(controls[2].audio_end_ms).toBeLessThanOrEqual(1_250);
+
+    await session.end();
+  });
+
+  it("does not interrupt before the active WebRTC output buffer is audible", async () => {
+    const session = createSession();
+
+    await connectRemoteSession(session);
+    audio.currentTime = 1;
+    emitRemoteOutput("response-1", "item-1", false);
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 100,
+      }),
+    );
+
+    expect(peer.dataChannel.send).not.toHaveBeenCalled();
+    await session.end();
+  });
+
+  it("clears and truncates completed audible output without cancelling a finished response", async () => {
+    const session = createSession();
+
+    await connectRemoteSession(session);
+    audio.currentTime = 0;
+    emitRemoteOutput("response-1", "item-1");
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.done",
+        response: { id: "response-1", status: "completed" },
+      }),
+    );
+
+    audio.currentTime = 0.75;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 100,
+      }),
+    );
+
+    const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls.map((event) => event.type)).toEqual([
+      "output_audio_buffer.clear",
+      "conversation.item.truncate",
+    ]);
+    expect(controls[1]).toMatchObject({
+      item_id: "item-1",
+      audio_end_ms: 750,
+    });
+    await session.end();
+  });
+
+  it("does not count paused remote-media time toward truncation", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const session = createSession();
+
+    await connectRemoteSession(session);
+    emitRemoteOutput("response-1", "item-1");
+
+    now.mockReturnValue(2_000);
+    audio.currentTime = 1;
+    audio.paused = true;
+    audio.onpause?.();
+    now.mockReturnValue(6_000);
+    audio.paused = false;
+    audio.onplaying?.();
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 100,
+      }),
+    );
+
+    const truncate = peer.dataChannel.send.mock.calls
+      .map(([raw]) => JSON.parse(raw))
+      .find((event) => event.type === "conversation.item.truncate");
+    expect(truncate?.audio_end_ms).toBeLessThanOrEqual(1_200);
+    await session.end();
+    now.mockRestore();
+  });
+
+  it("does not count held and muted remote-media time toward truncation", async () => {
+    const session = createSession();
+
+    await connectRemoteSession(session);
+    audio.currentTime = 0;
+    emitRemoteOutput("response-1", "item-1");
+
+    audio.currentTime = 1;
+    session.setHold(true);
+    audio.currentTime = 5;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    expect(peer.dataChannel.send).not.toHaveBeenCalled();
+
+    session.setHold(false);
+    await Promise.resolve();
+    audio.paused = false;
+    audio.currentTime = 5.5;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+
+    const truncate = peer.dataChannel.send.mock.calls
+      .map(([raw]) => JSON.parse(raw))
+      .find((event) => event.type === "conversation.item.truncate");
+    expect(truncate?.audio_end_ms).toBe(1_500);
+    await session.end();
+  });
+
+  it("ignores stale response and item events after a newer response is active", async () => {
+    const session = createSession();
+
+    await connectRemoteSession(session);
+    emitRemoteOutput("response-old", "item-old", false);
+    emitRemoteOutput("response-new", "item-new");
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.output_item.added",
+        response_id: "response-new",
+        item: { id: "item-late", type: "message", role: "assistant" },
+      }),
+    );
+
+    // A late duplicate from the older response must not retarget the active call.
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-old", status: "in_progress" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.started",
+        response_id: "response-old",
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.done",
+        response: { id: "response-old", status: "completed" },
+      }),
+    );
+    audio.currentTime = 1;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 100,
+      }),
+    );
+
+    const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls[0]).toMatchObject({
+      type: "response.cancel",
+      response_id: "response-new",
+    });
+    expect(controls[1]).toMatchObject({
+      type: "output_audio_buffer.clear",
+    });
+    expect(controls[2]).toMatchObject({
+      type: "conversation.item.truncate",
+      item_id: "item-new",
+    });
+    expect(controls).toHaveLength(3);
+    await session.end();
+  });
+
+  it("ignores a duplicate output start after the response buffer was cleared", async () => {
+    const playbackChanges: boolean[] = [];
+    const session = createSession({
+      onRemotePlaybackChange: (audible) => playbackChanges.push(audible),
+    });
+
+    await connectRemoteSession(session);
+    audio.currentTime = 0;
+    emitRemoteOutput("response-1", "item-1");
+    expect(playbackChanges).toEqual([true]);
+
+    audio.currentTime = 0.5;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.cleared",
+        response_id: "response-1",
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.started",
+        response_id: "response-1",
+      }),
+    );
+
+    expect(playbackChanges).toEqual([true, false]);
+    await session.end();
+  });
+
+  it("preserves hold metrics and records server-VAD speech segments", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const metrics: unknown[] = [];
+    const session = createSession({
+      onRecordingComplete: (_url, _full, _agent, sessionMetrics) => {
+        metrics.push(sessionMetrics);
+      },
+    });
+
+    await resolveConnection(session, peer);
+    session.setHold(true);
+    now.mockReturnValue(11_000);
+    session.setHold(false);
+
+    now.mockReturnValue(12_000);
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 0,
+      }),
+    );
+    now.mockReturnValue(13_500);
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_stopped",
+        audio_end_ms: 1_500,
+      }),
+    );
+
+    await session.end();
+
+    const captured = metrics[0] as {
+      hold?: { count: number; totalDurationMs: number };
+      speechSegments?: Array<{ durationMs: number }>;
+      totalSpeakingMs?: number;
+    };
+    expect(captured.hold).toMatchObject({ count: 1 });
+    expect(captured.hold?.totalDurationMs).toBeGreaterThanOrEqual(10_000);
+    expect(captured.speechSegments).toEqual([
+      expect.objectContaining({ durationMs: 1_500 }),
+    ]);
+    expect(captured.totalSpeakingMs).toBe(1_500);
+    now.mockRestore();
+  });
+
+  it("closes open server-VAD speech and hold intervals at finalization", async () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const metrics: SessionMetrics[] = [];
+    const session = createSession({
+      onRecordingComplete: (_url, _full, _agent, sessionMetrics) => {
+        metrics.push(sessionMetrics);
+      },
+    });
+
+    await resolveConnection(session, peer);
+    now.mockReturnValue(1_500);
+    session.setHold(true);
+    now.mockReturnValue(2_000);
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    now.mockReturnValue(5_000);
+    await session.end();
+
+    expect(metrics[0]).toMatchObject({
+      sessionDurationMs: 4_000,
+      totalSpeakingMs: 3_000,
+      totalSilenceMs: 1_000,
+      speechSegments: [{ startMs: 1_000, endMs: 4_000, durationMs: 3_000 }],
+      hold: { count: 1, totalDurationMs: 3_500 },
+    });
+    now.mockRestore();
+  });
+
+  it("keeps speaking state tied to audible playback after response.done", async () => {
+    const fetch = createFetch();
+    const transport = new OpenAIWebRtcTransport(
+      {
+        telefunTransport: "openai-webrtc",
+        telefunModelId: "gpt-realtime-2.1",
+        sessionId: SESSION_ID,
+        consumerTypes: [],
+      } as unknown as TelefunAppSettings,
+      "supabase-access-token",
+      {
+        websocketUrl: "wss://broker.example/base/ws",
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as TelefunWebRtcFactoryEnvironment["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+      },
+    );
+    const speaking: boolean[] = [];
+    transport.onAiSpeaking = (value) => speaking.push(value);
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.emitTrack(remoteTrack, remoteStream);
+    await Promise.resolve();
+    audio.paused = false;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-1", status: "in_progress" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.output_item.added",
+        response_id: "response-1",
+        item: { id: "item-1", type: "message", role: "assistant" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.started",
+        response_id: "response-1",
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.done",
+        response: { id: "response-1", status: "completed" },
+      }),
+    );
+
+    expect(speaking.at(-1)).toBe(true);
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.stopped",
+        response_id: "response-1",
+      }),
+    );
+    expect(speaking.at(-1)).toBe(false);
+    await transport.disconnect("user");
+  });
+
+  it("keeps a rapid interruption-control race recoverable and correlated", async () => {
+    const fetch = createFetch();
+    const transport = new OpenAIWebRtcTransport(
+      {
+        telefunTransport: "openai-webrtc",
+        telefunModelId: "gpt-realtime-2.1",
+        sessionId: SESSION_ID,
+        consumerTypes: [],
+      } as unknown as TelefunAppSettings,
+      "supabase-access-token",
+      {
+        websocketUrl: "wss://broker.example/base/ws",
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as TelefunWebRtcFactoryEnvironment["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+      },
+    );
+    const errors: Error[] = [];
+    const providerEvents: OpenAIWebRtcEvent[] = [];
+    transport.onError = (error) => errors.push(error);
+    transport.onProviderEvent = (event) => providerEvents.push(event);
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.emitTrack(remoteTrack, remoteStream);
+    await Promise.resolve();
+    audio.paused = false;
+    audio.currentTime = 0;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-1", status: "in_progress" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.output_item.added",
+        response_id: "response-1",
+        item: { id: "item-1", type: "message", role: "assistant" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.started",
+        response_id: "response-1",
+      }),
+    );
+    audio.currentTime = 0.5;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    const cancel = peer.dataChannel.send.mock.calls
+      .map(([raw]) => JSON.parse(raw))
+      .find((event) => event.type === "response.cancel");
+
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          code: "response_cancel_not_active",
+          event_id: cancel.event_id,
+          message: "Response is no longer active.",
+        },
+      }),
+    );
+    await Promise.resolve();
+
+    expect(errors).toEqual([]);
+    expect(providerEvents.at(-1)).toMatchObject({
+      kind: "event",
+      type: "error",
+      payload: {
+        error: { code: "interruption_control_rejected" },
+      },
+    });
+    expect(
+      fetch.mock.calls.filter(
+        (call) => (call[1] as RequestInit | undefined)?.method === "DELETE",
+      ),
+    ).toHaveLength(0);
+    await transport.disconnect("user");
+  });
+
+  it("recovers only the exact correlated truncate race and settles its state", async () => {
+    const session = createSession();
+    await resolveConnection(session, peer);
+    peer.dataChannel.readyState = "open";
+
+    expect(
+      session.sendControlEvent({
+        type: "conversation.item.truncate",
+        item_id: "item-1",
+        content_index: 0,
+        audio_end_ms: 500,
+      }),
+    ).toBe(true);
+    const truncate = peer.dataChannel.send.mock.calls
+      .map(([raw]) => JSON.parse(raw))
+      .find((event) => event.type === "conversation.item.truncate");
+    const error: OpenAIWebRtcEvent = {
+      kind: "event",
+      type: "error",
+      payload: {
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          code: "item_truncate_invalid_item_id",
+          event_id: truncate.event_id,
+        },
+      },
+    };
+
+    expect(session.isRecoverableControlError(error)).toBe(true);
+    expect(session.isRecoverableControlError(error)).toBe(false);
+    await session.end();
+  });
+
+  it("fails closed for a correlated server error instead of recovering it", async () => {
+    const fetch = createFetch();
+    const transport = createTransport(fetch);
+    const errors: Error[] = [];
+    transport.onError = (error) => errors.push(error);
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+
+    expect(
+      transport.sendControlEvent({
+        type: "response.cancel",
+        response_id: "response-1",
+      }),
+    ).toBe(true);
+    const cancel = peer.dataChannel.send.mock.calls
+      .map(([raw]) => JSON.parse(raw))
+      .find((event) => event.type === "response.cancel");
+
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "error",
+        error: {
+          type: "server_error",
+          code: "provider_failure",
+          event_id: cancel.event_id,
+        },
+      }),
+    );
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(errors).toContainEqual(
+      expect.objectContaining({ code: "provider_error" }),
+    );
+    expect(
+      fetch.mock.calls.filter(
+        (call) => (call[1] as RequestInit | undefined)?.method === "DELETE",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("sends WebRTC time cues as a system control item and response", async () => {
+    const fetch = createFetch();
+    const transport = new OpenAIWebRtcTransport(
+      {
+        telefunTransport: "openai-webrtc",
+        telefunModelId: "gpt-realtime-2.1",
+        sessionId: SESSION_ID,
+        consumerTypes: [
+          {
+            id: "ramah",
+            name: "Ramah",
+            description: "Kooperatif",
+            difficulty: "Mudah",
+          },
+        ],
+        activeConsumerType: {
+          id: "ramah",
+          name: "Ramah",
+          description: "Kooperatif",
+          difficulty: "Mudah",
+        },
+      } as unknown as TelefunAppSettings,
+      "supabase-access-token",
+      {
+        websocketUrl: "wss://broker.example/base/ws",
+        RTCPeerConnection: class {
+          constructor() {
+            return peer as unknown as RTCPeerConnection;
+          }
+        } as unknown as TelefunWebRtcFactoryEnvironment["RTCPeerConnection"],
+        fetch,
+        mediaDevices:
+          mediaDevices as unknown as OpenAIWebRtcDependencies["mediaDevices"],
+        audioElement:
+          audio as unknown as OpenAIWebRtcDependencies["audioElement"],
+      },
+    );
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+
+    try {
+      transport.sendTimeCue(20);
+
+      const events = peer.dataChannel.send.mock.calls.map(([raw]) =>
+        JSON.parse(raw),
+      );
+      expect(events).toHaveLength(2);
+      expect(events[0]).toMatchObject({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: expect.stringContaining("[TELEFUN_CONTROL:TIME_CUE]"),
+            },
+          ],
+        },
+      });
+      expect(events[1]).toEqual({ type: "response.create" });
+    } finally {
+      await transport.disconnect("user");
+    }
   });
 
   it("reports blocked autoplay once and retries playback after a user gesture", async () => {
@@ -411,6 +1148,31 @@ describe("OpenAIWebRtcSession", () => {
     peer.emitTrack(remoteTrack, remoteStream);
     await Promise.resolve();
     expect(onPlaybackBlocked).toHaveBeenCalledTimes(1);
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-1", status: "in_progress" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.output_item.added",
+        response_id: "response-1",
+        item: { id: "item-1", type: "message", role: "assistant" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.started",
+        response_id: "response-1",
+      }),
+    );
+    audio.currentTime = 1;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    expect(peer.dataChannel.send).not.toHaveBeenCalled();
 
     await expect(session.retryPlayback()).resolves.toBe(true);
     expect(audio.play).toHaveBeenCalledTimes(2);
@@ -956,7 +1718,7 @@ describe("OpenAIWebRtcSession", () => {
       },
       { kind: "invalid", reason: "malformed_json" },
     ]);
-    // DataChannel events are UI callbacks only; server persistence remains sideband-owned.
+    // Browser lifecycle observers may react locally; persistence remains sideband-owned.
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(updateSession).not.toHaveBeenCalled();
     expect(appendTranscript).not.toHaveBeenCalled();
