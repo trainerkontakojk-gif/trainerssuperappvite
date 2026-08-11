@@ -528,7 +528,7 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 
 ## Deployment Checklist
 
-### Railway (Canonical API/Telefun; Normal Web STAGING; Auxiliary Web PRODUCTION)
+### Railway (Canonical API/Telefun; Railway Web STAGING normal; Railway Web PRODUCTION auxiliary/noncanonical)
 
 - [ ] Apply all Supabase migrations
 - [ ] Deploy API dan Telefun sebagai service Railway kanonik; Railway Web staging adalah target normal, sedangkan Railway Web PRODUCTION hanya bila auxiliary host memang diperlukan

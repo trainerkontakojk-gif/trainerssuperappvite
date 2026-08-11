@@ -1,9 +1,12 @@
-# Handoff — Telefun OpenAI WebRTC Phase 5/6 + local Phase 7 continuation
+# Handoff — Telefun OpenAI WebRTC Phase 5/6 + Phase 7 Railway staging continuation
 
 - Generated: `2026-08-11T00:29:31Z`
-- Last updated: `2026-08-11` (Phase 7 provider-free local continuation)
+- Last updated: `2026-08-11` (Phase 7 provider-free Railway staging continuation)
 - Repository: `trainerssuperappvite`
 - Candidate branch: `candidate/telefun-webrtc-phase6-20260811`
+- Phase 7 application commit (local, intentionally unpushed): `7c72a4fd75cc51d5300cd6fd10083432fea0b680`
+- Phase 7 Railway staging Web deployment: `fea2a048-fd43-4b22-97bd-947b10bd8388`
+- Phase 7 Railway staging Telefun deployment: `721dd02a-529d-49f2-af4b-4b0ff9fc22ae`
 - Historical Railway staging Web candidate: `b7c5ed89626a1883d34f1308eca1f82d44a01bd0`
 - Deployed staging API/Telefun repair: `f8d9cec1365c5115db71c6611cbfb98ee1b28267`
 - Source-repair base: `8e9fdc3621f0f812f5a655e4935b2dd736b5b27f`
@@ -14,8 +17,9 @@
 > **Canonical host correction:** Vercel adalah production host kanonik untuk
 > Web. API dan Telefun tetap di Railway. Railway Web staging adalah target normal;
 > hanya referensi Railway Web PRODUCTION yang merupakan evidence
-> auxiliary/noncanonical, bukan bukti release Vercel. Phase 7 continuation pada worktree ini belum di-deploy atau
-> dibuktikan live di Vercel.
+> auxiliary/noncanonical, bukan bukti release Vercel. Phase 7 sudah di-deploy
+> hanya ke Railway Web/Telefun staging; belum di-push, di-deploy ke production,
+> atau dibuktikan live di Vercel.
 
 ## Purpose
 
@@ -36,6 +40,7 @@ Dokumen ini adalah titik lanjut untuk sesi/operator berikutnya. Ia memisahkan pe
 | Duplicate-start repair                     | **PASS — Railway staging**          | Race dua POST session ditemukan tanpa provider attempt kedua, placeholder dibersihkan melalui API lifecycle, dan single-flight fix `b7c5ed8` lulus full Web suite lalu ter-deploy ke Railway Web staging.                            |
 | Phase 6 production backend rollout         | **NO-GO / NOT DEPLOYED**            | API/Telefun production tidak menerima candidate ini. Release decision tetap tertahan pada warning durasi dan review historical auto-deploy Railway Web PRODUCTION auxiliary.                                                         |
 | Historical commit/push/deployment scope    | **DONE with auto-deploy caveat**    | `f8d9cec` dan `b7c5ed8` dipush ke candidate. Railway staging terverifikasi; push juga men-deploy Railway Web PRODUCTION auxiliary `b7c5ed8`, bukan Vercel canonical. API/Telefun production `SKIPPED`.                               |
+| Phase 7 Full Railway staging continuation  | **PASS, provider-free; push held**  | Commit lokal `7c72a4f` di-deploy manual ke Web `fea2a048` dan Telefun `721dd02a`, keduanya `SUCCESS/RUNNING`. Health Web/API/Telefun 200, broker disabled 404, flags tetap off, durable state tetap bersih, tanpa provider call.     |
 
 ## Explicit scope and authorization
 
@@ -448,30 +453,37 @@ Historical deployed candidate dipisahkan menjadi dua repair commit dan sudah dip
 
 Commit historis `c0cd6b1`, `eaf0c79`, `2b2545b`, dan `929d53a` tetap menjadi provenance checkpoint lama. Documentation follow-up setelah `b7c5ed8` bersifat docs-only dan tidak mengubah deployed application tree.
 
-Phase 7 Full continuation saat ini hanya ada sebagai perubahan lokal yang belum
-di-commit. Provider-free tests membuktikan audibility-gated interruption,
+Phase 7 Full continuation sudah di-commit lokal sebagai `7c72a4f` dan di-deploy
+manual dari clean commit snapshot ke Railway Web staging `fea2a048` serta
+Telefun staging `721dd02a`; keduanya `SUCCESS/RUNNING`. API staging tetap pada
+`f8d9cec`. Provider-free tests membuktikan audibility-gated interruption,
 scoped/deduplicated cancel-clear-truncate, hold/pause/autoplay elapsed exclusion,
 server-VAD/hold metrics finalization, existing time-cue contract, dan actual MIME
-MediaRecorder fallback. Tidak ada deploy, Vercel live check, provider call, atau
-physical browser/device proof. Mini dan keputusan deprecation OpenAI WebSocket
-tetap separate/deferred; Gemini dan legacy OpenAI WebSocket tidak diubah.
+MediaRecorder fallback. Hosted smoke membuktikan Web/API/Telefun HTTP 200,
+disabled broker POST 404, flags tetap off, dan durable state tetap attempts total
+8 dengan active attempts/leases/histories `0/0/0`. Tidak ada provider call,
+Vercel live check, production deployment, atau physical browser/device proof.
+Commit belum di-push karena Railway production Web dan Telefun terhubung ke
+candidate branch; push dapat memicu production di luar scope. Mini dan keputusan
+deprecation OpenAI WebSocket tetap separate/deferred; Gemini dan legacy OpenAI
+WebSocket tidak diubah.
 
 Plan lokal berada di bawah `/plan/markdown/*` dan di-ignore oleh `.gitignore`;
 jangan mengubah `.gitignore` hanya untuk men-track plan tersebut.
 
 ## Not processed / remaining work
 
-| Priority       | Item                                         | Current blocker / required decision                                                                                                                                               |
-| -------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1 decision    | Duration guardrail follow-up                 | Paid runtime technical PASS, tetapi usage 38.560 detik melampaui izin 30 detik. Tentukan apakah perlu hard auto-stop terpisah sebelum release GO; jangan menjalankan paid retry.  |
-| P1 decision    | Railway Web PRODUCTION auxiliary auto-deploy | Railway Web PRODUCTION auxiliary pernah menerima `b7c5ed8`; ini bukan status Vercel canonical. Retain/rollback auxiliary host membutuhkan keputusan dan authorization terpisah.   |
-| P2             | Cross-replica runtime evidence               | Staging services currently have one replica each; do not claim cross-replica behavior until an explicitly approved multi-replica drill exists.                                    |
-| P2             | Wider physical-device/audio matrix           | One manual Chrome desktop mic call connected, but multi-browser/mobile/physical-device coverage remains outside current evidence.                                                 |
-| P2             | Post-call scoring read-only follow-up        | Scoring call terbaru belum direcheck sebagai gate final. Recheck read-only jika artefak scoring perlu ditutup; jangan reinterpretasikan UI `0/10` sebagai connection failure.     |
-| P2             | Railway auxiliary Web variable cleanup       | Public bundle scan lulus, tetapi backend-only variable names masih terpasang pada auxiliary Web service. Hapus hanya lewat configuration change terpisah setelah scope disetujui. |
-| P2             | External security review                     | Belum dilakukan.                                                                                                                                                                  |
-| Separate scope | Mini WebRTC expansion                        | Provider mendukung Mini, tetapi registry/API/Web/broker/DB/test masih single-model Full. Harus change set additive terpisah.                                                      |
-| Separate scope | Supabase Security Advisor findings           | Temuan project-wide pre-existing belum diremediasi dan tidak boleh dibundel diam-diam dengan Telefun Phase 5/6.                                                                   |
+| Priority       | Item                                     | Current blocker / required decision                                                                                                                                                                                                                        |
+| -------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1 decision    | Duration guardrail follow-up             | Paid runtime technical PASS, tetapi usage 38.560 detik melampaui izin 30 detik. Tentukan apakah perlu hard auto-stop terpisah sebelum release GO; jangan menjalankan paid retry.                                                                           |
+| P1 decision    | Railway production candidate auto-deploy | Railway production Web dan Telefun terhubung ke candidate branch; `7c72a4f` sengaja belum di-push agar production tidak terpicu. Retarget/disconnect trigger atau authorization production memerlukan keputusan terpisah; Vercel canonical tidak disentuh. |
+| P2             | Cross-replica runtime evidence           | Staging services currently have one replica each; do not claim cross-replica behavior until an explicitly approved multi-replica drill exists.                                                                                                             |
+| P2             | Wider physical-device/audio matrix       | One manual Chrome desktop mic call connected, but multi-browser/mobile/physical-device coverage remains outside current evidence.                                                                                                                          |
+| P2             | Post-call scoring read-only follow-up    | Scoring call terbaru belum direcheck sebagai gate final. Recheck read-only jika artefak scoring perlu ditutup; jangan reinterpretasikan UI `0/10` sebagai connection failure.                                                                              |
+| P2             | Railway auxiliary Web variable cleanup   | Public bundle scan lulus, tetapi backend-only variable names masih terpasang pada auxiliary Web service. Hapus hanya lewat configuration change terpisah setelah scope disetujui.                                                                          |
+| P2             | External security review                 | Belum dilakukan.                                                                                                                                                                                                                                           |
+| Separate scope | Mini WebRTC expansion                    | Provider mendukung Mini, tetapi registry/API/Web/broker/DB/test masih single-model Full. Harus change set additive terpisah.                                                                                                                               |
+| Separate scope | Supabase Security Advisor findings       | Temuan project-wide pre-existing belum diremediasi dan tidak boleh dibundel diam-diam dengan Telefun Phase 5/6.                                                                                                                                            |
 
 ## Security Advisor follow-up scope
 
@@ -499,11 +511,11 @@ Jika Security Advisor akan diperbaiki, lakukan sebagai task terpisah:
 ## Next-session sequence
 
 1. Baca bagian paid re-smoke terbaru dan private final evidence; kedua paid authorizations sudah consumed dan staging kembali flags off.
-2. Verifikasi branch/status. Application runtime yang relevan adalah Web `b7c5ed8` serta API/Telefun `f8d9cec`; jangan kembali memakai `2b2545b` sebagai current candidate.
+2. Verifikasi branch/status. Phase 7 application commit lokal adalah `7c72a4f`; Railway staging runtime aktif adalah Web `fea2a048`, API `1ca5f4bc` (`f8d9cec`), dan Telefun `721dd02a`. Jangan push sebelum production branch trigger diputuskan.
 3. Pertahankan API/Telefun POC flags false. Jangan menjalankan paid retry atau provider call dari handoff ini.
 4. Migration `20260811044655` sudah terpasang dan terverifikasi hosted; jangan apply ulang.
 5. Putuskan secara eksplisit apakah duration hard-stop perlu ditambahkan sebelum release GO.
-6. Review historical auto-deploy Railway Web PRODUCTION auxiliary `b7c5ed8`; retain/rollback hanya dengan authorization terpisah. API/Telefun production belum di-rollout, dan status Vercel canonical harus dibuktikan tersendiri.
+6. Review production candidate auto-deploy boundary: Railway Web auxiliary pernah menerima `b7c5ed8`, dan production Web/Telefun masih terhubung ke candidate branch. Retarget/disconnect, retain/rollback, atau production rollout hanya dengan authorization terpisah; status Vercel canonical harus dibuktikan tersendiri.
 7. Cross-replica, wider physical-device matrix, Web variable cleanup, dan external review tetap task terpisah dengan scope eksplisit.
 8. Perluasan Mini dikerjakan sebagai additive phase terpisah setelah keputusan release model Full.
 9. Tangani Security Advisor hanya sebagai change set terpisah dengan preflight/backup/rollback sendiri.
@@ -516,7 +528,7 @@ Jika Security Advisor akan diperbaiki, lakukan sebagai task terpisah:
 - Jangan menyentuh atau “membersihkan” row Gemini/non-WebRTC sebagai bagian dari Telefun OpenAI WebRTC.
 - Jangan menyimpan backup production, raw SDP, token, environment value, atau provider secret di repository/evidence.
 - Jangan push candidate ke `main`, deploy/rollback production backend, mutate production DB, atau mengubah Gemini tanpa authorization baru. Railway Web PRODUCTION auxiliary `b7c5ed8` pernah ter-auto-deploy dan harus direview sebagai boundary terpisah; jangan menyamakannya dengan Vercel canonical.
-- Jangan me-redeploy docs-only branch tip dan menyebutnya application candidate baru; current application runtimes tetap Web `b7c5ed8` serta API/Telefun `f8d9cec` sampai ada deployment ter-attest berikutnya.
+- Jangan me-redeploy docs-only branch tip dan menyebutnya application candidate baru; Phase 7 application snapshot tetap `7c72a4f`, dengan Railway staging Web `fea2a048`, Telefun `721dd02a`, dan API `1ca5f4bc` (`f8d9cec`) sampai ada deployment ter-attest berikutnya.
 - Jangan menggunakan kembali paid authorization yang sudah consumed, menyalakan WebRTC flags, atau menjalankan provider start dari handoff ini.
 - Jangan paid retry untuk “memastikan” hasil. Lease repair sudah technical PASS pada paid re-smoke terbaru, kedua authorization sudah consumed, dan provider call berikutnya tetap memerlukan authorization baru.
 - Jangan mengklaim browser `data_channel_close` pada call lama sebagai initial cause atau provider failure. Exact server-side cause adalah ambiguity PL/pgSQL `expires_at`; hosted paid re-smoke terbaru membuktikan repair renewal bekerja.
