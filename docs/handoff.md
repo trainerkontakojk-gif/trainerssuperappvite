@@ -1,12 +1,14 @@
 # Handoff — Telefun OpenAI WebRTC Phase 5/6
 
 - Generated: `2026-08-11T00:29:31Z`
+- Last updated: `2026-08-11T02:12:05Z`
 - Repository: `trainerssuperappvite`
-- Pre-integration checkpoint branch: `main`
+- Candidate branch: `candidate/telefun-webrtc-phase6-20260811`
+- Deployed staging application candidate: `2b2545ba90e8d1e50913236c7353729f4ef8ed65`
 - Source-repair base: `8e9fdc3621f0f812f5a655e4935b2dd736b5b27f`
-- Current integration identity: selalu cek `git branch --show-current` dan
-  `git rev-parse HEAD`; jangan menganggap metadata checkpoint di atas sebagai
-  deployed SHA.
+- Current repository identity: selalu cek `git branch --show-current` dan
+  `git rev-parse HEAD`. Branch dapat berada di atas deployed candidate karena
+  commit dokumentasi-only tidak ikut di-deploy.
 
 ## Purpose
 
@@ -14,14 +16,16 @@ Dokumen ini adalah titik lanjut untuk sesi/operator berikutnya. Ia memisahkan pe
 
 ## Current status
 
-| Area                            | Status                  | Meaning                                                                                                               |
-| ------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Browser SDP source repair       | **PASS, provider-free** | Trigger `.trim()` yang menghapus terminal `CRLF` sudah direproduksi; candidate canonicalizer diterima Chromium lokal. |
-| Hosted Phase 5 database subgate | **PASS**                | Production lifecycle reconciliation serta canonical rollback/reapply selesai dan diverifikasi.                        |
-| Gate Phase 5 keseluruhan        | **PARTIAL**             | Application deployment/restart, cross-replica load, external review, dan real-device/network evidence belum tersedia. |
-| Phase 6 application rollout     | **NO-GO**               | Tidak ada staging deployment atau immutable deployed-artifact parity.                                                 |
-| Paid smoke                      | **NOT RUN / EXCLUDED**  | Provider call tetap `0`; tidak ada authorization/budget untuk paid call.                                              |
-| Commit/push                     | **NOT DONE**            | Worktree masih memuat perubahan kumulatif yang belum di-commit.                                                       |
+| Area                                  | Status                            | Meaning                                                                                                                               |
+| ------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser SDP source repair             | **PASS, provider-free**           | Trigger `.trim()` direproduksi; canonical SDP diterima Chromium 10/10 dan legacy trimmed ditolak 10/10.                               |
+| Hosted Phase 5 database subgate       | **PASS**                          | Production lifecycle reconciliation serta canonical rollback/reapply selesai dan diverifikasi.                                        |
+| Staging Web/API/Telefun               | **PASS, flags off**               | Ketiga service sehat pada candidate `2b2545b`; WebRTC POC false di API dan Telefun.                                                   |
+| Candidate provenance                  | **PASS with metadata boundary**   | Remote branch dan clean detached upload worktree sama dengan SHA candidate; Railway local-upload `commitHash` tetap `null`.           |
+| Provider-free staged browser/HTTP     | **PASS, unauthenticated scope**   | Landing Chromium, health, CORS cleanup, hidden POST, dan secret-bundle scan lulus; authenticated capability path belum dijalankan.    |
+| Gate Phase 5 keseluruhan              | **PARTIAL**                       | Database dan single-replica staging sehat; cross-replica load/restart, external review, serta real-device/network evidence belum ada. |
+| Paid/runtime OpenAI WebRTC validation | **NO-GO / NOT RUN**               | Provider call tetap `0`; tidak ada authorization/budget untuk paid call dan rollout flag tetap off.                                   |
+| Commit/push                           | **DONE on candidate branch only** | Candidate dipush ke branch khusus; `main` dan production application tidak disentuh.                                                  |
 
 ## Explicit scope and authorization
 
@@ -32,7 +36,15 @@ Fajar menjelaskan bahwa project ini tidak mempunyai staging database dan mengoto
 - jalur Telefun Gemini tidak boleh berubah;
 - operasi wajib preflight-first, mempunyai private backup, exact-state precondition, dan post-write verification.
 
-Authorization tersebut hanya mencakup pekerjaan database yang dicatat di bawah. Ia **bukan** authorization untuk application deploy, mengaktifkan rollout WebRTC, paid provider call, atau memperbaiki temuan Security Advisor di luar scope.
+Authorization database tersebut hanya mencakup pekerjaan database yang dicatat di bawah. Secara terpisah, pada 2026-08-11 Fajar mengotorisasi commit/push ke branch candidate dan deployment **staging-only** Web/API/Telefun dengan WebRTC tetap off. Eksekusi staging tidak mengotorisasi:
+
+- paid/provider call;
+- enablement WebRTC;
+- production application deployment;
+- production database mutation baru;
+- perubahan Gemini atau legacy OpenAI.
+
+Semua batas tersebut dipertahankan.
 
 ## Completed work
 
@@ -165,52 +177,99 @@ runtime smoke yang diotorisasi, agar DB contract, capability, lifecycle,
 pricing/usage, dan regression matrix kedua model dapat diuji tanpa mengganggu
 Gemini atau legacy `openai-audio`.
 
-## Current uncommitted worktree
+## Staging deployment completed — 2026-08-11
 
-Worktree berisi perubahan kumulatif Phase 6 repair, evidence, database follow-up documentation, dan generated graph output:
+Candidate `2b2545ba90e8d1e50913236c7353729f4ef8ed65` dipush ke branch
+`candidate/telefun-webrtc-phase6-20260811` dan di-upload dari clean detached
+worktree `/private/tmp/trainerssuperappvite-webrtc-candidate-2b2545b`.
+Remote branch SHA dan worktree SHA identik.
 
-### Product/tooling changes
+| Service             | Deployment ID                          | Status      | Image digest                                                              |
+| ------------------- | -------------------------------------- | ----------- | ------------------------------------------------------------------------- |
+| `@trainers/web`     | `1ff6807a-721b-4a11-8be9-a6c141c7659e` | **SUCCESS** | `sha256:a6d45c018a80fce607d905c30755cd816792a8c0e749b392da348f2924cc489b` |
+| `@trainers/api`     | `d747d8a4-e69c-4b4b-b676-e7e9d7c4d5b8` | **SUCCESS** | `sha256:31a4a5fadca797e7725cfb924673c432f6f24f921fae3e092eba95aefbe4d02e` |
+| `@trainers/telefun` | `971ac812-cc90-4f4b-b41d-6b3527d89634` | **SUCCESS** | `sha256:c167eb06031cce87a96ba8f0a9f9944244cb58a1e33d455bae2cfe5878ee9433` |
 
-- `apps/web/package.json`
-- `apps/web/vitest.config.ts`
-- `apps/web/scripts/verify-openai-webrtc-sdp-chromium.mjs`
+Railway sempat menandai upload API/Telefun pertama sebagai `SKIPPED` karena
+candidate tidak mengubah watched source path kedua service. Watch patterns
+**staging-only** dikosongkan sementara, upload exact candidate dijalankan, lalu
+watch patterns dipulihkan identik ke `/apps/api/**` dan `/apps/telefun/**`.
+Tidak ada production Railway setting yang diubah dan semua `preDeployCommand`
+tetap `null`, sehingga deploy tidak menjalankan migration.
 
-### Documentation changes
+Provider-free verification setelah deploy:
 
-- `docs/handoff.md`
-- file canonical/rebuild-log yang tercantum pada bagian sebelumnya
+- Web, API `/api/health`, dan Telefun `/health` mengembalikan HTTP 200;
+- `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` pada API dan Telefun;
+- exact staging Web origin hadir di API/Telefun, allowlist keduanya identik, dan
+  internal token boundary cocok tanpa nilai secret dipersist;
+- POST WebRTC dan preflight POST tersembunyi dengan 404 saat flag off; preflight
+  DELETE cleanup 204 dan DELETE tanpa auth 401;
+- Chromium 148 membuka landing staging tanpa console/page/request failure dan
+  tanpa request ke OpenAI, Gemini, atau OpenRouter;
+- 145 public Web files (5,338,019 bytes) dipindai. Exact value dan nama
+  `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ACCESS_TOKEN`, `GEMINI_API_KEY`, serta
+  `OPENROUTER_API_KEY` tidak ditemukan di bundle;
+- read-only database check pukul `2026-08-11T02:06:22Z` masih menunjukkan 10/10
+  WebRTC history failed, 6/6 attempt ended/failed, dan 0 active lease/outcome;
+- OpenAI WebRTC usage tetap 6 failed audit, 0 success, dengan row terbaru
+  `2026-08-10T23:39:00Z`, sebelum deployment staging;
+- Gemini usage terbaru `2026-08-11T01:15:10Z` dan history non-WebRTC terbaru
+  `2026-08-10T01:35:50Z`, keduanya sebelum deployment pertama pukul
+  `2026-08-11T01:52:24Z`. Total Gemini telah bergerak dari baseline historis
+  854 menjadi 857 **sebelum** deploy; jangan mengatribusikannya ke staging.
 
-### Generated graph changes
+Private staging evidence, mode `0600`:
 
-- `graphify-out/.graphify_labels.json`
-- `graphify-out/GRAPH_REPORT.md`
-- `graphify-out/graph.json`
+- Path: `~/.hermes/backups/trainerssuperappvite/telefun-webrtc-staging-20260811T021115Z.json`
+- SHA-256: `01a015df9393032417864c34db2c3b20b9afbd2ca6d5e109ae64ee8223635c39`
 
-Plan lokal berada di bawah `/plan/markdown/*` dan di-ignore oleh `.gitignore`; jangan mengubah `.gitignore` hanya untuk men-track plan tersebut.
+Railway local upload menyimpan `commitHash=null` dan `branch=null`. Provenance
+saat ini berasal dari clean detached worktree, remote branch SHA parity, exact
+SHA pada deployment message, deployment ID, dan image digest; jangan
+menganggapnya sebagai Git-attested SHA dari Railway sendiri.
+
+## Current repository/candidate state
+
+Candidate application telah dipisahkan menjadi tiga commit dan dipush:
+
+- `c0cd6b1` — provider-free Chromium SDP gate;
+- `eaf0c79` — Phase 6, production database, dan handoff documentation;
+- `2b2545b` — refreshed Graphify dependency output dan **deployed candidate**.
+
+Perubahan dokumentasi sesudah deployment boleh membuat branch tip lebih baru
+dari `2b2545b`; commit dokumentasi-only tersebut tidak boleh dianggap sebagai
+application artifact dan tidak perlu di-redeploy.
+
+Plan lokal berada di bawah `/plan/markdown/*` dan di-ignore oleh `.gitignore`;
+jangan mengubah `.gitignore` hanya untuk men-track plan tersebut.
 
 ## Not processed / remaining work
 
-| Priority       | Item                                            | Current blocker / required decision                                                                                                                                      |
-| -------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P1             | Freeze exact release candidate                  | Worktree masih uncommitted; deployed artifact belum dapat dipetakan ke immutable SHA. Perlu review diff dan explicit decision sebelum commit/push.                       |
-| P1             | Staging Web/API/Telefun deployment              | Ketiga staging service tidak mempunyai active/latest deployment; public fallback sebelumnya 404. Target topology dan deployment authorization diperlukan.                |
-| P1             | Web secret-name inventory review                | Web service inventory memuat nama variable service-role. Nilainya tidak dibaca; configuration owner harus membuktikan backend-only value tidak dapat masuk public build. |
-| P1             | Provider-free staged browser path               | Tidak dapat dijalankan sebelum exact application staging aktif, health valid, origin/allowlist konsisten, dan artifact parity terbukti.                                  |
-| P2             | Application kill-switch/default-off drill       | Database proof selesai, tetapi application rollout/rollback behavior pada deployed candidate belum diuji.                                                                |
-| P2             | Cross-replica load and Railway restart evidence | Belum tersedia.                                                                                                                                                          |
-| P2             | Real browser/device/network matrix              | Belum tersedia; bukti saat ini local Chromium provider-free.                                                                                                             |
-| P2             | External security review                        | Belum dilakukan.                                                                                                                                                         |
-| Gated          | Paid smoke                                      | Tetap dilarang tanpa authorization baru yang menyebut target, exact SHA, one-user cohort, budget, durasi, zero retry, dan stop conditions.                               |
-| Separate scope | Supabase Security Advisor findings              | Temuan project-wide pre-existing belum diremediasi dan tidak boleh dibundel diam-diam dengan Telefun Phase 5.                                                            |
+| Priority       | Item                                            | Current blocker / required decision                                                                                                                                                      |
+| -------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1             | Authenticated provider-free staging path        | Tidak ada staging auth session yang tersedia. Perlu login trainer/admin yang sah untuk membuktikan capability `enabled=false` dan UI tetap memilih legacy path tanpa provider call.      |
+| P1             | Independent deployed-SHA attestation            | Railway local upload menyimpan `commitHash=null`; current provenance kuat tetapi operator-supplied. Tambahkan build/runtime SHA attestation bila independent parity diwajibkan.          |
+| P2             | Full kill-switch/restart drill                  | Flag-off POST denial sudah lulus, tetapi transisi on→off, active-call cleanup, restart, dan rollback behavior belum diuji pada staging.                                                  |
+| P2             | Cross-replica load and Railway restart evidence | Belum tersedia; staging saat ini single replica per service.                                                                                                                             |
+| P2             | Real browser/device/network matrix              | Baru Chromium desktop provider-free landing yang diuji; microphone/audio/data-channel runtime belum diuji karena paid/provider path tetap off.                                           |
+| P2             | Web Railway variable ownership cleanup          | Public bundle scan lulus, tetapi backend-only variable names masih terpasang pada Web service. Hapus hanya lewat configuration change terpisah setelah owner/scope disetujui.            |
+| P2             | External security review                        | Belum dilakukan.                                                                                                                                                                         |
+| Gated          | Paid smoke                                      | Dilarang tanpa authorization baru yang menyebut exact deployed SHA, one-user cohort, budget, durasi, zero retry, stop conditions, dan keputusan apakah flags boleh dinyalakan sementara. |
+| Separate scope | Mini WebRTC expansion                           | Provider mendukung Mini, tetapi registry/API/Web/broker/DB/test masih single-model Full. Harus change set additive terpisah.                                                             |
+| Separate scope | Supabase Security Advisor findings              | Temuan project-wide pre-existing belum diremediasi dan tidak boleh dibundel diam-diam dengan Telefun Phase 5/6.                                                                          |
 
 ## Security Advisor follow-up scope
 
-Advisor sebelumnya melaporkan item di luar Telefun Phase 5, antara lain:
+Read-only advisor diulang pada 2026-08-11 dan menghasilkan 63 finding records:
 
-- `public.v_access_groups_with_item_counts` dengan finding `security_definer_view`;
-- sejumlah function non-Phase-5 dengan mutable/unlocked `search_path`;
-- sejumlah `SECURITY DEFINER` function dengan execution grants yang perlu ditinjau;
-- leaked-password protection Supabase Auth belum aktif.
+- satu `security_definer_view` untuk `public.v_access_groups_with_item_counts`;
+- 14 `function_search_path_mutable`;
+- 22 anon dan 25 authenticated `SECURITY DEFINER` execute findings;
+- satu leaked-password-protection finding.
+
+Temuan tersebut project-wide dan dapat overlap pada object yang sama; angka bukan
+jumlah object unik atau bukti compromise. Tidak ada remediation yang dijalankan.
 
 Phase 5 sendiri sudah diverifikasi: ketiga table RLS-enabled dan kesepuluh function tidak executable oleh `public`, `anon`, atau `authenticated`.
 
@@ -225,13 +284,13 @@ Jika Security Advisor akan diperbaiki, lakukan sebagai task terpisah:
 
 ## Next-session sequence
 
-1. Baca handoff ini dan kedua Phase 6 evidence logs; jangan mulai dari asumsi bahwa production DB masih stale.
-2. Jalankan `git status --short`, review cumulative diff, lalu tentukan apakah perubahan akan di-commit. Jangan commit/push tanpa instruksi Fajar.
-3. Untuk melanjutkan rollout, tetapkan target staging aplikasi dan freeze exact immutable SHA terlebih dahulu.
-4. Audit Web environment **name inventory** dan public-build boundary tanpa mencetak secret value.
-5. Deploy dengan WebRTC flags tetap false, lalu buktikan artifact parity, health, exact origins/allowlists, dan provider-free browser path.
-6. Jalankan application kill-switch/rollback drill dan regression Gemini/legacy.
-7. Paid smoke hanya setelah seluruh gate lulus dan authorization baru diterbitkan; maksimal satu call dan tanpa retry.
+1. Baca handoff ini dan kedua Phase 6 evidence logs; production database sudah reconciled dan staging application sudah aktif dengan flags off.
+2. Verifikasi branch/status, tetapi gunakan `2b2545ba90e8d1e50913236c7353729f4ef8ed65` sebagai application candidate yang benar-benar di-deploy. Jangan otomatis memakai docs-only branch tip.
+3. Sediakan staging login trainer/admin yang sah, lalu jalankan authenticated provider-free capability/UI path dengan kedua WebRTC flags tetap false.
+4. Jika independent SHA attestation diwajibkan, tambahkan build/runtime commit marker sebagai change set baru sebelum deploy berikutnya; jangan mengklaim `commitHash=null` sebagai Git attestation.
+5. Jalankan full kill-switch/restart dan cross-replica drill tanpa provider call, lalu regression Gemini/legacy.
+6. Paid smoke hanya setelah seluruh gate lulus dan authorization baru diterbitkan; maksimal satu call dan tanpa retry.
+7. Perluasan Mini dikerjakan sebagai additive phase terpisah setelah Full runtime gate disetujui.
 8. Tangani Security Advisor hanya sebagai change set terpisah dengan preflight/backup/rollback sendiri.
 
 ## Do not repeat blindly
@@ -241,11 +300,14 @@ Jika Security Advisor akan diperbaiki, lakukan sebagai task terpisah:
 - Jangan membuat migration duplikat untuk Phase 5; local/remote migration history sudah sinkron.
 - Jangan menyentuh atau “membersihkan” row Gemini/non-WebRTC sebagai bagian dari Telefun OpenAI WebRTC.
 - Jangan menyimpan backup production, raw SDP, token, environment value, atau provider secret di repository/evidence.
-- Jangan mengklaim Phase 6 GO sebelum exact deployment, staged browser path, paid authorization, dan required runtime evidence tersedia.
+- Jangan push candidate ke `main`, deploy production application, mutate production DB, atau mengubah Gemini tanpa authorization baru.
+- Jangan me-redeploy docs-only branch tip dan menyebutnya candidate yang sama; deployed application SHA adalah `2b2545b`.
+- Jangan menyalakan WebRTC flags atau menjalankan authenticated provider start/paid smoke dari staging evidence ini.
+- Jangan mengklaim Phase 6 runtime GO sebelum authenticated staged path, kill-switch/restart evidence, dan paid authorization yang diwajibkan tersedia.
 
 ## Durable and ephemeral evidence boundary
 
-Canonical migration/rollback files, repository docs, and private backup snapshots above are the durable evidence. Operational helper scripts yang digunakan saat eksekusi berada di `/tmp` dan bersifat ephemeral; jangan mengandalkannya sebagai satu-satunya sumber kebenaran atau menganggap keberadaannya wajib pada sesi berikutnya.
+Canonical migration/rollback files, repository docs, private database snapshots, dan private staging evidence JSON di atas adalah durable evidence. Operational helper scripts yang digunakan saat eksekusi berada di `/tmp` dan bersifat ephemeral; jangan mengandalkannya sebagai satu-satunya sumber kebenaran atau menganggap keberadaannya wajib pada sesi berikutnya.
 
 ## Safe read-only rechecks
 
