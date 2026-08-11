@@ -9,9 +9,12 @@ const landingSource = readFileSync(
   "utf8",
 );
 
-const startCallSource = landingSource.slice(
-  landingSource.indexOf("  const startCall = async () =>"),
-  landingSource.indexOf("  const handleEndCall", landingSource.indexOf("  const startCall = async () =>")),
+const startCallOnceSource = landingSource.slice(
+  landingSource.indexOf("  const startCallOnce = async () =>"),
+  landingSource.indexOf(
+    "  const startCall = async () =>",
+    landingSource.indexOf("  const startCallOnce = async () =>"),
+  ),
 );
 
 describe("Telefun WebRTC prompt parity wiring", () => {
@@ -19,28 +22,32 @@ describe("Telefun WebRTC prompt parity wiring", () => {
     expect(landingSource).toContain(
       'import { buildTelefunLiveSystemInstruction } from "./services/promptBuilder";',
     );
-    expect(startCallSource).toContain(
+    expect(startCallOnceSource).toContain(
       "buildTelefunLiveSystemInstruction({",
     );
-    expect(startCallSource).toContain("identity: sessionConfig.resolvedIdentity!");
-    expect(startCallSource).toContain("scenario: sessionConfig.activeScenario!");
-    expect(startCallSource).toContain(
+    expect(startCallOnceSource).toContain(
+      "identity: sessionConfig.resolvedIdentity!",
+    );
+    expect(startCallOnceSource).toContain(
+      "scenario: sessionConfig.activeScenario!",
+    );
+    expect(startCallOnceSource).toContain(
       "consumerType: sessionConfig.activeConsumerType!",
     );
-    expect(startCallSource).toContain(
+    expect(startCallOnceSource).toContain(
       "responsePacingMode: sessionConfig.responsePacingMode",
     );
-    expect(startCallSource).toContain(
+    expect(startCallOnceSource).toContain(
       "simulationChallengeTypes: sessionConfig.simulationChallengeTypes",
     );
   });
 
   it("sends the snapshot only for the WebRTC create-session payload", () => {
-    const promptBuild = startCallSource.indexOf(
+    const promptBuild = startCallOnceSource.indexOf(
       "buildTelefunLiveSystemInstruction({",
     );
-    const createSession = startCallSource.indexOf("createTelefunSession({");
-    const promptProperty = startCallSource.indexOf(
+    const createSession = startCallOnceSource.indexOf("createTelefunSession({");
+    const promptProperty = startCallOnceSource.indexOf(
       "live_prompt_instructions:",
       createSession,
     );
@@ -48,6 +55,6 @@ describe("Telefun WebRTC prompt parity wiring", () => {
     expect(promptBuild).toBeGreaterThanOrEqual(0);
     expect(createSession).toBeGreaterThan(promptBuild);
     expect(promptProperty).toBeGreaterThan(createSession);
-    expect(startCallSource).toContain("if (requestsWebRtc)");
+    expect(startCallOnceSource).toContain("if (requestsWebRtc)");
   });
 });
