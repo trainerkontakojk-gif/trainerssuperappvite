@@ -1,10 +1,11 @@
 # Handoff — Telefun OpenAI WebRTC Phase 5/6
 
 - Generated: `2026-08-11T00:29:31Z`
-- Last updated: `2026-08-11T05:32:15Z`
+- Last updated: `2026-08-11T07:41:01Z`
 - Repository: `trainerssuperappvite`
 - Candidate branch: `candidate/telefun-webrtc-phase6-20260811`
-- Deployed staging application candidate: `2b2545ba90e8d1e50913236c7353729f4ef8ed65`
+- Deployed staging Web candidate: `b7c5ed89626a1883d34f1308eca1f82d44a01bd0`
+- Deployed staging API/Telefun repair: `f8d9cec1365c5115db71c6611cbfb98ee1b28267`
 - Source-repair base: `8e9fdc3621f0f812f5a655e4935b2dd736b5b27f`
 - Current repository identity: selalu cek `git branch --show-current` dan
   `git rev-parse HEAD`. Branch dapat berada di atas deployed candidate karena
@@ -12,22 +13,23 @@
 
 ## Purpose
 
-Dokumen ini adalah titik lanjut untuk sesi/operator berikutnya. Ia memisahkan pekerjaan yang sudah selesai, bukti yang tersedia, pekerjaan yang belum diproses, dan guardrail agar operasi production tidak dijalankan ulang secara membabi buta.
+Dokumen ini adalah titik lanjut untuk sesi/operator berikutnya. Ia memisahkan pekerjaan yang sudah selesai, bukti yang tersedia, pekerjaan yang belum diproses, dan guardrail agar operasi production tidak dijalankan ulang secara membabi buta. Bagian bertanggal lama di bawah adalah checkpoint historis; tabel status ini dan bagian paid re-smoke terakhir adalah sumber status terkini.
 
 ## Current status
 
-| Area                                    | Status                              | Meaning                                                                                                                                                                  |
-| --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Browser SDP source repair               | **PASS, provider-free**             | Trigger `.trim()` direproduksi; canonical SDP diterima Chromium 10/10 dan legacy trimmed ditolak 10/10.                                                                  |
-| Hosted Phase 5 database subgate         | **PASS**                            | Production lifecycle reconciliation serta canonical rollback/reapply selesai dan diverifikasi.                                                                           |
-| Staging Web/API/Telefun                 | **PASS, restored flags off**        | Web/API/Telefun sehat HTTP 200; API dan Telefun kembali `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` setelah paid smoke.                                                    |
-| P1 authenticated provider-free gate     | **PASS**                            | Existing test account memuat profile dan PhoneInterface; capability/UI tetap disabled saat flags off, tanpa provider call atau durable mutation.                         |
-| P02 source/artifact attestation         | **PASS with docs-only boundary**    | Railway terhubung ke candidate branch; docs HEAD `929d53a` dan non-doc application tree terbukti identik dengan deployed application candidate `2b2545b`.                |
-| P2 provider-free runtime/browser drills | **PASS, bounded scope**             | Deny-all/restart/off restoration, emulated browser/device, fake mic, local peer/data channel, serta offline recovery lulus; physical device/cross-replica tidak diklaim. |
-| Authorized paid OpenAI WebRTC smoke     | **PARTIAL PASS / STABILITY FAIL**   | Satu call tersambung dan mempersist transcript/usage/cost/recording, lalu berakhir sekitar heartbeat pertama karena distributed lease loss; tidak ada paid retry.        |
-| Lease-renewal repair                    | **DB APPLIED / APP DEPLOY PENDING** | Exact ambiguity direproduksi dan migration additive terverifikasi di production canonical; candidate Telefun baru belum di-deploy.                                       |
-| Phase 6 production rollout              | **NO-GO**                           | Connect/persistence/cleanup lulus, tetapi stable-call gate gagal sampai lease renewal diperbaiki dan diverifikasi ulang dengan authorization baru.                       |
-| Commit/push                             | **DONE on candidate branch only**   | Application candidate dan docs follow-up terdahulu hanya dipush ke branch candidate; `main` dan production application tidak disentuh.                                   |
+| Area                                    | Status                              | Meaning                                                                                                                                                                                                                              |
+| --------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Browser SDP source repair               | **PASS, provider-free**             | Trigger `.trim()` direproduksi; canonical SDP diterima Chromium 10/10 dan legacy trimmed ditolak 10/10.                                                                                                                              |
+| Hosted Phase 5 database subgate         | **PASS**                            | Production lifecycle reconciliation serta canonical rollback/reapply selesai dan diverifikasi.                                                                                                                                       |
+| Staging Web/API/Telefun                 | **PASS, restored flags off**        | Web/API/Telefun sehat HTTP 200; API dan Telefun kembali `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` setelah paid re-smoke.                                                                                                             |
+| P1 authenticated provider-free gate     | **PASS**                            | Existing test account memuat profile dan PhoneInterface; capability/UI tetap disabled saat flags off, tanpa provider call atau durable mutation.                                                                                     |
+| P02 source/artifact attestation         | **PASS with docs-only boundary**    | Railway terhubung ke candidate branch; docs HEAD `929d53a` dan non-doc application tree terbukti identik dengan deployed application candidate `2b2545b`.                                                                            |
+| P2 provider-free runtime/browser drills | **PASS, bounded scope**             | Deny-all/restart/off restoration, emulated browser/device, fake mic, local peer/data channel, serta offline recovery lulus; physical device/cross-replica tidak diklaim.                                                             |
+| Authorized paid OpenAI WebRTC re-smoke  | **TECHNICAL PASS / GUARDRAIL WARN** | Tepat satu paid attempt selesai normal setelah melintasi sedikitnya tiga renewal interval; transcript, recording, usage, dan biaya persisten. Durasi usage 38.560 detik melewati izin 30 detik sebesar 8.560 detik; tidak ada retry. |
+| Lease-renewal repair                    | **PASS — DB + hosted runtime**      | Migration `20260811044655` terpasang; API/Telefun staging menjalankan `f8d9cec`; heartbeat maju 30.233 detik tanpa lease loss/orphan.                                                                                                |
+| Duplicate-start repair                  | **PASS — deployed staging Web**     | Race dua POST session ditemukan tanpa provider attempt kedua, placeholder dibersihkan melalui API lifecycle, dan single-flight fix `b7c5ed8` lulus full Web suite lalu ter-deploy.                                                   |
+| Phase 6 production backend rollout      | **NO-GO / NOT DEPLOYED**            | API/Telefun production tidak menerima candidate ini. Release decision tetap tertahan pada warning durasi dan review scope auto-deploy Web production.                                                                                |
+| Commit/push and deployment scope        | **DONE with auto-deploy caveat**    | `f8d9cec` dan `b7c5ed8` dipush ke candidate. Staging terverifikasi; Git push juga otomatis men-deploy Web production `b7c5ed8`, sedangkan API/Telefun production `SKIPPED`.                                                          |
 
 ## Explicit scope and authorization
 
@@ -57,7 +59,9 @@ authorization baru yang terpisah untuk:
   existing account/model/voice yang sama, maksimum 30 detik, budget maksimum
   USD `0.10`, dan zero retry; setelah satu attempt, flags wajib dipulihkan off.
 
-Semua credential, token, account identifier, raw transcript, dan provider secret tetap di luar repository. Batas production serta Gemini tetap dipertahankan.
+Authorization baru itu sudah digunakan dan ditutup. Tepat satu provider attempt dijalankan tanpa retry. Call selesai normal, tetapi usage duration `38.560` detik melampaui batas 30 detik sebesar `8.560` detik meskipun penghentian dilakukan manual. Biaya akhir USD `0.055794`, tetap di bawah batas USD `0.10`. API dan Telefun sudah dipulihkan ke `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false`; authorization tidak boleh dipakai ulang.
+
+Semua credential, token, account identifier, raw transcript, dan provider secret tetap di luar repository. Batas production backend serta Gemini tetap dipertahankan; auto-deploy Web production dicatat terpisah sebagai scope caveat.
 
 ## Completed work
 
@@ -299,7 +303,7 @@ coordinator menelan renewal exception/rejection reason sebelum marker
 `lease_lost`. Investigasi provider-free berikutnya sudah menemukan penyebabnya;
 jangan mengatribusikannya ke Supabase outage atau provider error.
 
-### Lease-renewal exact root cause and repair — DB applied, app deploy pending
+### Lease-renewal exact root cause and repair — historical pre-deploy checkpoint
 
 - Function Phase 5 `renew_telefun_realtime_lease(...)` memakai
   `RETURNS TABLE(..., expires_at, ...)`, lalu `UPDATE` merujuk
@@ -376,37 +380,84 @@ Private evidence berikut semuanya mode `0600` dan tidak boleh dipindah ke reposi
 - Paid disabled-state: `~/.hermes/backups/trainerssuperappvite/telefun-paid-smoke-disabled-20260811T041409Z.json` — SHA-256 `ba423394458d2bab9c6ef8589f4e2c085c86aa5e13f3008c2bc47847cb08e335`.
 - Paid closing: `~/.hermes/backups/trainerssuperappvite/telefun-paid-smoke-closing-20260811T041933Z.json` — SHA-256 `d63c2283044847f8c9b1b23da28a8a2113cbaf48f423e405714cf3419ccf4ada`.
 
+### Paid re-smoke after lease repair — technical PASS, duration warning
+
+Fresh provider-free preflight lulus, lalu authorization dipakai tepat satu kali pada staging untuk model `gpt-realtime-2.1`; tidak ada retry.
+
+| Gate              | Final result                                                                             |
+| ----------------- | ---------------------------------------------------------------------------------------- |
+| Provider attempt  | 1 attempt baru; baseline 7 menjadi total 8                                               |
+| Lifecycle         | `ended/completed`; usage `persisted`; tidak ada lease/orphan/provider error              |
+| Lease repair      | Heartbeat maju 30.233 detik dan melintasi sedikitnya tiga interval renewal 10 detik      |
+| Transcript        | 4 event berurutan: 2 agent + 2 consumer                                                  |
+| Recording         | History completed; recording `ready`; agent recording path tersedia                      |
+| Usage             | 4,144 input + 821 output = 4,965 total token                                             |
+| Cost              | USD `0.055794` / IDR `1,004`; di bawah budget USD `0.10`                                 |
+| Duration          | Lifecycle 39.446 detik; usage 38.560 detik; **8.560 detik di atas izin 30 detik**        |
+| Terminal boundary | Attempt ended, lease released, active attempts/leases/histories `0/0/0`                  |
+| Gemini boundary   | 857 usage rows; latest `2026-08-11T01:15:10.349369+00:00`; 0 row Gemini pada paid window |
+
+Call membuktikan repair hosted bekerja, tetapi durasi melebihi authorization. Karena itu verdict adalah **technical PASS** dengan **duration-guardrail warning**, bukan clean release GO.
+
+Paid test juga mengungkap dua POST pembuatan history yang overlap. Hanya POST pertama mencapai provider attempt; POST kedua menjadi placeholder active dengan durasi 0, recording pending, dan 0 attempt. Placeholder itu diterminalisasi melalui authenticated broker DELETE `outcome=failed`, diverifikasi terminal, lalu dihapus melalui API history DELETE. Postcondition: row hilang, active WebRTC histories 0, provider calls tambahan 0.
+
+Race diperbaiki tanpa menambah UI/schema/indicator baru:
+
+- `startCallInFlightRef` dan wrapper single-flight menggabungkan invocation start yang overlap;
+- regression double-click membuktikan hanya satu session request;
+- commit aplikasi `b7c5ed89626a1883d34f1308eca1f82d44a01bd0` dipush;
+- targeted 3/3 test, full Web 1,263/1,263 test dalam 147 file, typecheck, lint (0 error; 151 warning existing), build, dan `git diff --check` lulus;
+- Graphify diperbarui satu kali bersama source change.
+
+Hosted final state:
+
+| Boundary                             | Result                                                                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Staging Web                          | `98185f2f-138a-4f8e-a700-e317657cbf74` — SUCCESS — `b7c5ed8`                                                                  |
+| Staging API active runtime           | `1ca5f4bc-d1d7-436a-b6d3-2854712c76f0` — SUCCESS — `f8d9cec`                                                                  |
+| Staging Telefun active runtime       | `967907e3-ead1-4c2f-acb2-841d8f6f5857` — SUCCESS — `f8d9cec`                                                                  |
+| API/Telefun deployment for `b7c5ed8` | SKIPPED sesuai watch patterns; runtime `f8d9cec` tetap aktif                                                                  |
+| Health                               | Web/API/Telefun HTTP `200`                                                                                                    |
+| Rollout                              | API dan Telefun POC flags `false`; authenticated capability `enabled=false`, `allowed=false`; disabled broker POST HTTP `404` |
+| Durable state                        | Attempts total 8; active attempts 0; active leases 0; active WebRTC histories 0                                               |
+| Recent service errors                | 0 HTTP 5xx pada ketiga service staging dalam pemeriksaan dua jam terakhir                                                     |
+
+Git push juga memicu koneksi Railway production yang sudah ada: Web production deployment `6cdcf8e5-8c67-4363-9de7-dd63ac95b037` sukses pada `b7c5ed8` dan health HTTP 200. API serta Telefun production untuk commit itu `SKIPPED`; tidak ada production backend rollout. Tidak dilakukan rollback production tanpa authorization baru.
+
+Private redacted evidence, mode `0600`:
+
+- ready gate: `~/.hermes/backups/trainerssuperappvite/telefun-lease-repair-paid-ready-20260811T064058Z.json` — SHA-256 `5a0af583cf96ca63f5e011c19b2ba4312aa1be28555b8448f75649670f8cf3e9`;
+- watchdog/restoration: `~/.hermes/backups/trainerssuperappvite/telefun-lease-repair-watchdog-20260811T064333Z.json` — SHA-256 `0608586054b5abfa7e48ac036722df18eee663f0c615320496a93a12adcb01cf`;
+- duplicate cleanup: `~/.hermes/backups/trainerssuperappvite/telefun-duplicate-placeholder-cleanup-20260811T065909Z.json` — SHA-256 `b4d64f8375fb20f79607087b3a87e946bbcdd51542cc64b633a7eafecc0880bb`;
+- final consolidated: `~/.hermes/backups/trainerssuperappvite/telefun-lease-repair-paid-final-20260811T074101Z.json` — SHA-256 `3093f5ad92407c16a9b0f51bd294df1350b755bbfd127fbec275f0cf329904ea`.
+
+Tidak ada raw transcript, account identifier, bearer token, atau provider secret di repository/evidence final.
+
 ## Current repository/candidate state
 
-Candidate application dan docs follow-up terdahulu telah dipisahkan menjadi empat commit dan dipush:
+Candidate application saat ini dipisahkan menjadi dua repair commit dan sudah dipush:
 
-- `c0cd6b1` — provider-free Chromium SDP gate;
-- `eaf0c79` — Phase 6, production database, dan handoff documentation;
-- `2b2545b` — refreshed Graphify dependency output dan **deployed application candidate**;
-- `929d53a` — provider-free staging deployment documentation only.
+- `f8d9cec` — migration/runtime repair lease renewal; active pada API/Telefun staging;
+- `b7c5ed8` — frontend start-call single-flight repair; active pada Web staging dan ter-auto-deploy ke Web production.
 
-Perubahan handoff P1/P02/P2/paid-smoke dari sesi sebelumnya tetap dipertahankan
-di working tree. Working tree sekarang juga memuat source repair, regression
-tests, migration/rollback additive, dan dokumentasi lease-renewal. Semua ini
-belum commit/push/deploy; future application candidate harus dibekukan dan
-di-attest sebagai candidate baru, bukan dianggap sama dengan `2b2545b`.
+Commit historis `c0cd6b1`, `eaf0c79`, `2b2545b`, dan `929d53a` tetap menjadi provenance checkpoint lama. Documentation follow-up setelah `b7c5ed8` bersifat docs-only dan tidak mengubah deployed application tree.
 
 Plan lokal berada di bawah `/plan/markdown/*` dan di-ignore oleh `.gitignore`;
 jangan mengubah `.gitignore` hanya untuk men-track plan tersebut.
 
 ## Not processed / remaining work
 
-| Priority       | Item                                   | Current blocker / required decision                                                                                                                                           |
-| -------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Operator-gated | Freeze and deploy repaired candidate   | Source repair belum commit/push/deploy. Attest exact new SHA, deploy staging-only dengan flags false, lalu buktikan source/artifact parity dan hosted renewal contract.       |
-| Authorized     | Stable paid verification after repair  | Fresh authorization tersedia untuk satu call manual ≤30 detik, same account/model/voice, budget maks USD 0.10, zero retry, setelah provider-free staging gates lulus.         |
-| P2             | Cross-replica runtime evidence         | Staging services currently have one replica each; do not claim cross-replica behavior until an explicitly approved multi-replica drill exists.                                |
-| P2             | Wider physical-device/audio matrix     | One manual Chrome desktop mic call connected, but multi-browser/mobile/physical-device coverage remains outside current evidence.                                             |
-| P2             | Post-call scoring read-only follow-up  | Scoring was still `pending` at evidence capture. Recheck read-only if closing the scoring artifact is required; do not reinterpret UI `0/10` as connection failure.           |
-| P2             | Web Railway variable ownership cleanup | Public bundle scan lulus, tetapi backend-only variable names masih terpasang pada Web service. Hapus hanya lewat configuration change terpisah setelah owner/scope disetujui. |
-| P2             | External security review               | Belum dilakukan.                                                                                                                                                              |
-| Separate scope | Mini WebRTC expansion                  | Provider mendukung Mini, tetapi registry/API/Web/broker/DB/test masih single-model Full. Harus change set additive terpisah.                                                  |
-| Separate scope | Supabase Security Advisor findings     | Temuan project-wide pre-existing belum diremediasi dan tidak boleh dibundel diam-diam dengan Telefun Phase 5/6.                                                               |
+| Priority       | Item                                   | Current blocker / required decision                                                                                                                                              |
+| -------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1 decision    | Duration guardrail follow-up           | Paid runtime technical PASS, tetapi usage 38.560 detik melampaui izin 30 detik. Tentukan apakah perlu hard auto-stop terpisah sebelum release GO; jangan menjalankan paid retry. |
+| P1 decision    | Production Web auto-deploy boundary    | Web production sudah otomatis menerima `b7c5ed8`; API/Telefun production tidak. Retain/rollback membutuhkan keputusan dan authorization production terpisah.                     |
+| P2             | Cross-replica runtime evidence         | Staging services currently have one replica each; do not claim cross-replica behavior until an explicitly approved multi-replica drill exists.                                   |
+| P2             | Wider physical-device/audio matrix     | One manual Chrome desktop mic call connected, but multi-browser/mobile/physical-device coverage remains outside current evidence.                                                |
+| P2             | Post-call scoring read-only follow-up  | Scoring call terbaru belum direcheck sebagai gate final. Recheck read-only jika artefak scoring perlu ditutup; jangan reinterpretasikan UI `0/10` sebagai connection failure.    |
+| P2             | Web Railway variable ownership cleanup | Public bundle scan lulus, tetapi backend-only variable names masih terpasang pada Web service. Hapus hanya lewat configuration change terpisah setelah owner/scope disetujui.    |
+| P2             | External security review               | Belum dilakukan.                                                                                                                                                                 |
+| Separate scope | Mini WebRTC expansion                  | Provider mendukung Mini, tetapi registry/API/Web/broker/DB/test masih single-model Full. Harus change set additive terpisah.                                                     |
+| Separate scope | Supabase Security Advisor findings     | Temuan project-wide pre-existing belum diremediasi dan tidak boleh dibundel diam-diam dengan Telefun Phase 5/6.                                                                  |
 
 ## Security Advisor follow-up scope
 
@@ -433,14 +484,14 @@ Jika Security Advisor akan diperbaiki, lakukan sebagai task terpisah:
 
 ## Next-session sequence
 
-1. Baca handoff ini, kedua Phase 6 evidence logs, dan private closing evidence; paid authorization sudah consumed dan staging kembali flags off.
-2. Verifikasi branch/status serta review uncommitted repair. `2b2545b` tetap deployed application candidate lama; source repair berikutnya harus menjadi candidate baru.
-3. Pertahankan API/Telefun flags false. Jangan menjalankan paid retry atau provider call dari handoff ini.
-4. Migration `20260811044655` sudah terpasang dan terverifikasi; jangan apply ulang.
-5. Freeze/commit/push exact repair SHA dan deploy staging-only dengan flags false; buktikan artifact parity, health, dan provider-free contract.
-6. Gunakan fresh paid authorization hanya setelah gates lulus: satu call manual ≤30 detik, budget maks USD 0.10, zero retry, lalu restore flags off.
+1. Baca bagian paid re-smoke terbaru dan private final evidence; kedua paid authorizations sudah consumed dan staging kembali flags off.
+2. Verifikasi branch/status. Application runtime yang relevan adalah Web `b7c5ed8` serta API/Telefun `f8d9cec`; jangan kembali memakai `2b2545b` sebagai current candidate.
+3. Pertahankan API/Telefun POC flags false. Jangan menjalankan paid retry atau provider call dari handoff ini.
+4. Migration `20260811044655` sudah terpasang dan terverifikasi hosted; jangan apply ulang.
+5. Putuskan secara eksplisit apakah duration hard-stop perlu ditambahkan sebelum release GO.
+6. Review auto-deploy Web production `b7c5ed8`; retain/rollback hanya dengan authorization production terpisah. API/Telefun production belum di-rollout.
 7. Cross-replica, wider physical-device matrix, Web variable cleanup, dan external review tetap task terpisah dengan scope eksplisit.
-8. Perluasan Mini dikerjakan sebagai additive phase terpisah setelah Full stable-call gate lulus.
+8. Perluasan Mini dikerjakan sebagai additive phase terpisah setelah keputusan release model Full.
 9. Tangani Security Advisor hanya sebagai change set terpisah dengan preflight/backup/rollback sendiri.
 
 ## Do not repeat blindly
@@ -450,12 +501,12 @@ Jika Security Advisor akan diperbaiki, lakukan sebagai task terpisah:
 - Jangan membuat migration duplikat, mengedit migration Phase 5 lama, atau apply ulang; additive canonical `20260811044655` sudah remote.
 - Jangan menyentuh atau “membersihkan” row Gemini/non-WebRTC sebagai bagian dari Telefun OpenAI WebRTC.
 - Jangan menyimpan backup production, raw SDP, token, environment value, atau provider secret di repository/evidence.
-- Jangan push candidate ke `main`, deploy production application, mutate production DB, atau mengubah Gemini tanpa authorization baru.
-- Jangan me-redeploy docs-only branch tip dan menyebutnya candidate yang sama; original application-code candidate adalah `2b2545b`, dan future repair harus menjadi candidate baru yang ter-attest.
+- Jangan push candidate ke `main`, deploy/rollback production backend, mutate production DB, atau mengubah Gemini tanpa authorization baru. Web production `b7c5ed8` sudah ter-auto-deploy dan harus direview sebagai boundary terpisah.
+- Jangan me-redeploy docs-only branch tip dan menyebutnya application candidate baru; current application runtimes tetap Web `b7c5ed8` serta API/Telefun `f8d9cec` sampai ada deployment ter-attest berikutnya.
 - Jangan menggunakan kembali paid authorization yang sudah consumed, menyalakan WebRTC flags, atau menjalankan provider start dari handoff ini.
-- Jangan paid retry untuk “memastikan” disconnect. Stable-call gate sudah gagal dengan bukti `lease_lost`; observability dan root-cause repair harus selesai lebih dulu.
-- Jangan mengklaim browser `data_channel_close` sebagai initial cause atau provider failure. Exact server-side cause sudah direproduksi sebagai ambiguity PL/pgSQL `expires_at`; candidate repair belum menjadi bukti remote runtime sampai di-apply/deploy secara terotorisasi.
-- Jangan mengklaim Phase 6 runtime GO sebelum lease renewal repair dan stable-call verification yang diotorisasi terpisah lulus.
+- Jangan paid retry untuk “memastikan” hasil. Lease repair sudah technical PASS pada paid re-smoke terbaru, kedua authorization sudah consumed, dan provider call berikutnya tetap memerlukan authorization baru.
+- Jangan mengklaim browser `data_channel_close` pada call lama sebagai initial cause atau provider failure. Exact server-side cause adalah ambiguity PL/pgSQL `expires_at`; hosted paid re-smoke terbaru membuktikan repair renewal bekerja.
+- Jangan menyebut hasil terbaru sebagai clean release GO tanpa mencatat duration-guardrail overrun dan production Web auto-deploy boundary.
 
 ## Durable and ephemeral evidence boundary
 
