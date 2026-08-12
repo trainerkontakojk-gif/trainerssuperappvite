@@ -2,7 +2,7 @@
 
 > **TELEFUN** = **Tele**phone **Fun**
 > Modul simulasi panggilan suara untuk melatih agen menangani telepon.
-> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off/non-production (`gpt-realtime-2.1`; voice server-owned: `cedar` untuk male, `marin` untuk female/default); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Gate P5 tetap partial sampai migration/RLS/rollback, deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
+> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off; production hanya dapat dibuka untuk UUID exact allowlist (`gpt-realtime-2.1`; voice server-owned: `cedar` untuk male, `marin` untuk female/default); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Gate P5 tetap partial sampai deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
 
 Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 
@@ -378,7 +378,7 @@ apps/telefun/
 | **Leader**  | ❌ Diblokir — maintenance modal "Akses Terbatas"                       |
 | **Agent**   | ❌ Diblokir — maintenance modal "Akses Terbatas"                       |
 
-Catatan Phase 3–5: browser adapter `openaiWebRtc/` terintegrasi lewat `PhoneInterface` sebagai jalur capability-gated default-off; `LiveSession` tetap baseline Gemini/openai-audio. Lifecycle/recording/scoring Phase 4 dan distributed hardening Phase 5 sudah ada di source. Hosted database subgate—including reconciliation serta transactional rollback/reapply—sudah PASS tanpa perubahan baseline Gemini, tetapi Gate P5 keseluruhan masih partial dan tidak mengubah status non-production/default-off. Barge-in parity serta bukti deployment/load/real-browser tetap lanjutan.
+Catatan Phase 3–5: browser adapter `openaiWebRtc/` terintegrasi lewat `PhoneInterface` sebagai jalur capability-gated default-off; production hanya dapat dibuka untuk UUID exact allowlist. `LiveSession` tetap baseline Gemini/openai-audio. Lifecycle/recording/scoring Phase 4 dan distributed hardening Phase 5 sudah ada di source. Hosted database subgate—including reconciliation serta transactional rollback/reapply—sudah PASS tanpa perubahan baseline Gemini, tetapi Gate P5 keseluruhan masih partial dan tidak mengubah default provider. Barge-in parity serta bukti deployment/load/real-browser tetap lanjutan.
 
 ### Session States
 
@@ -793,7 +793,7 @@ Bukti distributed hardening dan batas verifikasinya dicatat pada [`rebuild-logs/
 | `OPENAI_API_KEY`                                   | Jika OpenAI realtime aktif | —               | Khusus service Telefun untuk OpenAI Realtime; tidak pernah ke Frontend                                   |
 | `TELEFUN_OPENAI_ENABLED`                           | ❌                         | `false`         | Kill switch OpenAI realtime                                                                              |
 | `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | ❌                         | `false`         | Phase 3 capability-gated broker/adapter + Phase 4 durable lifecycle; POST tetap off sampai gate terpisah |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | ❌                         | kosong          | CSV UUID exact; harus sama dengan API, development/staging saja; kosong = deny-all                       |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | ❌                         | kosong          | CSV UUID exact; harus sama dengan API; production tetap exact-cohort; kosong = deny-all                  |
 | `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | ❌                         | `15000`         | Timeout upstream `POST /v1/realtime/calls`                                                               |
 | `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | ❌                         | `10000`         | Timeout koneksi sideband `wss://api.openai.com/v1/realtime?call_id=...`                                  |
 | `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | Jika WebRTC aktif          | —               | Secret server-only minimal 32 karakter untuk opaque provider reference                                   |
@@ -809,7 +809,7 @@ Bukti distributed hardening dan batas verifikasinya dicatat pada [`rebuild-logs/
 
 Untuk broker Phase 3, `ALLOWED_ORIGINS` harus berisi origin web yang persis sama; `*` tidak diterima.
 
-Rollout WebRTC fail-closed: `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` hanya menerima CSV UUID yang valid dan harus identik di API serta Telefun. Flag dan allowlist berlaku hanya di development/staging; production default deny-all. Flag off menolak POST dan tidak membuka provider, tetapi authenticated DELETE yang session-bound tetap diizinkan sebagai exception cleanup untuk menandai session pre-created sebagai `failed`. DELETE bukan jalur start. Test otomatis dan smoke deployment tidak melakukan paid/provider call; paid smoke memerlukan approval terpisah.
+Rollout WebRTC fail-closed: `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` hanya menerima CSV UUID yang valid dan harus identik di API serta Telefun. Development, staging, dan production memerlukan flag aktif **dan** UUID user yang exact-match; flag off atau cohort kosong berarti deny-all. Pengguna di luar cohort tetap memakai baseline Gemini dan tidak melihat capability WebRTC. Flag off menolak POST dan tidak membuka provider, tetapi authenticated DELETE yang session-bound tetap diizinkan sebagai exception cleanup untuk menandai session pre-created sebagai `failed`. DELETE bukan jalur start. Test otomatis dan smoke deployment tidak melakukan paid/provider call; live acceptance memakai bounded operator gate.
 
 ### Frontend — dari `VITE_*` env (via `.env.local` root)
 
