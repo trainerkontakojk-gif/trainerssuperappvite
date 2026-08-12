@@ -31,7 +31,7 @@ export function isTelefunOpenAiWebRtcRuntimeEnabled(input: {
 }): boolean {
   return (
     input.enabled &&
-    (input.nodeEnv === "development" || input.nodeEnv === "staging")
+    ["development", "staging", "production"].includes(input.nodeEnv)
   );
 }
 

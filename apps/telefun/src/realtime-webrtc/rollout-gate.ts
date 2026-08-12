@@ -1,4 +1,5 @@
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type TelefunOpenAiWebRtcEnvironment =
   | "development"
@@ -27,7 +28,7 @@ export function isTelefunOpenAiWebRtcAllowed(
 ): boolean {
   if (
     !input.enabled ||
-    (input.nodeEnv !== "development" && input.nodeEnv !== "staging")
+    !["development", "staging", "production"].includes(input.nodeEnv)
   ) {
     return false;
   }

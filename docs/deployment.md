@@ -78,7 +78,7 @@ root sekarang mengunci ke web saja.
 | `TELEFUN_INTERNAL_TOKEN`                      | `<random>`                          | Shared server-only secret; nilai sama dengan Telefun                                     |
 | `ALLOWED_ORIGINS`                             | `https://<web-url>.up.railway.app`  | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
 | `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | `false`                             | Kill switch API untuk POST WebRTC; default deny                                          |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | `UUID,UUID`                         | Exact UUID CSV cohort; harus sama persis dengan Telefun, development/staging saja        |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | `UUID,UUID`                         | Exact UUID CSV cohort; harus sama persis dengan Telefun; production tetap exact-cohort   |
 | `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | `10`                                | Distributed session/write limit; RPC failure fail-closed untuk WebRTC                    |
 
 ### Telefun Service
@@ -98,7 +98,7 @@ root sekarang mengunci ke web saja.
 | `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | `false`                         | Phase 1 broker/harness; tetap off sampai approval gate terpisah                                                               |
 | `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | `15000`                         | Timeout upstream `POST /v1/realtime/calls`                                                                                    |
 | `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | `10000`                         | Timeout sideband `wss://api.openai.com/v1/realtime?call_id=...`                                                               |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | `UUID,UUID`                     | Exact UUID CSV; harus sama persis dengan API, development/staging saja, kosong = deny-all                                     |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | `UUID,UUID`                     | Exact UUID CSV; harus sama persis dengan API; production tetap exact-cohort; kosong = deny-all                                |
 | `TELEFUN_INTERNAL_TOKEN`                           | `<random>`                      | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web                                                 |
 | `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | `<random min 32 chars>`         | Server-only AES key untuk opaque provider reference; wajib saat POC aktif                                                     |
 | `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`               | `30000`                         | Distributed lease TTL; bounded expiry-safe session cap                                                                        |
@@ -115,7 +115,7 @@ Aturan secret/config:
 - `TELEFUN_INTERNAL_URL` **hanya** di service API; mengarah ke private URL Railway service Telefun (bukan public Web). `TELEFUN_INTERNAL_TOKEN` adalah shared server-only secret yang nilainya SAMA persis di API dan Telefun; token ini tidak boleh berawalan `VITE_` dan tidak boleh di-deploy ke Vercel/Web.
 - `TELEFUN_OPENAI_ENABLED=false` menolak **sesi OpenAI baru** tanpa menghapus history/model pricing. Panggilan aktif tidak dipindahkan ke Gemini di tengah sesi.
 - `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` atau cohort kosong menolak POST WebRTC dan tidak membuka provider. Authenticated, owner-bound DELETE cleanup tetap diizinkan untuk menandai pre-created session sebagai failed; DELETE exception ini bukan jalur start.
-- `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` harus berupa CSV UUID yang valid dan nilainya sama di API serta Telefun. Runtime rollout hanya development/staging; production default deny-all. Automated checks memakai fake upstream; tidak ada paid/provider smoke dalam routine deployment.
+- `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` harus berupa CSV UUID yang valid dan nilainya sama di API serta Telefun. Development, staging, dan production memerlukan flag aktif serta exact user match; flag off atau cohort kosong tetap deny-all. User di luar cohort tetap memakai Gemini. Automated checks memakai fake upstream; tidak ada paid/provider smoke dalam routine deployment.
 - Jika flag `true` tetapi key tidak ada/invalid, readiness OpenAI harus `not_ready` dan configure OpenAI ditolak dengan error aman. Service tetap dapat hidup untuk Gemini bila konfigurasi Gemini valid.
 - Mengubah Railway env memerlukan redeploy/restart service Telefun; jangan menganggap flag berubah in-process sebelum runtime mendukung reload.
 

@@ -117,7 +117,7 @@ describe("Telefun environment schema", () => {
     ]);
   });
 
-  it("denies rollout eligibility outside development and staging", async () => {
+  it("allows only the exact rollout cohort in development, staging, and production", async () => {
     const { isTelefunOpenAiWebRtcAllowed } =
       await import("./realtime-webrtc/rollout-gate.js");
     const config = {
@@ -141,6 +141,13 @@ describe("Telefun environment schema", () => {
     expect(
       isTelefunOpenAiWebRtcAllowed({
         ...config,
+        nodeEnv: "production",
+        userId: config.allowedUserIds[0],
+      }),
+    ).toBe(true);
+    expect(
+      isTelefunOpenAiWebRtcAllowed({
+        ...config,
         nodeEnv: "test",
         userId: config.allowedUserIds[0],
       }),
@@ -149,6 +156,22 @@ describe("Telefun environment schema", () => {
       isTelefunOpenAiWebRtcAllowed({
         ...config,
         nodeEnv: "production",
+        userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b4",
+      }),
+    ).toBe(false);
+    expect(
+      isTelefunOpenAiWebRtcAllowed({
+        ...config,
+        enabled: false,
+        nodeEnv: "production",
+        userId: config.allowedUserIds[0],
+      }),
+    ).toBe(false);
+    expect(
+      isTelefunOpenAiWebRtcAllowed({
+        ...config,
+        nodeEnv: "production",
+        allowedUserIds: [],
         userId: config.allowedUserIds[0],
       }),
     ).toBe(false);

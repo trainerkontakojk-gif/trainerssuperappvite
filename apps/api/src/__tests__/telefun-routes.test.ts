@@ -295,7 +295,7 @@ describe("telefun API payload and security validators", () => {
     });
   });
 
-  it("resolves only an exact allowlisted user in development or staging", () => {
+  it("resolves only an exact allowlisted user in development, staging, or production", () => {
     expect(
       resolveTelefunOpenAiWebRtcCapabilities({
         userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
@@ -324,21 +324,45 @@ describe("telefun API payload and security validators", () => {
       modelId: "gpt-realtime-2.1",
       transport: "openai-webrtc",
     });
-    for (const nodeEnv of ["production", "test"]) {
-      expect(
-        resolveTelefunOpenAiWebRtcCapabilities({
-          userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
-          enabled: true,
-          nodeEnv,
-          allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
-        }).openaiWebRtc,
-      ).toEqual({
-        enabled: false,
-        allowed: false,
-        modelId: "gpt-realtime-2.1",
-        transport: "openai-webrtc",
-      });
-    }
+    expect(
+      resolveTelefunOpenAiWebRtcCapabilities({
+        userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+        enabled: true,
+        nodeEnv: "production",
+        allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
+      }).openaiWebRtc,
+    ).toEqual({
+      enabled: true,
+      allowed: true,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+    });
+    expect(
+      resolveTelefunOpenAiWebRtcCapabilities({
+        userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+        enabled: true,
+        nodeEnv: "test",
+        allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
+      }).openaiWebRtc,
+    ).toEqual({
+      enabled: false,
+      allowed: false,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+    });
+    expect(
+      resolveTelefunOpenAiWebRtcCapabilities({
+        userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b4",
+        enabled: true,
+        nodeEnv: "production",
+        allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
+      }).openaiWebRtc,
+    ).toEqual({
+      enabled: false,
+      allowed: false,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+    });
   });
   const validSettingsBody = {
     selectedModel: "gemini-3.1-flash-live-preview",
