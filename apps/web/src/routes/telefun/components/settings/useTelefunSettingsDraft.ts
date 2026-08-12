@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   normalizeTelefunLiveModelSelection,
@@ -26,7 +26,7 @@ import {
 interface UseTelefunSettingsDraftProps {
   settings: AppSettings;
   isOpen: boolean;
-  onSave: (newSettings: AppSettings) => void;
+  onSave: (newSettings: AppSettings) => Promise<void>;
   onClose: () => void;
   providerReadiness?: TelefunProviderReadinessState;
   webRtcCapability?: TelefunWebRtcCapability | null;
@@ -150,6 +150,8 @@ export function useTelefunSettingsDraft({
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system"
   >("scenarios");
+  const [isSaving, setIsSaving] = useState(false);
+  const saveInFlightRef = useRef(false);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
 
   const selectedTelefunModel =
@@ -378,7 +380,8 @@ export function useTelefunSettingsDraft({
     return original !== current;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saveInFlightRef.current) return;
     const scenarioDirty = scenarioForm.isDirty(localSettings.scenarios);
     const consumerDirty = consumerForm.isDirty(localSettings.consumerTypes);
 
@@ -425,18 +428,23 @@ export function useTelefunSettingsDraft({
       webRtcCapability,
     });
 
-    if (scenarioDirty) {
-      scenarioForm.close();
+    saveInFlightRef.current = true;
+    setIsSaving(true);
+    try {
+      await onSave(settingsToSave);
+      if (scenarioDirty) scenarioForm.close();
+      if (consumerDirty) consumerForm.close();
+      onClose();
+    } catch {
+      // The parent reports the save error. Keep this draft open for retry.
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
-    if (consumerDirty) {
-      consumerForm.close();
-    }
-
-    onSave(settingsToSave);
-    onClose();
   };
 
   const handleClose = () => {
+    if (saveInFlightRef.current) return;
     if (hasUnsavedChanges()) {
       if (!window.confirm("Perubahan belum disimpan. Yakin ingin keluar?"))
         return;
@@ -461,6 +469,7 @@ export function useTelefunSettingsDraft({
     handleDeleteScenario,
     handleSelectConsumerType,
     handleDeleteConsumer,
+    isSaving,
     handleSave,
     handleClose,
   };

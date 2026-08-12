@@ -14,7 +14,7 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
-  onSave: (newSettings: AppSettings) => void;
+  onSave: (newSettings: AppSettings) => Promise<void>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -42,6 +42,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     handleDeleteScenario,
     handleSelectConsumerType,
     handleDeleteConsumer,
+    isSaving,
     handleSave,
     handleClose,
   } = useTelefunSettingsDraft({
@@ -152,8 +153,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <button
                 type="button"
                 onClick={handleClose}
+                disabled={isSaving}
                 aria-label="Tutup pengaturan simulasi"
-                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border"
+                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -252,13 +254,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent"
+                  disabled={isSaving}
+                  className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   Simpan Perubahan

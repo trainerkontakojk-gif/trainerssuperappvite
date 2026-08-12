@@ -22,7 +22,7 @@ describe("Telefun settings draft model/voice synchronization", () => {
   };
 
   it("preserves a compatible persisted OpenAI voice during async open and later coerces real model changes", async () => {
-    const onSave = vi.fn();
+    const onSave = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
     const persistedOpenAiSettings: TelefunAppSettings = {
       ...DEFAULT_TELEFUN_SETTINGS,
@@ -61,7 +61,9 @@ describe("Telefun settings draft model/voice synchronization", () => {
       );
     });
 
-    act(() => result.current.handleSave());
+    await act(async () => {
+      await result.current.handleSave();
+    });
     const saved = onSave.mock.calls[0][0] as TelefunAppSettings;
     expect(saved.telefunModelId).toBe("gpt-realtime-2.1");
     expect(saved.telefunTransport).toBe("openai-audio");
