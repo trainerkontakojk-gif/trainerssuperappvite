@@ -55,6 +55,14 @@ export class OpenAIWebRtcInterruptionController {
     return this.interruptionTotal;
   }
 
+  public get hasInProgressResponse(): boolean {
+    return this.inProgressResponseIds.size > 0;
+  }
+
+  public isResponseInProgress(responseId: string): boolean {
+    return this.inProgressResponseIds.has(responseId);
+  }
+
   public handleProviderEvent(event: OpenAIWebRtcEvent): void {
     if (event.kind !== "event") return;
     const payload = event.payload;
@@ -130,7 +138,8 @@ export class OpenAIWebRtcInterruptionController {
       const response = isRecordValue(payload.response)
         ? payload.response
         : null;
-      const responseId = stringValue(response?.id);
+      const responseId =
+        stringValue(payload.response_id) ?? stringValue(response?.id);
       if (!responseId || !this.seenResponseIds.has(responseId)) return;
       this.inProgressResponseIds.delete(responseId);
       const status = stringValue(response?.status);
@@ -235,7 +244,6 @@ export class OpenAIWebRtcInterruptionController {
       })
     ) {
       this.cancelledResponseIds.add(responseId);
-      this.inProgressResponseIds.delete(responseId);
       interrupted = true;
     }
 

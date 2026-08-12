@@ -83,12 +83,74 @@ type OpenAIInterruptionControlCorrelation = {
   kind: OpenAIInterruptionControlKind;
 };
 
+type ResponseCreateControlEvent = Extract<
+  OpenAIWebRtcControlEvent,
+  { type: "response.create" }
+>;
+
+type ManualResponseCreateBarrier = {
+  marker: string;
+  responseId: string | null;
+};
+
+type ResponseCreatedOrigin =
+  | { kind: "server_vad"; responseId: string }
+  | { kind: "manual"; marker: string; responseId: string }
+  | { kind: "unknown" };
+
+const TELEFUN_RESPONSE_CREATE_METADATA_KEY = "telefun_response_create";
+const TELEFUN_RESPONSE_CREATE_MARKER_PREFIX = "telefun-response-create-";
+const MAX_TELEFUN_RESPONSE_CREATE_MARKER_SEQUENCE = 0xffffff;
+const MAX_TELEFUN_RESPONSE_CREATE_MARKER_LENGTH =
+  TELEFUN_RESPONSE_CREATE_MARKER_PREFIX.length + 6;
+
 function isRecordValue(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function getResponseIdFromEvent(event: OpenAIWebRtcEvent): string | undefined {
+  if (event.kind !== "event") return undefined;
+  const response = isRecordValue(event.payload.response)
+    ? event.payload.response
+    : null;
+  return stringValue(event.payload.response_id) ?? stringValue(response?.id);
+}
+
+function getResponseCreatedOrigin(
+  event: OpenAIWebRtcEvent,
+): ResponseCreatedOrigin {
+  if (event.kind !== "event" || event.type !== "response.created") {
+    return { kind: "unknown" };
+  }
+
+  const response = isRecordValue(event.payload.response)
+    ? event.payload.response
+    : null;
+  const responseId = stringValue(response?.id);
+  if (!response || !responseId) return { kind: "unknown" };
+  if (
+    !Object.prototype.hasOwnProperty.call(response, "metadata") ||
+    response.metadata === null
+  ) {
+    return { kind: "server_vad", responseId };
+  }
+
+  const metadata = isRecordValue(response.metadata) ? response.metadata : null;
+  const marker = stringValue(metadata?.[TELEFUN_RESPONSE_CREATE_METADATA_KEY]);
+  if (
+    !metadata ||
+    !marker ||
+    marker.length > MAX_TELEFUN_RESPONSE_CREATE_MARKER_LENGTH ||
+    Object.keys(metadata).length !== 1
+  ) {
+    return { kind: "unknown" };
+  }
+
+  return { kind: "manual", marker, responseId };
 }
 
 function isSafeControlEvent(event: OpenAIWebRtcControlEvent): boolean {
@@ -191,11 +253,16 @@ export class OpenAIWebRtcSession {
     OpenAIInterruptionControlCorrelation
   >();
   private openAiControlSequence = 0;
+  private responseCreateMarkerSequence = 0;
   private speechSegments: SessionMetrics["speechSegments"] = [];
   private currentSpeechSegmentStartMs: number | null = null;
   private totalSpeakingMs = 0;
   private holdTracker: HoldTrackerState = createHoldTrackerState();
   private readonly interruptionController: OpenAIWebRtcInterruptionController;
+  private manualResponseCreateBarrier: ManualResponseCreateBarrier | null =
+    null;
+  private pendingResponseCreate: ResponseCreateControlEvent | null = null;
+  private serverVadResponsePending = false;
   private _state: OpenAIWebRtcState = "idle";
   private terminationSource: TerminationSource | null = null;
   private connectStageField: ConnectErrorStage | null = null;
@@ -451,10 +518,83 @@ export class OpenAIWebRtcSession {
 
   public sendControlEvent(event: OpenAIWebRtcControlEvent): boolean {
     if (!isSafeControlEvent(event)) return false;
+    if (event.type === "response.create") {
+      return this.sendResponseCreate(event);
+    }
+    return this.sendControlEventDirect(event);
+  }
+
+  private sendResponseCreate(event: ResponseCreateControlEvent): boolean {
+    if (!this.canSendControlEvent()) return false;
+    if (this.pendingResponseCreate || !this.isResponseCreateSafe()) {
+      this.pendingResponseCreate = event;
+      return true;
+    }
+    return this.sendManualResponseCreate(event);
+  }
+
+  private sendManualResponseCreate(event: ResponseCreateControlEvent): boolean {
+    const marker = this.createResponseCreateMarker();
+    this.manualResponseCreateBarrier = { marker, responseId: null };
+    const markedEvent: ResponseCreateControlEvent = {
+      ...event,
+      response: {
+        metadata: {
+          [TELEFUN_RESPONSE_CREATE_METADATA_KEY]: marker,
+        },
+      },
+    };
+    if (this.sendControlEventDirect(markedEvent)) return true;
+    this.manualResponseCreateBarrier = null;
+    return false;
+  }
+
+  private createResponseCreateMarker(): string {
+    this.responseCreateMarkerSequence =
+      this.responseCreateMarkerSequence >=
+      MAX_TELEFUN_RESPONSE_CREATE_MARKER_SEQUENCE
+        ? 1
+        : this.responseCreateMarkerSequence + 1;
+    return `${TELEFUN_RESPONSE_CREATE_MARKER_PREFIX}${this.responseCreateMarkerSequence.toString(36).padStart(6, "0")}`;
+  }
+
+  private canSendControlEvent(): boolean {
+    return Boolean(
+      !this.shutdownRequested &&
+      this.dataChannel?.readyState === "open" &&
+      this.dataChannel.send,
+    );
+  }
+
+  private isResponseCreateSafe(): boolean {
+    return Boolean(
+      !this.shutdownRequested &&
+      this.manualResponseCreateBarrier === null &&
+      !this.interruptionController.hasInProgressResponse &&
+      !this.serverVadResponsePending,
+    );
+  }
+
+  private flushPendingResponseCreate(): void {
+    const pendingResponseCreate = this.pendingResponseCreate;
+    if (!pendingResponseCreate || !this.isResponseCreateSafe()) return;
+    if (!this.canSendControlEvent()) return;
+
+    this.pendingResponseCreate = null;
+    if (
+      !this.sendManualResponseCreate(pendingResponseCreate) &&
+      !this.shutdownRequested
+    ) {
+      this.pendingResponseCreate = pendingResponseCreate;
+    }
+  }
+
+  private sendControlEventDirect(event: OpenAIWebRtcControlEvent): boolean {
+    const dataChannel = this.dataChannel;
     if (
       this.shutdownRequested ||
-      this.dataChannel?.readyState !== "open" ||
-      !this.dataChannel.send
+      dataChannel?.readyState !== "open" ||
+      !dataChannel.send
     ) {
       return false;
     }
@@ -471,7 +611,7 @@ export class OpenAIWebRtcSession {
         : event.event_id;
     const outbound = eventId ? { ...event, event_id: eventId } : event;
     try {
-      this.dataChannel.send(JSON.stringify(outbound));
+      dataChannel.send(JSON.stringify(outbound));
       if (shouldCorrelateError && eventId) {
         this.rememberOpenAiLifecycleId(
           this.openAiSentInterruptionEventIds,
@@ -655,13 +795,55 @@ export class OpenAIWebRtcSession {
   }
 
   private handleDataChannelEvent(event: OpenAIWebRtcEvent): void {
-    if (event.kind !== "event") return;
+    if (this.shutdownRequested || event.kind !== "event") return;
+
+    const terminalResponseId =
+      event.type === "response.done" || event.type === "response.cancelled"
+        ? getResponseIdFromEvent(event)
+        : undefined;
+    const responseWasInProgress = terminalResponseId
+      ? this.interruptionController.isResponseInProgress(terminalResponseId)
+      : false;
+
     if (event.type === "input_audio_buffer.speech_started") {
       this.recordSpeechStarted();
+      this.serverVadResponsePending = true;
     } else if (event.type === "input_audio_buffer.speech_stopped") {
       this.recordSpeechStopped();
     }
+
     this.interruptionController.handleProviderEvent(event);
+    if (event.type === "response.created") {
+      this.handleResponseCreated(event);
+    } else if (
+      (event.type === "response.done" || event.type === "response.cancelled") &&
+      responseWasInProgress
+    ) {
+      this.handleResponseTerminal(terminalResponseId);
+      this.flushPendingResponseCreate();
+    }
+  }
+
+  private handleResponseCreated(event: OpenAIWebRtcEvent): void {
+    const origin = getResponseCreatedOrigin(event);
+    if (origin.kind === "server_vad") {
+      this.serverVadResponsePending = false;
+      return;
+    }
+    if (origin.kind !== "manual") return;
+
+    const barrier = this.manualResponseCreateBarrier;
+    if (!barrier || barrier.marker !== origin.marker) return;
+    if (barrier.responseId === null) {
+      barrier.responseId = origin.responseId;
+    }
+  }
+
+  private handleResponseTerminal(responseId: string | undefined): void {
+    if (!responseId) return;
+    if (this.manualResponseCreateBarrier?.responseId === responseId) {
+      this.manualResponseCreateBarrier = null;
+    }
   }
 
   private recordSpeechStarted(): void {
@@ -898,6 +1080,7 @@ export class OpenAIWebRtcSession {
 
     this.brokerCleanupRequested = true;
     this.shutdownRequested = true;
+    this.invalidateResponseCreateBarriers();
     this.clearConnectTimeout();
     this.abortController?.abort();
     this.peerConnectedReject?.(
@@ -1189,7 +1372,14 @@ export class OpenAIWebRtcSession {
     ) as unknown as OpenAIWebRtcStreamLike;
   }
 
+  private invalidateResponseCreateBarriers(): void {
+    this.pendingResponseCreate = null;
+    this.manualResponseCreateBarrier = null;
+    this.serverVadResponsePending = false;
+  }
+
   private async cleanupResources(): Promise<void> {
+    this.invalidateResponseCreateBarriers();
     this.detachHandlers();
     await this.recordingGraph?.dispose();
     this.recordingGraph = null;

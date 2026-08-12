@@ -22,10 +22,18 @@ export type OpenAIWebRtcEvent =
 
 /** Browser controls are intentionally a closed set. Server-owned session config
  * is never sent through this seam. */
+export type OpenAIWebRtcResponseMetadata = {
+  telefun_response_create: string;
+};
+
 export type OpenAIWebRtcControlEvent =
   | { type: "response.cancel"; response_id: string; event_id?: string }
   | { type: "output_audio_buffer.clear"; event_id?: string }
-  | { type: "response.create"; event_id?: string }
+  | {
+      type: "response.create";
+      event_id?: string;
+      response?: { metadata?: OpenAIWebRtcResponseMetadata };
+    }
   | {
       type: "conversation.item.truncate";
       item_id: string;
