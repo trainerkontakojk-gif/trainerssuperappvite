@@ -77,7 +77,7 @@ export async function fetchTelefunOpenAIReadiness({
   } else {
     signal?.addEventListener("abort", abortRequest, { once: true });
   }
-  const timeout = window.setTimeout(abortRequest, timeoutMs);
+  const timeout = globalThis.setTimeout(abortRequest, timeoutMs);
 
   try {
     const response = await fetchImpl(deriveTelefunHealthUrl(websocketUrl), {
@@ -99,7 +99,7 @@ export async function fetchTelefunOpenAIReadiness({
     }
     return parseTelefunOpenAIReadiness(payload);
   } finally {
-    window.clearTimeout(timeout);
+    globalThis.clearTimeout(timeout);
     signal?.removeEventListener("abort", abortRequest);
   }
 }
