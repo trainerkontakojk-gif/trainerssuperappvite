@@ -116,8 +116,20 @@ transcript/usage/finalization server-side tetap dimiliki sideband dan lifecycle
 Phase 4–6.
 
 Metrics server-VAD, hold, dan interruption ditutup pada finalization. Time cue
-memakai system control item existing ditambah `response.create`. Recording
-memilih variant MediaRecorder yang didukung dan mempertahankan MIME output aktual.
+memakai system control item existing; `response.create` dikirim segera saat idle
+bersama marker internal berbatas di `response.metadata`. Hanya response yang
+mengembalikan marker yang sama lalu terminal yang melepaskan barrier manual.
+`response.created` dengan `metadata` absent/null diklasifikasikan sebagai
+server-VAD; metadata dengan shape lain atau marker mismatch menjadi unknown dan
+fail-closed. Create yang bertabrakan dengan response aktif, turn server-VAD yang
+belum menghasilkan `response.created`, atau create manual yang belum diakui
+ditunda; create pending terakhir dicoalesce sambil mempertahankan `event_id`
+pilihannya sampai lifecycle terminal idle. Barrier manual dan server-VAD tetap
+independen agar terminal response yang tidak berkorelasi tidak dapat memicu create
+baru. Kontrak ini mencegah provider error
+`conversation_already_has_active_response` yang ditemukan saat time cue 20 detik
+bertabrakan dengan response otomatis. Recording memilih variant MediaRecorder
+yang didukung dan mempertahankan MIME output aktual.
 Ini baru bukti unit/fake-browser provider-free; physical browser/device,
 production Vercel, Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar
 evidence candidate ini. Gemini dan legacy OpenAI WebSocket tidak diubah.

@@ -1111,10 +1111,535 @@ describe("OpenAIWebRtcSession", () => {
           ],
         },
       });
-      expect(events[1]).toEqual({ type: "response.create" });
+      expect(events[1]).toMatchObject({
+        type: "response.create",
+        response: {
+          metadata: {
+            telefun_response_create: expect.stringMatching(
+              /^telefun-response-create-/,
+            ),
+          },
+        },
+      });
     } finally {
       await transport.disconnect("user");
     }
+  });
+
+  it("defers and coalesces time-cue responses until the active response is done", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-active", status: "in_progress" },
+      }),
+    );
+
+    try {
+      transport.sendTimeCue(30);
+      transport.sendTimeCue(20);
+
+      expect(
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw).type),
+      ).toEqual(["conversation.item.create", "conversation.item.create"]);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-active", status: "completed" },
+        }),
+      );
+
+      expect(
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw).type),
+      ).toEqual([
+        "conversation.item.create",
+        "conversation.item.create",
+        "response.create",
+      ]);
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("coalesces pending creates to the latest complete client event", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-active", status: "in_progress" },
+      }),
+    );
+
+    try {
+      expect(
+        transport.sendControlEvent({
+          type: "response.create",
+          event_id: "cue-old",
+        }),
+      ).toBe(true);
+      expect(
+        transport.sendControlEvent({
+          type: "response.create",
+          event_id: "cue-latest",
+        }),
+      ).toBe(true);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-active", status: "completed" },
+        }),
+      );
+
+      const responseCreates = peer.dataChannel.send.mock.calls
+        .map(([raw]) => JSON.parse(raw))
+        .filter((event) => event.type === "response.create");
+      expect(responseCreates).toHaveLength(1);
+      expect(responseCreates[0]).toMatchObject({
+        event_id: "cue-latest",
+        response: {
+          metadata: {
+            telefun_response_create: expect.stringMatching(
+              /^telefun-response-create-/,
+            ),
+          },
+        },
+      });
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("flushes a pending create when the active response is cancelled", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-active", status: "in_progress" },
+      }),
+    );
+
+    try {
+      expect(
+        transport.sendControlEvent({
+          type: "response.create",
+          event_id: "cue-after-cancel",
+        }),
+      ).toBe(true);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.cancelled",
+          response_id: "response-active",
+        }),
+      );
+
+      const responseCreates = peer.dataChannel.send.mock.calls
+        .map(([raw]) => JSON.parse(raw))
+        .filter((event) => event.type === "response.create");
+      expect(responseCreates).toHaveLength(1);
+      expect(responseCreates[0]).toMatchObject({
+        event_id: "cue-after-cancel",
+      });
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("notifies observers before applying response lifecycle transitions", async () => {
+    const transport = createTransport(createFetch());
+    let createAcceptedDuringObserver: boolean | undefined;
+    let responseCreatesSeenDuringObserver: number | undefined;
+    transport.onProviderEvent = (event) => {
+      if (event.kind !== "event" || event.type !== "response.done") return;
+      createAcceptedDuringObserver = transport.sendControlEvent({
+        type: "response.create",
+        event_id: "observer-cue",
+      });
+      responseCreatesSeenDuringObserver = peer.dataChannel.send.mock.calls
+        .map(([raw]) => JSON.parse(raw))
+        .filter((sentEvent) => sentEvent.type === "response.create").length;
+    };
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-active", status: "in_progress" },
+      }),
+    );
+
+    try {
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-active", status: "completed" },
+        }),
+      );
+
+      expect(createAcceptedDuringObserver).toBe(true);
+      expect(responseCreatesSeenDuringObserver).toBe(0);
+      const responseCreates = peer.dataChannel.send.mock.calls
+        .map(([raw]) => JSON.parse(raw))
+        .filter((event) => event.type === "response.create");
+      expect(responseCreates).toHaveLength(1);
+      expect(responseCreates[0]).toMatchObject({ event_id: "observer-cue" });
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("waits for the marked manual response terminal before flushing another create", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+
+    try {
+      transport.sendTimeCue(30);
+      const sentEvents = () =>
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw));
+      const firstResponseCreate = sentEvents().find(
+        (event) => event.type === "response.create",
+      );
+      const manualMarker =
+        firstResponseCreate.response.metadata.telefun_response_create;
+
+      expect(
+        transport.sendControlEvent({
+          type: "response.create",
+          event_id: "cue-2",
+        }),
+      ).toBe(true);
+      expect(
+        sentEvents().filter((event) => event.type === "response.create"),
+      ).toHaveLength(1);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: { id: "response-unrelated", status: "in_progress" },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-unrelated", status: "completed" },
+        }),
+      );
+
+      expect(
+        sentEvents().filter((event) => event.type === "response.create"),
+      ).toHaveLength(1);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: {
+            id: "response-manual",
+            status: "in_progress",
+            metadata: { telefun_response_create: manualMarker },
+          },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-manual", status: "completed" },
+        }),
+      );
+
+      const responseCreates = sentEvents().filter(
+        (event) => event.type === "response.create",
+      );
+      expect(responseCreates).toHaveLength(2);
+      expect(responseCreates[1]).toMatchObject({ event_id: "cue-2" });
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("ignores stale and duplicate terminal events while coalescing creates", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-active", status: "in_progress" },
+      }),
+    );
+
+    try {
+      expect(
+        transport.sendControlEvent({
+          type: "response.create",
+          event_id: "cue-1",
+        }),
+      ).toBe(true);
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-active", status: "completed" },
+        }),
+      );
+
+      const sentEvents = () =>
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw));
+      const firstResponseCreate = sentEvents().find(
+        (event) => event.type === "response.create",
+      );
+      const manualMarker =
+        firstResponseCreate.response.metadata.telefun_response_create;
+      expect(firstResponseCreate).toMatchObject({ event_id: "cue-1" });
+
+      expect(
+        transport.sendControlEvent({
+          type: "response.create",
+          event_id: "cue-2",
+        }),
+      ).toBe(true);
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-active", status: "completed" },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-unknown", status: "completed" },
+        }),
+      );
+
+      expect(
+        sentEvents().filter((event) => event.type === "response.create"),
+      ).toHaveLength(1);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: {
+            id: "response-manual-1",
+            status: "in_progress",
+            metadata: { telefun_response_create: manualMarker },
+          },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-manual-1", status: "completed" },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-manual-1", status: "completed" },
+        }),
+      );
+
+      const responseCreates = sentEvents().filter(
+        (event) => event.type === "response.create",
+      );
+      expect(responseCreates).toHaveLength(2);
+      expect(responseCreates[1]).toMatchObject({ event_id: "cue-2" });
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("defers a time-cue response across an automatic VAD turn", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+
+    try {
+      peer.dataChannel.emitMessage(
+        JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+      );
+      transport.sendTimeCue(20);
+      peer.dataChannel.emitMessage(
+        JSON.stringify({ type: "input_audio_buffer.speech_stopped" }),
+      );
+
+      expect(
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw).type),
+      ).toEqual(["conversation.item.create"]);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: {
+            id: "response-vad",
+            status: "in_progress",
+            metadata: null,
+          },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-vad", status: "completed" },
+        }),
+      );
+
+      expect(
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw).type),
+      ).toEqual(["conversation.item.create", "response.create"]);
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("keeps manual and server-VAD response barriers independent", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+
+    try {
+      transport.sendTimeCue(30);
+      const sentEvents = () =>
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw));
+      const firstResponseCreate = sentEvents().find(
+        (event) => event.type === "response.create",
+      );
+      const manualMarker =
+        firstResponseCreate?.response?.metadata?.telefun_response_create ??
+        "manual-response-marker";
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+      );
+      transport.sendTimeCue(20);
+
+      expect(sentEvents().map((event) => event.type)).toEqual([
+        "conversation.item.create",
+        "response.create",
+        "conversation.item.create",
+      ]);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: {
+            id: "response-manual",
+            status: "in_progress",
+            metadata: { telefun_response_create: manualMarker },
+          },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-manual", status: "completed" },
+        }),
+      );
+
+      expect(
+        sentEvents().filter((event) => event.type === "response.create"),
+      ).toHaveLength(1);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: { id: "response-vad", status: "in_progress" },
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.done",
+          response: { id: "response-vad", status: "completed" },
+        }),
+      );
+
+      expect(
+        sentEvents().filter((event) => event.type === "response.create"),
+      ).toHaveLength(2);
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("does not flush a pending create when shutdown starts", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-active", status: "in_progress" },
+      }),
+    );
+
+    expect(
+      transport.sendControlEvent({
+        type: "response.create",
+        event_id: "cue-pending",
+      }),
+    ).toBe(true);
+    expect(
+      peer.dataChannel.send.mock.calls.filter(
+        ([raw]) => JSON.parse(raw).type === "response.create",
+      ),
+    ).toHaveLength(0);
+
+    const ending = transport.disconnect("user");
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.done",
+        response: { id: "response-active", status: "completed" },
+      }),
+    );
+
+    expect(
+      peer.dataChannel.send.mock.calls.filter(
+        ([raw]) => JSON.parse(raw).type === "response.create",
+      ),
+    ).toHaveLength(0);
+    await ending;
   });
 
   it("reports blocked autoplay once and retries playback after a user gesture", async () => {
