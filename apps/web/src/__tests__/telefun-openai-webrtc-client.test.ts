@@ -1479,7 +1479,7 @@ describe("OpenAIWebRtcSession", () => {
     }
   });
 
-  it("defers a time-cue response across an automatic VAD turn", async () => {
+  it("creates exactly one marked response after each unique committed VAD input", async () => {
     const transport = createTransport(createFetch());
 
     const connecting = transport.connect("supabase-access-token");
@@ -1490,11 +1490,81 @@ describe("OpenAIWebRtcSession", () => {
 
     try {
       peer.dataChannel.emitMessage(
-        JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+        JSON.stringify({
+          type: "input_audio_buffer.speech_started",
+          item_id: "user-item-1",
+        }),
+      );
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "input_audio_buffer.speech_stopped",
+          item_id: "user-item-1",
+        }),
+      );
+
+      expect(
+        peer.dataChannel.send.mock.calls.filter(
+          ([raw]) => JSON.parse(raw).type === "response.create",
+        ),
+      ).toHaveLength(0);
+
+      peer.dataChannel.emitMessage(
+        JSON.stringify({ type: "input_audio_buffer.committed" }),
+      );
+      expect(
+        peer.dataChannel.send.mock.calls.filter(
+          ([raw]) => JSON.parse(raw).type === "response.create",
+        ),
+      ).toHaveLength(0);
+
+      const committed = JSON.stringify({
+        type: "input_audio_buffer.committed",
+        item_id: "user-item-1",
+        previous_item_id: null,
+      });
+      peer.dataChannel.emitMessage(committed);
+      peer.dataChannel.emitMessage(committed);
+
+      const responseCreates = peer.dataChannel.send.mock.calls
+        .map(([raw]) => JSON.parse(raw))
+        .filter((event) => event.type === "response.create");
+      expect(responseCreates).toHaveLength(1);
+      expect(responseCreates[0]).toMatchObject({
+        response: {
+          metadata: {
+            telefun_response_create: expect.stringMatching(
+              /^telefun-response-create-/,
+            ),
+          },
+        },
+      });
+    } finally {
+      await transport.disconnect("user");
+    }
+  });
+
+  it("coalesces a time cue and committed VAD turn into one response", async () => {
+    const transport = createTransport(createFetch());
+
+    const connecting = transport.connect("supabase-access-token");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    peer.emitConnectionState("connected");
+    await connecting;
+    peer.dataChannel.readyState = "open";
+
+    try {
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "input_audio_buffer.speech_started",
+          item_id: "user-item-with-cue",
+        }),
       );
       transport.sendTimeCue(20);
       peer.dataChannel.emitMessage(
-        JSON.stringify({ type: "input_audio_buffer.speech_stopped" }),
+        JSON.stringify({
+          type: "input_audio_buffer.speech_stopped",
+          item_id: "user-item-with-cue",
+        }),
       );
 
       expect(
@@ -1503,18 +1573,9 @@ describe("OpenAIWebRtcSession", () => {
 
       peer.dataChannel.emitMessage(
         JSON.stringify({
-          type: "response.created",
-          response: {
-            id: "response-vad",
-            status: "in_progress",
-            metadata: null,
-          },
-        }),
-      );
-      peer.dataChannel.emitMessage(
-        JSON.stringify({
-          type: "response.done",
-          response: { id: "response-vad", status: "completed" },
+          type: "input_audio_buffer.committed",
+          item_id: "user-item-with-cue",
+          previous_item_id: "time-cue-item",
         }),
       );
 
@@ -1526,7 +1587,69 @@ describe("OpenAIWebRtcSession", () => {
     }
   });
 
-  it("keeps manual and server-VAD response barriers independent", async () => {
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+  ] as const)(
+    "queues a committed VAD response behind an unexpected active response with %s metadata",
+    async (_metadataShape, metadata) => {
+      const transport = createTransport(createFetch());
+
+      const connecting = transport.connect("supabase-access-token");
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      peer.emitConnectionState("connected");
+      await connecting;
+      peer.dataChannel.readyState = "open";
+      peer.dataChannel.emitMessage(
+        JSON.stringify({
+          type: "response.created",
+          response: {
+            id: "response-unexpected",
+            status: "in_progress",
+            ...(metadata === undefined ? {} : { metadata }),
+          },
+        }),
+      );
+
+      try {
+        peer.dataChannel.emitMessage(
+          JSON.stringify({
+            type: "input_audio_buffer.committed",
+            item_id: "user-item-out-of-order",
+            previous_item_id: null,
+          }),
+        );
+        expect(
+          peer.dataChannel.send.mock.calls.filter(
+            ([raw]) => JSON.parse(raw).type === "response.create",
+          ),
+        ).toHaveLength(0);
+
+        peer.dataChannel.emitMessage(
+          JSON.stringify({
+            type: "response.done",
+            response: { id: "response-unexpected", status: "completed" },
+          }),
+        );
+        peer.dataChannel.emitMessage(
+          JSON.stringify({
+            type: "response.done",
+            response: { id: "response-unexpected", status: "completed" },
+          }),
+        );
+
+        expect(
+          peer.dataChannel.send.mock.calls.filter(
+            ([raw]) => JSON.parse(raw).type === "response.create",
+          ),
+        ).toHaveLength(1);
+      } finally {
+        await transport.disconnect("user");
+      }
+    },
+  );
+
+  it("waits for committed VAD input when an active response terminates first", async () => {
     const transport = createTransport(createFetch());
 
     const connecting = transport.connect("supabase-access-token");
@@ -1534,66 +1657,40 @@ describe("OpenAIWebRtcSession", () => {
     peer.emitConnectionState("connected");
     await connecting;
     peer.dataChannel.readyState = "open";
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "response-before-commit", status: "in_progress" },
+      }),
+    );
 
     try {
-      transport.sendTimeCue(30);
-      const sentEvents = () =>
-        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw));
-      const firstResponseCreate = sentEvents().find(
-        (event) => event.type === "response.create",
-      );
-      const manualMarker =
-        firstResponseCreate?.response?.metadata?.telefun_response_create ??
-        "manual-response-marker";
-
       peer.dataChannel.emitMessage(
         JSON.stringify({ type: "input_audio_buffer.speech_started" }),
       );
       transport.sendTimeCue(20);
-
-      expect(sentEvents().map((event) => event.type)).toEqual([
-        "conversation.item.create",
-        "response.create",
-        "conversation.item.create",
-      ]);
-
-      peer.dataChannel.emitMessage(
-        JSON.stringify({
-          type: "response.created",
-          response: {
-            id: "response-manual",
-            status: "in_progress",
-            metadata: { telefun_response_create: manualMarker },
-          },
-        }),
-      );
       peer.dataChannel.emitMessage(
         JSON.stringify({
           type: "response.done",
-          response: { id: "response-manual", status: "completed" },
+          response: { id: "response-before-commit", status: "completed" },
         }),
       );
 
       expect(
-        sentEvents().filter((event) => event.type === "response.create"),
-      ).toHaveLength(1);
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw).type),
+      ).toEqual(["conversation.item.create"]);
 
       peer.dataChannel.emitMessage(
         JSON.stringify({
-          type: "response.created",
-          response: { id: "response-vad", status: "in_progress" },
-        }),
-      );
-      peer.dataChannel.emitMessage(
-        JSON.stringify({
-          type: "response.done",
-          response: { id: "response-vad", status: "completed" },
+          type: "input_audio_buffer.committed",
+          item_id: "user-item-after-terminal",
+          previous_item_id: null,
         }),
       );
 
       expect(
-        sentEvents().filter((event) => event.type === "response.create"),
-      ).toHaveLength(2);
+        peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw).type),
+      ).toEqual(["conversation.item.create", "response.create"]);
     } finally {
       await transport.disconnect("user");
     }

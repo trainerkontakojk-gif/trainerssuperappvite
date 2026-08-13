@@ -20,7 +20,9 @@ export interface CanonicalPocSession {
       transcription: { model: "gpt-4o-mini-transcribe" };
       turn_detection: {
         type: "server_vad";
-        create_response: true;
+        // VAD owns speech chunking only. The browser serializes every
+        // response.create after the corresponding committed input item.
+        create_response: false;
         interrupt_response: false;
       };
     };
@@ -47,7 +49,7 @@ export function buildCanonicalPocSession(
         transcription: { model: "gpt-4o-mini-transcribe" },
         turn_detection: {
           type: "server_vad",
-          create_response: true,
+          create_response: false,
           interrupt_response: false,
         },
       },

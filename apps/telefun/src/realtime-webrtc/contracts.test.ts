@@ -36,7 +36,7 @@ describe("OpenAI WebRTC POC contracts", () => {
           transcription: { model: "gpt-4o-mini-transcribe" },
           turn_detection: {
             type: "server_vad",
-            create_response: true,
+            create_response: false,
             interrupt_response: false,
           },
         },
@@ -68,9 +68,9 @@ describe("OpenAI WebRTC POC contracts", () => {
   ] as const)(
     "maps canonical consumer gender %j to server-owned voice %s",
     (gender, expectedVoice) => {
-      expect(buildCanonicalPocSession(canonicalPrompt, gender).audio.output.voice).toBe(
-        expectedVoice,
-      );
+      expect(
+        buildCanonicalPocSession(canonicalPrompt, gender).audio.output.voice,
+      ).toBe(expectedVoice);
     },
   );
 

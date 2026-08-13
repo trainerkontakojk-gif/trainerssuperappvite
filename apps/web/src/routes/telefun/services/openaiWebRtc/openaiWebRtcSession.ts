@@ -94,7 +94,6 @@ type ManualResponseCreateBarrier = {
 };
 
 type ResponseCreatedOrigin =
-  | { kind: "server_vad"; responseId: string }
   | { kind: "manual"; marker: string; responseId: string }
   | { kind: "unknown" };
 
@@ -103,6 +102,7 @@ const TELEFUN_RESPONSE_CREATE_MARKER_PREFIX = "telefun-response-create-";
 const MAX_TELEFUN_RESPONSE_CREATE_MARKER_SEQUENCE = 0xffffff;
 const MAX_TELEFUN_RESPONSE_CREATE_MARKER_LENGTH =
   TELEFUN_RESPONSE_CREATE_MARKER_PREFIX.length + 6;
+const MAX_COMMITTED_INPUT_ITEM_IDS = 4_096;
 
 function isRecordValue(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -120,6 +120,13 @@ function getResponseIdFromEvent(event: OpenAIWebRtcEvent): string | undefined {
   return stringValue(event.payload.response_id) ?? stringValue(response?.id);
 }
 
+function getCommittedInputItemId(event: OpenAIWebRtcEvent): string | undefined {
+  if (event.kind !== "event" || event.type !== "input_audio_buffer.committed") {
+    return undefined;
+  }
+  return stringValue(event.payload.item_id);
+}
+
 function getResponseCreatedOrigin(
   event: OpenAIWebRtcEvent,
 ): ResponseCreatedOrigin {
@@ -132,12 +139,6 @@ function getResponseCreatedOrigin(
     : null;
   const responseId = stringValue(response?.id);
   if (!response || !responseId) return { kind: "unknown" };
-  if (
-    !Object.prototype.hasOwnProperty.call(response, "metadata") ||
-    response.metadata === null
-  ) {
-    return { kind: "server_vad", responseId };
-  }
 
   const metadata = isRecordValue(response.metadata) ? response.metadata : null;
   const marker = stringValue(metadata?.[TELEFUN_RESPONSE_CREATE_METADATA_KEY]);
@@ -262,7 +263,10 @@ export class OpenAIWebRtcSession {
   private manualResponseCreateBarrier: ManualResponseCreateBarrier | null =
     null;
   private pendingResponseCreate: ResponseCreateControlEvent | null = null;
-  private serverVadResponsePending = false;
+  // Canonical server VAD commits input but never creates responses. Keep one
+  // application-owned create behind the committed-item and response barriers.
+  private serverVadInputPending = false;
+  private readonly committedInputItemIds = new Set<string>();
   private _state: OpenAIWebRtcState = "idle";
   private terminationSource: TerminationSource | null = null;
   private connectStageField: ConnectErrorStage | null = null;
@@ -571,7 +575,7 @@ export class OpenAIWebRtcSession {
       !this.shutdownRequested &&
       this.manualResponseCreateBarrier === null &&
       !this.interruptionController.hasInProgressResponse &&
-      !this.serverVadResponsePending,
+      !this.serverVadInputPending,
     );
   }
 
@@ -807,9 +811,11 @@ export class OpenAIWebRtcSession {
 
     if (event.type === "input_audio_buffer.speech_started") {
       this.recordSpeechStarted();
-      this.serverVadResponsePending = true;
+      this.serverVadInputPending = true;
     } else if (event.type === "input_audio_buffer.speech_stopped") {
       this.recordSpeechStopped();
+    } else if (event.type === "input_audio_buffer.committed") {
+      this.handleCommittedInput(event);
     }
 
     this.interruptionController.handleProviderEvent(event);
@@ -826,10 +832,6 @@ export class OpenAIWebRtcSession {
 
   private handleResponseCreated(event: OpenAIWebRtcEvent): void {
     const origin = getResponseCreatedOrigin(event);
-    if (origin.kind === "server_vad") {
-      this.serverVadResponsePending = false;
-      return;
-    }
     if (origin.kind !== "manual") return;
 
     const barrier = this.manualResponseCreateBarrier;
@@ -837,6 +839,22 @@ export class OpenAIWebRtcSession {
     if (barrier.responseId === null) {
       barrier.responseId = origin.responseId;
     }
+  }
+
+  private handleCommittedInput(event: OpenAIWebRtcEvent): void {
+    const itemId = getCommittedInputItemId(event);
+    if (!itemId || this.committedInputItemIds.has(itemId)) return;
+    // A 60-minute Realtime session cannot legitimately need this many turns.
+    // Fail closed instead of evicting an ID and risking duplicate generation.
+    if (this.committedInputItemIds.size >= MAX_COMMITTED_INPUT_ITEM_IDS) return;
+
+    this.committedInputItemIds.add(itemId);
+    this.serverVadInputPending = false;
+    if (this.pendingResponseCreate) {
+      this.flushPendingResponseCreate();
+      return;
+    }
+    this.sendResponseCreate({ type: "response.create" });
   }
 
   private handleResponseTerminal(responseId: string | undefined): void {
@@ -1375,7 +1393,8 @@ export class OpenAIWebRtcSession {
   private invalidateResponseCreateBarriers(): void {
     this.pendingResponseCreate = null;
     this.manualResponseCreateBarrier = null;
-    this.serverVadResponsePending = false;
+    this.serverVadInputPending = false;
+    this.committedInputItemIds.clear();
   }
 
   private async cleanupResources(): Promise<void> {

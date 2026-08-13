@@ -116,24 +116,32 @@ menambah elapsed. DataChannel browser tetap bukan persistence authority:
 transcript/usage/finalization server-side tetap dimiliki sideband dan lifecycle
 Phase 4–6.
 
-Metrics server-VAD, hold, dan interruption ditutup pada finalization. Time cue
-memakai system control item existing; `response.create` dikirim segera saat idle
-bersama marker internal berbatas di `response.metadata`. Hanya response yang
-mengembalikan marker yang sama lalu terminal yang melepaskan barrier manual.
-`response.created` dengan `metadata` absent/null diklasifikasikan sebagai
-server-VAD; metadata dengan shape lain atau marker mismatch menjadi unknown dan
-fail-closed. Create yang bertabrakan dengan response aktif, turn server-VAD yang
-belum menghasilkan `response.created`, atau create manual yang belum diakui
-ditunda; create pending terakhir dicoalesce sambil mempertahankan `event_id`
-pilihannya sampai lifecycle terminal idle. Barrier manual dan server-VAD tetap
-independen agar terminal response yang tidak berkorelasi tidak dapat memicu create
-baru. Kontrak ini mencegah provider error
-`conversation_already_has_active_response` yang ditemukan saat time cue 20 detik
-bertabrakan dengan response otomatis. Recording memilih variant MediaRecorder
+Metrics server-VAD, hold, dan interruption ditutup pada finalization. Canonical
+session mempertahankan `server_vad`, tetapi menetapkan `create_response=false`
+dan `interrupt_response=false`: provider hanya memotong serta meng-commit audio,
+sedangkan browser menjadi satu-satunya owner `response.create`. Speech start
+menahan generation sampai event `input_audio_buffer.committed` dengan `item_id`
+unik; commit itu kemudian meminta tepat satu response ber-marker internal bounded
+di `response.metadata`.
+
+Time cue tetap membuat system control item lebih dahulu. Jika cue berimpit dengan
+turn VAD, response aktif, atau create yang belum diakui, event create lengkap
+ditunda dan pending terakhir dicoalesce sambil mempertahankan `event_id`. Commit
+VAD melepas barrier input dan memakai pending cue yang sama, sehingga satu
+response melihat seluruh item conversation yang sudah committed. Semua
+`response.created` ber-ID tetap dianggap aktif oleh interruption controller;
+metadata absent/null, shape lain, atau marker mismatch adalah origin unknown dan
+tidak pernah mengaku sebagai create Telefun. Hanya marker exact diikuti terminal
+response yang sama yang melepaskan acknowledgement create. Shutdown membuang
+seluruh pending/barrier secara sinkron. Kontrak single-owner ini menghilangkan
+dual authority yang menghasilkan `conversation_already_has_active_response` pada
+dua acceptance production sebelumnya. Recording memilih variant MediaRecorder
 yang didukung dan mempertahankan MIME output aktual.
-Ini baru bukti unit/fake-browser provider-free; physical browser/device,
-production Vercel, Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar
-evidence candidate ini. Gemini dan legacy OpenAI WebSocket tidak diubah.
+
+Repair single-owner baru memiliki bukti unit/fake-browser provider-free; live
+production PASS setelah repair belum diklaim. Physical browser/device lintas
+browser, Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar evidence
+candidate ini. Gemini dan legacy OpenAI WebSocket tidak diubah.
 
 ## Directory Structure
 
