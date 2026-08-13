@@ -28,15 +28,12 @@ function stringValue(value: unknown): string | undefined {
  */
 export class OpenAIWebRtcInterruptionController {
   private audibleResponseId: string | null = null;
-  private audibleItemId: string | null = null;
   private audibleItemPlayedStartMs = 0;
   private readonly seenResponseIds = new Set<string>();
   private readonly responseOrder = new Map<string, number>();
-  private readonly responseItemIds = new Map<string, string>();
   private readonly inProgressResponseIds = new Set<string>();
   private readonly cancelledResponseIds = new Set<string>();
   private readonly clearedResponseIds = new Set<string>();
-  private readonly truncatedItemIds = new Set<string>();
   private readonly interruptedResponseIds = new Set<string>();
   private mediaAttached = false;
   private held = false;
@@ -102,7 +99,6 @@ export class OpenAIWebRtcInterruptionController {
       }
       this.latestAudibleResponseOrder = responseOrder;
       this.audibleResponseId = responseId;
-      this.audibleItemId = this.responseItemIds.get(responseId) ?? null;
       this.audibleItemPlayedStartMs = this.getPlayedPositionMs();
       this.notifyAudibilityChange();
       return;
@@ -182,7 +178,6 @@ export class OpenAIWebRtcInterruptionController {
     this.setPlaybackActive(false);
     this.mediaAttached = false;
     this.audibleResponseId = null;
-    this.audibleItemId = null;
     this.notifyAudibilityChange();
     const audio = this.deps.audioElement;
     audio.onplaying = null;
@@ -211,11 +206,6 @@ export class OpenAIWebRtcInterruptionController {
       if (!this.rememberResponseId(responseId)) return;
       this.inProgressResponseIds.add(responseId);
     }
-    if (this.responseItemIds.has(responseId)) return;
-    this.responseItemIds.set(responseId, itemId);
-    if (responseId === this.audibleResponseId && !this.audibleItemId) {
-      this.audibleItemId = itemId;
-    }
   }
 
   private rememberResponseId(responseId: string): boolean {
@@ -228,21 +218,25 @@ export class OpenAIWebRtcInterruptionController {
   private interruptAudibleResponse(): void {
     const responseId = this.audibleResponseId;
     if (!responseId || !this.isAudible()) return;
-    const audioEndMs = Math.max(
+    const playedProgressMs = Math.max(
       0,
       Math.round(this.getPlayedPositionMs() - this.audibleItemPlayedStartMs),
     );
-    if (audioEndMs <= 0) return;
+    if (playedProgressMs <= 0) return;
 
     let interrupted = false;
-    if (
+    const cancelRequired =
       this.inProgressResponseIds.has(responseId) &&
-      !this.cancelledResponseIds.has(responseId) &&
-      this.deps.sendControlEvent({
-        type: "response.cancel",
-        response_id: responseId,
-      })
-    ) {
+      !this.cancelledResponseIds.has(responseId);
+    if (cancelRequired) {
+      if (
+        !this.deps.sendControlEvent({
+          type: "response.cancel",
+          response_id: responseId,
+        })
+      ) {
+        return;
+      }
       this.cancelledResponseIds.add(responseId);
       interrupted = true;
     }
@@ -255,21 +249,6 @@ export class OpenAIWebRtcInterruptionController {
       interrupted = true;
     }
 
-    const itemId = this.audibleItemId;
-    if (
-      itemId &&
-      !this.truncatedItemIds.has(itemId) &&
-      this.deps.sendControlEvent({
-        type: "conversation.item.truncate",
-        item_id: itemId,
-        content_index: 0,
-        audio_end_ms: audioEndMs,
-      })
-    ) {
-      this.truncatedItemIds.add(itemId);
-      interrupted = true;
-    }
-
     if (interrupted && !this.interruptedResponseIds.has(responseId)) {
       this.interruptedResponseIds.add(responseId);
       this.interruptionTotal += 1;
@@ -279,7 +258,6 @@ export class OpenAIWebRtcInterruptionController {
   private clearAudibleResponse(responseId: string): void {
     if (responseId !== this.audibleResponseId) return;
     this.audibleResponseId = null;
-    this.audibleItemId = null;
     this.audibleItemPlayedStartMs = this.getPlayedPositionMs();
     this.notifyAudibilityChange();
   }

@@ -63,7 +63,9 @@ describe("WebRTC sideband observer", () => {
       type: "response.done",
       response: { id: "response-1", status: "completed", usage: USAGE },
     });
-    expect(() => observer.observe({ type: "future.event", secret: "hidden" })).not.toThrow();
+    expect(() =>
+      observer.observe({ type: "future.event", secret: "hidden" }),
+    ).not.toThrow();
 
     transcript.flush(100);
     expect(transcript.snapshot()).toEqual([
@@ -92,17 +94,43 @@ describe("WebRTC sideband observer", () => {
       error: {
         type: "server_error",
         code: "internal_error",
+        param: "audio_end_ms",
         message: "secret provider configuration details",
       },
     });
 
-    expect(providerError).toHaveBeenCalledWith({ code: "internal_error" });
+    expect(providerError).toHaveBeenCalledWith({
+      code: "internal_error",
+      param: "audio_end_ms",
+    });
     expect(diagnostics).toContainEqual({
       type: "provider_error",
       code: "internal_error",
+      param: "audio_end_ms",
     });
     expect(JSON.stringify(providerError.mock.calls)).not.toContain("secret");
     expect(JSON.stringify(diagnostics)).not.toContain("secret");
+  });
+
+  it("drops unbounded provider params while retaining the safe error code", () => {
+    const providerError = vi.fn();
+    const observer = new SidebandEventObserver({
+      transcript: new TranscriptCollector(0),
+      usage: createOpenAIUsageAccumulator(),
+      onProviderError: providerError,
+    });
+
+    observer.observe({
+      type: "error",
+      error: {
+        type: "invalid_request_error",
+        code: "invalid_value",
+        param: "non_allowlisted_provider_field",
+      },
+    });
+
+    expect(providerError).toHaveBeenCalledWith({ code: "invalid_value" });
+    expect(JSON.stringify(providerError.mock.calls)).not.toContain("secret");
   });
 
   it("reports bounded diagnostics without raw provider payloads", () => {
@@ -222,7 +250,11 @@ describe("WebRTC sideband observer", () => {
 
     transcript.flush(100);
     expect(transcript.snapshot()).toEqual([
-      { speaker: "consumer", text: "Selamat pagi", startMs: expect.any(Number) },
+      {
+        speaker: "consumer",
+        text: "Selamat pagi",
+        startMs: expect.any(Number),
+      },
       { speaker: "consumer", text: "Halo", startMs: expect.any(Number) },
     ]);
   });

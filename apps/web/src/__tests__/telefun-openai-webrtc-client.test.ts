@@ -477,7 +477,7 @@ describe("OpenAIWebRtcSession", () => {
     expect(localStreams.at(-1)).toBeNull();
   });
 
-  it("interrupts only the audible active remote response using media progress", async () => {
+  it("lets WebRTC buffer clear own truncation when interrupting audible output", async () => {
     const fetch = createFetch();
     const session = createSession({ fetch });
 
@@ -504,7 +504,7 @@ describe("OpenAIWebRtcSession", () => {
     const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
       JSON.parse(raw),
     );
-    expect(controls).toHaveLength(3);
+    expect(controls).toHaveLength(2);
     expect(controls[0]).toMatchObject({
       type: "response.cancel",
       response_id: "response-1",
@@ -514,15 +514,86 @@ describe("OpenAIWebRtcSession", () => {
       type: "output_audio_buffer.clear",
       event_id: expect.any(String),
     });
-    expect(controls[2]).toMatchObject({
-      type: "conversation.item.truncate",
-      item_id: "item-1",
-      content_index: 0,
-      audio_end_ms: expect.any(Number),
-      event_id: expect.any(String),
+    expect(controls).not.toContainEqual(
+      expect.objectContaining({ type: "conversation.item.truncate" }),
+    );
+
+    await session.end();
+  });
+
+  it("does not clear an active WebRTC buffer until scoped cancel is sent", async () => {
+    const session = createSession();
+    await connectRemoteSession(session);
+
+    audio.currentTime = 0;
+    emitRemoteOutput("response-1", "item-1");
+    audio.currentTime = 0.5;
+    peer.dataChannel.send.mockImplementationOnce(() => {
+      throw new Error("data channel send failed");
     });
-    expect(controls[2].audio_end_ms).toBeGreaterThanOrEqual(1_200);
-    expect(controls[2].audio_end_ms).toBeLessThanOrEqual(1_250);
+
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    let controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls.map((event) => event.type)).toEqual(["response.cancel"]);
+
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    controls = peer.dataChannel.send.mock.calls.map(([raw]) => JSON.parse(raw));
+    expect(controls.map((event) => event.type)).toEqual([
+      "response.cancel",
+      "response.cancel",
+      "output_audio_buffer.clear",
+    ]);
+
+    await session.end();
+  });
+
+  it("handles repeated WebRTC barge-ins with cancel and clear only", async () => {
+    const session = createSession();
+    await connectRemoteSession(session);
+
+    audio.currentTime = 0;
+    emitRemoteOutput("response-1", "item-1");
+    audio.currentTime = 0.5;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "response.done",
+        response: { id: "response-1", status: "cancelled" },
+      }),
+    );
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "output_audio_buffer.cleared",
+        response_id: "response-1",
+      }),
+    );
+
+    emitRemoteOutput("response-2", "item-2");
+    audio.currentTime = 1;
+    peer.dataChannel.emitMessage(
+      JSON.stringify({ type: "input_audio_buffer.speech_started" }),
+    );
+
+    const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls.map((event) => event.type)).toEqual([
+      "response.cancel",
+      "output_audio_buffer.clear",
+      "response.cancel",
+      "output_audio_buffer.clear",
+    ]);
+    expect(controls).not.toContainEqual(
+      expect.objectContaining({ type: "conversation.item.truncate" }),
+    );
 
     await session.end();
   });
@@ -544,7 +615,7 @@ describe("OpenAIWebRtcSession", () => {
     await session.end();
   });
 
-  it("clears and truncates completed audible output without cancelling a finished response", async () => {
+  it("clears completed audible output without cancelling or manually truncating it", async () => {
     const session = createSession();
 
     await connectRemoteSession(session);
@@ -570,16 +641,11 @@ describe("OpenAIWebRtcSession", () => {
     );
     expect(controls.map((event) => event.type)).toEqual([
       "output_audio_buffer.clear",
-      "conversation.item.truncate",
     ]);
-    expect(controls[1]).toMatchObject({
-      item_id: "item-1",
-      audio_end_ms: 750,
-    });
     await session.end();
   });
 
-  it("does not count paused remote-media time toward truncation", async () => {
+  it("does not interrupt paused remote media and clears after playback resumes", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(1_000);
     const session = createSession();
 
@@ -591,6 +657,14 @@ describe("OpenAIWebRtcSession", () => {
     audio.paused = true;
     audio.onpause?.();
     now.mockReturnValue(6_000);
+    peer.dataChannel.emitMessage(
+      JSON.stringify({
+        type: "input_audio_buffer.speech_started",
+        audio_start_ms: 100,
+      }),
+    );
+    expect(peer.dataChannel.send).not.toHaveBeenCalled();
+
     audio.paused = false;
     audio.onplaying?.();
     peer.dataChannel.emitMessage(
@@ -600,15 +674,18 @@ describe("OpenAIWebRtcSession", () => {
       }),
     );
 
-    const truncate = peer.dataChannel.send.mock.calls
-      .map(([raw]) => JSON.parse(raw))
-      .find((event) => event.type === "conversation.item.truncate");
-    expect(truncate?.audio_end_ms).toBeLessThanOrEqual(1_200);
+    const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls.map((event) => event.type)).toEqual([
+      "response.cancel",
+      "output_audio_buffer.clear",
+    ]);
     await session.end();
     now.mockRestore();
   });
 
-  it("does not count held and muted remote-media time toward truncation", async () => {
+  it("does not interrupt held media and clears after the call resumes", async () => {
     const session = createSession();
 
     await connectRemoteSession(session);
@@ -631,10 +708,13 @@ describe("OpenAIWebRtcSession", () => {
       JSON.stringify({ type: "input_audio_buffer.speech_started" }),
     );
 
-    const truncate = peer.dataChannel.send.mock.calls
-      .map(([raw]) => JSON.parse(raw))
-      .find((event) => event.type === "conversation.item.truncate");
-    expect(truncate?.audio_end_ms).toBe(1_500);
+    const controls = peer.dataChannel.send.mock.calls.map(([raw]) =>
+      JSON.parse(raw),
+    );
+    expect(controls.map((event) => event.type)).toEqual([
+      "response.cancel",
+      "output_audio_buffer.clear",
+    ]);
     await session.end();
   });
 
@@ -689,11 +769,7 @@ describe("OpenAIWebRtcSession", () => {
     expect(controls[1]).toMatchObject({
       type: "output_audio_buffer.clear",
     });
-    expect(controls[2]).toMatchObject({
-      type: "conversation.item.truncate",
-      item_id: "item-new",
-    });
-    expect(controls).toHaveLength(3);
+    expect(controls).toHaveLength(2);
     await session.end();
   });
 
@@ -967,40 +1043,6 @@ describe("OpenAIWebRtcSession", () => {
       ),
     ).toHaveLength(0);
     await transport.disconnect("user");
-  });
-
-  it("recovers only the exact correlated truncate race and settles its state", async () => {
-    const session = createSession();
-    await resolveConnection(session, peer);
-    peer.dataChannel.readyState = "open";
-
-    expect(
-      session.sendControlEvent({
-        type: "conversation.item.truncate",
-        item_id: "item-1",
-        content_index: 0,
-        audio_end_ms: 500,
-      }),
-    ).toBe(true);
-    const truncate = peer.dataChannel.send.mock.calls
-      .map(([raw]) => JSON.parse(raw))
-      .find((event) => event.type === "conversation.item.truncate");
-    const error: OpenAIWebRtcEvent = {
-      kind: "event",
-      type: "error",
-      payload: {
-        type: "error",
-        error: {
-          type: "invalid_request_error",
-          code: "item_truncate_invalid_item_id",
-          event_id: truncate.event_id,
-        },
-      },
-    };
-
-    expect(session.isRecoverableControlError(error)).toBe(true);
-    expect(session.isRecoverableControlError(error)).toBe(false);
-    await session.end();
   });
 
   it("fails closed for a correlated server error instead of recovering it", async () => {

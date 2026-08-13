@@ -34,6 +34,21 @@ const OPENAI_REALTIME_EVENT_TYPES = new Set([
   "error",
 ]);
 
+const SAFE_PROVIDER_ERROR_PARAMS = new Set([
+  "audio_end_ms",
+  "content_index",
+  "event_id",
+  "item_id",
+  "response_id",
+  "conversation.item.truncate",
+  "output_audio_buffer.clear",
+  "response.cancel",
+  "response.create",
+  "response.metadata",
+  "session.turn_detection.create_response",
+  "session.turn_detection.interrupt_response",
+]);
+
 export function isOpenAIRealtimeEventType(type: string): boolean {
   return OPENAI_REALTIME_EVENT_TYPES.has(type);
 }
@@ -55,6 +70,7 @@ export type OpenAIRealtimeResponseDone = {
 
 export type OpenAIRealtimeProviderErrorSignal = {
   code: string;
+  param?: string;
 };
 
 export type OpenAIRealtimeObserverCapacity = {
@@ -284,7 +300,12 @@ export function createOpenAIRealtimeEventObserver(options: {
             (boundedString(error.code, MAX_EVENT_ID_LENGTH) ??
               boundedString(error.type, MAX_EVENT_ID_LENGTH))) ??
           "unknown";
-        callbacks.onProviderError?.({ code: safeEventType(code) });
+        const rawParam = error && boundedString(error.param, MAX_EVENT_ID_LENGTH);
+        const param = rawParam ? safeProviderErrorParam(rawParam) : undefined;
+        callbacks.onProviderError?.({
+          code: safeEventType(code),
+          ...(param ? { param } : {}),
+        });
         return { eventType, suppressClientForward: true };
       }
       if (eventType === "input_audio_buffer.speech_started") {
@@ -505,4 +526,8 @@ function boundedString(value: unknown, maxLength: number): string | null {
 
 function safeEventType(value: string): string {
   return /^[a-zA-Z0-9_.-]{1,80}$/.test(value) ? value : "unknown";
+}
+
+function safeProviderErrorParam(value: string): string | undefined {
+  return SAFE_PROVIDER_ERROR_PARAMS.has(value) ? value : undefined;
 }

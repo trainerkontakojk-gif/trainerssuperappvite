@@ -54,6 +54,8 @@ Dokumen ini adalah titik lanjut untuk sesi/operator berikutnya. Ia memisahkan pe
 | Latest Phase 7 production acceptance #2    | **FAILED; watchdog clean**          | Exact candidate `376b0ca` mencapai satu attempt production lalu berakhir `failed` setelah sekitar 26 detik dengan collision `conversation_already_has_active_response`; zero retry. Watchdog menutup dua flags, menghapus runtime Telefun, menguras durable boundary, dan membuktikan boundary Gemini identik. |
 | Historical response single-flight repair   | **INSUFFICIENT in production**      | Commit `34c9469` menahan create manual terhadap lifecycle yang terlihat browser, tetapi canonical server VAD masih memakai `create_response=true`; provider tetap mempunyai authority create kedua sehingga acceptance #2 mengulang collision.                                                                 |
 | Single-owner response repair               | **LOCAL GREEN; release pending**    | Base `376b0ca` mengubah canonical VAD menjadi `create_response=false`; browser meminta tepat satu response setelah committed input, menggabungkannya dengan pending cue, dan tetap memakai marker/terminal/shutdown barrier. Evidence saat ini provider-free; belum di-commit, deploy, atau live-PASS.         |
+| Production acceptance #3                   | **FAILED; watchdog clean**          | Exact candidate `4ae2235` tidak mengulang collision create dan menyelesaikan tiga response, lalu gagal sesudah dua interruption dengan provider code `invalid_value`. Window hanya membuat satu attempt; watchdog menutup flags, menghapus Telefun, dan menguras active state.                                 |
+| WebRTC double-truncation repair            | **LOCAL RELEASE GATES PASS**        | WebRTC barge-in kini hanya `response.cancel` lalu `output_audio_buffer.clear`; explicit `conversation.item.truncate` dihapus karena clear buffer WebRTC sudah menjadi authority truncation. Sideband menyimpan hanya provider `code` dan `param` dari allowlist bounded, tanpa raw message.                    |
 | Production exact-cohort guard              | **PASS locally; commit pending**    | API capability dan Telefun broker mengizinkan production hanya saat flag aktif + UUID exact-match. Flag off, cohort kosong, user lain, dan `NODE_ENV=test` tetap deny-all. Focused RED→GREEN: Telefun `12/12`, API `32/32`.                                                                                    |
 
 ## Production acceptance #2 and single-owner repair — 2026-08-13
@@ -95,6 +97,62 @@ di luar scope; file source/test area itu byte-identik dengan base `376b0ca`, dan
 kegagalannya direproduksi pada worktree base. Review independen, commit, deploy
 flags-off, dan satu live acceptance baru masih pending saat bagian ini ditulis.
 Gemini tetap default dan tidak berubah.
+
+## Production acceptance #3 and WebRTC interruption repair — 2026-08-13
+
+Acceptance ketiga menjalankan exact single-owner candidate `4ae2235` dan satu
+attempt tanpa retry. History ditargetkan 300 detik tetapi attempt berakhir
+`failed` sekitar 25 detik setelah mulai. Sideband sudah connected, tiga response
+usage selesai, lima transcript lifecycle event tersimpan, dan dua interruption
+tercatat sebelum finalization `provider_error` dengan code `invalid_value`.
+Karena first time cue untuk durasi 300 detik baru mungkin setelah 180 detik,
+kegagalan ini bukan time-cue collision dan error lama
+`conversation_already_has_active_response` tidak berulang.
+
+Watchdog menutup window setelah terminal event—bukan crash service. Evidence
+`telefun-phase7-production-watchdog-20260813T040800Z.json` mencatat flags closed,
+Telefun stopped, durable boundary drained, dan active attempt/history/lease
+`0/0/0`; SHA-256-nya
+`9c79a668e7a7877c2fddc57b05129793be910ccf9ee8f12f2b109394f515f21c`.
+Gemini tidak berubah.
+
+Source acceptance masih mengirim tiga control pada setiap audible barge-in:
+scoped `response.cancel`, WebRTC `output_audio_buffer.clear`, lalu explicit
+`conversation.item.truncate` dengan `audio_end_ms` yang dihitung browser.
+Kontrak WebRTC membuat clear buffer sekaligus men-truncate conversation, sehingga
+truncate kedua dapat menargetkan state/durasi audio yang sudah berubah. Karena
+sideband lama membuang provider `param`, ini adalah root-cause kandidat terkuat,
+bukan klaim exact param historis.
+
+Repair provider-free mengubah kontrak menjadi:
+
+- response in-progress: `response.cancel(response_id)` lalu
+  `output_audio_buffer.clear`;
+- bila send cancel gagal sinkron, clear ditahan dan event berikutnya dapat mencoba
+  kembali urutan cancel-then-clear;
+- response completed tetapi audio masih buffered: clear saja;
+- tidak ada explicit `conversation.item.truncate` pada seam OpenAI WebRTC;
+- repeated/stale barge-in tetap dideduplikasi;
+- sideband mempertahankan hanya `code` dan optional `param` yang masuk allowlist
+  bounded; raw provider message/payload tetap tidak masuk log.
+
+RED pertama menerima tiga control saat hanya dua yang diizinkan; RED kedua
+menunjukkan safe provider `param` hilang; RED ketiga membuktikan clear sebelumnya
+tetap terkirim ketika send cancel gagal. Setelah GREEN, focused WebRTC client
+`96/96`, related WebRTC matrix `134/134`, focused Telefun
+observer/call-manager/wiring `41/41`, dan full Telefun `408/408` lulus. Root
+typecheck `4/4`, lint tanpa error, curated core `4/4` (termasuk Web `151/151`),
+build `3/3`, final `graphify update .`, diff check, dan bounded secret scan juga
+lulus. Independent GPT-5.6 Luna review memberi verdict GO tanpa release blocker;
+commit, deploy, dan live acceptance berikutnya masih pending.
+
+Atas arahan Fajar setelah acceptance #3, rollout repair berikutnya bukan lagi
+window satu-attempt yang ditutup watchdog. Setelah exact candidate direview dan
+di-deploy, WebRTC boleh tetap aktif di production hanya untuk exact cohort Fajar
+agar testing manual dapat diulang tanpa Telefun dimatikan otomatis. Gemini tetap
+default untuk semua user lain. Penutupan gate menjadi tindakan manual bila ada
+error material, kebocoran cohort, state durable tidak terdrain, atau Fajar meminta
+rollout dihentikan.
 
 ## Historical acceptance #1 and dual-barrier repair — 2026-08-12
 

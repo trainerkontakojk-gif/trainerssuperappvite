@@ -144,6 +144,9 @@ const openAIWebRtcManager = createWebRtcCallManager({
     // closed, non-secret type set; raw provider errors never reach stdout.
     console.warn("[Telefun] OpenAI WebRTC sideband diagnostic", {
       type: diagnostic.type,
+      ...(diagnostic.type === "provider_error"
+        ? { code: diagnostic.code, param: diagnostic.param }
+        : {}),
     });
   },
   flushUsage: async ({ usageRequestId, userId, aggregate, durationMs }) =>

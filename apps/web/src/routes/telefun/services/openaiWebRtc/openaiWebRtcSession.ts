@@ -76,8 +76,7 @@ type CodedError = Error & { code?: string };
 
 type OpenAIInterruptionControlKind =
   | "response.cancel"
-  | "output_audio_buffer.clear"
-  | "conversation.item.truncate";
+  | "output_audio_buffer.clear";
 
 type OpenAIInterruptionControlCorrelation = {
   kind: OpenAIInterruptionControlKind;
@@ -163,15 +162,6 @@ function isSafeControlEvent(event: OpenAIWebRtcControlEvent): boolean {
     event.type === "output_audio_buffer.clear"
   ) {
     return true;
-  }
-  if (event.type === "conversation.item.truncate") {
-    return (
-      typeof event.item_id === "string" &&
-      event.item_id.length > 0 &&
-      event.content_index === 0 &&
-      Number.isFinite(event.audio_end_ms) &&
-      event.audio_end_ms >= 0
-    );
   }
   if (event.type !== "conversation.item.create") return false;
   const text = event.item.content[0]?.text;
@@ -604,8 +594,7 @@ export class OpenAIWebRtcSession {
     }
     const controlKind: OpenAIInterruptionControlKind | undefined =
       event.type === "response.cancel" ||
-      event.type === "output_audio_buffer.clear" ||
-      event.type === "conversation.item.truncate"
+      event.type === "output_audio_buffer.clear"
         ? event.type
         : undefined;
     const shouldCorrelateError = controlKind !== undefined;
@@ -642,16 +631,14 @@ export class OpenAIWebRtcSession {
     if (!correlation) return false;
 
     // Every correlated provider error settles its bounded correlation state.
-    // Recovery is limited to two exact, benign interruption races: a response
-    // can finish before cancel is handled, or buffer clear can advance provider
-    // state before the following explicit item truncate is handled.
+    // Recovery is limited to the exact benign race where a response finishes
+    // before its correlated cancel is handled. WebRTC output-buffer clear owns
+    // transcript truncation, so no explicit item-truncate race exists here.
     this.openAiSentInterruptionEventIds.delete(eventId);
     if (error?.type !== "invalid_request_error") return false;
     return (
-      (correlation.kind === "response.cancel" &&
-        error.code === "response_cancel_not_active") ||
-      (correlation.kind === "conversation.item.truncate" &&
-        error.code === "item_truncate_invalid_item_id")
+      correlation.kind === "response.cancel" &&
+      error.code === "response_cancel_not_active"
     );
   }
 

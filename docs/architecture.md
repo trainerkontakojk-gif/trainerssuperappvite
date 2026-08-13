@@ -108,11 +108,16 @@ buffer yang sedang dimainkan, dan elapsed media yang benar-benar maju. Server
 tetap memiliki canonical session configuration (`server_vad` dengan
 `interrupt_response=false`); browser tidak mengirim `session.update`.
 
-Pada speech start, hanya response/item audible yang ditargetkan. Response yang
-masih in progress menerima scoped `response.cancel`, output WebRTC di-clear, dan
-assistant item di-truncate dengan elapsed played media. Event stale/duplicate dan
-rapid repeats dideduplikasi; autoplay block, pause/stall/end, serta hold tidak
-menambah elapsed. DataChannel browser tetap bukan persistence authority:
+Pada speech start, hanya response audible yang sudah mempunyai kemajuan playback
+yang ditargetkan. Response yang masih in progress menerima scoped
+`response.cancel`, kemudian output WebRTC di-clear. Pada transport WebRTC,
+`output_audio_buffer.clear` menjadi authority truncation conversation; browser
+tidak mengirim explicit `conversation.item.truncate` kedua dengan estimasi
+`audio_end_ms`. Clear untuk response aktif hanya dikirim setelah scoped cancel
+berhasil masuk DataChannel; kegagalan send membiarkan event berikutnya mencoba
+ulang urutan cancel-then-clear. Event stale/duplicate dan rapid repeats dideduplikasi; autoplay
+block, pause/stall/end, serta hold tidak dapat memicu interruption. DataChannel
+browser tetap bukan persistence authority:
 transcript/usage/finalization server-side tetap dimiliki sideband dan lifecycle
 Phase 4–6.
 
@@ -138,10 +143,16 @@ dual authority yang menghasilkan `conversation_already_has_active_response` pada
 dua acceptance production sebelumnya. Recording memilih variant MediaRecorder
 yang didukung dan mempertahankan MIME output aktual.
 
-Repair single-owner baru memiliki bukti unit/fake-browser provider-free; live
-production PASS setelah repair belum diklaim. Physical browser/device lintas
-browser, Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar evidence
-candidate ini. Gemini dan legacy OpenAI WebSocket tidak diubah.
+Single-owner menghilangkan collision response-create pada acceptance production
+ketiga, tetapi call itu gagal setelah tiga response dan dua interruption dengan
+provider code `invalid_value`. Sideband lama hanya mempertahankan code, jadi exact
+provider `param` tidak tersedia. Korelasi timeline dan kontrak WebRTC menjadikan
+double truncation (`output_audio_buffer.clear` lalu explicit item truncate)
+kandidat terkuat; repair menghapus writer kedua dan mempertahankan hanya `param`
+provider yang masuk allowlist bounded untuk diagnosis berikutnya. Live production
+PASS setelah repair terbaru belum diklaim. Physical browser/device lintas browser,
+Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar evidence candidate
+ini. Gemini dan legacy OpenAI WebSocket tidak diubah.
 
 ## Directory Structure
 

@@ -35,13 +35,6 @@ export type OpenAIWebRtcControlEvent =
       response?: { metadata?: OpenAIWebRtcResponseMetadata };
     }
   | {
-      type: "conversation.item.truncate";
-      item_id: string;
-      content_index: 0;
-      audio_end_ms: number;
-      event_id?: string;
-    }
-  | {
       type: "conversation.item.create";
       event_id?: string;
       item: {
