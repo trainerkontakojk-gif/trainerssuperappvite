@@ -26,7 +26,7 @@
     "@trainers/types": "workspace:*",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.39.0",
-    "hono": "^4.12.27",
+    "hono": "^4.12.34",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.475.0",

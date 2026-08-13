@@ -154,6 +154,19 @@ PASS setelah repair terbaru belum diklaim. Physical browser/device lintas browse
 Mini, dan keputusan deprecation OpenAI WebSocket tetap di luar evidence candidate
 ini. Gemini dan legacy OpenAI WebSocket tidak diubah.
 
+Untuk maintainability, browser orchestrator `openaiWebRtcSession.ts` dibatasi
+menjadi 999 baris pada merge-preparation. Response-create arbitration, connect
+diagnostics, session metrics, dan recording callback/URL ownership hidup di
+controller/helper terpisah. Ekstraksi ini mempertahankan kontrak provider-free
+yang sama dan tidak mengubah feature flag atau transport default.
+
+History list/detail untuk sesi `openai-webrtc` berstatus `completed`
+memproyeksikan field `feedback` secara deterministik dari `voice_assessment`
+tervalidasi ketika kolom legacy `feedback` kosong. Nilai feedback yang sudah
+dipersist tetap menang. Ini membuat hasil worker WebRTC—yang
+menyimpan assessment lewat RPC service-role—terlihat setara pada ReviewModal
+tanpa memberi browser authority menulis scoring.
+
 ## Directory Structure
 
 Struktur folder monorepo:

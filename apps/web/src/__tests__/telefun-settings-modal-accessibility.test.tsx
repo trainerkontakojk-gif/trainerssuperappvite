@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_TELEFUN_SETTINGS } from "../routes/telefun/telefunSettings";
 
 const draftState = vi.hoisted(() => ({
   handleClose: vi.fn(),
   handleSave: vi.fn(),
+  isSaving: false,
 }));
 
 vi.mock("../routes/telefun/hooks/useTelefunProviderReadiness", () => ({
@@ -38,6 +39,7 @@ vi.mock(
       handleDeleteScenario: vi.fn(),
       handleSelectConsumerType: vi.fn(),
       handleDeleteConsumer: vi.fn(),
+      isSaving: draftState.isSaving,
       handleSave: draftState.handleSave,
       handleClose: draftState.handleClose,
     }),
@@ -59,6 +61,11 @@ vi.mock("../routes/telefun/components/settings/TelefunSystemTab", () => ({
 import { SettingsModal } from "../routes/telefun/components/SettingsModal";
 
 describe("Telefun SettingsModal accessibility", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    draftState.isSaving = false;
+  });
+
   it("provides dialog semantics, Escape close, and focus restoration", async () => {
     const trigger = document.createElement("button");
     document.body.append(trigger);
@@ -91,5 +98,26 @@ describe("Telefun SettingsModal accessibility", () => {
     );
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
+  });
+
+  it("announces the pending save and disables every modal exit action", () => {
+    draftState.isSaving = true;
+    render(
+      <SettingsModal
+        isOpen
+        onClose={draftState.handleClose}
+        settings={DEFAULT_TELEFUN_SETTINGS}
+        onSave={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-busy", "true");
+    expect(dialog.querySelector("[inert]")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Menyimpan…" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Batal" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Tutup pengaturan simulasi" }),
+    ).toBeDisabled();
   });
 });

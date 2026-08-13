@@ -2,6 +2,7 @@ import type { ProfilerPeserta } from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
 import { getPhotoFrame } from "../../../lib/photo-frame";
 import { buildFramedPhotoData } from "./profilerExportUtils";
+import { sanitizeProfilerPptxImageData } from "./profilerPptxImageBoundary";
 import { formatTanggal, hitungMasaDinas, hitungUsia, labelTim, timTheme } from "./profilerFormatters";
 
 export const downloadPPTX = async (
@@ -44,7 +45,9 @@ export const downloadPPTX = async (
 
         if (p.foto_url) {
           const frame = getPhotoFrame(p.id, p.photo_frame);
-          const framedData = await buildFramedPhotoData(p.foto_url, frame);
+          const framedData = sanitizeProfilerPptxImageData(
+            await buildFramedPhotoData(p.foto_url, frame),
+          );
           try {
             if (framedData) {
               slide.addImage({
@@ -56,15 +59,7 @@ export const downloadPPTX = async (
                 rounding: true,
               });
             } else {
-              slide.addImage({
-                path: p.foto_url,
-                x: finalX,
-                y: finalY,
-                w: finalW,
-                h: finalH,
-                rounding: true,
-                sizing: { type: "cover", w: finalW, h: finalH },
-              });
+              throw new Error("Unsupported or unreadable profile image.");
             }
             return;
           } catch (_e) {

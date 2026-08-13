@@ -117,3 +117,16 @@ export function closePeerConnectionOnce(
 export function getTracksFromStream(stream: OpenAIWebRtcStreamLike | null) {
   return stream ? stream.getTracks() : [];
 }
+
+export function createOpenAIWebRtcRemoteStream(
+  tracks: OpenAIWebRtcTrackLike[],
+  factory?: (tracks: OpenAIWebRtcTrackLike[]) => OpenAIWebRtcStreamLike,
+): OpenAIWebRtcStreamLike {
+  if (factory) return factory(tracks);
+  if (typeof MediaStream === "undefined") {
+    throw new Error("Browser MediaStream is unavailable.");
+  }
+  return new MediaStream(
+    tracks as unknown as MediaStreamTrack[],
+  ) as unknown as OpenAIWebRtcStreamLike;
+}

@@ -1,4 +1,3 @@
-import type { SessionMetrics } from "@trainers/types";
 import {
   OPENAI_WEBRTC_DEFAULT_DELETE_TIMEOUT_MS,
   OPENAI_WEBRTC_DEFAULT_TIMEOUT_MS,
@@ -18,34 +17,32 @@ import {
 import {
   buildOpenAIWebRtcBrokerCallUrl,
   createOpenAIWebRtcBrokerCall,
-  deleteOpenAIWebRtcBrokerCall,
 } from "./brokerApi";
+import { deleteOpenAIWebRtcBrokerCallWithTimeout } from "./brokerCleanup";
 import {
   clearAudioElement,
   closeDataChannelOnce,
   closePeerConnectionOnce,
+  createOpenAIWebRtcRemoteStream,
   getTracksFromStream,
   stopTracksOnce,
 } from "./cleanup";
 import { parseOpenAIWebRtcDataChannelMessage } from "./events";
 import { OpenAIWebRtcInterruptionController } from "./interruptionController";
+import { OpenAIWebRtcResponseCreateController } from "./responseCreateController";
 import {
-  calculateRecordingVolumeConsistency,
-  OpenAIWebRtcRecordingGraph,
-  type OpenAIWebRtcRecordingResult,
-} from "./recording";
+  createOpenAIWebRtcCodedError as createCodedError,
+  wrapOpenAIWebRtcCodedError as wrapCodedError,
+  warnOpenAIWebRtcConnectStage,
+  type OpenAIWebRtcConnectStage as ConnectErrorStage,
+} from "./connectDiagnostics";
+import { OpenAIWebRtcRecordingGraph } from "./recording";
+import { finalizeOpenAIWebRtcRecording } from "./recordingFinalizer";
 import {
   buildWebRtcRecoveryPlan,
   type WebRtcRecoveryCause,
 } from "./recovery-policy";
-import {
-  createHoldTrackerState,
-  endHold,
-  finalizeActiveHold,
-  startHold,
-  summarizeHoldMetrics,
-  type HoldTrackerState,
-} from "../holdMetrics";
+import { OpenAIWebRtcSessionMetricsTracker } from "./sessionMetricsTracker";
 
 type DataChannelMessageEvent = { data: string };
 type TerminalState = "ended" | "failed";
@@ -61,19 +58,7 @@ type TerminationSource =
   | "connect_timeout"
   | "connect_failure"
   | "broker_cleanup";
-
 export type { TerminationSource };
-type ConnectErrorStage =
-  | "get_user_media"
-  | "recording_start"
-  | "create_offer"
-  | "set_local_description"
-  | "broker_request"
-  | "set_remote_description"
-  | "wait_for_peer";
-
-type CodedError = Error & { code?: string };
-
 type OpenAIInterruptionControlKind =
   | "response.cancel"
   | "output_audio_buffer.clear";
@@ -81,27 +66,6 @@ type OpenAIInterruptionControlKind =
 type OpenAIInterruptionControlCorrelation = {
   kind: OpenAIInterruptionControlKind;
 };
-
-type ResponseCreateControlEvent = Extract<
-  OpenAIWebRtcControlEvent,
-  { type: "response.create" }
->;
-
-type ManualResponseCreateBarrier = {
-  marker: string;
-  responseId: string | null;
-};
-
-type ResponseCreatedOrigin =
-  | { kind: "manual"; marker: string; responseId: string }
-  | { kind: "unknown" };
-
-const TELEFUN_RESPONSE_CREATE_METADATA_KEY = "telefun_response_create";
-const TELEFUN_RESPONSE_CREATE_MARKER_PREFIX = "telefun-response-create-";
-const MAX_TELEFUN_RESPONSE_CREATE_MARKER_SEQUENCE = 0xffffff;
-const MAX_TELEFUN_RESPONSE_CREATE_MARKER_LENGTH =
-  TELEFUN_RESPONSE_CREATE_MARKER_PREFIX.length + 6;
-const MAX_COMMITTED_INPUT_ITEM_IDS = 4_096;
 
 function isRecordValue(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -117,40 +81,6 @@ function getResponseIdFromEvent(event: OpenAIWebRtcEvent): string | undefined {
     ? event.payload.response
     : null;
   return stringValue(event.payload.response_id) ?? stringValue(response?.id);
-}
-
-function getCommittedInputItemId(event: OpenAIWebRtcEvent): string | undefined {
-  if (event.kind !== "event" || event.type !== "input_audio_buffer.committed") {
-    return undefined;
-  }
-  return stringValue(event.payload.item_id);
-}
-
-function getResponseCreatedOrigin(
-  event: OpenAIWebRtcEvent,
-): ResponseCreatedOrigin {
-  if (event.kind !== "event" || event.type !== "response.created") {
-    return { kind: "unknown" };
-  }
-
-  const response = isRecordValue(event.payload.response)
-    ? event.payload.response
-    : null;
-  const responseId = stringValue(response?.id);
-  if (!response || !responseId) return { kind: "unknown" };
-
-  const metadata = isRecordValue(response.metadata) ? response.metadata : null;
-  const marker = stringValue(metadata?.[TELEFUN_RESPONSE_CREATE_METADATA_KEY]);
-  if (
-    !metadata ||
-    !marker ||
-    marker.length > MAX_TELEFUN_RESPONSE_CREATE_MARKER_LENGTH ||
-    Object.keys(metadata).length !== 1
-  ) {
-    return { kind: "unknown" };
-  }
-
-  return { kind: "manual", marker, responseId };
 }
 
 function isSafeControlEvent(event: OpenAIWebRtcControlEvent): boolean {
@@ -172,41 +102,6 @@ function isSafeControlEvent(event: OpenAIWebRtcControlEvent): boolean {
     typeof text === "string" &&
     text.startsWith("[TELEFUN_CONTROL:TIME_CUE]")
   );
-}
-
-function createCodedError(
-  message: string,
-  code: string,
-  cause?: unknown,
-): CodedError {
-  const error = new Error(message, { cause }) as CodedError;
-  error.code = code;
-  return error;
-}
-
-function wrapCodedError(
-  error: unknown,
-  code: string,
-  fallbackMessage: string,
-): CodedError {
-  const sourceMessage =
-    error instanceof Error ? error.message : fallbackMessage;
-  const wrapped = createCodedError(sourceMessage, code, error);
-  if (error instanceof Error) wrapped.name = error.name;
-  return wrapped;
-}
-
-const RECORDING_CALLBACK_TIMEOUT_MS = 10_000;
-const MAX_CONNECT_DIAGNOSTIC_MESSAGE_LENGTH = 200;
-const SESSION_DESCRIPTION_DIAGNOSTIC_PATTERN =
-  /(?:\bsdp\b|\bsession\s*description\b|\bset(?:local|remote)description\b|\bice-(?:pwd|ufrag)\b|\b(?:candidate|fingerprint)\s*:|(?:^|[\r\n])[ \t]*(?:v|o|s|t|c|m|a)=)/im;
-
-function getSafeConnectDiagnosticMessage(message: unknown): string | undefined {
-  if (typeof message !== "string") return undefined;
-  if (SESSION_DESCRIPTION_DIAGNOSTIC_PATTERN.test(message)) {
-    return "session_description_parse_failed";
-  }
-  return message.slice(0, MAX_CONNECT_DIAGNOSTIC_MESSAGE_LENGTH);
 }
 
 export class OpenAIWebRtcSession {
@@ -236,7 +131,6 @@ export class OpenAIWebRtcSession {
   private muted = false;
   private held = false;
   private recordingGraph: OpenAIWebRtcRecordingGraph | null = null;
-  private sessionStartTime = 0;
   private hasConnected = false;
   private recoveryNotified = false;
   private openAiSentInterruptionEventIds = new Map<
@@ -244,19 +138,9 @@ export class OpenAIWebRtcSession {
     OpenAIInterruptionControlCorrelation
   >();
   private openAiControlSequence = 0;
-  private responseCreateMarkerSequence = 0;
-  private speechSegments: SessionMetrics["speechSegments"] = [];
-  private currentSpeechSegmentStartMs: number | null = null;
-  private totalSpeakingMs = 0;
-  private holdTracker: HoldTrackerState = createHoldTrackerState();
+  private readonly metricsTracker = new OpenAIWebRtcSessionMetricsTracker();
   private readonly interruptionController: OpenAIWebRtcInterruptionController;
-  private manualResponseCreateBarrier: ManualResponseCreateBarrier | null =
-    null;
-  private pendingResponseCreate: ResponseCreateControlEvent | null = null;
-  // Canonical server VAD commits input but never creates responses. Keep one
-  // application-owned create behind the committed-item and response barriers.
-  private serverVadInputPending = false;
-  private readonly committedInputItemIds = new Set<string>();
+  private readonly responseCreateController: OpenAIWebRtcResponseCreateController;
   private _state: OpenAIWebRtcState = "idle";
   private terminationSource: TerminationSource | null = null;
   private connectStageField: ConnectErrorStage | null = null;
@@ -275,6 +159,12 @@ export class OpenAIWebRtcSession {
       onAudibilityChange: (audible) =>
         this.notify(deps.onRemotePlaybackChange, audible),
       canActivatePlayback: () => !this.shutdownRequested,
+    });
+    this.responseCreateController = new OpenAIWebRtcResponseCreateController({
+      canSendControlEvent: () => this.canSendControlEvent(),
+      hasInProgressResponse: () =>
+        this.interruptionController.hasInProgressResponse,
+      sendControlEventDirect: (event) => this.sendControlEventDirect(event),
     });
   }
 
@@ -318,7 +208,7 @@ export class OpenAIWebRtcSession {
       if (!activeLocalStream) {
         throw this.createShutdownError();
       }
-      this.sessionStartTime = Date.now();
+      this.metricsTracker.start();
       this.notify(this.deps.onLocalStream, localStream);
       this.localTracks.clear();
       this.recordingGraph = new OpenAIWebRtcRecordingGraph(
@@ -394,9 +284,9 @@ export class OpenAIWebRtcSession {
       this.connectStageField = connectStage;
       const { answerSdp } = await createOpenAIWebRtcBrokerCall({
         onBrokerRequestStarted: () =>
-          this.warnConnectStage("broker_request_started"),
+          warnOpenAIWebRtcConnectStage("broker_request_started"),
         onBrokerResponse: () => {
-          this.warnConnectStage("broker_response");
+          warnOpenAIWebRtcConnectStage("broker_response");
           // A POST can resolve after DELETE has already terminalized the
           // browser session. It may need one broker-only cleanup retry, but it
           // must never restart recording callback/resource finalization.
@@ -446,7 +336,7 @@ export class OpenAIWebRtcSession {
         this.state !== "ended" &&
         this.state !== "failed"
       ) {
-        this.warnConnectStage(connectStage, normalizedError);
+        warnOpenAIWebRtcConnectStage(connectStage, normalizedError);
       }
       await this.fail(
         normalizedError,
@@ -497,11 +387,7 @@ export class OpenAIWebRtcSession {
   }
 
   public setHold(held: boolean): void {
-    const relativeNow = this.getRelativeSessionTimeMs();
-    this.holdTracker = held
-      ? startHold(this.holdTracker, relativeNow)
-      : endHold(this.holdTracker, relativeNow);
-    this.held = this.holdTracker.active !== null;
+    this.held = this.metricsTracker.setHeld(held);
     this.applyLocalTrackState();
     this.deps.audioElement.muted = this.held;
     this.interruptionController.setHeld(this.held);
@@ -513,43 +399,9 @@ export class OpenAIWebRtcSession {
   public sendControlEvent(event: OpenAIWebRtcControlEvent): boolean {
     if (!isSafeControlEvent(event)) return false;
     if (event.type === "response.create") {
-      return this.sendResponseCreate(event);
+      return this.responseCreateController.send(event);
     }
     return this.sendControlEventDirect(event);
-  }
-
-  private sendResponseCreate(event: ResponseCreateControlEvent): boolean {
-    if (!this.canSendControlEvent()) return false;
-    if (this.pendingResponseCreate || !this.isResponseCreateSafe()) {
-      this.pendingResponseCreate = event;
-      return true;
-    }
-    return this.sendManualResponseCreate(event);
-  }
-
-  private sendManualResponseCreate(event: ResponseCreateControlEvent): boolean {
-    const marker = this.createResponseCreateMarker();
-    this.manualResponseCreateBarrier = { marker, responseId: null };
-    const markedEvent: ResponseCreateControlEvent = {
-      ...event,
-      response: {
-        metadata: {
-          [TELEFUN_RESPONSE_CREATE_METADATA_KEY]: marker,
-        },
-      },
-    };
-    if (this.sendControlEventDirect(markedEvent)) return true;
-    this.manualResponseCreateBarrier = null;
-    return false;
-  }
-
-  private createResponseCreateMarker(): string {
-    this.responseCreateMarkerSequence =
-      this.responseCreateMarkerSequence >=
-      MAX_TELEFUN_RESPONSE_CREATE_MARKER_SEQUENCE
-        ? 1
-        : this.responseCreateMarkerSequence + 1;
-    return `${TELEFUN_RESPONSE_CREATE_MARKER_PREFIX}${this.responseCreateMarkerSequence.toString(36).padStart(6, "0")}`;
   }
 
   private canSendControlEvent(): boolean {
@@ -558,29 +410,6 @@ export class OpenAIWebRtcSession {
       this.dataChannel?.readyState === "open" &&
       this.dataChannel.send,
     );
-  }
-
-  private isResponseCreateSafe(): boolean {
-    return Boolean(
-      !this.shutdownRequested &&
-      this.manualResponseCreateBarrier === null &&
-      !this.interruptionController.hasInProgressResponse &&
-      !this.serverVadInputPending,
-    );
-  }
-
-  private flushPendingResponseCreate(): void {
-    const pendingResponseCreate = this.pendingResponseCreate;
-    if (!pendingResponseCreate || !this.isResponseCreateSafe()) return;
-    if (!this.canSendControlEvent()) return;
-
-    this.pendingResponseCreate = null;
-    if (
-      !this.sendManualResponseCreate(pendingResponseCreate) &&
-      !this.shutdownRequested
-    ) {
-      this.pendingResponseCreate = pendingResponseCreate;
-    }
   }
 
   private sendControlEventDirect(event: OpenAIWebRtcControlEvent): boolean {
@@ -699,8 +528,9 @@ export class OpenAIWebRtcSession {
         ) {
           this.remoteStream.addTrack(event.track);
         } else if (!this.remoteStream) {
-          this.remoteStream = this.createRemoteStream(
+          this.remoteStream = createOpenAIWebRtcRemoteStream(
             Array.from(this.remoteTracks),
+            this.deps.mediaStreamFactory,
           );
         }
 
@@ -797,102 +627,22 @@ export class OpenAIWebRtcSession {
       : false;
 
     if (event.type === "input_audio_buffer.speech_started") {
-      this.recordSpeechStarted();
-      this.serverVadInputPending = true;
+      this.metricsTracker.recordSpeechStarted();
     } else if (event.type === "input_audio_buffer.speech_stopped") {
-      this.recordSpeechStopped();
-    } else if (event.type === "input_audio_buffer.committed") {
-      this.handleCommittedInput(event);
+      this.metricsTracker.recordSpeechStopped();
     }
+    this.responseCreateController.handleInputEvent(event);
 
     this.interruptionController.handleProviderEvent(event);
     if (event.type === "response.created") {
-      this.handleResponseCreated(event);
+      this.responseCreateController.handleResponseCreated(event);
     } else if (
       (event.type === "response.done" || event.type === "response.cancelled") &&
       responseWasInProgress
     ) {
-      this.handleResponseTerminal(terminalResponseId);
-      this.flushPendingResponseCreate();
+      this.responseCreateController.handleResponseTerminal(terminalResponseId);
+      this.responseCreateController.flush();
     }
-  }
-
-  private handleResponseCreated(event: OpenAIWebRtcEvent): void {
-    const origin = getResponseCreatedOrigin(event);
-    if (origin.kind !== "manual") return;
-
-    const barrier = this.manualResponseCreateBarrier;
-    if (!barrier || barrier.marker !== origin.marker) return;
-    if (barrier.responseId === null) {
-      barrier.responseId = origin.responseId;
-    }
-  }
-
-  private handleCommittedInput(event: OpenAIWebRtcEvent): void {
-    const itemId = getCommittedInputItemId(event);
-    if (!itemId || this.committedInputItemIds.has(itemId)) return;
-    // A 60-minute Realtime session cannot legitimately need this many turns.
-    // Fail closed instead of evicting an ID and risking duplicate generation.
-    if (this.committedInputItemIds.size >= MAX_COMMITTED_INPUT_ITEM_IDS) return;
-
-    this.committedInputItemIds.add(itemId);
-    this.serverVadInputPending = false;
-    if (this.pendingResponseCreate) {
-      this.flushPendingResponseCreate();
-      return;
-    }
-    this.sendResponseCreate({ type: "response.create" });
-  }
-
-  private handleResponseTerminal(responseId: string | undefined): void {
-    if (!responseId) return;
-    if (this.manualResponseCreateBarrier?.responseId === responseId) {
-      this.manualResponseCreateBarrier = null;
-    }
-  }
-
-  private recordSpeechStarted(): void {
-    if (this.currentSpeechSegmentStartMs === null) {
-      this.currentSpeechSegmentStartMs = this.getRelativeSessionTimeMs();
-    }
-  }
-
-  private recordSpeechStopped(): void {
-    if (this.currentSpeechSegmentStartMs === null) return;
-    const endMs = this.getRelativeSessionTimeMs();
-    const durationMs = Math.max(0, endMs - this.currentSpeechSegmentStartMs);
-    if (durationMs > 200) {
-      this.speechSegments.push({
-        startMs: this.currentSpeechSegmentStartMs,
-        endMs,
-        durationMs,
-      });
-      this.totalSpeakingMs += durationMs;
-    }
-    this.currentSpeechSegmentStartMs = null;
-  }
-
-  private finalizeSpeechSegment(sessionEndMs: number): void {
-    if (this.currentSpeechSegmentStartMs === null) return;
-    const durationMs = Math.max(
-      0,
-      sessionEndMs - this.currentSpeechSegmentStartMs,
-    );
-    if (durationMs > 200) {
-      this.speechSegments.push({
-        startMs: this.currentSpeechSegmentStartMs,
-        endMs: sessionEndMs,
-        durationMs,
-      });
-      this.totalSpeakingMs += durationMs;
-    }
-    this.currentSpeechSegmentStartMs = null;
-  }
-
-  private getRelativeSessionTimeMs(): number {
-    return this.sessionStartTime
-      ? Math.max(0, Date.now() - this.sessionStartTime)
-      : 0;
   }
 
   private rememberOpenAiLifecycleId(
@@ -904,26 +654,6 @@ export class OpenAIWebRtcSession {
     if (store.size >= 4_096) return false;
     store.set(value, correlation);
     return true;
-  }
-
-  private warnConnectStage(
-    stage: ConnectErrorStage | "broker_request_started" | "broker_response",
-    error?: unknown,
-  ): void {
-    const value =
-      error && typeof error === "object"
-        ? (error as { name?: unknown; code?: unknown; message?: unknown })
-        : undefined;
-    try {
-      console.warn({
-        stage,
-        name: typeof value?.name === "string" ? value.name : undefined,
-        code: typeof value?.code === "string" ? value.code : undefined,
-        message: getSafeConnectDiagnosticMessage(value?.message),
-      });
-    } catch {
-      // Observability must never block connect failure handling.
-    }
   }
 
   private setState(state: OpenAIWebRtcState): void {
@@ -1181,9 +911,14 @@ export class OpenAIWebRtcSession {
       return this.brokerDeletePromise;
     }
 
-    this.brokerDeletePromise = this.deleteBrokerCall(
-      this.brokerCleanupOutcome,
-    ).then(
+    this.brokerDeletePromise = deleteOpenAIWebRtcBrokerCallWithTimeout({
+      fetch: this.deps.fetch,
+      brokerHttpBaseUrl: this.config.brokerHttpBaseUrl,
+      sessionId: this.config.sessionId,
+      accessToken: this.config.accessToken,
+      outcome: this.brokerCleanupOutcome,
+      timeoutMs: this.deleteTimeoutMs,
+    }).then(
       () => {
         this.brokerCallDeleted = true;
         try {
@@ -1201,187 +936,21 @@ export class OpenAIWebRtcSession {
     return this.brokerDeletePromise;
   }
 
-  private async deleteBrokerCall(
-    outcome?: OpenAIWebRtcCallOutcome,
-  ): Promise<void> {
-    const controller = new AbortController();
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const timeout = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        controller.abort();
-        reject(new Error("OpenAI WebRTC cleanup timed out."));
-      }, this.deleteTimeoutMs);
-    });
-
-    try {
-      await Promise.race([
-        deleteOpenAIWebRtcBrokerCall({
-          fetch: this.deps.fetch,
-          brokerHttpBaseUrl: this.config.brokerHttpBaseUrl,
-          sessionId: this.config.sessionId,
-          accessToken: this.config.accessToken,
-          outcome,
-          signal: controller.signal,
+  private finalizeRecording(): Promise<void> {
+    return finalizeOpenAIWebRtcRecording({
+      graph: this.recordingGraph,
+      deps: this.deps,
+      buildMetrics: (volumeSamples) =>
+        this.metricsTracker.build({
+          volumeSamples,
+          interruptionCount: this.interruptionController.interruptionCount,
         }),
-        timeout,
-      ]);
-    } finally {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    }
-  }
-
-  private async finalizeRecording(): Promise<void> {
-    const graph = this.recordingGraph;
-    let result: OpenAIWebRtcRecordingResult;
-    try {
-      result = graph
-        ? await graph.stop()
-        : { fullBlob: null, agentBlob: null, recordingError: null };
-    } catch (error) {
-      result = {
-        fullBlob: null,
-        agentBlob: null,
-        recordingError:
-          error instanceof Error
-            ? error
-            : new Error("WebRTC recording stop failed."),
-      };
-    }
-    const url = graph?.createFullObjectUrl(result.fullBlob) ?? null;
-    const metrics = this.buildSessionMetrics();
-    let callbackResult: { retainObjectUrl?: boolean } | void = undefined;
-    let callbackTimedOut = false;
-    let callbackTimedOutWithPageOwner = false;
-
-    if (this.deps.onRecordingComplete) {
-      const timeoutMarker = Symbol("recording-callback-timeout");
-      const callbackPromise = Promise.resolve().then(() =>
-        this.deps.onRecordingComplete!(
-          url,
-          result.fullBlob,
-          result.agentBlob,
-          metrics,
-          graph && !result.recordingError ? "ready" : "failed",
-        ),
-      );
-      // A callback may finish after the bounded lifecycle wait and publish a
-      // fallback owner. Keep the URL alive until that callback settles; the
-      // continuation below performs the eventual single ownership decision.
-      void callbackPromise.then(
-        (lateResult) => {
-          if (!callbackTimedOut) return;
-          // The page owner is responsible for abandonment after navigation.
-          // If it already released this URL, the late callback must not revoke
-          // the same URL a second time.
-          if (callbackTimedOutWithPageOwner && !this.isObjectUrlRetained(url)) {
-            return;
-          }
-          this.reconcileObjectUrl(url, lateResult, graph);
-        },
-        () => {
-          if (!callbackTimedOut) return;
-          this.notifyError(new Error("WebRTC recording callback failed."));
-          if (callbackTimedOutWithPageOwner && !this.isObjectUrlRetained(url)) {
-            return;
-          }
-          this.reconcileObjectUrl(url, undefined, graph);
-        },
-      );
-
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
-      try {
-        callbackResult = await Promise.race([
-          callbackPromise,
-          new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(
-              () => reject(timeoutMarker),
-              RECORDING_CALLBACK_TIMEOUT_MS,
-            );
-          }),
-        ]);
-      } catch (error) {
-        if (error === timeoutMarker) {
-          callbackTimedOut = true;
-          callbackTimedOutWithPageOwner = this.isObjectUrlRetained(url);
-          this.notifyError(new Error("WebRTC recording callback timed out."));
-        } else {
-          callbackResult = { retainObjectUrl: true };
-          this.notifyError(
-            error instanceof Error
-              ? error
-              : new Error("WebRTC recording callback failed."),
-          );
-        }
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-      }
-      if (callbackTimedOut) return;
-    }
-
-    this.reconcileObjectUrl(url, callbackResult, graph);
-  }
-
-  private isObjectUrlRetained(url: string | null): boolean {
-    if (!url) return false;
-    try {
-      return this.deps.isObjectUrlRetained?.(url) === true;
-    } catch {
-      return false;
-    }
-  }
-
-  private reconcileObjectUrl(
-    url: string | null,
-    callbackResult: { retainObjectUrl?: boolean } | void,
-    graph: OpenAIWebRtcRecordingGraph | null,
-  ): void {
-    const retainedByOwner =
-      callbackResult?.retainObjectUrl === true && this.isObjectUrlRetained(url);
-    if (!retainedByOwner) graph?.revokeObjectUrl(url);
-  }
-
-  private buildSessionMetrics(): SessionMetrics {
-    const sessionDurationMs = this.sessionStartTime
-      ? Math.max(0, Date.now() - this.sessionStartTime)
-      : 0;
-    this.finalizeSpeechSegment(sessionDurationMs);
-    this.holdTracker = finalizeActiveHold(this.holdTracker, sessionDurationMs);
-    const volumeSamples = this.recordingGraph?.getVolumeSamples() ?? [];
-    return {
-      speechSegments: this.speechSegments,
-      totalSpeakingMs: this.totalSpeakingMs,
-      totalSilenceMs: Math.max(0, sessionDurationMs - this.totalSpeakingMs),
-      deadAirCount: 0,
-      interruptionCount: this.interruptionController.interruptionCount,
-      volumeSamples,
-      volumeConsistency: calculateRecordingVolumeConsistency(volumeSamples),
-      inputTranscriptionChunks: [],
-      sessionDurationMs,
-      hold: summarizeHoldMetrics(this.holdTracker),
-    };
-  }
-
-  private createRemoteStream(
-    tracks: OpenAIWebRtcTrackLike[],
-  ): OpenAIWebRtcStreamLike {
-    if (this.deps.mediaStreamFactory) {
-      return this.deps.mediaStreamFactory(tracks);
-    }
-    if (typeof MediaStream === "undefined") {
-      throw new Error("Browser MediaStream is unavailable.");
-    }
-    return new MediaStream(
-      tracks as unknown as MediaStreamTrack[],
-    ) as unknown as OpenAIWebRtcStreamLike;
+      onError: (error) => this.notifyError(error),
+    });
   }
 
   private invalidateResponseCreateBarriers(): void {
-    this.pendingResponseCreate = null;
-    this.manualResponseCreateBarrier = null;
-    this.serverVadInputPending = false;
-    this.committedInputItemIds.clear();
+    this.responseCreateController.shutdown();
   }
 
   private async cleanupResources(): Promise<void> {

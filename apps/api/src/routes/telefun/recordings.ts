@@ -18,6 +18,9 @@ import {
   isWebRtcScoringReady,
 } from "../../services/telefun-scoring-service";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
+import { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
+
+export { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
 
 type Variables = { user: User; profile: any };
 
@@ -103,26 +106,6 @@ function cachedScoringResponse(session: {
     },
     cached: true as const,
   };
-}
-
-export function buildTelefunFeedbackSummary(
-  assessment: VoiceQualityAssessment,
-): string {
-  const voiceParts = [
-    assessment.speakingRate?.feedback,
-    assessment.intonation?.feedback,
-    assessment.articulation?.feedback,
-    assessment.fillerWords?.feedback,
-    assessment.emotionalTone?.feedback,
-  ]
-    .filter(Boolean)
-    .slice(0, 3);
-  const holdFeedback =
-    assessment.holdManagement?.status &&
-    assessment.holdManagement.status !== "not_used"
-      ? assessment.holdManagement.feedback
-      : null;
-  return [...voiceParts, holdFeedback].filter(Boolean).join("\n\n");
 }
 
 telefunRecordings.post(

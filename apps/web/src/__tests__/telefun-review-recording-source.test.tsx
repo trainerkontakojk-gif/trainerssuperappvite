@@ -56,7 +56,10 @@ describe("ReviewModal recording source", () => {
       <ReviewModal
         isOpen
         onClose={vi.fn()}
-        record={{ ...baseRecord, recordingPath: "user/session/full_call.seekable.webm" }}
+        record={{
+          ...baseRecord,
+          recordingPath: "user/session/full_call.seekable.webm",
+        }}
       />,
     );
 
@@ -64,11 +67,26 @@ describe("ReviewModal recording source", () => {
   });
 
   it("keeps the local blob fallback when no persistent path exists", async () => {
-    render(
-      <ReviewModal isOpen onClose={vi.fn()} record={baseRecord} />,
-    );
+    render(<ReviewModal isOpen onClose={vi.fn()} record={baseRecord} />);
 
     await waitFor(() => expect(mocks.getRecording).not.toHaveBeenCalled());
+  });
+
+  it("renders projected feedback for a terminal OpenAI WebRTC history record", () => {
+    render(
+      <ReviewModal
+        isOpen
+        onClose={vi.fn()}
+        record={{
+          ...baseRecord,
+          telefunTransport: "openai-webrtc",
+          feedback: "Tempo stabil.\n\nArtikulasi jelas.",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Feedback")).toBeDefined();
+    expect(screen.getByText(/Tempo stabil/)).toBeDefined();
   });
 
   it("loads replay data only after the replay tab is opened", async () => {

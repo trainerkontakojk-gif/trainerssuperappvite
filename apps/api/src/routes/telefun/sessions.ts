@@ -19,6 +19,7 @@ import {
   type TelefunTransport,
 } from "@trainers/types";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
+import { enrichTelefunHistoryFeedback } from "../../lib/telefun-feedback";
 
 type Variables = { user: User; profile: any };
 
@@ -241,7 +242,10 @@ telefunSessions.get("/sessions", async (c) => {
 
     const { data, error } = await query;
     if (error) throw error;
-    return c.json({ success: true, data: data ?? [] });
+    return c.json({
+      success: true,
+      data: (data ?? []).map(enrichTelefunHistoryFeedback),
+    });
   } catch (error: any) {
     return c.json(
       {
@@ -714,7 +718,10 @@ telefunSessions.get("/history/:id", async (c) => {
       );
     }
 
-    return c.json({ success: true, data });
+    return c.json({
+      success: true,
+      data: enrichTelefunHistoryFeedback(data),
+    });
   } catch (error: any) {
     return c.json(
       {

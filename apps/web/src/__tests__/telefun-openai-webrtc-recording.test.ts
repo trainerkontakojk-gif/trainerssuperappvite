@@ -214,6 +214,51 @@ describe("OpenAI WebRTC recording graph", () => {
     },
   );
 
+  it("builds final metrics after recorder stop flushes the last volume samples", async () => {
+    let volumeSamples: number[] = [];
+    const graph = {
+      stop: vi.fn(async () => {
+        volumeSamples = [42];
+        return {
+          fullBlob: null,
+          agentBlob: null,
+          recordingError: null,
+        };
+      }),
+      createFullObjectUrl: vi.fn(() => null),
+      revokeObjectUrl: vi.fn(),
+      getVolumeSamples: vi.fn(() => volumeSamples),
+    };
+    const onRecordingComplete = vi.fn<
+      NonNullable<OpenAIWebRtcDependencies["onRecordingComplete"]>
+    >(async () => undefined);
+    const session = new OpenAIWebRtcSession(
+      {
+        sessionId: SESSION_ID,
+        accessToken: "token",
+        brokerHttpBaseUrl: "https://broker.example",
+      },
+      {
+        RTCPeerConnection:
+          class {} as unknown as OpenAIWebRtcDependencies["RTCPeerConnection"],
+        fetch: vi.fn(),
+        mediaDevices: { getUserMedia: vi.fn() },
+        audioElement: { srcObject: null, play: vi.fn() },
+        onRecordingComplete,
+      },
+    );
+    Object.assign(session, { recordingGraph: graph });
+
+    await (
+      session as unknown as { finalizeRecording: () => Promise<void> }
+    ).finalizeRecording();
+
+    expect(graph.stop).toHaveBeenCalledOnce();
+    expect(onRecordingComplete.mock.calls[0][3]).toMatchObject({
+      volumeSamples: [42],
+    });
+  });
+
   it("does not revoke before a slow recording callback can publish its fallback owner", async () => {
     vi.useFakeTimers();
     let resolveCallback!: () => void;

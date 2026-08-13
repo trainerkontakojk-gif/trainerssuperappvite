@@ -222,8 +222,9 @@ export default function TelefunLanding() {
       await saveTelefunSettings(newSettings);
       setSettings(newSettings);
       notify.success("Pengaturan Telefun berhasil disimpan");
-    } catch {
+    } catch (error) {
       notify.error("Gagal menyimpan pengaturan");
+      throw error;
     }
   };
 

@@ -493,37 +493,36 @@ describe("PDKT scenario wizard", () => {
   it("preserves normalized OJK recipients through the three-stage wizard and outer save", async () => {
     const user = userEvent.setup();
     const { onSave } = renderModal();
-    await user.click(
+    fireEvent.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
     await completeScenarioStage(user);
-    await user.click(screen.getByRole("button", { name: "Lanjut" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lanjut" }));
 
-    await user.selectOptions(screen.getByLabelText(/Penerima Utama/), "ojk");
-    await user.selectOptions(
-      screen.getByLabelText(/Mode Penerima/),
-      "multiple",
-    );
-    await user.click(screen.getByRole("button", { name: "Tambah alamat" }));
-    expect(
-      screen.getByRole("textbox", { name: "Alamat email tambahan 1" }),
-    ).toBeDefined();
-    await user.type(
-      screen.getByPlaceholderText("alamat.tujuan@domain.com"),
-      "Compliance@Example.com",
-    );
-    await user.click(screen.getByRole("button", { name: "Tambah alamat" }));
-    expect(
-      screen.getByRole("textbox", { name: "Alamat email tambahan 2" }),
-    ).toBeDefined();
-    const recipientInputs = screen.getAllByPlaceholderText(
-      "alamat.tujuan@domain.com",
-    );
-    await user.type(recipientInputs[1], "audit@example.com");
+    fireEvent.change(screen.getByLabelText(/Penerima Utama/), {
+      target: { value: "ojk" },
+    });
+    fireEvent.change(screen.getByLabelText(/Mode Penerima/), {
+      target: { value: "multiple" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tambah alamat" }));
+    const firstRecipient = screen.getByRole("textbox", {
+      name: "Alamat email tambahan 1",
+    });
+    fireEvent.change(firstRecipient, {
+      target: { value: "Compliance@Example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tambah alamat" }));
+    const secondRecipient = screen.getByRole("textbox", {
+      name: "Alamat email tambahan 2",
+    });
+    fireEvent.change(secondRecipient, {
+      target: { value: "audit@example.com" },
+    });
 
-    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
+    fireEvent.click(screen.getByRole("button", { name: "Buat Skenario" }));
     expect(screen.queryByRole("button", { name: "Buat Skenario" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Simpan Perubahan" }));
 
     expect(onSave).toHaveBeenCalledTimes(1);
     const savedSettings = onSave.mock.calls[0][0];
@@ -591,16 +590,15 @@ describe("PDKT scenario wizard", () => {
   it("keeps invalid recipient validation visible and focused on final save", async () => {
     const user = userEvent.setup();
     renderModal();
-    await user.click(
+    fireEvent.click(
       screen.getByRole("button", { name: /tambah skenario baru/i }),
     );
     await reachEmailStage(user);
-    await user.click(screen.getByRole("button", { name: /tambah alamat/i }));
-    await user.type(
-      screen.getByPlaceholderText("alamat.tujuan@domain.com"),
-      "bad",
-    );
-    await user.click(screen.getByRole("button", { name: "Buat Skenario" }));
+    fireEvent.click(screen.getByRole("button", { name: /tambah alamat/i }));
+    fireEvent.change(screen.getByPlaceholderText("alamat.tujuan@domain.com"), {
+      target: { value: "bad" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Buat Skenario" }));
     expect(screen.getByText(/format email tidak valid/i)).toBeDefined();
     expect(
       screen.getByPlaceholderText("alamat.tujuan@domain.com"),
