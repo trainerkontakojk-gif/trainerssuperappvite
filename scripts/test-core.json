@@ -28,5 +28,21 @@
       "src/__tests__/pdkt.test.ts",
       "src/__tests__/monitoring-history-delete-migration.test.ts"
     ]
+  },
+  "telefun": {
+    "config": null,
+    "files": [
+      "src/__tests__/usage-modality.test.ts",
+      "src/__tests__/openai-usage-migration.test.ts",
+      "src/providers/OpenAIRealtimeAdapter.test.ts",
+      "src/providers/GeminiLiveAdapter.test.ts",
+      "src/providers/provider-router.test.ts",
+      "src/providers/openai-realtime-event-observer.test.ts",
+      "src/providers/openai-realtime-tool-coordinator.test.ts",
+      "src/realtime-webrtc/contracts.test.ts",
+      "src/realtime-webrtc/phase4-durable-contract.test.ts",
+      "src/realtime-webrtc/phase5-production-hardening.test.ts",
+      "src/realtime-webrtc/broker-auth.test.ts"
+    ]
   }
 }

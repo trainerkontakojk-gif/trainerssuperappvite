@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:targeted": "vitest run --changed",
     "test:core": "node ../../scripts/test-core.mjs api",
-    "test:fast": "vitest run",
+    "test:fast": "node ../../scripts/test-core.mjs api fast",
     "test:full": "vitest run",
     "test:db-integration": "vitest run --config vitest.config.db-integration.ts",
     "lint": "eslint .",

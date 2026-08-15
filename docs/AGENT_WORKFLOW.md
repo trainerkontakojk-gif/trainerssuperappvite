@@ -191,7 +191,7 @@ pnpm build
 git diff --check
 ```
 
-Expected evidence is lint success, curated core tests (including Web `.tsx` entries under the default config and the current Telefun core/full suite), production build success, and a clean final diff check. Full `pnpm test`/`pnpm test:full` is a pre-merge/release product gate, not required solely for docs/config-only work.
+Expected evidence is lint success, curated core tests (including Web `.tsx` entries under the default config and the Telefun curated core list), production build success, and a clean final diff check. Full `pnpm test`/`pnpm test:full` is a pre-merge/release product gate, not required solely for docs/config-only work. The `test:fast` unit sweep is curated in `scripts/test-fast.json` (append new light unit tests there); heavy integration-style files run only in the full suite.
 
 Any verification failure is unresolved until independently explained; do not weaken a gate or change unrelated product code to make it pass.
 
