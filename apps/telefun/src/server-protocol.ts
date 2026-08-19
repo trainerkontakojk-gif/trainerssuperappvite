@@ -9,7 +9,18 @@ import {
 // Bound untrusted prompt text before it is ever handed to a provider adapter.
 // The limit is measured in JavaScript string code units and intentionally keeps
 // normal Telefun prompts while rejecting unexpectedly large control frames.
-export const TELEFUN_MAX_INSTRUCTIONS_LENGTH = 16_000;
+//
+// Evidence (2026-07, production bug 4002 invalid_instructions on Railway):
+// - A realistic maximum-size scenario (300-line script, all challenge types,
+//   realistic pacing) measures 27,032 chars (orchestrator fixture) and
+//   34,717 chars (re-verified in apps/web telefun-prompt-builder.test.ts).
+// - The stale 16,000-char limit predated builder growth (commits 16a9510,
+//   4f70945, 86c3ab5) and rejected real Gemini sessions server-side.
+// - No provider-side instruction limit for Gemini Live / OpenAI Realtime is
+//   documented in-repo; 48,000 is our own untrusted-input bound, chosen ~38%
+//   above the measured realistic maximum to absorb longer scripts and future
+//   builder growth without another production outage.
+export const TELEFUN_MAX_INSTRUCTIONS_LENGTH = 48_000;
 
 export type TelefunConfigureErrorReason =
   | "invalid_envelope"

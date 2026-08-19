@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   POC_TRANSPORT,
+  POC_MAX_INSTRUCTIONS_LENGTH,
   TELEFUN_OPENAI_WEBRTC_MODEL_IDS,
   DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
   assertTelefunWebRtcModelId,
@@ -26,6 +27,43 @@ describe("OpenAI WebRTC contracts — validated model flows", () => {
     "TINGKAT KESULITAN: Hard",
     "EMOSI: MARAH/KESAL. Nada tinggi dan cepat. PROFIL LENGKAP: Konsumen sangat marah dan menuntut solusi.",
   ].join("\n");
+
+// Realistic dialogue pool mirroring the long scenario fixture in
+// apps/web/src/__tests__/telefun-prompt-builder.test.ts (300-line scripts
+// build ~27k-35k chars; re-verified web harness fixture: 34,717).
+const LONG_SCRIPT_LINES = [
+  "Agent: Selamat siang Ibu, terima kasih sudah menunggu. Dengan Ibu Siti, betul?",
+  "Konsumen: Iya benar. Ini soal tagihan KPR saya, kok tiba-tiba mau dilelang?",
+  "Agent: Mohon maaf Ibu. Saya cek dulu data pembayarannya, mohon tunggu sebentar.",
+  "Konsumen: Saya tunggu, tapi tolong jelaskan kenapa surat peringatan baru terima sekarang.",
+  "Agent: Terima kasih sudah menunggu. Saya lihat tunggakan enam bulan terakhir, betul?",
+  "Konsumen: Usaha saya terdampak, toko tutup dua bulan. Saya minta restrukturisasi.",
+  "Agent: Baik Ibu, saya catat permohonannya. Tim kredit akan menghubungi maksimal tiga hari.",
+  "Konsumen: Tiga hari itu lama. Saya butuh surat bahwa lelang ditunda sementara.",
+  "Agent: Penundaan lelang bisa diajukan, tapi keputusannya tetap di komite kredit Ibu.",
+  "Konsumen: Saya mau kepastian tertulis, jangan cuma janji lewat telepon seperti kemarin.",
+  "Agent: Boleh Ibu, cabang buka pukul delapan. Bawa dokumen usaha dan laporan keuangan.",
+  "Konsumen: Dokumen saya siapkan. Tolong kasih nomor referensi supaya tidak hilang.",
+  "Konsumen: Saya tunggu kabar baiknya. Jangan sampai cuma janji manis seperti kemarin.",
+] as const;
+
+function buildLongWebRtcPrompt(lineCount: number): string {
+  const script = Array.from(
+    { length: lineCount },
+    (_, index) => LONG_SCRIPT_LINES[index % LONG_SCRIPT_LINES.length],
+  ).join("\n");
+  return [canonicalPrompt, "SKRIP PERCAKAPAN:", script].join("\n");
+}
+
+function canonicalPromptOfExactLength(length: number): string {
+  const full = buildLongWebRtcPrompt(600);
+  if (full.length < length) {
+    throw new Error(`fixture too short to build a ${length}-char prompt`);
+  }
+  // Required sections live at the top, so trimming the script tail keeps
+  // the canonical shape valid while fixing the exact boundary length.
+  return full.slice(0, length);
+}
 
   it("keeps the exact registry-derived WebRTC model set with an explicit Full-only default", () => {
     expect(TELEFUN_OPENAI_WEBRTC_MODEL_IDS).toEqual([
@@ -148,6 +186,46 @@ describe("OpenAI WebRTC contracts — validated model flows", () => {
       ).toThrow("canonical Telefun prompt");
     },
   );
+
+  it("keeps a realistic maximum-size builder prompt within the WebRTC instruction contract", () => {
+    // Same evidence as the WS path: a 410-line scenario script builds
+    // ~34.9k chars here (web harness re-verification: 34,717) — far above
+    // the stale 16k POC limit, so long sessions would be rejected at
+    // build time the moment the cohort opens.
+    const prompt = buildLongWebRtcPrompt(410);
+
+    expect(prompt.length).toBeGreaterThan(34_000);
+    expect(prompt.length).toBeLessThanOrEqual(POC_MAX_INSTRUCTIONS_LENGTH);
+    expect(() =>
+      buildCanonicalWebRtcSession("gpt-realtime-2.1-mini", prompt),
+    ).not.toThrow();
+  });
+
+  it("accepts instructions exactly at the expanded 48,000-char limit", () => {
+    expect(() =>
+      buildCanonicalWebRtcSession(
+        "gpt-realtime-2.1-mini",
+        canonicalPromptOfExactLength(48_000),
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects instructions one char above the 48,000-char limit", () => {
+    expect(() =>
+      buildCanonicalWebRtcSession(
+        "gpt-realtime-2.1-mini",
+        canonicalPromptOfExactLength(48_001),
+      ),
+    ).toThrow("too long");
+  });
+
+  it("keeps the limit comfortably above the measured realistic builder maximum (~35k chars)", () => {
+    // Production bug (WS path): realistic 300-line scenario scripts build
+    // ~27k-35k chars (orchestrator fixture: 27,032; re-verified web harness
+    // fixture: 34,717), above the stale 16k limit. The WebRTC POC limit
+    // must stay at least as high as the raised WS contract.
+    expect(POC_MAX_INSTRUCTIONS_LENGTH).toBeGreaterThanOrEqual(48_000);
+  });
 
   it("accepts a bounded raw SDP offer and UUID path only", () => {
     expect(parseSessionId("019f45e3-5fac-7cd2-afeb-8069c2f813b3")).toBe(

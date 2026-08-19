@@ -3,10 +3,52 @@ import {
   buildTelefunLiveSystemInstruction,
   getTimeCueInstruction,
 } from "../routes/telefun/services/promptBuilder";
+// Server validation contract owned by apps/telefun/src/server-protocol.ts
+// (TELEFUN_MAX_INSTRUCTIONS_LENGTH). Imported directly because the web
+// package does not depend on @trainers/telefun.
+import { TELEFUN_MAX_INSTRUCTIONS_LENGTH } from "../../../telefun/src/server-protocol.js";
 import {
   ConsumerDifficulty,
   type TelefunConsumerType,
 } from "../routes/telefun/telefunSettings";
+
+const LONG_SCENARIO_SCRIPT_LINES = [
+  "Agent: Selamat siang Ibu, terima kasih sudah menunggu. Dengan Ibu Siti, betul?",
+  "Konsumen: Iya benar. Ini soal tagihan KPR saya, kok tiba-tiba mau dilelang?",
+  "Agent: Mohon maaf Ibu. Saya cek dulu data pembayarannya, mohon tunggu sebentar.",
+  "Konsumen: Saya tunggu, tapi tolong jelaskan kenapa surat peringatan baru terima sekarang.",
+  "Agent: Terima kasih sudah menunggu. Saya lihat tunggakan enam bulan terakhir, betul?",
+  "Konsumen: Usaha saya terdampak, toko tutup dua bulan. Saya minta restrukturisasi.",
+  "Agent: Baik Ibu, saya catat permohonannya. Tim kredit akan menghubungi maksimal tiga hari.",
+  "Konsumen: Tiga hari itu lama. Saya butuh surat bahwa lelang ditunda sementara.",
+  "Agent: Penundaan lelang bisa diajukan, tapi keputusannya tetap di komite kredit Ibu.",
+  "Konsumen: Saya mau kepastian tertulis, jangan cuma janji lewat telepon seperti kemarin.",
+  "Agent: Boleh Ibu, cabang buka pukul delapan. Bawa dokumen usaha dan laporan keuangan.",
+  "Konsumen: Dokumen saya siapkan. Tolong kasih nomor referensi supaya tidak hilang.",
+  "Agent: Nomor referensinya 882311, saya kirim SMS setelah telepon ini selesai.",
+  "Konsumen: Baik saya catat. Bunga penalti keterlambatan dihitung dari tanggal kapan?",
+  "Agent: Penalti dihitung sejak jatuh tempo tiap angsuran, rinciannya saya emailkan.",
+  "Konsumen: Jangan email saja, jelaskan sekarang singkat supaya saya paham dulu.",
+  "Agent: Baik Ibu. Penalti dua persen per bulan dari pokok angsuran yang tertunggak.",
+  "Konsumen: Dua persen per bulan besar sekali. Kalau lunasi sebagian, bunganya turun?",
+  "Agent: Bunga dihitung dari sisa tunggakan, jadi pelunasan sebagian mengurangi bunga.",
+  "Konsumen: Syukur. Saya setor minggu depan, sisanya menyusul setelah usaha jalan.",
+  "Awal: Konsumen membuka dengan nada kesal, langsung menyebut surat peringatan.",
+  "Jika agen tanya penyebab tunggakan: toko tutup dua bulan, lalu rinci usaha singkat.",
+  "Jika agen tawarkan restrukturisasi: tanyakan skema, jangka waktu, dan biaya admin.",
+  "Jika agen minta dokumen: sebut punya laporan keuangan, tanyakan cara mengirimnya.",
+  "Jika agen janji telepon balik: minta nomor referensi dan batas waktu yang jelas.",
+  "Setelah dapat nomor referensi: ulangi nomornya pelan untuk memastikan benar.",
+  "Akhir: Konsumen menutup dengan nada tenang, minta konfirmasi tertulis via SMS.",
+  "Konsumen: Saya tunggu kabar baiknya. Jangan sampai cuma janji manis seperti kemarin.",
+] as const;
+
+function buildLongScenarioScript(): string {
+  const lines = Array.from({ length: 300 }, (_, index) => {
+    return LONG_SCENARIO_SCRIPT_LINES[index % LONG_SCENARIO_SCRIPT_LINES.length];
+  });
+  return lines.join("\n");
+}
 
 function makeConsumerType(
   overrides: Partial<TelefunConsumerType> = {},
@@ -674,6 +716,50 @@ describe("buildTelefunLiveSystemInstruction", () => {
       responsePacingMode: "realistic",
     });
     expect(prompt).not.toContain("SKRIP PERCAKAPAN");
+  });
+
+  it("keeps a realistic maximum-size scenario within the server instruction contract", () => {
+    const prompt = buildTelefunLiveSystemInstruction({
+      identity: {
+        name: "Siti Rahayu",
+        gender: "female",
+        phone: "081234567890",
+        city: "Bandung",
+        voiceName: "Kore",
+        signatureName: "",
+      },
+      scenario: {
+        id: "kpr-bermasalah",
+        title: "KPR bermasalah: tunggakan dan ancaman lelang",
+        instruction:
+          "Konsumen menunggak enam bulan KPR karena usaha terdampak, menolak lelang, dan minta restrukturisasi yang jelas.",
+        script: buildLongScenarioScript(),
+        isActive: true,
+      },
+      consumerType: makeConsumerType({
+        id: "marah",
+        name: "Marah & Emosional",
+        description:
+          "Marah, tidak sabar, dan menuntut kepastian tertulis atas restrukturisasi KPR.",
+        difficulty: ConsumerDifficulty.Hard,
+      }),
+      responsePacingMode: "realistic",
+      simulationChallengeTypes: [
+        "technical_term_confusion",
+        "repeated_question",
+        "misunderstanding",
+        "interruption",
+        "incomplete_data",
+        "unclear_voice",
+        "emotional_escalation",
+      ],
+    });
+
+    // Regression for production bug: Railway telefun closed real sessions
+    // with 4002 invalid_instructions because a 300-line scenario script
+    // built ~27k-35k chars (re-verified here: 34,717), above the stale 16k
+    // server limit. The built prompt must always fit the server contract.
+    expect(prompt.length).toBeLessThanOrEqual(TELEFUN_MAX_INSTRUCTIONS_LENGTH);
   });
 });
 

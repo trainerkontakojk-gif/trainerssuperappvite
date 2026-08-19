@@ -33,7 +33,20 @@ export const POC_MALE_VOICE = "cedar" as const;
 export const POC_TRANSPORT = "openai-webrtc" as const;
 export const POC_MAX_SDP_BYTES = 512 * 1024;
 export const POC_MAX_SDP_RESPONSE_BYTES = 512 * 1024;
-export const POC_MAX_INSTRUCTIONS_LENGTH = 16_000;
+// Bound untrusted prompt text before it is ever handed to the OpenAI WebRTC
+// provider adapter. Mirrors TELEFUN_MAX_INSTRUCTIONS_LENGTH in
+// server-protocol.ts (48_000) — the WebRTC path persists the SAME built
+// instructions (live_prompt_instructions) that the WS broker validates.
+//
+// Evidence (2026-07, production bug 4002 invalid_instructions on Railway,
+// WS path): a realistic maximum-size scenario (300-line script, all
+// challenge types, realistic pacing) measures 27,032 chars (orchestrator
+// fixture) and 34,717 chars (re-verified in apps/web
+// telefun-prompt-builder.test.ts). The stale 16,000-char limit predated
+// builder growth and rejected real sessions; 48,000 is our own
+// untrusted-input bound, ~38% above the measured realistic maximum to
+// absorb longer scripts and future builder growth.
+export const POC_MAX_INSTRUCTIONS_LENGTH = 48_000;
 export const POC_MAX_SESSION_JSON_BYTES = 65_536;
 
 export type CanonicalPocVoice = typeof POC_VOICE | typeof POC_MALE_VOICE;

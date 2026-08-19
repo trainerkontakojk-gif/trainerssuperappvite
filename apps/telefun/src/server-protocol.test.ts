@@ -107,6 +107,32 @@ describe("telefun proxy protocol", () => {
       });
     });
 
+    it("accepts instructions exactly at the expanded 48,000-char limit", () => {
+      expect(
+        parseTelefunSessionConfigure({
+          ...validGeminiConfigure,
+          instructions: "x".repeat(48_000),
+        }),
+      ).toMatchObject({ ok: true });
+    });
+
+    it("rejects instructions one char above the 48,000-char limit", () => {
+      expect(
+        parseTelefunSessionConfigure({
+          ...validGeminiConfigure,
+          instructions: "x".repeat(48_001),
+        }),
+      ).toEqual({ ok: false, reason: "invalid_instructions" });
+    });
+
+    it("keeps the limit comfortably above the measured realistic builder maximum (~35k chars)", () => {
+      // Production bug: realistic 300-line scenario scripts build ~27k-35k
+      // chars (orchestrator fixture: 27,032; re-verified web harness fixture:
+      // 34,717), above the stale 16k limit, so Railway telefun rejected real
+      // Gemini sessions with 4002 invalid_instructions.
+      expect(TELEFUN_MAX_INSTRUCTIONS_LENGTH).toBeGreaterThanOrEqual(48_000);
+    });
+
     it("accepts only the canonical OpenAI pair, voice, and 24 kHz rate", () => {
       expect(
         parseTelefunSessionConfigure({
