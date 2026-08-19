@@ -63,7 +63,6 @@ import {
 import { createWebRtcCallManager } from "./realtime-webrtc/call-manager.js";
 import { createOpenAiCallsClient } from "./realtime-webrtc/openai-calls-client.js";
 import { createSidebandClient } from "./realtime-webrtc/sideband-client.js";
-import { POC_MODEL_ID } from "./realtime-webrtc/contracts.js";
 import { createDistributedWebRtcLeaseCoordinator } from "./realtime-webrtc/distributed-lease.js";
 import { createOrphanCleanupWorker } from "./realtime-webrtc/orphan-cleanup.js";
 import {
@@ -149,12 +148,18 @@ const openAIWebRtcManager = createWebRtcCallManager({
         : {}),
     });
   },
-  flushUsage: async ({ usageRequestId, userId, aggregate, durationMs }) =>
+  flushUsage: async ({
+    usageRequestId,
+    userId,
+    aggregate,
+    durationMs,
+    modelId,
+  }) =>
     flushOpenAIRealtimeUsage(
       usageRequestId,
       userId,
       aggregate,
-      POC_MODEL_ID,
+      modelId,
       durationMs,
     ),
   auditFailedUsage: ({ usageRequestId, userId, modelId, errorMessage }) =>
@@ -206,6 +211,7 @@ const openAIWebRtcHandler = createOpenAIWebRtcHttpHandler({
     enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
     nodeEnv: env.NODE_ENV,
     allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+    allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
   },
   verifyToken,
   getProfile: getWebRtcProfile,

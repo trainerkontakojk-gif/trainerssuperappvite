@@ -11,6 +11,7 @@ import {
   FileDown,
 } from "lucide-react";
 import type { CallRecord } from "../types";
+import { getTelefunScoringStatusLabel } from "../types";
 import { notify } from "../../../lib/toast";
 import { telefunClient, unwrapResponse } from "../../../lib/api";
 
@@ -72,6 +73,17 @@ function exportToCSV(history: CallRecord[]) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+const SCORING_STATUS_ICONS: Record<
+  NonNullable<ReturnType<typeof getTelefunScoringStatusLabel>>["tone"],
+  React.ReactNode
+> = {
+  waiting: <Clock className="h-3 w-3 text-amber-500" aria-hidden />,
+  processing: <HistoryIcon className="h-3 w-3 text-sky-500 animate-pulse" aria-hidden />,
+  retryable: <Clock className="h-3 w-3 text-amber-500" aria-hidden />,
+  failed: <Trash2 className="h-3 w-3 text-red-500" aria-hidden />,
+  ready: <Eye className="h-3 w-3 text-emerald-500" aria-hidden />,
+};
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
   isOpen,
@@ -226,7 +238,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  {sortedHistory.map(rec => (
+                  {sortedHistory.map(rec => {
+                    const scoringLabel = getTelefunScoringStatusLabel(rec);
+                    return (
                     <motion.div
                       key={rec.id}
                       whileHover={{ scale: 1.01, backgroundColor: 'rgba(var(--foreground),0.03)' }}
@@ -243,6 +257,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                               {rec.consumerName} · {formatDate(rec.date)}
                               {rec.configuredDuration ? ` · Limit: ${rec.configuredDuration}m` : ''}
                             </p>
+                            {scoringLabel && (
+                              <p className="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                                {SCORING_STATUS_ICONS[scoringLabel.tone]}
+                                <span>{scoringLabel.text}</span>
+                              </p>
+                            )}
                           </div>
                         </div>
                         
@@ -283,7 +303,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

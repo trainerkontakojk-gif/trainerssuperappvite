@@ -18,7 +18,11 @@ import {
   isWebRtcScoringReady,
 } from "../../services/telefun-scoring-service";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
-import { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
+import {
+  buildTelefunFeedbackSummary,
+  buildTelefunHistoryScoringView,
+} from "../../lib/telefun-feedback";
+import type { TelefunHistoryScoringView } from "@trainers/types";
 
 export { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
 
@@ -83,7 +87,7 @@ function safeRecordingError(code: string): string {
 }
 
 const SCORING_STATE_SELECT =
-  "telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, score, voice_assessment";
+  "telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, scoring_attempt_count, scoring_next_attempt_at, score, voice_assessment";
 
 function readRpcBoolean(data: unknown): boolean | null {
   const value = Array.isArray(data) ? data[0] : data;
@@ -93,15 +97,24 @@ function readRpcBoolean(data: unknown): boolean | null {
 function cachedScoringResponse(session: {
   score?: number | null;
   voice_assessment?: unknown;
-}) {
+  scoring_status?: TelefunScoringStatus | null;
+  scoring_ready_at?: string | null;
+  scoring_next_attempt_at?: string | null;
+  scoring_attempt_count?: number | null;
+}): {
+  success: true;
+  data: TelefunHistoryScoringView & { assessment?: unknown };
+  cached: true;
+} {
   const assessment = session.voice_assessment
     ? (session.voice_assessment as VoiceQualityAssessment)
     : undefined;
+  const view = buildTelefunHistoryScoringView(session);
   return {
     success: true as const,
     data: {
-      score: session.score ?? 0,
-      feedback: assessment ? buildTelefunFeedbackSummary(assessment) : "",
+      ...view,
+      feedback: assessment ? buildTelefunFeedbackSummary(assessment) : null,
       assessment,
     },
     cached: true as const,

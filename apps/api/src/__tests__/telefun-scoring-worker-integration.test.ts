@@ -193,6 +193,82 @@ describe("Telefun scoring worker integration", () => {
     expect(stats.completed).toBe(1);
   });
 
+  it("stops admission when the abort signal fires between jobs (no new claim, no new AI call)", async () => {
+    const fetchSpy = vi.spyOn(scoringService, "fetchPendingJobs");
+    fetchSpy.mockResolvedValue([
+      { sessionId: "s1", userId: "u1" },
+      { sessionId: "s2", userId: "u1" },
+    ]);
+
+    const claimSpy = vi.spyOn(scoringService, "claimJob");
+    claimSpy.mockResolvedValue({ claimed: true });
+
+    const cacheSpy = vi.spyOn(scoringService, "checkCachedAssessment");
+    cacheSpy.mockResolvedValue(null);
+
+    const processSpy = vi.spyOn(scoringService, "processScoringJob");
+    const controller = new AbortController();
+    processSpy.mockImplementation(async () => {
+      // The shutdown signal arrives while the first job is being processed.
+      controller.abort();
+      return { success: true, status: "completed" };
+    });
+
+    const stats = await processNextBatch(undefined, { signal: controller.signal });
+
+    expect(stats.processed).toBe(1);
+    expect(processSpy).toHaveBeenCalledTimes(1);
+    // Job 2 is never claimed: admission stopped after the signal.
+    expect(claimSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("claims nothing when the signal is already aborted before the batch starts", async () => {
+    const fetchSpy = vi.spyOn(scoringService, "fetchPendingJobs");
+    fetchSpy.mockResolvedValue([{ sessionId: "s1", userId: "u1" }]);
+    const claimSpy = vi.spyOn(scoringService, "claimJob");
+    const processSpy = vi.spyOn(scoringService, "processScoringJob");
+
+    const controller = new AbortController();
+    controller.abort();
+    const stats = await processNextBatch(undefined, { signal: controller.signal });
+
+    expect(stats.processed).toBe(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(claimSpy).not.toHaveBeenCalled();
+    expect(processSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not trigger a second AI call when a reclaimed job already has a valid assessment (post-shutdown release path)", async () => {
+    // A worker released this claim during shutdown and exited; the next batch
+    // (same or new worker process) re-fetches and re-claims the row. The
+    // cached-assessment guard must prevent a second AI call for the completed row.
+    const fetchSpy = vi.spyOn(scoringService, "fetchPendingJobs");
+    fetchSpy.mockResolvedValue([{ sessionId: "s1", userId: "u1" }]);
+
+    const claimSpy = vi.spyOn(scoringService, "claimJob");
+    claimSpy.mockResolvedValue({ claimed: true });
+
+    const cacheSpy = vi.spyOn(scoringService, "checkCachedAssessment");
+    cacheSpy.mockResolvedValue({
+      overallScore: 8,
+      speakingRate: { score: 7, wordsPerMinute: 130, verdict: "Baik", feedback: "Ok" },
+      intonation: { score: 8, verdict: "Baik", feedback: "Ok" },
+      articulation: { score: 9, verdict: "Baik", feedback: "Ok" },
+      fillerWords: { score: 8, count: 0, examples: [], verdict: "Baik", feedback: "Ok" },
+      emotionalTone: { score: 7, dominant: "netral", verdict: "Baik", feedback: "Ok" },
+      transcript: "Test",
+      highlights: [],
+      strengths: [],
+    } as any);
+
+    const processSpy = vi.spyOn(scoringService, "processScoringJob");
+
+    const stats = await processNextBatch();
+
+    expect(stats.completed).toBe(1);
+    expect(processSpy).not.toHaveBeenCalled();
+  });
+
   it("processes rescheduled jobs with backoff", async () => {
     const fetchSpy = vi.spyOn(scoringService, "fetchPendingJobs");
     fetchSpy.mockResolvedValue([{ sessionId: "s1", userId: "u1" }]);

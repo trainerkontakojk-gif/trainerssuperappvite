@@ -7,6 +7,7 @@
       "src/__tests__/sidak-scoring-core.test.tsx",
       "src/__tests__/sidak-scoring-session.test.ts",
       "src/__tests__/telefun-session-finalizer.test.ts",
+      "src/__tests__/telefun-session-reconciliation.test.tsx",
       "src/__tests__/telefun-openai-webrtc-recovery.test.ts",
       "src/__tests__/telefun-communication-profile.test.tsx",
       "src/__tests__/pdkt-mailbox.test.tsx",
@@ -24,6 +25,7 @@
       "src/__tests__/telefun-routes.test.ts",
       "src/__tests__/telefun-phase5-hardening.test.ts",
       "src/__tests__/telefun-schema-contract.test.ts",
+      "src/__tests__/telefun-scoring-worker-runtime.test.ts",
       "src/__tests__/ketik-review-lifecycle.test.ts",
       "src/__tests__/pdkt.test.ts",
       "src/__tests__/monitoring-history-delete-migration.test.ts"

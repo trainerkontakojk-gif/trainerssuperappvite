@@ -255,7 +255,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 ## AI Integration Pattern
 
 - Integrasi AI dipusatkan di backend service wrapper (`apps/api/src/lib/gemini.ts`, `apps/api/src/lib/openai.ts`).
-- Pemilihan model dan provider mengikuti canonical mapping di `apps/api/src/lib/ai-models.ts`. Newly added text model IDs: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Telefun's realtime registry remains separate. Legacy OpenRouter/DeepSeek selections dinormalisasi ke model direct yang setara.
+- Pemilihan model dan provider mengikuti canonical mapping di `apps/api/src/lib/ai-models.ts`. Newly added text model IDs: `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Telefun's realtime registry remains separate: the canonical live-model registry lives in `packages/types/src/ai-models.ts` (`TELEFUN_LIVE_MODELS`), and the exact WebRTC model set is derived from it (`TELEFUN_OPENAI_WEBRTC_MODEL_IDS`), never from env. `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` (comma-separated exact ids, default `gpt-realtime-2.1`, fail-closed) bounds which registered models the runtime admits; the effective set is registry ∩ config and must be identical in API and Telefun. Legacy OpenRouter/DeepSeek selections dinormalisasi ke model direct yang setara.
 - Semua AI calls wajib dicatat (logged) dari backend ke tabel `ai_usage_logs` via `logAiUsage()`.
 - `logAiUsage()` sekarang menerima parameter `status` (`'success'` | `'failed'` | `'timeout'`) dan `errorMessage`. Jika gagal/timeout, token di-set ke 0 dan error message dicatat.
 - `resolveModelProvider()` mencari provider via `MODEL_REGISTRY` lookup. Provider aktif hanya `gemini` dan `openai`.
@@ -294,6 +294,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - `TELEFUN_OPENAI_ENABLED` (opsional — feature flag untuk mengaktifkan model GPT Realtime)
 - `TELEFUN_OPENAI_WEBRTC_POC_ENABLED` (default `false`; Phase 3 capability-gated integration and Phase 4 durable lifecycle remain off for new starts; POST kill switch)
 - `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` (CSV UUID exact, sama di API dan Telefun; development/staging only; kosong = deny-all; cleanup DELETE exception)
+- `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` (CSV exact model id dari shared registry; default `gpt-realtime-2.1`; unknown/duplicate/empty value fail-closed ke default Full-only; set efektif = registry ∩ config, identik di API dan Telefun)
 - `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS` (default `15000`; upstream provider timeout and manager hangup bound)
 - `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS` (default `10000`; sideband connect timeout; finalization drain uses bounded manager default)
 - `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY` (server-only encryption key; wajib jika POC aktif; tidak pernah dibundle ke Web)

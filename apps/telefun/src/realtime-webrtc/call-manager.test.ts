@@ -63,7 +63,7 @@ describe("WebRTC call manager", () => {
       createAttemptId: vi.fn(() => "attempt-race"),
     });
 
-    const starting = manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    const starting = manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await manager.endCall(sessionId);
     created.resolve({ answerSdp: answer, callId: "rtc_late" });
 
@@ -105,7 +105,7 @@ describe("WebRTC call manager", () => {
     });
 
     await expect(
-      manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT }),
+      manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT }),
     ).rejects.toThrow("provider call failed");
 
     expect(order).toEqual([
@@ -135,7 +135,7 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    const starting = manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    const starting = manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await vi.waitFor(() => expect(socket.connect).toHaveBeenCalledOnce());
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     await expect(starting).rejects.toThrow("provider call failed");
@@ -154,7 +154,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
 
     expect(updateSession).toHaveBeenCalledWith(
@@ -175,7 +175,7 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(closeCall).toHaveBeenCalledTimes(2);
@@ -194,7 +194,7 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("provider call failed");
+    await expect(manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("provider call failed");
     expect(closeCall).toHaveBeenCalledWith("rtc_header_bound");
   });
 
@@ -209,7 +209,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(updateSession).toHaveBeenCalledTimes(2);
@@ -239,7 +239,7 @@ describe("WebRTC call manager", () => {
       flushUsage,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     socket.emit("response.done", null);
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
@@ -263,7 +263,7 @@ describe("WebRTC call manager", () => {
       auditFailedUsage,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     socket.emit("response.done", null);
     await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
     await manager.endCall(sessionId);
@@ -291,7 +291,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     sidebandCallbacks!.onEvent({
       type: "response.done",
       response: { id: "response-cancelled", status: "cancelled" },
@@ -332,6 +332,7 @@ describe("WebRTC call manager", () => {
     await failedManager.startCall({
       userId: "user-1",
       sessionId: failedSessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -361,7 +362,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     const ending = manager.endCall(sessionId);
     await vi.waitFor(() => expect(callbacks).toBeDefined());
     callbacks!.onClose(true);
@@ -393,7 +394,7 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     sidebandCallbacks!.onEvent({
       type: "response.done",
       response: { id: "response-incomplete", status: "incomplete" },
@@ -444,7 +445,7 @@ describe("WebRTC call manager", () => {
       onSidebandDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
     sidebandCallbacks!.onEvent({
       type: "conversation.item.input_audio_transcription.completed",
       item_id: "item-1",
@@ -528,8 +529,8 @@ describe("WebRTC call manager", () => {
       now: () => 1_000,
     });
 
-    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).resolves.toEqual({ answerSdp: answer });
-    await expect(manager.startCall({ userId: "user-1", sessionId, offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("active call");
+    await expect(manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).resolves.toEqual({ answerSdp: answer });
+    await expect(manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("active call");
 
     await manager.endCall(sessionId);
     await manager.endCall(sessionId);
@@ -570,6 +571,7 @@ describe("WebRTC call manager", () => {
         await manager.startCall({
           userId: "user-1",
           sessionId,
+          modelId: "gpt-realtime-2.1",
           offerSdp: offer,
           livePromptInstructions: LIVE_PROMPT,
         });
@@ -619,6 +621,7 @@ describe("WebRTC call manager", () => {
         await manager.startCall({
           userId: "user-1",
           sessionId,
+          modelId: "gpt-realtime-2.1",
           offerSdp: offer,
           livePromptInstructions: LIVE_PROMPT,
         });
@@ -678,6 +681,7 @@ describe("WebRTC call manager", () => {
         await manager.startCall({
           userId: "user-1",
           sessionId,
+          modelId: "gpt-realtime-2.1",
           offerSdp: offer,
           livePromptInstructions: LIVE_PROMPT,
         });
@@ -727,6 +731,7 @@ describe("WebRTC call manager", () => {
         await manager.startCall({
           userId: "user-1",
           sessionId,
+          modelId: "gpt-realtime-2.1",
           offerSdp: offer,
           livePromptInstructions: LIVE_PROMPT,
         });
@@ -772,6 +777,7 @@ describe("WebRTC call manager", () => {
         await manager.startCall({
           userId: "user-1",
           sessionId,
+          modelId: "gpt-realtime-2.1",
           offerSdp: offer,
           livePromptInstructions: LIVE_PROMPT,
         });
@@ -788,5 +794,215 @@ describe("WebRTC call manager", () => {
         warn.mockRestore();
       }
     });
+  });
+});
+
+describe("WebRTC call manager model flows", () => {
+  const MINI = "gpt-realtime-2.1-mini" as const;
+
+  function durableDb() {
+    return {
+      claimAttempt: vi.fn(async () => ({
+        claimed: true,
+        attemptId: "019f45e3-5fac-7cd2-afeb-8069c2f81401",
+        finalizationKey: "019f45e3-5fac-7cd2-afeb-8069c2f81402",
+        usageRequestId:
+          "telefun-webrtc:019f45e3-5fac-7cd2-afeb-8069c2f81401" as `telefun-webrtc:${string}`,
+        state: "claimed" as const,
+        reason: "claimed",
+      })),
+      getAttempt: vi.fn(async () => null),
+      bindProviderCall: vi.fn(async () => ({
+        accepted: true,
+        state: "brokered" as const,
+        reason: "bound",
+      })),
+      markSidebandConnected: vi.fn(async () => ({
+        accepted: true,
+        state: "sideband_connected" as const,
+        reason: "connected",
+      })),
+      checkpointTranscript: vi.fn(async (input: { sequence: number }) => ({
+        accepted: true,
+        operation: "inserted",
+        checkpointSequence: input.sequence,
+        reason: "checkpointed",
+      })),
+      beginFinalization: vi.fn(async () => ({
+        accepted: true,
+        shouldFinalize: true,
+        state: "ending" as const,
+        reason: "ending",
+      })),
+      finalizeAttempt: vi.fn(async () => ({
+        applied: true,
+        idempotent: false,
+        reason: "ended",
+      })),
+      markUsage: vi.fn(
+        async (input: { status: "persisted" | "incomplete" | "failed" }) => ({
+          applied: true,
+          idempotent: false,
+          usageRequestId: "telefun-webrtc:019f45e3-5fac-7cd2-afeb-8069c2f81401",
+          status: input.status,
+          reason: "recorded",
+        }),
+      ),
+    };
+  }
+
+  const usage = {
+    input_tokens: 10,
+    output_tokens: 4,
+    total_tokens: 14,
+    input_token_details: {
+      text_tokens: 10,
+      audio_tokens: 0,
+      cached_tokens: 0,
+    },
+    output_token_details: { text_tokens: 4, audio_tokens: 0 },
+  };
+
+  it("claims and builds the canonical session with the EXACT model for Full and Mini", async () => {
+    for (const modelId of ["gpt-realtime-2.1", MINI] as const) {
+      const db = durableDb();
+      const createCall = vi.fn(async () => ({
+        answerSdp: answer,
+        callId: "rtc_model_claim",
+      }));
+      const manager = createWebRtcCallManager({
+        db,
+        callsClient: { createCall, closeCall: vi.fn(async () => true) },
+        createSideband: vi.fn(() => ({
+          connect: vi.fn(async () => undefined),
+          sealAdmission: vi.fn(),
+          drain: vi.fn(async () => ({ admittedFrameCount: 0 })),
+          close: vi.fn(),
+        })),
+        createAttemptId: vi.fn(() => "019f45e3-5fac-7cd2-afeb-8069c2f81401"),
+      });
+
+      await manager.startCall({
+        userId: "user-1",
+        sessionId,
+        modelId,
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+      });
+
+      expect(db.claimAttempt).toHaveBeenCalledWith(
+        expect.objectContaining({ modelId, transport: "openai-webrtc" }),
+      );
+      expect(createCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: expect.objectContaining({ model: modelId }),
+        }),
+      );
+    }
+  });
+
+  it("persists usage with the binding's model on the normal flush path", async () => {
+    const socket = sideband();
+    const flushUsage = vi.fn(async () => true);
+    const manager = createWebRtcCallManager({
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_model_usage",
+        })),
+        closeCall: vi.fn(async () => true),
+      },
+      createSideband: vi.fn((_callId, callbacks) => {
+        socket.emit.mockImplementation((event: string, _value: unknown) => {
+          if (event === "response.done") {
+            callbacks.onEvent({
+              type: event,
+              response: { id: "response-1", status: "completed", usage },
+            });
+          }
+        });
+        return socket;
+      }),
+      updateSession: vi.fn(async () => undefined),
+      flushUsage,
+      createAttemptId: vi.fn(() => "attempt-model-flush"),
+    });
+
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: MINI,
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
+    socket.emit("response.done", null);
+    await manager.endCall(sessionId, "user-1");
+
+    expect(flushUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: MINI, usageRequestId: expect.stringMatching(/^telefun-webrtc:/) }),
+    );
+  });
+
+  it("audits missing usage with the binding's model on the durable failure path", async () => {
+    const db = durableDb();
+    const auditFailedUsage = vi.fn(async () => true);
+    const manager = createWebRtcCallManager({
+      db,
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_model_audit",
+        })),
+        closeCall: vi.fn(async () => true),
+      },
+      createSideband: vi.fn(() => ({
+        connect: vi.fn(async () => undefined),
+        sealAdmission: vi.fn(),
+        drain: vi.fn(async () => ({ admittedFrameCount: 0 })),
+        close: vi.fn(),
+      })),
+      auditFailedUsage,
+      createAttemptId: vi.fn(() => "019f45e3-5fac-7cd2-afeb-8069c2f81401"),
+    });
+
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: MINI,
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
+    await manager.endCall(sessionId, "user-1");
+
+    expect(auditFailedUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: MINI }),
+    );
+  });
+
+  it("carries the binding model into the abort/legacy missing-usage audit", async () => {
+    const auditFailedUsage = vi.fn(async () => true);
+    const manager = createWebRtcCallManager({
+      callsClient: { createCall: vi.fn(), closeCall: vi.fn() },
+      createSideband: vi.fn(),
+      updateSession: vi.fn(async () => undefined),
+      auditFailedUsage,
+    });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      manager.startCall({
+        userId: "user-1",
+        sessionId,
+        modelId: MINI,
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow();
+
+    expect(auditFailedUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: MINI }),
+    );
   });
 });

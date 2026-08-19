@@ -31,6 +31,16 @@ export type TelefunScoringStatus =
   | "completed"
   | "failed";
 
+export type TelefunHistoryScoringView = {
+  scoring_status: TelefunScoringStatus | null;
+  scoring_ready_at: string | null; // ISO-8601 UTC, e.g. "2026-08-14T09:00:00.000Z"
+  scoring_next_attempt_at: string | null; // ISO-8601 UTC; public-safe retry schedule
+  scoring_retryable: boolean;
+  score: number | null; // 0..10 when present; null when not scored
+  feedback: string | null; // projected ONLY via telefun-feedback helper
+  voice_assessment: unknown; // raw canonical JSON; parsed at Web boundary
+};
+
 export type TelefunRealtimeAttemptState =
   | "claimed"
   | "brokered"

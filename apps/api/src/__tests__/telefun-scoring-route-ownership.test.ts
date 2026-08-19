@@ -64,4 +64,28 @@ describe("POST /score/:id ownership", () => {
     });
     expect(mockRpc).not.toHaveBeenCalled();
   });
+
+  it("menolak ownership sebelum claim walaupun session asing sudah completed", async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: {
+        user_id: "different-user",
+        telefun_transport: "openai-webrtc",
+        scoring_status: "completed",
+        score: 8,
+        voice_assessment: null,
+      },
+      error: null,
+    });
+
+    const response = await buildApp().request("/score/session-1", {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: { code: "UNAUTHORIZED" },
+    });
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
 });

@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { User } from "@supabase/supabase-js";
 import {
+  DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+  type TelefunWebRtcModelId,
+} from "@trainers/types";
+import {
   env,
   isTelefunOpenAiWebRtcAllowed,
   isTelefunOpenAiWebRtcRuntimeEnabled,
@@ -16,16 +20,23 @@ export function resolveTelefunOpenAiWebRtcCapabilities(input: {
   enabled: boolean;
   nodeEnv: string;
   allowedUserIds: readonly string[];
+  allowedModelIds?: readonly TelefunWebRtcModelId[];
 }) {
   const runtimeEnabled = isTelefunOpenAiWebRtcRuntimeEnabled(input);
   const allowed = isTelefunOpenAiWebRtcAllowed(input);
+  const modelIds =
+    input.allowedModelIds ?? DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
 
   return {
     openaiWebRtc: {
       enabled: runtimeEnabled && allowed,
       allowed,
+      // Compatibility default during the transition window: always Full.
+      // The Web gates the selected model on `modelIds`, never on `modelId`.
       modelId: OPENAI_WEBRTC_MODEL_ID,
       transport: OPENAI_WEBRTC_TRANSPORT,
+      // Effective set = shared registry ∩ server-owned allowed-model config.
+      modelIds,
     },
   };
 }
@@ -41,6 +52,7 @@ telefunCapabilities.get("/capabilities", (c) => {
       enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
       nodeEnv: env.NODE_ENV,
       allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+      allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
     }),
   });
 });

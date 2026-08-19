@@ -183,6 +183,7 @@ function buildCallRecord(
     feedback: "",
     voiceAssessment: undefined,
   },
+  scoringStatus?: TelefunRecordingTransitionResult["scoringStatus"],
 ): CallRecord {
   // If remux succeeded, use signed URL (empty string — ReviewModal will fetch via API).
   // If remux failed or wasn't attempted, fall back to blob URL.
@@ -198,9 +199,11 @@ function buildCallRecord(
     duration: params.duration,
     recordingPath: paths.recordingPath,
     agentRecordingPath: paths.agentRecordingPath,
-    score: scoring.score ?? 0,
+    // A missing score must stay undefined ("—") — never force it to 0.
+    score: scoring.score ?? undefined,
     feedback: scoring.feedback,
     voiceAssessment: scoring.voiceAssessment,
+    scoringStatus,
     sessionMetrics: params.metrics,
     responsePacingMode: params.sessionConfig?.responsePacingMode,
     telefunModelId: params.sessionConfig?.telefunModelId,
@@ -349,6 +352,8 @@ export async function saveTelefunSession(
             queued.remux.data.recordingReady ?? recordingTransition?.recordingReady,
           scoringReady:
             queued.remux.data.scoringReady ?? recordingTransition?.scoringReady,
+          scoringStatus:
+            queued.remux.data.scoringStatus ?? recordingTransition?.scoringStatus,
         };
       }
       if (queued.removed && queued.remux?.success) {
@@ -412,6 +417,8 @@ export async function saveTelefunSession(
               remuxResult.data.recordingReady ?? recordingTransition?.recordingReady,
             scoringReady:
               remuxResult.data.scoringReady ?? recordingTransition?.scoringReady,
+            scoringStatus:
+              remuxResult.data.scoringStatus ?? recordingTransition?.scoringStatus,
           };
         }
       } catch (err) {
@@ -425,6 +432,8 @@ export async function saveTelefunSession(
       params,
       { recordingPath, agentRecordingPath },
       status.remuxed,
+      undefined,
+      recordingTransition?.scoringStatus,
     ),
     recordingPath,
     agentRecordingPath,
@@ -501,6 +510,11 @@ export async function finalizeTelefunSession(
     dependencies: params.dependencies,
   });
 
+  const finalScoringStatus =
+    scoring.scoringStatus === "succeeded"
+      ? "completed"
+      : saved.record.scoringStatus;
+
   return {
     ...saved,
     record: buildCallRecord(
@@ -511,6 +525,7 @@ export async function finalizeTelefunSession(
       },
       saved.remuxed,
       scoring,
+      finalScoringStatus,
     ),
     scoringStatus: scoring.scoringStatus,
   };

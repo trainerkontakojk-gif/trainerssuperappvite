@@ -7,7 +7,7 @@ import {
   isValidTelefunModelTransportPair,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
-import { isTelefunOpenAiWebRtcEligible } from "../../lib/env";
+import { env, isTelefunOpenAiWebRtcEligible } from "../../lib/env";
 
 type Variables = { user: User; profile: any };
 
@@ -170,6 +170,24 @@ telefunSettings.put(
           error: {
             code: "BAD_REQUEST",
             message: "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
+          },
+        },
+        400,
+      );
+    }
+    if (
+      body.telefunTransport === "openai-webrtc" &&
+      body.telefunModelId !== undefined &&
+      !(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS as readonly string[]).includes(
+        body.telefunModelId,
+      )
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "BAD_REQUEST",
+            message: "Model dan transport OpenAI WebRTC tidak tersedia.",
           },
         },
         400,

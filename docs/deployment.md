@@ -79,6 +79,7 @@ root sekarang mengunci ke web saja.
 | `ALLOWED_ORIGINS`                             | `https://<web-url>.up.railway.app`  | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
 | `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | `false`                             | Kill switch API untuk POST WebRTC; default deny                                          |
 | `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | `UUID,UUID`                         | Exact UUID CSV cohort; harus sama persis dengan Telefun; production tetap exact-cohort   |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | `gpt-realtime-2.1`                  | CSV exact model id; default Full-only; token unknown/empty/duplicate menolak seluruh nilai; harus identik dengan Telefun |
 | `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | `10`                                | Distributed session/write limit; RPC failure fail-closed untuk WebRTC                    |
 
 ### Telefun Service
@@ -99,6 +100,7 @@ root sekarang mengunci ke web saja.
 | `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | `15000`                         | Timeout upstream `POST /v1/realtime/calls`                                                                                    |
 | `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | `10000`                         | Timeout sideband `wss://api.openai.com/v1/realtime?call_id=...`                                                               |
 | `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | `UUID,UUID`                     | Exact UUID CSV; harus sama persis dengan API; production tetap exact-cohort; kosong = deny-all                                |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`          | `gpt-realtime-2.1`              | CSV exact model id (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`); default Full-only; token unknown/empty/duplicate → fail-closed ke Full-only; harus identik dengan API                                  |
 | `TELEFUN_INTERNAL_TOKEN`                           | `<random>`                      | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web                                                 |
 | `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | `<random min 32 chars>`         | Server-only AES key untuk opaque provider reference; wajib saat POC aktif                                                     |
 | `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`               | `30000`                         | Distributed lease TTL; bounded expiry-safe session cap                                                                        |
@@ -116,8 +118,50 @@ Aturan secret/config:
 - `TELEFUN_OPENAI_ENABLED=false` menolak **sesi OpenAI baru** tanpa menghapus history/model pricing. Panggilan aktif tidak dipindahkan ke Gemini di tengah sesi.
 - `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` atau cohort kosong menolak POST WebRTC dan tidak membuka provider. Authenticated, owner-bound DELETE cleanup tetap diizinkan untuk menandai pre-created session sebagai failed; DELETE exception ini bukan jalur start.
 - `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` harus berupa CSV UUID yang valid dan nilainya sama di API serta Telefun. Development, staging, dan production memerlukan flag aktif serta exact user match; flag off atau cohort kosong tetap deny-all. User di luar cohort tetap memakai Gemini. Automated checks memakai fake upstream; tidak ada paid/provider smoke dalam routine deployment.
+- `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` memakai parse exact-allowlist yang sama di API dan Telefun: CSV exact model id dari registry (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`), default Full-only. Token unknown, kosong, atau duplikat menolak seluruh nilai dan jatuh ke default Full-only (Mini tidak aktif implisit). Broker memvalidasi `telefun_model_id` yang dipersist ke allowed set server; model di luar set ditolak `404` sebelum provider call. Mismatch set parsed antara API dan Telefun harus diterminalisasi/di-cleanup fail-closed sebelum provider call.
+- Voice WebRTC (`marin` female/default, `cedar` male) server-owned dari `telefun_history.consumer_gender` dan berlaku untuk Full maupun Mini (diverifikasi terhadap dokumentasi resmi OpenAI; browser tidak mengirim voice).
 - Jika flag `true` tetapi key tidak ada/invalid, readiness OpenAI harus `not_ready` dan configure OpenAI ditolak dengan error aman. Service tetap dapat hidup untuk Gemini bila konfigurasi Gemini valid.
 - Mengubah Railway env memerlukan redeploy/restart service Telefun; jangan menganggap flag berubah in-process sebelum runtime mendukung reload.
+
+### Telefun Scoring Worker Service
+
+Worker scoring berjalan sebagai **service Railway private terpisah** (long-running), di-deploy dari exact SHA yang sama dengan Web/API/Telefun. Bukan cron: loop internal menangani polling/claim/retry. Proses web API tidak pernah menjalankan loop worker (`apps/api/src/index.ts` tidak mengimpor worker).
+
+Start command:
+
+```bash
+pnpm start:telefun-scoring-worker   # root = pnpm --filter @trainers/api start:telefun-scoring-worker
+```
+
+Env vars (nama exact; invalid/disabled config → proses **exit non-zero** dengan log JSON terstruktur, fail-fast):
+
+| Variable | Wajib | Value / bound | Notes |
+| --- | --- | --- | --- |
+| `TELEFUN_SCORING_WORKER_ENABLED` | ya | `true` | Harus persis `"true"`; selain itu = kill switch, worker exit non-zero tanpa memproses job |
+| `TELEFUN_SCORING_WORKER_INTERVAL_MS` | ya | `30000` | Integer positif `1000..600000` |
+| `TELEFUN_SCORING_WORKER_BATCH_SIZE` | ya | `5` | Integer positif `1..50` |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `120` | Integer positif; claim timeout RPC sekaligus deadline shutdown in-flight |
+| `TELEFUN_SCORING_WORKER_HEALTH_PORT` | opsional | `9100` | Integer `1024..65535`; mengaktifkan health internal. Jangan pakai `PORT` publik |
+| `TELEFUN_INTERNAL_TOKEN` | bila health aktif | `<random>` | Shared server-only secret, nilai sama dengan API/Telefun; wajib saat health port diset |
+| `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/release worker (service-role, backend-only) |
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` | ya | sesuai provider | Untuk analysis scoring; usage dicatat via `logAiUsage()` |
+
+Health endpoint (`GET /health`, bind default `127.0.0.1:<port>`; deployment mem-bind alamat private network Railway):
+
+- Auth `Authorization: Bearer <TELEFUN_INTERNAL_TOKEN>` (constant-time); tanpa token → `401`.
+- Non-billable; tidak membuka koneksi provider; tidak memproses job.
+- Payload bounded: `enabled`, `loopAlive`, `lastSuccessfulPollAt`, `lastErrorClass`, `queue {pending,processing,failed}`, `oldestEligiblePendingAgeMs` — tanpa UUID/session/user ID/recording path/prompt/raw error.
+- DB error pada queue fetch **tidak pernah** tampil sebagai empty/healthy: `lastErrorClass` terisi (mis. `DatabaseError`) dan `lastSuccessfulPollAt` stale.
+
+Graceful shutdown (SIGTERM/SIGINT): stop admission → abort analysis (`AbortSignal`, deadline = claim timeout) → bounded wait → bila deadline habis, claim aktif di-*release* ke retryable (`reschedule_telefun_scoring`) **sebelum** exit; late result tidak persist (guard `complete_telefun_scoring`) dan tidak ada AI call kedua (`checkCachedAssessment`). Pastikan grace period orchestrator ≥ claim timeout.
+
+Alert thresholds:
+
+- **No-poll:** `lastSuccessfulPollAt` > `2× interval` (minimal 2 menit) atau `lastErrorClass` menetap.
+- **Oldest eligible pending:** `oldestEligiblePendingAgeMs` > 30 menit.
+- **Failed-reschedule spike:** `failed+rescheduled` > 50% batch selama 3 poll berturut-turut.
+
+Kill switch: set `TELEFUN_SCORING_WORKER_ENABLED=false` + redeploy/restart service (exit non-zero, pending jobs/history tidak diubah), atau stop/scale-to-zero service / kirim SIGTERM untuk shutdown graceful.
 
 ### Phase 5 WebRTC hardening dan recovery
 
@@ -157,6 +201,7 @@ Setelah remux berhasil, player menggunakan signed URL persisten; jika gagal, blo
 | `start:web`     | `pnpm --filter @trainers/web start`               | Web production via `serve`       |
 | `build:web`     | `pnpm turbo run build --filter @trainers/web`     | Build web (TSC + Vite)           |
 | `start:api`     | `pnpm --filter @trainers/api start`               | API production via `tsx`         |
+| `start:telefun-scoring-worker` | `pnpm --filter @trainers/api start:telefun-scoring-worker` | Scoring worker runtime (service terpisah) |
 | `build:api`     | `pnpm turbo run build --filter @trainers/api`     | Build API (TSC)                  |
 | `start:telefun` | `pnpm --filter @trainers/telefun start`           | Telefun production via `node`    |
 | `build:telefun` | `pnpm turbo run build --filter @trainers/telefun` | Build Telefun (TSC)              |
@@ -248,6 +293,7 @@ VITE_TELEFUN_WS_URL=ws://localhost:3002
 TELEFUN_OPENAI_ENABLED=false
 TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false
 TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS=
+TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS=
 TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS=15000
 TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS=10000
 TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY=
@@ -568,3 +614,10 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 2. Pertahankan exact Vercel production origin di Railway API/Telefun selama domain canonical tetap sama.
 3. Jika incident owner secara eksplisit mengaktifkan Railway Web PRODUCTION auxiliary sebagai fallback sementara, verifikasi origin dan Supabase redirect exact sebelum traffic dialihkan.
 4. Setelah Vercel canonical pulih, kembalikan routing sementara dan verifikasi auth, API, serta Telefun dari domain Vercel.
+
+### Rollback Mini (Release Train B)
+
+1. Hapus `gpt-realtime-2.1-mini` dari `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` di API **dan** Telefun terlebih dahulu; Full (`gpt-realtime-2.1`) dan baseline transport tetap.
+2. Terminalisasi/reconcile seluruh Mini attempt/usage sebelum perubahan schema apa pun.
+3. **Jangan mempersempit constraint DB (`telefun_realtime_attempts.model_id`) selama masih ada row Mini**; schema additive boleh tetap menerima Mini sementara runtime menolaknya (broker `404` sebelum provider call).
+4. Rollback code hanya setelah capability client/server dan stored settings lama tetap terbaca aman.

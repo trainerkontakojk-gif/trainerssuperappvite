@@ -2,6 +2,7 @@ import type {
   SessionMetrics,
   VoiceQualityAssessment,
   TelefunTranscriptEntry,
+  TelefunScoringStatus,
 } from "@trainers/types";
 
 export interface CallRecord {
@@ -20,6 +21,11 @@ export interface CallRecord {
   feedback?: string;
   voiceAssessment?: VoiceQualityAssessment | null;
   sessionMetrics?: SessionMetrics | null;
+  /** Scoring state owned by the backend scoring worker / manual scoring RPC. */
+  scoringStatus?: TelefunScoringStatus;
+  scoringReadyAt?: string | null;
+  scoringNextAttemptAt?: string | null;
+  scoringRetryable?: boolean;
   /** Legacy metadata retained so historical sessions remain readable. */
   legacyRealisticModeEnabled?: boolean;
   voiceDashboardMetrics?: any | null;
@@ -30,6 +36,59 @@ export interface CallRecord {
   telefunModelId?: string;
   telefunTransport?: string;
   transcript?: TelefunTranscriptEntry[];
+}
+
+export interface TelefunScoringStatusLabel {
+  text: string;
+  tone: "waiting" | "processing" | "retryable" | "failed" | "ready";
+}
+
+/**
+ * A record only renders a concrete score when scoring actually finished:
+ * `completed`, or a legacy row without a scoring state. Pending/processing/
+ * failed rows must never show a fabricated `0/10` or a stale score.
+ */
+export function isTelefunRecordScored(
+  record: Pick<CallRecord, "scoringStatus" | "score">,
+): boolean {
+  return (
+    record.score != null &&
+    record.scoringStatus !== "pending" &&
+    record.scoringStatus !== "processing" &&
+    record.scoringStatus !== "failed"
+  );
+}
+
+/**
+ * Truthful, non-color-only status text for unscored sessions. Returns null
+ * when no status applies (legacy rows, or `completed` without a score, which
+ * is an observable inconsistency and must not be presented as success).
+ */
+export function getTelefunScoringStatusLabel(
+  record: Pick<
+    CallRecord,
+    "scoringStatus" | "score" | "scoringRetryable"
+  >,
+): TelefunScoringStatusLabel | null {
+  switch (record.scoringStatus) {
+    case "pending":
+      return { text: "Menunggu analisis", tone: "waiting" };
+    case "processing":
+      return { text: "Sedang dianalisis", tone: "processing" };
+    case "failed":
+      return record.scoringRetryable
+        ? {
+            text: "Analisis gagal, akan dicoba lagi otomatis",
+            tone: "retryable",
+          }
+        : { text: "Analisis gagal, coba lagi", tone: "failed" };
+    case "completed":
+      return record.score == null
+        ? null
+        : { text: "Feedback siap", tone: "ready" };
+    default:
+      return null;
+  }
 }
 
 export type TelefunSessionState =

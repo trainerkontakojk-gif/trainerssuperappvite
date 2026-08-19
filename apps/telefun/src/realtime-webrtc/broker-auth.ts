@@ -1,6 +1,7 @@
-import { POC_MODEL_ID, POC_TRANSPORT } from "./contracts.js";
+import { POC_TRANSPORT } from "./contracts.js";
 import {
   isTelefunOpenAiWebRtcAllowed,
+  isTelefunOpenAiWebRtcModelAllowed,
   type TelefunOpenAiWebRtcRolloutConfig,
 } from "./rollout-gate.js";
 
@@ -121,7 +122,10 @@ export async function authorizeWebRtcCall(
     session.id !== input.sessionId ||
     session.user_id !== userId ||
     ((input.operation ?? "start") === "start" && session.status !== "active") ||
-    session.telefun_model_id !== POC_MODEL_ID ||
+    !isTelefunOpenAiWebRtcModelAllowed(
+      session.telefun_model_id,
+      dependencies.rollout.allowedModelIds,
+    ) ||
     session.telefun_transport !== POC_TRANSPORT
   ) {
     return { ok: false, reason: "not_found" };

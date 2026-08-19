@@ -9,6 +9,7 @@ let mockDownloadResult: any = {
   data: new Blob(["audio"], { type: "audio/webm" }),
   error: null,
 };
+let mockFetchQueryError: Error | null = null;
 
 function buildChain(rowOrList: any, isList: boolean) {
   const result = isList
@@ -34,7 +35,13 @@ function buildChain(rowOrList: any, isList: boolean) {
   chain.in = vi.fn(() => chain);
   chain.or = vi.fn(() => chain);
   chain.maybeSingle = vi.fn(() => Promise.resolve(result));
-  chain.limit = vi.fn(() => Promise.resolve(result));
+  chain.limit = vi.fn(() =>
+    Promise.resolve(
+      mockFetchQueryError
+        ? { data: null, error: mockFetchQueryError }
+        : result,
+    ),
+  );
 
   // update returns a sub-chain where eq/in are terminal
   chain.update = vi.fn((_data: any) => {
@@ -238,6 +245,7 @@ describe("fetchPendingJobs", () => {
     vi.clearAllMocks();
     mockRows.clear();
     mockInCalls.length = 0;
+    mockFetchQueryError = null;
   });
 
   it("returns jobs from pending/failed sessions due for retry", async () => {
@@ -293,6 +301,12 @@ describe("fetchPendingJobs", () => {
   it("returns empty array when no jobs", async () => {
     const result = await fetchPendingJobs(5);
     expect(result).toEqual([]);
+  });
+
+  it("throws on DB error instead of masking it as an empty queue", async () => {
+    mockFetchQueryError = new Error("Queue query failed");
+
+    await expect(fetchPendingJobs(5)).rejects.toThrow("Queue query failed");
   });
 });
 
@@ -445,5 +459,65 @@ describe("processScoringJob", () => {
     const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
     expect(result.status).toBe("failed");
     expect(result.error).toContain("Max attempts");
+  });
+
+  it("does not start analysis when the signal is already aborted", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 0,
+    });
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await processScoringJob(
+      { sessionId: "s1", userId: "u1" },
+      controller.signal,
+    );
+
+    expect(result.status).toBe("rescheduled");
+    expect(geminiMock).not.toHaveBeenCalled();
+  });
+
+  it("does not persist a late provider result once the signal aborts mid-analysis", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 0,
+    });
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    let resolveGemini!: (value: unknown) => void;
+    const geminiDeferred = new Promise((done) => {
+      resolveGemini = done;
+    });
+    geminiMock.mockReturnValueOnce(geminiDeferred);
+    mockRpcResult = { data: true, error: null };
+    const controller = new AbortController();
+
+    const pending = processScoringJob(
+      { sessionId: "s1", userId: "u1" },
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(geminiMock).toHaveBeenCalledTimes(1));
+
+    controller.abort();
+    resolveGemini({ success: true, text: JSON.stringify(VALID_ASSESSMENT) });
+
+    const result = await pending;
+    expect(result.status).toBe("rescheduled");
+    expect(mockRpcs.map((rpc) => rpc.name)).not.toContain(
+      "complete_telefun_scoring",
+    );
   });
 });

@@ -170,6 +170,7 @@ function brokerDependencies(
       enabled: true,
       nodeEnv: "development",
       allowedUserIds: [userId],
+      allowedModelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
     },
     verifyToken: vi.fn(async () => ({ success: true, user: { id: userId } })),
     getProfile: vi.fn(async () => ({
@@ -229,12 +230,22 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
       consumerGender: "male",
     });
 
     expect(db.claimAttempt).toHaveBeenCalledOnce();
+    expect(db.claimAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId,
+        userId,
+        attemptId,
+        modelId: "gpt-realtime-2.1",
+        transport: "openai-webrtc",
+      }),
+    );
     expect(callsClient.createCall).toHaveBeenCalledWith(
       expect.objectContaining({
         session: expect.objectContaining({
@@ -291,6 +302,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -337,6 +349,43 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     );
   });
 
+  it("claims the exact persisted model for Full and Mini", async () => {
+    for (const modelId of ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"] as const) {
+      const db = durableDb();
+      const manager = createWebRtcCallManager({
+        db,
+        callsClient: {
+          createCall: vi.fn(async () => ({ answerSdp: answer, callId })),
+          closeCall: vi.fn(async () => true),
+        },
+        createSideband: vi.fn(() => ({
+          connect: vi.fn(async () => undefined),
+          sealAdmission: vi.fn(),
+          drain: vi.fn(async () => ({ admittedFrameCount: 0 })),
+          close: vi.fn(),
+        })),
+        createAttemptId: vi.fn(() => attemptId),
+      });
+
+      await manager.startCall({
+        userId,
+        sessionId,
+        modelId,
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+      });
+
+      expect(db.claimAttempt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelId,
+          transport: "openai-webrtc",
+          sessionId,
+          userId,
+        }),
+      );
+    }
+  });
+
   it("rejects row-drift prompt overflow before provider work", async () => {
     const db = durableDb();
     const consumeRateLimit = vi.fn(async () => ({
@@ -358,6 +407,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
       manager.startCall({
         userId,
         sessionId,
+        modelId: "gpt-realtime-2.1",
         offerSdp: offer,
         livePromptInstructions: "x".repeat(16_001),
       }),
@@ -395,6 +445,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -439,6 +490,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -503,6 +555,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
       state: "ended",
       usageRequestId: `telefun-webrtc:${sessionId}`,
       providerCallIdHash: null,
+      modelId: "gpt-realtime-2.1",
     });
     const manager = createWebRtcCallManager({
       db: { ...db, failSessionWithoutAttempt },
@@ -602,6 +655,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     const starting = manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -708,6 +762,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -762,6 +817,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -799,6 +855,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -842,6 +899,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
       manager.startCall({
         userId,
         sessionId,
+        modelId: "gpt-realtime-2.1",
         offerSdp: offer,
         livePromptInstructions: LIVE_PROMPT,
       }),
@@ -868,6 +926,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     const starting = manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -887,6 +946,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
       state: "sideband_connected",
       usageRequestId,
       providerCallIdHash: null,
+      modelId: "gpt-realtime-2.1",
     });
     const closeCall = vi.fn(async () => true);
     const manager = createWebRtcCallManager({
@@ -923,6 +983,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -958,6 +1019,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
     await manager.startCall({
       userId,
       sessionId,
+      modelId: "gpt-realtime-2.1",
       offerSdp: offer,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -970,6 +1032,7 @@ describe("OpenAI WebRTC Phase 4 durable contract", () => {
       manager.startCall({
         userId,
         sessionId: "019f45e3-5fac-7cd2-afeb-8069c2f81499",
+        modelId: "gpt-realtime-2.1",
         offerSdp: offer,
         livePromptInstructions: LIVE_PROMPT,
       }),

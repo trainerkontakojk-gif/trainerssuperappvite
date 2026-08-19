@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -12,6 +12,10 @@ import {
   Mic2,
 } from "lucide-react";
 import type { CallRecord } from "../types";
+import {
+  getTelefunScoringStatusLabel,
+  isTelefunRecordScored,
+} from "../types";
 import type {
   VoiceQualityAssessment,
   TelefunCoachingSummary,
@@ -36,6 +40,11 @@ interface ReviewModalProps {
     sessionId: string,
     assessment: VoiceQualityAssessment,
   ) => void;
+  /**
+   * Requested once per open when the record is not scored yet, so the parent
+   * can run one authoritative detail refetch (session reconciler).
+   */
+  onRequestScoringRefresh?: (sessionId: string) => void;
 }
 
 export type ReviewModalTab =
@@ -78,6 +87,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
   onClose,
   record,
   onAssessmentComplete,
+  onRequestScoringRefresh,
 }) => {
   const [activeTab, setActiveTab] = useState<ReviewModalTab>("details");
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
@@ -87,6 +97,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     record?.voiceAssessment ?? null,
   );
   const [retryTrigger, setRetryTrigger] = useState(0);
+  const requestedScoringRefreshRef = useRef<string | null>(null);
+  const onRequestScoringRefreshRef = useRef(onRequestScoringRefresh);
+  useEffect(() => {
+    onRequestScoringRefreshRef.current = onRequestScoringRefresh;
+  });
 
   const summaryPath =
     isOpen && record && activeTab === "replay"
@@ -116,6 +131,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       setRecordingUrl(null);
       setRecordingError(null);
       setRecordingLoading(false);
+      requestedScoringRefreshRef.current = null;
       return;
     }
 
@@ -126,6 +142,15 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
     setAssessment(record.voiceAssessment ?? null);
     setRecordingError(null);
     setRecordingLoading(false);
+
+    // Reopening an unscored session triggers one authoritative refetch.
+    if (
+      !isTelefunRecordScored(record) &&
+      requestedScoringRefreshRef.current !== record.id
+    ) {
+      requestedScoringRefreshRef.current = record.id;
+      onRequestScoringRefreshRef.current?.(record.id);
+    }
 
     const hasPersistentRecording = Boolean(
       record.recordingPath || record.agentRecordingPath,
@@ -367,9 +392,9 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Skor</span>
                         </div>
                         <p className="text-sm font-bold text-foreground">
-                          {record.score != null
+                          {isTelefunRecordScored(record)
                             ? `${record.score}/10`
-                            : "—"}
+                            : getTelefunScoringStatusLabel(record)?.text ?? "—"}
                         </p>
                       </div>
                     </div>
@@ -450,6 +475,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                     <VoiceAssessmentSection
                       sessionId={record.id}
                       initialAssessment={assessment || undefined}
+                      initialScoringStatus={record.scoringStatus ?? null}
                       hasAgentRecording={Boolean(record.agentRecordingPath)}
                       onAssessmentUpdate={handleAssessmentUpdate}
                       transcript={record.transcript}

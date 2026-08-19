@@ -19,7 +19,11 @@ import {
   type TelefunTransport,
 } from "@trainers/types";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
-import { enrichTelefunHistoryFeedback } from "../../lib/telefun-feedback";
+import {
+  enrichTelefunHistoryFeedback,
+  buildTelefunHistoryScoringView,
+} from "../../lib/telefun-feedback";
+import type { TelefunHistoryScoringView } from "@trainers/types";
 
 type Variables = { user: User; profile: any };
 
@@ -57,6 +61,16 @@ function retryAfterSeconds(resetAt: string): string {
 }
 
 export class TelefunSessionValidationError extends Error {}
+
+function projectTelefunHistoryRow<T extends {
+  feedback?: unknown;
+  status?: unknown;
+  telefun_transport?: unknown;
+  voice_assessment?: unknown;
+}>(row: T): T & TelefunHistoryScoringView {
+  const enriched = enrichTelefunHistoryFeedback(row);
+  return { ...enriched, ...buildTelefunHistoryScoringView(enriched) };
+}
 
 export const LIVE_PROMPT_INSTRUCTIONS_MAX_LENGTH = 16_000;
 
@@ -244,7 +258,7 @@ telefunSessions.get("/sessions", async (c) => {
     if (error) throw error;
     return c.json({
       success: true,
-      data: (data ?? []).map(enrichTelefunHistoryFeedback),
+      data: (data ?? []).map(projectTelefunHistoryRow),
     });
   } catch (error: any) {
     return c.json(
@@ -325,6 +339,17 @@ telefunSessions.post(
       ) {
         throw new TelefunSessionValidationError(
           "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
+        );
+      }
+      if (
+        insertPayload.telefun_transport === "openai-webrtc" &&
+        !(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS as readonly string[]).includes(
+          insertPayload.telefun_model_id,
+        )
+      ) {
+        // Public-safe: never leaks cohort/config/allowlist contents.
+        throw new TelefunSessionValidationError(
+          "Model dan transport OpenAI WebRTC tidak tersedia.",
         );
       }
       const adminClient = createAdminClient();
@@ -525,6 +550,18 @@ telefunSessions.patch(
           "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
         );
       }
+      if (
+        body.telefun_transport === "openai-webrtc" &&
+        body.telefun_model_id !== undefined &&
+        !(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS as readonly string[]).includes(
+          body.telefun_model_id,
+        )
+      ) {
+        // Public-safe: never leaks cohort/config/allowlist contents.
+        throw new TelefunSessionValidationError(
+          "Model dan transport OpenAI WebRTC tidak tersedia.",
+        );
+      }
 
       const { data: existingSession, error: existingSessionError } =
         await adminClient
@@ -720,7 +757,7 @@ telefunSessions.get("/history/:id", async (c) => {
 
     return c.json({
       success: true,
-      data: enrichTelefunHistoryFeedback(data),
+      data: projectTelefunHistoryRow(data),
     });
   } catch (error: any) {
     return c.json(

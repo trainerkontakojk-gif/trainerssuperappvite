@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildCanonicalPocSession } from "./contracts.js";
+import { buildCanonicalWebRtcSession } from "./contracts.js";
 import {
   createOpenAiCallsClient,
   OpenAiCallCreationError,
@@ -22,7 +22,8 @@ const CANONICAL_PROMPT = [
   "TINGKAT KESULITAN: Hard",
   "EMOSI: MARAH/KESAL.",
 ].join("\n");
-const canonicalSession = () => buildCanonicalPocSession(CANONICAL_PROMPT);
+const canonicalSession = () =>
+  buildCanonicalWebRtcSession("gpt-realtime-2.1", CANONICAL_PROMPT);
 
 function response(body: string, location: string, ok = true) {
   return {

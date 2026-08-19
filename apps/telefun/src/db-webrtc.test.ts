@@ -208,6 +208,40 @@ describe("TelefunWebRtcDb RPC wrapper", () => {
     });
   });
 
+  it("claims the exact Mini model through the RPC wrapper", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        {
+          claimed: true,
+          attempt_id: attemptId,
+          finalization_key: finalizationKey,
+          usage_request_id: `telefun-webrtc:${attemptId}`,
+          state: "claimed",
+          reason: "claimed",
+        },
+      ],
+      error: null,
+    }));
+    const db = createTelefunWebRtcDb({ rpc, from: vi.fn() });
+
+    await expect(
+      db.claimAttempt({
+        sessionId,
+        userId,
+        attemptId,
+        modelId: "gpt-realtime-2.1-mini",
+        transport: "openai-webrtc",
+      }),
+    ).resolves.toMatchObject({ claimed: true, attemptId });
+    expect(rpc).toHaveBeenCalledWith("claim_telefun_realtime_attempt", {
+      p_session_id: sessionId,
+      p_user_id: userId,
+      p_attempt_id: attemptId,
+      p_model_id: "gpt-realtime-2.1-mini",
+      p_transport: "openai-webrtc",
+    });
+  });
+
   it("preserves a business rejection row when the claim RPC returns nullable IDs", async () => {
     const rpc = vi.fn(async () => ({
       data: [

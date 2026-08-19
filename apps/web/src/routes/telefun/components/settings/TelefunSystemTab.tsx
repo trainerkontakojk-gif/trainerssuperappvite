@@ -7,6 +7,7 @@ import { SIMULATION_CHALLENGES } from "../../services/simulationChallenges";
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
 import {
   isAllowedTelefunWebRtc,
+  isTelefunWebRtcModelAllowed,
   type TelefunWebRtcCapability,
 } from "../../services/telefunWebRtcCapability";
 
@@ -66,8 +67,8 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
             const isSelected = selectedTelefunModel === model.id;
             const isOpenAI = model.provider === "openai";
             const isWebRtcPilot =
-              model.id === webRtcCapability?.modelId &&
-              isAllowedTelefunWebRtc(webRtcCapability);
+              isAllowedTelefunWebRtc(webRtcCapability) &&
+              isTelefunWebRtcModelAllowed(webRtcCapability, model.id);
             const isDisabled = isOpenAI && !openAIReady && !isWebRtcPilot;
             return (
               <button
@@ -128,7 +129,10 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
           })}
         </div>
         {isAllowedTelefunWebRtc(webRtcCapability) &&
-        selectedTelefunModel === webRtcCapability?.modelId ? (
+        isTelefunWebRtcModelAllowed(
+          webRtcCapability,
+          selectedTelefunModel,
+        ) ? (
           <div className="space-y-2 rounded-xl border border-border bg-card/30 p-4">
             <p className="text-xs font-semibold text-foreground">
               Transport panggilan (pilot non-produksi)

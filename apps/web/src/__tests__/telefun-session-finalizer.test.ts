@@ -651,7 +651,7 @@ describe("Telefun Session Finalizer", () => {
 
     expect(result.scoringStatus).toBe("failed");
     expect(result.record.voiceAssessment).toBeUndefined();
-    expect(result.record.score).toBe(0);
+    expect(result.record.score).toBeUndefined();
   });
 
   it("marks upload failure and skips scoring when user id is unavailable", async () => {
@@ -758,6 +758,128 @@ describe("Telefun Session Finalizer", () => {
     expect(patchMetricsIdx).toBeLessThan(scoreIdx);
   });
 
+  it("seeds the recording transition scoringStatus into the saved record before polling starts", async () => {
+    const result = await saveTelefunSession({
+      sessionId: "session-seeded-status",
+      fullBlob: new Blob(["full"]),
+      agentBlob: null,
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: { telefunTransport: "openai-webrtc" } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(
+          async () => "user-1/session-seeded-status/full_call.webm",
+        ),
+        patchSession: vi.fn(async () => undefined),
+        finalizeRecording: vi.fn(async () => ({
+          recordingStatus: "ready" as const,
+          recordingReady: true,
+          scoringReady: true,
+          scoringStatus: "processing" as const,
+        })),
+        remuxRecording: vi.fn(async () => ({
+          success: true,
+          data: {
+            remuxed: true,
+            recordings: {
+              "user-1/session-seeded-status/full_call.webm": {
+                originalPath: "user-1/session-seeded-status/full_call.webm",
+                seekablePath:
+                  "user-1/session-seeded-status/full_call.seekable.webm",
+                remuxed: true,
+              },
+            },
+            recordingReady: true,
+          },
+        })),
+        scoreSession: vi.fn(),
+      },
+    });
+
+    expect(result.record.scoringStatus).toBe("processing");
+    expect(result.record.score).toBeUndefined();
+    expect(result.record.feedback).toBe("");
+  });
+
+  it("prefers the remux scoringStatus when the transition carried none", async () => {
+    const result = await saveTelefunSession({
+      sessionId: "session-remux-seeded-status",
+      fullBlob: new Blob(["full"]),
+      agentBlob: null,
+      duration: 12,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: { telefunTransport: "openai-webrtc" } as TelefunAppSettings,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(
+          async () => "user-1/session-remux-seeded-status/full_call.webm",
+        ),
+        patchSession: vi.fn(async () => undefined),
+        finalizeRecording: vi.fn(async () => ({
+          recordingStatus: "uploaded" as const,
+          recordingReady: false,
+          scoringReady: false,
+        })),
+        remuxRecording: vi.fn(async () => ({
+          success: true,
+          data: {
+            remuxed: true,
+            recordings: {
+              "user-1/session-remux-seeded-status/full_call.webm": {
+                originalPath:
+                  "user-1/session-remux-seeded-status/full_call.webm",
+                seekablePath:
+                  "user-1/session-remux-seeded-status/full_call.seekable.webm",
+                remuxed: true,
+              },
+            },
+            recordingReady: true,
+            scoringReady: true,
+            scoringStatus: "completed" as const,
+          },
+        })),
+        scoreSession: vi.fn(),
+      },
+    });
+
+    expect(result.record.scoringStatus).toBe("completed");
+  });
+
+  it("marks the finalized record completed when client scoring succeeds", async () => {
+    const result = await finalizeTelefunSession({
+      sessionId: "session-finalize-completed",
+      fullBlob: null,
+      agentBlob: new Blob(["agent"]),
+      duration: 15,
+      metrics: baseMetrics(),
+      localUrl: "blob:local",
+      sessionConfig: null,
+      scenarioTitle: "Skenario",
+      consumerName: "Konsumen",
+      dependencies: {
+        getUserId: vi.fn(async () => "user-1"),
+        uploadRecording: vi.fn(async () => "path"),
+        patchSession: vi.fn(async () => {}),
+        finalizeRecording: vi.fn(async () => {}),
+        scoreSession: vi.fn(async () => ({
+          score: 8,
+          feedback: "Bagus",
+          assessment: { ...mockAssessment, overallScore: 8 },
+        })),
+      },
+    });
+
+    expect(result.record.scoringStatus).toBe("completed");
+    expect(result.record.score).toBe(8);
+  });
+
   it("retains hold metrics in patch even when scoring fails (no agent recording)", async () => {
     const capturedBodies: Array<{
       session_metrics?: SessionMetrics;
@@ -856,7 +978,7 @@ describe("Telefun Session Finalizer", () => {
     });
 
     await Promise.resolve();
-    expect(saved.record.score).toBe(0);
+    expect(saved.record.score).toBeUndefined();
     expect(scoreSession).toHaveBeenCalledTimes(1);
     expect(scoringResolved).toBe(false);
 

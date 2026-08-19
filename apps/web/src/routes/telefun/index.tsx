@@ -19,6 +19,7 @@ import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
 import { notify } from "../../lib/toast";
+import { ApiError } from "../../lib/api";
 import type { CallRecord } from "./types";
 import {
   canOverwriteTelefunLocalHistory,
@@ -42,15 +43,21 @@ import {
   getTelefunSettings,
   saveTelefunSettings,
   getTelefunSessions,
+  getTelefunSession,
   createTelefunSession,
   deleteTelefunSession,
   clearTelefunHistory,
   mapTelefunSessionRow,
+  upsertTelefunSessionRecord,
   getTelefunWebRtcCapability,
 } from "./telefunApi";
 import {
+  createTelefunSessionReconciler,
+  type TelefunSessionReconciler,
+} from "./sessionReconciler";
+import {
   isAllowedTelefunWebRtc,
-  OPENAI_WEBRTC_MODEL_ID,
+  isTelefunWebRtcModelAllowed,
   OPENAI_WEBRTC_TRANSPORT,
 } from "./services/telefunWebRtcCapability";
 import { buildTelefunLiveSystemInstruction } from "./services/promptBuilder";
@@ -117,11 +124,67 @@ export default function TelefunLanding() {
   );
   const pageMountedRef = useRef(true);
   const localHistoryIsCorruptRef = useRef(false);
+  const historyRef = useRef<CallRecord[]>([]);
+  const reviewRecordRef = useRef<CallRecord | null>(null);
+  const reviewOpenRef = useRef(false);
+  const historyOpenRef = useRef(false);
 
   const releaseRetainedObjectUrl = useCallback(
     () => retainedObjectUrlOwner.release(),
     [retainedObjectUrlOwner],
   );
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+  useEffect(() => {
+    reviewRecordRef.current = reviewRecord;
+  }, [reviewRecord]);
+  useEffect(() => {
+    reviewOpenRef.current = isReviewOpen;
+  }, [isReviewOpen]);
+
+  const applyAuthoritativeRecord = useCallback((record: CallRecord) => {
+    const result = upsertTelefunSessionRecord({
+      record,
+      history: historyRef.current,
+      reviewRecord: reviewOpenRef.current ? reviewRecordRef.current : null,
+      canOverwriteLocalHistory: canOverwriteTelefunLocalHistory(
+        localHistoryIsCorruptRef.current,
+      ),
+    });
+    historyRef.current = result.history;
+    setHistory(result.history);
+    if (reviewOpenRef.current) {
+      reviewRecordRef.current = result.reviewRecord;
+      setReviewRecord(result.reviewRecord);
+    }
+    if (result.localHistory !== undefined) {
+      localStorage.setItem("telefun_history", result.localHistory);
+    }
+  }, []);
+
+  const sessionReconcilerRef = useRef<TelefunSessionReconciler | null>(null);
+  useEffect(() => {
+    const reconciler = createTelefunSessionReconciler({
+      fetchSessionDetail: async (sessionId, { signal }) => {
+        try {
+          return await getTelefunSession(sessionId, { signal });
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "NOT_FOUND") {
+            return null;
+          }
+          throw error;
+        }
+      },
+      onRow: (row) => applyAuthoritativeRecord(mapTelefunSessionRow(row)),
+    });
+    sessionReconcilerRef.current = reconciler;
+    return () => {
+      reconciler.dispose();
+      sessionReconcilerRef.current = null;
+    };
+  }, [applyAuthoritativeRecord]);
 
   const retainObjectUrl = useCallback(
     (url: string | null): boolean =>
@@ -217,6 +280,45 @@ export default function TelefunLanding() {
     };
   }, []);
 
+  // Reopening the History modal triggers one authoritative list refetch.
+  useEffect(() => {
+    if (!isHistoryOpen) {
+      historyOpenRef.current = false;
+      return;
+    }
+    if (historyOpenRef.current) return;
+    historyOpenRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await getTelefunSessions();
+        if (cancelled) return;
+        const dbRecords = rows.map(mapTelefunSessionRow);
+        const dbRecordIds = new Set(dbRecords.map((r) => r.id));
+        const merged = [
+          ...dbRecords,
+          ...historyRef.current.filter((r) => !dbRecordIds.has(r.id)),
+        ].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        );
+        setHistory(merged);
+        if (
+          shouldPersistTelefunLocalHistory(
+            merged,
+            localHistoryIsCorruptRef.current,
+          )
+        ) {
+          localStorage.setItem("telefun_history", JSON.stringify(merged));
+        }
+      } catch {
+        // ignore transient reopen failures; the modal still shows local state
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isHistoryOpen]);
+
   const handleSaveSettings = async (newSettings: TelefunAppSettings) => {
     try {
       await saveTelefunSettings(newSettings);
@@ -264,14 +366,12 @@ export default function TelefunLanding() {
     const requestedTransport = settings.telefunTransport ?? "gemini-live";
     const requestsWebRtc = requestedTransport === OPENAI_WEBRTC_TRANSPORT;
     if (requestsWebRtc) {
-      if (settings.telefunModelId !== OPENAI_WEBRTC_MODEL_ID) {
-        notify.error("OpenAI WebRTC hanya tersedia untuk GPT Realtime 2.1.");
-        setActiveScenario(null);
-        return;
-      }
       try {
         const capability = await getTelefunWebRtcCapability();
-        if (!isAllowedTelefunWebRtc(capability)) {
+        if (
+          !isAllowedTelefunWebRtc(capability) ||
+          !isTelefunWebRtcModelAllowed(capability, settings.telefunModelId)
+        ) {
           notify.error(
             "Transport OpenAI WebRTC belum tersedia untuk akun ini.",
           );
@@ -287,9 +387,7 @@ export default function TelefunLanding() {
 
     const sessionConfig: TelefunAppSettings = {
       ...settings,
-      telefunModelId: requestsWebRtc
-        ? OPENAI_WEBRTC_MODEL_ID
-        : settings.telefunModelId,
+      telefunModelId: settings.telefunModelId,
       telefunTransport: requestedTransport,
       activeScenario: randomScenario,
       activeConsumerType: consumerType,
@@ -494,6 +592,9 @@ export default function TelefunLanding() {
 
       setReviewRecord(record);
       setIsReviewOpen(true);
+      if (isWebRtcSession) {
+        sessionReconcilerRef.current?.start(finalSessionId);
+      }
     } catch (e) {
       usedFallbackRecord = true;
       console.error("Failed to finalize session", e);
@@ -588,7 +689,8 @@ export default function TelefunLanding() {
 
             const scoredRecord: CallRecord = {
               ...savedSessionForScoring.record,
-              score: scoring.score ?? 0,
+              // A missing score must stay undefined ("—") — never force it to 0.
+              score: scoring.score ?? undefined,
               feedback: scoring.feedback,
               voiceAssessment: scoring.voiceAssessment,
             };
@@ -643,6 +745,7 @@ export default function TelefunLanding() {
     if (reviewRecord?.id === id) {
       releaseRetainedObjectUrl();
     }
+    sessionReconcilerRef.current?.stop(id);
     try {
       await deleteTelefunSession(id);
       setHistory((prev) => {
@@ -691,6 +794,15 @@ export default function TelefunLanding() {
         prev ? { ...prev, voiceAssessment: assessment } : null,
       );
     }
+    // Manual scoring success: refetch the authoritative detail so score,
+    // feedback, voiceAssessment, and scoringStatus change together. The
+    // session reconciler stops polling — the authoritative row is fetched now.
+    sessionReconcilerRef.current?.stop(sessionId);
+    void getTelefunSession(sessionId)
+      .then((row) => applyAuthoritativeRecord(mapTelefunSessionRow(row)))
+      .catch(() => {
+        // The local assessment stays visible; History/Review remain truthful.
+      });
   };
 
   return (
@@ -720,6 +832,9 @@ export default function TelefunLanding() {
           }}
           record={reviewRecord}
           onAssessmentComplete={handleAssessmentComplete}
+          onRequestScoringRefresh={(sessionId) => {
+            sessionReconcilerRef.current?.watch(sessionId);
+          }}
         />
       </Suspense>
 

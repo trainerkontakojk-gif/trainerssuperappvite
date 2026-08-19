@@ -1071,4 +1071,99 @@ describe("OpenAI Realtime response usage", () => {
       final_cost_idr: 997_500,
     });
   });
+
+  it("persists Mini usage with the exact Mini model and its verified pricing", async () => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "ai_pricing_settings") {
+        return buildQueryResult({
+          input_price_usd_per_million: 0.6,
+          output_price_usd_per_million: 2.4,
+          input_text_price_usd_per_million: 0.6,
+          cached_input_text_price_usd_per_million: 0.06,
+          input_audio_price_usd_per_million: 10,
+          cached_input_audio_price_usd_per_million: 0.3,
+          output_text_price_usd_per_million: 2.4,
+          output_audio_price_usd_per_million: 20,
+        });
+      }
+      if (table === "ai_billing_settings") {
+        return buildQueryResult({ usd_to_idr_rate: 15_000 });
+      }
+      if (table === "ai_usage_logs") {
+        return {
+          insert: vi.fn(async (payload: Record<string, unknown>) => {
+            insertedUsagePayloads.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    });
+
+    const accumulator = createOpenAIUsageAccumulator();
+    observeOpenAIUsage(accumulator, {
+      source: "openai_realtime_response",
+      id: "resp_mini_persist",
+      usage: responseUsage,
+    });
+
+    await expect(
+      flushOpenAIRealtimeUsage(
+        "telefun-webrtc:mini-attempt",
+        "user-1",
+        summarizeOpenAIUsageAccumulator(accumulator)!,
+        "gpt-realtime-2.1-mini",
+        120_000,
+      ),
+    ).resolves.toBe(true);
+
+    expect(insertedUsagePayloads).toHaveLength(1);
+    expect(insertedUsagePayloads[0]).toMatchObject({
+      request_id: "telefun-webrtc:mini-attempt",
+      provider: "openai",
+      model_id: "gpt-realtime-2.1-mini",
+      billing_model: "openai_realtime_per_response_v1",
+      input_text_tokens: 1_000_000,
+      cached_input_text_tokens: 250_000,
+      input_audio_tokens: 2_000_000,
+      cached_input_audio_tokens: 500_000,
+      output_text_tokens: 100_000,
+      output_audio_tokens: 200_000,
+      cached_input_text_price_usd_per_million: 0.06,
+      cached_input_audio_price_usd_per_million: 0.3,
+      estimated_cost_usd: 19.855,
+      estimated_cost_idr: 297_825,
+      session_duration_ms: 120_000,
+    });
+  });
+
+  it("records the exact Mini model on a failed usage audit", async () => {
+    insertedUsagePayloads.length = 0;
+    mockFrom.mockImplementation((table: string) =>
+      table === "ai_usage_logs"
+        ? {
+            insert: vi.fn(async (payload: Record<string, unknown>) => {
+              insertedUsagePayloads.push(payload);
+              return { error: null };
+            }),
+          }
+        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+    );
+
+    await expect(
+      recordFailedOpenAIRealtimeUsage(
+        "telefun-webrtc:mini-attempt-failed",
+        "user-1",
+        "gpt-realtime-2.1-mini",
+        "missing usage details",
+      ),
+    ).resolves.toBe(true);
+    expect(insertedUsagePayloads[0]).toMatchObject({
+      request_id: "telefun-webrtc:mini-attempt-failed",
+      provider: "openai",
+      model_id: "gpt-realtime-2.1-mini",
+      status: "failed",
+    });
+  });
 });

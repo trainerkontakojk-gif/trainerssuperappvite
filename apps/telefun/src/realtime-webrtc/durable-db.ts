@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../env.js";
+import {
+  assertTelefunWebRtcModelId,
+  type TelefunWebRtcModelId,
+} from "./contracts.js";
 
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -40,7 +44,7 @@ export interface TelefunWebRtcDb {
     sessionId: string;
     userId: string;
     attemptId: string;
-    modelId: "gpt-realtime-2.1";
+    modelId: TelefunWebRtcModelId;
     transport: "openai-webrtc";
   }): Promise<WebRtcAttemptClaim>;
   getAttempt(
@@ -52,6 +56,7 @@ export interface TelefunWebRtcDb {
     state: AttemptState;
     usageRequestId: string;
     providerCallIdHash: string | null;
+    modelId: TelefunWebRtcModelId;
   } | null>;
   /** Atomically fails a still-active pre-created session only when no attempt exists. */
   failSessionWithoutAttempt?: (
@@ -423,7 +428,7 @@ export function createTelefunWebRtcDb(
         const query = client.from("telefun_realtime_attempts") as DurableQuery;
         const { data, error } = await query
           .select(
-            "id, finalization_key, state, usage_request_id, provider_call_id_hash",
+            "id, finalization_key, state, usage_request_id, provider_call_id_hash, model_id",
           )
           .eq("session_id", sessionId)
           .eq("user_id", userId)
@@ -449,6 +454,7 @@ export function createTelefunWebRtcDb(
           state: readAttemptState(row),
           usageRequestId,
           providerCallIdHash,
+          modelId: assertTelefunWebRtcModelId(row.model_id),
         };
       } catch (error) {
         if (error instanceof WebRtcDurabilityError) throw error;

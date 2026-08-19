@@ -161,3 +161,67 @@ describe("Telefun OpenAI WebRTC Phase 4 migration contract", () => {
     expect(completion).not.toContain("FOR UPDATE");
   });
 });
+
+const miniMigrationName =
+  "20260814000000_telefun_openai_webrtc_mini_model.sql";
+
+describe("Telefun OpenAI WebRTC Mini model migration contract", () => {
+  it("ships the new additive Mini migration artifact", () => {
+    expect(
+      existsSync(
+        join(process.cwd(), "../../supabase/migrations", miniMigrationName),
+      ),
+    ).toBe(true);
+  });
+
+  it("widens the attempt model check to the exact two-model registry set", () => {
+    const sql = readMigration(miniMigrationName);
+    expect(sql).toContain(
+      "DROP CONSTRAINT IF EXISTS telefun_realtime_attempts_model_check",
+    );
+    expect(sql).toContain(
+      "CHECK (model_id IN ('gpt-realtime-2.1', 'gpt-realtime-2.1-mini'))",
+    );
+    expect(sql).not.toContain("CHECK (model_id = 'gpt-realtime-2.1')");
+  });
+
+  it("claims only the exact two-model registry set with a history-row model match", () => {
+    const sql = readMigration(miniMigrationName);
+    const start = sql.indexOf(
+      "CREATE OR REPLACE FUNCTION public.claim_telefun_realtime_attempt(",
+    );
+    expect(start).toBeGreaterThanOrEqual(0);
+    const claimBody = sql.slice(start);
+
+    expect(claimBody).toContain("SECURITY DEFINER");
+    expect(claimBody).toContain("SET search_path = ''");
+    expect(claimBody).toContain(
+      "p_model_id NOT IN ('gpt-realtime-2.1', 'gpt-realtime-2.1-mini')",
+    );
+    expect(claimBody).toContain(
+      "v_history_model_id IS DISTINCT FROM p_model_id",
+    );
+    expect(claimBody).toContain("p_transport IS DISTINCT FROM 'openai-webrtc'");
+    expect(claimBody).toContain(
+      "v_history_transport IS DISTINCT FROM 'openai-webrtc'",
+    );
+    expect(claimBody).toContain("v_history_status <> 'active'");
+    expect(claimBody).toContain("v_history_user_id <> p_user_id");
+    expect(claimBody).toContain("'telefun-webrtc:' || p_attempt_id::text");
+    expect(claimBody).toContain("v_finalization_key := gen_random_uuid()");
+    expect(claimBody).toContain("attempt_exists_terminal");
+    expect(claimBody).toContain("attempt_exists_active");
+    expect(claimBody).toContain("FOR UPDATE");
+    expect(claimBody).not.toContain("p_model_id <> 'gpt-realtime-2.1'");
+  });
+
+  it("preserves service-role-only grants for the replaced claim RPC", () => {
+    const sql = readMigration(miniMigrationName);
+    expect(sql).toContain(
+      "REVOKE ALL ON FUNCTION public.claim_telefun_realtime_attempt(UUID, UUID, UUID, TEXT, TEXT) FROM public, anon, authenticated",
+    );
+    expect(sql).toContain(
+      "GRANT EXECUTE ON FUNCTION public.claim_telefun_realtime_attempt(UUID, UUID, UUID, TEXT, TEXT) TO service_role",
+    );
+  });
+});

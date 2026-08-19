@@ -4,9 +4,9 @@ import {
   summarizeOpenAIUsageAccumulator,
 } from "../usage.js";
 import {
-  buildCanonicalPocSession,
-  POC_MODEL_ID,
+  buildCanonicalWebRtcSession,
   POC_TRANSPORT,
+  type TelefunWebRtcModelId,
 } from "./contracts.js";
 import { OpenAiCallCreationError } from "./openai-calls-client.js";
 import { SidebandEventObserver } from "./sideband-event-observer.js";
@@ -302,6 +302,7 @@ export function createWebRtcCallManager(
     userId: string,
     sessionId: string,
     attemptId: string,
+    modelId: TelefunWebRtcModelId,
   ): Promise<WebRtcAttemptClaim> => {
     if (!options.db) return Promise.resolve(createLegacyClaim(attemptId));
     return persist("claim_attempt", () =>
@@ -309,7 +310,7 @@ export function createWebRtcCallManager(
         sessionId,
         userId,
         attemptId,
-        modelId: POC_MODEL_ID,
+        modelId,
         transport: POC_TRANSPORT,
       }),
     ).then((claim) => {
@@ -422,7 +423,7 @@ export function createWebRtcCallManager(
             usageRequestId: binding.claim!.usageRequestId,
             userId: binding.userId,
             sessionId: binding.sessionId,
-            modelId: POC_MODEL_ID,
+            modelId: binding.modelId,
             errorMessage: boundedFailureMessage(warning),
           }),
         );
@@ -454,6 +455,7 @@ export function createWebRtcCallManager(
             usageRequestId: binding.claim!.usageRequestId,
             userId: binding.userId,
             sessionId: binding.sessionId,
+            modelId: binding.modelId,
             aggregate,
             durationMs,
           }),
@@ -730,6 +732,7 @@ export function createWebRtcCallManager(
       userId,
       sessionId,
       attemptId: attempt.attemptId,
+      modelId: attempt.modelId,
       claimPromise: Promise.resolve(claim),
       leasePromise: Promise.resolve(null),
       now,
@@ -843,6 +846,7 @@ export function createWebRtcCallManager(
       userId,
       sessionId,
       offerSdp,
+      modelId,
       livePromptInstructions,
       consumerGender,
       signal,
@@ -853,7 +857,8 @@ export function createWebRtcCallManager(
       if (bindings.has(sessionId)) throw new WebRtcCallConflictError();
       let canonicalSession;
       try {
-        canonicalSession = buildCanonicalPocSession(
+        canonicalSession = buildCanonicalWebRtcSession(
+          modelId,
           livePromptInstructions,
           consumerGender,
         );
@@ -866,7 +871,7 @@ export function createWebRtcCallManager(
       // durable lifecycle instead of racing a pre-created history row.
       const rateLimitPromise = consumeStartRateLimit({ userId, sessionId });
       const claimPromise = rateLimitPromise.then(() =>
-        claimAttempt(userId, sessionId, attemptId),
+        claimAttempt(userId, sessionId, attemptId, modelId),
       );
       const leasePromise = claimPromise.then(() =>
         acquireLease({ userId, sessionId, attemptId }),
@@ -875,6 +880,7 @@ export function createWebRtcCallManager(
         userId,
         sessionId,
         attemptId,
+        modelId,
         claimPromise,
         leasePromise,
         now,

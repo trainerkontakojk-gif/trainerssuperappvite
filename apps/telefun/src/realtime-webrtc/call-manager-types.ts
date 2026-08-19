@@ -4,6 +4,7 @@ import {
   type OpenAIUsageAggregate,
 } from "../usage.js";
 import { TranscriptCollector } from "../transcript.js";
+import type { TelefunWebRtcModelId } from "./contracts.js";
 import {
   WebRtcDurabilityError,
   type AttemptOutcome,
@@ -98,6 +99,7 @@ export interface WebRtcCallManagerOptions {
     usageRequestId: string;
     userId: string;
     sessionId: string;
+    modelId: TelefunWebRtcModelId;
     aggregate: OpenAIUsageAggregate;
     durationMs: number;
   }) => Promise<boolean>;
@@ -108,7 +110,7 @@ export interface WebRtcCallManagerOptions {
     usageRequestId: string;
     userId: string;
     sessionId: string;
-    modelId: string;
+    modelId: TelefunWebRtcModelId;
     errorMessage: string;
   }) => Promise<boolean>;
   createAttemptId?: () => string;
@@ -131,6 +133,7 @@ export interface WebRtcCallManager {
     userId: string;
     sessionId: string;
     offerSdp: string;
+    modelId: TelefunWebRtcModelId;
     livePromptInstructions?: string | null;
     consumerGender?: string | null;
     signal?: AbortSignal;
@@ -150,6 +153,7 @@ export interface WebRtcCallManager {
 }
 
 export interface ActiveBinding extends WebRtcCallBinding {
+  modelId: TelefunWebRtcModelId;
   startedAtMs: number;
   transcript: TranscriptCollector;
   usage: ReturnType<typeof createOpenAIUsageAccumulator>;
@@ -180,6 +184,7 @@ export function createActiveBinding(input: {
   userId: string;
   sessionId: string;
   attemptId: string;
+  modelId: TelefunWebRtcModelId;
   claimPromise: Promise<WebRtcAttemptClaim>;
   leasePromise: Promise<DistributedWebRtcLeaseHandle | null>;
   now: () => number;
@@ -188,6 +193,7 @@ export function createActiveBinding(input: {
     attemptId: input.attemptId,
     userId: input.userId,
     sessionId: input.sessionId,
+    modelId: input.modelId,
     callId: "",
     state: "claimed",
     startedAtMs: input.now(),

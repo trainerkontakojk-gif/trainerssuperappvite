@@ -7,6 +7,7 @@ import {
   PermanentScoringError,
   TransientScoringError,
 } from "../lib/telefun-scoring-errors";
+import { buildTelefunHistoryScoringView } from "../lib/telefun-feedback";
 
 describe("classifyScoringError", () => {
   it("classifies PermanentScoringError instance as permanent", () => {
@@ -140,5 +141,78 @@ describe("calculateNextAttemptAt", () => {
 describe("MAX_SCORING_ATTEMPTS", () => {
   it("is 3", () => {
     expect(MAX_SCORING_ATTEMPTS).toBe(3);
+  });
+});
+
+describe("buildTelefunHistoryScoringView retryable derivation", () => {
+  it("marks a retryable failed row retryable with a public-safe next attempt", () => {
+    const view = buildTelefunHistoryScoringView({
+      scoring_status: "failed",
+      scoring_attempt_count: 1,
+      scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+    });
+
+    expect(view.scoring_status).toBe("failed");
+    expect(view.scoring_next_attempt_at).toBe("2026-08-15T09:00:00.000Z");
+    expect(view.scoring_retryable).toBe(true);
+  });
+
+  it("treats a missing attempt count with a scheduled next attempt as retryable", () => {
+    const view = buildTelefunHistoryScoringView({
+      scoring_status: "failed",
+      scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+    });
+    expect(view.scoring_retryable).toBe(true);
+  });
+
+  it("marks exhausted failures (attempt count at MAX_SCORING_ATTEMPTS) as not retryable", () => {
+    const view = buildTelefunHistoryScoringView({
+      scoring_status: "failed",
+      scoring_attempt_count: MAX_SCORING_ATTEMPTS,
+      scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+    });
+    expect(view.scoring_retryable).toBe(false);
+  });
+
+  it("marks permanent failures (no next attempt) as not retryable", () => {
+    const view = buildTelefunHistoryScoringView({
+      scoring_status: "failed",
+      scoring_attempt_count: 1,
+      scoring_next_attempt_at: null,
+    });
+    expect(view.scoring_retryable).toBe(false);
+  });
+
+  it("never marks pending, processing, or completed rows retryable", () => {
+    expect(
+      buildTelefunHistoryScoringView({ scoring_status: "pending" })
+        .scoring_retryable,
+    ).toBe(false);
+    expect(
+      buildTelefunHistoryScoringView({ scoring_status: "processing" })
+        .scoring_retryable,
+    ).toBe(false);
+    expect(
+      buildTelefunHistoryScoringView({ scoring_status: "completed" })
+        .scoring_retryable,
+    ).toBe(false);
+  });
+
+  it("keeps a null score null and a zero score as zero", () => {
+    expect(buildTelefunHistoryScoringView({ score: null }).score).toBeNull();
+    expect(buildTelefunHistoryScoringView({ score: 0 }).score).toBe(0);
+  });
+
+  it("projects a legacy row with null status, null score, and null feedback", () => {
+    const view = buildTelefunHistoryScoringView({});
+    expect(view).toEqual({
+      scoring_status: null,
+      scoring_ready_at: null,
+      scoring_next_attempt_at: null,
+      scoring_retryable: false,
+      score: null,
+      feedback: null,
+      voice_assessment: null,
+    });
   });
 });

@@ -59,6 +59,7 @@ export type RecordingRemuxResponse = {
     recordingStatus?: "uploaded" | "partial" | "ready" | "failed";
     recordingReady?: boolean;
     scoringReady?: boolean;
+    scoringStatus?: "pending" | "processing" | "completed" | "failed";
   };
   errorCode?: string;
 };

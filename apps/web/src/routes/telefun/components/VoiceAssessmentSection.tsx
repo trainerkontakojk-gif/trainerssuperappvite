@@ -31,6 +31,7 @@ import { telefunClient, unwrapResponse } from "../../../lib/api";
 interface VoiceAssessmentSectionProps {
   sessionId: string;
   initialAssessment?: VoiceQualityAssessment | null;
+  initialScoringStatus?: "pending" | "processing" | "failed" | "completed" | null;
   hasAgentRecording?: boolean;
   onAssessmentUpdate?: (assessment: VoiceQualityAssessment) => void;
   transcript?: TelefunTranscriptEntry[] | null;
@@ -52,6 +53,7 @@ const STATUS_LABELS: Record<string, string> = {
 export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   sessionId,
   initialAssessment,
+  initialScoringStatus,
   hasAgentRecording = true,
   onAssessmentUpdate,
   transcript,
@@ -62,7 +64,13 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scoringStatus, setScoringStatus] = useState<
     "idle" | "pending" | "processing" | "failed" | null
-  >(null);
+  >(
+    initialScoringStatus === "pending" ||
+      initialScoringStatus === "processing" ||
+      initialScoringStatus === "failed"
+      ? initialScoringStatus
+      : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
 
@@ -111,7 +119,7 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
     }
   };
 
-  if (!assessment && !isAnalyzing && scoringStatus !== "processing" && scoringStatus !== "pending") {
+  if (!assessment && !isAnalyzing && scoringStatus !== "processing" && scoringStatus !== "pending" && scoringStatus !== "failed") {
     return (
       <div className="rounded-2xl border border-dashed border-slate-950/10 bg-slate-950/5 p-8 text-center dark:border-white/10 dark:bg-white/5">
         <Sparkles className="mx-auto mb-3 h-8 w-8 text-emerald-500" />

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useTelefunSettingsDraft } from "../routes/telefun/components/settings/useTelefunSettingsDraft";
 import type { TelefunProviderReadinessState } from "../routes/telefun/hooks/useTelefunProviderReadiness";
+import type { TelefunWebRtcCapability } from "../routes/telefun/services/telefunWebRtcCapability";
 import {
   DEFAULT_TELEFUN_SETTINGS,
   type TelefunAppSettings,
@@ -183,5 +184,126 @@ describe("Telefun settings draft model/voice synchronization", () => {
     expect(result.current.selectedTelefunModel).toBe(
       "gemini-3.0-flash-live-preview",
     );
+  });
+
+  it("preserves a selected Mini+WebRTC draft without forcing Full or audio", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    const miniSettings: TelefunAppSettings = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1-mini",
+      telefunTransport: "openai-audio",
+    };
+    const miniWebRtcCapability: TelefunWebRtcCapability = {
+      enabled: true,
+      allowed: true,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
+    };
+
+    const { result } = renderHook(() =>
+      useTelefunSettingsDraft({
+        settings: miniSettings,
+        isOpen: true,
+        onSave,
+        onClose,
+        providerReadiness: ready,
+        webRtcCapability: miniWebRtcCapability,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1-mini");
+    });
+
+    act(() => result.current.setSelectedTelefunTransport("openai-webrtc"));
+    expect(result.current.selectedTelefunTransport).toBe("openai-webrtc");
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+    const saved = onSave.mock.calls[0][0] as TelefunAppSettings;
+    expect(saved.telefunModelId).toBe("gpt-realtime-2.1-mini");
+    expect(saved.telefunTransport).toBe("openai-webrtc");
+  });
+
+  it("rejects a WebRTC transport selection for a model missing from modelIds", async () => {
+    const miniSettings: TelefunAppSettings = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1-mini",
+      telefunTransport: "openai-audio",
+    };
+    const fullOnlyCapability: TelefunWebRtcCapability = {
+      enabled: true,
+      allowed: true,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
+    };
+
+    const { result } = renderHook(() =>
+      useTelefunSettingsDraft({
+        settings: miniSettings,
+        isOpen: true,
+        onSave: vi.fn(),
+        onClose: vi.fn(),
+        providerReadiness: ready,
+        webRtcCapability: fullOnlyCapability,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1-mini");
+    });
+
+    act(() => result.current.setSelectedTelefunTransport("openai-webrtc"));
+    expect(result.current.selectedTelefunTransport).toBe("openai-audio");
+  });
+
+  it("drops a persisted Mini+WebRTC selection when the capability does not admit Mini", async () => {
+    const miniWebRtcSettings: TelefunAppSettings = {
+      ...DEFAULT_TELEFUN_SETTINGS,
+      telefunModelId: "gpt-realtime-2.1-mini",
+      telefunTransport: "openai-webrtc",
+    };
+    const fullOnlyCapability: TelefunWebRtcCapability = {
+      enabled: true,
+      allowed: true,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
+    };
+
+    const { result, rerender } = renderHook(
+      ({ capability }: { capability: TelefunWebRtcCapability | null }) =>
+        useTelefunSettingsDraft({
+          settings: miniWebRtcSettings,
+          isOpen: true,
+          onSave: vi.fn(),
+          onClose: vi.fn(),
+          providerReadiness: unavailable,
+          webRtcCapability: capability,
+        }),
+      {
+        initialProps: { capability: null } as {
+          capability: TelefunWebRtcCapability | null;
+        },
+      },
+    );
+
+    rerender({ capability: fullOnlyCapability });
+
+    await waitFor(() => {
+      expect(result.current.selectedTelefunModel).toBe(
+        DEFAULT_TELEFUN_SETTINGS.telefunModelId,
+      );
+      expect(result.current.localSettings.telefunModelId).toBe(
+        DEFAULT_TELEFUN_SETTINGS.telefunModelId,
+      );
+      expect(result.current.localSettings.telefunModelWarningReason).toBe(
+        "provider-unavailable",
+      );
+    });
   });
 });

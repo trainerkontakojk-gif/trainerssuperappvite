@@ -3,7 +3,6 @@ import {
   summarizeOpenAIUsageAccumulator,
 } from "../usage.js";
 import { WebRtcDurabilityError, type AttemptOutcome } from "../db.js";
-import { POC_MODEL_ID } from "./contracts.js";
 import type {
   ActiveBinding,
   WebRtcCallManagerOptions,
@@ -98,6 +97,7 @@ export function finalizeLegacy(
                   usageRequestId: binding.claim!.usageRequestId,
                   userId: binding.userId,
                   sessionId: binding.sessionId,
+                  modelId: binding.modelId,
                   aggregate,
                   durationMs,
                 }),
@@ -113,7 +113,7 @@ export function finalizeLegacy(
               usageRequestId: binding.claim!.usageRequestId,
               userId: binding.userId,
               sessionId: binding.sessionId,
-              modelId: POC_MODEL_ID,
+              modelId: binding.modelId,
               errorMessage: boundedFailureMessage(warnings),
             }),
           );

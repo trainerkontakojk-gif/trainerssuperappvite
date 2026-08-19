@@ -18,7 +18,8 @@
     "test:full": "vitest run",
     "test:db-integration": "vitest run --config vitest.config.db-integration.ts",
     "lint": "eslint .",
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.ts",
+    "start:telefun-scoring-worker": "tsx src/workers/telefun-scoring-worker-runtime.ts"
   },
   "dependencies": {
     "@google/genai": "^2.9.0",

@@ -2,7 +2,7 @@
 
 > **TELEFUN** = **Tele**phone **Fun**
 > Modul simulasi panggilan suara untuk melatih agen menangani telepon.
-> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off; production hanya dapat dibuka untuk UUID exact allowlist (`gpt-realtime-2.1`; voice server-owned: `cedar` untuk male, `marin` untuk female/default); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Gate P5 tetap partial sampai deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
+> Mendukung baseline **Gemini Live API** (default) dan jalur **OpenAI Realtime WebSocket** yang ada. Jalur **OpenAI WebRTC** terintegrasi secara capability-gated ke **PhoneInterface** dan tetap default-off; production hanya dapat dibuka untuk UUID exact allowlist (model disetujui server via `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`, default Full-only `gpt-realtime-2.1`; voice server-owned: `cedar` untuk male, `marin` untuk female/default); **LiveSession** tetap baseline untuk **Gemini/openai-audio**. Phase 4 menyediakan lifecycle/recording/scoring durable, sedangkan Phase 5 menambahkan distributed lease/quota, rate limit, orphan/network recovery, security boundary, dan observability. Release Train B menambahkan `gpt-realtime-2.1-mini` sebagai model WebRTC kedua yang diaktifkan hanya melalui allowed-model config server. Gate P5 tetap partial sampai deployment/load, external security review, dan real-browser/network evidence benar-benar dijalankan.
 
 Modul Telefun terdiri dari **3 layer** yang bekerja bersama:
 
@@ -96,8 +96,9 @@ Telefun broker ──> OpenAI /v1/realtime/calls (multipart sdp + session)
 Telefun broker ──> sideband wss://api.openai.com/v1/realtime?call_id=...
 ```
 
-- Canonical model: `gpt-realtime-2.1`
-- Canonical server-owned voice: `cedar` untuk consumer `male`; `marin` untuk `female`, null, atau blank
+- Canonical model: `gpt-realtime-2.1` (default Full-only; `gpt-realtime-2.1-mini` hanya setelah disetujui `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` di API + Telefun)
+- Model validated server-side: persisted `telefun_history.telefun_model_id` harus anggota server allowed set (registry ∩ config); model di luar set atau unknown ditolak `404` sebelum provider call; browser tidak pernah mengirim model
+- Canonical server-owned voice: `cedar` untuk consumer `male`; `marin` untuk `female`, null, atau blank (berlaku untuk Full dan Mini; per OpenAI docs `marin`/`cedar` direkomendasikan untuk kedua model)
 - Broker/session authority: active admin/trainer profile + owned pre-created `telefun_history` session only
 - Baseline Gemini Live dan OpenAI WebSocket tetap unchanged
 - No production UI cutover; Phase 3 memakai adapter WebRTC capability-gated di PhoneInterface, sementara LiveSession tetap baseline Gemini/openai-audio
@@ -253,7 +254,8 @@ apps/api/src/
 │   └── telefun-scoring-service.ts    # Scoring worker logic
 │
 ├── workers/
-│   └── telefun-scoring-worker.ts     # Background worker untuk scoring
+│   ├── telefun-scoring-worker.ts           # Pure batch processor (claim/process; testable)
+│   └── telefun-scoring-worker-runtime.ts   # Executable runtime: env fail-fast, loop, shutdown, health
 │
 └── __tests__/
     ├── telefun-routes.test.ts
@@ -423,6 +425,63 @@ evaluateTelefunHoldAssessment() [deterministic]
         ▼
 Patch telefun_history → score, feedback, voice_assessment
 ```
+
+#### Scoring Worker Production Runtime
+
+Worker berjalan sebagai **proses/service terpisah** (bukan loop tersembunyi di proses web API; `apps/api/src/index.ts` tidak pernah mengimpor worker). Jalankan dengan script resmi:
+
+```bash
+pnpm start:telefun-scoring-worker   # root; setara pnpm --filter @trainers/api start:telefun-scoring-worker
+```
+
+Konfigurasi via env (nama exact; invalid/disabled **exit non-zero** dengan log JSON terstruktur — fail-fast, bukan silent no-op):
+
+| Env var | Wajib | Aturan / bound |
+| --- | --- | --- |
+| `TELEFUN_SCORING_WORKER_ENABLED` | ya | Harus persis `"true"`; selain itu worker exit non-zero (kill switch) |
+| `TELEFUN_SCORING_WORKER_INTERVAL_MS` | ya | Integer positif `1000..600000` |
+| `TELEFUN_SCORING_WORKER_BATCH_SIZE` | ya | Integer positif `1..50` |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | Integer positif (default `120`); dipakai untuk claim RPC **dan** deadline shutdown job in-flight |
+| `TELEFUN_SCORING_WORKER_HEALTH_PORT` | opsional | Integer `1024..65535`; mengaktifkan health server internal |
+| `TELEFUN_INTERNAL_TOKEN` | bila health aktif | Secret shared server-only; wajib saat `TELEFUN_SCORING_WORKER_HEALTH_PORT` diset |
+
+Satu batch tidak pernah overlap dengan batch berikutnya (loop `await` serial). `[]` dari queue fetch hanya berarti query sukses tanpa job; DB error pada queue fetch **tidak pernah** dilaporkan sebagai empty/healthy — runtime mencatat `lastErrorClass` (mis. `DatabaseError`, `PostgrestError`) dan health tetap melaporkan degraded, sementara `lastSuccessfulPollAt` menjadi stale untuk alert no-poll.
+
+##### Internal health endpoint
+
+`GET /health` pada server HTTP internal, bind default `127.0.0.1:<TELEFUN_SCORING_WORKER_HEALTH_PORT>` (deployment mem-bind alamat private network Railway; kode tidak pernah listen di `PORT` publik). Auth: `Authorization: Bearer <TELEFUN_INTERNAL_TOKEN>` (perbandingan constant-time); tanpa/bearer salah → `401`. Endpoint **non-billable**, tidak pernah membuka koneksi provider, dan tidak pernah memproses job.
+
+Payload dibatasi **hanya** field berikut — tanpa session ID, user ID, recording path, prompt, transcript, UUID, atau raw exception:
+
+```json
+{
+  "enabled": true,
+  "loopAlive": true,
+  "lastSuccessfulPollAt": "2026-08-14T09:00:00.000Z",
+  "lastErrorClass": "DatabaseError",
+  "queue": { "pending": 0, "processing": 0, "failed": 0 },
+  "oldestEligiblePendingAgeMs": 12000
+}
+```
+
+`lastErrorClass` hanya class/kind error (tidak pernah message). `queue` berisi aggregate terakhir yang sukses (null sebelum ada aggregate sukses); `oldestEligiblePendingAgeMs` = usia job pending eligible tertua, tanpa identifier.
+
+##### Graceful shutdown (SIGTERM/SIGINT)
+
+1. **Stop admission:** tidak ada `claimJob` baru setelah sinyal; batch loop berhenti di antara job.
+2. **Abort bounded:** `AbortSignal` diteruskan ke analysis/provider boundary; deadline = `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS`.
+3. **Bounded wait** untuk job in-flight sampai deadline. Bila deadline habis sebelum job settle: claim aktif di-*release*/reschedule secara **atomik** ke state retryable (`reschedule_telefun_scoring`, `p_next_attempt_at` = now + claim timeout) **sebelum** exit.
+4. **No late write / no double AI call:** late provider result tidak dapat persist (guard `complete_telefun_scoring` menolak saat row tidak lagi `processing`), dan `checkCachedAssessment` mencegah AI call kedua pada row yang sudah `completed` (guard reclaim). Grace period orchestrator harus ≥ claim timeout.
+
+##### Alert thresholds
+
+- **No-poll:** `lastSuccessfulPollAt` lebih tua dari `2× interval` (minimal 2 menit) atau `lastErrorClass` menetap.
+- **Oldest eligible pending:** `oldestEligiblePendingAgeMs` melewati 30 menit (backlog tidak maju).
+- **Failed-reschedule spike:** rasio `failed+rescheduled` > 50% dari batch selama 3 poll berturut-turut.
+
+##### Kill switch
+
+Set `TELEFUN_SCORING_WORKER_ENABLED=false` + redeploy/restart service: worker **exit non-zero** dan tidak memproses job apa pun (pending jobs/history tidak dihapus). Untuk menghentikan worker berjalan: stop/scale-to-zero service Railway atau kirim SIGTERM (shutdown graceful di atas).
 
 ### Hold Behavior
 
@@ -615,7 +674,7 @@ Catatan kontrak:
 - `sessionId` wajib dari path UUID; broker menolak session foreign, terminal, pending, mismatch, atau auto-create fallback.
 - Caller harus admin/trainer dengan profile ternormalisasi `active`, `is_deleted != true`, dan session owned/`active` yang sudah pre-created.
 - Untuk `openai-webrtc`, API hanya membuat history setelah menerima `live_prompt_instructions` nonblank dari finalized simulation context. Snapshot itu dibangun oleh builder prompt yang sama dengan Gemini, memuat identity/verification facts, scenario/script data boundary, selected consumer name/description/difficulty/behavior, dan role rules; prompt kosong atau malformed ditolak sebelum provider call, tanpa generic identity/persona fallback.
-- Broker membangun session JSON server-side dengan model `gpt-realtime-2.1`, voice `cedar` untuk consumer `male` atau `marin` untuk `female`/missing, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON. `create_response=false` membuat VAD hanya memotong/meng-commit input dan menjadikan arbiter browser satu-satunya owner response generation. `interrupt_response=false` mempertahankan authority interruption aplikasi yang hanya membatalkan output yang benar-benar terdengar.
+- Broker membangun session JSON server-side dengan model dari row session yang divalidasi (`gpt-realtime-2.1` atau `gpt-realtime-2.1-mini`, sesuai allowed set server), voice `cedar` untuk consumer `male` atau `marin` untuk `female`/missing, `server_vad`, dan audio 24 kHz; browser tidak mengirim model, voice, instructions, atau session JSON. `create_response=false` membuat VAD hanya memotong/meng-commit input dan menjadikan arbiter browser satu-satunya owner response generation. `interrupt_response=false` mempertahankan authority interruption aplikasi yang hanya membatalkan output yang benar-benar terdengar.
 - `Location` dari upstream diparse menjadi `call_id` opaque; sideband `wss://api.openai.com/v1/realtime?call_id=...` adalah authority untuk transcript/usage/control server-side.
 - Cleanup upstream memakai official OpenAI POST hangup; browser tetap hanya melihat DELETE broker yang idempotent.
 - Transcript/usage failure diaudit; usage yang tidak lengkap tidak disintesis.
@@ -796,6 +855,7 @@ Bukti distributed hardening dan batas verifikasinya dicatat pada [`rebuild-logs/
 | `TELEFUN_OPENAI_ENABLED`                           | ❌                         | `false`         | Kill switch OpenAI realtime                                                                              |
 | `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | ❌                         | `false`         | Phase 3 capability-gated broker/adapter + Phase 4 durable lifecycle; POST tetap off sampai gate terpisah |
 | `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | ❌                         | kosong          | CSV UUID exact; harus sama dengan API; production tetap exact-cohort; kosong = deny-all                  |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`          | ❌                         | `gpt-realtime-2.1` | CSV exact model id; default Full-only; token unknown/empty/duplicate menolak seluruh nilai (fail-closed ke Full-only); harus identik di API dan Telefun |
 | `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | ❌                         | `15000`         | Timeout upstream `POST /v1/realtime/calls`                                                               |
 | `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | ❌                         | `10000`         | Timeout koneksi sideband `wss://api.openai.com/v1/realtime?call_id=...`                                  |
 | `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | Jika WebRTC aktif          | —               | Secret server-only minimal 32 karakter untuk opaque provider reference                                   |
@@ -811,7 +871,7 @@ Bukti distributed hardening dan batas verifikasinya dicatat pada [`rebuild-logs/
 
 Untuk broker Phase 3, `ALLOWED_ORIGINS` harus berisi origin web yang persis sama; `*` tidak diterima.
 
-Rollout WebRTC fail-closed: `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` hanya menerima CSV UUID yang valid dan harus identik di API serta Telefun. Development, staging, dan production memerlukan flag aktif **dan** UUID user yang exact-match; flag off atau cohort kosong berarti deny-all. Pengguna di luar cohort tetap memakai baseline Gemini dan tidak melihat capability WebRTC. Flag off menolak POST dan tidak membuka provider, tetapi authenticated DELETE yang session-bound tetap diizinkan sebagai exception cleanup untuk menandai session pre-created sebagai `failed`. DELETE bukan jalur start. Test otomatis dan smoke deployment tidak melakukan paid/provider call; live acceptance memakai bounded operator gate.
+Rollout WebRTC fail-closed: `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` hanya menerima CSV UUID yang valid dan harus identik di API serta Telefun. `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` menerima CSV exact model id dari registry (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`); token unknown, kosong, atau duplikat menolak seluruh nilai dan jatuh kembali ke default Full-only — Mini tidak pernah aktif secara implisit setelah code deploy. Broker memvalidasi `telefun_model_id` yang dipersist ke dalam allowed set server; model di luar set ditolak sebelum provider call. Development, staging, dan production memerlukan flag aktif **dan** UUID user yang exact-match; flag off atau cohort kosong berarti deny-all. Pengguna di luar cohort tetap memakai baseline Gemini dan tidak melihat capability WebRTC. Flag off menolak POST dan tidak membuka provider, tetapi authenticated DELETE yang session-bound tetap diizinkan sebagai exception cleanup untuk menandai session pre-created sebagai `failed`. DELETE bukan jalur start. Test otomatis dan smoke deployment tidak melakukan paid/provider call; live acceptance memakai bounded operator gate.
 
 ### Frontend — dari `VITE_*` env (via `.env.local` root)
 

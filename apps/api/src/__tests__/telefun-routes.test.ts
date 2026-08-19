@@ -31,6 +31,9 @@ import {
   getTelefunLiveModel,
   telefunTranscriptSchema,
   parseTelefunTranscript,
+  DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+  TELEFUN_OPENAI_WEBRTC_MODEL_IDS,
+  parseTelefunOpenAiWebRtcAllowedModelIds,
 } from "@trainers/types";
 import {
   telefunSettingsPayloadSchema,
@@ -269,6 +272,313 @@ describe("telefun API payload and security validators", () => {
     }
   });
 
+  it("rejects Mini+WebRTC settings when the server allowed-model set is Full-only", async () => {
+    const userId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
+    const previous = {
+      enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+      nodeEnv: env.NODE_ENV,
+      allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+      allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+    };
+    env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = true;
+    env.NODE_ENV = "staging";
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = [userId];
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = ["gpt-realtime-2.1"];
+
+    const upsert = vi.fn();
+    const select = vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn(async () => ({
+          data: { settings: {} },
+          error: null,
+        })),
+      })),
+    }));
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => ({ upsert, select })),
+    } as never);
+    const app = new Hono<{
+      Variables: { user: { id: string }; profile: { role: string } };
+    }>();
+    app.use("*", async (c, next) => {
+      c.set("user", { id: userId });
+      c.set("profile", { role: "admin" });
+      await next();
+    });
+    app.route("/", telefunSettings);
+
+    try {
+      const response = await app.request("/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectedModel: "gpt-realtime-2.1-mini",
+          voiceName: "marin",
+          consumerName: "Consumer",
+          consumerGender: "female",
+          telefunModelId: "gpt-realtime-2.1-mini",
+          telefunTransport: "openai-webrtc",
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error.code).toBe("BAD_REQUEST");
+      expect(body.error.message).toBe(
+        "Model dan transport OpenAI WebRTC tidak tersedia.",
+      );
+      expect(upsert).not.toHaveBeenCalled();
+    } finally {
+      env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = previous.enabled;
+      env.NODE_ENV = previous.nodeEnv;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = previous.allowedUserIds;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = previous.allowedModelIds;
+    }
+  });
+
+  it("accepts Mini+WebRTC settings when the server allowed-model set admits it", async () => {
+    const userId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
+    const previous = {
+      enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+      nodeEnv: env.NODE_ENV,
+      allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+      allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+    };
+    env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = true;
+    env.NODE_ENV = "staging";
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = [userId];
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = [
+      "gpt-realtime-2.1",
+      "gpt-realtime-2.1-mini",
+    ];
+
+    const upsert = vi.fn(async () => ({ error: null }));
+    const select = vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn(async () => ({
+          data: { settings: {} },
+          error: null,
+        })),
+      })),
+    }));
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => ({ upsert, select })),
+    } as never);
+    const app = new Hono<{
+      Variables: { user: { id: string }; profile: { role: string } };
+    }>();
+    app.use("*", async (c, next) => {
+      c.set("user", { id: userId });
+      c.set("profile", { role: "admin" });
+      await next();
+    });
+    app.route("/", telefunSettings);
+
+    try {
+      const response = await app.request("/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectedModel: "gpt-realtime-2.1-mini",
+          voiceName: "marin",
+          consumerName: "Consumer",
+          consumerGender: "female",
+          telefunModelId: "gpt-realtime-2.1-mini",
+          telefunTransport: "openai-webrtc",
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(upsert).toHaveBeenCalledOnce();
+    } finally {
+      env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = previous.enabled;
+      env.NODE_ENV = previous.nodeEnv;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = previous.allowedUserIds;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = previous.allowedModelIds;
+    }
+  });
+
+  it("rejects Mini+WebRTC session creation when the server allowed-model set is Full-only", async () => {
+    const userId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
+    const previous = {
+      enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+      nodeEnv: env.NODE_ENV,
+      allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+      allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+    };
+    env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = true;
+    env.NODE_ENV = "staging";
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = [userId];
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = ["gpt-realtime-2.1"];
+
+    const insert = vi.fn();
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => ({ insert })),
+    } as never);
+    const app = new Hono<{
+      Variables: { user: { id: string }; profile: { role: string } };
+    }>();
+    app.use("*", async (c, next) => {
+      c.set("user", { id: userId });
+      c.set("profile", { role: "admin" });
+      await next();
+    });
+    app.route("/", telefunSessions);
+
+    try {
+      const response = await app.request("/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenario_title: "Test",
+          consumer_name: "Consumer",
+          telefun_model_id: "gpt-realtime-2.1-mini",
+          telefun_transport: "openai-webrtc",
+          live_prompt_instructions: "canonical prompt snapshot",
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error.code).toBe("BAD_REQUEST");
+      expect(body.error.message).toBe(
+        "Model dan transport OpenAI WebRTC tidak tersedia.",
+      );
+      expect(insert).not.toHaveBeenCalled();
+    } finally {
+      env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = previous.enabled;
+      env.NODE_ENV = previous.nodeEnv;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = previous.allowedUserIds;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = previous.allowedModelIds;
+    }
+  });
+
+  it("accepts Mini+WebRTC session creation when the server allowed-model set admits it", async () => {
+    const userId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
+    const previous = {
+      enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+      nodeEnv: env.NODE_ENV,
+      allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+      allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+    };
+    env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = true;
+    env.NODE_ENV = "staging";
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = [userId];
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = [
+      "gpt-realtime-2.1",
+      "gpt-realtime-2.1-mini",
+    ];
+
+    const insert = vi.fn((payload: unknown) => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: { id: "session-mini-1" },
+          error: null,
+        })),
+      })),
+    }));
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => ({ insert })),
+      rpc: vi.fn(async () => ({
+        data: {
+          allowed: true,
+          remaining: 9,
+          reset_at: "2026-08-01T00:01:00.000Z",
+          reason: "allowed",
+        },
+        error: null,
+      })),
+    } as never);
+    const app = new Hono<{
+      Variables: { user: { id: string }; profile: { role: string } };
+    }>();
+    app.use("*", async (c, next) => {
+      c.set("user", { id: userId });
+      c.set("profile", { role: "admin" });
+      await next();
+    });
+    app.route("/", telefunSessions);
+
+    try {
+      const response = await app.request("/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenario_title: "Test",
+          consumer_name: "Consumer",
+          telefun_model_id: "gpt-realtime-2.1-mini",
+          telefun_transport: "openai-webrtc",
+          live_prompt_instructions: "canonical prompt snapshot",
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(insert).toHaveBeenCalledOnce();
+      const insertArgs = insert.mock.calls[0][0] as {
+        telefun_model_id: string;
+        telefun_transport: string;
+      };
+      expect(insertArgs.telefun_model_id).toBe("gpt-realtime-2.1-mini");
+      expect(insertArgs.telefun_transport).toBe("openai-webrtc");
+    } finally {
+      env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = previous.enabled;
+      env.NODE_ENV = previous.nodeEnv;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = previous.allowedUserIds;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = previous.allowedModelIds;
+    }
+  });
+
+  it("rejects Mini+WebRTC PATCH when the server allowed-model set is Full-only", async () => {
+    const userId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
+    const previous = {
+      enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
+      nodeEnv: env.NODE_ENV,
+      allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
+      allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+    };
+    env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = true;
+    env.NODE_ENV = "staging";
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = [userId];
+    env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = ["gpt-realtime-2.1"];
+
+    const update = vi.fn();
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn(() => ({ update })),
+    } as never);
+    const app = new Hono<{
+      Variables: { user: { id: string }; profile: { role: string } };
+    }>();
+    app.use("*", async (c, next) => {
+      c.set("user", { id: userId });
+      c.set("profile", { role: "admin" });
+      await next();
+    });
+    app.route("/", telefunSessions);
+
+    try {
+      const response = await app.request(`/sessions/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefun_model_id: "gpt-realtime-2.1-mini",
+          telefun_transport: "openai-webrtc",
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error.code).toBe("BAD_REQUEST");
+      expect(body.error.message).toBe(
+        "Model dan transport OpenAI WebRTC tidak tersedia.",
+      );
+      expect(update).not.toHaveBeenCalled();
+    } finally {
+      env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED = previous.enabled;
+      env.NODE_ENV = previous.nodeEnv;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS = previous.allowedUserIds;
+      env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS = previous.allowedModelIds;
+    }
+  });
+
   it("returns the exact authenticated capability shape without provider metadata", async () => {
     const app = new Hono<{
       Variables: { user: { id: string }; profile: { role: string } };
@@ -290,6 +600,7 @@ describe("telefun API payload and security validators", () => {
           allowed: false,
           modelId: "gpt-realtime-2.1",
           transport: "openai-webrtc",
+          modelIds: ["gpt-realtime-2.1"],
         },
       },
     });
@@ -309,6 +620,7 @@ describe("telefun API payload and security validators", () => {
         allowed: true,
         modelId: "gpt-realtime-2.1",
         transport: "openai-webrtc",
+        modelIds: ["gpt-realtime-2.1"],
       },
     });
     expect(
@@ -323,6 +635,7 @@ describe("telefun API payload and security validators", () => {
       allowed: false,
       modelId: "gpt-realtime-2.1",
       transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
     });
     expect(
       resolveTelefunOpenAiWebRtcCapabilities({
@@ -336,6 +649,7 @@ describe("telefun API payload and security validators", () => {
       allowed: true,
       modelId: "gpt-realtime-2.1",
       transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
     });
     expect(
       resolveTelefunOpenAiWebRtcCapabilities({
@@ -349,6 +663,7 @@ describe("telefun API payload and security validators", () => {
       allowed: false,
       modelId: "gpt-realtime-2.1",
       transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
     });
     expect(
       resolveTelefunOpenAiWebRtcCapabilities({
@@ -362,8 +677,43 @@ describe("telefun API payload and security validators", () => {
       allowed: false,
       modelId: "gpt-realtime-2.1",
       transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
     });
   });
+  it("keeps the compatibility modelId while exposing the effective WebRTC model set additively", () => {
+    const capability = resolveTelefunOpenAiWebRtcCapabilities({
+      userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+      enabled: true,
+      nodeEnv: "staging",
+      allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
+      allowedModelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
+    });
+    expect(capability.openaiWebRtc).toEqual({
+      enabled: true,
+      allowed: true,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
+    });
+  });
+
+  it("defaults the capability WebRTC model set to Full-only without allowed-model config", () => {
+    expect(
+      resolveTelefunOpenAiWebRtcCapabilities({
+        userId: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+        enabled: true,
+        nodeEnv: "staging",
+        allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
+      }).openaiWebRtc,
+    ).toEqual({
+      enabled: true,
+      allowed: true,
+      modelId: "gpt-realtime-2.1",
+      transport: "openai-webrtc",
+      modelIds: ["gpt-realtime-2.1"],
+    });
+  });
+
   const validSettingsBody = {
     selectedModel: "gemini-3.1-flash-live-preview",
     voiceName: "Kore",
@@ -543,8 +893,9 @@ describe("telefun API payload and security validators", () => {
         ...base,
         telefun_model_id: "gpt-realtime-2.1-mini",
         telefun_transport: "openai-webrtc",
+        live_prompt_instructions: "canonical prompt snapshot",
       }).success,
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       buildTelefunSessionInsertPayload({ userId: "user-1", body: base }),
@@ -575,16 +926,20 @@ describe("telefun API payload and security validators", () => {
       telefun_model_id: "gpt-realtime-2.1",
       telefun_transport: "openai-webrtc",
     });
-    expect(() =>
+    expect(
       buildTelefunSessionInsertPayload({
         userId: "user-1",
         body: {
           ...base,
           telefun_model_id: "gpt-realtime-2.1-mini",
           telefun_transport: "openai-webrtc",
+          live_prompt_instructions: "canonical prompt snapshot",
         },
       }),
-    ).toThrow("Model dan transport Telefun tidak cocok");
+    ).toMatchObject({
+      telefun_model_id: "gpt-realtime-2.1-mini",
+      telefun_transport: "openai-webrtc",
+    });
   });
 
   it("rejects invalid session create pairs before database persistence", () => {
@@ -691,7 +1046,7 @@ describe("telefun API payload and security validators", () => {
         telefun_model_id: "gpt-realtime-2.1-mini",
         telefun_transport: "openai-webrtc",
       }).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(() =>
       buildTelefunSessionUpdatePayload({
         telefun_transport: "openai-audio",
@@ -706,12 +1061,15 @@ describe("telefun API payload and security validators", () => {
       telefun_model_id: "gpt-realtime-2.1",
       telefun_transport: "openai-webrtc",
     });
-    expect(() =>
+    expect(
       buildTelefunSessionUpdatePayload({
         telefun_model_id: "gpt-realtime-2.1-mini",
         telefun_transport: "openai-webrtc",
       }),
-    ).toThrow("Model dan transport Telefun tidak cocok");
+    ).toEqual({
+      telefun_model_id: "gpt-realtime-2.1-mini",
+      telefun_transport: "openai-webrtc",
+    });
   });
 
   it("validates recording path format and session ownership", () => {
@@ -1026,5 +1384,54 @@ describe("buildSeekablePath", () => {
   it("keeps an existing seekable path idempotent", () => {
     const path = "u1/s1/full_call.seekable.webm";
     expect(buildSeekablePath(path)).toBe(path);
+  });
+});
+
+describe("TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS parsing", () => {
+  it("defaults to the explicit Full-only set when missing or empty", () => {
+    expect(DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS).toEqual([
+      "gpt-realtime-2.1",
+    ]);
+    expect(parseTelefunOpenAiWebRtcAllowedModelIds(undefined)).toEqual([
+      "gpt-realtime-2.1",
+    ]);
+  });
+
+  it("rejects unknown, duplicate, and empty tokens fail-closed to Full-only", () => {
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds(
+        "gpt-realtime-2.1,unknown-model",
+      ),
+    ).toEqual(["gpt-realtime-2.1"]);
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds(
+        "gpt-realtime-2.1,gpt-realtime-2.1",
+      ),
+    ).toEqual(["gpt-realtime-2.1"]);
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds("gpt-realtime-2.1-mini,"),
+    ).toEqual(["gpt-realtime-2.1"]);
+    expect(parseTelefunOpenAiWebRtcAllowedModelIds("")).toEqual([
+      "gpt-realtime-2.1",
+    ]);
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds("gemini-3.1-flash-live-preview"),
+    ).toEqual(["gpt-realtime-2.1"]);
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds(
+        TELEFUN_OPENAI_WEBRTC_MODEL_IDS.join(",") + ",gpt-realtime-2.1",
+      ),
+    ).toEqual(["gpt-realtime-2.1"]);
+  });
+
+  it("accepts only exact registry members with whitespace trimming", () => {
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds(
+        " gpt-realtime-2.1 , gpt-realtime-2.1-mini ",
+      ),
+    ).toEqual(["gpt-realtime-2.1", "gpt-realtime-2.1-mini"]);
+    expect(
+      parseTelefunOpenAiWebRtcAllowedModelIds("gpt-realtime-2.1-mini"),
+    ).toEqual(["gpt-realtime-2.1-mini"]);
   });
 });

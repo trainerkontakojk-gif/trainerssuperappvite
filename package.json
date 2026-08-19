@@ -8,6 +8,7 @@
     "start:web": "pnpm --filter @trainers/web start",
     "build:web": "pnpm turbo run build --filter @trainers/web",
     "start:api": "pnpm --filter @trainers/api start",
+    "start:telefun-scoring-worker": "pnpm --filter @trainers/api start:telefun-scoring-worker",
     "build:api": "pnpm turbo run build --filter @trainers/api",
     "start:telefun": "pnpm --filter @trainers/telefun start",
     "build:telefun": "pnpm turbo run build --filter @trainers/telefun",

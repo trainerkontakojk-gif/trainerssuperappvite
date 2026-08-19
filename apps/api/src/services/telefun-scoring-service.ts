@@ -217,11 +217,25 @@ export async function persistScoringAssessment(
 
 export async function processScoringJob(
   job: ScoringJob,
+  signal?: AbortSignal,
 ): Promise<ScoringResult> {
   const adminClient = createAdminClient();
 
   try {
+    if (signal?.aborted) {
+      // Bounded abort: stop admission before the provider boundary. The
+      // caller (worker runtime) releases/reschedules the claim atomically.
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
+
     const result = await analyzeVoiceQuality(job.sessionId, job.userId);
+
+    if (signal?.aborted) {
+      // Bounded abort: a late provider result must not be persisted (no late
+      // write). The claim stays processing and is released/rescheduled by the
+      // caller or reclaimed after the stale-claim timeout.
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
 
     if (result.success && result.assessment) {
       const persisted = await persistScoringAssessment(
@@ -284,6 +298,12 @@ export async function processScoringJob(
 
     return { success: false, status: "rescheduled", error: errorMsg };
   } catch (error: unknown) {
+    if (signal?.aborted) {
+      // Bounded abort: never write a failure/retry state for an aborted job;
+      // the shutdown path owns the atomic release.
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
+
     if (error instanceof ScoringNotReadyError) {
       return {
         success: false,
@@ -356,7 +376,7 @@ export async function fetchPendingJobs(
     .limit(limit);
 
   if (error) {
-    return [];
+    throw error;
   }
 
   return (data || [])

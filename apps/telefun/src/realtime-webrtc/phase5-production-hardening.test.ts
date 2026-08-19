@@ -613,11 +613,109 @@ describe("Phase 5 distributed WebRTC hardening", () => {
     await manager.startCall({
       userId: "user-1",
       sessionId: SESSION_ID,
+      modelId: "gpt-realtime-2.1",
       offerSdp: OFFER_SDP,
       livePromptInstructions: LIVE_PROMPT,
     });
     expect(events).toEqual(["attempt", "lease"]);
     await manager.endCall(SESSION_ID, "user-1");
+  });
+
+  it("carries the Mini model into the durable attempt and usage audit", async () => {
+    const attempt = {
+      claimed: true,
+      attemptId: ATTEMPT_ID,
+      finalizationKey: "750e8400-e29b-41d4-a716-446655440000",
+      usageRequestId:
+        `telefun-webrtc:${ATTEMPT_ID}` as `telefun-webrtc:${string}`,
+      state: "claimed" as const,
+      reason: "claimed",
+    };
+    const db = {
+      claimAttempt: vi.fn(async () => attempt),
+      bindProviderCall: vi.fn(async () => ({
+        accepted: true,
+        state: "brokered" as const,
+        reason: "bound",
+      })),
+      markSidebandConnected: vi.fn(async () => ({
+        accepted: true,
+        state: "sideband_connected" as const,
+        reason: "connected",
+      })),
+      checkpointTranscript: vi.fn(),
+      beginFinalization: vi.fn(async () => ({
+        accepted: true,
+        shouldFinalize: true,
+        state: "ending" as const,
+        reason: "ready_to_finalize",
+      })),
+      markUsage: vi.fn(async () => ({
+        applied: true,
+        idempotent: false,
+        usageRequestId: attempt.usageRequestId,
+        status: "incomplete" as const,
+        reason: "missing_usage",
+      })),
+      finalizeAttempt: vi.fn(async () => ({
+        applied: true,
+        idempotent: false,
+        reason: "finalized",
+      })),
+    } as unknown as TelefunWebRtcDb;
+    const auditFailedUsage = vi.fn(async () => true);
+    const manager = createWebRtcCallManager({
+      db,
+      lease: {
+        acquire: vi.fn(async () => ({
+          handle: {
+            leaseId: "lease-mini",
+            attemptId: ATTEMPT_ID,
+            tokenHash: "a".repeat(64),
+            expiresAtMs: Date.now() + 30_000,
+            lost: false,
+            whenLost: new Promise<void>(() => undefined),
+            renew: vi.fn(async () => true),
+            release: vi.fn(async () => undefined),
+          },
+          activeCount: 1,
+          reason: "claimed",
+        })),
+      },
+      createAttemptId: () => ATTEMPT_ID,
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: OFFER_SDP,
+          callId: "rtc_mini",
+        })),
+        closeCall: vi.fn(async () => true),
+      },
+      createSideband: vi.fn(() => ({
+        connect: vi.fn(async () => undefined),
+        sealAdmission: vi.fn(),
+        drain: vi.fn(async () => ({ admittedFrameCount: 0 })),
+        close: vi.fn(),
+      })),
+      auditFailedUsage,
+    });
+
+    await manager.startCall({
+      userId: "user-1",
+      sessionId: SESSION_ID,
+      modelId: "gpt-realtime-2.1-mini",
+      offerSdp: OFFER_SDP,
+      livePromptInstructions: LIVE_PROMPT,
+    });
+    expect(db.claimAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelId: "gpt-realtime-2.1-mini",
+        transport: "openai-webrtc",
+      }),
+    );
+    await manager.endCall(SESSION_ID, "user-1");
+    expect(auditFailedUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: "gpt-realtime-2.1-mini" }),
+    );
   });
 
   it("terminalizes the provider call when the distributed lease is lost", async () => {
@@ -706,6 +804,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
     await manager.startCall({
       userId: "user-1",
       sessionId: SESSION_ID,
+      modelId: "gpt-realtime-2.1",
       offerSdp: OFFER_SDP,
       livePromptInstructions: LIVE_PROMPT,
     });
@@ -738,6 +837,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
       manager.startCall({
         userId: "user-1",
         sessionId: SESSION_ID,
+        modelId: "gpt-realtime-2.1",
         offerSdp: OFFER_SDP,
         livePromptInstructions: LIVE_PROMPT,
       }),
@@ -770,6 +870,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
       manager.startCall({
         userId: "user-1",
         sessionId: SESSION_ID,
+        modelId: "gpt-realtime-2.1",
         offerSdp: OFFER_SDP,
         livePromptInstructions: LIVE_PROMPT,
       }),
@@ -778,6 +879,7 @@ describe("Phase 5 distributed WebRTC hardening", () => {
       manager.startCall({
         userId: "user-1",
         sessionId: SESSION_ID,
+        modelId: "gpt-realtime-2.1",
         offerSdp: OFFER_SDP,
         livePromptInstructions: LIVE_PROMPT,
       }),

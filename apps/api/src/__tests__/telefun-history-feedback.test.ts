@@ -58,6 +58,10 @@ const terminalWebRtcRow = {
   user_id: "user-1",
   status: "completed",
   telefun_transport: "openai-webrtc",
+  scoring_status: "completed",
+  scoring_ready_at: "2026-08-14T09:00:00.000Z",
+  scoring_next_attempt_at: null,
+  scoring_attempt_count: 1,
   score: 8,
   feedback: null,
   voice_assessment: assessment,
@@ -127,5 +131,157 @@ describe("Telefun history feedback contract", () => {
     const payload = await response.json();
 
     expect(payload.data[0].feedback).toBe("Feedback tersimpan.");
+  });
+});
+
+describe("Telefun history scoring view contract", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listResult.mockResolvedValue({ data: [terminalWebRtcRow], error: null });
+    detailResult.mockResolvedValue({ data: terminalWebRtcRow, error: null });
+  });
+
+  async function listFirstRow(overrides: Record<string, unknown>) {
+    listResult.mockResolvedValue({
+      data: [{ ...terminalWebRtcRow, ...overrides }],
+      error: null,
+    });
+    const response = await buildApp().request("/sessions");
+    expect(response.status).toBe(200);
+    return (await response.json()).data[0];
+  }
+
+  it("exposes scoring view fields on list", async () => {
+    const row = await listFirstRow({});
+    expect(row).toMatchObject({
+      scoring_status: "completed",
+      scoring_ready_at: "2026-08-14T09:00:00.000Z",
+      scoring_next_attempt_at: null,
+      scoring_retryable: false,
+      score: 8,
+      voice_assessment: assessment,
+    });
+  });
+
+  it("exposes the same scoring view fields on detail", async () => {
+    const response = await buildApp().request(
+      "/history/session-webrtc-feedback",
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.data).toMatchObject({
+      scoring_status: "completed",
+      scoring_ready_at: "2026-08-14T09:00:00.000Z",
+      scoring_next_attempt_at: null,
+      scoring_retryable: false,
+      score: 8,
+      voice_assessment: assessment,
+    });
+  });
+
+  it("never normalizes a null score to 0 on list or detail", async () => {
+    const row = await listFirstRow({ score: null });
+    expect(row.score).toBeNull();
+
+    detailResult.mockResolvedValue({
+      data: { ...terminalWebRtcRow, score: null },
+      error: null,
+    });
+    const detail = await buildApp().request("/history/session-webrtc-feedback");
+    expect((await detail.json()).data.score).toBeNull();
+  });
+
+  it("keeps a zero score as 0", async () => {
+    const row = await listFirstRow({ score: 0 });
+    expect(row.score).toBe(0);
+  });
+
+  it("keeps completed-without-assessment observable instead of fabricating feedback", async () => {
+    const row = await listFirstRow({
+      voice_assessment: null,
+      feedback: null,
+      score: null,
+    });
+    expect(row).toMatchObject({
+      scoring_status: "completed",
+      voice_assessment: null,
+      feedback: null,
+      score: null,
+    });
+  });
+
+  it.each([
+    [
+      "a retryable failed row (attempt 1, next attempt scheduled)",
+      {
+        scoring_status: "failed",
+        scoring_attempt_count: 1,
+        scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+      },
+      true,
+    ],
+    [
+      "a failed row with no recorded attempts but a scheduled next attempt",
+      {
+        scoring_status: "failed",
+        scoring_attempt_count: null,
+        scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+      },
+      true,
+    ],
+    [
+      "an exhausted failed row (attempt count at MAX_SCORING_ATTEMPTS)",
+      {
+        scoring_status: "failed",
+        scoring_attempt_count: 3,
+        scoring_next_attempt_at: "2026-08-15T09:00:00.000Z",
+      },
+      false,
+    ],
+    [
+      "a permanent failed row (no next attempt scheduled)",
+      {
+        scoring_status: "failed",
+        scoring_attempt_count: 1,
+        scoring_next_attempt_at: null,
+      },
+      false,
+    ],
+    ["a completed row", { scoring_status: "completed" }, false],
+    ["a pending row", { scoring_status: "pending" }, false],
+    ["a processing row", { scoring_status: "processing" }, false],
+  ])(
+    "derives scoring_retryable for %s",
+    async (_label, overrides, expected) => {
+      const row = await listFirstRow(overrides);
+      expect(row.scoring_retryable).toBe(expected);
+    },
+  );
+
+  it("always exposes scoring_retryable as a boolean for legacy rows", async () => {
+    const row = await listFirstRow({
+      telefun_transport: "gemini-live",
+      scoring_status: undefined,
+      scoring_attempt_count: undefined,
+      scoring_next_attempt_at: undefined,
+      score: undefined,
+    });
+    expect(typeof row.scoring_retryable).toBe("boolean");
+    expect(row.scoring_retryable).toBe(false);
+    expect(row.scoring_status).toBeNull();
+    expect(row.score).toBeNull();
+    expect(row.feedback).toBeNull();
+  });
+
+  it("returns deterministic score/assessment/feedback on list and detail", async () => {
+    const listRow = await listFirstRow({});
+    const detail = await buildApp().request("/history/session-webrtc-feedback");
+    const detailData = (await detail.json()).data;
+
+    expect(detailData.score).toBe(listRow.score);
+    expect(detailData.feedback).toBe(listRow.feedback);
+    expect(detailData.voice_assessment).toEqual(listRow.voice_assessment);
+    expect(detailData.scoring_status).toBe(listRow.scoring_status);
   });
 });

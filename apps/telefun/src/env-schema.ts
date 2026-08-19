@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseTelefunOpenAiWebRtcAllowedModelIds } from "@trainers/types";
 import { parseTelefunOpenAiWebRtcAllowedUserIds } from "./realtime-webrtc/rollout-gate.js";
 
 const optionalSecret = z.preprocess(
@@ -27,6 +28,10 @@ export const telefunEnvSchema = z
       .string()
       .default("")
       .transform(parseTelefunOpenAiWebRtcAllowedUserIds),
+    TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: z
+      .string()
+      .optional()
+      .transform(parseTelefunOpenAiWebRtcAllowedModelIds),
     TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS: z.coerce
       .number()
       .int()

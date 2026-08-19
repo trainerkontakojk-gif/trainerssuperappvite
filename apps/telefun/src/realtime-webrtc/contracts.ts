@@ -1,4 +1,33 @@
-export const POC_MODEL_ID = "gpt-realtime-2.1" as const;
+import {
+  DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+  TELEFUN_OPENAI_WEBRTC_MODEL_IDS,
+  type TelefunWebRtcModelId,
+} from "@trainers/types";
+
+export {
+  DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
+  TELEFUN_OPENAI_WEBRTC_MODEL_IDS,
+} from "@trainers/types";
+export type { TelefunWebRtcModelId } from "@trainers/types";
+
+export function isTelefunWebRtcModelId(
+  value: unknown,
+): value is TelefunWebRtcModelId {
+  return (
+    typeof value === "string" &&
+    (TELEFUN_OPENAI_WEBRTC_MODEL_IDS as readonly string[]).includes(value)
+  );
+}
+
+export function assertTelefunWebRtcModelId(
+  value: unknown,
+): TelefunWebRtcModelId {
+  if (!isTelefunWebRtcModelId(value)) {
+    throw new Error("Unsupported OpenAI WebRTC model.");
+  }
+  return value;
+}
+
 export const POC_VOICE = "marin" as const;
 export const POC_MALE_VOICE = "cedar" as const;
 export const POC_TRANSPORT = "openai-webrtc" as const;
@@ -11,7 +40,7 @@ export type CanonicalPocVoice = typeof POC_VOICE | typeof POC_MALE_VOICE;
 
 export interface CanonicalPocSession {
   type: "realtime";
-  model: typeof POC_MODEL_ID;
+  model: TelefunWebRtcModelId;
   instructions: string;
   output_modalities: ["audio"];
   audio: {
@@ -33,14 +62,21 @@ export interface CanonicalPocSession {
   };
 }
 
-export function buildCanonicalPocSession(
+/**
+ * Canonical WebRTC session builder. The model is a validated input: any
+ * value outside the registry set throws before a session is built, so an
+ * unsupported persisted model can never reach the provider call.
+ */
+export function buildCanonicalWebRtcSession(
+  modelId: TelefunWebRtcModelId,
   instructions?: string | null,
   consumerGender?: string | null,
 ): CanonicalPocSession {
+  const model = assertTelefunWebRtcModelId(modelId);
   const prompt = assertCanonicalTelefunPrompt(instructions);
   return {
     type: "realtime",
-    model: POC_MODEL_ID,
+    model,
     instructions: prompt,
     output_modalities: ["audio"],
     audio: {

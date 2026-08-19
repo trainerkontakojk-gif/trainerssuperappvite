@@ -20,6 +20,9 @@ describe("Telefun environment schema", () => {
     expect(parsed.data.TELEFUN_OPENAI_ENABLED).toBe(false);
     expect(parsed.data.TELEFUN_OPENAI_WEBRTC_POC_ENABLED).toBe(false);
     expect(parsed.data.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS).toEqual([]);
+    expect(parsed.data.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS).toEqual([
+      "gpt-realtime-2.1",
+    ]);
     expect(parsed.data.OPENAI_API_KEY).toBeUndefined();
     expect(parsed.data.GEMINI_API_KEY).toBe("gemini");
     expect(parsed.data.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS).toBe(15_000);
@@ -117,12 +120,49 @@ describe("Telefun environment schema", () => {
     ]);
   });
 
+  it("parses a comma-separated exact allowed-model set with trimming", () => {
+    const parsed = parseTelefunEnv({
+      ...REQUIRED_ENV,
+      TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS:
+        "  gpt-realtime-2.1 , gpt-realtime-2.1-mini ",
+    });
+
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS).toEqual([
+      "gpt-realtime-2.1",
+      "gpt-realtime-2.1-mini",
+    ]);
+  });
+
+  it.each([
+    ["", "empty value"],
+    ["gpt-realtime-4", "unknown model"],
+    ["gpt-realtime-2.1,,gpt-realtime-2.1-mini", "empty token"],
+    ["gpt-realtime-2.1-mini,gpt-realtime-2.1-mini", "duplicate token"],
+  ])(
+    "fails closed to the explicit Full-only default for %s",
+    (value) => {
+      const parsed = parseTelefunEnv({
+        ...REQUIRED_ENV,
+        TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: value,
+      });
+
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      expect(parsed.data.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS).toEqual([
+        "gpt-realtime-2.1",
+      ]);
+    },
+  );
+
   it("allows only the exact rollout cohort in development, staging, and production", async () => {
     const { isTelefunOpenAiWebRtcAllowed } =
       await import("./realtime-webrtc/rollout-gate.js");
     const config = {
       enabled: true,
       allowedUserIds: ["019f45e3-5fac-7cd2-afeb-8069c2f813b3"],
+      allowedModelIds: ["gpt-realtime-2.1"] as const,
     };
     expect(
       isTelefunOpenAiWebRtcAllowed({

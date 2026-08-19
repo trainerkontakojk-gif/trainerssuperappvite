@@ -20,6 +20,7 @@ import { normalizeSimulationChallengeTypes } from "../../services/simulationChal
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
 import {
   isAllowedTelefunWebRtc,
+  isTelefunWebRtcModelAllowed,
   type TelefunWebRtcCapability,
 } from "../../services/telefunWebRtcCapability";
 
@@ -62,9 +63,9 @@ function resolveAvailableModel(
     persistedSelection?.transport,
   );
   const isAllowedWebRtcPilot =
-    selectedModel.model.id === "gpt-realtime-2.1" &&
     selectedModel.transport === "openai-webrtc" &&
-    isAllowedTelefunWebRtc(webRtcCapability);
+    isAllowedTelefunWebRtc(webRtcCapability) &&
+    isTelefunWebRtcModelAllowed(webRtcCapability, selectedModel.model.id);
   const isPersistedOpenAISelection =
     persistedSelection?.modelId === selectedModel.model.id &&
     persistedSelection.transport === selectedModel.transport;
@@ -103,8 +104,11 @@ export function buildTelefunSettingsForSave(params: {
     params.selectedTelefunTransport ?? selectedModel.transport;
   const canPersistWebRtc =
     selectedTransport === "openai-webrtc" &&
-    selectedModel.model.id === "gpt-realtime-2.1" &&
-    isAllowedTelefunWebRtc(params.webRtcCapability);
+    isAllowedTelefunWebRtc(params.webRtcCapability) &&
+    isTelefunWebRtcModelAllowed(
+      params.webRtcCapability,
+      selectedModel.model.id,
+    );
   const persistedTransport = canPersistWebRtc
     ? "openai-webrtc"
     : selectedModel.transport === "openai-webrtc"
@@ -226,7 +230,12 @@ export function useTelefunSettingsDraft({
       if (currentModel.model.provider !== "openai") return prev;
       if (
         currentModel.transport === "openai-webrtc" &&
-        (webRtcCapability === null || isAllowedTelefunWebRtc(webRtcCapability))
+        (webRtcCapability === null ||
+          (isAllowedTelefunWebRtc(webRtcCapability) &&
+            isTelefunWebRtcModelAllowed(
+              webRtcCapability,
+              currentModel.model.id,
+            )))
       ) {
         return prev;
       }
@@ -256,8 +265,8 @@ export function useTelefunSettingsDraft({
   ) => {
     if (
       transport === "openai-webrtc" &&
-      (selectedTelefunModel !== "gpt-realtime-2.1" ||
-        !isAllowedTelefunWebRtc(webRtcCapability))
+      (!isAllowedTelefunWebRtc(webRtcCapability) ||
+        !isTelefunWebRtcModelAllowed(webRtcCapability, selectedTelefunModel))
     ) {
       return;
     }
@@ -267,8 +276,8 @@ export function useTelefunSettingsDraft({
   const setSelectedTelefunModel = (modelId: string) => {
     const selectedModel = normalizeTelefunLiveModelSelection(modelId);
     const isAllowedWebRtcPilot =
-      selectedModel.model.id === "gpt-realtime-2.1" &&
-      isAllowedTelefunWebRtc(webRtcCapability);
+      isAllowedTelefunWebRtc(webRtcCapability) &&
+      isTelefunWebRtcModelAllowed(webRtcCapability, selectedModel.model.id);
     if (
       selectedModel.model.provider === "openai" &&
       !isOpenAIReady(providerReadiness) &&

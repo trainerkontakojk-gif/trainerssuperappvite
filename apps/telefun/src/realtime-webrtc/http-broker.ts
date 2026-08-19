@@ -4,7 +4,13 @@ import {
   type BrokerAuthDependencies,
 } from "./broker-auth.js";
 import type { TelefunOpenAiWebRtcRolloutConfig } from "./rollout-gate.js";
-import { parseRawSdp, parseSessionId, POC_MAX_SDP_BYTES } from "./contracts.js";
+import {
+  assertTelefunWebRtcModelId,
+  parseRawSdp,
+  parseSessionId,
+  POC_MAX_SDP_BYTES,
+  type TelefunWebRtcModelId,
+} from "./contracts.js";
 import {
   WebRtcCallConflictError,
   WebRtcCallQuotaError,
@@ -296,10 +302,30 @@ export function createOpenAIWebRtcHttpHandler(
       }
       if (requestAbort.signal.aborted) return true;
 
+      // The model is authoritative from the owned pre-created history row
+      // (already validated against the server allowed set by broker-auth);
+      // the browser never sends a model. The assert is defense in depth so
+      // an unsupported persisted model can never reach a provider call.
+      let modelId: TelefunWebRtcModelId;
+      try {
+        modelId = assertTelefunWebRtcModelId(
+          auth.session.telefun_model_id,
+        );
+      } catch {
+        // An unsupported persisted model is a server-side invariant
+        // violation; surface it as not_found like broker-auth instead of
+        // letting the generic catch map it to 502.
+        authOutcome = "not_found";
+        logOutcome(404);
+        sendJson(res, 404, { error: "Request rejected" }, cors);
+        return true;
+      }
+
       const result = await dependencies.manager.startCall({
         userId: auth.userId,
         sessionId,
         offerSdp,
+        modelId,
         livePromptInstructions: auth.session.live_prompt_instructions,
         consumerGender: auth.session.consumer_gender,
         signal: requestAbort.signal,

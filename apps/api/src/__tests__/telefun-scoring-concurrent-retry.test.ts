@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 const state = vi.hoisted(() => ({
   claimCount: 0,
   status: "pending",
+  cachedScore: 0 as number | null,
 }));
 const mockAnalyzeVoiceQuality = vi.hoisted(() => vi.fn());
 const mockGenerateCoachingSummary = vi.hoisted(() => vi.fn());
@@ -62,7 +63,10 @@ const mockMaybeSingle = vi.hoisted(() =>
         ? {
             user_id: "user-1",
             scoring_status: "completed",
-            score: 0,
+            scoring_ready_at: "2026-08-14T09:00:00.000Z",
+            scoring_next_attempt_at: null,
+            scoring_attempt_count: 2,
+            score: state.cachedScore,
             voice_assessment: validAssessment,
           }
         : {
@@ -125,6 +129,7 @@ describe("Telefun scoring atomic claim", () => {
   beforeEach(() => {
     state.claimCount = 0;
     state.status = "pending";
+    state.cachedScore = 0;
     vi.clearAllMocks();
     mockAnalyzeVoiceQuality.mockResolvedValue({
       success: true,
@@ -173,6 +178,45 @@ describe("Telefun scoring atomic claim", () => {
       success: true,
       cached: true,
       data: { score: 0 },
+    });
+    expect(mockAnalyzeVoiceQuality).not.toHaveBeenCalled();
+  });
+
+  it("cached response tidak memaksa null score menjadi 0", async () => {
+    state.status = "completed";
+    state.claimCount = 1;
+    state.cachedScore = null;
+
+    const response = await buildApp().request("/score/session-1", {
+      method: "POST",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      success: true,
+      cached: true,
+      data: { score: null },
+    });
+    expect(mockAnalyzeVoiceQuality).not.toHaveBeenCalled();
+  });
+
+  it("cached response mengekspos scoring view fields", async () => {
+    state.status = "completed";
+    state.claimCount = 1;
+
+    const response = await buildApp().request("/score/session-1", {
+      method: "POST",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toMatchObject({
+      scoring_status: "completed",
+      scoring_ready_at: "2026-08-14T09:00:00.000Z",
+      scoring_next_attempt_at: null,
+      scoring_retryable: false,
+      score: 0,
     });
     expect(mockAnalyzeVoiceQuality).not.toHaveBeenCalled();
   });

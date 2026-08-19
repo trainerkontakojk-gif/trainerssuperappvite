@@ -115,7 +115,7 @@ export const TELEFUN_LIVE_MODELS = [
     availableModules: ["telefun"],
     realtime: {
       transport: "openai-audio",
-      supportedTransports: ["openai-audio"],
+      supportedTransports: ["openai-audio", "openai-webrtc"],
       inputSampleRateHz: 24_000,
       outputSampleRateHz: 24_000,
       voiceProvider: "openai",
@@ -126,6 +126,67 @@ export const TELEFUN_LIVE_MODELS = [
 ] as const satisfies readonly AiModelInfo[];
 
 export type TelefunLiveModel = (typeof TELEFUN_LIVE_MODELS)[number];
+
+export type TelefunWebRtcModelId =
+  | "gpt-realtime-2.1"
+  | "gpt-realtime-2.1-mini";
+
+/**
+ * Server-owned default for TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: explicit
+ * Full-only. Missing, empty, unknown, duplicate, or otherwise invalid config
+ * fails closed to this default; Mini is never opened by the registry alone.
+ */
+export const DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: readonly TelefunWebRtcModelId[] =
+  ["gpt-realtime-2.1"];
+
+/**
+ * Exact models that support the openai-webrtc transport, derived from the
+ * canonical registry so the set can never drift from TELEFUN_LIVE_MODELS.
+ */
+export const TELEFUN_OPENAI_WEBRTC_MODEL_IDS: readonly TelefunWebRtcModelId[] =
+  TELEFUN_LIVE_MODELS.filter((model) => {
+    const realtime = model.realtime;
+    return (
+      realtime !== undefined &&
+      "supportedTransports" in realtime &&
+      realtime.supportedTransports?.includes("openai-webrtc") === true
+    );
+  }).map((model) => model.id as TelefunWebRtcModelId);
+
+/**
+ * Shared parse rule for TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS
+ * (comma-separated exact model ids). Any empty token, any token outside the
+ * shared registry set, or any duplicate rejects the whole value and falls
+ * back to the explicit Full-only default (fail-closed; a partial set is
+ * never accepted). The effective set is registry ∩ config by construction.
+ */
+export function parseTelefunOpenAiWebRtcAllowedModelIds(
+  value: string | undefined,
+): readonly TelefunWebRtcModelId[] {
+  if (value === undefined) {
+    return DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
+  }
+
+  const tokens = value.split(",").map((token) => token.trim());
+  const seen = new Set<string>();
+  for (const token of tokens) {
+    if (
+      token.length === 0 ||
+      !TELEFUN_OPENAI_WEBRTC_MODEL_IDS.includes(
+        token as TelefunWebRtcModelId,
+      ) ||
+      seen.has(token)
+    ) {
+      console.error(
+        "[telefun] invalid TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS value; " +
+          "falling back to the Full-only default.",
+      );
+      return DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
+    }
+    seen.add(token);
+  }
+  return tokens as readonly TelefunWebRtcModelId[];
+}
 export type TelefunLiveModelWarningReason =
   | "unknown-model"
   | "transport-mismatch"

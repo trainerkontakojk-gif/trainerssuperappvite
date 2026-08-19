@@ -2,7 +2,10 @@ import { telefunClient, unwrapResponse } from "../../lib/api";
 import type { TelefunAppSettings } from "./telefunSettings";
 import type { CallRecord } from "./types";
 import { validateAssessment } from "../../lib/voiceAssessmentUtils";
-import type { SessionMetrics } from "@trainers/types";
+import type {
+  SessionMetrics,
+  TelefunScoringStatus,
+} from "@trainers/types";
 import { parseTelefunTranscript } from "@trainers/types";
 import {
   fetchTelefunWebRtcCapability,
@@ -26,6 +29,11 @@ export interface TelefunSessionRow {
   score?: number | null;
   feedback?: string | null;
   voice_assessment?: unknown;
+  /** Additive scoring view (contract §1.2). `null` score stays undefined in the UI. */
+  scoring_status?: TelefunScoringStatus | null;
+  scoring_ready_at?: string | null;
+  scoring_next_attempt_at?: string | null;
+  scoring_retryable?: boolean;
   session_metrics?: SessionMetrics | null;
   realistic_mode_enabled?: boolean;
   voice_dashboard_metrics?: CallRecord["voiceDashboardMetrics"];
@@ -83,6 +91,23 @@ export async function getTelefunSessions(): Promise<TelefunSessionRow[]> {
   )) as TelefunSessionRow[];
 }
 
+/**
+ * Typed detail fetch for a single session (contract §2.1).
+ * The Hono client path already exists and is used by delete; this adds the
+ * missing typed read with abort support for the session reconciler.
+ */
+export async function getTelefunSession(
+  id: string,
+  options?: { signal?: AbortSignal },
+): Promise<TelefunSessionRow> {
+  return (await unwrapResponse(
+    await telefunClient.history[":id"].$get({
+      param: { id },
+      ...(options?.signal ? { signal: options.signal } : {}),
+    }),
+  )) as TelefunSessionRow;
+}
+
 export async function createTelefunSession(
   input: CreateTelefunSessionInput,
 ): Promise<TelefunSessionRow> {
@@ -123,9 +148,14 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
     configuredDuration: row.configured_duration ?? 0,
     recordingPath: row.recording_path ?? undefined,
     agentRecordingPath: row.agent_recording_path ?? undefined,
-    score: row.score ?? dashboardScore ?? 0,
+    // A missing score must stay undefined ("—") — never force it to 0.
+    score: row.score ?? dashboardScore ?? undefined,
     feedback: row.feedback ?? undefined,
     voiceAssessment,
+    scoringStatus: row.scoring_status ?? undefined,
+    scoringReadyAt: row.scoring_ready_at ?? null,
+    scoringNextAttemptAt: row.scoring_next_attempt_at ?? null,
+    scoringRetryable: row.scoring_retryable ?? false,
     sessionMetrics: row.session_metrics ?? null,
     legacyRealisticModeEnabled: row.realistic_mode_enabled,
     voiceDashboardMetrics: row.voice_dashboard_metrics,
@@ -136,5 +166,45 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
     telefunModelId: row.telefun_model_id ?? undefined,
     telefunTransport: row.telefun_transport ?? undefined,
     transcript,
+  };
+}
+
+export interface TelefunSessionUpsertInput {
+  record: CallRecord;
+  history: CallRecord[];
+  reviewRecord: CallRecord | null;
+  canOverwriteLocalHistory: boolean;
+}
+
+export interface TelefunSessionUpsertResult {
+  history: CallRecord[];
+  reviewRecord: CallRecord | null;
+  /** Serialized history to persist, present only when a write is allowed. */
+  localHistory?: string;
+}
+
+/**
+ * Authoritative upsert keyed by session ID. Updates the history list, the
+ * open Review record (when it belongs to the same session), and the valid
+ * local storage copy together, so score, feedback, voiceAssessment, and
+ * scoringStatus always change as one unit.
+ */
+export function upsertTelefunSessionRecord(
+  input: TelefunSessionUpsertInput,
+): TelefunSessionUpsertResult {
+  const { record, history, reviewRecord, canOverwriteLocalHistory } = input;
+  const merged = [
+    record,
+    ...history.filter((existing) => existing.id !== record.id),
+  ].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+
+  return {
+    history: merged,
+    reviewRecord: reviewRecord?.id === record.id ? record : reviewRecord,
+    ...(canOverwriteLocalHistory
+      ? { localHistory: JSON.stringify(merged) }
+      : {}),
   };
 }

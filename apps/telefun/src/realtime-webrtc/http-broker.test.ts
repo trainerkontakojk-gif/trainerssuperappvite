@@ -22,6 +22,7 @@ const defaultRollout = {
   enabled: true,
   nodeEnv: "development",
   allowedUserIds: ["user-1"],
+  allowedModelIds: ["gpt-realtime-2.1"],
 } as const;
 
 function createOpenAIWebRtcHttpHandler(
@@ -119,6 +120,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
         enabled: true,
         nodeEnv: "staging",
         allowedUserIds: ["different-user"],
+        allowedModelIds: ["gpt-realtime-2.1"],
       },
       verifyToken: vi.fn(async () => ({
         success: true,
@@ -159,6 +161,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
         enabled: false,
         nodeEnv: "staging",
         allowedUserIds: [],
+        allowedModelIds: ["gpt-realtime-2.1"],
       },
       verifyToken: vi.fn(async () => ({
         success: true,
@@ -195,7 +198,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
-      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [], allowedModelIds: ["gpt-realtime-2.1"] },
       verifyToken,
       getProfile: vi.fn(),
       getSession: vi.fn(),
@@ -230,7 +233,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
-      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [], allowedModelIds: ["gpt-realtime-2.1"] },
       verifyToken,
       getProfile: vi.fn(),
       getSession: vi.fn(),
@@ -259,7 +262,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
-      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [], allowedModelIds: ["gpt-realtime-2.1"] },
       verifyToken,
       getProfile: vi.fn(),
       getSession: vi.fn(),
@@ -281,7 +284,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
-      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [], allowedModelIds: ["gpt-realtime-2.1"] },
       verifyToken: vi.fn(async () => ({
         success: true,
         user: { id: "user-1" },
@@ -366,7 +369,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
-      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [], allowedModelIds: ["gpt-realtime-2.1"] },
       verifyToken: vi.fn(async () => ({
         success: true,
         user: { id: "user-1" },
@@ -424,7 +427,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const handler = createOpenAIWebRtcHttpHandler({
       enabled: false,
       allowedOrigins: origin,
-      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [] },
+      rollout: { enabled: false, nodeEnv: "staging", allowedUserIds: [], allowedModelIds: ["gpt-realtime-2.1"] },
       verifyToken: vi.fn(async () => ({
         success: true,
         user: { id: "user-1" },
@@ -756,6 +759,7 @@ describe("OpenAI WebRTC HTTP broker", () => {
       userId: "user-1",
       sessionId,
       offerSdp: offer,
+      modelId: "gpt-realtime-2.1",
       livePromptInstructions: "Scenario: Kartu kredit jatuh tempo.",
       consumerGender: "male",
       signal: expect.any(AbortSignal),
@@ -868,5 +872,110 @@ describe("OpenAI WebRTC HTTP broker", () => {
     const ended = response();
     await endedHandler(request("DELETE"), ended);
     expect(ended.status).toBe(204);
+  });
+
+  it("passes the exact persisted model into the manager start call for Full and Mini", async () => {
+    for (const modelId of ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"]) {
+      const startCall = vi.fn(async () => ({ answerSdp: offer }));
+      const handler = createOpenAIWebRtcHttpHandler({
+        enabled: true,
+        allowedOrigins: origin,
+        rollout: {
+          enabled: true,
+          nodeEnv: "development",
+          allowedUserIds: ["user-1"],
+          allowedModelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
+        },
+        verifyToken: vi.fn(async () => ({
+          success: true,
+          user: { id: "user-1" },
+        })),
+        getProfile: vi.fn(async () => ({
+          role: "trainer",
+          status: "active",
+          is_deleted: false,
+        })),
+        getSession: vi.fn(async () => ({
+          id: sessionId,
+          user_id: "user-1",
+          status: "active",
+          telefun_model_id: modelId,
+          telefun_transport: "openai-webrtc",
+        })),
+        manager: { startCall, endCall: vi.fn(), failCall: vi.fn() },
+      });
+      const res = response();
+
+      await handler(request("POST", offer), res);
+
+      expect(res.status).toBe(201);
+      expect(startCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelId,
+          sessionId,
+          offerSdp: offer,
+        }),
+      );
+    }
+  });
+
+  it("rejects an unsupported persisted model with 404 before any manager call", async () => {
+    const startCall = vi.fn();
+    const handler = createOpenAIWebRtcHttpHandler({
+      enabled: true,
+      allowedOrigins: origin,
+      rollout: {
+        enabled: true,
+        nodeEnv: "development",
+        allowedUserIds: ["user-1"],
+        allowedModelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
+      },
+      verifyToken: vi.fn(async () => ({
+        success: true,
+        user: { id: "user-1" },
+      })),
+      getProfile: vi.fn(async () => ({
+        role: "trainer",
+        status: "active",
+        is_deleted: false,
+      })),
+      getSession: vi.fn(async () => ({
+        id: sessionId,
+        user_id: "user-1",
+        status: "active",
+        telefun_model_id: "gpt-realtime-4",
+        telefun_transport: "openai-webrtc",
+      })),
+      manager: { startCall, endCall: vi.fn(), failCall: vi.fn() },
+    });
+    const res = response();
+
+    await handler(request("POST", offer), res);
+
+    expect(res.status).toBe(404);
+    expect(startCall).not.toHaveBeenCalled();
+  });
+
+  it("keeps the browser unable to override the persisted model (raw SDP body only)", async () => {
+    const startCall = vi.fn();
+    const handler = createOpenAIWebRtcHttpHandler({
+      enabled: true,
+      allowedOrigins: origin,
+      verifyToken: vi.fn(),
+      getProfile: vi.fn(),
+      getSession: vi.fn(),
+      manager: { startCall, endCall: vi.fn(), failCall: vi.fn() },
+    });
+    const res = response();
+
+    await handler(
+      request("POST", '{"model":"gpt-realtime-2.1-mini"}', {
+        "content-type": "application/json",
+      }),
+      res,
+    );
+
+    expect(res.status).toBe(400);
+    expect(startCall).not.toHaveBeenCalled();
   });
 });
