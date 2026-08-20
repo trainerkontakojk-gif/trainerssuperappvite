@@ -964,9 +964,14 @@ export class LiveSession {
     this.stalledWatchdogTimer = setInterval(() => {
       if (!this.isSetupComplete) return;
       const elapsed = Date.now() - this.lastModelActivityMs;
+      const watchdogResponseIsActive =
+        this.config.telefunTransport !== "openai-audio" ||
+        (this.openAiActiveResponseId !== null &&
+          !this.openAiTerminalResponseIds.has(this.openAiActiveResponseId));
       if (
         this.sessionState === "ai_speaking" &&
-        elapsed > this.STALLED_RESPONSE_MID_MS
+        elapsed > this.STALLED_RESPONSE_MID_MS &&
+        watchdogResponseIsActive
       ) {
         this.emitTimelineEvent("stalled_response_watchdog", {
           reason: "mid_response_timeout",

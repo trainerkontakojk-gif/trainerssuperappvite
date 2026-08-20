@@ -390,6 +390,137 @@ describe("LiveSession OpenAI browser runtime", () => {
     expect(speaking.mock.calls).toEqual([[true], [false]]);
   });
 
+  it("keeps terminal OpenAI buffered playback connected beyond the watchdog threshold", async () => {
+    vi.useFakeTimers();
+    try {
+      const session = new LiveSession(createOpenAiConfig());
+      sessions.push(session);
+      const speaking = vi.fn();
+      const states: string[] = [];
+      session.onAiSpeaking = speaking;
+      session.onStateChange = (state) => states.push(state);
+
+      await session.connect("access-token");
+      const socket = sockets[0];
+      socket.open();
+      socket.receive({ type: "auth_ok", sessionId: "session-openai" });
+      socket.receive({
+        type: "telefun_session_configured",
+        modelId: "gpt-realtime-2.1-mini",
+        transport: "openai-audio",
+      });
+      (session as any).recordingDestination = {};
+
+      socket.receive({
+        type: "response.created",
+        response: { id: "response-1", status: "in_progress" },
+      });
+      socket.receive({
+        type: "response.output_audio.delta",
+        response_id: "response-1",
+        item_id: "item-1",
+        delta: Buffer.from(new Int16Array(240).buffer).toString("base64"),
+      });
+      socket.receive({
+        type: "response.done",
+        response: { id: "response-1", status: "completed" },
+      });
+
+      expect((session as any).isAiSpeaking).toBe(true);
+      expect((session as any).pendingTurnCompletion).toBe(true);
+      expect(audioContexts[0].sources).toHaveLength(1);
+
+      vi.advanceTimersByTime(26_000);
+
+      expect(socket.readyState).toBe(FakeWebSocket.OPEN);
+      expect(
+        socket.sent
+          .map((raw) => JSON.parse(raw))
+          .filter((event) => event.type === "session_end_request"),
+      ).toHaveLength(0);
+      expect((session as any).activeSources.size).toBe(1);
+      expect((session as any).isAiSpeaking).toBe(true);
+      expect((session as any).pendingTurnCompletion).toBe(true);
+      expect(speaking.mock.calls).toEqual([[true]]);
+      expect(states.at(-1)).toBe("ai_speaking");
+
+      audioContexts[0].sources[0].onended?.();
+
+      expect((session as any).activeSources.size).toBe(0);
+      expect((session as any).isAiSpeaking).toBe(false);
+      expect((session as any).sessionState).toBe("idle");
+      expect((session as any).pendingTurnCompletion).toBe(false);
+      expect(speaking.mock.calls).toEqual([[true], [false]]);
+      expect(states.at(-1)).toBe("idle");
+      expect(
+        socket.sent
+          .map((raw) => JSON.parse(raw))
+          .filter((event) => event.type === "session_end_request"),
+      ).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still disconnects an active non-terminal OpenAI response after the watchdog threshold", async () => {
+    vi.useFakeTimers();
+    try {
+      const session = new LiveSession(createOpenAiConfig());
+      sessions.push(session);
+      const timeline = vi.fn();
+      session.onTimelineEvent = timeline;
+      vi.spyOn(session as any, "stopRecordingOnce").mockImplementation(
+        () => undefined,
+      );
+
+      await session.connect("access-token");
+      const socket = sockets[0];
+      socket.open();
+      socket.receive({ type: "auth_ok", sessionId: "session-openai" });
+      socket.receive({
+        type: "telefun_session_configured",
+        modelId: "gpt-realtime-2.1-mini",
+        transport: "openai-audio",
+      });
+      (session as any).recordingDestination = {};
+      socket.receive({
+        type: "response.created",
+        response: { id: "response-1", status: "in_progress" },
+      });
+      socket.receive({
+        type: "response.output_audio.delta",
+        response_id: "response-1",
+        item_id: "item-1",
+        delta: Buffer.from(new Int16Array(240).buffer).toString("base64"),
+      });
+
+      vi.advanceTimersByTime(26_000);
+
+      const sent = socket.sent.map((raw) => JSON.parse(raw));
+      expect(socket.readyState).toBe(FakeWebSocket.OPEN);
+      expect(
+        sent.filter((event) => event.type === "response.cancel"),
+      ).toHaveLength(1);
+      expect(
+        sent.filter((event) => event.type === "session_end_request"),
+      ).toEqual([{ type: "session_end_request", reason: "timeout" }]);
+      expect(
+        timeline.mock.calls.filter(
+          ([event]) => event.event === "stalled_response_watchdog",
+        ),
+      ).toHaveLength(1);
+
+      socket.receive({
+        type: "session_end_complete",
+        outcome: "turn_complete",
+      });
+      await (session as any).disconnectPromise;
+      expect(socket.readyState).toBe(FakeWebSocket.CLOSED);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["failed", "incomplete", "cancelled"])(
     "treats a %s response as interrupted rather than successfully completed",
     async (status) => {
