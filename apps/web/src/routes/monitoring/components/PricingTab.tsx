@@ -5,7 +5,10 @@ import { PricingRow } from "./PricingRow";
 import { mapError } from "../utils/formatting";
 import type { PricingEntry as ApiPricingEntry } from "../../../lib/api";
 
-export type PricingEntry = ApiPricingEntry;
+export type PricingEntry = ApiPricingEntry & {
+  historical?: boolean;
+  editable?: boolean;
+};
 
 export function buildPricingUpdatePayload(entry: PricingEntry) {
   return {

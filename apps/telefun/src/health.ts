@@ -1,7 +1,8 @@
 export interface TelefunProviderReadinessInput {
   geminiConfigured: boolean;
-  openAIEnabled: boolean;
-  openAIConfigured: boolean;
+  /** Deprecated no-op inputs retained for caller compatibility. */
+  openAIEnabled?: boolean;
+  openAIConfigured?: boolean;
 }
 
 export interface TelefunHealthRuntimeInput {
@@ -77,13 +78,12 @@ export function buildTelefunHealthPayload(
   provider: TelefunProviderReadinessInput,
   runtime: TelefunHealthRuntimeInput,
 ) {
-  const openAIReady = provider.openAIEnabled && provider.openAIConfigured;
   return {
     status: "ok" as const,
     uptime: runtime.uptime,
     timestamp: runtime.timestamp,
     readiness: {
-      acceptingSessions: provider.geminiConfigured || openAIReady,
+      acceptingSessions: provider.geminiConfigured,
       providers: {
         gemini: {
           enabled: true,
@@ -91,9 +91,9 @@ export function buildTelefunHealthPayload(
           ready: provider.geminiConfigured,
         },
         openai: {
-          enabled: provider.openAIEnabled,
-          configured: provider.openAIConfigured,
-          ready: openAIReady,
+          enabled: false,
+          configured: false,
+          ready: false,
         },
       },
     },

@@ -8,7 +8,10 @@ import {
   POC_TRANSPORT,
   type TelefunWebRtcModelId,
 } from "./contracts.js";
-import { OpenAiCallCreationError } from "./openai-calls-client.js";
+import {
+  OpenAiCallCreationError,
+  type OpenAiCallsClient,
+} from "./openai-calls-client.js";
 import { SidebandEventObserver } from "./sideband-event-observer.js";
 import {
   WebRtcDurabilityError,
@@ -79,8 +82,73 @@ const DEFAULT_PROVIDER_HANGUP_TIMEOUT_MS = 15_000;
 const DEFAULT_PERSISTENCE_TIMEOUT_MS = 10_000;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
 
+export type WebRtcCleanupManager = Pick<
+  WebRtcCallManager,
+  "endCall" | "failCall" | "shutdown"
+>;
+
+export interface WebRtcCleanupManagerOptions {
+  db: TelefunWebRtcDb;
+  callsClient: { closeCall(callId: string): Promise<boolean> };
+  /**
+   * Server-only decryption boundary for a persisted historical reference.
+   * Returning null (including for a missing key) keeps a bound call retryable.
+   */
+  decryptProviderCallReference?: (
+    providerCallReference: string,
+  ) => string | null;
+  now?: () => number;
+  providerHangupTimeoutMs?: number;
+  persistenceTimeoutMs?: number;
+  shutdownTimeoutMs?: number;
+}
+
+/**
+ * Cleanup-only facade for historical calls. The returned boundary has no
+ * startCall method, cannot create sidebands, and skips usage persistence.
+ */
+export function createWebRtcCleanupManager(
+  options: WebRtcCleanupManagerOptions,
+): WebRtcCleanupManager {
+  const callsClient: OpenAiCallsClient = {
+    createCall: async () => {
+      throw new Error("OpenAI WebRTC starts are disabled");
+    },
+    closeCall: options.callsClient.closeCall,
+  };
+  const manager = createWebRtcCallManagerInternal(
+    {
+      db: options.db,
+      callsClient,
+      createSideband: () => {
+        throw new Error("OpenAI WebRTC sideband is disabled");
+      },
+      now: options.now,
+      providerHangupTimeoutMs: options.providerHangupTimeoutMs,
+      persistenceTimeoutMs: options.persistenceTimeoutMs,
+      shutdownTimeoutMs: options.shutdownTimeoutMs,
+    },
+    true,
+    options.decryptProviderCallReference,
+  );
+  return {
+    endCall: manager.endCall,
+    failCall: manager.failCall,
+    shutdown: manager.shutdown,
+  };
+}
+
+/** Legacy internal manager retained for historical lifecycle compatibility. */
 export function createWebRtcCallManager(
   options: WebRtcCallManagerOptions,
+): WebRtcCallManager {
+  return createWebRtcCallManagerInternal(options, false);
+}
+
+function createWebRtcCallManagerInternal(
+  options: WebRtcCallManagerOptions,
+  cleanupOnly: boolean,
+  decryptProviderCallReference?: (providerCallReference: string) => string | null,
 ): WebRtcCallManager {
   if (!options.db && !options.updateSession) {
     throw new Error("WebRTC persistence is not configured");
@@ -269,6 +337,18 @@ export function createWebRtcCallManager(
       closeProvider: () => closeBindingProvider(binding),
       sidebandDrainTimeoutMs,
     });
+
+  const runFinalizationBarrier = async (binding: ActiveBinding) => {
+    if (!cleanupOnly) return runBarrier(binding);
+    // Historical DELETE cleanup is provider-hangup-only. It never opens,
+    // drains, or closes a sideband and never performs usage work.
+    binding.state = "ending";
+    if (!binding.callId) binding.startController.abort();
+    return {
+      providerClosed: await closeBindingProvider(binding),
+      sidebandFailure: null,
+    };
+  };
 
   const releaseLease = async (
     binding: ActiveBinding,
@@ -559,7 +639,8 @@ export function createWebRtcCallManager(
       // beginFinalization is always the first durable finalization operation.
       begin = await beginFinalization(desiredStatus);
     } catch (error) {
-      const { providerClosed, sidebandFailure } = await runBarrier(binding);
+      const { providerClosed, sidebandFailure } =
+        await runFinalizationBarrier(binding);
       if (sidebandFailure) throw sidebandFailure;
       if (!providerClosed) binding.terminalStatus = "failed";
       throw error instanceof WebRtcDurabilityError
@@ -567,7 +648,8 @@ export function createWebRtcCallManager(
         : new WebRtcDurabilityError("begin_finalization");
     }
     if (!begin.accepted) {
-      const { providerClosed, sidebandFailure } = await runBarrier(binding);
+      const { providerClosed, sidebandFailure } =
+        await runFinalizationBarrier(binding);
       if (sidebandFailure) throw sidebandFailure;
       if (!providerClosed) binding.terminalStatus = "failed";
       if (isFinalizationConflictReason(begin.reason)) {
@@ -576,7 +658,8 @@ export function createWebRtcCallManager(
       throw new WebRtcDurabilityError("begin_finalization");
     }
     if (!begin.shouldFinalize || begin.state === "ended") {
-      const { providerClosed, sidebandFailure } = await runBarrier(binding);
+      const { providerClosed, sidebandFailure } =
+        await runFinalizationBarrier(binding);
       if (sidebandFailure) throw sidebandFailure;
       if (!providerClosed) {
         await requestFailedOutcome();
@@ -590,9 +673,10 @@ export function createWebRtcCallManager(
       return;
     }
 
-    // Keep sideband admission open while the bounded provider hangup is in
-    // flight. The synchronous seal happens in the barrier below.
-    const { providerClosed, sidebandFailure } = await runBarrier(binding);
+    // Full legacy finalization keeps sideband admission open while hangup is
+    // in flight. Cleanup-only finalization bypasses sideband work entirely.
+    const { providerClosed, sidebandFailure } =
+      await runFinalizationBarrier(binding);
     if (sidebandFailure) {
       binding.terminalStatus = "failed";
       try {
@@ -603,13 +687,15 @@ export function createWebRtcCallManager(
       throw sidebandFailure;
     }
 
-    binding.transcript.flush(now());
-    await queueTranscriptCheckpoint(
-      binding,
-      binding.terminalStatus === "failed",
-    );
     const durationMs = Math.max(0, now() - binding.startedAtMs);
-    await persistDurableUsage(binding, durationMs);
+    if (!cleanupOnly) {
+      binding.transcript.flush(now());
+      await queueTranscriptCheckpoint(
+        binding,
+        binding.terminalStatus === "failed",
+      );
+      await persistDurableUsage(binding, durationMs);
+    }
 
     if (!providerClosed) {
       binding.terminalStatus = "failed";
@@ -715,6 +801,37 @@ export function createWebRtcCallManager(
     }
   };
 
+  const recoverProviderCall = (
+    attempt: NonNullable<Awaited<ReturnType<TelefunWebRtcDb["getAttempt"]>>>,
+  ): { callId: string; providerRecoveryRequired: boolean } => {
+    if (!attempt.providerCallIdHash) {
+      // An existing attempt without a persisted provider identity is not proof
+      // that no upstream call exists (the process may have died before bind).
+      // Keep it retryable; only a true no-attempt read may finalize locally.
+      return { callId: "", providerRecoveryRequired: true };
+    }
+    if (
+      !cleanupOnly ||
+      !attempt.providerCallReference ||
+      !decryptProviderCallReference
+    ) {
+      return { callId: "", providerRecoveryRequired: true };
+    }
+    try {
+      const callId = decryptProviderCallReference(attempt.providerCallReference);
+      if (
+        !callId ||
+        !isSafeProviderCallId(callId) ||
+        hashProviderCallId(callId) !== attempt.providerCallIdHash
+      ) {
+        return { callId: "", providerRecoveryRequired: true };
+      }
+      return { callId, providerRecoveryRequired: false };
+    } catch {
+      return { callId: "", providerRecoveryRequired: true };
+    }
+  };
+
   const recoverBinding = async (
     sessionId: string,
     userId: string,
@@ -740,8 +857,10 @@ export function createWebRtcCallManager(
     binding.claim = claim;
     binding.state = attempt.state;
     binding.startInFlight = false;
-    binding.callId = "";
-    binding.providerRecoveryRequired = true;
+    const recoveredProviderCall = recoverProviderCall(attempt);
+    binding.callId = recoveredProviderCall.callId;
+    binding.providerRecoveryRequired =
+      recoveredProviderCall.providerRecoveryRequired;
     bindings.set(sessionId, binding);
     return binding;
   };

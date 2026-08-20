@@ -9,12 +9,6 @@ import {
   observeLiveUsageMetadata,
   commitPendingLiveUsageTurn,
   summarizeLiveUsageAccumulator,
-  createOpenAIUsageAccumulator,
-  observeOpenAIUsage,
-  summarizeOpenAIUsageAccumulator,
-  getOpenAIUsageDiagnostics,
-  flushOpenAIRealtimeUsage,
-  recordFailedOpenAIRealtimeUsage,
 } from "./usage.js";
 import {
   createSession,
@@ -36,10 +30,6 @@ import { DrainCoordinator, type DrainOutcome } from "./session-drain.js";
 import { buildSafeCloseMetadata } from "./server-close.js";
 import { TelefunAuthGate } from "./server-auth.js";
 import { GeminiLiveAdapter } from "./providers/GeminiLiveAdapter.js";
-import {
-  OpenAIRealtimeAdapter,
-  buildSafeOpenAIDiagnosticLogMetadata,
-} from "./providers/OpenAIRealtimeAdapter.js";
 import type { RealtimeProviderAdapter } from "./providers/RealtimeProviderAdapter.js";
 import { createRealtimeProviderAdapter } from "./providers/provider-router.js";
 import {
@@ -60,15 +50,10 @@ import {
   createOpenAIWebRtcHttpHandler,
   isOpenAIWebRtcRequest,
 } from "./realtime-webrtc/http-broker.js";
-import { createWebRtcCallManager } from "./realtime-webrtc/call-manager.js";
-import { createOpenAiCallsClient } from "./realtime-webrtc/openai-calls-client.js";
-import { createSidebandClient } from "./realtime-webrtc/sideband-client.js";
-import { createDistributedWebRtcLeaseCoordinator } from "./realtime-webrtc/distributed-lease.js";
+import { createWebRtcCleanupManager } from "./realtime-webrtc/call-manager.js";
+import { createOpenAiCallCleanupClient } from "./realtime-webrtc/openai-calls-client.js";
 import { createOrphanCleanupWorker } from "./realtime-webrtc/orphan-cleanup.js";
-import {
-  decryptProviderCallReference,
-  encryptProviderCallReference,
-} from "./realtime-webrtc/provider-reference.js";
+import { decryptProviderCallReference } from "./realtime-webrtc/provider-reference.js";
 import {
   createWebRtcMetricRecorder,
   redactProviderDiagnostic,
@@ -90,103 +75,49 @@ const webRtcMetricRecorder = createWebRtcMetricRecorder(async (metric) => {
   await openAIWebRtcDb.recordMetric?.(metric);
 });
 const WEBRTC_SHUTDOWN_TIMEOUT_MS = 30_000;
-const openAICallsClient = createOpenAiCallsClient({
+const openAiCleanupClient = createOpenAiCallCleanupClient({
   apiKey: env.OPENAI_API_KEY ?? "",
   timeoutMs: env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS,
 });
-const openAIWebRtcLease = createDistributedWebRtcLeaseCoordinator(
-  {
-    acquire: (input) => openAIWebRtcDb.acquireLease!(input),
-    renew: (input) => openAIWebRtcDb.renewLease!(input),
-    release: (input) => openAIWebRtcDb.releaseLease!(input),
-  },
-  {
-    heartbeatMs: env.TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS,
-    onLost: (input) =>
-      webRtcMetricRecorder.record({
-        name: "orphan",
-        userId: input.userId,
-        sessionId: input.sessionId,
-        attemptId: input.attemptId,
-        metadata: { reason: input.reason },
-      }),
-  },
-);
 
-const openAIWebRtcManager = createWebRtcCallManager({
+/** Server-only decryptor for an already-bound historical provider call. */
+const decryptHistoricalProviderCallReference = (
+  encryptedReference: string,
+): string | null => {
+  const key = env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY;
+  return key ? decryptProviderCallReference(encryptedReference, key) : null;
+};
+
+// The broker receives only this facade: no HTTP route can call startCall,
+// construct a provider session, or create a sideband.
+const openAIWebRtcManager = createWebRtcCleanupManager({
   db: openAIWebRtcDb,
-  callsClient: openAICallsClient,
-  lease: openAIWebRtcLease,
-  leaseTtlMs: env.TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS,
-  maxUserSessions: env.TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS,
-  maxProviderSessions: env.TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS,
-  onMetric: (metric) => webRtcMetricRecorder.record(metric),
-  encryptProviderCallReference: (callId) =>
-    encryptProviderCallReference(
-      callId,
-      env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY ?? "",
-    ),
+  callsClient: openAiCleanupClient,
+  decryptProviderCallReference: decryptHistoricalProviderCallReference,
   providerHangupTimeoutMs: env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS,
   shutdownTimeoutMs: WEBRTC_SHUTDOWN_TIMEOUT_MS,
-  createSideband: (callId, callbacks) =>
-    createSidebandClient({
-      callId,
-      apiKey: env.OPENAI_API_KEY ?? "",
-      createSocket: (url, options) => new WebSocket(url, options),
-      onEvent: callbacks.onEvent,
-      onDiagnostic: callbacks.onDiagnostic,
-      onClose: callbacks.onClose,
-      timeoutMs: env.TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS,
-    }),
-  onSidebandDiagnostic: (diagnostic) => {
-    // Diagnostic payloads can originate from a provider frame. Keep logs to a
-    // closed, non-secret type set; raw provider errors never reach stdout.
-    console.warn("[Telefun] OpenAI WebRTC sideband diagnostic", {
-      type: diagnostic.type,
-      ...(diagnostic.type === "provider_error"
-        ? { code: diagnostic.code, param: diagnostic.param }
-        : {}),
-    });
-  },
-  flushUsage: async ({
-    usageRequestId,
-    userId,
-    aggregate,
-    durationMs,
-    modelId,
-  }) =>
-    flushOpenAIRealtimeUsage(
-      usageRequestId,
-      userId,
-      aggregate,
-      modelId,
-      durationMs,
-    ),
-  auditFailedUsage: ({ usageRequestId, userId, modelId, errorMessage }) =>
-    recordFailedOpenAIRealtimeUsage(
-      usageRequestId,
-      userId,
-      modelId,
-      errorMessage,
-    ),
 });
 
 const orphanCleanupWorker = createOrphanCleanupWorker({
   store: {
     claim: (limit) =>
       openAIWebRtcDb.claimOrphans?.(limit) ?? Promise.resolve([]),
+    getProviderBinding: async (candidate) => {
+      const attempt = await openAIWebRtcDb.getAttempt(
+        candidate.sessionId,
+        candidate.userId,
+      );
+      if (!attempt) return "unknown";
+      return attempt.providerCallIdHash ? "bound" : "unbound";
+    },
     complete: (input) => openAIWebRtcDb.completeOrphan!(input),
   },
   closeProvider: async (encryptedReference) => {
-    const key = env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY;
-    const callId = key
-      ? decryptProviderCallReference(encryptedReference, key)
-      : null;
-    if (!callId || !openAICallsClient.closeCall) return false;
-    return openAICallsClient.closeCall(callId);
+    const callId = decryptHistoricalProviderCallReference(encryptedReference);
+    if (!callId) return false;
+    return openAiCleanupClient.closeCall(callId);
   },
-  // A provider hangup closes the server-side sideband after restart; there is
-  // no process-local socket to reuse.
+  // Historical orphan cleanup has no process-local sideband to touch.
   closeSideband: async () => true,
   onOrphan: ({ candidate, completed }) =>
     webRtcMetricRecorder.record({
@@ -198,21 +129,12 @@ const orphanCleanupWorker = createOrphanCleanupWorker({
     }),
   intervalMs: env.TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS,
 });
-if (env.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY) orphanCleanupWorker.start();
+// Without a key, cleanup attempts remain retryable and the cleanup client
+// refuses to fetch; do not convert unavailable hangup authority into success.
+orphanCleanupWorker.start();
 
 const openAIWebRtcHandler = createOpenAIWebRtcHttpHandler({
-  enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
   allowedOrigins: env.ALLOWED_ORIGINS,
-  requestTimeoutMs:
-    env.TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS +
-    env.TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS +
-    5_000,
-  rollout: {
-    enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
-    nodeEnv: env.NODE_ENV,
-    allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
-    allowedModelIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
-  },
   verifyToken,
   getProfile: getWebRtcProfile,
   getSession: getWebRtcSession,
@@ -258,11 +180,7 @@ const server = createServer((req, res) => {
     res.end(
       JSON.stringify(
         buildTelefunHealthPayload(
-          {
-            geminiConfigured: Boolean(env.GEMINI_API_KEY),
-            openAIEnabled: env.TELEFUN_OPENAI_ENABLED,
-            openAIConfigured: Boolean(env.OPENAI_API_KEY),
-          },
+          { geminiConfigured: Boolean(env.GEMINI_API_KEY) },
           {
             uptime: process.uptime(),
             timestamp: new Date().toISOString(),
@@ -319,11 +237,9 @@ wss.on("connection", async (ws, req) => {
     `http://${req.headers.host || "localhost"}`,
   );
   const usageAccumulator = createLiveUsageAccumulator();
-  const openAIUsageAccumulator = createOpenAIUsageAccumulator();
   let usageFlushed = false;
   let usageFlushPromise: Promise<void> | null = null;
   let activeModelId = "gemini-3.1-flash-live-preview";
-  let activeProvider: "gemini" | "openai" = "gemini";
   let finalized = false;
   let drainCoordinator: DrainCoordinator | null = null;
   let drainTimers: ReturnType<typeof setTimeout>[] = [];
@@ -354,51 +270,17 @@ wss.on("connection", async (ws, req) => {
     if (usageFlushPromise) return usageFlushPromise;
 
     const attempt = async () => {
-      if (activeProvider !== "openai") {
-        commitPendingLiveUsageTurn(usageAccumulator, "session_flush");
-        const usageAggregate = summarizeLiveUsageAccumulator(usageAccumulator);
-        if (!usageAggregate) return;
-        usageFlushed = true;
-        await flushLiveUsage(
-          requestId,
-          userId,
-          usageAggregate,
-          activeModelId,
-          sessionDurationMs,
-        );
-        return;
-      }
-
-      const usageAggregate = summarizeOpenAIUsageAccumulator(
-        openAIUsageAccumulator,
-      );
-      const diagnostics = getOpenAIUsageDiagnostics(openAIUsageAccumulator);
-      if (diagnostics.warnings.length > 0 || !usageAggregate) {
-        console.warn("[Telefun] OpenAI usage incomplete", {
-          requestId,
-          ...diagnostics,
-          hasAggregate: Boolean(usageAggregate),
-        });
-      }
-      if (!usageAggregate) {
-        usageFlushed = true;
-        return;
-      }
-      const persisted = await flushOpenAIRealtimeUsage(
+      commitPendingLiveUsageTurn(usageAccumulator, "session_flush");
+      const usageAggregate = summarizeLiveUsageAccumulator(usageAccumulator);
+      if (!usageAggregate) return;
+      usageFlushed = true;
+      await flushLiveUsage(
         requestId,
         userId,
         usageAggregate,
         activeModelId,
         sessionDurationMs,
       );
-      if (!persisted) {
-        console.warn("[Telefun] OpenAI usage was not persisted", {
-          requestId,
-          modelId: activeModelId,
-        });
-        return;
-      }
-      usageFlushed = true;
     };
 
     usageFlushPromise = attempt().finally(() => {
@@ -494,67 +376,12 @@ wss.on("connection", async (ws, req) => {
       },
     });
 
-  const createOpenAIAdapter = (
-    configuration: Parameters<typeof createRealtimeProviderAdapter>[0],
-  ) => {
-    const openAIKey = env.OPENAI_API_KEY;
-    if (!openAIKey) {
-      throw new Error("OpenAI Realtime is not configured");
-    }
-
-    return new OpenAIRealtimeAdapter({
-      configuration,
-      apiKey: openAIKey,
-      userId,
-      createSocket: (url, { headers }) => new WebSocket(url, { headers }),
-      callbacks: {
-        forwardToClient: (raw) => {
-          if (ws.readyState === WebSocket.OPEN) ws.send(raw);
-        },
-        observeUsage: (observation, observedAtMs) => {
-          observeOpenAIUsage(openAIUsageAccumulator, observation, observedAtMs);
-        },
-        appendTranscript: (entry) => transcriptCollector.append(entry),
-        startAiSpeaking: () => turnManager.startAiSpeaking(),
-        completeTurn: () => {
-          transcriptCollector.completeTurn("consumer");
-          turnManager.endAiSpeaking();
-        },
-        interruptTurn: () => {
-          transcriptCollector.interruptTurn();
-          turnManager.endAiSpeaking();
-        },
-        notifyActivity: () => drainCoordinator?.notifyActivity(),
-        notifyTurnComplete: () => drainCoordinator?.notifyTurnComplete(),
-        notifyInterrupted: () => drainCoordinator?.notifyInterrupted(),
-        onFinalClose: (code, reason) => {
-          const closeMeta = buildSafeCloseMetadata(code, reason);
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.close(closeMeta.code, closeMeta.reason);
-          }
-        },
-        onDiagnostic: (diagnostic) => {
-          console.warn("[Telefun] OpenAI adapter diagnostic", {
-            requestId,
-            ...buildSafeOpenAIDiagnosticLogMetadata(diagnostic),
-          });
-        },
-      },
-    });
-  };
-
   const configurationGate = new TelefunProviderConfigurationGate({
     createAdapter: (configuration) =>
-      createRealtimeProviderAdapter(configuration, {
-        createGeminiAdapter,
-        createOpenAIAdapter,
-        openAIEnabled: env.TELEFUN_OPENAI_ENABLED,
-        openAIConfigured: Boolean(env.OPENAI_API_KEY),
-      }),
+      createRealtimeProviderAdapter(configuration, { createGeminiAdapter }),
     onConfigured: (configuration, adapter) => {
       providerAdapter = adapter;
       activeModelId = configuration.model.id;
-      activeProvider = configuration.model.provider;
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({
@@ -702,9 +529,6 @@ server.listen(env.PORT, "0.0.0.0", () => {
   console.log(`[Telefun] Server running on http://0.0.0.0:${env.PORT}`);
   console.log(
     `[Telefun] Gemini API Key: ${env.GEMINI_API_KEY ? "configured" : "missing"}`,
-  );
-  console.log(
-    `[Telefun] OpenAI Realtime: ${env.TELEFUN_OPENAI_ENABLED ? "enabled/configured" : "disabled"}`,
   );
 });
 

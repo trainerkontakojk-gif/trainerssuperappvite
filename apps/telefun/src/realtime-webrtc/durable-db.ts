@@ -56,6 +56,8 @@ export interface TelefunWebRtcDb {
     state: AttemptState;
     usageRequestId: string;
     providerCallIdHash: string | null;
+    /** Encrypted server-only reference; never expose this beyond cleanup code. */
+    providerCallReference?: string | null;
     modelId: TelefunWebRtcModelId;
   } | null>;
   /** Atomically fails a still-active pre-created session only when no attempt exists. */
@@ -428,7 +430,7 @@ export function createTelefunWebRtcDb(
         const query = client.from("telefun_realtime_attempts") as DurableQuery;
         const { data, error } = await query
           .select(
-            "id, finalization_key, state, usage_request_id, provider_call_id_hash, model_id",
+            "id, finalization_key, state, usage_request_id, provider_call_id_hash, provider_call_reference, model_id",
           )
           .eq("session_id", sessionId)
           .eq("user_id", userId)
@@ -444,6 +446,11 @@ export function createTelefunWebRtcDb(
         if (providerCallIdHash && !/^[a-f0-9]{64}$/.test(providerCallIdHash)) {
           throw new WebRtcDurabilityError("invalid_provider_call_id_hash");
         }
+        const providerCallReference = readOptionalString(
+          row,
+          "provider_call_reference",
+          16_384,
+        );
         const usageRequestId = readRequiredString(row, "usage_request_id", 128);
         if (!usageRequestId.startsWith("telefun-webrtc:")) {
           throw new WebRtcDurabilityError("invalid_usage_request_id");
@@ -454,6 +461,7 @@ export function createTelefunWebRtcDb(
           state: readAttemptState(row),
           usageRequestId,
           providerCallIdHash,
+          providerCallReference,
           modelId: assertTelefunWebRtcModelId(row.model_id),
         };
       } catch (error) {

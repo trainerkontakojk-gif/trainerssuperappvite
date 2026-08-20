@@ -1,6 +1,6 @@
 import React from "react";
 import { User } from "lucide-react";
-import { normalizeTelefunLiveModelSelection } from "@trainers/types";
+import { normalizeTelefunBrowserSelection } from "../../telefunSettings";
 import {
   TelefunAppSettings as AppSettings,
   TelefunIdentitySettings as ConsumerIdentitySettings,
@@ -19,7 +19,7 @@ export const TelefunIdentityTab: React.FC<TelefunIdentityTabProps> = ({
   setLocalSettings,
 }) => {
   const selectedModel =
-    normalizeTelefunLiveModelSelection(telefunModelId).model;
+    normalizeTelefunBrowserSelection(telefunModelId).model;
   const selectedGender = identitySettings?.gender || "random";
   const voiceSelectionDisabled = selectedGender === "random";
   const voiceOptions =

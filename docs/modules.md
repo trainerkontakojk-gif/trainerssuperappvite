@@ -117,7 +117,9 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
 
 Modul simulasi komunikasi suara untuk melatih intonasi dan kecepatan respon telepon.
 
-- **Fungsi**: Mempersiapkan peserta untuk menangani panggilan telepon melalui simulasi suara berbasis AI.
+- **Fungsi**: Mempersiapkan peserta untuk menangani panggilan telepon melalui simulasi suara berbasis Gemini Live.
+- **Status provider**: Telefun model selection dan start flow Gemini-only. GPT/OpenAI Realtime Telefun telah concluded/permanently disabled untuk semua user; tidak ada OpenAI card, readiness, capability fetch, WebRTC POST, sideband, atau scoring baru. History, recording, feedback, usage, dan historical realtime pricing tetap readable; pricing historical read-only. Owner-bound DELETE cleanup tetap tersedia hanya untuk historical WebRTC call yang sudah terikat.
+- **Batas OpenAI text**: Fallback/direct OpenAI text yang didokumentasikan untuk KETIK atau PDKT adalah operasi API terpisah. Itu tidak membuat model, transport, pricing realtime, atau provider Telefun OpenAI dapat dipilih.
 - **Route**: `/telefun`
 - **Fitur Utama**:
   - **Live Voice Interface**: Panggilan dimulai dari ringtone, izin mikrofon, dan koneksi WebSocket.

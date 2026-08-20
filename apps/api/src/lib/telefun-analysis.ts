@@ -5,14 +5,16 @@ import {
   TELEFUN_VOICE_ASSESSMENT_JSON_SCHEMA,
 } from "@trainers/types";
 import type { VoiceQualityAssessment } from "@trainers/types";
-import { getTelefunLiveModel } from "@trainers/types";
+import { isRetiredTelefunOpenAiRealtimeSelection } from "@trainers/types";
 import { parseJsonFromModelText } from "./ai-json";
 import {
   normalizeTelefunHoldMetrics,
   evaluateTelefunHoldAssessment,
   applyHoldAssessmentToOverallScore,
 } from "./telefun-hold-assessment";
-import { requestOpenAITelefunAssessment } from "./telefun-openai-assessment";
+import {
+  TELEFUN_OPENAI_SCORING_DISABLED_REASON,
+} from "./telefun-openai-assessment";
 
 export type { VoiceQualityAssessment };
 
@@ -49,18 +51,6 @@ export async function analyzeVoiceQuality(
   if (fetchError || !row) return { success: false, error: "Session not found" };
   if (row.user_id !== userId) return { success: false, error: "Unauthorized" };
   const isWebRtc = row.telefun_transport === "openai-webrtc";
-  if (
-    isWebRtc &&
-    (row.status !== "completed" ||
-      !row.scoring_ready_at ||
-      !isTelefunWebRtcSeekableAgentPath({
-        path: row.agent_recording_path,
-        userId,
-        sessionId,
-      }))
-  ) {
-    return { success: false, error: "Scoring not ready" };
-  }
 
   // Compute hold assessment from session_metrics (shared by both providers)
   const sessionMetrics =
@@ -124,46 +114,26 @@ export async function analyzeVoiceQuality(
     };
   }
 
-  // Provider-matched routing happens only after the shared cache boundary, so
-  // a completed assessment never opens another provider connection.
-  const liveModel = getTelefunLiveModel(row.telefun_model_id);
-  if (liveModel?.provider === "openai") {
-    const assessment = await requestOpenAITelefunAssessment({
-      sessionId,
-      userId,
+  if (
+    isRetiredTelefunOpenAiRealtimeSelection({
       modelId: row.telefun_model_id,
-    });
-    const synchronizedAssessment = parseVoiceQualityAssessment({
-      ...assessment,
-      holdManagement: holdAssessment,
-      overallScore: applyHoldAssessmentToOverallScore(
-        assessment.overallScore,
-        holdAssessment,
-      ),
-    });
-    if (!synchronizedAssessment) {
-      return { success: false, error: "Format hasil analisis tidak valid." };
-    }
+      transport: row.telefun_transport,
+    })
+  ) {
+    return { success: false, error: TELEFUN_OPENAI_SCORING_DISABLED_REASON };
+  }
 
-    if (!isWebRtc) {
-      const { error: updateError } = await adminClient
-        .from("telefun_history")
-        .update({
-          voice_assessment: synchronizedAssessment,
-          score: synchronizedAssessment.overallScore,
-          scoring_status: "completed",
-          scoring_completed_at: new Date().toISOString(),
-        })
-        .eq("id", sessionId);
-      if (updateError) {
-        console.error("[Telefun] Failed to save OpenAI assessment:", updateError);
-        return {
-          success: false,
-          error: "Gagal menyimpan hasil penilaian suara.",
-        };
-      }
-    }
-    return { success: true, assessment: synchronizedAssessment };
+  if (
+    isWebRtc &&
+    (row.status !== "completed" ||
+      !row.scoring_ready_at ||
+      !isTelefunWebRtcSeekableAgentPath({
+        path: row.agent_recording_path,
+        userId,
+        sessionId,
+      }))
+  ) {
+    return { success: false, error: "Scoring not ready" };
   }
 
   const agentPath = row.agent_recording_path;

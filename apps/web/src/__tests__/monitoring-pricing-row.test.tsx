@@ -53,13 +53,15 @@ describe("PricingRow", () => {
     expect(screen.queryByText(/Rate modality/)).not.toBeInTheDocument();
   });
 
-  it("shows six labelled rates for realtime models and saves their edits", () => {
+  it("renders historical realtime rates read-only", () => {
     const onSave = renderRow(
       entry({
         model_id: "gpt-realtime-2.1-mini",
         model_name: "GPT Realtime 2.1 Mini",
         provider: "openai",
         pricing_mode: "realtime",
+        historical: true,
+        editable: false,
         input_price_usd_per_million: 0.6,
         output_price_usd_per_million: 2.4,
         input_text_price_usd_per_million: 0.6,
@@ -68,23 +70,13 @@ describe("PricingRow", () => {
         cached_input_audio_price_usd_per_million: 0.3,
         output_text_price_usd_per_million: 2.4,
         output_audio_price_usd_per_million: 20,
-      }),
+      } as Partial<PricingEntry>),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    expect(screen.getAllByRole("spinbutton")).toHaveLength(6);
-    fireEvent.change(
-      screen.getByLabelText("GPT Realtime 2.1 Mini Cached audio input"),
-      { target: { value: "0.35" } },
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
-
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model_id: "gpt-realtime-2.1-mini",
-        cached_input_audio_price_usd_per_million: 0.35,
-      }),
-    );
+    expect(screen.getByText("Riwayat (read-only)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.queryAllByRole("spinbutton")).toHaveLength(0);
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it("restores the current values after cancelling an edit", () => {

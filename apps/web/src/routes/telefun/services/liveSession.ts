@@ -1,4 +1,7 @@
-import type { TelefunAppSettings } from "../telefunSettings";
+import {
+  normalizeTelefunBrowserSelection,
+  type TelefunAppSettings,
+} from "../telefunSettings";
 import type { TelefunSessionState, TelefunTimelineEvent } from "../types";
 import type { SessionMetrics, SpeechSegment } from "@trainers/types";
 import {
@@ -27,13 +30,7 @@ import {
   shouldReportTelefunCloseError,
   getTelefunAudioConfiguration,
   buildTelefunSessionConfigure,
-  buildOpenAiInputAudioAppend,
-  buildOpenAiSystemInputItem,
   buildGeminiRealtimeTextMessage,
-  buildOpenAiResponseCreate,
-  buildOpenAiResponseCancel,
-  buildOpenAiConversationItemTruncate,
-  parseOpenAiRealtimeEvent,
 } from "./liveProtocol";
 import {
   buildTelefunLiveSystemInstruction,
@@ -45,20 +42,8 @@ interface WebkitAudioContextWindow extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
 
-interface OpenAiPlaybackSegment {
-  responseId: string;
-  itemId: string;
-  start: number;
-  end: number;
-  source: AudioBufferSourceNode;
-}
-
-interface OpenAiPlaybackOwner {
-  responseId?: string;
-  itemId?: string;
-}
-
 export class LiveSession {
+  private config: TelefunAppSettings;
   private readonly audioConfiguration: ReturnType<
     typeof getTelefunAudioConfiguration
   >;
@@ -95,12 +80,6 @@ export class LiveSession {
   private pendingTurnCompletion: boolean = false;
   private hasSentFirstUserAudio: boolean = false;
   private hasReceivedFirstModelAudio: boolean = false;
-  private openAiPlaybackSegments: OpenAiPlaybackSegment[] = [];
-  private openAiActiveResponseId: string | null = null;
-  private openAiPendingCompletionResponseId: string | null = null;
-  private openAiTerminalResponseIds: Set<string> = new Set();
-  private openAiInterruptedResponseKeys: Set<string> = new Set();
-  private openAiTruncatedItems: Set<string> = new Set();
 
   // Volume Throttling
   private lastVolumeEmitMs: number = 0;
@@ -156,19 +135,22 @@ export class LiveSession {
   private deadAirCount: number = 0;
   private holdTracker: HoldTrackerState = createHoldTrackerState();
 
-  constructor(private config: TelefunAppSettings) {
-    this.audioConfiguration = getTelefunAudioConfiguration(
+  constructor(config: TelefunAppSettings) {
+    const selection = normalizeTelefunBrowserSelection(
       config.telefunModelId,
+      config.telefunTransport,
+    );
+    this.config = {
+      ...config,
+      telefunModelId: selection.model.id,
+      telefunTransport: "gemini-live",
+    };
+    this.audioConfiguration = getTelefunAudioConfiguration(
+      selection.model.id,
     );
   }
 
   public async connect(accessToken: string) {
-    if (this.config.telefunTransport === "openai-webrtc") {
-      throw new Error(
-        "Transport openai-webrtc harus menggunakan OpenAIWebRtcSession, bukan LiveSession.",
-      );
-    }
-
     try {
       this.setSessionState("connecting");
       this.onStatusChange("Menghubungkan...");
@@ -334,23 +316,11 @@ export class LiveSession {
       if (this.intentionalClose) return;
       if (this.hasConfigured) return;
       this.hasConfigured = true;
-      if (this.config.telefunTransport === "openai-audio") {
-        this.completeSetup();
-      } else if (this.config.telefunTransport === "gemini-live") {
-        this.sendSetup();
-      }
+      this.sendSetup();
       return;
     }
 
     if (!this.hasConfigured) return;
-
-    if (this.config.telefunTransport === "openai-audio") {
-      this.handleOpenAiMessage(msg);
-      return;
-    }
-    if (this.config.telefunTransport !== "gemini-live") {
-      return;
-    }
 
     if (msg.type === "session_created" && msg.sessionId) {
       this.config.sessionId = msg.sessionId;
@@ -416,191 +386,6 @@ export class LiveSession {
       this.onStatusChange("Tersambung");
       this.emitTimelineEvent("session_resumed");
     }
-  }
-
-  private handleOpenAiMessage(msg: unknown) {
-    const event = parseOpenAiRealtimeEvent(msg);
-    switch (event.kind) {
-      case "session_created":
-      case "session_updated":
-      case "speech_stopped":
-      case "transcript_delta":
-      case "transcript_done":
-        this.lastModelActivityMs = Date.now();
-        return;
-      case "response_created":
-        if (event.responseId !== this.openAiActiveResponseId) {
-          this.openAiActiveResponseId = event.responseId;
-          this.pendingTurnCompletion = false;
-          this.openAiPendingCompletionResponseId = null;
-        }
-        this.lastModelActivityMs = Date.now();
-        return;
-      case "audio_delta":
-        if (event.responseId) {
-          if (
-            this.openAiActiveResponseId &&
-            event.responseId !== this.openAiActiveResponseId
-          ) {
-            return;
-          }
-          this.openAiActiveResponseId = event.responseId;
-        }
-        this.lastModelActivityMs = Date.now();
-        this.setIsAiSpeaking(true);
-        this.setSessionState("ai_speaking");
-        this.playPcm(event.data, event.sampleRate, {
-          responseId: event.responseId,
-          itemId: event.itemId,
-        });
-        if (!this.hasReceivedFirstModelAudio) {
-          this.hasReceivedFirstModelAudio = true;
-          this.emitTimelineEvent("first_model_audio_chunk");
-        }
-        return;
-      case "turn_complete":
-        if (!this.acceptOpenAiTerminalEvent(event.responseId)) return;
-        if (event.status === "completed") {
-          this.pendingTurnCompletion = true;
-          this.openAiPendingCompletionResponseId = event.responseId;
-          if (this.activeSources.size === 0) {
-            this.finishOpenAiPlaybackCompletion();
-          }
-        } else {
-          this.handleOpenAiInterruption(false, event.responseId);
-        }
-        return;
-      case "speech_started":
-        this.handleOpenAiInterruption(true, this.openAiActiveResponseId);
-        return;
-      case "response_cancelled":
-        {
-          const responseId = this.acceptOpenAiTerminalEvent(event.responseId);
-          if (!responseId) return;
-          this.handleOpenAiInterruption(false, responseId);
-        }
-        return;
-      case "error":
-        this.lastLocalError = new Error(event.message);
-        this.onError(this.lastLocalError);
-        return;
-      case "unknown":
-      case "invalid":
-        return;
-    }
-  }
-
-  private acceptOpenAiTerminalEvent(
-    responseId: string | undefined,
-  ): string | null {
-    const resolvedResponseId = responseId ?? this.openAiActiveResponseId;
-    if (
-      !resolvedResponseId ||
-      resolvedResponseId !== this.openAiActiveResponseId ||
-      this.openAiTerminalResponseIds.has(resolvedResponseId)
-    ) {
-      return null;
-    }
-    this.openAiTerminalResponseIds.add(resolvedResponseId);
-    return resolvedResponseId;
-  }
-
-  private handleOpenAiInterruption(
-    sendCancel: boolean,
-    responseId: string | null,
-  ) {
-    const playedSegment = this.selectOpenAiPlayedSegment();
-    const hadActiveResponse = Boolean(
-      responseId ||
-      playedSegment ||
-      this.activeSources.size > 0 ||
-      this.isAiSpeaking,
-    );
-    const audioEndMs = playedSegment
-      ? this.getOpenAiPlayedAudioEndMs(playedSegment)
-      : 0;
-
-    this.stopActiveSources();
-    this.setIsAiSpeaking(false);
-    this.setSessionState("idle");
-
-    if (sendCancel && hadActiveResponse) {
-      this.sendOpenAiEvent(buildOpenAiResponseCancel());
-    }
-    if (playedSegment && !this.openAiTruncatedItems.has(playedSegment.itemId)) {
-      this.openAiTruncatedItems.add(playedSegment.itemId);
-      this.sendOpenAiEvent(
-        buildOpenAiConversationItemTruncate({
-          itemId: playedSegment.itemId,
-          audioEndMs,
-        }),
-      );
-    }
-    const interruptionKey =
-      responseId ??
-      playedSegment?.responseId ??
-      playedSegment?.itemId ??
-      "active";
-    if (
-      hadActiveResponse &&
-      !this.openAiInterruptedResponseKeys.has(interruptionKey)
-    ) {
-      this.openAiInterruptedResponseKeys.add(interruptionKey);
-      this.interruptionCount++;
-      this.emitTimelineEvent("interrupted_received");
-    }
-  }
-
-  private selectOpenAiPlayedSegment(): OpenAiPlaybackSegment | null {
-    if (!this.audioContext) return null;
-    const currentTime = this.audioContext.currentTime;
-    const heardSegments = this.openAiPlaybackSegments.filter(
-      (segment) => segment.start < currentTime && segment.end > segment.start,
-    );
-    if (heardSegments.length === 0) return null;
-
-    const currentlyPlaying = heardSegments
-      .filter((segment) => currentTime < segment.end)
-      .sort((left, right) => right.start - left.start)[0];
-    if (currentlyPlaying) return currentlyPlaying;
-
-    return heardSegments.sort(
-      (left, right) => right.end - left.end || right.start - left.start,
-    )[0];
-  }
-
-  private getOpenAiPlayedAudioEndMs(
-    playedSegment = this.selectOpenAiPlayedSegment(),
-  ): number {
-    if (!this.audioContext || !playedSegment) return 0;
-    const currentTime = this.audioContext.currentTime;
-    const playedSeconds = this.openAiPlaybackSegments
-      .filter(
-        (segment) =>
-          segment.responseId === playedSegment.responseId &&
-          segment.itemId === playedSegment.itemId,
-      )
-      .reduce(
-        (total, segment) =>
-          total +
-          Math.max(0, Math.min(currentTime, segment.end) - segment.start),
-        0,
-      );
-    return Math.max(0, Math.round(playedSeconds * 1000));
-  }
-
-  private finishOpenAiPlaybackCompletion() {
-    this.pendingTurnCompletion = false;
-    this.openAiPendingCompletionResponseId = null;
-    this.setIsAiSpeaking(false);
-    this.setSessionState("idle");
-    this.resetOpenAiPlaybackTracking();
-  }
-
-  private resetOpenAiPlaybackTracking() {
-    this.openAiPlaybackSegments = [];
-    this.openAiActiveResponseId = null;
-    this.openAiPendingCompletionResponseId = null;
   }
 
   private setupRecorders() {
@@ -712,15 +497,10 @@ export class LiveSession {
 
     if (!canSend) return;
 
-    const audioMessage =
-      this.config.telefunTransport === "openai-audio"
-        ? buildOpenAiInputAudioAppend(frame.pcm16Buffer)
-        : this.config.telefunTransport === "gemini-live"
-          ? buildRealtimeAudioMessage(
-              frame.pcm16Buffer,
-              this.audioConfiguration.inputSampleRateHz,
-            )
-          : null;
+    const audioMessage = buildRealtimeAudioMessage(
+      frame.pcm16Buffer,
+      this.audioConfiguration.inputSampleRateHz,
+    );
     if (!audioMessage) return;
     this.ws!.send(JSON.stringify(audioMessage));
     if (!this.hasSentFirstUserAudio) {
@@ -776,14 +556,9 @@ export class LiveSession {
     this.stopActiveSources();
     this.setIsAiSpeaking(false);
     this.setSessionState("idle");
-    this.resetOpenAiPlaybackTracking();
   }
 
-  private playPcm(
-    data: Uint8Array,
-    sampleRate = 24000,
-    openAiOwner?: OpenAiPlaybackOwner,
-  ) {
+  private playPcm(data: Uint8Array, sampleRate = 24000) {
     if (
       !this.audioContext ||
       !this.recordingDestination ||
@@ -814,16 +589,9 @@ export class LiveSession {
     source.onended = () => {
       this.activeSources.delete(source);
       if (this.activeSources.size === 0 && this.pendingTurnCompletion) {
-        if (
-          this.config.telefunTransport === "openai-audio" &&
-          this.openAiPendingCompletionResponseId === this.openAiActiveResponseId
-        ) {
-          this.finishOpenAiPlaybackCompletion();
-        } else if (this.config.telefunTransport === "gemini-live") {
-          this.pendingTurnCompletion = false;
-          this.setIsAiSpeaking(false);
-          this.setSessionState("idle");
-        }
+        this.pendingTurnCompletion = false;
+        this.setIsAiSpeaking(false);
+        this.setSessionState("idle");
       }
     };
 
@@ -833,15 +601,6 @@ export class LiveSession {
     );
     source.start(startTime);
     this.nextStartTime = startTime + buffer.duration;
-    if (openAiOwner?.responseId && openAiOwner.itemId) {
-      this.openAiPlaybackSegments.push({
-        responseId: openAiOwner.responseId,
-        itemId: openAiOwner.itemId,
-        start: startTime,
-        end: this.nextStartTime,
-        source,
-      });
-    }
   }
 
   private completeSetup() {
@@ -891,14 +650,11 @@ export class LiveSession {
         instructions: systemInstructionText,
         responsePacingMode: this.config.responsePacingMode || "realistic",
       }),
-      setup:
-        this.config.telefunTransport === "gemini-live"
-          ? buildTelefunLiveSetupMessage({
-              telefunModelId: modelId,
-              voiceName: setupVoiceName,
-              systemInstruction: systemInstructionText,
-            })
-          : null,
+      setup: buildTelefunLiveSetupMessage({
+        telefunModelId: modelId,
+        voiceName: setupVoiceName,
+        systemInstruction: systemInstructionText,
+      }),
     };
   }
 
@@ -929,16 +685,6 @@ export class LiveSession {
     this.emitTimelineEvent("setup_sent");
   }
 
-  private sendOpenAiEvent(event: unknown) {
-    if (
-      !this.intentionalClose &&
-      this.hasConfigured &&
-      this.ws?.readyState === WebSocket.OPEN
-    ) {
-      this.ws.send(JSON.stringify(event));
-    }
-  }
-
   private startSetupTimeout() {
     this.clearSetupTimeout();
     this.setupTimeoutTimer = setTimeout(() => {
@@ -964,10 +710,7 @@ export class LiveSession {
     this.stalledWatchdogTimer = setInterval(() => {
       if (!this.isSetupComplete) return;
       const elapsed = Date.now() - this.lastModelActivityMs;
-      const watchdogResponseIsActive =
-        this.config.telefunTransport !== "openai-audio" ||
-        (this.openAiActiveResponseId !== null &&
-          !this.openAiTerminalResponseIds.has(this.openAiActiveResponseId));
+      const watchdogResponseIsActive = true;
       if (
         this.sessionState === "ai_speaking" &&
         elapsed > this.STALLED_RESPONSE_MID_MS &&
@@ -1068,23 +811,12 @@ export class LiveSession {
     this.stopStalledWatchdog();
     this.clearAiPlayback("disconnect");
 
-    if (
-      this.ws?.readyState === WebSocket.OPEN &&
-      this.hasConfigured &&
-      this.config.telefunTransport === "openai-audio"
-    ) {
-      this.ws.send(JSON.stringify(buildOpenAiResponseCancel()));
-    }
-
     // Stop sending audio
     this.stopRecordingOnce();
 
     // Send drain handshake
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      if (
-        this.hasConfigured &&
-        this.config.telefunTransport === "gemini-live"
-      ) {
+      if (this.hasConfigured) {
         this.ws.send(JSON.stringify(buildAudioStreamEndMessage()));
       }
       this.ws.send(JSON.stringify(buildSessionEndRequest(reason)));
@@ -1243,10 +975,7 @@ export class LiveSession {
     const activeConsumer =
       this.config.activeConsumerType ?? this.config.consumerTypes[0];
     const text = getTimeCueInstruction(activeConsumer, remainingSeconds);
-    if (this.config.telefunTransport === "openai-audio") {
-      this.sendOpenAiEvent(buildOpenAiSystemInputItem(text));
-      this.sendOpenAiEvent(buildOpenAiResponseCreate());
-    } else if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(buildGeminiRealtimeTextMessage(text)));
     }
     this.emitTimelineEvent("time_cue_prompt_sent", {

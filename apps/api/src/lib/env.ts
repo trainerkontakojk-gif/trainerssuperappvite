@@ -1,7 +1,6 @@
 import { z } from "zod";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseTelefunOpenAiWebRtcAllowedModelIds } from "@trainers/types";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../../..");
@@ -13,50 +12,6 @@ try {
   // Ignore if file doesn't exist
 }
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function parseTelefunOpenAiWebRtcAllowedUserIds(
-  value: string | undefined,
-): string[] {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => UUID_PATTERN.test(item));
-}
-
-export function isTelefunOpenAiWebRtcRuntimeEnabled(input: {
-  enabled: boolean;
-  nodeEnv: string;
-}): boolean {
-  return (
-    input.enabled &&
-    ["development", "staging", "production"].includes(input.nodeEnv)
-  );
-}
-
-export function isTelefunOpenAiWebRtcAllowed(input: {
-  enabled: boolean;
-  nodeEnv: string;
-  allowedUserIds: readonly string[];
-  userId: string;
-}): boolean {
-  return (
-    isTelefunOpenAiWebRtcRuntimeEnabled(input) &&
-    input.allowedUserIds.includes(input.userId)
-  );
-}
-
-export function isTelefunOpenAiWebRtcEligible(userId: string): boolean {
-  return isTelefunOpenAiWebRtcAllowed({
-    enabled: env.TELEFUN_OPENAI_WEBRTC_POC_ENABLED,
-    nodeEnv: env.NODE_ENV,
-    allowedUserIds: env.TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS,
-    userId,
-  });
-}
-
 const envSchema = z.object({
   PORT: z.string().default("3001").transform(Number),
   VITE_SUPABASE_URL: z.string().url(),
@@ -66,24 +21,6 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
   ALLOWED_ORIGINS: z.string().optional(),
-  TELEFUN_OPENAI_WEBRTC_POC_ENABLED: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((value) => value === "true"),
-  TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS: z
-    .string()
-    .default("")
-    .transform(parseTelefunOpenAiWebRtcAllowedUserIds),
-  TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: z
-    .string()
-    .optional()
-    .transform(parseTelefunOpenAiWebRtcAllowedModelIds),
-  TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(10_000)
-    .default(10),
   NODE_ENV: z
     .enum(["development", "staging", "production", "test"])
     .default("development"),

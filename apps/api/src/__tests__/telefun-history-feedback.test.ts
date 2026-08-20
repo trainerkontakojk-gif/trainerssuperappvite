@@ -58,6 +58,7 @@ const terminalWebRtcRow = {
   user_id: "user-1",
   status: "completed",
   telefun_transport: "openai-webrtc",
+  telefun_model_id: "gpt-realtime-2.1",
   scoring_status: "completed",
   scoring_ready_at: "2026-08-14T09:00:00.000Z",
   scoring_next_attempt_at: null,
@@ -119,6 +120,17 @@ describe("Telefun history feedback contract", () => {
     const payload = await response.json();
 
     expect(payload.data[0].feedback).toBeNull();
+  });
+
+  it("preserves raw historical model and transport fields in history responses", async () => {
+    const response = await buildApp().request("/sessions");
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.data[0]).toMatchObject({
+      telefun_model_id: "gpt-realtime-2.1",
+      telefun_transport: "openai-webrtc",
+    });
   });
 
   it("preserves an explicitly persisted legacy feedback value", async () => {

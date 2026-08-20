@@ -13,7 +13,11 @@ import {
   type OpenAIRealtimeAdapterCallbacks,
   type OpenAIRealtimeSocketLike,
 } from "./OpenAIRealtimeAdapter.js";
-import { parseTelefunSessionConfigure } from "../server-protocol.js";
+import {
+  getHistoricalTelefunRealtimeModel,
+  type TelefunSessionConfigure,
+} from "@trainers/types";
+import type { ValidatedTelefunSessionConfigure } from "../server-protocol.js";
 import {
   SidebandEventObserver,
   type SidebandEventObserverOptions,
@@ -170,8 +174,11 @@ class ParitySocket extends EventEmitter implements OpenAIRealtimeSocketLike {
   }
 }
 
-function parityConfiguration() {
-  const parsed = parseTelefunSessionConfigure({
+/** Internal historical fixture; active session admission remains Gemini-only. */
+function historicalParityConfiguration(): ValidatedTelefunSessionConfigure {
+  const model = getHistoricalTelefunRealtimeModel("gpt-realtime-2.1");
+  if (!model) throw new Error("historical fixture model is unavailable");
+  const configure = {
     type: "telefun_session_configure",
     modelId: "gpt-realtime-2.1",
     transport: "openai-audio",
@@ -179,9 +186,8 @@ function parityConfiguration() {
     instructions: "Parity fixture",
     inputAudio: { format: "pcm16", sampleRate: 24_000 },
     responsePacingMode: "realistic",
-  });
-  if (!parsed.ok) throw new Error(parsed.reason);
-  return parsed.value;
+  } satisfies TelefunSessionConfigure;
+  return { configure, model };
 }
 
 function createParitySink() {
@@ -228,7 +234,7 @@ function runActualAdapterFixture(events: unknown[]) {
     onToolEvent: (event) => sink.snapshot.toolCalls.push({ phase: event.phase, responseId: event.responseId, callId: event.callId }),
   };
   const adapter = new OpenAIRealtimeAdapter({
-    configuration: parityConfiguration(),
+    configuration: historicalParityConfiguration(),
     apiKey: "server-key",
     userId: "parity-user",
     createSocket: () => socket,

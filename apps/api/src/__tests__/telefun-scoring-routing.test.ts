@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const DISABLED_REASON =
+  "Penilaian OpenAI Realtime tidak lagi tersedia untuk Telefun.";
+
 const VALID_ASSESSMENT = {
   overallScore: 8,
   speakingRate: {
@@ -28,109 +31,61 @@ const VALID_ASSESSMENT = {
   strengths: [],
 };
 
-const OPEN_SESSION = {
-  user_id: "u1",
-  scenario_title: "Test",
-  agent_recording_path: "u1/s1/agent_only.webm",
-  voice_assessment: null,
-  session_metrics: null,
-  scoring_status: "processing",
-  scoring_attempt_count: 0,
-};
+const mockRows = new Map<string, Record<string, unknown>>();
+const mockRpcs: Array<{ name: string; args: unknown }> = [];
+const mockUpdates: Array<Record<string, unknown>> = [];
+let mockUpdateError: Error | null = null;
 
-const mockRows = new Map<string, Record<string, any>>();
-const mockRpcs: Array<{ name: string; args: any }> = [];
-let mockRpcResult: any = { data: null, error: null };
-
-function buildChain(rowOrList: any, isList: boolean) {
-  const result = isList
-    ? {
-        data: Array.isArray(rowOrList)
-          ? rowOrList
-          : rowOrList
-            ? [rowOrList]
-            : [],
-        error: null,
-      }
-    : { data: rowOrList ?? null, error: null };
-  const chain: Record<string, any> = {};
-  const chaining = ["select", "order", "lte", "not"];
-  for (const m of chaining) chain[m] = vi.fn(() => chain);
-  chain.eq = vi.fn(() => chain);
-  chain.in = vi.fn(() => chain);
-  chain.or = vi.fn(() => chain);
-  chain.maybeSingle = vi.fn(() => Promise.resolve(result));
-  chain.limit = vi.fn(() => Promise.resolve(result));
-  chain.update = vi.fn((_data: any) => {
-    const sub: Record<string, any> = {};
-    sub.eq = vi.fn((_f: string, v: string) => {
-      const existing = mockRows.get(v);
-      if (existing) mockRows.set(v, { ...existing, ..._data });
-      return Promise.resolve({ error: null });
-    });
-    sub.in = vi.fn(() => Promise.resolve({ error: null }));
-    return sub;
-  });
-  return chain;
+function rowFor(id: string) {
+  return { data: mockRows.get(id) ?? null, error: null };
 }
 
-vi.mock("../lib/supabase", () => ({
-  createAdminClient: vi.fn(() => ({
-    rpc: vi.fn((name: string, args: any) => {
+function buildClient() {
+  return {
+    rpc: vi.fn(async (name: string, args: unknown) => {
       mockRpcs.push({ name, args });
-      return Promise.resolve(
-        name === "complete_telefun_scoring"
-          ? { data: true, error: null }
-          : mockRpcResult,
-      );
+      return { data: true, error: null };
     }),
     from: vi.fn(() => {
-      const allRows = Array.from(mockRows.values());
-      const selectChain = buildChain(null, false);
-      selectChain.eq = vi.fn((_field: string, value: string) =>
-        buildChain(mockRows.get(value) || null, false),
-      );
-      selectChain.in = vi.fn(() => buildChain(allRows, true));
-      selectChain.or = vi.fn(() => {
-        const listChain = buildChain(allRows, true);
-        listChain.order = vi.fn(() => listChain);
-        return listChain;
+      const chain: Record<string, any> = {};
+      chain.select = vi.fn(() => chain);
+      chain.eq = vi.fn((_field: string, id: string) => ({
+        maybeSingle: vi.fn(async () => rowFor(id)),
+      }));
+      chain.update = vi.fn((payload: Record<string, unknown>) => {
+        mockUpdates.push(payload);
+        return {
+          eq: vi.fn(async () => ({ error: mockUpdateError })),
+        };
       });
-      selectChain.update = vi.fn((data: any) => {
-        const sub: Record<string, any> = {};
-        sub.eq = vi.fn((_f: string, v: string) => {
-          const existing = mockRows.get(v);
-          if (existing) mockRows.set(v, { ...existing, ...data });
-          return Promise.resolve({ error: null });
-        });
-        sub.in = vi.fn(() => Promise.resolve({ error: null }));
-        return sub;
-      });
-      return selectChain;
+      return chain;
     }),
     storage: {
       from: vi.fn(() => ({
-        download: vi.fn(() =>
-          Promise.resolve({
-            data: new Blob(["audio"], { type: "audio/webm" }),
-            error: null,
-          }),
-        ),
+        download: vi.fn(async () => ({
+          data: new Blob(["audio"], { type: "audio/webm" }),
+          error: null,
+        })),
       })),
     },
-  })),
+  };
+}
+
+vi.mock("../lib/supabase", () => ({
+  createAdminClient: vi.fn(() => buildClient()),
 }));
 
 const generateGeminiContent = vi.fn();
 const requestOpenAITelefunAssessment = vi.fn();
-requestOpenAITelefunAssessment.mockResolvedValue(VALID_ASSESSMENT);
 
 vi.mock("../lib/gemini", () => ({
-  generateGeminiContent: (...args: any[]) => generateGeminiContent(...args),
+  generateGeminiContent: (...args: unknown[]) => generateGeminiContent(...args),
 }));
 
 vi.mock("../lib/telefun-openai-assessment", () => ({
-  requestOpenAITelefunAssessment: (...args: any[]) =>
+  TELEFUN_OPENAI_SCORING_DISABLED_REASON:
+    "Penilaian OpenAI Realtime tidak lagi tersedia untuk Telefun.",
+  requestOpenAITelefunAssessment: (...args: unknown[]) =>
     requestOpenAITelefunAssessment(...args),
 }));
 
@@ -155,116 +110,224 @@ vi.mock("../lib/telefun-hold-assessment", () => ({
   applyHoldAssessmentToOverallScore: vi.fn((score: number) => score),
 }));
 
+const { analyzeVoiceQuality } = await import("../lib/telefun-analysis");
 const { processScoringJob } =
   await import("../services/telefun-scoring-service");
 
-function seedSession(id: string, data: Record<string, any>) {
-  mockRows.set(id, { id, user_id: "u1", ...data });
+function seedSession(id: string, row: Record<string, unknown>) {
+  mockRows.set(id, {
+    id,
+    user_id: "u1",
+    scenario_title: "Test",
+    session_metrics: null,
+    scoring_attempt_count: 0,
+    ...row,
+  });
 }
 
 afterEach(() => {
   vi.clearAllMocks();
   mockRows.clear();
   mockRpcs.length = 0;
-  mockRpcResult = { data: null, error: null };
-  requestOpenAITelefunAssessment.mockResolvedValue(VALID_ASSESSMENT);
+  mockUpdates.length = 0;
+  mockUpdateError = null;
 });
 
-describe("processScoringJob provider routing", () => {
-  it.each(["gpt-realtime-2.1", "gpt-realtime-2.1-mini"])(
-    "routes %s to the exact OpenAI evaluator without Gemini fallback",
-    async (modelId) => {
-      seedSession("s1", { telefun_model_id: modelId, ...OPEN_SESSION });
-      await processScoringJob({ sessionId: "s1", userId: "u1" });
-      expect(requestOpenAITelefunAssessment).toHaveBeenCalledWith({
-        sessionId: "s1",
-        userId: "u1",
-        modelId,
+describe("processScoringJob OpenAI retirement routing", () => {
+  it.each([
+    ["gpt-realtime-2.1", "openai-webrtc"],
+    ["gpt-realtime-2.1-mini", "openai-audio"],
+  ])(
+    "permanently suppresses uncached historical %s without any provider call",
+    async (modelId, transport) => {
+      seedSession("s1", {
+        status: "completed",
+        telefun_model_id: modelId,
+        telefun_transport: transport,
+        recording_status: "ready",
+        recording_error: null,
+        scoring_ready_at: "2026-08-14T09:00:00.000Z",
+        agent_recording_path: "u1/s1/agent_only.seekable.webm",
+        scoring_status: "processing",
+        voice_assessment: null,
       });
+
+      const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+
+      expect(result).toEqual({
+        success: false,
+        status: "failed",
+        error: DISABLED_REASON,
+      });
+      expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
       expect(generateGeminiContent).not.toHaveBeenCalled();
+      expect(mockRpcs.map((call) => call.name)).toContain(
+        "fail_telefun_scoring",
+      );
+      expect(mockRpcs.map((call) => call.name)).not.toContain(
+        "reschedule_telefun_scoring",
+      );
+      expect(mockUpdates).toEqual([]);
     },
   );
 
-  it("uses Gemini 3.5 Flash for Gemini sessions", async () => {
-    seedSession("s1", {
-      telefun_model_id: "gemini-3.1-flash-live-preview",
-      ...OPEN_SESSION,
-    });
-    generateGeminiContent.mockResolvedValue({
-      success: true,
-      text: JSON.stringify(VALID_ASSESSMENT),
-    });
-    await processScoringJob({ sessionId: "s1", userId: "u1" });
-    expect(generateGeminiContent).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-3.5-flash" }),
-    );
-    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
-  });
-
-  it("routes null/legacy model id to Gemini", async () => {
-    seedSession("s1", { telefun_model_id: null, ...OPEN_SESSION });
-    generateGeminiContent.mockResolvedValue({
-      success: true,
-      text: JSON.stringify(VALID_ASSESSMENT),
-    });
-    await processScoringJob({ sessionId: "s1", userId: "u1" });
-    expect(generateGeminiContent).toHaveBeenCalled();
-    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
-  });
-
-  it("bypasses OpenAI client when a cached assessment exists", async () => {
-    seedSession("s1", {
-      telefun_model_id: "gpt-realtime-2.1",
-      ...OPEN_SESSION,
+  it("returns a transport-only cached historical assessment without completing or rescheduling it", async () => {
+    seedSession("transport-cached", {
+      status: "completed",
+      telefun_model_id: null,
+      telefun_transport: "openai-webrtc",
       scoring_status: "completed",
       score: 8,
       voice_assessment: VALID_ASSESSMENT,
     });
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
-    expect(result).toMatchObject({ success: true, status: "completed" });
+
+    await expect(
+      processScoringJob({ sessionId: "transport-cached", userId: "u1" }),
+    ).resolves.toEqual({ success: true, status: "completed" });
+
+    expect(mockRpcs).toEqual([]);
+    expect(mockUpdates).toEqual([]);
     expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
+    expect(generateGeminiContent).not.toHaveBeenCalled();
   });
 
-  it("preserves transient OpenAI failures for queue retry without Gemini fallback", async () => {
-    const { TransientScoringError } =
-      await import("../lib/telefun-scoring-errors");
-    seedSession("s1", {
+  it("permanently suppresses a terminal transport-only row before the WebRTC artifact gate", async () => {
+    seedSession("transport-terminal", {
+      status: "completed",
+      telefun_model_id: null,
+      telefun_transport: "openai-webrtc",
+      recording_status: "pending",
+      recording_error: null,
+      scoring_ready_at: null,
+      agent_recording_path: null,
+      scoring_status: "processing",
+      voice_assessment: null,
+    });
+
+    await expect(
+      processScoringJob({ sessionId: "transport-terminal", userId: "u1" }),
+    ).resolves.toEqual({
+      success: false,
+      status: "failed",
+      error: DISABLED_REASON,
+    });
+
+    expect(mockRpcs.map((call) => call.name)).toEqual([
+      "fail_telefun_scoring",
+    ]);
+    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
+    expect(generateGeminiContent).not.toHaveBeenCalled();
+  });
+
+  it("keeps an active transport-only WebRTC lifecycle row out of scoring", async () => {
+    seedSession("transport-active", {
+      status: "active",
+      telefun_model_id: null,
+      telefun_transport: "openai-webrtc",
+      recording_status: "pending",
+      recording_error: null,
+      scoring_ready_at: null,
+      agent_recording_path: null,
+      scoring_status: "processing",
+      voice_assessment: null,
+    });
+
+    await expect(
+      processScoringJob({ sessionId: "transport-active", userId: "u1" }),
+    ).resolves.toEqual({
+      success: false,
+      status: "failed",
+      error: "SCORING_NOT_READY",
+    });
+
+    expect(mockRpcs).toEqual([]);
+    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
+    expect(generateGeminiContent).not.toHaveBeenCalled();
+  });
+
+  it("does not reschedule retired scoring after fail persistence succeeds and retry cleanup is unavailable", async () => {
+    mockUpdateError = new Error("obsolete retry-clear update failed");
+    seedSession("retired-no-resurrection", {
+      status: "completed",
       telefun_model_id: "gpt-realtime-2.1",
-      ...OPEN_SESSION,
-      scoring_attempt_count: 1,
+      telefun_transport: "openai-audio",
+      scoring_status: "processing",
+      voice_assessment: null,
     });
-    requestOpenAITelefunAssessment.mockRejectedValue(
-      new TransientScoringError(
-        "Internal service unavailable",
-        "INTERNAL_TRANSIENT",
-      ),
-    );
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
-    expect(result.status).toBe("rescheduled");
-    expect(
-      mockRpcs.some((rpc) => rpc.name === "reschedule_telefun_scoring"),
-    ).toBe(true);
+
+    await expect(
+      processScoringJob({ sessionId: "retired-no-resurrection", userId: "u1" }),
+    ).resolves.toEqual({
+      success: false,
+      status: "failed",
+      error: DISABLED_REASON,
+    });
+
+    expect(mockRpcs.map((call) => call.name)).toEqual([
+      "fail_telefun_scoring",
+    ]);
+    expect(mockUpdates).toEqual([]);
+  });
+
+  it("rejects a direct uncached historical analysis before storage or either provider", async () => {
+    seedSession("s1", {
+      status: "completed",
+      telefun_model_id: "gpt-realtime-2.1",
+      telefun_transport: "openai-webrtc",
+      recording_status: "ready",
+      recording_error: null,
+      scoring_ready_at: "2026-08-14T09:00:00.000Z",
+      agent_recording_path: "u1/s1/agent_only.seekable.webm",
+      scoring_status: "processing",
+      voice_assessment: null,
+    });
+
+    await expect(analyzeVoiceQuality("s1", "u1")).resolves.toEqual({
+      success: false,
+      error: DISABLED_REASON,
+    });
+    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
     expect(generateGeminiContent).not.toHaveBeenCalled();
   });
 
-  it("fails permanently for rejected OpenAI requests without Gemini fallback", async () => {
-    const { PermanentScoringError } =
-      await import("../lib/telefun-scoring-errors");
+  it("leaves a valid cached historical assessment untouched", async () => {
     seedSession("s1", {
-      telefun_model_id: "gpt-realtime-2.1-mini",
-      ...OPEN_SESSION,
+      status: "completed",
+      telefun_model_id: "gpt-realtime-2.1",
+      telefun_transport: "openai-webrtc",
+      scoring_status: "completed",
+      voice_assessment: VALID_ASSESSMENT,
     });
-    requestOpenAITelefunAssessment.mockRejectedValue(
-      new PermanentScoringError(
-        "Internal request rejected",
-        "INTERNAL_PERMANENT",
-      ),
-    );
+
     const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
-    expect(result.status).toBe("failed");
-    expect(mockRpcs.some((rpc) => rpc.name === "fail_telefun_scoring")).toBe(
-      true,
-    );
+
+    expect(result).toEqual({ success: true, status: "completed" });
+    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
     expect(generateGeminiContent).not.toHaveBeenCalled();
+    expect(mockRpcs).toEqual([]);
+    expect(mockUpdates).toEqual([]);
+  });
+
+  it("keeps Gemini scoring on the Gemini assessment path", async () => {
+    seedSession("s1", {
+      status: "completed",
+      telefun_model_id: "gemini-3.1-flash-live-preview",
+      telefun_transport: "gemini-live",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      scoring_status: "processing",
+      voice_assessment: null,
+    });
+    generateGeminiContent.mockResolvedValue({
+      success: true,
+      text: JSON.stringify(VALID_ASSESSMENT),
+    });
+
+    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+
+    expect(result).toMatchObject({ success: true, status: "completed" });
+    expect(generateGeminiContent).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "gemini-3.5-flash" }),
+    );
+    expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
   });
 });

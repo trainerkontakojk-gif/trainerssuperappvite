@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import {
   AI_MODELS,
   TELEFUN_LIVE_MODELS,
+  getHistoricalTelefunRealtimeModel,
   getModelsForModule,
   resolveModelProvider,
 } from "../lib/ai-models";
@@ -807,19 +808,37 @@ ai.get("/monitoring/pricing", requireRole("admin", "trainer"), async (c) => {
   }));
 
   for (const p of dbPricing) {
-    if (!result.some((r) => r.model_id === p.model_id)) {
+    if (result.some((r) => r.model_id === p.model_id)) continue;
+
+    const historicalModel = getHistoricalTelefunRealtimeModel(p.model_id);
+    if (historicalModel) {
       result.push({
-        model_id: p.model_id,
-        model_name: p.model_id,
-        provider: "unknown" as const,
-        pricing_mode: "simple" as const,
+        model_id: historicalModel.id,
+        model_name: historicalModel.name,
+        provider: historicalModel.provider,
+        pricing_mode: "realtime" as const,
+        historical: true,
+        editable: false,
         input_price_usd_per_million: p.input_price_usd_per_million,
         output_price_usd_per_million: p.output_price_usd_per_million,
         ...Object.fromEntries(
           REALTIME_PRICING_COLUMNS.map((column) => [column, p[column] ?? null]),
         ),
       });
+      continue;
     }
+
+    result.push({
+      model_id: p.model_id,
+      model_name: p.model_id,
+      provider: "unknown" as const,
+      pricing_mode: "simple" as const,
+      input_price_usd_per_million: p.input_price_usd_per_million,
+      output_price_usd_per_million: p.output_price_usd_per_million,
+      ...Object.fromEntries(
+        REALTIME_PRICING_COLUMNS.map((column) => [column, p[column] ?? null]),
+      ),
+    });
   }
 
   return c.json({ success: true, data: result });
@@ -831,6 +850,19 @@ ai.put(
   zValidator("json", pricingUpsertSchema),
   async (c) => {
     const body = c.req.valid("json");
+    if (getHistoricalTelefunRealtimeModel(body.model_id)) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: "TELEFUN_REALTIME_MODEL_RETIRED",
+            message:
+              "Harga model realtime OpenAI Telefun hanya tersedia untuk riwayat.",
+          },
+        },
+        410,
+      );
+    }
 
     const admin = createAdminClient();
     const { error } = await admin

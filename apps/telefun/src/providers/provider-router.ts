@@ -5,35 +5,22 @@ export interface RealtimeProviderRouterDependencies {
   createGeminiAdapter: (
     configuration: ValidatedTelefunSessionConfigure,
   ) => RealtimeProviderAdapter;
-  createOpenAIAdapter?: (
-    configuration: ValidatedTelefunSessionConfigure,
-  ) => RealtimeProviderAdapter;
-  openAIEnabled?: boolean;
-  openAIConfigured?: boolean;
 }
 
 export type RealtimeProviderRouterResult =
   | { ok: true; adapter: RealtimeProviderAdapter }
-  | {
-      ok: false;
-      reason: "openai_disabled" | "openai_not_configured";
-    };
+  | { ok: false; reason: "unsupported_provider" };
 
+/** Resolves only the active Gemini Live provider for new WebSocket sessions. */
 export function createRealtimeProviderAdapter(
   configuration: ValidatedTelefunSessionConfigure,
   dependencies: RealtimeProviderRouterDependencies,
 ): RealtimeProviderRouterResult {
-  if (configuration.model.provider === "openai") {
-    if (!dependencies.openAIEnabled) {
-      return { ok: false, reason: "openai_disabled" };
-    }
-    if (!dependencies.openAIConfigured || !dependencies.createOpenAIAdapter) {
-      return { ok: false, reason: "openai_not_configured" };
-    }
-    return {
-      ok: true,
-      adapter: dependencies.createOpenAIAdapter(configuration),
-    };
+  if (
+    configuration.model.provider !== "gemini" ||
+    configuration.model.realtime.transport !== "gemini-live"
+  ) {
+    return { ok: false, reason: "unsupported_provider" };
   }
 
   return {

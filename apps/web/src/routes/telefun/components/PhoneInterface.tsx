@@ -14,18 +14,11 @@ import {
   TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS,
 } from "@trainers/types";
 import type { TelefunAppSettings } from "../telefunSettings";
-import type { OpenAIWebRtcRecordingCallbackResult } from "../services/openaiWebRtc/contracts";
-import type { WebRtcRecoveryPlan } from "../services/openaiWebRtc/recovery-policy";
 import {
-  cleanupOpenAIWebRtcSession,
   createTelefunTransport,
   mapTelefunTransportError,
   type TelefunTransportSession,
 } from "../services/telefunTransport";
-import {
-  createWebRtcCleanupOwner,
-  type WebRtcCleanupOwner,
-} from "../services/openaiWebRtc/cleanup-owner";
 import {
   getTelefunTimeCueThreshold,
   type TelefunTimeCue,
@@ -37,13 +30,12 @@ import {
 import { useMicrophoneActivity } from "./useMicrophoneActivity";
 import { HoldStatusDisplay } from "./HoldStatusDisplay";
 
+type TelefunEndSessionReason = "completed" | "failed" | "timeout";
+
 interface PhoneInterfaceProps {
   config: TelefunAppSettings;
   accessToken: string;
-  isObjectUrlRetained?: (url: string) => boolean;
-  canRetainObjectUrl?: boolean;
-  retainObjectUrl?: (url: string | null) => boolean;
-  onEndSession: (reason?: string) => void;
+  onEndSession: (reason?: TelefunEndSessionReason) => void;
   onRecordingReady?: (
     url: string | null,
     consumerName: string,
@@ -51,12 +43,8 @@ interface PhoneInterfaceProps {
     fullCallBlob: Blob | null,
     agentBlob: Blob | null,
     metrics: SessionMetrics,
-    captureStatus?: "ready" | "failed",
-  ) =>
-    | OpenAIWebRtcRecordingCallbackResult
-    | Promise<OpenAIWebRtcRecordingCallbackResult>;
+  ) => void | Promise<void>;
   onSessionCreated?: (sessionId: string) => void;
-  onRecoveryRequired?: (plan: WebRtcRecoveryPlan) => void;
 }
 
 interface ActiveHoldUi {
@@ -67,12 +55,6 @@ interface ActiveHoldUi {
 
 const CLEANUP_PENDING_MESSAGE =
   "Panggilan belum tersimpan. Coba lagi untuk mengakhiri.";
-const MIC_ERROR_MESSAGE =
-  "Panggilan belum dapat dimulai. Periksa mikrofon dan coba lagi.";
-const NETWORK_ERROR_MESSAGE =
-  "Koneksi terputus. Sesi ini ditutup; buat sesi baru untuk melanjutkan.";
-const PROVIDER_ERROR_MESSAGE =
-  "Terjadi kesalahan pada layanan suara. Silakan coba lagi.";
 function getInitials(name: string): string {
   return name
     .split(/\s+/)
@@ -85,13 +67,9 @@ function getInitials(name: string): string {
 export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   config,
   accessToken,
-  isObjectUrlRetained,
-  canRetainObjectUrl,
-  retainObjectUrl,
   onEndSession,
   onRecordingReady,
   onSessionCreated,
-  onRecoveryRequired,
 }) => {
   const [connectionState, setConnectionState] = useState("Memanggil...");
   const [callDuration, setCallDuration] = useState(0);
@@ -112,8 +90,6 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   const holdSequenceRef = useRef(0);
 
   const sessionRef = useRef<TelefunTransportSession | null>(null);
-  const cleanupOwnerRef = useRef<WebRtcCleanupOwner | null>(null);
-  const cleanupConfirmedRef = useRef(false);
   const terminalFailureRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -280,27 +256,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
     const startCallSequence = async () => {
       sentTimeCues.current = new Set();
       terminalFailureRef.current = false;
-      cleanupConfirmedRef.current = false;
-      cleanupOwnerRef.current = null;
       setTerminalFailure(false);
       setCleanupRetryable(false);
       setPlaybackBlocked(false);
-
-      const setupCleanupOwner =
-        config.telefunTransport === "openai-webrtc" && config.sessionId
-          ? createWebRtcCleanupOwner({
-              sessionId: config.sessionId,
-              accessToken,
-              requestCleanup: () =>
-                cleanupOpenAIWebRtcSession({
-                  websocketUrl: import.meta.env.VITE_TELEFUN_WS_URL,
-                  sessionId: config.sessionId!,
-                  accessToken,
-                  fetch,
-                }),
-            })
-          : null;
-      cleanupOwnerRef.current = setupCleanupOwner;
 
       try {
         let session: TelefunTransportSession | null = null;
@@ -328,30 +286,12 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
               setConnectionState("Selesai");
             }
           };
-          session.onCleanupConfirmed = () => {
-            cleanupConfirmedRef.current = true;
-          };
           session.onError = (e) => {
             terminalFailureRef.current = true;
             if (isActive) {
               setTerminalFailure(true);
               setError(mapTelefunTransportError(e));
             }
-          };
-          session.onRecoveryRequired = (plan) => {
-            if (isActive) {
-              setTerminalFailure(plan.outcome === "failed");
-              setError(
-                plan.reason === "device_unplugged"
-                  ? MIC_ERROR_MESSAGE
-                  : plan.outcome === "network_lost"
-                    ? NETWORK_ERROR_MESSAGE
-                    : plan.reason === "provider_error"
-                      ? PROVIDER_ERROR_MESSAGE
-                      : mapTelefunTransportError({ code: plan.reason }),
-              );
-            }
-            onRecoveryRequired?.(plan);
           };
           session.onPlaybackBlocked = () => {
             if (isActive) setPlaybackBlocked(true);
@@ -362,90 +302,43 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           session.onVolumeChange = (vol) => {
             if (isActive) setAgentVolume(vol);
           };
-          if (session.onRecordingComplete) {
-            session.onRecordingComplete = async (
-              url,
-              fullBlob,
-              agentBlob,
-              metrics,
-              captureStatus,
-            ) => {
-              // Transfer the page owner synchronously before upload/transition/
-              // remux work can outlive the session callback deadline.
-              if (
-                mountedRef.current &&
-                config.telefunTransport === "openai-webrtc" &&
-                url &&
-                onRecordingReadyRef.current &&
-                canRetainObjectUrl !== false
-              ) {
-                retainObjectUrl?.(url);
-              }
-              let callbackResult:
-                | OpenAIWebRtcRecordingCallbackResult
-                | undefined;
-              if (onRecordingReadyRef.current) {
-                const measuredDuration =
-                  Number.isFinite(metrics.sessionDurationMs) &&
-                  metrics.sessionDurationMs > 0
-                    ? Math.round(metrics.sessionDurationMs / 1000)
-                    : callDurationRef.current;
-                try {
-                  callbackResult = captureStatus
-                    ? await onRecordingReadyRef.current(
-                        url,
-                        config.consumerName,
-                        measuredDuration,
-                        fullBlob,
-                        agentBlob,
-                        metrics,
-                        captureStatus,
-                      )
-                    : await onRecordingReadyRef.current(
-                        url,
-                        config.consumerName,
-                        measuredDuration,
-                        fullBlob,
-                        agentBlob,
-                        metrics,
-                      );
-                } catch (err) {
-                  console.error("onRecordingReady failed:", err);
-                  callbackResult = undefined;
-                }
-              }
-              // If disconnect (end call) is in progress, handleEndCall will navigate home.
-              // Otherwise a WebRTC callback may navigate only after the authenticated
-              // cleanup owner has observed the broker's 204.
-              if (
-                mountedRef.current &&
-                !isDisconnectingRef.current &&
-                (config.telefunTransport !== "openai-webrtc" ||
-                  cleanupConfirmedRef.current)
-              ) {
-                onEndSessionRef.current(
-                  config.telefunTransport === "openai-webrtc" &&
-                    terminalFailureRef.current
-                    ? "provider_error"
-                    : "completed",
+          session.onRecordingComplete = async (
+            url,
+            fullBlob,
+            agentBlob,
+            metrics,
+          ) => {
+            // Transfer the page owner synchronously before upload/transition/
+            // remux work can outlive the session callback deadline.
+            let callbackResult: void | Promise<void> = undefined;
+            if (onRecordingReadyRef.current) {
+              const measuredDuration =
+                Number.isFinite(metrics.sessionDurationMs) &&
+                metrics.sessionDurationMs > 0
+                  ? Math.round(metrics.sessionDurationMs / 1000)
+                  : callDurationRef.current;
+              try {
+                callbackResult = await onRecordingReadyRef.current(
+                  url,
+                  config.consumerName,
+                  measuredDuration,
+                  fullBlob,
+                  agentBlob,
+                  metrics,
                 );
+              } catch (err) {
+                console.error("onRecordingReady failed:", err);
+                callbackResult = undefined;
               }
-              return callbackResult;
-            };
-          }
+            }
+            if (mountedRef.current && !isDisconnectingRef.current) {
+              onEndSessionRef.current(
+                terminalFailureRef.current ? "failed" : "completed",
+              );
+            }
+            return callbackResult;
+          };
         };
-
-        if (config.telefunTransport === "openai-webrtc") {
-          session = createTelefunTransport(config, {
-            accessToken,
-            isObjectUrlRetained,
-          });
-          sessionRef.current = session;
-          // The WebRTC owner closes the pre-created session if construction
-          // fails. Once construction succeeds, the transport owns cleanup.
-          cleanupOwnerRef.current = null;
-          bindSession(session);
-        }
 
         if (isActive) {
           console.log("[Telefun] Starting ringtone sequence");
@@ -464,10 +357,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         if (!session) {
           // Legacy transports are intentionally constructed after the ringtone.
           // Cancelling during the ringtone must not create an empty recording.
-          session = createTelefunTransport(config, {
-            accessToken,
-            isObjectUrlRetained,
-          });
+          session = createTelefunTransport(config, { accessToken });
           sessionRef.current = session;
           bindSession(session);
         }
@@ -490,32 +380,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
           setTerminalFailure(true);
         }
         setIsRinging(false);
-        let cleanupPending = false;
-        if (setupCleanupOwner) {
-          try {
-            await setupCleanupOwner.request();
-            cleanupConfirmedRef.current = true;
-            if (isActive) setCleanupRetryable(false);
-          } catch {
-            cleanupPending = true;
-            console.warn(
-              "[Telefun] Failed to clean up WebRTC session setup failure",
-            );
-            if (isActive) {
-              setCleanupRetryable(true);
-              setIsDisconnecting(false);
-              isDisconnectingRef.current = false;
-              endCallStartedRef.current = false;
-            }
-          }
-        }
         console.error("[Telefun] Failed to initialize session:", err);
         if (isActive && !failureAlreadyReported) {
-          setError(
-            cleanupPending
-              ? CLEANUP_PENDING_MESSAGE
-              : mapTelefunTransportError(err),
-          );
+          setError(mapTelefunTransportError(err));
         }
       }
     };
@@ -530,27 +397,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       if (!endCallStartedRef.current) {
         const disconnect = sessionRef.current?.disconnect("cleanup");
         if (disconnect) {
-          void disconnect
-            .then(() => {
-              if (config.telefunTransport === "openai-webrtc") {
-                cleanupConfirmedRef.current = true;
-              }
-            })
-            .catch((cleanupError: unknown) => {
-              console.warn(
-                "[Telefun] cleanup disconnect failed:",
-                cleanupError,
-              );
-            });
-        } else if (cleanupOwnerRef.current?.state === "pending") {
-          void cleanupOwnerRef.current
-            .request()
-            .catch((cleanupError: unknown) => {
-              console.warn(
-                "[Telefun] setup cleanup failed during unmount:",
-                cleanupError,
-              );
-            });
+          void disconnect.catch((cleanupError: unknown) => {
+            console.warn("[Telefun] cleanup disconnect failed:", cleanupError);
+          });
         }
       }
       setLocalStream(null);
@@ -622,7 +471,7 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
   };
 
   const handleEndCall = useCallback(
-    async (reason?: string) => {
+    async (reason?: TelefunEndSessionReason) => {
       // Guard: prevent concurrent end-call executions
       if (endCallStartedRef.current) return;
       endCallStartedRef.current = true;
@@ -646,16 +495,6 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
         const session = sessionRef.current;
         if (session) {
           await session.disconnect(reason === "timeout" ? "timeout" : "user");
-          if (config.telefunTransport === "openai-webrtc") {
-            cleanupConfirmedRef.current = true;
-          }
-        } else if (config.telefunTransport === "openai-webrtc") {
-          const cleanupOwner = cleanupOwnerRef.current;
-          if (!cleanupOwner) {
-            throw new Error("OpenAI WebRTC cleanup owner is unavailable.");
-          }
-          await cleanupOwner.request();
-          cleanupConfirmedRef.current = true;
         }
       } catch (err) {
         console.error("[Telefun] disconnect error:", err);
@@ -672,17 +511,9 @@ export const PhoneInterface: React.FC<PhoneInterfaceProps> = ({
       }
 
       setCleanupRetryable(false);
-      // Navigate home only after disconnect + recording finalization complete
-      // and, for WebRTC, an authenticated 204 confirmation.
-      if (
-        mountedRef.current &&
-        (config.telefunTransport !== "openai-webrtc" ||
-          cleanupConfirmedRef.current)
-      ) {
-        onEndSessionRef.current(reason);
-      }
+      if (mountedRef.current) onEndSessionRef.current(reason);
     },
-    [config.telefunTransport, stopHoldMusic],
+    [stopHoldMusic],
   );
 
   useEffect(() => {

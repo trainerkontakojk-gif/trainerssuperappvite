@@ -9,8 +9,14 @@ import {
   MAX_SCORING_ATTEMPTS,
   TransientScoringError,
 } from "../lib/telefun-scoring-errors";
-import { parseVoiceQualityAssessment } from "@trainers/types";
+import {
+  isRetiredTelefunOpenAiRealtimeSelection,
+  parseVoiceQualityAssessment,
+} from "@trainers/types";
 import type { VoiceQualityAssessment } from "@trainers/types";
+import {
+  TELEFUN_OPENAI_SCORING_DISABLED_REASON,
+} from "../lib/telefun-openai-assessment";
 
 export interface ScoringJob {
   sessionId: string;
@@ -24,6 +30,7 @@ export interface ScoringResult {
 }
 
 type ScoringStateSnapshot = {
+  telefun_model_id: string | null;
   telefun_transport: string | null;
   status: string | null;
   recording_status: string | null;
@@ -31,6 +38,7 @@ type ScoringStateSnapshot = {
   scoring_ready_at: string | null;
   agent_recording_path: string | null;
   scoring_status: string | null;
+  scoring_next_attempt_at: string | null;
   score: number | null;
   voice_assessment: unknown;
 };
@@ -63,8 +71,18 @@ export function isWebRtcScoringReady(
   );
 }
 
+function isHistoricalOpenAiScoringModel(state: {
+  telefun_model_id?: unknown;
+  telefun_transport?: unknown;
+}): boolean {
+  return isRetiredTelefunOpenAiRealtimeSelection({
+    modelId: state.telefun_model_id,
+    transport: state.telefun_transport,
+  });
+}
+
 const SCORING_STATE_SELECT =
-  "telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, score, voice_assessment";
+  "telefun_model_id, telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, scoring_next_attempt_at, score, voice_assessment";
 
 function readRpcBoolean(data: unknown): boolean | null {
   const value = Array.isArray(data) ? data[0] : data;
@@ -118,7 +136,10 @@ export async function checkCachedAssessment(
   return null;
 }
 
-async function ensureFailed(sessionId: string, errorMsg: string): Promise<void> {
+async function ensureFailed(
+  sessionId: string,
+  errorMsg: string,
+): Promise<boolean> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient.rpc("fail_telefun_scoring", {
     p_session_id: sessionId,
@@ -126,7 +147,20 @@ async function ensureFailed(sessionId: string, errorMsg: string): Promise<void> 
   });
   if (error || data === false) {
     console.error("[Telefun Scoring] Failed to persist failed state");
+    return false;
   }
+  return true;
+}
+
+/**
+ * The fail RPC atomically records the permanent terminal state and clears any
+ * retry eligibility. Do not append a best-effort update: a post-failure error
+ * must never resurrect this retired job through the transient catch path.
+ */
+export async function permanentlyFailRetiredOpenAiScoring(
+  sessionId: string,
+): Promise<boolean> {
+  return ensureFailed(sessionId, TELEFUN_OPENAI_SCORING_DISABLED_REASON);
 }
 
 async function ensureRescheduled(
@@ -228,6 +262,37 @@ export async function processScoringJob(
       return { success: false, status: "rescheduled", error: "Scoring aborted" };
     }
 
+    const { data: initialState } = await adminClient
+      .from("telefun_history")
+      .select(SCORING_STATE_SELECT)
+      .eq("id", job.sessionId)
+      .maybeSingle();
+    if (initialState && isHistoricalOpenAiScoringModel(initialState)) {
+      if (parseVoiceQualityAssessment(initialState.voice_assessment)) {
+        return { success: true, status: "completed" };
+      }
+      if (
+        initialState.telefun_transport === "openai-webrtc" &&
+        (initialState.status === "active" || initialState.status === "pending")
+      ) {
+        return {
+          success: false,
+          status: "failed",
+          error: "SCORING_NOT_READY",
+        };
+      }
+      if (!(await permanentlyFailRetiredOpenAiScoring(job.sessionId))) {
+        throw new TransientScoringError(
+          "Scoring result persistence unavailable",
+          "SCORING_PERSISTENCE_UNAVAILABLE",
+        );
+      }
+      return {
+        success: false,
+        status: "failed",
+        error: TELEFUN_OPENAI_SCORING_DISABLED_REASON,
+      };
+    }
     const result = await analyzeVoiceQuality(job.sessionId, job.userId);
 
     if (signal?.aborted) {
@@ -358,16 +423,11 @@ export async function fetchPendingJobs(
   const { data, error } = await adminClient
     .from("telefun_history")
     .select(
-      "id, user_id, status, telefun_transport, scoring_ready_at, agent_recording_path",
+      "id, user_id, status, telefun_model_id, telefun_transport, scoring_status, scoring_next_attempt_at, scoring_ready_at, agent_recording_path",
     )
     .in("scoring_status", ["pending", "failed", "processing"])
     .or(
       `scoring_next_attempt_at.lte.${now},scoring_next_attempt_at.is.null`,
-    )
-    // Keep not-ready WebRTC rows out of the worker query itself. The
-    // application filter below additionally verifies the exact owned path.
-    .or(
-      "telefun_transport.is.null,telefun_transport.neq.openai-webrtc,and(telefun_transport.eq.openai-webrtc,status.eq.completed,scoring_ready_at.not.is.null,agent_recording_path.not.is.null)",
     )
     .order("scoring_next_attempt_at", {
       ascending: true,
@@ -381,6 +441,19 @@ export async function fetchPendingJobs(
 
   return (data || [])
     .filter((row: any) => {
+      const isRetired = isHistoricalOpenAiScoringModel(row);
+      if (isRetired) {
+        // A permanently failed retired row has no retry schedule and must not
+        // be claimed again. Terminal historical WebRTC rows intentionally
+        // bypass the retired-provider seekable artifact gate.
+        if (
+          row.scoring_status === "failed" &&
+          row.scoring_next_attempt_at == null
+        ) {
+          return false;
+        }
+        return row.status === "completed" || row.status === "failed";
+      }
       if (row.telefun_transport !== "openai-webrtc") return true;
       return (
         row.status === "completed" &&

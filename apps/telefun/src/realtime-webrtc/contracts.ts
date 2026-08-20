@@ -1,5 +1,4 @@
 import {
-  DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
   TELEFUN_OPENAI_WEBRTC_MODEL_IDS,
   type TelefunWebRtcModelId,
 } from "@trainers/types";
@@ -10,7 +9,11 @@ export {
 } from "@trainers/types";
 export type { TelefunWebRtcModelId } from "@trainers/types";
 
-export function isTelefunWebRtcModelId(
+/**
+ * Historical-only membership check for owner-bound cleanup. It is not a
+ * selector, admission check, or capability signal for a new WebRTC call.
+ */
+export function isHistoricalTelefunOpenAiWebRtcModelId(
   value: unknown,
 ): value is TelefunWebRtcModelId {
   return (
@@ -18,6 +21,9 @@ export function isTelefunWebRtcModelId(
     (TELEFUN_OPENAI_WEBRTC_MODEL_IDS as readonly string[]).includes(value)
   );
 }
+
+/** @deprecated Use isHistoricalTelefunOpenAiWebRtcModelId for cleanup only. */
+export const isTelefunWebRtcModelId = isHistoricalTelefunOpenAiWebRtcModelId;
 
 export function assertTelefunWebRtcModelId(
   value: unknown,

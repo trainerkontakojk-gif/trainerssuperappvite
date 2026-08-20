@@ -55,6 +55,50 @@ export interface OpenAiCallsClientOptions {
   fetch?: OpenAiFetch;
 }
 
+/** Cleanup-only provider boundary used by historical owner-bound DELETE. */
+export interface OpenAiCallCleanupClient {
+  closeCall(callId: string): Promise<boolean>;
+}
+
+export function createOpenAiCallCleanupClient(
+  options: OpenAiCallsClientOptions,
+): OpenAiCallCleanupClient {
+  const fetchImpl: OpenAiFetch =
+    options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  const timeoutMs = options.timeoutMs ?? 15_000;
+
+  const request = async <T>(operation: (signal: AbortSignal) => Promise<T>) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await operation(controller.signal);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  return {
+    async closeCall(callId) {
+      // An absent key is not a reason to send an unauthenticated provider
+      // request. The durable manager keeps the historical attempt retryable.
+      if (!options.apiKey.trim() || !isSafeCallId(callId)) return false;
+      const location = `${OPENAI_CALLS_ORIGIN}/v1/realtime/calls/${callId}/hangup`;
+      try {
+        return await request(async (signal) => {
+          const response = await fetchImpl(location, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${options.apiKey}` },
+            signal,
+          });
+          return response.status >= 200 && response.status < 300;
+        });
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 export function createOpenAiCallsClient(
   options: OpenAiCallsClientOptions,
 ): OpenAiCallsClient {
@@ -69,7 +113,8 @@ export function createOpenAiCallsClient(
     const controller = new AbortController();
     const abortFromCaller = () => controller.abort();
     if (callerSignal?.aborted) controller.abort();
-    else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+    else
+      callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await operation(controller.signal);
@@ -159,11 +204,7 @@ export function parseCallId(location: string | null): string | null {
   } catch {
     return null;
   }
-  if (
-    parsed.origin !== OPENAI_CALLS_ORIGIN ||
-    parsed.search ||
-    parsed.hash
-  ) {
+  if (parsed.origin !== OPENAI_CALLS_ORIGIN || parsed.search || parsed.hash) {
     return null;
   }
   const match = CALL_LOCATION_PATTERN.exec(parsed.pathname);
@@ -211,7 +252,10 @@ async function readBoundedText(
   return text;
 }
 
-async function raceWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
+async function raceWithAbort<T>(
+  operation: Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
   if (signal.aborted) throw new Error("request aborted");
   let abort: (() => void) | undefined;
   const aborted = new Promise<never>((_, reject) => {

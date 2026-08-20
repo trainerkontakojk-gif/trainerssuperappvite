@@ -3,15 +3,10 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
-import { env, isTelefunOpenAiWebRtcEligible } from "../../lib/env";
-import {
-  consumeTelefunDistributedRateLimit,
-  TelefunDistributedRateLimitError,
-  type TelefunDistributedRateLimitClient,
-} from "../../middleware/rateLimit";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   getTelefunLiveModel,
+  isRetiredTelefunOpenAiRealtimeSelection,
   isValidTelefunModelTransportPair,
   telefunTranscriptSchema,
   type AiModelRealtimeMetadata,
@@ -54,13 +49,22 @@ function activeWebRtcDeleteResponse(c: {
   );
 }
 
-function retryAfterSeconds(resetAt: string): string {
-  const resetMs = Date.parse(resetAt);
-  if (!Number.isFinite(resetMs)) return "1";
-  return String(Math.max(1, Math.ceil((resetMs - Date.now()) / 1_000)));
+export class TelefunSessionValidationError extends Error {}
+
+export class TelefunOpenAiDisabledError extends TelefunSessionValidationError {
+  constructor() {
+    super("OpenAI Realtime tidak tersedia untuk Telefun.");
+    this.name = "TelefunOpenAiDisabledError";
+  }
 }
 
-export class TelefunSessionValidationError extends Error {}
+const TELEFUN_OPENAI_DISABLED_ERROR = {
+  success: false as const,
+  error: {
+    code: "TELEFUN_OPENAI_DISABLED",
+    message: "OpenAI Realtime tidak tersedia untuk Telefun.",
+  },
+};
 
 function projectTelefunHistoryRow<T extends {
   feedback?: unknown;
@@ -99,6 +103,15 @@ function resolveTelefunSessionModelPair(params: {
   modelId?: string;
   transport?: string;
 }) {
+  if (
+    isRetiredTelefunOpenAiRealtimeSelection({
+      modelId: params.modelId,
+      transport: params.transport,
+    })
+  ) {
+    throw new TelefunOpenAiDisabledError();
+  }
+
   if (params.modelId === undefined && params.transport !== undefined) {
     throw new TelefunSessionValidationError(
       "Model Telefun wajib dikirim ketika transport disediakan.",
@@ -168,6 +181,15 @@ export const telefunSessionCreatePayloadSchema = z
     live_prompt_instructions: livePromptInstructionsSchema,
   })
   .superRefine((body, ctx) => {
+    if (
+      isRetiredTelefunOpenAiRealtimeSelection({
+        modelId: body.telefun_model_id,
+        transport: body.telefun_transport,
+      })
+    ) {
+      return;
+    }
+
     try {
       const pair = resolveTelefunSessionModelPair({
         modelId: body.telefun_model_id,
@@ -209,6 +231,15 @@ export const telefunSessionUpdatePayloadSchema = z
     telefun_transport: z.string().optional(),
   })
   .superRefine((body, ctx) => {
+    if (
+      isRetiredTelefunOpenAiRealtimeSelection({
+        modelId: body.telefun_model_id,
+        transport: body.telefun_transport,
+      })
+    ) {
+      return;
+    }
+
     const hasModel = body.telefun_model_id !== undefined;
     const hasTransport = body.telefun_transport !== undefined;
     if (!hasModel && !hasTransport) return;
@@ -333,53 +364,7 @@ telefunSessions.post(
         userId: user.id,
         body,
       });
-      if (
-        insertPayload.telefun_transport === "openai-webrtc" &&
-        !isTelefunOpenAiWebRtcEligible(user.id)
-      ) {
-        throw new TelefunSessionValidationError(
-          "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
-        );
-      }
-      if (
-        insertPayload.telefun_transport === "openai-webrtc" &&
-        !(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS as readonly string[]).includes(
-          insertPayload.telefun_model_id,
-        )
-      ) {
-        // Public-safe: never leaks cohort/config/allowlist contents.
-        throw new TelefunSessionValidationError(
-          "Model dan transport OpenAI WebRTC tidak tersedia.",
-        );
-      }
       const adminClient = createAdminClient();
-      if (insertPayload.telefun_transport === "openai-webrtc") {
-        const rateLimitClient =
-          adminClient as unknown as Partial<TelefunDistributedRateLimitClient>;
-        if (typeof rateLimitClient.rpc !== "function") {
-          throw new TelefunDistributedRateLimitError();
-        }
-        const rate = await consumeTelefunDistributedRateLimit({
-          client: rateLimitClient as TelefunDistributedRateLimitClient,
-          userId: user.id,
-          provider: "openai-webrtc",
-          scope: "session-create",
-          requestLimit: env.TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE,
-        });
-        if (!rate.allowed) {
-          c.header("Retry-After", retryAfterSeconds(rate.resetAt));
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "RATE_LIMITED",
-                message: "Terlalu banyak sesi WebRTC. Coba lagi nanti.",
-              },
-            },
-            429,
-          );
-        }
-      }
       const { data, error } = await adminClient
         .from("telefun_history")
         .insert(insertPayload)
@@ -389,17 +374,8 @@ telefunSessions.post(
       if (error) throw error;
       return c.json({ success: true, data });
     } catch (error: any) {
-      if (error instanceof TelefunDistributedRateLimitError) {
-        return c.json(
-          {
-            success: false,
-            error: {
-              code: "RATE_LIMIT_UNAVAILABLE",
-              message: "Pembatasan sesi belum tersedia. Coba lagi nanti.",
-            },
-          },
-          503,
-        );
+      if (error instanceof TelefunOpenAiDisabledError) {
+        return c.json(TELEFUN_OPENAI_DISABLED_ERROR, 400);
       }
       if (error instanceof TelefunSessionValidationError) {
         return c.json(
@@ -448,6 +424,15 @@ export function buildTelefunSessionUpdatePayload(
     sessionId: string;
   },
 ) {
+  if (
+    isRetiredTelefunOpenAiRealtimeSelection({
+      modelId: body.telefun_model_id,
+      transport: body.telefun_transport,
+    })
+  ) {
+    throw new TelefunOpenAiDisabledError();
+  }
+
   const hasModel = body.telefun_model_id !== undefined;
   const hasTransport = body.telefun_transport !== undefined;
   if (hasModel !== hasTransport) {
@@ -538,31 +523,19 @@ telefunSessions.patch(
   async (c) => {
     const id = c.req.param("id");
     const user = c.get("user");
-    const adminClient = createAdminClient();
     const body = c.req.valid("json");
 
     try {
       if (
-        body.telefun_transport === "openai-webrtc" &&
-        !isTelefunOpenAiWebRtcEligible(user.id)
+        isRetiredTelefunOpenAiRealtimeSelection({
+          modelId: body.telefun_model_id,
+          transport: body.telefun_transport,
+        })
       ) {
-        throw new TelefunSessionValidationError(
-          "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
-        );
-      }
-      if (
-        body.telefun_transport === "openai-webrtc" &&
-        body.telefun_model_id !== undefined &&
-        !(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS as readonly string[]).includes(
-          body.telefun_model_id,
-        )
-      ) {
-        // Public-safe: never leaks cohort/config/allowlist contents.
-        throw new TelefunSessionValidationError(
-          "Model dan transport OpenAI WebRTC tidak tersedia.",
-        );
+        throw new TelefunOpenAiDisabledError();
       }
 
+      const adminClient = createAdminClient();
       const { data: existingSession, error: existingSessionError } =
         await adminClient
           .from("telefun_history")
@@ -636,35 +609,6 @@ telefunSessions.patch(
         userId: user.id,
         sessionId: id,
       });
-      if (isWebRtcSession) {
-        const rateLimitClient =
-          adminClient as unknown as Partial<TelefunDistributedRateLimitClient>;
-        if (typeof rateLimitClient.rpc !== "function") {
-          throw new TelefunDistributedRateLimitError();
-        }
-        const rate = await consumeTelefunDistributedRateLimit({
-          client: rateLimitClient as TelefunDistributedRateLimitClient,
-          userId: user.id,
-          sessionId: id,
-          provider: "openai-webrtc",
-          scope: "session-write",
-          requestLimit: env.TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE,
-        });
-        if (!rate.allowed) {
-          c.header("Retry-After", retryAfterSeconds(rate.resetAt));
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "RATE_LIMITED",
-                message:
-                  "Terlalu banyak perubahan sesi WebRTC. Coba lagi nanti.",
-              },
-            },
-            429,
-          );
-        }
-      }
       const { error } = await adminClient
         .from("telefun_history")
         .update(updatePayload)
@@ -674,17 +618,8 @@ telefunSessions.patch(
       if (error) throw error;
       return c.json({ success: true, message: "Sesi diperbarui." });
     } catch (error: any) {
-      if (error instanceof TelefunDistributedRateLimitError) {
-        return c.json(
-          {
-            success: false,
-            error: {
-              code: "RATE_LIMIT_UNAVAILABLE",
-              message: "Pembatasan sesi belum tersedia. Coba lagi nanti.",
-            },
-          },
-          503,
-        );
+      if (error instanceof TelefunOpenAiDisabledError) {
+        return c.json(TELEFUN_OPENAI_DISABLED_ERROR, 400);
       }
       if (
         error?.message === "Invalid recording path ownership" ||

@@ -13,6 +13,7 @@ import {
   DEFAULT_TELEFUN_SETTINGS,
   resolveFinalIdentity,
   parseTelefunSettings,
+  normalizeTelefunBrowserSelection,
 } from "./telefunSettings";
 import { SettingsModal } from "./components/SettingsModal";
 import { PhoneInterface } from "./components/PhoneInterface";
@@ -49,18 +50,11 @@ import {
   clearTelefunHistory,
   mapTelefunSessionRow,
   upsertTelefunSessionRecord,
-  getTelefunWebRtcCapability,
 } from "./telefunApi";
 import {
   createTelefunSessionReconciler,
   type TelefunSessionReconciler,
 } from "./sessionReconciler";
-import {
-  isAllowedTelefunWebRtc,
-  isTelefunWebRtcModelAllowed,
-  OPENAI_WEBRTC_TRANSPORT,
-} from "./services/telefunWebRtcCapability";
-import { buildTelefunLiveSystemInstruction } from "./services/promptBuilder";
 import { createRetainedObjectUrlOwner } from "./services/openaiWebRtc/cleanup";
 import {
   installTelefunRecordingReconciliation,
@@ -185,17 +179,6 @@ export default function TelefunLanding() {
       sessionReconcilerRef.current = null;
     };
   }, [applyAuthoritativeRecord]);
-
-  const retainObjectUrl = useCallback(
-    (url: string | null): boolean =>
-      pageMountedRef.current && retainedObjectUrlOwner.retain(url),
-    [retainedObjectUrlOwner],
-  );
-
-  const isObjectUrlRetained = useCallback(
-    (url: string) => retainedObjectUrlOwner.isRetained(url),
-    [retainedObjectUrlOwner],
-  );
 
   useEffect(() => {
     pageMountedRef.current = true;
@@ -357,38 +340,20 @@ export default function TelefunLanding() {
             (ct) => ct.id === settings.preferredConsumerTypeId,
           ) || settings.consumerTypes[0];
 
+    const normalizedSelection = normalizeTelefunBrowserSelection(
+      settings.telefunModelId,
+      settings.telefunTransport,
+    );
     const identity = resolveFinalIdentity(
       settings.identitySettings,
-      settings.telefunModelId,
+      normalizedSelection.model.id,
     );
     const voiceName = identity.voiceName || settings.voiceName;
 
-    const requestedTransport = settings.telefunTransport ?? "gemini-live";
-    const requestsWebRtc = requestedTransport === OPENAI_WEBRTC_TRANSPORT;
-    if (requestsWebRtc) {
-      try {
-        const capability = await getTelefunWebRtcCapability();
-        if (
-          !isAllowedTelefunWebRtc(capability) ||
-          !isTelefunWebRtcModelAllowed(capability, settings.telefunModelId)
-        ) {
-          notify.error(
-            "Transport OpenAI WebRTC belum tersedia untuk akun ini.",
-          );
-          setActiveScenario(null);
-          return;
-        }
-      } catch {
-        notify.error("Gagal memeriksa ketersediaan OpenAI WebRTC.");
-        setActiveScenario(null);
-        return;
-      }
-    }
-
     const sessionConfig: TelefunAppSettings = {
       ...settings,
-      telefunModelId: settings.telefunModelId,
-      telefunTransport: requestedTransport,
+      telefunModelId: normalizedSelection.model.id,
+      telefunTransport: "gemini-live",
       activeScenario: randomScenario,
       activeConsumerType: consumerType,
       scenarioTitle: randomScenario.title,
@@ -397,16 +362,6 @@ export default function TelefunLanding() {
       voiceName,
       resolvedIdentity: identity,
     };
-
-    const livePromptInstructions = requestsWebRtc
-      ? buildTelefunLiveSystemInstruction({
-          identity: sessionConfig.resolvedIdentity!,
-          scenario: sessionConfig.activeScenario!,
-          consumerType: sessionConfig.activeConsumerType!,
-          responsePacingMode: sessionConfig.responsePacingMode,
-          simulationChallengeTypes: sessionConfig.simulationChallengeTypes,
-        })
-      : undefined;
 
     const runId = ++sessionRunIdRef.current;
     setSessionDelta(null);
@@ -435,24 +390,12 @@ export default function TelefunLanding() {
         response_pacing_mode: settings.responsePacingMode,
         telefun_model_id: sessionConfig.telefunModelId,
         telefun_transport: sessionConfig.telefunTransport,
-        ...(requestsWebRtc
-          ? { live_prompt_instructions: livePromptInstructions }
-          : {}),
       });
       if (res?.id) {
         setActiveSessionId(res.id);
         sessionConfig.sessionId = res.id;
-      } else if (requestsWebRtc) {
-        throw new Error("Sesi OpenAI WebRTC tidak berhasil dibuat.");
       }
     } catch (e) {
-      if (requestsWebRtc) {
-        notify.error(
-          e instanceof Error ? e.message : "Gagal membuat sesi OpenAI WebRTC.",
-        );
-        setActiveScenario(null);
-        return;
-      }
       console.warn("Failed to create session upfront", e);
     }
 
@@ -494,22 +437,6 @@ export default function TelefunLanding() {
     let sessionId = activeSessionId;
     const finalScenario = activeScenario;
     const sessionConfig = activeSessionConfig;
-    const isWebRtcSession =
-      sessionConfig?.telefunTransport === "openai-webrtc";
-
-    if (!sessionId && isWebRtcSession) {
-      notify.error("Sesi OpenAI WebRTC tidak tersedia untuk disimpan.");
-      // Return the synchronous page handoff without revoking; the recording
-      // session sees the callback reject retention and performs the one revoke.
-      retainedObjectUrlOwner.returnToSession(url);
-      setActiveSessionId(null);
-      setActiveScenario(null);
-      setView("home");
-      setActiveSessionConfig(null);
-      setActiveAccessToken(null);
-      return undefined;
-    }
-
     if (!sessionId) {
       console.warn(
         "No activeSessionId found during finalization. Attempting fallback session creation.",
@@ -547,7 +474,6 @@ export default function TelefunLanding() {
     const optimisticId = optimisticRecordIdRef.current || finalSessionId;
     optimisticRecordIdRef.current = optimisticId;
     let savedSession: SavedTelefunSession | null = null;
-    let usedFallbackRecord = false;
 
     try {
       savedSession = await saveTelefunSession({
@@ -592,11 +518,7 @@ export default function TelefunLanding() {
 
       setReviewRecord(record);
       setIsReviewOpen(true);
-      if (isWebRtcSession) {
-        sessionReconcilerRef.current?.start(finalSessionId);
-      }
     } catch (e) {
-      usedFallbackRecord = true;
       console.error("Failed to finalize session", e);
       if (e instanceof Error && e.message === "Save session failed") {
         // Already handled by toast above
@@ -674,7 +596,7 @@ export default function TelefunLanding() {
     const savedSessionForScoring =
       savedSession && !savedSession.saveFailed ? savedSession : null;
     const scoringTask =
-      !isWebRtcSession && savedSessionForScoring?.agentRecordingPath
+      savedSessionForScoring?.agentRecordingPath
         ? scoreTelefunSession({
             sessionId: finalSessionId,
             agentRecordingPath: savedSessionForScoring.agentRecordingPath,
@@ -725,20 +647,6 @@ export default function TelefunLanding() {
       : Promise.resolve();
 
     void scoringTask.finally(startUsagePolling).catch(() => {});
-
-    if (sessionConfig?.telefunTransport === "openai-webrtc") {
-      const shouldRetainObjectUrl = usedFallbackRecord || !savedSession?.remuxed;
-      if (!shouldRetainObjectUrl) {
-        retainedObjectUrlOwner.returnToSession(url);
-        return undefined;
-      }
-      const retained = retainObjectUrl(url);
-      const transferred =
-        retained && url
-          ? retainedObjectUrlOwner.transferToReview(url)
-          : false;
-      return transferred ? { retainObjectUrl: true } : undefined;
-    }
   };
 
   const handleDeleteSession = async (id: string) => {
@@ -933,8 +841,6 @@ export default function TelefunLanding() {
             <PhoneInterface
               config={activeSessionConfig}
               accessToken={activeAccessToken}
-              isObjectUrlRetained={isObjectUrlRetained} canRetainObjectUrl={activeSessionId !== null}
-              retainObjectUrl={retainObjectUrl}
               onEndSession={handleEndCall}
               onRecordingReady={handleRecordingReady}
               onSessionCreated={(id) => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateModalityCost,
+  resolveModalityPricing,
   type ModalityTokenCounts,
   type PricingRates,
 } from "../lib/modality-pricing";
@@ -120,7 +121,7 @@ describe("calculateModalityCost", () => {
     expect(result.cachedInputAudioPriceUsdPerMillion).toBe(0.4);
   });
 
-  it("uses canonical registry metadata instead of a live substring", () => {
+  it("uses active or historical registry metadata instead of a live substring", () => {
     const rates: PricingRates = {
       inputPriceUsdPerMillion: 9,
       outputPriceUsdPerMillion: 11,
@@ -143,5 +144,24 @@ describe("calculateModalityCost", () => {
         "gemini-3.1-flash-live-preview",
       ).costUsd,
     ).toBe(0.75);
+    expect(
+      resolveModalityPricing("gpt-realtime-2.1", {
+        inputPriceUsdPerMillion: 4,
+        outputPriceUsdPerMillion: 24,
+        inputTextPriceUsdPerMillion: 4,
+        cachedInputTextPriceUsdPerMillion: 0.4,
+        inputAudioPriceUsdPerMillion: 32,
+        cachedInputAudioPriceUsdPerMillion: 0.4,
+        outputTextPriceUsdPerMillion: 24,
+        outputAudioPriceUsdPerMillion: 64,
+      }),
+    ).toMatchObject({
+      inputTextPriceUsdPerMillion: 4,
+      cachedInputTextPriceUsdPerMillion: 0.4,
+      inputAudioPriceUsdPerMillion: 32,
+      cachedInputAudioPriceUsdPerMillion: 0.4,
+      outputTextPriceUsdPerMillion: 24,
+      outputAudioPriceUsdPerMillion: 64,
+    });
   });
 });

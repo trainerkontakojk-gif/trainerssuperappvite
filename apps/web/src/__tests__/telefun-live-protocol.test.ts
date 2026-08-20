@@ -25,19 +25,13 @@ import {
 } from "../routes/telefun/telefunVoiceRegistry";
 
 describe("telefun live protocol", () => {
-  it("exposes provider-specific runtime control message builders", () => {
+  it("exports only the active Gemini runtime control message builder", () => {
     expect(liveProtocol).toHaveProperty("buildGeminiRealtimeTextMessage");
-    expect(liveProtocol).toHaveProperty("buildOpenAiSystemInputItem");
+    expect(liveProtocol).not.toHaveProperty("buildOpenAiSystemInputItem");
     expect(
       liveProtocol.buildGeminiRealtimeTextMessage("[TELEFUN_CONTROL:TIME_CUE]"),
     ).toEqual({
       realtimeInput: { text: "[TELEFUN_CONTROL:TIME_CUE]" },
-    });
-    expect(
-      liveProtocol.buildOpenAiSystemInputItem("[TELEFUN_CONTROL:TIME_CUE]"),
-    ).toMatchObject({
-      type: "conversation.item.create",
-      item: { role: "system" },
     });
   });
 
@@ -177,12 +171,12 @@ describe("telefun live protocol", () => {
     expect(message.realtimeInput.audio.data.length).toBeGreaterThan(0);
   });
 
-  it("uses canonical model metadata for Telefun input and output sample rates", () => {
+  it("uses active Gemini metadata and falls back safely for retired models", () => {
     expect(
       getTelefunAudioConfiguration("gemini-3.1-flash-live-preview"),
     ).toMatchObject({ inputSampleRateHz: 16000, outputSampleRateHz: 24000 });
     expect(getTelefunAudioConfiguration("gpt-realtime-2.1")).toMatchObject({
-      inputSampleRateHz: 24000,
+      inputSampleRateHz: 16000,
       outputSampleRateHz: 24000,
     });
     expect(getTelefunAudioConfiguration("unknown-model")).toMatchObject({

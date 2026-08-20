@@ -51,22 +51,24 @@ describe("Telefun WebRTC prompt parity contract", () => {
     ).toBe(true);
   });
 
-  it("requires the canonical prompt snapshot for OpenAI WebRTC sessions", () => {
+  it("retires OpenAI WebRTC before prompt snapshot validation", () => {
     const webRtcBase = {
       ...base,
       telefun_model_id: "gpt-realtime-2.1",
       telefun_transport: "openai-webrtc",
     };
 
+    // Parsing stays permissive so the route can return the stable public
+    // TELEFUN_OPENAI_DISABLED shape before persistence.
     expect(
       telefunSessionCreatePayloadSchema.safeParse(webRtcBase).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(() =>
       buildTelefunSessionInsertPayload({
         userId: "user-1",
         body: webRtcBase,
       }),
-    ).toThrow("prompt snapshot");
+    ).toThrow("OpenAI Realtime tidak tersedia untuk Telefun");
   });
 
   it.each(["", "   ", "\n\t"]) (

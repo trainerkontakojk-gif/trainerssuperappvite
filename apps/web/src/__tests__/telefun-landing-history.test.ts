@@ -157,15 +157,16 @@ describe("Telefun local history parsing", () => {
     expect(landingSource).toContain("createRetainedObjectUrlOwner");
   });
 
-  it("returns a missing-session URL to the recording session for one revoke", () => {
+  it("does not retain the retired WebRTC missing-session branch", () => {
     const handlerStart = landingSource.indexOf("const handleRecordingReady");
-    const missingSessionEnd = landingSource.indexOf(
-      "if (!sessionId)",
-      handlerStart + 1,
+    const handlerEnd = landingSource.indexOf(
+      "const handleDeleteSession",
+      handlerStart,
     );
-    const handlerSource = landingSource.slice(handlerStart, missingSessionEnd);
+    const handlerSource = landingSource.slice(handlerStart, handlerEnd);
 
-    expect(handlerSource).toContain("returnToSession(url)");
+    expect(handlerSource).not.toContain("returnToSession(url)");
+    expect(handlerSource).not.toContain('telefunTransport === "openai-webrtc"');
   });
 
   it("captures the usage run and baseline before background scoring can finish", () => {
@@ -191,19 +192,18 @@ describe("Telefun local history parsing", () => {
     ).toBeLessThan(scoringIndex);
   });
 
-  it("starts the session reconciler after a WebRTC session is saved", () => {
+  it("does not start the retired WebRTC reconciler after a Gemini session is saved", () => {
     const handlerStart = landingSource.indexOf("const handleRecordingReady");
     const handlerEnd = landingSource.indexOf(
       "const handleDeleteSession",
       handlerStart,
     );
     const handlerSource = landingSource.slice(handlerStart, handlerEnd);
-    const reviewOpenIndex = handlerSource.indexOf("setIsReviewOpen(true)");
 
-    expect(reviewOpenIndex).toBeGreaterThanOrEqual(0);
-    expect(
-      handlerSource.indexOf("sessionReconcilerRef.current?.start("),
-    ).toBeGreaterThan(reviewOpenIndex);
+    expect(handlerSource).toContain("setIsReviewOpen(true)");
+    expect(handlerSource).not.toContain(
+      "sessionReconcilerRef.current?.start(",
+    );
   });
 
   it("stops the reconciler when a session is deleted", () => {

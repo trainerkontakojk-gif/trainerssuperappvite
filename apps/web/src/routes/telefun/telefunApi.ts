@@ -7,10 +7,6 @@ import type {
   TelefunScoringStatus,
 } from "@trainers/types";
 import { parseTelefunTranscript } from "@trainers/types";
-import {
-  fetchTelefunWebRtcCapability,
-  type TelefunWebRtcCapability,
-} from "./services/telefunWebRtcCapability";
 
 export interface TelefunSessionRow {
   id: string;
@@ -61,12 +57,6 @@ export interface CreateTelefunSessionInput {
   telefun_model_id?: string;
   telefun_transport?: string;
   live_prompt_instructions?: string | null;
-}
-
-export async function getTelefunWebRtcCapability(options?: {
-  signal?: AbortSignal;
-}): Promise<TelefunWebRtcCapability> {
-  return fetchTelefunWebRtcCapability(options);
 }
 
 export async function getTelefunSettings(): Promise<Record<

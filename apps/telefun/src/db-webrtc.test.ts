@@ -291,6 +291,41 @@ describe("TelefunWebRtcDb RPC wrapper", () => {
     );
   });
 
+  it("retrieves an encrypted provider reference only through the server attempt boundary", async () => {
+    const maybeSingle = vi.fn(async () => ({
+      data: {
+        id: attemptId,
+        finalization_key: finalizationKey,
+        state: "brokered",
+        usage_request_id: `telefun-webrtc:${attemptId}`,
+        provider_call_id_hash: "a".repeat(64),
+        provider_call_reference: "v1:server-only-ciphertext",
+        model_id: "gpt-realtime-2.1",
+      },
+      error: null,
+    }));
+    const userFilter = vi.fn(() => ({ maybeSingle }));
+    const sessionFilter = vi.fn(() => ({ eq: userFilter }));
+    const select = vi.fn(() => ({ eq: sessionFilter }));
+    const db = createTelefunWebRtcDb({
+      rpc: vi.fn(),
+      from: vi.fn(() => ({ select })),
+    });
+
+    await expect(db.getAttempt(sessionId, userId)).resolves.toEqual({
+      attemptId,
+      finalizationKey,
+      state: "brokered",
+      usageRequestId: `telefun-webrtc:${attemptId}`,
+      providerCallIdHash: "a".repeat(64),
+      providerCallReference: "v1:server-only-ciphertext",
+      modelId: "gpt-realtime-2.1",
+    });
+    expect(select).toHaveBeenCalledWith(
+      expect.stringContaining("provider_call_reference"),
+    );
+  });
+
   it("does not leak the Supabase error when an RPC is unavailable", async () => {
     const rpc = vi.fn(async () => ({
       data: null,

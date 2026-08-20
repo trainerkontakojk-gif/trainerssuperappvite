@@ -26,6 +26,10 @@ export function PricingRow({
   const [draft, setDraft] = useState(() => createDraft(entry));
   const [editing, setEditing] = useState(false);
   const isRealtime = entry.pricing_mode === "realtime";
+  const isHistorical =
+    entry.historical === true ||
+    entry.editable === false ||
+    entry.model_id.startsWith("gpt-realtime-");
 
   useEffect(() => {
     if (!editing) setDraft(createDraft(entry));
@@ -57,7 +61,7 @@ export function PricingRow({
           </span>
           {isRealtime ? (
             <span className="ml-2 rounded border border-primary/20 bg-primary/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
-              6 rate
+              {isHistorical ? "Riwayat (read-only)" : "6 rate"}
             </span>
           ) : null}
         </td>
@@ -103,7 +107,7 @@ export function PricingRow({
           )}
         </td>
         <td className="px-6 py-3.5 text-center">
-          {editing ? (
+          {editing && !isHistorical ? (
             <div className="flex justify-center gap-1.5">
               <button
                 type="button"
@@ -120,7 +124,7 @@ export function PricingRow({
                 Batal
               </button>
             </div>
-          ) : (
+          ) : isHistorical ? null : (
             <button
               type="button"
               aria-expanded={isRealtime ? false : undefined}
@@ -132,7 +136,7 @@ export function PricingRow({
           )}
         </td>
       </tr>
-      {isRealtime && editing ? (
+      {isRealtime && editing && !isHistorical ? (
         <tr className="bg-muted/15">
           <td colSpan={5} className="px-6 pb-5 pt-2">
             <fieldset>

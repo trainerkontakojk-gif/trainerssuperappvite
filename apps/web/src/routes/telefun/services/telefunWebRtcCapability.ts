@@ -1,9 +1,3 @@
-import { fetchApi } from "../../../hooks/useApi";
-import {
-  DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
-  type TelefunWebRtcModelId,
-} from "@trainers/types";
-
 export const OPENAI_WEBRTC_MODEL_ID = "gpt-realtime-2.1" as const;
 export const OPENAI_WEBRTC_TRANSPORT = "openai-webrtc" as const;
 
@@ -12,48 +6,36 @@ export interface TelefunWebRtcCapability {
   allowed: boolean;
   modelId: typeof OPENAI_WEBRTC_MODEL_ID;
   transport: typeof OPENAI_WEBRTC_TRANSPORT;
-  // Additive: absent (pre-rollout server or legacy callers) means the
-  // Full-only default; the client never opens Mini by itself.
-  modelIds?: readonly TelefunWebRtcModelId[];
+  modelIds?: readonly string[];
 }
 
-export async function fetchTelefunWebRtcCapability(
-  options: { signal?: AbortSignal } = {},
-): Promise<TelefunWebRtcCapability> {
-  const capability = await fetchApi<{
-    openaiWebRtc?: Partial<TelefunWebRtcCapability>;
-  }>("/telefun/capabilities", {
-    signal: options.signal,
-  });
+const RETIRED_WEBRTC_CAPABILITY: TelefunWebRtcCapability = {
+  enabled: false,
+  allowed: false,
+  modelId: OPENAI_WEBRTC_MODEL_ID,
+  transport: OPENAI_WEBRTC_TRANSPORT,
+  modelIds: [],
+};
 
-  return {
-    enabled: capability.openaiWebRtc?.enabled === true,
-    allowed: capability.openaiWebRtc?.allowed === true,
-    modelId: OPENAI_WEBRTC_MODEL_ID,
-    transport: OPENAI_WEBRTC_TRANSPORT,
-    modelIds:
-      capability.openaiWebRtc?.modelIds ??
-      DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS,
-  };
+/**
+ * Shape compatibility only. A retired capability is static so browser startup
+ * never performs a capability fetch that could become an admission seam.
+ */
+export async function fetchTelefunWebRtcCapability(
+  _options: { signal?: AbortSignal } = {},
+): Promise<TelefunWebRtcCapability> {
+  return RETIRED_WEBRTC_CAPABILITY;
 }
 
 export function isTelefunWebRtcModelAllowed(
-  capability: TelefunWebRtcCapability | null | undefined,
-  modelId: string | null | undefined,
-): boolean {
-  if (!modelId || !capability) return false;
-  const modelIds =
-    capability.modelIds ?? DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
-  return modelIds.includes(modelId as TelefunWebRtcModelId);
+  _capability: TelefunWebRtcCapability | null | undefined,
+  _modelId: string | null | undefined,
+): false {
+  return false;
 }
 
 export function isAllowedTelefunWebRtc(
-  capability: TelefunWebRtcCapability | null | undefined,
-): boolean {
-  return (
-    capability?.enabled === true &&
-    capability.allowed === true &&
-    capability.transport === OPENAI_WEBRTC_TRANSPORT &&
-    isTelefunWebRtcModelAllowed(capability, OPENAI_WEBRTC_MODEL_ID)
-  );
+  _capability: TelefunWebRtcCapability | null | undefined,
+): false {
+  return false;
 }

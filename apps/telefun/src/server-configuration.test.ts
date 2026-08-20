@@ -132,11 +132,8 @@ describe("Telefun provider configuration gate", () => {
     );
   });
 
-  it("rejects OpenAI honestly without invoking any Gemini adapter", () => {
-    const { gate, createAdapter, onClose } = createHarness({
-      ok: false,
-      reason: "openai_disabled",
-    });
+  it("rejects a historical GPT configure at 4002 before adapter construction", () => {
+    const { gate, createAdapter, onClose } = createHarness();
     gate.start();
 
     gate.handleMessage({
@@ -147,10 +144,10 @@ describe("Telefun provider configuration gate", () => {
       inputAudio: { format: "pcm16", sampleRate: 24_000 },
     });
 
-    expect(createAdapter).toHaveBeenCalledOnce();
+    expect(createAdapter).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledWith(
       TELEFUN_CONFIGURATION_CLOSE_CODE,
-      "Telefun configuration rejected: openai_disabled",
+      "Telefun configuration rejected: unknown_model",
     );
     expect(gate.isConfigured()).toBe(false);
   });

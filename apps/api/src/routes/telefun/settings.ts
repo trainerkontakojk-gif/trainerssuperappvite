@@ -3,11 +3,14 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import {
+  DEFAULT_TELEFUN_LIVE_MODEL_ID,
   getTelefunLiveModel,
+  isRetiredTelefunOpenAiRealtimeSelection,
   isValidTelefunModelTransportPair,
+  normalizePersistedTelefunSettings,
+  normalizeTelefunLiveModelSelection,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
-import { env, isTelefunOpenAiWebRtcEligible } from "../../lib/env";
 
 type Variables = { user: User; profile: any };
 
@@ -26,6 +29,14 @@ const TELEFUN_SIMULATION_CHALLENGE_IDS = [
 export const telefunSimulationChallengeTypesSchema = z
   .array(z.enum(TELEFUN_SIMULATION_CHALLENGE_IDS))
   .max(3);
+
+const TELEFUN_OPENAI_DISABLED_ERROR = {
+  success: false as const,
+  error: {
+    code: "TELEFUN_OPENAI_DISABLED",
+    message: "OpenAI Realtime tidak tersedia untuk Telefun.",
+  },
+};
 
 export const telefunSettingsPayloadSchema = z
   .object({
@@ -71,6 +82,18 @@ export const telefunSettingsPayloadSchema = z
   })
   .passthrough()
   .superRefine((body, ctx) => {
+    if (
+      isRetiredTelefunOpenAiRealtimeSelection({
+        modelId: body.telefunModelId,
+        transport: body.telefunTransport,
+        selectedModel: body.selectedModel,
+      })
+    ) {
+      // Let the route return its stable public disabled shape before any DB
+      // access instead of leaking a generic pair-validation error.
+      return;
+    }
+
     const hasModel = body.telefunModelId !== undefined;
     const hasTransport = body.telefunTransport !== undefined;
     if (!hasModel && !hasTransport) return;
@@ -118,11 +141,12 @@ telefunSettings.get("/settings", async (c) => {
       .maybeSingle();
 
     if (error) throw error;
-    const telefunSettings = data?.settings?.telefun || null;
+    const persistedSettings = data?.settings?.telefun || null;
+    const projected = normalizePersistedTelefunSettings(persistedSettings);
     return c.json({
       success: true,
-      settings: telefunSettings,
-      data: telefunSettings,
+      settings: projected.settings,
+      data: projected.settings,
     });
   } catch (error: any) {
     return c.json(
@@ -161,37 +185,13 @@ telefunSettings.put(
     const user = c.get("user");
     const body = c.req.valid("json");
     if (
-      body.telefunTransport === "openai-webrtc" &&
-      !isTelefunOpenAiWebRtcEligible(user.id)
+      isRetiredTelefunOpenAiRealtimeSelection({
+        modelId: body.telefunModelId,
+        transport: body.telefunTransport,
+        selectedModel: body.selectedModel,
+      })
     ) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "BAD_REQUEST",
-            message: "OpenAI WebRTC rollout tidak tersedia untuk akun ini.",
-          },
-        },
-        400,
-      );
-    }
-    if (
-      body.telefunTransport === "openai-webrtc" &&
-      body.telefunModelId !== undefined &&
-      !(env.TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS as readonly string[]).includes(
-        body.telefunModelId,
-      )
-    ) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: "BAD_REQUEST",
-            message: "Model dan transport OpenAI WebRTC tidak tersedia.",
-          },
-        },
-        400,
-      );
+      return c.json(TELEFUN_OPENAI_DISABLED_ERROR, 400);
     }
     const adminClient = createAdminClient();
 
@@ -207,10 +207,18 @@ telefunSettings.put(
         realisticModeDisruptionTypes: _legacyTypes,
         ...settingsToSave
       } = body;
+      const normalizedSelection = normalizeTelefunLiveModelSelection(
+        body.telefunModelId ?? DEFAULT_TELEFUN_LIVE_MODEL_ID,
+        body.telefunTransport,
+      );
       const upsertPayload = buildTelefunSettingsUpsertPayload({
         userId: user.id,
         existingSettings: existing?.settings,
-        telefunSettings: settingsToSave,
+        telefunSettings: {
+          ...settingsToSave,
+          telefunModelId: normalizedSelection.model.id,
+          telefunTransport: normalizedSelection.transport,
+        },
         now: new Date().toISOString(),
       });
 

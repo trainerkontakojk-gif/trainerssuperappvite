@@ -10,8 +10,17 @@ export interface OrphanLeaseCandidate {
   sidebandConnected: boolean;
 }
 
+export type OrphanProviderBinding = "bound" | "unbound" | "unknown";
+
 export interface OrphanCleanupStore {
   claim(limit: number): Promise<OrphanLeaseCandidate[]>;
+  /**
+   * A null reference is safe to terminalize only when this server-side lookup
+   * proves no provider call was ever bound. Missing lookup data fails closed.
+   */
+  getProviderBinding?: (
+    candidate: OrphanLeaseCandidate,
+  ) => Promise<OrphanProviderBinding>;
   complete(input: {
     leaseId: string;
     attemptId: string;
@@ -66,7 +75,7 @@ export function createOrphanCleanupWorker(options: {
       let completed = 0;
       let failed = 0;
       for (const candidate of candidates) {
-        let providerClosed = candidate.providerCallReference === null;
+        let providerClosed = false;
         let sidebandClosed = !candidate.sidebandConnected;
         let errorCode: string | undefined;
         try {
@@ -74,6 +83,16 @@ export function createOrphanCleanupWorker(options: {
             providerClosed = await options.closeProvider(
               candidate.providerCallReference,
             );
+          } else {
+            const providerBinding = options.store.getProviderBinding
+              ? await options.store
+                  .getProviderBinding(candidate)
+                  .catch(() => "unknown")
+              : "unknown";
+            providerClosed = providerBinding === "unbound";
+            if (!providerClosed) {
+              errorCode = "provider_reference_unavailable";
+            }
           }
           if (options.closeSideband) {
             sidebandClosed = await options.closeSideband(candidate);

@@ -1,7 +1,7 @@
 import {
   getTelefunLiveModel,
   isGeminiLiveVoiceName,
-  isOpenAiRealtimeVoiceName,
+  type HistoricalTelefunOpenAiRealtimeModel,
   type TelefunLiveModel,
   type TelefunSessionConfigure,
 } from "@trainers/types";
@@ -34,7 +34,10 @@ export type TelefunConfigureErrorReason =
 
 export interface ValidatedTelefunSessionConfigure {
   configure: TelefunSessionConfigure;
-  model: TelefunLiveModel;
+  // The parser returns only an active Gemini model. The historical member is
+  // retained solely so the unwired legacy adapter can typecheck while cleanup
+  // compatibility identifiers remain in the build.
+  model: TelefunLiveModel | HistoricalTelefunOpenAiRealtimeModel;
 }
 
 export type TelefunConfigureParseResult =
@@ -63,16 +66,20 @@ export function parseTelefunSessionConfigure(
   }
 
   const model = getTelefunLiveModel(value.modelId);
-  if (!model) return { ok: false, reason: "unknown_model" };
+  if (
+    !model ||
+    model.provider !== "gemini" ||
+    model.realtime.transport !== "gemini-live"
+  ) {
+    return { ok: false, reason: "unknown_model" };
+  }
   if (value.transport !== model.realtime.transport) {
     return { ok: false, reason: "model_transport_mismatch" };
   }
 
-  const voiceIsValid =
-    model.realtime.voiceProvider === "gemini"
-      ? isGeminiLiveVoiceName(value.voice)
-      : isOpenAiRealtimeVoiceName(value.voice);
-  if (!voiceIsValid) return { ok: false, reason: "invalid_voice" };
+  if (!isGeminiLiveVoiceName(value.voice)) {
+    return { ok: false, reason: "invalid_voice" };
+  }
   if (inputAudio.format !== "pcm16") {
     return { ok: false, reason: "invalid_audio_format" };
   }

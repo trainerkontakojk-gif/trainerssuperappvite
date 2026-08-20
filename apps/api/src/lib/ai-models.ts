@@ -10,6 +10,7 @@ import {
   TEXT_MODELS,
   IMAGE_GENERATION_MODELS,
   TELEFUN_LIVE_MODELS,
+  getHistoricalTelefunRealtimeModel,
 } from "@trainers/types";
 import type { AiModelModule } from "@trainers/types";
 
@@ -23,6 +24,7 @@ export {
   IMAGE_GENERATION_MODELS,
   TEXT_SIMULATION_MODELS,
   TELEFUN_LIVE_MODELS,
+  getHistoricalTelefunRealtimeModel,
 };
 
 export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(

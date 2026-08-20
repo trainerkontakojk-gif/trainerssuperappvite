@@ -1,309 +1,68 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useTelefunSettingsDraft } from "../routes/telefun/components/settings/useTelefunSettingsDraft";
-import type { TelefunProviderReadinessState } from "../routes/telefun/hooks/useTelefunProviderReadiness";
-import type { TelefunWebRtcCapability } from "../routes/telefun/services/telefunWebRtcCapability";
-import {
-  DEFAULT_TELEFUN_SETTINGS,
-  type TelefunAppSettings,
-} from "../routes/telefun/telefunSettings";
+import { DEFAULT_TELEFUN_SETTINGS } from "../routes/telefun/telefunSettings";
 
-describe("Telefun settings draft model/voice synchronization", () => {
-  const ready: TelefunProviderReadinessState = {
-    status: "ready",
-    openai: { enabled: true, configured: true, ready: true },
-  };
-  const loading: TelefunProviderReadinessState = {
-    status: "loading",
-    openai: null,
-  };
-  const unavailable: TelefunProviderReadinessState = {
-    status: "unavailable",
-    openai: null,
-  };
-
-  it("preserves a compatible persisted OpenAI voice during async open and later coerces real model changes", async () => {
-    const onSave = vi.fn().mockResolvedValue(undefined);
-    const onClose = vi.fn();
-    const persistedOpenAiSettings: TelefunAppSettings = {
+describe("Telefun settings draft retirement normalization", () => {
+  it("normalizes persisted OpenAI settings synchronously when the modal opens", async () => {
+    const persisted = {
       ...DEFAULT_TELEFUN_SETTINGS,
       telefunModelId: "gpt-realtime-2.1",
-      telefunTransport: "openai-audio",
+      telefunTransport: "openai-webrtc" as const,
       identitySettings: {
         ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
-        gender: "random",
+        gender: "female" as const,
         voiceName: "cedar",
       },
     };
-
-    const { result, rerender } = renderHook(
-      ({ settings, isOpen }) =>
-        useTelefunSettingsDraft({
-          settings,
-          isOpen,
-          onSave,
-          onClose,
-          providerReadiness: ready,
-        }),
-      {
-        initialProps: {
-          settings: DEFAULT_TELEFUN_SETTINGS,
-          isOpen: false,
-        },
-      },
+    const { result } = renderHook(() =>
+      useTelefunSettingsDraft({
+        settings: persisted,
+        isOpen: true,
+        onSave: vi.fn(),
+        onClose: vi.fn(),
+      }),
     );
-
-    rerender({ settings: persistedOpenAiSettings, isOpen: true });
-
-    await waitFor(() => {
-      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1");
-      expect(result.current.localSettings.identitySettings.voiceName).toBe(
-        "cedar",
-      );
-    });
-
-    await act(async () => {
-      await result.current.handleSave();
-    });
-    const saved = onSave.mock.calls[0][0] as TelefunAppSettings;
-    expect(saved.telefunModelId).toBe("gpt-realtime-2.1");
-    expect(saved.telefunTransport).toBe("openai-audio");
-    expect(saved.identitySettings.voiceName).toBe("cedar");
-
-    act(() =>
-      result.current.setSelectedTelefunModel(
-        DEFAULT_TELEFUN_SETTINGS.telefunModelId,
-      ),
-    );
-    expect(result.current.localSettings.identitySettings.voiceName).toBe("");
-
-    act(() => result.current.setSelectedTelefunModel("gpt-realtime-2.1"));
-    expect(result.current.localSettings.identitySettings.voiceName).toBe(
-      "marin",
-    );
-  });
-
-  it("preserves persisted OpenAI while checking, then atomically falls back when unavailable", async () => {
-    const persistedOpenAiSettings: TelefunAppSettings = {
-      ...DEFAULT_TELEFUN_SETTINGS,
-      telefunModelId: "gpt-realtime-2.1-mini",
-      telefunTransport: "openai-audio",
-      identitySettings: {
-        ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
-        voiceName: "cedar",
-      },
-    };
-    const { result, rerender } = renderHook(
-      ({
-        providerReadiness,
-      }: {
-        providerReadiness: TelefunProviderReadinessState;
-      }) =>
-        useTelefunSettingsDraft({
-          settings: persistedOpenAiSettings,
-          isOpen: true,
-          onSave: vi.fn(),
-          onClose: vi.fn(),
-          providerReadiness,
-        }),
-      {
-        initialProps: {
-          providerReadiness: loading,
-        } as { providerReadiness: TelefunProviderReadinessState },
-      },
-    );
-
-    await waitFor(() => {
-      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1-mini");
-      expect(result.current.localSettings.identitySettings.voiceName).toBe(
-        "cedar",
-      );
-    });
-
-    rerender({ providerReadiness: unavailable });
 
     await waitFor(() => {
       expect(result.current.selectedTelefunModel).toBe(
         DEFAULT_TELEFUN_SETTINGS.telefunModelId,
       );
-      expect(result.current.localSettings.telefunModelId).toBe(
-        DEFAULT_TELEFUN_SETTINGS.telefunModelId,
-      );
-      expect(result.current.localSettings.telefunTransport).toBe(
-        DEFAULT_TELEFUN_SETTINGS.telefunTransport,
-      );
+      expect(result.current.selectedTelefunTransport).toBe("gemini-live");
       expect(result.current.localSettings.identitySettings.voiceName).toBe("");
-      expect(result.current.localSettings.telefunModelWarningReason).toBe(
-        "provider-unavailable",
-      );
     });
   });
 
-  it("does not discard a persisted WebRTC pilot while capability is still loading", async () => {
-    const persistedWebRtcSettings: TelefunAppSettings = {
-      ...DEFAULT_TELEFUN_SETTINGS,
-      telefunModelId: "gpt-realtime-2.1",
-      telefunTransport: "openai-webrtc",
-    };
-    const { result } = renderHook(() =>
-      useTelefunSettingsDraft({
-        settings: persistedWebRtcSettings,
-        isOpen: true,
-        onSave: vi.fn(),
-        onClose: vi.fn(),
-        providerReadiness: unavailable,
-        webRtcCapability: null,
-      }),
-    );
-
-    await waitFor(() => {
-      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1");
-      expect(result.current.selectedTelefunTransport).toBe("openai-webrtc");
-    });
-  });
-
-  it("blocks direct OpenAI selection while unavailable without affecting Gemini", () => {
-    const { result } = renderHook(() =>
-      useTelefunSettingsDraft({
-        settings: DEFAULT_TELEFUN_SETTINGS,
-        isOpen: true,
-        onSave: vi.fn(),
-        onClose: vi.fn(),
-        providerReadiness: unavailable,
-      }),
-    );
-
-    act(() => result.current.setSelectedTelefunModel("gpt-realtime-2.1"));
-    expect(result.current.selectedTelefunModel).toBe(
-      DEFAULT_TELEFUN_SETTINGS.telefunModelId,
-    );
-
-    act(() =>
-      result.current.setSelectedTelefunModel("gemini-3.0-flash-live-preview"),
-    );
-    expect(result.current.selectedTelefunModel).toBe(
-      "gemini-3.0-flash-live-preview",
-    );
-  });
-
-  it("preserves a selected Mini+WebRTC draft without forcing Full or audio", async () => {
+  it("always emits Gemini model, transport, and voice in the save payload", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    const onClose = vi.fn();
-    const miniSettings: TelefunAppSettings = {
+    const persisted = {
       ...DEFAULT_TELEFUN_SETTINGS,
       telefunModelId: "gpt-realtime-2.1-mini",
-      telefunTransport: "openai-audio",
+      telefunTransport: "openai-audio" as const,
+      identitySettings: {
+        ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
+        voiceName: "marin",
+      },
     };
-    const miniWebRtcCapability: TelefunWebRtcCapability = {
-      enabled: true,
-      allowed: true,
-      modelId: "gpt-realtime-2.1",
-      transport: "openai-webrtc",
-      modelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
-    };
-
     const { result } = renderHook(() =>
       useTelefunSettingsDraft({
-        settings: miniSettings,
+        settings: persisted,
         isOpen: true,
         onSave,
-        onClose,
-        providerReadiness: ready,
-        webRtcCapability: miniWebRtcCapability,
+        onClose: vi.fn(),
       }),
     );
-
-    await waitFor(() => {
-      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1-mini");
-    });
-
-    act(() => result.current.setSelectedTelefunTransport("openai-webrtc"));
-    expect(result.current.selectedTelefunTransport).toBe("openai-webrtc");
 
     await act(async () => {
       await result.current.handleSave();
     });
-    const saved = onSave.mock.calls[0][0] as TelefunAppSettings;
-    expect(saved.telefunModelId).toBe("gpt-realtime-2.1-mini");
-    expect(saved.telefunTransport).toBe("openai-webrtc");
-  });
-
-  it("rejects a WebRTC transport selection for a model missing from modelIds", async () => {
-    const miniSettings: TelefunAppSettings = {
-      ...DEFAULT_TELEFUN_SETTINGS,
-      telefunModelId: "gpt-realtime-2.1-mini",
-      telefunTransport: "openai-audio",
-    };
-    const fullOnlyCapability: TelefunWebRtcCapability = {
-      enabled: true,
-      allowed: true,
-      modelId: "gpt-realtime-2.1",
-      transport: "openai-webrtc",
-      modelIds: ["gpt-realtime-2.1"],
-    };
-
-    const { result } = renderHook(() =>
-      useTelefunSettingsDraft({
-        settings: miniSettings,
-        isOpen: true,
-        onSave: vi.fn(),
-        onClose: vi.fn(),
-        providerReadiness: ready,
-        webRtcCapability: fullOnlyCapability,
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        telefunModelId: DEFAULT_TELEFUN_SETTINGS.telefunModelId,
+        telefunTransport: "gemini-live",
+        identitySettings: expect.objectContaining({ voiceName: "" }),
       }),
     );
-
-    await waitFor(() => {
-      expect(result.current.selectedTelefunModel).toBe("gpt-realtime-2.1-mini");
-    });
-
-    act(() => result.current.setSelectedTelefunTransport("openai-webrtc"));
-    expect(result.current.selectedTelefunTransport).toBe("openai-audio");
   });
 
-  it("drops a persisted Mini+WebRTC selection when the capability does not admit Mini", async () => {
-    const miniWebRtcSettings: TelefunAppSettings = {
-      ...DEFAULT_TELEFUN_SETTINGS,
-      telefunModelId: "gpt-realtime-2.1-mini",
-      telefunTransport: "openai-webrtc",
-    };
-    const fullOnlyCapability: TelefunWebRtcCapability = {
-      enabled: true,
-      allowed: true,
-      modelId: "gpt-realtime-2.1",
-      transport: "openai-webrtc",
-      modelIds: ["gpt-realtime-2.1"],
-    };
-
-    const { result, rerender } = renderHook(
-      ({ capability }: { capability: TelefunWebRtcCapability | null }) =>
-        useTelefunSettingsDraft({
-          settings: miniWebRtcSettings,
-          isOpen: true,
-          onSave: vi.fn(),
-          onClose: vi.fn(),
-          providerReadiness: unavailable,
-          webRtcCapability: capability,
-        }),
-      {
-        initialProps: { capability: null } as {
-          capability: TelefunWebRtcCapability | null;
-        },
-      },
-    );
-
-    rerender({ capability: fullOnlyCapability });
-
-    await waitFor(() => {
-      expect(result.current.selectedTelefunModel).toBe(
-        DEFAULT_TELEFUN_SETTINGS.telefunModelId,
-      );
-      expect(result.current.localSettings.telefunModelId).toBe(
-        DEFAULT_TELEFUN_SETTINGS.telefunModelId,
-      );
-      expect(result.current.localSettings.telefunModelWarningReason).toBe(
-        "provider-unavailable",
-      );
-    });
-  });
 });

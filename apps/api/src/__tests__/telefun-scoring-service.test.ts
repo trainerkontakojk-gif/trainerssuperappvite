@@ -273,12 +273,13 @@ describe("fetchPendingJobs", () => {
     });
   });
 
-  it("does not return not-ready WebRTC rows to the polling worker", async () => {
+  it("does not return active transport-only WebRTC lifecycle rows to the polling worker", async () => {
     seedSession("webrtc-not-ready", {
       user_id: "u1",
       scoring_status: "pending",
+      telefun_model_id: null,
       telefun_transport: "openai-webrtc",
-      status: "completed",
+      status: "active",
       scoring_ready_at: null,
       agent_recording_path: null,
     });
@@ -296,6 +297,55 @@ describe("fetchPendingJobs", () => {
     expect(result).toEqual([
       { sessionId: "webrtc-ready", userId: "u2" },
     ]);
+  });
+
+  it("includes terminal historical OpenAI jobs before the retired WebRTC readiness gate", async () => {
+    seedSession("historical-webrtc", {
+      user_id: "u1",
+      status: "completed",
+      telefun_model_id: "gpt-realtime-2.1",
+      telefun_transport: "openai-webrtc",
+      scoring_status: "pending",
+      scoring_next_attempt_at: null,
+      scoring_ready_at: null,
+      agent_recording_path: null,
+    });
+
+    await expect(fetchPendingJobs(5)).resolves.toEqual([
+      { sessionId: "historical-webrtc", userId: "u1" },
+    ]);
+  });
+
+  it("includes a terminal transport-only historical job before the WebRTC readiness gate", async () => {
+    seedSession("transport-only-terminal", {
+      user_id: "u1",
+      status: "completed",
+      telefun_model_id: null,
+      telefun_transport: "openai-webrtc",
+      scoring_status: "pending",
+      scoring_next_attempt_at: null,
+      scoring_ready_at: null,
+      agent_recording_path: null,
+    });
+
+    await expect(fetchPendingJobs(5)).resolves.toEqual([
+      { sessionId: "transport-only-terminal", userId: "u1" },
+    ]);
+  });
+
+  it("does not requeue a permanently failed historical OpenAI job", async () => {
+    seedSession("historical-failed", {
+      user_id: "u1",
+      status: "completed",
+      telefun_model_id: "gpt-realtime-2.1-mini",
+      telefun_transport: "openai-audio",
+      scoring_status: "failed",
+      scoring_next_attempt_at: null,
+      scoring_ready_at: null,
+      agent_recording_path: null,
+    });
+
+    await expect(fetchPendingJobs(5)).resolves.toEqual([]);
   });
 
   it("returns empty array when no jobs", async () => {
@@ -345,7 +395,7 @@ describe("processScoringJob", () => {
     expect(result.status).toBe("completed");
   });
 
-  it("does not re-enqueue a WebRTC job after a failed-capture completion race", async () => {
+  it("permanently disables a terminal transport-only WebRTC row even after failed capture", async () => {
     seedSession("webrtc-failed", {
       user_id: "u1",
       status: "completed",
@@ -359,12 +409,12 @@ describe("processScoringJob", () => {
       voice_assessment: null,
       session_metrics: null,
     });
-    mockRpcResult = { data: false, error: null };
     const geminiMock = (await import("../lib/gemini")).generateGeminiContent as any;
     geminiMock.mockResolvedValue({
       success: true,
       text: JSON.stringify(VALID_ASSESSMENT),
     });
+    mockRpcResult = { data: true, error: null };
 
     const result = await processScoringJob({
       sessionId: "webrtc-failed",
@@ -374,10 +424,10 @@ describe("processScoringJob", () => {
     expect(result).toEqual({
       success: false,
       status: "failed",
-      error: "SCORING_NOT_READY",
+      error: "Penilaian OpenAI Realtime tidak lagi tersedia untuk Telefun.",
     });
     expect(mockRpcs.map((rpc) => rpc.name)).toEqual([
-      "complete_telefun_scoring",
+      "fail_telefun_scoring",
     ]);
   });
 

@@ -5,11 +5,7 @@ import { DurationSelector } from "../DurationSelector";
 import { TelefunAppSettings as AppSettings } from "../../telefunSettings";
 import { SIMULATION_CHALLENGES } from "../../services/simulationChallenges";
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
-import {
-  isAllowedTelefunWebRtc,
-  isTelefunWebRtcModelAllowed,
-  type TelefunWebRtcCapability,
-} from "../../services/telefunWebRtcCapability";
+import type { TelefunWebRtcCapability } from "../../services/telefunWebRtcCapability";
 
 interface TelefunSystemTabProps {
   localSettings: AppSettings;
@@ -29,16 +25,11 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
   setLocalSettings,
   selectedTelefunModel,
   setSelectedTelefunModel,
-  selectedTelefunTransport,
-  setSelectedTelefunTransport,
-  providerReadiness,
-  webRtcCapability = null,
+  selectedTelefunTransport: _selectedTelefunTransport,
+  setSelectedTelefunTransport: _setSelectedTelefunTransport,
+  providerReadiness: _providerReadiness,
+  webRtcCapability: _webRtcCapability,
 }) => {
-  const openAIReady =
-    providerReadiness.status === "ready" &&
-    providerReadiness.openai.enabled &&
-    providerReadiness.openai.configured &&
-    providerReadiness.openai.ready;
   return (
     <div className="space-y-8 mt-4">
       {/* AI Model Selection for Telefun */}
@@ -63,13 +54,10 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
         </div>
 
         <div className="grid grid-cols-1 gap-2.5">
-          {TELEFUN_LIVE_MODELS.map((model) => {
+          {TELEFUN_LIVE_MODELS.filter((model) => model.provider === "gemini").map(
+            (model) => {
             const isSelected = selectedTelefunModel === model.id;
-            const isOpenAI = model.provider === "openai";
-            const isWebRtcPilot =
-              isAllowedTelefunWebRtc(webRtcCapability) &&
-              isTelefunWebRtcModelAllowed(webRtcCapability, model.id);
-            const isDisabled = isOpenAI && !openAIReady && !isWebRtcPilot;
+            const isDisabled = false;
             return (
               <button
                 type="button"
@@ -92,28 +80,16 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                     </h4>
                     <span
                       className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
-                        model.realtime.transport === "openai-audio"
-                          ? "bg-orange-500/10 text-orange-500 border-orange-500/20"
-                          : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                        "bg-blue-500/10 text-blue-500 border-blue-500/20"
                       }`}
                     >
-                      {model.realtime.transport}
+                      Gemini Live
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground font-medium">
                     {model.description}
                   </p>
-                  {isOpenAI && providerReadiness.status === "loading" ? (
-                    <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>Memeriksa kesiapan layanan OpenAI…</span>
-                    </div>
-                  ) : isDisabled ? (
-                    <div className="flex items-center gap-1 mt-1.5 text-amber-600 dark:text-amber-400 text-xs font-semibold">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Layanan OpenAI belum siap di Telefun.</span>
-                    </div>
-                  ) : null}
+
                 </div>
                 <div className="flex items-center shrink-0">
                   {isSelected && !isDisabled ? (
@@ -128,44 +104,7 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
             );
           })}
         </div>
-        {isAllowedTelefunWebRtc(webRtcCapability) &&
-        isTelefunWebRtcModelAllowed(
-          webRtcCapability,
-          selectedTelefunModel,
-        ) ? (
-          <div className="space-y-2 rounded-xl border border-border bg-card/30 p-4">
-            <p className="text-xs font-semibold text-foreground">
-              Transport panggilan (pilot non-produksi)
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {(["openai-audio", "openai-webrtc"] as const).map((transport) => (
-                <button
-                  key={transport}
-                  type="button"
-                  aria-pressed={
-                    (selectedTelefunTransport ??
-                      localSettings.telefunTransport) === transport
-                  }
-                  onClick={() => setSelectedTelefunTransport?.(transport)}
-                  className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                    (selectedTelefunTransport ??
-                      localSettings.telefunTransport) === transport
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground hover:bg-foreground/[0.03]"
-                  }`}
-                >
-                  {transport === "openai-webrtc"
-                    ? "OpenAI WebRTC"
-                    : "OpenAI WebSocket"}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              WebRTC tidak dipilih otomatis dan belum menyediakan rekaman atau
-              fallback di tengah panggilan.
-            </p>
-          </div>
-        ) : null}
+
         {localSettings.telefunModelWarningReason ? (
           <p
             role="status"
@@ -177,8 +116,8 @@ export const TelefunSystemTab: React.FC<TelefunSystemTabProps> = ({
                 ? "Model tersimpan tidak dikenali. Pilihan dikembalikan ke Gemini 3.1."
                 : localSettings.telefunModelWarningReason ===
                     "provider-unavailable"
-                  ? "Layanan OpenAI belum siap. Pilihan dikembalikan ke Gemini 3.1."
-                  : "Transport model tersimpan tidak cocok dan telah disesuaikan."}
+                  ? "Pilihan model lama telah dikembalikan ke Gemini 3.1."
+                  : "Pilihan model lama telah dikembalikan ke Gemini."}
             </span>
           </p>
         ) : null}

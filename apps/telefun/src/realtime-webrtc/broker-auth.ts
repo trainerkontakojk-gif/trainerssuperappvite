@@ -1,9 +1,7 @@
-import { POC_TRANSPORT } from "./contracts.js";
 import {
-  isTelefunOpenAiWebRtcAllowed,
-  isTelefunOpenAiWebRtcModelAllowed,
-  type TelefunOpenAiWebRtcRolloutConfig,
-} from "./rollout-gate.js";
+  POC_TRANSPORT,
+  isHistoricalTelefunOpenAiWebRtcModelId,
+} from "./contracts.js";
 
 export interface WebRtcProfile {
   id?: string;
@@ -23,7 +21,8 @@ export interface WebRtcSession {
 }
 
 export interface BrokerAuthDependencies {
-  rollout: TelefunOpenAiWebRtcRolloutConfig;
+  /** Deprecated admission input retained only for call-site compatibility. */
+  rollout?: unknown;
   verifyToken: (
     token: string,
     signal?: AbortSignal,
@@ -49,6 +48,10 @@ export type BrokerAuthResult =
       reason: "unauthorized" | "forbidden" | "not_found" | "aborted";
     };
 
+/**
+ * Authorizes only cleanup of an already-owned historical WebRTC session.
+ * Retired rollout values are intentionally absent from every decision.
+ */
 export async function authorizeWebRtcCall(
   input: {
     token: string;
@@ -74,12 +77,9 @@ export async function authorizeWebRtcCall(
   const userId = verified.success ? verified.user?.id : undefined;
   if (!userId) return { ok: false, reason: "unauthorized" };
 
-  if (
-    (input.operation ?? "start") === "start" &&
-    !isTelefunOpenAiWebRtcAllowed({ ...dependencies.rollout, userId })
-  ) {
-    return { ok: false, reason: "forbidden" };
-  }
+  // There is no longer a start authorization path. Keeping this explicit
+  // prevents a future caller from turning compatibility auth into admission.
+  if (input.operation === "start") return { ok: false, reason: "not_found" };
 
   let profile: WebRtcProfile | null;
   try {
@@ -97,8 +97,9 @@ export async function authorizeWebRtcCall(
   if (!profile || profile.is_deleted === true) {
     return { ok: false, reason: "forbidden" };
   }
-  const normalizedStatus = normalizeWebRtcProfileStatus(profile.status);
-  if (normalizedStatus !== "active") return { ok: false, reason: "forbidden" };
+  if (normalizeWebRtcProfileStatus(profile.status) !== "active") {
+    return { ok: false, reason: "forbidden" };
+  }
   const normalizedRole = normalizeWebRtcProfileRole(profile.role);
   if (normalizedRole !== "admin" && normalizedRole !== "trainer") {
     return { ok: false, reason: "forbidden" };
@@ -121,16 +122,18 @@ export async function authorizeWebRtcCall(
     !session ||
     session.id !== input.sessionId ||
     session.user_id !== userId ||
-    ((input.operation ?? "start") === "start" && session.status !== "active") ||
-    !isTelefunOpenAiWebRtcModelAllowed(
-      session.telefun_model_id,
-      dependencies.rollout.allowedModelIds,
-    ) ||
-    session.telefun_transport !== POC_TRANSPORT
+    !isHistoricalCleanupStatus(session.status) ||
+    session.telefun_transport !== POC_TRANSPORT ||
+    !isHistoricalTelefunOpenAiWebRtcModelId(session.telefun_model_id)
   ) {
     return { ok: false, reason: "not_found" };
   }
+
   return { ok: true, userId, sessionId: input.sessionId, session };
+}
+
+function isHistoricalCleanupStatus(status: string): boolean {
+  return ["pending", "active", "completed", "failed"].includes(status);
 }
 
 function normalizeWebRtcProfileStatus(status?: string | null): string {

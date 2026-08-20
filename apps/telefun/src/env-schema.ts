@@ -1,12 +1,22 @@
 import { z } from "zod";
-import { parseTelefunOpenAiWebRtcAllowedModelIds } from "@trainers/types";
-import { parseTelefunOpenAiWebRtcAllowedUserIds } from "./realtime-webrtc/rollout-gate.js";
 
 const optionalSecret = z.preprocess(
   (value) =>
     typeof value === "string" && value.trim().length === 0 ? undefined : value,
   z.string().trim().min(1).optional(),
 );
+
+// Retired admission values remain parseable for deployment compatibility, but
+// their parsed values are deliberately inert. They cannot make a new OpenAI
+// Realtime session available.
+const retiredFlag = z
+  .unknown()
+  .optional()
+  .transform(() => false);
+const retiredList = z
+  .unknown()
+  .optional()
+  .transform(() => [] as string[]);
 
 export const telefunEnvSchema = z
   .object({
@@ -15,23 +25,13 @@ export const telefunEnvSchema = z
     SUPABASE_ANON_KEY: z.string().min(1),
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
     GEMINI_API_KEY: z.string().min(1),
+    // Optional solely for historical WebRTC hangup cleanup. It never changes
+    // readiness, provider selection, or admission.
     OPENAI_API_KEY: optionalSecret,
-    TELEFUN_OPENAI_ENABLED: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((value) => value === "true"),
-    TELEFUN_OPENAI_WEBRTC_POC_ENABLED: z
-      .enum(["true", "false"])
-      .default("false")
-      .transform((value) => value === "true"),
-    TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS: z
-      .string()
-      .default("")
-      .transform(parseTelefunOpenAiWebRtcAllowedUserIds),
-    TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: z
-      .string()
-      .optional()
-      .transform(parseTelefunOpenAiWebRtcAllowedModelIds),
+    TELEFUN_OPENAI_ENABLED: retiredFlag,
+    TELEFUN_OPENAI_WEBRTC_POC_ENABLED: retiredFlag,
+    TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS: retiredList,
+    TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: retiredList,
     TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS: z.coerce
       .number()
       .int()
@@ -88,34 +88,7 @@ export const telefunEnvSchema = z
       .default("development"),
   })
   .superRefine((value, context) => {
-    if (value.TELEFUN_OPENAI_ENABLED && !value.OPENAI_API_KEY) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["OPENAI_API_KEY"],
-        message: "OPENAI_API_KEY is required when TELEFUN_OPENAI_ENABLED=true",
-      });
-    } else if (
-      value.TELEFUN_OPENAI_WEBRTC_POC_ENABLED &&
-      !value.OPENAI_API_KEY
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["OPENAI_API_KEY"],
-        message:
-          "OPENAI_API_KEY is required when TELEFUN_OPENAI_WEBRTC_POC_ENABLED=true",
-      });
-    }
     if (
-      value.TELEFUN_OPENAI_WEBRTC_POC_ENABLED &&
-      !value.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY"],
-        message:
-          "TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY is required when TELEFUN_OPENAI_WEBRTC_POC_ENABLED=true",
-      });
-    } else if (
       value.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY &&
       value.TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY.length < 32
     ) {
@@ -124,14 +97,6 @@ export const telefunEnvSchema = z
         path: ["TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY"],
         message:
           "TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY must contain at least 32 characters",
-      });
-    }
-    if (value.TELEFUN_OPENAI_ENABLED && !value.TELEFUN_INTERNAL_TOKEN) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["TELEFUN_INTERNAL_TOKEN"],
-        message:
-          "TELEFUN_INTERNAL_TOKEN is required when TELEFUN_OPENAI_ENABLED=true",
       });
     }
     if (value.NODE_ENV === "production") {

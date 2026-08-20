@@ -263,22 +263,26 @@ describe("LiveSession first-message authentication", () => {
     expect(onLocalStream).toHaveBeenLastCalledWith(null);
   });
 
-  it("rejects openai-webrtc before microphone or legacy WebSocket setup", async () => {
+  it("normalizes a historical WebRTC selection into the Gemini microphone and WebSocket flow", async () => {
     const config = {
       ...createMockConfig(),
+      telefunModelId: "gpt-realtime-2.1",
       telefunTransport: "openai-webrtc",
     } as unknown as TelefunAppSettings;
-    const onError = vi.fn();
     session = new LiveSession(config);
-    session.onError = onError;
 
-    await expect(session.connect("test-access-token")).rejects.toThrow(
-      /OpenAIWebRtcSession/,
-    );
+    await session.connect("test-access-token");
 
-    expect(onError).not.toHaveBeenCalled();
-    expect(sockets).toHaveLength(0);
-    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledOnce();
+    const socket = sockets[0];
+    socket.open();
+    socket.receive({ type: "auth_ok", sessionId: "session-1" });
+
+    expect(JSON.parse(socket.sent[1])).toMatchObject({
+      type: "telefun_session_configure",
+      modelId: "gemini-3.1-flash-live-preview",
+      transport: "gemini-live",
+    });
   });
 
   it("does not send configure when auth_ok arrives after disconnect begins", async () => {

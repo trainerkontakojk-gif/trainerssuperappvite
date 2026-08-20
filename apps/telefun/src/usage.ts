@@ -919,7 +919,12 @@ export async function recordFailedOpenAIRealtimeUsage(
   errorMessage: string,
   action: "voice_live" | "voice_assessment" = "voice_live",
 ): Promise<boolean> {
-  const model = getTelefunLiveModel(modelId);
+  // Retired realtime IDs are never allowed to create a fresh usage audit,
+  // even if a future registry edit accidentally exposes one again.
+  if (modelId.startsWith("gpt-realtime-")) return false;
+  const model = getTelefunLiveModel(modelId) as
+    | { provider: "openai"; id: string }
+    | undefined;
   if (model?.provider !== "openai") return false;
   const boundedError =
     errorMessage.replace(/\s+/g, " ").trim().slice(0, 240) ||
@@ -941,10 +946,16 @@ export async function recordFailedOpenAIRealtimeUsage(
       estimated_cost_idr: 0,
       final_cost_usd: 0,
       final_cost_idr: 0,
-      raw_usage_metadata: { billing_model: "openai_realtime_per_response_v1", status: "failed" },
+      raw_usage_metadata: {
+        billing_model: "openai_realtime_per_response_v1",
+        status: "failed",
+      },
     });
     if (error && error.code !== "23505") {
-      console.error("[Telefun Usage] Failed to insert OpenAI failure audit:", error);
+      console.error(
+        "[Telefun Usage] Failed to insert OpenAI failure audit:",
+        error,
+      );
       return false;
     }
     return true;
@@ -962,7 +973,12 @@ export async function flushOpenAIRealtimeUsage(
   sessionDurationMs?: number,
   action: "voice_live" | "voice_assessment" = "voice_live",
 ): Promise<boolean> {
-  const model = getTelefunLiveModel(modelId);
+  // New Telefun OpenAI Realtime usage is permanently disabled. Keep the
+  // historical calculation helpers above for immutable usage-read support.
+  if (modelId.startsWith("gpt-realtime-")) return false;
+  const model = getTelefunLiveModel(modelId) as
+    | { provider: "openai"; id: string }
+    | undefined;
   if (model?.provider !== "openai") {
     console.error(
       "[Telefun Usage] Refusing non-OpenAI model for OpenAI usage",

@@ -8,7 +8,11 @@ vi.mock("../env.js", () => ({
 }));
 
 import { createOpenAIUsageAccumulator } from "../usage.js";
-import { createWebRtcCallManager } from "./call-manager.js";
+import {
+  createWebRtcCallManager,
+  createWebRtcCleanupManager,
+  hashProviderCallId,
+} from "./call-manager.js";
 import { OpenAiCallCreationError } from "./openai-calls-client.js";
 
 const sessionId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
@@ -63,7 +67,13 @@ describe("WebRTC call manager", () => {
       createAttemptId: vi.fn(() => "attempt-race"),
     });
 
-    const starting = manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    const starting = manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     await manager.endCall(sessionId);
     created.resolve({ answerSdp: answer, callId: "rtc_late" });
 
@@ -105,7 +115,13 @@ describe("WebRTC call manager", () => {
     });
 
     await expect(
-      manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT }),
+      manager.startCall({
+        userId: "user-1",
+        sessionId,
+        modelId: "gpt-realtime-2.1",
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+      }),
     ).rejects.toThrow("provider call failed");
 
     expect(order).toEqual([
@@ -128,14 +144,23 @@ describe("WebRTC call manager", () => {
     const closeCall = vi.fn(async () => true);
     const manager = createWebRtcCallManager({
       callsClient: {
-        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_pending_connect" })),
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_pending_connect",
+        })),
         closeCall,
       },
       createSideband: vi.fn(() => socket),
       updateSession: vi.fn(async () => undefined),
     });
 
-    const starting = manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    const starting = manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     await vi.waitFor(() => expect(socket.connect).toHaveBeenCalledOnce());
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     await expect(starting).rejects.toThrow("provider call failed");
@@ -147,15 +172,26 @@ describe("WebRTC call manager", () => {
     const updateSession = vi.fn(async () => undefined);
     const manager = createWebRtcCallManager({
       callsClient: {
-        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_hangup_failed" })),
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_hangup_failed",
+        })),
         closeCall: vi.fn(async () => false),
       },
       createSideband: vi.fn(() => sideband()),
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
-    await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
+    await expect(manager.endCall(sessionId)).rejects.toThrow(
+      "finalization failed",
+    );
 
     expect(updateSession).toHaveBeenCalledWith(
       sessionId,
@@ -166,17 +202,32 @@ describe("WebRTC call manager", () => {
 
   it("retains a binding when provider hangup times out so DELETE can retry", async () => {
     const socket = sideband();
-    const closeCall = vi.fn()
+    const closeCall = vi
+      .fn()
       .mockRejectedValueOnce(new Error("hangup timeout"))
       .mockResolvedValueOnce(true);
     const manager = createWebRtcCallManager({
-      callsClient: { createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_hangup_retry" })), closeCall },
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_hangup_retry",
+        })),
+        closeCall,
+      },
       createSideband: vi.fn(() => socket),
       updateSession: vi.fn(async () => undefined),
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
-    await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
+    await expect(manager.endCall(sessionId)).rejects.toThrow(
+      "finalization failed",
+    );
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(closeCall).toHaveBeenCalledTimes(2);
   });
@@ -186,7 +237,10 @@ describe("WebRTC call manager", () => {
     const manager = createWebRtcCallManager({
       callsClient: {
         createCall: vi.fn(async () => {
-          throw new OpenAiCallCreationError("provider call failed", "rtc_header_bound");
+          throw new OpenAiCallCreationError(
+            "provider call failed",
+            "rtc_header_bound",
+          );
         }),
         closeCall,
       },
@@ -194,23 +248,46 @@ describe("WebRTC call manager", () => {
       updateSession: vi.fn(async () => undefined),
     });
 
-    await expect(manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("provider call failed");
+    await expect(
+      manager.startCall({
+        userId: "user-1",
+        sessionId,
+        modelId: "gpt-realtime-2.1",
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+      }),
+    ).rejects.toThrow("provider call failed");
     expect(closeCall).toHaveBeenCalledWith("rtc_header_bound");
   });
 
   it("retains a binding when session persistence fails so DELETE can retry", async () => {
     const socket = sideband();
-    const updateSession = vi.fn()
+    const updateSession = vi
+      .fn()
       .mockRejectedValueOnce(new Error("database unavailable"))
       .mockResolvedValue(undefined);
     const manager = createWebRtcCallManager({
-      callsClient: { createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_retry" })), closeCall: vi.fn(async () => true) },
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_retry",
+        })),
+        closeCall: vi.fn(async () => true),
+      },
       createSideband: vi.fn(() => socket),
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
-    await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
+    await expect(manager.endCall(sessionId)).rejects.toThrow(
+      "finalization failed",
+    );
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(updateSession).toHaveBeenCalledTimes(2);
   });
@@ -221,17 +298,32 @@ describe("WebRTC call manager", () => {
       input_tokens: 1,
       output_tokens: 1,
       total_tokens: 2,
-      input_token_details: { text_tokens: 1, audio_tokens: 0, cached_tokens: 0 },
+      input_token_details: {
+        text_tokens: 1,
+        audio_tokens: 0,
+        cached_tokens: 0,
+      },
       output_token_details: { text_tokens: 1, audio_tokens: 0 },
     };
-    const flushUsage = vi.fn()
+    const flushUsage = vi
+      .fn()
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true);
     const manager = createWebRtcCallManager({
-      callsClient: { createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_usage_retry" })), closeCall: vi.fn(async () => true) },
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_usage_retry",
+        })),
+        closeCall: vi.fn(async () => true),
+      },
       createSideband: vi.fn((_callId, callbacks) => {
         socket.emit.mockImplementation((event: string, _value: unknown) => {
-          if (event === "response.done") callbacks.onEvent({ type: event, response: { id: "response-1", status: "completed", usage } });
+          if (event === "response.done")
+            callbacks.onEvent({
+              type: event,
+              response: { id: "response-1", status: "completed", usage },
+            });
         });
         return socket;
       }),
@@ -239,23 +331,42 @@ describe("WebRTC call manager", () => {
       flushUsage,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     socket.emit("response.done", null);
-    await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
+    await expect(manager.endCall(sessionId)).rejects.toThrow(
+      "finalization failed",
+    );
     await expect(manager.endCall(sessionId)).resolves.toBeUndefined();
     expect(flushUsage).toHaveBeenCalledTimes(2);
   });
 
   it("writes a failed audit when provider usage is incomplete", async () => {
     const socket = sideband();
-    const auditFailedUsage = vi.fn()
+    const auditFailedUsage = vi
+      .fn()
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true);
     const manager = createWebRtcCallManager({
-      callsClient: { createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_missing_usage" })), closeCall: vi.fn(async () => true) },
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_missing_usage",
+        })),
+        closeCall: vi.fn(async () => true),
+      },
       createSideband: vi.fn((_callId, callbacks) => {
         socket.emit.mockImplementation((event: string) => {
-          if (event === "response.done") callbacks.onEvent({ type: event, response: { id: "response-missing", status: "completed" } });
+          if (event === "response.done")
+            callbacks.onEvent({
+              type: event,
+              response: { id: "response-missing", status: "completed" },
+            });
         });
         return socket;
       }),
@@ -263,25 +374,43 @@ describe("WebRTC call manager", () => {
       auditFailedUsage,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     socket.emit("response.done", null);
-    await expect(manager.endCall(sessionId)).rejects.toThrow("finalization failed");
+    await expect(manager.endCall(sessionId)).rejects.toThrow(
+      "finalization failed",
+    );
     await manager.endCall(sessionId);
     expect(auditFailedUsage).toHaveBeenCalledTimes(2);
-    expect(auditFailedUsage).toHaveBeenCalledWith(expect.objectContaining({ attemptId: expect.any(String), errorMessage: expect.stringContaining("missing") }));
+    expect(auditFailedUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptId: expect.any(String),
+        errorMessage: expect.stringContaining("missing"),
+      }),
+    );
   });
 
   it("keeps response interruptions at turn scope and fails only on sideband close", async () => {
     const socket = sideband();
-    let sidebandCallbacks: {
-      onEvent: (event: unknown) => void;
-      onClose: (unexpected: boolean) => void;
-    } | undefined;
+    let sidebandCallbacks:
+      | {
+          onEvent: (event: unknown) => void;
+          onClose: (unexpected: boolean) => void;
+        }
+      | undefined;
     const updateSession = vi.fn(async () => undefined);
     const closeCall = vi.fn(async () => true);
     const manager = createWebRtcCallManager({
       callsClient: {
-        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_status" })),
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_status",
+        })),
         closeCall,
       },
       createSideband: vi.fn((_callId, callbacks) => {
@@ -291,7 +420,13 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     sidebandCallbacks!.onEvent({
       type: "response.done",
       response: { id: "response-cancelled", status: "cancelled" },
@@ -313,13 +448,18 @@ describe("WebRTC call manager", () => {
     );
 
     const failedUpdate = vi.fn(async () => undefined);
-    let failedCallbacks: {
-      onEvent: (event: unknown) => void;
-      onClose: (unexpected: boolean) => void;
-    } | undefined;
+    let failedCallbacks:
+      | {
+          onEvent: (event: unknown) => void;
+          onClose: (unexpected: boolean) => void;
+        }
+      | undefined;
     const failedManager = createWebRtcCallManager({
       callsClient: {
-        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_close" })),
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_close",
+        })),
         closeCall: vi.fn(async () => true),
       },
       createSideband: vi.fn((_callId, callbacks) => {
@@ -352,7 +492,10 @@ describe("WebRTC call manager", () => {
     let callbacks: { onClose: (unexpected: boolean) => void } | undefined;
     const manager = createWebRtcCallManager({
       callsClient: {
-        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_failure_race" })),
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_failure_race",
+        })),
         closeCall: vi.fn(() => close.promise),
       },
       createSideband: vi.fn((_callId, nextCallbacks) => {
@@ -362,7 +505,13 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     const ending = manager.endCall(sessionId);
     await vi.waitFor(() => expect(callbacks).toBeDefined());
     callbacks!.onClose(true);
@@ -379,14 +528,22 @@ describe("WebRTC call manager", () => {
 
   it("finalizes a sideband provider error as failed and leaves response cancellation non-terminal", async () => {
     const socket = sideband();
-    let sidebandCallbacks: {
-      onEvent: (event: unknown) => void;
-      onClose: (unexpected: boolean) => void;
-    } | undefined;
+    let sidebandCallbacks:
+      | {
+          onEvent: (event: unknown) => void;
+          onClose: (unexpected: boolean) => void;
+        }
+      | undefined;
     const updateSession = vi.fn(async () => undefined);
     const closeCall = vi.fn(async () => true);
     const manager = createWebRtcCallManager({
-      callsClient: { createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_provider_error" })), closeCall },
+      callsClient: {
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_provider_error",
+        })),
+        closeCall,
+      },
       createSideband: vi.fn((_callId, callbacks) => {
         sidebandCallbacks = callbacks;
         return socket;
@@ -394,7 +551,13 @@ describe("WebRTC call manager", () => {
       updateSession,
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     sidebandCallbacks!.onEvent({
       type: "response.done",
       response: { id: "response-incomplete", status: "incomplete" },
@@ -416,7 +579,9 @@ describe("WebRTC call manager", () => {
       ),
     );
     expect(closeCall).toHaveBeenCalledWith("rtc_provider_error");
-    expect(JSON.stringify(updateSession.mock.calls)).not.toContain("provider secret");
+    expect(JSON.stringify(updateSession.mock.calls)).not.toContain(
+      "provider secret",
+    );
 
     await manager.endCall(sessionId);
     expect(updateSession).toHaveBeenCalledTimes(1);
@@ -425,15 +590,20 @@ describe("WebRTC call manager", () => {
   it("fails the WebRTC call when the sideband observer reaches capacity", async () => {
     const socket = sideband();
     const diagnostics: unknown[] = [];
-    let sidebandCallbacks: {
-      onEvent: (event: unknown) => void;
-      onClose: (unexpected: boolean) => void;
-      onDiagnostic: (diagnostic: unknown) => void;
-    } | undefined;
+    let sidebandCallbacks:
+      | {
+          onEvent: (event: unknown) => void;
+          onClose: (unexpected: boolean) => void;
+          onDiagnostic: (diagnostic: unknown) => void;
+        }
+      | undefined;
     const updateSession = vi.fn(async () => undefined);
     const manager = createWebRtcCallManager({
       callsClient: {
-        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_capacity" })),
+        createCall: vi.fn(async () => ({
+          answerSdp: answer,
+          callId: "rtc_capacity",
+        })),
         closeCall: vi.fn(async () => true),
       },
       createSideband: vi.fn((_callId, callbacks) => {
@@ -445,7 +615,13 @@ describe("WebRTC call manager", () => {
       onSidebandDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
     });
 
-    await manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT });
+    await manager.startCall({
+      userId: "user-1",
+      sessionId,
+      modelId: "gpt-realtime-2.1",
+      offerSdp: offer,
+      livePromptInstructions: LIVE_PROMPT,
+    });
     sidebandCallbacks!.onEvent({
       type: "conversation.item.input_audio_transcription.completed",
       item_id: "item-1",
@@ -521,7 +697,10 @@ describe("WebRTC call manager", () => {
     const updateSession = vi.fn(async () => undefined);
     const flushUsage = vi.fn(async () => true);
     const manager = createWebRtcCallManager({
-      callsClient: { createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_1" })), closeCall: vi.fn(async () => true) },
+      callsClient: {
+        createCall: vi.fn(async () => ({ answerSdp: answer, callId: "rtc_1" })),
+        closeCall: vi.fn(async () => true),
+      },
       createSideband: vi.fn(() => socket),
       updateSession,
       flushUsage,
@@ -529,14 +708,34 @@ describe("WebRTC call manager", () => {
       now: () => 1_000,
     });
 
-    await expect(manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).resolves.toEqual({ answerSdp: answer });
-    await expect(manager.startCall({ userId: "user-1", sessionId, modelId: "gpt-realtime-2.1", offerSdp: offer, livePromptInstructions: LIVE_PROMPT })).rejects.toThrow("active call");
+    await expect(
+      manager.startCall({
+        userId: "user-1",
+        sessionId,
+        modelId: "gpt-realtime-2.1",
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+      }),
+    ).resolves.toEqual({ answerSdp: answer });
+    await expect(
+      manager.startCall({
+        userId: "user-1",
+        sessionId,
+        modelId: "gpt-realtime-2.1",
+        offerSdp: offer,
+        livePromptInstructions: LIVE_PROMPT,
+      }),
+    ).rejects.toThrow("active call");
 
     await manager.endCall(sessionId);
     await manager.endCall(sessionId);
     expect(socket.close).toHaveBeenCalledOnce();
     expect(updateSession).toHaveBeenCalledOnce();
-    expect(updateSession).toHaveBeenCalledWith(sessionId, "user-1", expect.objectContaining({ status: "completed" }));
+    expect(updateSession).toHaveBeenCalledWith(
+      sessionId,
+      "user-1",
+      expect.objectContaining({ status: "completed" }),
+    );
     expect(flushUsage).not.toHaveBeenCalled();
     expect(createOpenAIUsageAccumulator).toBeDefined();
   });
@@ -939,7 +1138,10 @@ describe("WebRTC call manager model flows", () => {
     await manager.endCall(sessionId, "user-1");
 
     expect(flushUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: MINI, usageRequestId: expect.stringMatching(/^telefun-webrtc:/) }),
+      expect.objectContaining({
+        modelId: MINI,
+        usageRequestId: expect.stringMatching(/^telefun-webrtc:/),
+      }),
     );
   });
 
@@ -1004,5 +1206,94 @@ describe("WebRTC call manager model flows", () => {
     expect(auditFailedUsage).toHaveBeenCalledWith(
       expect.objectContaining({ modelId: MINI }),
     );
+  });
+});
+
+describe("historical WebRTC cleanup facade", () => {
+  it("exposes no start operation and terminalizes a no-attempt historical row without usage or sideband work", async () => {
+    const failSessionWithoutAttempt = vi.fn(async () => ({
+      applied: true,
+      terminal: false,
+      reason: "updated",
+    }));
+    const getAttempt = vi.fn(async () => null);
+    const closeCall = vi.fn(async () => true);
+    const manager = createWebRtcCleanupManager({
+      db: { getAttempt, failSessionWithoutAttempt } as any,
+      callsClient: { closeCall },
+    });
+
+    expect(manager).not.toHaveProperty("startCall");
+    await manager.failCall(sessionId, "user-1");
+
+    expect(failSessionWithoutAttempt).toHaveBeenCalledWith(sessionId, "user-1");
+    expect(closeCall).not.toHaveBeenCalled();
+  });
+
+  it("recovers a bound encrypted provider reference after restart for owner DELETE cleanup", async () => {
+    const callId = "rtc_restart_owner_delete";
+    const getAttempt = vi.fn(async () => ({
+      attemptId: "attempt-restarted",
+      finalizationKey: "finalization-key",
+      state: "brokered" as const,
+      usageRequestId: "telefun-webrtc:attempt-restarted",
+      providerCallIdHash: hashProviderCallId(callId),
+      providerCallReference: "v1:encrypted-restart-reference",
+      modelId: "gpt-realtime-2.1" as const,
+    }));
+    const beginFinalization = vi.fn(async () => ({
+      accepted: true,
+      shouldFinalize: true,
+      state: "ending" as const,
+      reason: "ending",
+    }));
+    const finalizeAttempt = vi.fn(async () => ({
+      applied: true,
+      idempotent: false,
+      reason: "finalized",
+    }));
+    const decryptProviderCallReference = vi.fn((reference: string) =>
+      reference === "v1:encrypted-restart-reference" ? callId : null,
+    );
+    const closeCall = vi.fn(async () => true);
+    const manager = createWebRtcCleanupManager({
+      db: { getAttempt, beginFinalization, finalizeAttempt } as any,
+      callsClient: { closeCall },
+      decryptProviderCallReference,
+    });
+
+    await expect(manager.endCall(sessionId, "user-1")).resolves.toBeUndefined();
+
+    expect(decryptProviderCallReference).toHaveBeenCalledWith(
+      "v1:encrypted-restart-reference",
+    );
+    expect(closeCall).toHaveBeenCalledWith(callId);
+    expect(finalizeAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "failed" }),
+    );
+  });
+
+  it("keeps a recovered bound historical attempt retryable when its encrypted reference is missing", async () => {
+    const getAttempt = vi.fn(async () => ({
+      attemptId: "attempt-historical",
+      finalizationKey: "finalization-key",
+      state: "brokered",
+      usageRequestId: "telefun-webrtc:attempt-historical",
+      providerCallIdHash: hashProviderCallId("rtc_missing_reference"),
+      providerCallReference: null,
+      modelId: "gpt-realtime-2.1",
+    }));
+    const finalizeAttempt = vi.fn();
+    const closeCall = vi.fn(async () => true);
+    const manager = createWebRtcCleanupManager({
+      db: { getAttempt, finalizeAttempt } as any,
+      callsClient: { closeCall },
+    });
+
+    await expect(manager.endCall(sessionId, "user-1")).rejects.toMatchObject({
+      retryable: true,
+    });
+    expect(closeCall).not.toHaveBeenCalled();
+    expect(finalizeAttempt).not.toHaveBeenCalled();
   });
 });

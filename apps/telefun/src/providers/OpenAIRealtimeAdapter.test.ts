@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { parseTelefunSessionConfigure } from "../server-protocol.js";
+import {
+  getHistoricalTelefunRealtimeModel,
+  type TelefunSessionConfigure,
+} from "@trainers/types";
+import type { ValidatedTelefunSessionConfigure } from "../server-protocol.js";
 import { RealtimeToolDispatcher } from "../tools/RealtimeToolDispatcher.js";
 import {
   OPENAI_REALTIME_CONNECT_TIMEOUT_MS,
@@ -61,10 +65,16 @@ class FakeOpenAISocket
   }
 }
 
-function validatedOpenAIConfigure(
+/**
+ * Historical/internal fixture only. It bypasses the active parser deliberately:
+ * new browser configure frames must continue to reject this retired model.
+ */
+function historicalOpenAIConfigure(
   modelId: "gpt-realtime-2.1" | "gpt-realtime-2.1-mini" = "gpt-realtime-2.1",
-) {
-  const parsed = parseTelefunSessionConfigure({
+): ValidatedTelefunSessionConfigure {
+  const model = getHistoricalTelefunRealtimeModel(modelId);
+  if (!model) throw new Error("historical fixture model is unavailable");
+  const configure = {
     type: "telefun_session_configure",
     modelId,
     transport: "openai-audio",
@@ -72,9 +82,8 @@ function validatedOpenAIConfigure(
     instructions: "Stay in the approved roleplay.",
     inputAudio: { format: "pcm16", sampleRate: 24_000 },
     responsePacingMode: "realistic",
-  });
-  if (!parsed.ok) throw new Error(parsed.reason);
-  return parsed.value;
+  } satisfies TelefunSessionConfigure;
+  return { configure, model };
 }
 
 function createCallbacks(): OpenAIRealtimeAdapterCallbacks {
@@ -116,7 +125,7 @@ function createHarness(
   }> = [];
   const callbacks = createCallbacks();
   const adapter = new OpenAIRealtimeAdapter({
-    configuration: validatedOpenAIConfigure(),
+    configuration: historicalOpenAIConfigure(),
     apiKey: options.apiKey ?? "sk-server-only-secret",
     userId: options.userId ?? "user-123@example.invalid",
     createSocket: (url, socketOptions) => {
@@ -197,7 +206,7 @@ describe("OpenAIRealtimeAdapter connection contract", () => {
     sockets[0].open();
 
     expect(JSON.parse(sockets[0].sent[0])).toEqual(
-      buildOpenAIRealtimeSessionUpdate(validatedOpenAIConfigure()),
+      buildOpenAIRealtimeSessionUpdate(historicalOpenAIConfigure()),
     );
     expect(JSON.parse(sockets[0].sent[0])).toEqual({
       type: "session.update",

@@ -7,7 +7,6 @@ import {
   OPENAI_REALTIME_VOICES_BY_GENDER,
   isGeminiLiveVoiceName,
   isOpenAiRealtimeVoiceName,
-  normalizeTelefunLiveModelSelection,
   type GeminiLiveVoiceName,
   type OpenAiRealtimeVoiceName,
   type TelefunGender,
@@ -31,38 +30,24 @@ export type {
   TelefunVoiceName,
 };
 
-function getVoiceProviderForModel(modelId: string | null | undefined) {
-  return normalizeTelefunLiveModelSelection(modelId).model.realtime
-    .voiceProvider;
-}
-
 export function getVoicesForModel(
-  modelId: string | null | undefined,
+  _modelId: string | null | undefined,
   gender?: TelefunGender,
 ): readonly TelefunVoiceName[] {
-  if (getVoiceProviderForModel(modelId) === "openai") {
-    return gender
-      ? OPENAI_REALTIME_VOICES_BY_GENDER[gender]
-      : OPENAI_REALTIME_VOICES;
-  }
   return gender ? GEMINI_LIVE_VOICES_BY_GENDER[gender] : GEMINI_LIVE_VOICES;
 }
 
 export function getDefaultVoiceForModel(
-  modelId: string | null | undefined,
+  _modelId: string | null | undefined,
 ): TelefunVoiceName {
-  return getVoiceProviderForModel(modelId) === "openai"
-    ? DEFAULT_OPENAI_REALTIME_VOICE
-    : DEFAULT_GEMINI_LIVE_VOICE;
+  return DEFAULT_GEMINI_LIVE_VOICE;
 }
 
 export function isVoiceValidForModel(
-  modelId: string | null | undefined,
+  _modelId: string | null | undefined,
   voice: unknown,
 ): voice is TelefunVoiceName {
-  return getVoiceProviderForModel(modelId) === "openai"
-    ? isOpenAiRealtimeVoiceName(voice)
-    : isGeminiLiveVoiceName(voice);
+  return isGeminiLiveVoiceName(voice);
 }
 
 export function resolveGeminiLiveVoice(params: {
@@ -102,13 +87,6 @@ export function resolveVoiceForModel(params: {
   gender: TelefunGender;
   random?: () => number;
 }): TelefunVoiceName {
-  if (getVoiceProviderForModel(params.modelId) === "openai") {
-    return resolveVoiceFromPool({
-      requestedVoice: params.requestedVoice,
-      pool: OPENAI_REALTIME_VOICES_BY_GENDER[params.gender],
-      random: params.random,
-    });
-  }
   return resolveGeminiLiveVoice({
     requestedVoice: params.requestedVoice,
     gender: params.gender,

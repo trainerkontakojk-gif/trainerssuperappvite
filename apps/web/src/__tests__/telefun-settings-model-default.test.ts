@@ -9,7 +9,6 @@ import {
 } from "../routes/telefun/telefunSettings";
 import {
   GEMINI_LIVE_VOICES_BY_GENDER,
-  OPENAI_REALTIME_VOICES_BY_GENDER,
 } from "../routes/telefun/telefunVoiceRegistry";
 
 afterEach(() => {
@@ -106,7 +105,7 @@ describe("resolveFinalIdentity gender-first", () => {
 });
 
 describe("resolveFinalIdentity invalid voice normalization", () => {
-  it("resolves OpenAI identities without leaking a Gemini fallback voice", () => {
+  it("normalizes a historical OpenAI model to a Gemini-safe voice", () => {
     const identity = resolveFinalIdentity(
       {
         displayName: "Sari",
@@ -114,17 +113,15 @@ describe("resolveFinalIdentity invalid voice normalization", () => {
         phoneNumber: "0813",
         city: "Jakarta",
         signatureName: "",
-        voiceName: "Kore",
+        voiceName: "marin",
       },
       "gpt-realtime-2.1",
     );
 
-    expect(OPENAI_REALTIME_VOICES_BY_GENDER.female).toContain(
+    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).toContain(
       identity.voiceName as any,
     );
-    expect(GEMINI_LIVE_VOICES_BY_GENDER.female).not.toContain(
-      identity.voiceName as any,
-    );
+    expect(["marin", "cedar"]).not.toContain(identity.voiceName);
   });
 
   it("[CHAR] normalizes legacy Ursa male voice to a provider-valid male voice", () => {
@@ -316,9 +313,11 @@ describe("parseTelefunSettings", () => {
       telefunModelId: "gpt-realtime-2.1-mini",
     });
 
-    expect(result.telefunModelId).toBe("gpt-realtime-2.1-mini");
-    expect(result.telefunTransport).toBe("openai-audio");
-    expect(result.telefunModelWarningReason).toBeUndefined();
+    expect(result.selectedModel).toBe("gemini-3.1-flash-live-preview");
+    expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
+    expect(result.telefunTransport).toBe("gemini-live");
+    expect(result.identitySettings.voiceName).toBe("");
+    expect(result.telefunModelWarningReason).toBe("provider-unavailable");
   });
 
   it("falls back unknown persisted models to Gemini 3.1 with a stable warning", () => {
@@ -329,18 +328,19 @@ describe("parseTelefunSettings", () => {
 
     expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
     expect(result.telefunTransport).toBe("gemini-live");
-    expect(result.telefunModelWarningReason).toBe("unknown-model");
+    expect(result.telefunModelWarningReason).toBe("provider-unavailable");
   });
 
-  it("repairs mismatched persisted model and transport pairs with a stable warning", () => {
+  it("normalizes an OpenAI transport even when the model is otherwise valid", () => {
     const result = parseTelefunSettings({
       telefunModelId: "gemini-3.0-flash-live-preview",
       telefunTransport: "openai-audio",
     });
 
-    expect(result.telefunModelId).toBe("gemini-3.0-flash-live-preview");
+    expect(result.telefunModelId).toBe("gemini-3.1-flash-live-preview");
+    expect(result.selectedModel).toBe("gemini-3.1-flash-live-preview");
     expect(result.telefunTransport).toBe("gemini-live");
-    expect(result.telefunModelWarningReason).toBe("transport-mismatch");
+    expect(result.telefunModelWarningReason).toBe("provider-unavailable");
   });
 
   it("parses maxCallDuration as number", () => {

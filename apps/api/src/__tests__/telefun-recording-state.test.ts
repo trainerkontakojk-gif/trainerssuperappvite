@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   analyze: vi.fn(),
   coaching: vi.fn(),
+  permanentlyFail: vi.fn(),
 }));
 
 vi.mock("../lib/supabase", () => ({
@@ -63,6 +64,7 @@ vi.mock("../services/telefun-scoring-service", () => ({
       state.agent_recording_path ===
         `${userId}/${sessionId}/agent_only.seekable.webm`),
   ),
+  permanentlyFailRetiredOpenAiScoring: mocks.permanentlyFail,
 }));
 
 import { telefunRecordings } from "../routes/telefun/recordings";
@@ -117,6 +119,7 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
     }));
     mocks.analyze.mockResolvedValue({ success: true });
     mocks.coaching.mockResolvedValue({ success: true });
+    mocks.permanentlyFail.mockResolvedValue(true);
   });
 
   it("persists upload state through the recording RPC without completing the session", async () => {
@@ -152,7 +155,7 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
-  it("rejects scoring before the WebRTC agent seekable artifact is ready", async () => {
+  it("permanently retires terminal historical WebRTC scoring before artifact readiness", async () => {
     state.rpcResult = { data: true, error: null };
 
     const response = await buildApp("recordings").request("/score/019f45e3-5fac-7cd2-afeb-8069c2f813b3", {
@@ -160,13 +163,21 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
     });
     const body = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(body.error).toMatchObject({ code: "SCORING_NOT_READY" });
-    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(response.status).toBe(410);
+    expect(body.error).toMatchObject({
+      code: "TELEFUN_OPENAI_SCORING_DISABLED",
+    });
+    expect(mocks.rpc).toHaveBeenCalledWith("claim_telefun_scoring", {
+      p_session_id: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+      p_claim_timeout_seconds: 120,
+    });
+    expect(mocks.permanentlyFail).toHaveBeenCalledWith(
+      "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+    );
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
 
-  it("classifies a failed WebRTC capture after completion false as not ready", async () => {
+  it("does not run analysis or completion for a terminal historical WebRTC capture", async () => {
     state.session = {
       user_id: "user-1",
       status: "completed",
@@ -178,35 +189,23 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
       recording_status: "ready",
       recording_error: null,
     };
-    mocks.analyze.mockResolvedValue({
-      success: true,
-      assessment: { overallScore: 8 },
-    });
-    mocks.rpc.mockImplementation(async (name: string) => {
-      if (name === "claim_telefun_scoring") {
-        return { data: true, error: null };
-      }
-      if (name === "complete_telefun_scoring") {
-        state.session.recording_status = "failed";
-        state.session.recording_error = "Recording capture failed";
-        state.session.scoring_ready_at = null;
-        state.session.scoring_status = "failed";
-        return { data: false, error: null };
-      }
-      return { data: true, error: null };
-    });
+    mocks.rpc.mockResolvedValue({ data: true, error: null });
 
     const response = await buildApp("recordings").request("/score/session-1", {
       method: "POST",
     });
     const body = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(body.error).toMatchObject({ code: "SCORING_NOT_READY" });
+    expect(response.status).toBe(410);
+    expect(body.error).toMatchObject({
+      code: "TELEFUN_OPENAI_SCORING_DISABLED",
+    });
+    expect(mocks.analyze).not.toHaveBeenCalled();
     expect(mocks.rpc).not.toHaveBeenCalledWith(
-      "fail_telefun_scoring",
+      "complete_telefun_scoring",
       expect.anything(),
     );
+    expect(mocks.permanentlyFail).toHaveBeenCalledWith("session-1");
   });
 
   it("rejects deletion of an active WebRTC session before touching storage", async () => {

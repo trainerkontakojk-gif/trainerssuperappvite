@@ -133,7 +133,7 @@ describe("telefun proxy protocol", () => {
       expect(TELEFUN_MAX_INSTRUCTIONS_LENGTH).toBeGreaterThanOrEqual(48_000);
     });
 
-    it("accepts only the canonical OpenAI pair, voice, and 24 kHz rate", () => {
+    it("rejects a historical GPT realtime configure before any adapter can be selected", () => {
       expect(
         parseTelefunSessionConfigure({
           ...validGeminiConfigure,
@@ -143,12 +143,7 @@ describe("telefun proxy protocol", () => {
           inputAudio: { format: "pcm16", sampleRate: 24000 },
           responsePacingMode: "training_fast",
         }),
-      ).toMatchObject({
-        ok: true,
-        value: {
-          model: { id: "gpt-realtime-2.1-mini", provider: "openai" },
-        },
-      });
+      ).toEqual({ ok: false, reason: "unknown_model" });
     });
 
     it.each([

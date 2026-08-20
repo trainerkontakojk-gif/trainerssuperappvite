@@ -522,7 +522,7 @@ describe("OpenAI Realtime response usage", () => {
     },
   };
 
-  it("persists an idempotent failed audit row for incomplete usage", async () => {
+  it("refuses a new failed audit for a retired realtime model", async () => {
     insertedUsagePayloads.length = 0;
     mockFrom.mockImplementation((table: string) =>
       table === "ai_usage_logs"
@@ -532,7 +532,9 @@ describe("OpenAI Realtime response usage", () => {
               return { error: null };
             }),
           }
-        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+        : (() => {
+            throw new Error(`unexpected table: ${table}`);
+          })(),
     );
 
     await expect(
@@ -542,45 +544,58 @@ describe("OpenAI Realtime response usage", () => {
         "gpt-realtime-2.1",
         "missing usage details ".repeat(100),
       ),
-    ).resolves.toBe(true);
-    expect(insertedUsagePayloads[0]).toMatchObject({
-      request_id: "attempt-incomplete",
-      status: "failed",
-      input_tokens: 0,
-      output_tokens: 0,
-      total_tokens: 0,
-      estimated_cost_usd: 0,
-      estimated_cost_idr: 0,
-      final_cost_usd: 0,
-      final_cost_idr: 0,
-    });
-    expect(String(insertedUsagePayloads[0]?.error_message).length).toBeLessThanOrEqual(240);
+    ).resolves.toBe(false);
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
   });
 
-  it("treats an existing request ID as an idempotent failed audit", async () => {
+  it("does not write a retired audit even when a request ID would be duplicate", async () => {
     mockFrom.mockImplementation((table: string) =>
       table === "ai_usage_logs"
-        ? { insert: vi.fn(async () => ({ error: { code: "23505", message: "duplicate" } })) }
-        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+        ? {
+            insert: vi.fn(async () => ({
+              error: { code: "23505", message: "duplicate" },
+            })),
+          }
+        : (() => {
+            throw new Error(`unexpected table: ${table}`);
+          })(),
     );
     await expect(
-      recordFailedOpenAIRealtimeUsage("attempt-duplicate", "user-1", "gpt-realtime-2.1", "missing usage"),
-    ).resolves.toBe(true);
+      recordFailedOpenAIRealtimeUsage(
+        "attempt-duplicate",
+        "user-1",
+        "gpt-realtime-2.1",
+        "missing usage",
+      ),
+    ).resolves.toBe(false);
+    expect(mockFrom).not.toHaveBeenCalled();
   });
 
-  it("returns false when the failed usage audit cannot be persisted", async () => {
+  it("refuses a nonhistorical failed audit before persistence", async () => {
     mockFrom.mockImplementation((table: string) =>
       table === "ai_usage_logs"
-        ? { insert: vi.fn(async () => ({ error: { code: "PGRST500", message: "db down" } })) }
-        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+        ? {
+            insert: vi.fn(async () => ({
+              error: { code: "PGRST500", message: "db down" },
+            })),
+          }
+        : (() => {
+            throw new Error(`unexpected table: ${table}`);
+          })(),
     );
 
     await expect(
-      recordFailedOpenAIRealtimeUsage("attempt-db-failure", "user-1", "gpt-realtime-2.1", "missing usage"),
+      recordFailedOpenAIRealtimeUsage(
+        "attempt-db-failure",
+        "user-1",
+        "gemini-3.1-flash-live-preview",
+        "missing usage",
+      ),
     ).resolves.toBe(false);
   });
 
-  it("persists assessment usage under telefun/voice_assessment", async () => {
+  it("refuses retired assessment usage before pricing or storage work", async () => {
     insertedUsagePayloads.length = 0;
     mockFrom.mockImplementation((table: string) => {
       if (table === "ai_pricing_settings") {
@@ -621,11 +636,9 @@ describe("OpenAI Realtime response usage", () => {
         undefined,
         "voice_assessment",
       ),
-    ).resolves.toBe(true);
-    expect(insertedUsagePayloads[0]).toMatchObject({
-      module: "telefun",
-      action: "voice_assessment",
-    });
+    ).resolves.toBe(false);
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
   });
 
   it("parses text, audio, and cached input details without inventing missing fields", () => {
@@ -1003,7 +1016,7 @@ describe("OpenAI Realtime response usage", () => {
     consoleError.mockRestore();
   });
 
-  it("persists OpenAI provider, modality tokens, cached snapshots, and token-only billing", async () => {
+  it("refuses retired Full-model usage before pricing or storage work", async () => {
     insertedUsagePayloads.length = 0;
     mockFrom.mockImplementation((table: string) => {
       if (table === "ai_pricing_settings") {
@@ -1047,32 +1060,13 @@ describe("OpenAI Realtime response usage", () => {
         "gpt-realtime-2.1",
         120_000,
       ),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
 
-    expect(insertedUsagePayloads).toHaveLength(1);
-    expect(insertedUsagePayloads[0]).toMatchObject({
-      provider: "openai",
-      model_id: "gpt-realtime-2.1",
-      billing_model: "openai_realtime_per_response_v1",
-      input_text_tokens: 1_000_000,
-      cached_input_text_tokens: 250_000,
-      input_audio_tokens: 2_000_000,
-      cached_input_audio_tokens: 500_000,
-      output_text_tokens: 100_000,
-      output_audio_tokens: 200_000,
-      cached_input_text_price_usd_per_million: 0.4,
-      cached_input_audio_price_usd_per_million: 0.4,
-      estimated_cost_usd: 66.5,
-      estimated_cost_idr: 997_500,
-      session_duration_ms: 120_000,
-      per_minute_cost_usd: null,
-      per_minute_cost_idr: null,
-      final_cost_usd: 66.5,
-      final_cost_idr: 997_500,
-    });
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
   });
 
-  it("persists Mini usage with the exact Mini model and its verified pricing", async () => {
+  it("refuses retired Mini-model usage before pricing or storage work", async () => {
     insertedUsagePayloads.length = 0;
     mockFrom.mockImplementation((table: string) => {
       if (table === "ai_pricing_settings") {
@@ -1116,29 +1110,13 @@ describe("OpenAI Realtime response usage", () => {
         "gpt-realtime-2.1-mini",
         120_000,
       ),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
 
-    expect(insertedUsagePayloads).toHaveLength(1);
-    expect(insertedUsagePayloads[0]).toMatchObject({
-      request_id: "telefun-webrtc:mini-attempt",
-      provider: "openai",
-      model_id: "gpt-realtime-2.1-mini",
-      billing_model: "openai_realtime_per_response_v1",
-      input_text_tokens: 1_000_000,
-      cached_input_text_tokens: 250_000,
-      input_audio_tokens: 2_000_000,
-      cached_input_audio_tokens: 500_000,
-      output_text_tokens: 100_000,
-      output_audio_tokens: 200_000,
-      cached_input_text_price_usd_per_million: 0.06,
-      cached_input_audio_price_usd_per_million: 0.3,
-      estimated_cost_usd: 19.855,
-      estimated_cost_idr: 297_825,
-      session_duration_ms: 120_000,
-    });
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
   });
 
-  it("records the exact Mini model on a failed usage audit", async () => {
+  it("refuses a failed audit for the retired Mini model", async () => {
     insertedUsagePayloads.length = 0;
     mockFrom.mockImplementation((table: string) =>
       table === "ai_usage_logs"
@@ -1148,7 +1126,9 @@ describe("OpenAI Realtime response usage", () => {
               return { error: null };
             }),
           }
-        : (() => { throw new Error(`unexpected table: ${table}`); })(),
+        : (() => {
+            throw new Error(`unexpected table: ${table}`);
+          })(),
     );
 
     await expect(
@@ -1158,12 +1138,8 @@ describe("OpenAI Realtime response usage", () => {
         "gpt-realtime-2.1-mini",
         "missing usage details",
       ),
-    ).resolves.toBe(true);
-    expect(insertedUsagePayloads[0]).toMatchObject({
-      request_id: "telefun-webrtc:mini-attempt-failed",
-      provider: "openai",
-      model_id: "gpt-realtime-2.1-mini",
-      status: "failed",
-    });
+    ).resolves.toBe(false);
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(insertedUsagePayloads).toHaveLength(0);
   });
 });

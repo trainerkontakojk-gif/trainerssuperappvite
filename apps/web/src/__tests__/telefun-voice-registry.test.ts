@@ -52,7 +52,7 @@ describe("Telefun provider-aware voice registry", () => {
     expect(voice).toBe("Puck");
   });
 
-  it("exposes all official OpenAI voices with marin as the explicit default", () => {
+  it("keeps OpenAI voice metadata historical while active selectors use Gemini", () => {
     expect(OPENAI_REALTIME_VOICES).toEqual([
       "alloy",
       "ash",
@@ -66,35 +66,22 @@ describe("Telefun provider-aware voice registry", () => {
       "cedar",
     ]);
     expect(getVoicesForModel("gpt-realtime-2.1")).toEqual(
-      OPENAI_REALTIME_VOICES,
+      Object.values(GEMINI_LIVE_VOICES_BY_GENDER).flat(),
     );
-    expect(getVoicesForModel("gpt-realtime-2.1", "male")).toEqual([
-      "ash",
-      "ballad",
-      "echo",
-      "verse",
-      "cedar",
-    ]);
-    expect(getVoicesForModel("gpt-realtime-2.1", "female")).toEqual([
-      "coral",
-      "sage",
-      "shimmer",
-      "marin",
-    ]);
-    expect(getDefaultVoiceForModel("gpt-realtime-2.1-mini")).toBe("marin");
-    expect(isVoiceValidForModel("gpt-realtime-2.1", "cedar")).toBe(true);
-    expect(isVoiceValidForModel("gpt-realtime-2.1", "Kore")).toBe(false);
-    expect(
-      resolveVoiceForModel({
-        modelId: "gpt-realtime-2.1",
-        requestedVoice: "Kore",
-        gender: "female",
-        random: () => 0,
-      }),
-    ).toBe("coral");
+    expect(getVoicesForModel("gpt-realtime-2.1", "male")).toEqual(
+      GEMINI_LIVE_VOICES_BY_GENDER.male,
+    );
+    expect(getVoicesForModel("gpt-realtime-2.1", "female")).toEqual(
+      GEMINI_LIVE_VOICES_BY_GENDER.female,
+    );
+    expect(getDefaultVoiceForModel("gpt-realtime-2.1-mini")).toBe(
+      DEFAULT_GEMINI_LIVE_VOICE,
+    );
+    expect(isVoiceValidForModel("gpt-realtime-2.1", "cedar")).toBe(false);
+    expect(isVoiceValidForModel("gpt-realtime-2.1", "Kore")).toBe(true);
   });
 
-  it("normalizes OpenAI voices to the resolved persona gender", () => {
+  it("normalizes historical OpenAI voices to the resolved Gemini gender", () => {
     expect(
       resolveVoiceForModel({
         modelId: "gpt-realtime-2.1",
@@ -102,7 +89,7 @@ describe("Telefun provider-aware voice registry", () => {
         gender: "male",
         random: () => 0,
       }),
-    ).toBe("ash");
+    ).toBe(GEMINI_LIVE_VOICES_BY_GENDER.male[0]);
     expect(
       resolveVoiceForModel({
         modelId: "gpt-realtime-2.1",
@@ -110,8 +97,8 @@ describe("Telefun provider-aware voice registry", () => {
         gender: "female",
         random: () => 0,
       }),
-    ).toBe("coral");
-    expect(isVoiceValidForModel("gpt-realtime-2.1", "alloy")).toBe(true);
+    ).toBe(GEMINI_LIVE_VOICES_BY_GENDER.female[0]);
+    expect(isVoiceValidForModel("gpt-realtime-2.1", "alloy")).toBe(false);
   });
 
   it("falls unknown models back through the canonical Gemini model", () => {

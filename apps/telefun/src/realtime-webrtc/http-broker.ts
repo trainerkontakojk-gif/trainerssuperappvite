@@ -3,33 +3,26 @@ import {
   authorizeWebRtcCall,
   type BrokerAuthDependencies,
 } from "./broker-auth.js";
-import type { TelefunOpenAiWebRtcRolloutConfig } from "./rollout-gate.js";
-import {
-  assertTelefunWebRtcModelId,
-  parseRawSdp,
-  parseSessionId,
-  POC_MAX_SDP_BYTES,
-  type TelefunWebRtcModelId,
-} from "./contracts.js";
+import { parseSessionId } from "./contracts.js";
 import {
   WebRtcCallConflictError,
-  WebRtcCallQuotaError,
-  WebRtcRateLimitError,
   type WebRtcCallManager,
 } from "./call-manager.js";
-import { WebRtcDurabilityError, type AttemptOutcome } from "../db.js";
+import type { AttemptOutcome } from "../db.js";
 
 const ROUTE_PATTERN =
   /^\/telefun\/realtime\/openai\/webrtc\/sessions\/([^/]+)\/call$/;
-const METHODS = "OPTIONS, POST, DELETE";
-const HEADERS = "Authorization, Content-Type";
+const CLEANUP_METHODS = "OPTIONS, DELETE";
+const CLEANUP_HEADERS = "Authorization, Content-Type";
+const MAX_DELETE_BODY_BYTES = 4_096;
 
 export interface OpenAIWebRtcHttpHandlerDependencies extends BrokerAuthDependencies {
-  enabled: boolean;
-  rollout: TelefunOpenAiWebRtcRolloutConfig;
-  allowedOrigins: string;
+  /** Deprecated no-op values retained for stale service wiring compatibility. */
+  enabled?: boolean;
+  rollout?: unknown;
   requestTimeoutMs?: number;
-  manager: Pick<WebRtcCallManager, "startCall" | "endCall" | "failCall">;
+  allowedOrigins: string;
+  manager: Pick<WebRtcCallManager, "endCall" | "failCall">;
 }
 
 export type OpenAIWebRtcHttpHandler = (
@@ -42,6 +35,11 @@ export function isOpenAIWebRtcRequest(req: IncomingMessage): boolean {
   return ROUTE_PATTERN.test(pathname);
 }
 
+/**
+ * Retains only owner-bound DELETE cleanup for historical calls. New WebRTC
+ * starts are hidden before CORS, authentication, body parsing, or lifecycle
+ * dependencies can run.
+ */
 export function createOpenAIWebRtcHttpHandler(
   dependencies: OpenAIWebRtcHttpHandlerDependencies,
 ): OpenAIWebRtcHttpHandler {
@@ -50,46 +48,33 @@ export function createOpenAIWebRtcHttpHandler(
     const match = ROUTE_PATTERN.exec(requestUrl.pathname);
     if (!match) return false;
 
-    if (!dependencies.enabled) {
-      if (req.method === "OPTIONS") {
-        const requestedMethod = header(req, "access-control-request-method");
-        if (requestedMethod !== "DELETE") {
-          sendJson(res, 404, { error: "Not found" });
-          return true;
-        }
-      } else if (req.method !== "DELETE") {
+    const requestedMethod = header(
+      req,
+      "access-control-request-method",
+    ).toUpperCase();
+    if (
+      req.method === "POST" ||
+      (req.method === "OPTIONS" && requestedMethod === "POST")
+    ) {
+      sendJson(res, 404, { error: "Not found" });
+      return true;
+    }
+
+    if (req.method === "OPTIONS") {
+      if (requestedMethod !== "DELETE") {
         sendJson(res, 404, { error: "Not found" });
         return true;
       }
-    }
-
-    const origin = header(req, "origin");
-    const corsOrigin = resolvePaidOrigin(dependencies.allowedOrigins, origin);
-    if (!corsOrigin) {
-      sendJson(res, 403, { error: "Forbidden" });
-      return true;
-    }
-    const cors = {
-      "Access-Control-Allow-Origin": corsOrigin,
-      "Access-Control-Allow-Methods": METHODS,
-      "Access-Control-Allow-Headers": HEADERS,
-      Vary: "Origin",
-    };
-
-    if (req.method === "OPTIONS") {
-      const requestedMethod = header(req, "access-control-request-method");
-      if (requestedMethod && !["POST", "DELETE"].includes(requestedMethod)) {
-        sendJson(res, 405, { error: "Method not allowed" }, cors);
+      const cors = resolveCleanupCors(
+        dependencies.allowedOrigins,
+        header(req, "origin"),
+      );
+      if (!cors) {
+        sendJson(res, 403, { error: "Forbidden" });
         return true;
       }
-      const requestedHeaders = header(req, "access-control-request-headers")
-        .split(",")
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean);
       if (
-        requestedHeaders.some(
-          (value) => value !== "authorization" && value !== "content-type",
-        )
+        !hasOnlyCleanupHeaders(header(req, "access-control-request-headers"))
       ) {
         sendJson(res, 400, { error: "Invalid request" }, cors);
         return true;
@@ -98,303 +83,140 @@ export function createOpenAIWebRtcHttpHandler(
       res.end();
       return true;
     }
-    if (req.method !== "POST" && req.method !== "DELETE") {
-      sendJson(
-        res,
-        405,
-        { error: "Method not allowed" },
-        { ...cors, Allow: METHODS },
-      );
+
+    if (req.method !== "DELETE") {
+      sendJson(res, 404, { error: "Not found" });
+      return true;
+    }
+
+    const cors = resolveCleanupCors(
+      dependencies.allowedOrigins,
+      header(req, "origin"),
+    );
+    if (!cors) {
+      sendJson(res, 403, { error: "Forbidden" });
       return true;
     }
 
     const sessionId = parseSessionId(match[1]!);
-    if (!sessionId) {
+    if (!sessionId || !hasValidCleanupQuery(requestUrl)) {
       sendJson(res, 400, { error: "Invalid request" }, cors);
       return true;
     }
-
-    const requestStartedAtMs = Date.now();
-    let authOutcome = "not_attempted";
-    const logOutcome = (httpStatus: number): void => {
-      try {
-        console.warn("[Telefun] OpenAI WebRTC broker request", {
-          method: req.method,
-          sessionId,
-          requestedOutcome:
-            req.method === "DELETE"
-              ? (requestedOutcome ?? "completed")
-              : "start",
-          authOutcome,
-          httpStatus,
-          durationMs: Math.max(0, Date.now() - requestStartedAtMs),
-        });
-      } catch {
-        // Observability is non-authoritative for lifecycle.
-      }
-    };
-
-    let requestedOutcome: AttemptOutcome | undefined;
-    if (req.method === "DELETE") {
-      const outcomeValues = requestUrl.searchParams.getAll("outcome");
-      const unknownQuery = [...requestUrl.searchParams.keys()].some(
-        (key) => key !== "outcome",
-      );
-      if (
-        unknownQuery ||
-        (outcomeValues.length > 0 &&
-          (outcomeValues.length !== 1 ||
-            !["failed", "network_lost", "orphaned"].includes(
-              outcomeValues[0]!,
-            )))
-      ) {
-        sendJson(res, 400, { error: "Invalid request" }, cors);
-        return true;
-      }
-      requestedOutcome = outcomeValues[0] as AttemptOutcome | undefined;
-    } else if ([...requestUrl.searchParams.keys()].length > 0) {
-      sendJson(res, 400, { error: "Invalid request" }, cors);
-      return true;
-    }
-
-    if (req.method === "POST") {
-      const contentType = header(req, "content-type")
-        .split(";", 1)[0]!
-        .trim()
-        .toLowerCase();
-      if (contentType !== "application/sdp") {
-        sendJson(res, 400, { error: "Invalid request" }, cors);
-        return true;
-      }
-    }
+    const requestedOutcome = requestUrl.searchParams.get(
+      "outcome",
+    ) as AttemptOutcome | null;
 
     const contentLength = Number(header(req, "content-length"));
-    if (Number.isFinite(contentLength) && contentLength > POC_MAX_SDP_BYTES) {
-      sendJson(res, 413, { error: "Request too large" }, cors);
+    if (
+      Number.isFinite(contentLength) &&
+      contentLength > MAX_DELETE_BODY_BYTES
+    ) {
+      sendJson(res, 400, { error: "Invalid request" }, cors);
+      return true;
+    }
+    const body = await readDeleteBody(req);
+    if (body === null || body.length > 0) {
+      sendJson(res, 400, { error: "Invalid request" }, cors);
       return true;
     }
 
-    // Observe a client disconnect before either body consumption or auth. A
-    // normal IncomingMessage `close` is deliberately not an abort signal.
-    const requestAbort = new AbortController();
-    const requestTimeoutMs = Math.max(
-      1_000,
-      Math.min(120_000, Math.floor(dependencies.requestTimeoutMs ?? 30_000)),
-    );
-    const requestTimer = setTimeout(
-      () => requestAbort.abort(),
-      requestTimeoutMs,
-    );
-    const abortRequest = () => requestAbort.abort();
-    const abortResponse = () => {
-      if (!res.headersSent && !res.writableEnded) requestAbort.abort();
-    };
-    if (req.aborted) abortRequest();
-    req.on("aborted", abortRequest);
-    res.on("close", abortResponse);
-    try {
-      const body = await readBody(
-        req,
-        req.method === "POST" ? POC_MAX_SDP_BYTES : 4_096,
-        requestAbort.signal,
-      );
-      if (requestAbort.signal.aborted) return true;
-      if (body === null) {
-        sendJson(res, 400, { error: "Invalid request" }, cors);
-        return true;
-      }
-      if (req.method === "DELETE" && body.length > 0) {
-        sendJson(res, 400, { error: "Invalid request" }, cors);
-        return true;
-      }
+    const token = /^Bearer\s+(\S+)$/.exec(header(req, "authorization"))?.[1];
+    if (!token) {
+      sendJson(res, 401, { error: "Unauthorized" }, cors);
+      return true;
+    }
 
-      const authorization = header(req, "authorization");
-      const token = /^Bearer\s+(\S+)$/.exec(authorization)?.[1];
-      if (!token) {
-        sendJson(res, 401, { error: "Unauthorized" }, cors);
-        return true;
-      }
-      const auth = await authorizeWebRtcCall(
-        {
-          token,
-          sessionId,
-          operation: req.method === "DELETE" ? "end" : "start",
-          signal: requestAbort.signal,
-        },
-        dependencies,
+    const auth = await authorizeWebRtcCall(
+      { token, sessionId, operation: "end" },
+      dependencies,
+    );
+    if (!auth.ok) {
+      if (auth.reason === "aborted") return true;
+      const status =
+        auth.reason === "unauthorized"
+          ? 401
+          : auth.reason === "forbidden"
+            ? 403
+            : 404;
+      sendJson(
+        res,
+        status,
+        { error: status === 401 ? "Unauthorized" : "Request rejected" },
+        cors,
       );
-      if (requestAbort.signal.aborted) return true;
-      if (!auth.ok && auth.reason === "aborted") return true;
-      if (!auth.ok) {
-        authOutcome = auth.reason;
-        const status =
-          auth.reason === "unauthorized"
-            ? 401
-            : auth.reason === "forbidden"
-              ? 403
-              : 404;
-        logOutcome(status);
+      return true;
+    }
+
+    try {
+      if (requestedOutcome === "failed") {
+        await dependencies.manager.failCall(sessionId, auth.userId);
+      } else if (requestedOutcome) {
+        await dependencies.manager.failCall(
+          sessionId,
+          auth.userId,
+          requestedOutcome,
+        );
+      } else {
+        await dependencies.manager.endCall(sessionId, auth.userId);
+      }
+      res.writeHead(204, cors);
+      res.end();
+    } catch (error) {
+      if (error instanceof WebRtcCallConflictError) {
         sendJson(
           res,
-          status,
-          { error: status === 401 ? "Unauthorized" : "Request rejected" },
+          409,
+          { error: "Realtime call finalization rejected" },
           cors,
         );
-        return true;
-      }
-
-      authOutcome = "success";
-      if (req.method === "DELETE") {
-        try {
-          if (requestAbort.signal.aborted) return true;
-          if (requestedOutcome === "failed") {
-            await dependencies.manager.failCall(sessionId, auth.userId);
-          } else if (requestedOutcome) {
-            await dependencies.manager.failCall(
-              sessionId,
-              auth.userId,
-              requestedOutcome,
-            );
-          } else {
-            await dependencies.manager.endCall(sessionId, auth.userId);
-          }
-          if (requestAbort.signal.aborted) return true;
-          res.writeHead(204, cors);
-          res.end();
-          logOutcome(204);
-        } catch (error) {
-          const status =
-            error instanceof WebRtcDurabilityError
-              ? 503
-              : error instanceof WebRtcCallQuotaError
-                ? 429
-                : error instanceof WebRtcRateLimitError
-                  ? 429
-                  : error instanceof WebRtcCallConflictError
-                    ? 409
-                    : 500;
-          logOutcome(status);
-          sendJson(
-            res,
-            status,
-            {
-              error:
-                status === 503
-                  ? "Realtime call finalization unavailable"
-                  : "Realtime call finalization rejected",
-            },
-            {
-              ...cors,
-              ...(error instanceof WebRtcRateLimitError
-                ? { "Retry-After": retryAfterSeconds(error.resetAt) }
-                : {}),
-            },
-          );
-        }
-        return true;
-      }
-
-      const offerSdp = parseRawSdp(body);
-      if (!offerSdp) {
-        logOutcome(400);
-        sendJson(res, 400, { error: "Invalid request" }, cors);
-        return true;
-      }
-      if (requestAbort.signal.aborted) return true;
-
-      // The model is authoritative from the owned pre-created history row
-      // (already validated against the server allowed set by broker-auth);
-      // the browser never sends a model. The assert is defense in depth so
-      // an unsupported persisted model can never reach a provider call.
-      let modelId: TelefunWebRtcModelId;
-      try {
-        modelId = assertTelefunWebRtcModelId(
-          auth.session.telefun_model_id,
-        );
-      } catch {
-        // An unsupported persisted model is a server-side invariant
-        // violation; surface it as not_found like broker-auth instead of
-        // letting the generic catch map it to 502.
-        authOutcome = "not_found";
-        logOutcome(404);
-        sendJson(res, 404, { error: "Request rejected" }, cors);
-        return true;
-      }
-
-      const result = await dependencies.manager.startCall({
-        userId: auth.userId,
-        sessionId,
-        offerSdp,
-        modelId,
-        livePromptInstructions: auth.session.live_prompt_instructions,
-        consumerGender: auth.session.consumer_gender,
-        signal: requestAbort.signal,
-      });
-      if (res.headersSent || res.writableEnded || requestAbort.signal.aborted)
-        return true;
-      res.writeHead(201, { ...cors, "Content-Type": "application/sdp" });
-      res.end(result.answerSdp);
-      logOutcome(201);
-    } catch (error) {
-      if (
-        !requestAbort.signal.aborted &&
-        !res.headersSent &&
-        !res.writableEnded
-      ) {
-        const status =
-          error instanceof WebRtcCallQuotaError
-            ? 429
-            : error instanceof WebRtcRateLimitError
-              ? 429
-              : error instanceof WebRtcCallConflictError
-                ? 409
-                : error instanceof WebRtcDurabilityError
-                  ? 503
-                  : 502;
-        logOutcome(status);
+      } else {
         sendJson(
           res,
-          status,
-          {
-            error:
-              status === 503
-                ? "Realtime call persistence unavailable"
-                : "Realtime call unavailable",
-          },
-          {
-            ...cors,
-            ...(error instanceof WebRtcRateLimitError
-              ? { "Retry-After": retryAfterSeconds(error.resetAt) }
-              : {}),
-          },
+          503,
+          { error: "Realtime call finalization unavailable" },
+          cors,
         );
       }
-    } finally {
-      clearTimeout(requestTimer);
-      req.removeListener("aborted", abortRequest);
-      res.removeListener("close", abortResponse);
     }
     return true;
   };
 }
 
-function resolvePaidOrigin(
+function resolveCleanupCors(
   allowedOrigins: string,
   requestOrigin: string,
-): string | null {
+): Record<string, string> | null {
   if (!requestOrigin || allowedOrigins.trim() === "*") return null;
   const origins = allowedOrigins
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  if (origins.includes("*")) return null;
-  return origins.includes(requestOrigin) ? requestOrigin : null;
+  if (origins.includes("*") || !origins.includes(requestOrigin)) return null;
+  return {
+    "Access-Control-Allow-Origin": requestOrigin,
+    "Access-Control-Allow-Methods": CLEANUP_METHODS,
+    "Access-Control-Allow-Headers": CLEANUP_HEADERS,
+    Vary: "Origin",
+  };
 }
 
-function retryAfterSeconds(resetAt: string): string {
-  const resetMs = Date.parse(resetAt);
-  if (!Number.isFinite(resetMs)) return "1";
-  return String(Math.max(1, Math.ceil((resetMs - Date.now()) / 1_000)));
+function hasOnlyCleanupHeaders(value: string): boolean {
+  return value
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .every((item) => item === "authorization" || item === "content-type");
+}
+
+function hasValidCleanupQuery(requestUrl: URL): boolean {
+  const outcomes = requestUrl.searchParams.getAll("outcome");
+  return (
+    [...requestUrl.searchParams.keys()].every((key) => key === "outcome") &&
+    (outcomes.length === 0 ||
+      (outcomes.length === 1 &&
+        ["failed", "network_lost", "orphaned"].includes(outcomes[0]!)))
+  );
 }
 
 function header(req: IncomingMessage, name: string): string {
@@ -402,34 +224,16 @@ function header(req: IncomingMessage, name: string): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
-function readBody(
-  req: IncomingMessage,
-  maxBytes: number,
-  signal: AbortSignal,
-): Promise<string | null> {
+function readDeleteBody(req: IncomingMessage): Promise<string | null> {
   return new Promise((resolve) => {
-    let bytes = 0;
     const chunks: Buffer[] = [];
+    let bytes = 0;
     let done = false;
-    const onData = (chunk: Buffer | string) => {
-      if (done) return;
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      bytes += buffer.length;
-      if (bytes > maxBytes) {
-        finish(null);
-        return;
-      }
-      chunks.push(buffer);
-    };
-    const onEnd = () => finish(Buffer.concat(chunks).toString("utf8"));
-    const onError = () => finish(null);
-    const onAborted = () => finish(null);
     const cleanup = () => {
       req.removeListener("data", onData);
       req.removeListener("end", onEnd);
       req.removeListener("error", onError);
-      req.removeListener("aborted", onAborted);
-      signal.removeEventListener("abort", onAborted);
+      req.removeListener("aborted", onError);
     };
     const finish = (value: string | null) => {
       if (done) return;
@@ -437,12 +241,21 @@ function readBody(
       cleanup();
       resolve(value);
     };
+    const onData = (chunk: Buffer | string) => {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      bytes += buffer.length;
+      if (bytes > MAX_DELETE_BODY_BYTES) {
+        finish(null);
+        return;
+      }
+      chunks.push(buffer);
+    };
+    const onEnd = () => finish(Buffer.concat(chunks).toString("utf8"));
+    const onError = () => finish(null);
     req.on("data", onData);
     req.on("end", onEnd);
     req.on("error", onError);
-    req.on("aborted", onAborted);
-    signal.addEventListener("abort", onAborted, { once: true });
-    if (signal.aborted) finish(null);
+    req.on("aborted", onError);
   });
 }
 

@@ -2,13 +2,9 @@ import { describe, expect, it } from "vitest";
 import { buildTelefunHealthPayload } from "./health.js";
 
 describe("Telefun health payload", () => {
-  it("separates liveness from non-billable provider readiness without secrets", () => {
+  it("reports Gemini-only non-billable readiness without secrets", () => {
     const payload = buildTelefunHealthPayload(
-      {
-        geminiConfigured: true,
-        openAIEnabled: false,
-        openAIConfigured: false,
-      },
+      { geminiConfigured: true },
       { uptime: 12.5, timestamp: "2026-07-17T00:00:00.000Z" },
     );
 
@@ -28,20 +24,21 @@ describe("Telefun health payload", () => {
     expect(JSON.stringify(payload)).not.toContain("token");
   });
 
-  it("marks OpenAI ready only when both enabled and configured", () => {
+  it("hard-disables OpenAI and does not accept sessions without Gemini even under retired flags", () => {
     const payload = buildTelefunHealthPayload(
       {
-        geminiConfigured: true,
+        geminiConfigured: false,
         openAIEnabled: true,
         openAIConfigured: true,
       },
       { uptime: 1, timestamp: "now" },
     );
 
+    expect(payload.readiness.acceptingSessions).toBe(false);
     expect(payload.readiness.providers.openai).toEqual({
-      enabled: true,
-      configured: true,
-      ready: true,
+      enabled: false,
+      configured: false,
+      ready: false,
     });
   });
 });

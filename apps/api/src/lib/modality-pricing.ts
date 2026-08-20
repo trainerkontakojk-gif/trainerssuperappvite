@@ -3,7 +3,10 @@
  * Pure function for computing per-modality costs from token counts.
  */
 
-import { getTelefunLiveModel } from "@trainers/types";
+import {
+  getHistoricalTelefunRealtimeModel,
+  getTelefunLiveModel,
+} from "@trainers/types";
 
 export interface ModalityTokenCounts {
   inputTextTokens: number;
@@ -49,8 +52,9 @@ export function resolveModalityPricing(
   modelId: string,
   pricing: PricingRates,
 ): Required<PricingRates> {
-  const liveModel = getTelefunLiveModel(modelId);
-  const isGeminiLive = liveModel?.provider === "gemini";
+  const realtimeModel =
+    getTelefunLiveModel(modelId) ?? getHistoricalTelefunRealtimeModel(modelId);
+  const isGeminiLive = realtimeModel?.provider === "gemini";
 
   const liveDefaults = isGeminiLive ? GEMINI_LIVE_PRICING : null;
 

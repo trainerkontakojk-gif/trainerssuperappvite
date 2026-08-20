@@ -1,14 +1,13 @@
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   normalizeTelefunLiveModelSelection,
+  type NormalizedTelefunLiveModelSelection,
   type TelefunLiveModelWarningReason,
   type TelefunTransport,
 } from "@trainers/types";
 import {
   GEMINI_LIVE_VOICES_BY_GENDER,
-  getDefaultVoiceForModel,
   getVoicesForModel,
-  isVoiceValidForModel,
   resolveGeminiLiveVoice,
   resolveVoiceForModel,
 } from "./telefunVoiceRegistry";
@@ -16,6 +15,46 @@ import type { TelefunSimulationChallengeType } from "./services/simulationChalle
 import { normalizeSimulationChallengeTypes } from "./services/simulationChallenges";
 
 export type { TelefunTransport } from "@trainers/types";
+
+const HISTORICAL_OPENAI_REALTIME_MODEL_IDS = new Set([
+  "gpt-realtime-2.1",
+  "gpt-realtime-2.1-mini",
+]);
+
+export function isHistoricalTelefunOpenAiSelection(
+  modelId: unknown,
+  transport: unknown,
+): boolean {
+  return (
+    (typeof modelId === "string" &&
+      (HISTORICAL_OPENAI_REALTIME_MODEL_IDS.has(modelId) ||
+        modelId.startsWith("gpt-realtime-"))) ||
+    transport === "openai-audio" ||
+    transport === "openai-webrtc"
+  );
+}
+
+export function normalizeTelefunBrowserSelection(
+  modelId?: unknown,
+  transport?: unknown,
+): NormalizedTelefunLiveModelSelection {
+  if (isHistoricalTelefunOpenAiSelection(modelId, transport)) {
+    return {
+      ...normalizeTelefunLiveModelSelection(DEFAULT_TELEFUN_LIVE_MODEL_ID),
+      didFallback: true,
+      warningReason: "provider-unavailable",
+    };
+  }
+  const normalized = normalizeTelefunLiveModelSelection(modelId, transport);
+  if (normalized.model.provider !== "gemini") {
+    return {
+      ...normalizeTelefunLiveModelSelection(DEFAULT_TELEFUN_LIVE_MODEL_ID),
+      didFallback: true,
+      warningReason: "provider-unavailable",
+    };
+  }
+  return normalized;
+}
 
 export enum ConsumerDifficulty {
   Easy = "Easy",
@@ -310,13 +349,7 @@ export function coerceIdentityVoiceForModel(params: {
   voiceName: string;
   gender: TelefunIdentitySettings["gender"];
 }): string {
-  const normalizedModel = normalizeTelefunLiveModelSelection(params.modelId);
-  if (normalizedModel.model.realtime.voiceProvider === "openai") {
-    return isVoiceValidForModel(normalizedModel.model.id, params.voiceName)
-      ? params.voiceName
-      : getDefaultVoiceForModel(normalizedModel.model.id);
-  }
-
+  const normalizedModel = normalizeTelefunBrowserSelection(params.modelId);
   if (!params.voiceName || params.gender === "random") return "";
   return getVoicesForModel(normalizedModel.model.id, params.gender).some(
     (voice) => voice === params.voiceName,
@@ -390,8 +423,8 @@ function coerceTelefunConsumerTypes(value: unknown): TelefunConsumerType[] {
 export function parseTelefunSettings(
   parsed: Record<string, unknown>,
 ): TelefunAppSettings {
-  const normalizedLiveModel = normalizeTelefunLiveModelSelection(
-    parsed.telefunModelId,
+  const normalizedLiveModel = normalizeTelefunBrowserSelection(
+    parsed.telefunModelId ?? parsed.selectedModel,
     parsed.telefunTransport,
   );
   const identityRaw = parsed.identitySettings as
@@ -464,6 +497,15 @@ export function parseTelefunSettings(
     responsePacingMode: coerceResponsePacingMode(parsed.responsePacingMode),
     simulationChallengeTypes:
       normalizeSimulationChallengeTypes(rawChallengeTypes),
+    selectedModel: normalizedLiveModel.model.id,
+    voiceName:
+      parsed.voiceName === undefined
+        ? "Kore"
+        : coerceIdentityVoiceForModel({
+            modelId: normalizedLiveModel.model.id,
+            voiceName: coerceString(parsed.voiceName),
+            gender: identitySettings.gender,
+          }),
     telefunModelId: normalizedLiveModel.model.id,
     telefunTransport: normalizedLiveModel.transport,
     telefunModelWarningReason: normalizedLiveModel.warningReason,

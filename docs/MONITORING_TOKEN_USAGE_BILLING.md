@@ -136,16 +136,27 @@ Aturan penting:
 - jika provider tidak memberi metadata token, flow user tetap lanjut tetapi usage tidak dicatat
 - jika pricing model belum tersedia, flow user tetap lanjut tetapi usage tidak dicatat (cost 0)
 
-### Target OpenAI Realtime usage contract
+### Archived historical OpenAI Realtime row interpretation
 
-Kontrak ini berlaku setelah adapter dan migration OpenAI diimplementasikan; produksi pada fase dokumentasi masih Gemini-only.
+GPT/OpenAI Realtime Telefun is concluded and permanently disabled for all users.
+This subsection explains only how already-stored `ai_usage_logs` and pricing
+snapshots are displayed for reconciliation/history; it is not a provider,
+scoring, retry, reconnect, or usage-emission instruction. No new Telefun OpenAI
+Realtime usage, scoring, provider call, fallback, or zero-cost substitute is
+emitted. Historical realtime pricing is display-only/read-only; direct OpenAI
+text model pricing remains editable without change.
 
-- Sumber usage OpenAI adalah event terminal `response.done`. Satu response ID hanya boleh dihitung sekali, walaupun event diterima ulang atau lifecycle finalization dipanggil berulang.
-- Parser mengambil text/audio input, cached text/audio input, dan text/audio output dari detail usage provider. Cached token dibebankan dengan cached rate, bukan full input rate.
-- Setiap row menyimpan snapshot `provider`, `model_id`, seluruh rate modality/cached yang aktif, kurs, dan hasil biaya. Tidak ada model/provider hardcoded ke Gemini pada jalur OpenAI.
-- Flat input/output pricing tetap dibaca untuk model legacy. Model realtime enam-rate memakai snapshot modality/cached tanpa menghapus kontrak lama.
-- Bila `response.done` tidak memuat usage yang valid, sesi user tetap diselesaikan dan kondisi tersebut dicatat sebagai diagnostic usage-missing. Sistem tidak mengarang token, tidak mengarang cost, dan tidak menggunakan per-minute/fallback Gemini.
-- Retry atau reconnect tidak boleh menambahkan biaya response yang sudah pernah dilihat. OpenAI reconnect merupakan sesi upstream baru yang discontinuous, tetapi dedupe tetap memakai identity response upstream dalam scope session logging.
+- A stored terminal `response.done` usage snapshot is deduplicated by its
+  historical response identity; duplicate persisted evidence is not charged
+  twice.
+- Stored text/audio/cached modality counters and six-rate snapshots are read as
+  captured. Cached input remains reconciled with the historical cached rate.
+- Stored `provider`, `model_id`, modality rates, currency, and cost remain
+  immutable. The UI must not relabel those rows as Gemini or recompute them.
+- Missing historical usage stays a diagnostic/missing state; the system does
+  not fabricate tokens, costs, a per-minute amount, or Gemini fallback usage.
+- References to OpenAI retries/reconnects in pre-retirement records are archive
+  context only and cannot schedule a Telefun OpenAI request.
 
 ### Activity Logs (Audit Trail)
 
@@ -206,7 +217,7 @@ Baseline OpenAI resmi (USD per satu juta token):
 | `gpt-realtime-2.1`      |       4.00 |              0.40 |       24.00 |       32.00 |               0.40 |        64.00 |
 | `gpt-realtime-2.1-mini` |       0.60 |              0.06 |        2.40 |       10.00 |               0.30 |        20.00 |
 
-Baseline seed harus editable dan di-snapshot per usage; harga resmi perlu diverifikasi ulang sebelum enable produksi. Sumber model: [`gpt-realtime-2.1`](https://developers.openai.com/api/docs/models/gpt-realtime-2.1) dan [`gpt-realtime-2.1-mini`](https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini).
+Historical seed rates are retained for display and reconciliation only; they are not an enablement path and cannot be edited. Stored usage rows keep their original modality snapshots. Direct OpenAI text pricing remains a normal writable pricing surface.
 
 ### Kurs USD/IDR
 

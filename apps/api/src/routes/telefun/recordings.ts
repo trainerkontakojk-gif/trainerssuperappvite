@@ -7,6 +7,10 @@ import {
   analyzeVoiceQuality,
   generateCoachingSummary,
 } from "../../lib/telefun-analysis";
+import {
+  isRetiredTelefunOpenAiRealtimeSelection,
+  parseVoiceQualityAssessment,
+} from "@trainers/types";
 import type {
   TelefunRecordingReadiness,
   TelefunRecordingStatus,
@@ -16,6 +20,7 @@ import type {
 import {
   enqueueScoring,
   isWebRtcScoringReady,
+  permanentlyFailRetiredOpenAiScoring,
 } from "../../services/telefun-scoring-service";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
 import {
@@ -23,6 +28,9 @@ import {
   buildTelefunHistoryScoringView,
 } from "../../lib/telefun-feedback";
 import type { TelefunHistoryScoringView } from "@trainers/types";
+import {
+  TELEFUN_OPENAI_SCORING_DISABLED_REASON,
+} from "../../lib/telefun-openai-assessment";
 
 export { buildTelefunFeedbackSummary } from "../../lib/telefun-feedback";
 
@@ -119,6 +127,45 @@ function cachedScoringResponse(session: {
     },
     cached: true as const,
   };
+}
+
+function isCanonicalCachedAssessment(session: {
+  scoring_status?: TelefunScoringStatus | null;
+  voice_assessment?: unknown;
+}): boolean {
+  return (
+    session.scoring_status === "completed" &&
+    parseVoiceQualityAssessment(session.voice_assessment) !== null
+  );
+}
+
+function isTerminalHistoricalSession(status: unknown): boolean {
+  return status === "completed" || status === "failed";
+}
+
+function isHistoricalOpenAiScoringModel(session: {
+  telefun_model_id?: unknown;
+  telefun_transport?: unknown;
+}): boolean {
+  return isRetiredTelefunOpenAiRealtimeSelection({
+    modelId: session.telefun_model_id,
+    transport: session.telefun_transport,
+  });
+}
+
+function retiredOpenAiScoringResponse(c: {
+  json: (body: unknown, status: 410) => Response;
+}) {
+  return c.json(
+    {
+      success: false,
+      error: {
+        code: "TELEFUN_OPENAI_SCORING_DISABLED",
+        message: TELEFUN_OPENAI_SCORING_DISABLED_REASON,
+      },
+    },
+    410,
+  );
 }
 
 telefunRecordings.post(
@@ -424,7 +471,7 @@ telefunRecordings.post("/score/:id", async (c) => {
     const { data: sessionOwner, error: ownerError } = await adminClient
       .from("telefun_history")
       .select(
-        "user_id, status, telefun_transport, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, score, voice_assessment",
+        "user_id, status, telefun_model_id, telefun_transport, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, score, voice_assessment",
       )
       .eq("id", id)
       .maybeSingle();
@@ -453,6 +500,67 @@ telefunRecordings.post("/score/:id", async (c) => {
         { success: false, error: { code: "UNAUTHORIZED", message: "Anda tidak memiliki akses ke session ini." } },
         403,
       );
+    }
+
+    const isRetiredOpenAiSession = isHistoricalOpenAiScoringModel(sessionOwner);
+    if (isRetiredOpenAiSession) {
+      // A valid cache is immutable historical evidence and is returned before
+      // the retired WebRTC artifact gate can classify it as not-ready.
+      if (isCanonicalCachedAssessment(sessionOwner)) {
+        return c.json(cachedScoringResponse(sessionOwner));
+      }
+      if (
+        sessionOwner.telefun_transport === "openai-webrtc" &&
+        (sessionOwner.status === "active" || sessionOwner.status === "pending")
+      ) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SCORING_NOT_READY",
+              message: "Rekaman agen belum siap untuk scoring.",
+            },
+          },
+          409,
+        );
+      }
+      if (!isTerminalHistoricalSession(sessionOwner.status)) {
+        return retiredOpenAiScoringResponse(c);
+      }
+
+      const { data: retiredClaim, error: retiredClaimError } =
+        await adminClient.rpc("claim_telefun_scoring", {
+          p_session_id: id,
+          p_claim_timeout_seconds: 120,
+        });
+      if (retiredClaimError) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SCORING_STATE_UNAVAILABLE",
+              message: "Status scoring belum dapat disimpan.",
+            },
+          },
+          503,
+        );
+      }
+      const claimed = Array.isArray(retiredClaim)
+        ? retiredClaim[0]
+        : retiredClaim;
+      if (claimed !== true || !(await permanentlyFailRetiredOpenAiScoring(id))) {
+        return c.json(
+          {
+            success: false,
+            error: {
+              code: "SCORING_STATE_UNAVAILABLE",
+              message: "Status scoring belum dapat disimpan.",
+            },
+          },
+          503,
+        );
+      }
+      return retiredOpenAiScoringResponse(c);
     }
 
     if (

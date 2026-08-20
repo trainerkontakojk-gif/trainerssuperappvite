@@ -5,20 +5,31 @@ import {
   type WebRtcProfile,
   type WebRtcSession,
 } from "./broker-auth.js";
-import { DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS } from "./contracts.js";
 
 const sessionId = "019f45e3-5fac-7cd2-afeb-8069c2f813b3";
 
 function deps(
-  profile: Record<string, unknown> | null,
-  session: Record<string, unknown> | null,
+  profile: Record<string, unknown> | null = {
+    role: "trainer",
+    status: "active",
+    is_deleted: false,
+  },
+  session: Record<string, unknown> | null = {
+    id: sessionId,
+    user_id: "user-1",
+    status: "active",
+    telefun_model_id: "gpt-realtime-2.1",
+    telefun_transport: "openai-webrtc",
+  },
 ): BrokerAuthDependencies {
   return {
+    // Retired configuration is intentionally hostile to prove cleanup does
+    // not depend on a former rollout/cohort/model admission decision.
     rollout: {
-      enabled: true,
-      nodeEnv: "development",
-      allowedUserIds: ["user-1"],
-      allowedModelIds: [...DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS],
+      enabled: false,
+      nodeEnv: "test",
+      allowedUserIds: [],
+      allowedModelIds: [],
     },
     verifyToken: vi.fn(async () => ({ success: true, user: { id: "user-1" } })),
     getProfile: vi.fn(async () => profile as WebRtcProfile | null),
@@ -26,177 +37,98 @@ function deps(
   };
 }
 
-describe("WebRTC broker authorization", () => {
-  it.each([
-    ["whitespace/case legacy approved status", { role: "trainer", status: " approved ", is_deleted: false }],
-    ["uppercase normalized active status", { role: "trainer", status: "ACTIVE", is_deleted: false }],
-    ["uppercase admin role", { role: "ADMIN", status: "active", is_deleted: false }],
-    ["whitespace/case legacy trainers role", { role: " Trainers ", status: "active", is_deleted: false }],
-  ])("accepts %s", async (_name, profile) => {
-    const dependencies = deps(profile, {
-      id: sessionId,
-      user_id: "user-1",
-      status: "active",
-      telefun_model_id: "gpt-realtime-2.1",
-      telefun_transport: "openai-webrtc",
-    });
-
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({ ok: true, userId: "user-1", sessionId });
-  });
-
-  it.each([
-    ["unknown status", { role: "trainer", status: "unknown", is_deleted: false }],
-    ["null status", { role: "trainer", status: null, is_deleted: false }],
-    ["unknown role", { role: "unknown", status: "active", is_deleted: false }],
-    ["null role", { role: null, status: "active", is_deleted: false }],
-  ])("rejects %s", async (_name, profile) => {
-    const dependencies = deps(profile, null);
-
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({ ok: false, reason: "forbidden" });
-  });
-
-  it("preserves the owned session live prompt for the broker handoff", async () => {
-    const instructions = "Konsumen menghadapi tagihan kartu kredit.";
-    const dependencies = deps(
-      { role: "trainer", status: "active", is_deleted: false },
-      {
+describe("WebRTC historical cleanup authorization", () => {
+  it.each(["pending", "active", "completed", "failed"])(
+    "authorizes an owned historical cleanup row in %s regardless of retired rollout values",
+    async (status) => {
+      const dependencies = deps(undefined, {
         id: sessionId,
         user_id: "user-1",
-        status: "active",
-        telefun_model_id: "gpt-realtime-2.1",
-        telefun_transport: "openai-webrtc",
-        live_prompt_instructions: instructions,
-        consumer_gender: "male",
-      },
-    );
-
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({
-      ok: true,
-      session: {
-        live_prompt_instructions: instructions,
-        consumer_gender: "male",
-      },
-    });
-  });
-
-  it("requires active admin/trainer profile and an owned active canonical session", async () => {
-    const dependencies = deps(
-      { id: "user-1", role: "trainer", status: "approved", is_deleted: false },
-      {
-        id: sessionId,
-        user_id: "user-1",
-        status: "active",
-        telefun_model_id: "gpt-realtime-2.1",
-        telefun_transport: "openai-webrtc",
-      },
-    );
-
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({ ok: true, userId: "user-1", sessionId, session: { id: sessionId } });
-  });
-
-  it("accepts a Mini persisted model when the server allowed set admits it", async () => {
-    const dependencies = deps(
-      { role: "trainer", status: "active", is_deleted: false },
-      {
-        id: sessionId,
-        user_id: "user-1",
-        status: "active",
+        status,
         telefun_model_id: "gpt-realtime-2.1-mini",
         telefun_transport: "openai-webrtc",
-      },
-    );
-    dependencies.rollout = {
-      ...dependencies.rollout,
-      allowedModelIds: ["gpt-realtime-2.1", "gpt-realtime-2.1-mini"],
-    };
+      });
 
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({
-      ok: true,
-      session: { telefun_model_id: "gpt-realtime-2.1-mini" },
-    });
-  });
+      await expect(
+        authorizeWebRtcCall(
+          { token: "jwt", sessionId, operation: "end" },
+          dependencies,
+        ),
+      ).resolves.toMatchObject({
+        ok: true,
+        userId: "user-1",
+        sessionId,
+      });
+    },
+  );
 
-  it("rejects a persisted Mini model while the server config is still Full-only", async () => {
-    const dependencies = deps(
-      { role: "trainer", status: "active", is_deleted: false },
+  it("rejects nonhistorical models and non-WebRTC transports after ownership lookup", async () => {
+    for (const session of [
       {
         id: sessionId,
         user_id: "user-1",
-        status: "active",
-        telefun_model_id: "gpt-realtime-2.1-mini",
-        telefun_transport: "openai-webrtc",
-      },
-    );
-
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({ ok: false, reason: "not_found" });
-  });
-
-  it("rejects an unsupported persisted model before any provider dependency", async () => {
-    const dependencies = deps(
-      { role: "trainer", status: "active", is_deleted: false },
-      {
-        id: sessionId,
-        user_id: "user-1",
-        status: "active",
+        status: "completed",
         telefun_model_id: "gpt-realtime-4",
         telefun_transport: "openai-webrtc",
       },
-    );
-
-    await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({ ok: false, reason: "not_found" });
-    expect(dependencies.getSession).toHaveBeenCalledOnce();
-  });
-
-  it("denies a start for an exact non-allowlisted user and permits end after rollout removal", async () => {
-    const dependencies = deps(
-      { role: "trainer", status: "active", is_deleted: false },
       {
         id: sessionId,
         user_id: "user-1",
-        status: "active",
+        status: "completed",
         telefun_model_id: "gpt-realtime-2.1",
-        telefun_transport: "openai-webrtc",
+        telefun_transport: "openai-audio",
       },
-    );
-    dependencies.rollout = {
-      enabled: true,
-      nodeEnv: "staging",
-      allowedUserIds: ["another-user"],
-      allowedModelIds: ["gpt-realtime-2.1"],
-    };
+    ]) {
+      const dependencies = deps(undefined, session);
+      await expect(
+        authorizeWebRtcCall(
+          { token: "jwt", sessionId, operation: "end" },
+          dependencies,
+        ),
+      ).resolves.toEqual({ ok: false, reason: "not_found" });
+      expect(dependencies.getSession).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("requires a valid bearer identity before profile or session lookup", async () => {
+    const dependencies = deps();
+    vi.mocked(dependencies.verifyToken).mockResolvedValue({ success: false });
 
     await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies),
-    ).resolves.toMatchObject({ ok: false, reason: "forbidden" });
+      authorizeWebRtcCall(
+        { token: "invalid", sessionId, operation: "end" },
+        dependencies,
+      ),
+    ).resolves.toEqual({ ok: false, reason: "unauthorized" });
+    expect(dependencies.getProfile).not.toHaveBeenCalled();
+    expect(dependencies.getSession).not.toHaveBeenCalled();
+  });
+
+  it("fails closed if a caller attempts the retired start operation", async () => {
+    const dependencies = deps();
+
     await expect(
-      authorizeWebRtcCall({ token: "jwt", sessionId, operation: "end" }, dependencies),
-    ).resolves.toMatchObject({ ok: true, userId: "user-1" });
+      authorizeWebRtcCall(
+        { token: "jwt", sessionId, operation: "start" },
+        dependencies,
+      ),
+    ).resolves.toEqual({ ok: false, reason: "not_found" });
+    expect(dependencies.getProfile).not.toHaveBeenCalled();
+    expect(dependencies.getSession).not.toHaveBeenCalled();
   });
 
   it.each([
-    ["pending profile", { role: "trainer", status: "pending", is_deleted: false }, null],
-    ["wrong role", { role: "agent", status: "active", is_deleted: false }, null],
-    ["deleted profile", { role: "admin", status: "active", is_deleted: true }, null],
-    ["foreign session", { role: "admin", status: "active", is_deleted: false }, { id: sessionId, user_id: "other", status: "active", telefun_model_id: "gpt-realtime-2.1", telefun_transport: "openai-webrtc" }],
-    ["wrong session state", { role: "admin", status: "active", is_deleted: false }, { id: sessionId, user_id: "user-1", status: "completed", telefun_model_id: "gpt-realtime-2.1", telefun_transport: "openai-webrtc" }],
-    ["wrong transport", { role: "admin", status: "active", is_deleted: false }, { id: sessionId, user_id: "user-1", status: "active", telefun_model_id: "gpt-realtime-2.1", telefun_transport: "openai-audio" }],
-  ])("rejects %s before any provider dependency", async (_name, profile, session) => {
-    const dependencies = deps(profile, session);
-    await expect(authorizeWebRtcCall({ token: "jwt", sessionId }, dependencies)).resolves.toMatchObject({ ok: false });
-    expect(dependencies.verifyToken).toHaveBeenCalledOnce();
+    ["deleted", { role: "trainer", status: "active", is_deleted: true }],
+    ["inactive", { role: "trainer", status: "pending", is_deleted: false }],
+    ["wrong role", { role: "agent", status: "active", is_deleted: false }],
+  ])("rejects a %s profile", async (_label, profile) => {
+    const dependencies = deps(profile);
+
+    await expect(
+      authorizeWebRtcCall(
+        { token: "jwt", sessionId, operation: "end" },
+        dependencies,
+      ),
+    ).resolves.toEqual({ ok: false, reason: "forbidden" });
   });
 });

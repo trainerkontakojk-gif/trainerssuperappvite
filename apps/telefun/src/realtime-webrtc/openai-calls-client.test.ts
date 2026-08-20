@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildCanonicalWebRtcSession } from "./contracts.js";
 import {
   createOpenAiCallsClient,
+  createOpenAiCallCleanupClient,
   OpenAiCallCreationError,
 } from "./openai-calls-client.js";
 
@@ -44,17 +45,57 @@ function streamedResponse(body: ReadableStream<Uint8Array>, location: string) {
 }
 
 describe("OpenAI unified calls client", () => {
+  it("exposes a cleanup-only client that cannot create calls and refuses a missing cleanup key", async () => {
+    const fetch = vi.fn(async () => response("", ""));
+    const client = createOpenAiCallCleanupClient({ apiKey: "", fetch });
+
+    expect(client).not.toHaveProperty("createCall");
+    await expect(client.closeCall("rtc_fake_123")).resolves.toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("lets the cleanup-only client issue a bounded authenticated hangup for a historical reference", async () => {
+    const fetch = vi.fn(
+      async (
+        _url: string,
+        _init: { method: "POST"; headers: Record<string, string> },
+      ) => response("", ""),
+    );
+    const client = createOpenAiCallCleanupClient({
+      apiKey: "server-secret",
+      fetch,
+    });
+
+    await expect(client.closeCall("rtc_fake_123")).resolves.toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/realtime/calls/rtc_fake_123/hangup",
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer server-secret" },
+      }),
+    );
+    expect(fetch.mock.calls[0]?.[1]).not.toHaveProperty("body");
+  });
+
   it("uses the documented POST hangup endpoint without a request body", async () => {
     const fetch = vi.fn(
-      async (_url: string, _init: { method: "POST"; headers: Record<string, string>; signal?: AbortSignal }) =>
-        response("", ""),
+      async (
+        _url: string,
+        _init: {
+          method: "POST";
+          headers: Record<string, string>;
+          signal?: AbortSignal;
+        },
+      ) => response("", ""),
     );
     const client = createOpenAiCallsClient({ apiKey: "server-secret", fetch });
 
     await expect(client.closeCall?.("rtc_fake_123")).resolves.toBe(true);
 
     const [url, init] = fetch.mock.calls[0] ?? [];
-    expect(url).toBe("https://api.openai.com/v1/realtime/calls/rtc_fake_123/hangup");
+    expect(url).toBe(
+      "https://api.openai.com/v1/realtime/calls/rtc_fake_123/hangup",
+    );
     expect(init?.method).toBe("POST");
     expect(init?.headers).toEqual({ Authorization: "Bearer server-secret" });
     expect(init).not.toHaveProperty("body");
@@ -80,7 +121,12 @@ describe("OpenAI unified calls client", () => {
     const fetch = vi.fn(
       async (
         _url: string,
-        _init: { method: "POST"; headers: Record<string, string>; body?: FormData; signal?: AbortSignal },
+        _init: {
+          method: "POST";
+          headers: Record<string, string>;
+          body?: FormData;
+          signal?: AbortSignal;
+        },
       ) => response(ANSWER, "/v1/realtime/calls/rtc_fake_123"),
     );
     const client = createOpenAiCallsClient({
@@ -99,14 +145,14 @@ describe("OpenAI unified calls client", () => {
     expect(init?.body).toBeInstanceOf(FormData);
     const form = init?.body as FormData;
     expect(form.get("sdp")).toBe(OFFER);
-    expect(JSON.parse(String(form.get("session")))).toEqual(
-      canonicalSession(),
-    );
+    expect(JSON.parse(String(form.get("session")))).toEqual(canonicalSession());
     expect(JSON.stringify(init)).not.toContain("rtc_fake_123");
   });
 
   it("rejects an oversized serialized session before creating FormData or fetching", async () => {
-    const fetch = vi.fn(async () => response(ANSWER, "/v1/realtime/calls/rtc_never"));
+    const fetch = vi.fn(async () =>
+      response(ANSWER, "/v1/realtime/calls/rtc_never"),
+    );
     const client = createOpenAiCallsClient({
       apiKey: "server-secret",
       fetch,
@@ -116,9 +162,9 @@ describe("OpenAI unified calls client", () => {
       instructions: "x".repeat(70_000),
     };
 
-    await expect(client.createCall({ offerSdp: OFFER, session })).rejects.toThrow(
-      "provider call failed",
-    );
+    await expect(
+      client.createCall({ offerSdp: OFFER, session }),
+    ).rejects.toThrow("provider call failed");
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -130,12 +176,23 @@ describe("OpenAI unified calls client", () => {
         async (_url: string, init: { signal?: AbortSignal }) => {
           observedSignal = init.signal;
           return await new Promise<never>((_resolve, reject) => {
-            init.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+            init.signal?.addEventListener(
+              "abort",
+              () => reject(new Error("aborted")),
+              { once: true },
+            );
           });
         },
       );
-      const client = createOpenAiCallsClient({ apiKey: "server-secret", fetch, timeoutMs: 25 });
-      const pending = client.createCall({ offerSdp: OFFER, session: canonicalSession() });
+      const client = createOpenAiCallsClient({
+        apiKey: "server-secret",
+        fetch,
+        timeoutMs: 25,
+      });
+      const pending = client.createCall({
+        offerSdp: OFFER,
+        session: canonicalSession(),
+      });
       const assertion = expect(pending).rejects.toThrow("provider call failed");
       await vi.advanceTimersByTimeAsync(25);
       await assertion;
@@ -160,10 +217,15 @@ describe("OpenAI unified calls client", () => {
       const client = createOpenAiCallsClient({
         apiKey: "server-secret",
         timeoutMs: 25,
-        fetch: vi.fn(async () => streamedResponse(body, "/v1/realtime/calls/rtc_hanging")),
+        fetch: vi.fn(async () =>
+          streamedResponse(body, "/v1/realtime/calls/rtc_hanging"),
+        ),
       });
 
-      const pending = client.createCall({ offerSdp: OFFER, session: canonicalSession() });
+      const pending = client.createCall({
+        offerSdp: OFFER,
+        session: canonicalSession(),
+      });
       const assertion = expect(pending).rejects.toThrow("provider call failed");
       await vi.advanceTimersByTimeAsync(25);
       await assertion;
@@ -176,7 +238,10 @@ describe("OpenAI unified calls client", () => {
   it("retains the validated call ID when the SDP body hangs", async () => {
     const read = vi
       .fn()
-      .mockResolvedValueOnce({ done: false, value: new TextEncoder().encode(ANSWER) })
+      .mockResolvedValueOnce({
+        done: false,
+        value: new TextEncoder().encode(ANSWER),
+      })
       .mockImplementation(() => new Promise<never>(() => undefined));
     const cancel = vi.fn(async () => undefined);
     const body = {
@@ -185,7 +250,9 @@ describe("OpenAI unified calls client", () => {
     const client = createOpenAiCallsClient({
       apiKey: "server-secret",
       timeoutMs: 25,
-      fetch: vi.fn(async () => streamedResponse(body, "/v1/realtime/calls/rtc_body_timeout")),
+      fetch: vi.fn(async () =>
+        streamedResponse(body, "/v1/realtime/calls/rtc_body_timeout"),
+      ),
     });
 
     const error = await client
@@ -200,7 +267,9 @@ describe("OpenAI unified calls client", () => {
     let cancelled = false;
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(new TextEncoder().encode("v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\n"));
+        controller.enqueue(
+          new TextEncoder().encode("v=0\r\no=- 1 1 IN IP4 0.0.0.0\r\n"),
+        );
         controller.enqueue(new Uint8Array(512 * 1024));
       },
       cancel() {
@@ -209,7 +278,9 @@ describe("OpenAI unified calls client", () => {
     });
     const client = createOpenAiCallsClient({
       apiKey: "server-secret",
-      fetch: vi.fn(async () => streamedResponse(body, "/v1/realtime/calls/rtc_large")),
+      fetch: vi.fn(async () =>
+        streamedResponse(body, "/v1/realtime/calls/rtc_large"),
+      ),
     });
 
     await expect(
@@ -224,7 +295,12 @@ describe("OpenAI unified calls client", () => {
       fetch: vi.fn(
         async (
           _url: string,
-          _init: { method: "POST"; headers: Record<string, string>; body?: FormData; signal?: AbortSignal },
+          _init: {
+            method: "POST";
+            headers: Record<string, string>;
+            body?: FormData;
+            signal?: AbortSignal;
+          },
         ) => response("not sdp", "/v1/realtime/calls/rtc_fake_123"),
       ),
     });
@@ -237,8 +313,17 @@ describe("OpenAI unified calls client", () => {
       fetch: vi.fn(
         async (
           _url: string,
-          _init: { method: "POST"; headers: Record<string, string>; body?: FormData; signal?: AbortSignal },
-        ) => response(ANSWER, "https://evil.example/v1/realtime/calls/rtc_fake_123"),
+          _init: {
+            method: "POST";
+            headers: Record<string, string>;
+            body?: FormData;
+            signal?: AbortSignal;
+          },
+        ) =>
+          response(
+            ANSWER,
+            "https://evil.example/v1/realtime/calls/rtc_fake_123",
+          ),
       ),
     });
     await expect(

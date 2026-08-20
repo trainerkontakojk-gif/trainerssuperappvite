@@ -1,3 +1,5 @@
+import { isGeminiLiveVoiceName } from "./telefun-voices";
+
 export interface AiModelCapabilities {
   supportsText: boolean;
   supportsImage: boolean;
@@ -81,17 +83,26 @@ export const TELEFUN_LIVE_MODELS = [
       supportsAudio: true,
     },
   },
+] as const satisfies readonly AiModelInfo[];
+
+export type TelefunLiveModel = (typeof TELEFUN_LIVE_MODELS)[number];
+
+/**
+ * Readonly compatibility metadata for rows created before Telefun OpenAI
+ * Realtime retirement. This registry is not selectable and is never merged
+ * into the active Telefun or direct-text registries.
+ */
+export const TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS = [
   {
     id: "gpt-realtime-2.1",
     name: "GPT Realtime 2.1",
-    description: "Model realtime OpenAI untuk percakapan audio native.",
+    description: "Metadata historis OpenAI Realtime untuk riwayat Telefun.",
     provider: "openai",
     timeoutMs: 300_000,
     capabilities: {
       supportsText: true,
       supportsImage: false,
     },
-    availableModules: ["telefun"],
     realtime: {
       transport: "openai-audio",
       supportedTransports: ["openai-audio", "openai-webrtc"],
@@ -105,14 +116,13 @@ export const TELEFUN_LIVE_MODELS = [
   {
     id: "gpt-realtime-2.1-mini",
     name: "GPT Realtime 2.1 Mini",
-    description: "Model realtime OpenAI yang lebih ringkas dan efisien.",
+    description: "Metadata historis OpenAI Realtime untuk riwayat Telefun.",
     provider: "openai",
     timeoutMs: 300_000,
     capabilities: {
       supportsText: true,
       supportsImage: false,
     },
-    availableModules: ["telefun"],
     realtime: {
       transport: "openai-audio",
       supportedTransports: ["openai-audio", "openai-webrtc"],
@@ -125,70 +135,33 @@ export const TELEFUN_LIVE_MODELS = [
   },
 ] as const satisfies readonly AiModelInfo[];
 
-export type TelefunLiveModel = (typeof TELEFUN_LIVE_MODELS)[number];
+export type HistoricalTelefunOpenAiRealtimeModel =
+  (typeof TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS)[number];
 
-export type TelefunWebRtcModelId =
-  | "gpt-realtime-2.1"
-  | "gpt-realtime-2.1-mini";
+/** @deprecated Historical cleanup identifiers only; never use for admission. */
+export type TelefunWebRtcModelId = HistoricalTelefunOpenAiRealtimeModel["id"];
+
+/** @deprecated Historical cleanup identifiers only; never use for admission. */
+export const TELEFUN_OPENAI_WEBRTC_MODEL_IDS: readonly TelefunWebRtcModelId[] =
+  TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS.map((model) => model.id);
 
 /**
- * Server-owned default for TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: explicit
- * Full-only. Missing, empty, unknown, duplicate, or otherwise invalid config
- * fails closed to this default; Mini is never opened by the registry alone.
+ * @deprecated Retired configuration inputs are ignored. The empty set makes
+ * accidental consumers fail closed while historical cleanup retains exact IDs
+ * through TELEFUN_OPENAI_WEBRTC_MODEL_IDS.
  */
 export const DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS: readonly TelefunWebRtcModelId[] =
-  ["gpt-realtime-2.1"];
+  [];
 
-/**
- * Exact models that support the openai-webrtc transport, derived from the
- * canonical registry so the set can never drift from TELEFUN_LIVE_MODELS.
- */
-export const TELEFUN_OPENAI_WEBRTC_MODEL_IDS: readonly TelefunWebRtcModelId[] =
-  TELEFUN_LIVE_MODELS.filter((model) => {
-    const realtime = model.realtime;
-    return (
-      realtime !== undefined &&
-      "supportedTransports" in realtime &&
-      realtime.supportedTransports?.includes("openai-webrtc") === true
-    );
-  }).map((model) => model.id as TelefunWebRtcModelId);
-
-/**
- * Shared parse rule for TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS
- * (comma-separated exact model ids). Any empty token, any token outside the
- * shared registry set, or any duplicate rejects the whole value and falls
- * back to the explicit Full-only default (fail-closed; a partial set is
- * never accepted). The effective set is registry ∩ config by construction.
- */
+/** @deprecated Retired configuration inputs are ignored and cannot admit a model. */
 export function parseTelefunOpenAiWebRtcAllowedModelIds(
-  value: string | undefined,
+  _value: string | undefined,
 ): readonly TelefunWebRtcModelId[] {
-  if (value === undefined) {
-    return DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
-  }
-
-  const tokens = value.split(",").map((token) => token.trim());
-  const seen = new Set<string>();
-  for (const token of tokens) {
-    if (
-      token.length === 0 ||
-      !TELEFUN_OPENAI_WEBRTC_MODEL_IDS.includes(
-        token as TelefunWebRtcModelId,
-      ) ||
-      seen.has(token)
-    ) {
-      console.error(
-        "[telefun] invalid TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS value; " +
-          "falling back to the Full-only default.",
-      );
-      return DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
-    }
-    seen.add(token);
-  }
-  return tokens as readonly TelefunWebRtcModelId[];
+  return DEFAULT_TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS;
 }
 export type TelefunLiveModelWarningReason =
   | "unknown-model"
+  | "legacy-model"
   | "transport-mismatch"
   | "provider-unavailable";
 
@@ -205,15 +178,59 @@ export function getTelefunLiveModel(
   return TELEFUN_LIVE_MODELS.find((model) => model.id === modelId);
 }
 
+/** Exact readonly lookup for persisted pre-retirement OpenAI Realtime rows. */
+export function getHistoricalTelefunRealtimeModel(
+  modelId: string | null | undefined,
+): HistoricalTelefunOpenAiRealtimeModel | undefined {
+  return TELEFUN_HISTORICAL_OPENAI_REALTIME_MODELS.find(
+    (model) => model.id === modelId,
+  );
+}
+
+/** True only for a known historical OpenAI Realtime model identifier. */
+export function isHistoricalTelefunOpenAiRealtimeModelId(
+  modelId: unknown,
+): modelId is TelefunWebRtcModelId {
+  return (
+    typeof modelId === "string" &&
+    getHistoricalTelefunRealtimeModel(modelId) !== undefined
+  );
+}
+
+export function isRetiredTelefunOpenAiTransport(
+  transport: unknown,
+): transport is Extract<TelefunTransport, "openai-audio" | "openai-webrtc"> {
+  return transport === "openai-audio" || transport === "openai-webrtc";
+}
+
+/**
+ * Fail-closed detector for persisted Telefun data. The exact lookup preserves
+ * historical metadata semantics; the prefix guard prevents unknown old GPT
+ * realtime rows from falling through to an active Gemini path.
+ */
+export function isRetiredTelefunOpenAiRealtimeSelection(input: {
+  modelId?: unknown;
+  transport?: unknown;
+  selectedModel?: unknown;
+}): boolean {
+  return (
+    isHistoricalTelefunOpenAiRealtimeModelId(input.modelId) ||
+    isHistoricalTelefunOpenAiRealtimeModelId(input.selectedModel) ||
+    isRetiredTelefunOpenAiTransport(input.transport) ||
+    (typeof input.modelId === "string" &&
+      input.modelId.startsWith("gpt-realtime-")) ||
+    (typeof input.selectedModel === "string" &&
+      input.selectedModel.startsWith("gpt-realtime-"))
+  );
+}
+
 function getTelefunLiveModelSupportedTransports(
   model: TelefunLiveModel | undefined,
 ): readonly TelefunTransport[] {
   if (!model?.realtime) return [];
 
   const supportedTransports =
-    "supportedTransports" in model.realtime
-      ? model.realtime.supportedTransports ?? []
-      : [];
+    (model.realtime as AiModelRealtimeMetadata).supportedTransports ?? [];
 
   return Array.from(
     new Set([model.realtime.transport, ...supportedTransports]),
@@ -247,7 +264,9 @@ export function normalizeTelefunLiveModelSelection(
 
   let warningReason: TelefunLiveModelWarningReason | undefined;
   if (didFallback) {
-    warningReason = "unknown-model";
+    warningReason = isHistoricalTelefunOpenAiRealtimeModelId(modelId)
+      ? "legacy-model"
+      : "unknown-model";
   } else if (
     typeof transport === "string" &&
     supportedTransports.includes(transport as TelefunTransport)
@@ -268,6 +287,67 @@ export function normalizeTelefunLiveModelSelection(
     didFallback,
     warningReason,
   };
+}
+
+type UnknownSettingsRecord = Record<string, unknown>;
+
+function isSettingsRecord(value: unknown): value is UnknownSettingsRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeGeminiVoice(value: unknown): string {
+  return isGeminiLiveVoiceName(value) ? value : "";
+}
+
+function normalizeIdentityVoice(
+  value: unknown,
+): unknown {
+  if (!isSettingsRecord(value) || value.voiceName === undefined) return value;
+  return { ...value, voiceName: normalizeGeminiVoice(value.voiceName) };
+}
+
+export interface TelefunPersistedSettingsNormalization<T> {
+  settings: T;
+  didNormalize: boolean;
+}
+
+/**
+ * Projects a persisted retired Telefun selection to the active Gemini pair.
+ * This is pure: callers must never write the returned object during a read.
+ */
+export function normalizePersistedTelefunSettings<T>(
+  settings: T,
+): TelefunPersistedSettingsNormalization<T> {
+  if (!isSettingsRecord(settings)) {
+    return { settings, didNormalize: false };
+  }
+
+  const isRetired = isRetiredTelefunOpenAiRealtimeSelection({
+    modelId: settings.telefunModelId,
+    transport: settings.telefunTransport,
+    selectedModel: settings.selectedModel,
+  });
+  if (!isRetired) return { settings, didNormalize: false };
+
+  const normalized: UnknownSettingsRecord = {
+    ...settings,
+    telefunModelId: DEFAULT_TELEFUN_LIVE_MODEL_ID,
+    telefunTransport: "gemini-live",
+  };
+  if (isHistoricalTelefunOpenAiRealtimeModelId(settings.selectedModel)) {
+    normalized.selectedModel = DEFAULT_TELEFUN_LIVE_MODEL_ID;
+  }
+  if (settings.voiceName !== undefined) {
+    normalized.voiceName = normalizeGeminiVoice(settings.voiceName);
+  }
+  if (settings.identitySettings !== undefined) {
+    normalized.identitySettings = normalizeIdentityVoice(settings.identitySettings);
+  }
+  if (settings.identity !== undefined) {
+    normalized.identity = normalizeIdentityVoice(settings.identity);
+  }
+
+  return { settings: normalized as T, didNormalize: true };
 }
 
 export const TEXT_MODELS: AiModelInfo[] = [

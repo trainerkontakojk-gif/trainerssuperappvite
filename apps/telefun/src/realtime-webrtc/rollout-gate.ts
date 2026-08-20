@@ -9,6 +9,10 @@ export type TelefunOpenAiWebRtcEnvironment =
   | "production"
   | "test";
 
+/**
+ * Deprecated shape retained only so stale deployment config can deserialize.
+ * It is never an admission authority.
+ */
 export interface TelefunOpenAiWebRtcRolloutConfig {
   enabled: boolean;
   nodeEnv: string;
@@ -16,17 +20,15 @@ export interface TelefunOpenAiWebRtcRolloutConfig {
   allowedModelIds: readonly TelefunWebRtcModelId[];
 }
 
-/** Membership of a persisted model id in the server allowed set. */
+/** Retired model allowlists cannot authorize a new WebRTC call. */
 export function isTelefunOpenAiWebRtcModelAllowed(
-  modelId: string | null | undefined,
-  allowedModelIds: readonly TelefunWebRtcModelId[],
-): modelId is TelefunWebRtcModelId {
-  return (
-    typeof modelId === "string" &&
-    (allowedModelIds as readonly string[]).includes(modelId)
-  );
+  _modelId: string | null | undefined,
+  _allowedModelIds: readonly TelefunWebRtcModelId[],
+): false {
+  return false;
 }
 
+/** Retained parser for ignored deployment input only. */
 export function parseTelefunOpenAiWebRtcAllowedUserIds(
   value: string | undefined,
 ): string[] {
@@ -37,14 +39,9 @@ export function parseTelefunOpenAiWebRtcAllowedUserIds(
     .filter((item) => UUID_PATTERN.test(item));
 }
 
+/** Retired rollout always fails closed; no environment can re-enable starts. */
 export function isTelefunOpenAiWebRtcAllowed(
-  input: TelefunOpenAiWebRtcRolloutConfig & { userId: string },
-): boolean {
-  if (
-    !input.enabled ||
-    !["development", "staging", "production"].includes(input.nodeEnv)
-  ) {
-    return false;
-  }
-  return input.allowedUserIds.includes(input.userId);
+  _input: TelefunOpenAiWebRtcRolloutConfig & { userId: string },
+): false {
+  return false;
 }

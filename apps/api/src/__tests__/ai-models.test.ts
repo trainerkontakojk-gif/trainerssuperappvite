@@ -51,9 +51,8 @@ describe("ai model registry", () => {
     expect(models.map((model) => model.id)).toEqual([
       "gemini-3.1-flash-live-preview",
       "gemini-3.0-flash-live-preview",
-      "gpt-realtime-2.1",
-      "gpt-realtime-2.1-mini",
     ]);
+    expect(models.every((model) => model.provider === "gemini")).toBe(true);
     expect(models.every((model) => model.realtime?.supportsAudio)).toBe(true);
   });
 
@@ -66,6 +65,16 @@ describe("ai model registry", () => {
         "gpt-5.4-mini",
       ].every((id) => KETIK_PDKT_MODELS.some((model) => model.id === id)),
     ).toBe(true);
+    expect(resolveModelProvider("gpt-5.6-luna")).toMatchObject({
+      modelId: "gpt-5.6-luna",
+      provider: "openai",
+      isFallback: false,
+    });
+    expect(resolveModelProvider("gpt-5.4-mini")).toMatchObject({
+      modelId: "gpt-5.4-mini",
+      provider: "openai",
+      isFallback: false,
+    });
     expect(
       KETIK_PDKT_MODELS.every((model) =>
         ["gemini", "openai"].includes(model.provider),

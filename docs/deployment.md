@@ -1,5 +1,7 @@
 # Deployment Guide
 
+> **Telefun provider status:** GPT/OpenAI Realtime Telefun work is concluded and permanently disabled for all users. Deployments must not enable a new WebSocket, WebRTC, sideband, or OpenAI scoring path. Historical rows and owner-bound DELETE cleanup remain available. The optional Telefun cleanup reference key is not a feature flag. `OPENAI_API_KEY` remains required for direct OpenAI text operations in the API, outside Telefun. Do not use paid/provider smoke calls as evidence for this change.
+
 ## Architecture Overview
 
 ```
@@ -74,17 +76,17 @@ root sekarang mengunci ke web saja.
 | `SUPABASE_SERVICE_ROLE_KEY`                   | `eyJ...`                            | Service role key                                                                         |
 | `GEMINI_API_KEY`                              | `AI...`                             | Google Gemini API key                                                                    |
 | `OPENAI_API_KEY`                              | `sk-...`                            | OpenAI API key untuk text generation direct via Responses API                            |
-| `TELEFUN_INTERNAL_URL`                        | `http://<telefun-private-url>:3002` | Origin privat Telefun untuk assessment OpenAI; hanya di API                              |
+| `TELEFUN_INTERNAL_URL`                        | retired compatibility value         | Tidak memulai assessment OpenAI Telefun; API scoring tidak memanggil endpoint internal ini |
 | `TELEFUN_INTERNAL_TOKEN`                      | `<random>`                          | Shared server-only secret; nilai sama dengan Telefun                                     |
 | `ALLOWED_ORIGINS`                             | `https://<web-url>.up.railway.app`  | Wajib — tanpa ini, CORS origin array kosong → semua request diblokir                     |
-| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | `false`                             | Kill switch API untuk POST WebRTC; default deny                                          |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | `UUID,UUID`                         | Exact UUID CSV cohort; harus sama persis dengan Telefun; production tetap exact-cohort   |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | `gpt-realtime-2.1`                  | CSV exact model id; default Full-only; token unknown/empty/duplicate menolak seluruh nilai; harus identik dengan Telefun |
-| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | `10`                                | Distributed session/write limit; RPC failure fail-closed untuk WebRTC                    |
+| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`           | retired/no-op                      | Permanently disabled; POST/start and capability unavailable                              |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`      | retired/no-op                      | Cohort retired; ignored                                                                    |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`     | retired/no-op                      | Model allowlist retired; ignored                                                           |
+| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE` | retired/no-op                      | No new WebRTC session/write path                                                           |
 
 ### Telefun Service
 
-`OPENAI_API_KEY` dipakai per service: API service untuk text generation direct, Telefun service untuk realtime jika `TELEFUN_OPENAI_ENABLED=true`. Pastikan secret-nya terpisah antar service. Default flag Telefun tetap `false`, sehingga rollout awal tetap Gemini-only.
+`OPENAI_API_KEY` di API tetap dipakai untuk direct OpenAI text generation. Telefun aktif hanya Gemini Live; GPT/OpenAI Realtime Telefun sudah permanen dinonaktifkan untuk semua user. Telefun tidak memerlukan key provider untuk start baru. Optional cleanup reference key hanya untuk authenticated owner-bound DELETE historical call.
 
 | Variable                                           | Value                           | Notes                                                                                                                         |
 | -------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -94,33 +96,33 @@ root sekarang mengunci ke web saja.
 | `SUPABASE_ANON_KEY`                                | `eyJ...`                        | Supabase anon key                                                                                                             |
 | `SUPABASE_SERVICE_ROLE_KEY`                        | `eyJ...`                        | Service role key                                                                                                              |
 | `GEMINI_API_KEY`                                   | `AI...`                         | Google Gemini API key                                                                                                         |
-| `OPENAI_API_KEY`                                   | `sk-...`                        | Realtime-only; set terpisah dari API service bila `TELEFUN_OPENAI_ENABLED=true` atau `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=true` |
-| `TELEFUN_OPENAI_ENABLED`                           | `false`                         | Kill switch; default/off mempertahankan Gemini-only                                                                           |
-| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | `false`                         | Phase 1 broker/harness; tetap off sampai approval gate terpisah                                                               |
-| `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | `15000`                         | Timeout upstream `POST /v1/realtime/calls`                                                                                    |
-| `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | `10000`                         | Timeout sideband `wss://api.openai.com/v1/realtime?call_id=...`                                                               |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | `UUID,UUID`                     | Exact UUID CSV; harus sama persis dengan API; production tetap exact-cohort; kosong = deny-all                                |
-| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`          | `gpt-realtime-2.1`              | CSV exact model id (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`); default Full-only; token unknown/empty/duplicate → fail-closed ke Full-only; harus identik dengan API                                  |
+| `OPENAI_API_KEY`                                   | kosong/opsional                 | Tidak digunakan untuk Telefun start; API tetap memerlukan key ini untuk direct OpenAI text |
+| `TELEFUN_OPENAI_ENABLED`                           | retired/no-op                  | Retired permanently; ignored and cannot enable Telefun OpenAI Realtime                                                      |
+| `TELEFUN_OPENAI_WEBRTC_POC_ENABLED`                | retired/no-op                  | Retired permanently; POST/start and capability remain unavailable                                                            |
+| `TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS`        | retired/no-op                  | No upstream provider POST; retained only as deployment compatibility input                                                     |
+| `TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS`        | retired/no-op                  | No sideband start path                                                                                                         |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS`           | retired/no-op                   | Former cohort input; ignored and never read for admission                                                                        |
+| `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS`          | retired/no-op                   | Former model allowlist; ignored and never read for admission                                                                     |
 | `TELEFUN_INTERNAL_TOKEN`                           | `<random>`                      | Shared server-only secret (API + Telefun); bukan `VITE_`, bukan di Vercel/Web                                                 |
-| `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | `<random min 32 chars>`         | Server-only AES key untuk opaque provider reference; wajib saat POC aktif                                                     |
-| `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`               | `30000`                         | Distributed lease TTL; bounded expiry-safe session cap                                                                        |
-| `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS`         | `10000`                         | Lease renewal heartbeat; harus lebih kecil dari TTL                                                                           |
-| `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`          | `1`                             | Atomic active session cap per user                                                                                            |
-| `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS`      | `100`                           | Atomic active session cap per provider                                                                                        |
-| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE`      | `10`                            | Distributed per-user/session/provider request window                                                                          |
-| `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` | `30000`                         | Bounded stale lease cleanup interval                                                                                          |
-| `ALLOWED_ORIGINS`                                  | exact HTTPS allowlist           | Exact origin list; wildcard dan HTTP selalu ditolak di production/broker POC                                                  |
+| `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`                 | optional                        | Server-only historical cleanup reference key; never an enablement flag                                                          |
+| `TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS`               | historical compatibility        | Never admits a session; retained only for durable cleanup data compatibility                                                  |
+| `TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS`         | historical compatibility        | Never admits a session; retained only for durable cleanup data compatibility                                                  |
+| `TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS`          | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                        |
+| `TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS`      | retired/no-op                   | No active OpenAI WebRTC sessions exist                                                                                        |
+| `TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE`      | retired/no-op                   | No active OpenAI WebRTC start/write path                                                                                      |
+| `TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS` | `30000`                         | Bounded historical encrypted-reference cleanup retry interval                                                                  |
+| `ALLOWED_ORIGINS`                                  | exact HTTPS allowlist           | Exact origin list for production and historical cleanup DELETE; wildcard/HTTP are rejected                                     |
 
 Aturan secret/config:
 
-- `OPENAI_API_KEY` wajib ada di API service untuk text generation direct. Jika Telefun OpenAI diaktifkan, set `OPENAI_API_KEY` terpisah di service Telefun; jangan share secret antar service. `OPENAI_API_KEY` tidak boleh memakai prefix `VITE_` dan tidak boleh berada di Vercel.
-- `TELEFUN_INTERNAL_URL` **hanya** di service API; mengarah ke private URL Railway service Telefun (bukan public Web). `TELEFUN_INTERNAL_TOKEN` adalah shared server-only secret yang nilainya SAMA persis di API dan Telefun; token ini tidak boleh berawalan `VITE_` dan tidak boleh di-deploy ke Vercel/Web.
-- `TELEFUN_OPENAI_ENABLED=false` menolak **sesi OpenAI baru** tanpa menghapus history/model pricing. Panggilan aktif tidak dipindahkan ke Gemini di tengah sesi.
-- `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false` atau cohort kosong menolak POST WebRTC dan tidak membuka provider. Authenticated, owner-bound DELETE cleanup tetap diizinkan untuk menandai pre-created session sebagai failed; DELETE exception ini bukan jalur start.
-- `TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS` harus berupa CSV UUID yang valid dan nilainya sama di API serta Telefun. Development, staging, dan production memerlukan flag aktif serta exact user match; flag off atau cohort kosong tetap deny-all. User di luar cohort tetap memakai Gemini. Automated checks memakai fake upstream; tidak ada paid/provider smoke dalam routine deployment.
-- `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` memakai parse exact-allowlist yang sama di API dan Telefun: CSV exact model id dari registry (`gpt-realtime-2.1`, `gpt-realtime-2.1-mini`), default Full-only. Token unknown, kosong, atau duplikat menolak seluruh nilai dan jatuh ke default Full-only (Mini tidak aktif implisit). Broker memvalidasi `telefun_model_id` yang dipersist ke allowed set server; model di luar set ditolak `404` sebelum provider call. Mismatch set parsed antara API dan Telefun harus diterminalisasi/di-cleanup fail-closed sebelum provider call.
-- Voice WebRTC (`marin` female/default, `cedar` male) server-owned dari `telefun_history.consumer_gender` dan berlaku untuk Full maupun Mini (diverifikasi terhadap dokumentasi resmi OpenAI; browser tidak mengirim voice).
-- Jika flag `true` tetapi key tidak ada/invalid, readiness OpenAI harus `not_ready` dan configure OpenAI ditolak dengan error aman. Service tetap dapat hidup untuk Gemini bila konfigurasi Gemini valid.
+- `OPENAI_API_KEY` wajib ada di API service untuk direct text generation. Telefun tidak mengaktifkan OpenAI Realtime; optional historical cleanup credentials tetap server-only dan tidak pernah dibundle ke Web/Vercel.
+- `TELEFUN_INTERNAL_URL`/`TELEFUN_INTERNAL_TOKEN` remain server-only compatibility/health values. They do not authorize OpenAI scoring, sideband, or a provider start, and must never be exposed as `VITE_*` values.
+- Semua `TELEFUN_OPENAI*` rollout/cohort/model flags adalah retired/no-op. Tidak ada sesi OpenAI Realtime baru; history dan pricing snapshot tidak dihapus atau ditulis ulang.
+- POST WebRTC dan preflight POST selalu 404 tanpa auth/provider work. Exact-origin authenticated owner-bound DELETE tetap dipertahankan hanya untuk cleanup historical `openai-webrtc`; DELETE bukan jalur start.
+- Retired cohort/model inputs tidak lagi diparse atau dipakai untuk admission. Semua user memakai Gemini; automated checks tidak melakukan paid/provider smoke.
+- Historical GPT model IDs remain data-only metadata. They are rejected for new sessions and never reach a provider call; owner-bound DELETE remains the only WebRTC compatibility operation.
+- Historical OpenAI voice metadata is read-only evidence. It is never selected by the browser or sent to a provider.
+- Retired flags are ignored whether absent, malformed, false, or true. Telefun readiness and session acceptance derive from Gemini only.
 - Mengubah Railway env memerlukan redeploy/restart service Telefun; jangan menganggap flag berubah in-process sebelum runtime mendukung reload.
 
 ### Telefun Scoring Worker Service
@@ -144,7 +146,7 @@ Env vars (nama exact; invalid/disabled config → proses **exit non-zero** denga
 | `TELEFUN_SCORING_WORKER_HEALTH_PORT` | opsional | `9100` | Integer `1024..65535`; mengaktifkan health internal. Jangan pakai `PORT` publik |
 | `TELEFUN_INTERNAL_TOKEN` | bila health aktif | `<random>` | Shared server-only secret, nilai sama dengan API/Telefun; wajib saat health port diset |
 | `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/release worker (service-role, backend-only) |
-| `GEMINI_API_KEY` / `OPENAI_API_KEY` | ya | sesuai provider | Untuk analysis scoring; usage dicatat via `logAiUsage()` |
+| `GEMINI_API_KEY` | ya | Gemini credential | Untuk active Gemini voice scoring; usage dicatat via `logAiUsage()`. API `OPENAI_API_KEY` remains separate for direct text only. |
 
 Health endpoint (`GET /health`, bind default `127.0.0.1:<port>`; deployment mem-bind alamat private network Railway):
 
@@ -163,16 +165,25 @@ Alert thresholds:
 
 Kill switch: set `TELEFUN_SCORING_WORKER_ENABLED=false` + redeploy/restart service (exit non-zero, pending jobs/history tidak diubah), atau stop/scale-to-zero service / kirim SIGTERM untuk shutdown graceful.
 
-### Phase 5 WebRTC hardening dan recovery
+### Historical WebRTC cleanup operations
 
-- `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`, `OPENAI_API_KEY`, `TELEFUN_INTERNAL_TOKEN`, dan Supabase service-role key hanya berada di API/Telefun server. Orphan key wajib minimal 32 karakter. Jangan menambahkan variabel tersebut sebagai `VITE_*` atau ke Vercel Web.
-- Lease, rate limit, orphan claim, metric write, dan finalization memakai migration/RPC additive Phase 5. Jangan mengganti RPC dengan `Map` lokal atau menganggap binding satu replica sebagai quota authority.
-- Production `ALLOWED_ORIGINS` harus berupa daftar origin HTTPS exact yang benar-benar dipakai Web; tidak boleh `*`, wildcard host, atau URL dengan credential. Browser memakai HTTPS/WSS. CSP dan Permissions Policy di `apps/web/public/serve.json` serta `vercel.json` harus tetap sinkron dengan deployment classes yang disetujui.
-- Broker hanya menghubungi fixed upstream OpenAI server-side, menerima preflight terbatas, membatasi SDP/body dan timeout, serta tidak meneruskan provider error/URL/secret ke browser. Healthcheck tidak membuka upstream dan tidak menulis usage/cost.
-- Sideband/provider orphan setelah restart di-claim worker dengan outcome `orphaned`. Lease loss saat process masih hidup memicu provider hangup dan finalisasi `network_lost`; release bertoken tetap dicoba setelah cleanup. Network failure di browser juga dikirim sebagai `network_lost`; recreate tidak boleh silent dan harus memakai attempt/session boundary baru plus discontinuity record.
-- Metrics bounded untuk cost reconciliation, sideband disconnect, duplicate write, missing usage, orphan, dan session cap. User disimpan sebagai SHA-256 `user_id_hash`, bukan UUID mentah. Missing atau unpriceable usage tetap audit state dan perlu alert/reconciliation, bukan biaya nol sintetis.
+- `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY`, optional Telefun `OPENAI_API_KEY`,
+  `TELEFUN_INTERNAL_TOKEN`, and the Supabase service-role key are server-only.
+  Do not expose them as `VITE_*` values.
+- Exact HTTPS `ALLOWED_ORIGINS` protect the retained cleanup `DELETE`; POST and
+  POST preflight are permanently `404`.
+- Historical cleanup can issue only a server-side hangup for an already-bound
+  encrypted reference. There is no broker POST/SDP/session start, sideband,
+  browser media, provider scoring, or new usage operation.
+- The orphan worker may retry encrypted-reference hangup after restart.
+  Missing/invalid key or reference stays retryable; a bound provider is never
+  marked closed without a successful hangup. A no-provider terminal result
+  requires server-side proof that no call was bound.
+- Existing metric/usage/recording rows are historical evidence; they are not a
+  reason to create a new Telefun OpenAI lifecycle or cost row.
 
-Migration Phase 5 wajib dijalankan additive di staging lebih dahulu dan rollback drill harus dilakukan pada database disposable. Run repository ini hanya membuktikan kontrak fake/unit/static; tidak mengklaim Railway restart, hosted schema, atau paid-provider smoke.
+This repository's fake/unit/static verification is not evidence of remote
+cleanup, deployment, a migration, or a paid-provider smoke test.
 
 ### Catatan FFmpeg (Telefun Recording Remux)
 
@@ -219,12 +230,22 @@ Ekspektasi: `PASS: / returned HTTP 200 on PORT=9876`. Smoke ini juga memvalidasi
 
 `GET /health` memisahkan:
 
-- **Liveness:** proses/event loop HTTP hidup. Tidak membuka koneksi Gemini/OpenAI.
-- **Readiness:** status konfigurasi non-sensitive per provider (enabled/disabled/configured) dan kemampuan menerima provider yang dipilih. Readiness tidak mengembalikan secret, suffix key, token, prompt, atau URL bercredential.
+- **Liveness:** proses/event loop HTTP hidup. Tidak membuka koneksi provider.
+- **Readiness:** hanya berasal dari konfigurasi Gemini. Kompatibilitas OpenAI
+  selalu dilaporkan disabled/unavailable and never affects accepting sessions.
 
-Endpoint ini tidak membuka upstream dan tidak membuktikan quota/model access vendor. `GET` dan preflight `OPTIONS` mengikuti `ALLOWED_ORIGINS`: wildcard mengembalikan `Access-Control-Allow-Origin: *`, sedangkan allowlist hanya merefleksikan origin ter-normalisasi yang diizinkan serta `Vary: Origin`. Credentials tidak diaktifkan. Web menurunkan URL health dari origin `VITE_TELEFUN_WS_URL`, menghapus path/query/hash/credential, dan menganggap timeout, network error, non-2xx, atau payload malformed sebagai OpenAI unavailable.
+Endpoint ini tidak membuka upstream dan tidak membuktikan quota/model access
+vendor. `GET` dan preflight `OPTIONS` mengikuti `ALLOWED_ORIGINS`: wildcard
+mengembalikan `Access-Control-Allow-Origin: *`, sedangkan allowlist hanya
+merefleksikan origin ter-normalisasi yang diizinkan serta `Vary: Origin`.
+Credentials tidak diaktifkan. Web menurunkan URL health dari origin
+`VITE_TELEFUN_WS_URL`, menghapus path/query/hash/credential, dan menganggap
+timeout, network error, non-2xx, atau payload malformed sebagai Gemini
+unavailable.
 
-Routine Railway healthcheck, CI, dan smoke test **tidak boleh membuka sesi provider berbayar** dan tetap non-billable. Koneksi upstream hanya dibuka setelah WebSocket user terautentikasi dan `telefun_session_configure` tervalidasi; broker POC memakai exact `ALLOWED_ORIGINS`, bukan wildcard. Paid/manual provider smoke dijalankan terpisah dengan otorisasi eksplisit.
+Routine healthcheck, CI, dan smoke evidence **tidak boleh membuka sesi provider
+berbayar**. Do not run a Telefun OpenAI provider smoke test; Gemini-only unit,
+health, and contract verification are the applicable evidence.
 
 ## Web Security Headers
 
@@ -248,13 +269,13 @@ Ekspektasi: `web, api, and telefun health return HTTP 200` and `All health check
 2. Telefun service env:
    - `ALLOWED_ORIGINS=https://<canonical-vercel-domain>`
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`
-   - Keep `TELEFUN_OPENAI_ENABLED=false` and `TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false`; any OpenAI smoke needs a separate approval gate and isolated environment.
+   - Keep all retired `TELEFUN_OPENAI*` inputs as no-op compatibility values; do not run OpenAI Realtime smoke. Gemini-only verification is sufficient.
 3. Redeploy Vercel Web after changing any `VITE_*` value.
 4. Login, open `/telefun`, start call, allow mic, speak one sentence, wait for AI response, end call.
 5. Verify no close code `4001` (Unauthorized/Token invalid), `4003` (Forbidden Origin), `1006` (Connection drop), or `1011` (Gemini API error) in browser UI.
 6. Verify session appears in history and review opens.
 
-Baseline manual smoke di atas tetap menguji Gemini. OpenAI WebRTC POC tidak diaktifkan di sini; jika ada gate terpisah, jalankan sebagai paid/manual smoke yang eksplisit dan terisolasi.
+Baseline manual smoke above is Gemini-only. This change does not use paid/provider smoke as evidence.
 
 ## Development (Local)
 
@@ -287,22 +308,10 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 GEMINI_API_KEY=your_gemini_key
 OPENAI_API_KEY=your_api_openai_key
 
-# Telefun
+# Telefun — Gemini Live only; GPT/OpenAI Realtime permanently disabled
 VITE_TELEFUN_WS_URL=ws://localhost:3002
-# Set a separate OPENAI_API_KEY in the Telefun service if TELEFUN_OPENAI_ENABLED=true or TELEFUN_OPENAI_WEBRTC_POC_ENABLED=true
-TELEFUN_OPENAI_ENABLED=false
-TELEFUN_OPENAI_WEBRTC_POC_ENABLED=false
-TELEFUN_OPENAI_WEBRTC_ALLOWED_USER_IDS=
-TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS=
-TELEFUN_OPENAI_WEBRTC_PROVIDER_TIMEOUT_MS=15000
-TELEFUN_OPENAI_WEBRTC_SIDEBAND_TIMEOUT_MS=10000
+# Optional server-only historical cleanup reference; never an enablement flag.
 TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY=
-TELEFUN_OPENAI_WEBRTC_LEASE_TTL_MS=30000
-TELEFUN_OPENAI_WEBRTC_LEASE_HEARTBEAT_MS=10000
-TELEFUN_OPENAI_WEBRTC_MAX_USER_SESSIONS=1
-TELEFUN_OPENAI_WEBRTC_MAX_PROVIDER_SESSIONS=100
-TELEFUN_OPENAI_WEBRTC_RATE_LIMIT_PER_MINUTE=10
-TELEFUN_OPENAI_WEBRTC_ORPHAN_CLEANUP_INTERVAL_MS=30000
 TELEFUN_INTERNAL_TOKEN=replace_with_random_internal_token
 
 # API
@@ -585,7 +594,7 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 - [ ] Jika Railway Web PRODUCTION auxiliary dipertahankan, pastikan header `serve dist` lulus
 - [ ] Verify API health: `GET https://<api-url>.up.railway.app/api/health`
 - [ ] Verify WebSocket: `wss://<telefun-url>.up.railway.app`
-- [ ] Pastikan `TELEFUN_OPENAI_ENABLED=false` untuk rollout awal; jika diaktifkan, set `OPENAI_API_KEY` terpisah di Telefun service (API service tetap memerlukan key sendiri)
+- [ ] Confirm Telefun GPT/OpenAI Realtime is permanently disabled; do not configure provider smoke or enablement flags. API `OPENAI_API_KEY` remains for direct text only.
 - [ ] Verify liveness/readiness tanpa membuka koneksi provider berbayar
 - [ ] Set up monitoring / alerting
 
@@ -617,7 +626,7 @@ Ini tidak memengaruhi Railway — jika vars tidak diset, turbo treat sebagai emp
 
 ### Rollback Mini (Release Train B)
 
-1. Hapus `gpt-realtime-2.1-mini` dari `TELEFUN_OPENAI_WEBRTC_ALLOWED_MODEL_IDS` di API **dan** Telefun terlebih dahulu; Full (`gpt-realtime-2.1`) dan baseline transport tetap.
+1. Do not perform a model rollout; all GPT Realtime Telefun IDs and transport values are historical-only and permanently retired.
 2. Terminalisasi/reconcile seluruh Mini attempt/usage sebelum perubahan schema apa pun.
 3. **Jangan mempersempit constraint DB (`telefun_realtime_attempts.model_id`) selama masih ada row Mini**; schema additive boleh tetap menerima Mini sementara runtime menolaknya (broker `404` sebelum provider call).
 4. Rollback code hanya setelah capability client/server dan stored settings lama tetap terbaca aman.

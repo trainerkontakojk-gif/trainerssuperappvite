@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import {
-  DEFAULT_TELEFUN_LIVE_MODEL_ID,
-  normalizeTelefunLiveModelSelection,
-} from "@trainers/types";
+import { DEFAULT_TELEFUN_LIVE_MODEL_ID } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import {
   TelefunAppSettings as AppSettings,
@@ -10,6 +7,7 @@ import {
   TelefunConsumerType as ConsumerType,
   ConsumerDifficulty,
   coerceIdentityVoiceForModel,
+  normalizeTelefunBrowserSelection,
   normalizeTelefunConsumerDifficulty,
 } from "../../telefunSettings";
 import {
@@ -18,11 +16,7 @@ import {
 } from "./telefunDraftNormalizers";
 import { normalizeSimulationChallengeTypes } from "../../services/simulationChallenges";
 import type { TelefunProviderReadinessState } from "../../hooks/useTelefunProviderReadiness";
-import {
-  isAllowedTelefunWebRtc,
-  isTelefunWebRtcModelAllowed,
-  type TelefunWebRtcCapability,
-} from "../../services/telefunWebRtcCapability";
+import type { TelefunWebRtcCapability } from "../../services/telefunWebRtcCapability";
 
 interface UseTelefunSettingsDraftProps {
   settings: AppSettings;
@@ -33,52 +27,6 @@ interface UseTelefunSettingsDraftProps {
   webRtcCapability?: TelefunWebRtcCapability | null;
 }
 
-const UNAVAILABLE_PROVIDER_READINESS: TelefunProviderReadinessState = {
-  status: "unavailable",
-  openai: null,
-};
-
-function isOpenAIReady(
-  providerReadiness: TelefunProviderReadinessState,
-): boolean {
-  return (
-    providerReadiness.status === "ready" &&
-    providerReadiness.openai.enabled &&
-    providerReadiness.openai.configured &&
-    providerReadiness.openai.ready
-  );
-}
-
-function resolveAvailableModel(
-  modelId: string,
-  providerReadiness: TelefunProviderReadinessState,
-  persistedSelection?: {
-    modelId?: string;
-    transport?: AppSettings["telefunTransport"];
-  },
-  webRtcCapability?: TelefunWebRtcCapability | null,
-) {
-  const selectedModel = normalizeTelefunLiveModelSelection(
-    modelId,
-    persistedSelection?.transport,
-  );
-  const isAllowedWebRtcPilot =
-    selectedModel.transport === "openai-webrtc" &&
-    isAllowedTelefunWebRtc(webRtcCapability) &&
-    isTelefunWebRtcModelAllowed(webRtcCapability, selectedModel.model.id);
-  const isPersistedOpenAISelection =
-    persistedSelection?.modelId === selectedModel.model.id &&
-    persistedSelection.transport === selectedModel.transport;
-  if (
-    selectedModel.model.provider === "openai" &&
-    !isOpenAIReady(providerReadiness) &&
-    !isAllowedWebRtcPilot &&
-    !(providerReadiness.status === "loading" && isPersistedOpenAISelection)
-  ) {
-    return normalizeTelefunLiveModelSelection(DEFAULT_TELEFUN_LIVE_MODEL_ID);
-  }
-  return selectedModel;
-}
 
 export function buildTelefunSettingsForSave(params: {
   localSettings: AppSettings;
@@ -89,31 +37,11 @@ export function buildTelefunSettingsForSave(params: {
   selectedTelefunTransport?: AppSettings["telefunTransport"];
   webRtcCapability?: TelefunWebRtcCapability | null;
 }): AppSettings {
-  const selectedModel = resolveAvailableModel(
+  const selectedModel = normalizeTelefunBrowserSelection(
     params.selectedTelefunModel,
-    params.providerReadiness ?? UNAVAILABLE_PROVIDER_READINESS,
-    {
-      modelId: params.localSettings.telefunModelId,
-      transport:
-        params.selectedTelefunTransport ??
-        params.localSettings.telefunTransport,
-    },
-    params.webRtcCapability,
+    params.selectedTelefunTransport ?? params.localSettings.telefunTransport,
   );
-  const selectedTransport =
-    params.selectedTelefunTransport ?? selectedModel.transport;
-  const canPersistWebRtc =
-    selectedTransport === "openai-webrtc" &&
-    isAllowedTelefunWebRtc(params.webRtcCapability) &&
-    isTelefunWebRtcModelAllowed(
-      params.webRtcCapability,
-      selectedModel.model.id,
-    );
-  const persistedTransport = canPersistWebRtc
-    ? "openai-webrtc"
-    : selectedModel.transport === "openai-webrtc"
-      ? normalizeTelefunLiveModelSelection(selectedModel.model.id).transport
-      : selectedModel.transport;
+  const persistedTransport = "gemini-live" as const;
 
   const settingsToSave = {
     ...params.localSettings,
@@ -121,6 +49,11 @@ export function buildTelefunSettingsForSave(params: {
     consumerTypes: params.consumerTypes.map(normalizeTelefunConsumerDifficulty),
     telefunTransport: persistedTransport,
     telefunModelId: selectedModel.model.id,
+    voiceName: coerceIdentityVoiceForModel({
+      modelId: selectedModel.model.id,
+      voiceName: params.localSettings.voiceName,
+      gender: params.localSettings.identitySettings.gender,
+    }),
     identitySettings: {
       ...params.localSettings.identitySettings,
       voiceName: coerceIdentityVoiceForModel({
@@ -148,8 +81,8 @@ export function useTelefunSettingsDraft({
   isOpen,
   onSave,
   onClose,
-  providerReadiness = UNAVAILABLE_PROVIDER_READINESS,
-  webRtcCapability = null,
+  providerReadiness: _providerReadiness,
+  webRtcCapability: _webRtcCapability,
 }: UseTelefunSettingsDraftProps) {
   const [activeTab, setActiveTab] = useState<
     "scenarios" | "consumers" | "identity" | "system"
@@ -161,8 +94,7 @@ export function useTelefunSettingsDraft({
   const selectedTelefunModel =
     localSettings.telefunModelId || DEFAULT_TELEFUN_LIVE_MODEL_ID;
   const selectedTelefunTransport =
-    localSettings.telefunTransport ||
-    normalizeTelefunLiveModelSelection(selectedTelefunModel).transport;
+    localSettings.telefunTransport || "gemini-live";
 
   const scenarioForm = useCrudForm<Scenario>({
     generateId: () => `s-${Date.now()}`,
@@ -198,7 +130,7 @@ export function useTelefunSettingsDraft({
   // Sync settings when modal opens
   useEffect(() => {
     if (isOpen) {
-      const selectedModel = normalizeTelefunLiveModelSelection(
+      const selectedModel = normalizeTelefunBrowserSelection(
         settings.telefunModelId,
         settings.telefunTransport,
       );
@@ -220,71 +152,15 @@ export function useTelefunSettingsDraft({
     }
   }, [isOpen, settings]);
 
-  useEffect(() => {
-    if (!isOpen || providerReadiness.status !== "unavailable") return;
-    setLocalSettings((prev) => {
-      const currentModel = normalizeTelefunLiveModelSelection(
-        prev.telefunModelId,
-        prev.telefunTransport,
-      );
-      if (currentModel.model.provider !== "openai") return prev;
-      if (
-        currentModel.transport === "openai-webrtc" &&
-        (webRtcCapability === null ||
-          (isAllowedTelefunWebRtc(webRtcCapability) &&
-            isTelefunWebRtcModelAllowed(
-              webRtcCapability,
-              currentModel.model.id,
-            )))
-      ) {
-        return prev;
-      }
-
-      const fallback = normalizeTelefunLiveModelSelection(
-        DEFAULT_TELEFUN_LIVE_MODEL_ID,
-      );
-      return {
-        ...prev,
-        telefunModelId: fallback.model.id,
-        telefunTransport: fallback.transport,
-        telefunModelWarningReason: "provider-unavailable",
-        identitySettings: {
-          ...prev.identitySettings,
-          voiceName: coerceIdentityVoiceForModel({
-            modelId: fallback.model.id,
-            voiceName: prev.identitySettings.voiceName,
-            gender: prev.identitySettings.gender,
-          }),
-        },
-      };
-    });
-  }, [isOpen, providerReadiness.status, webRtcCapability]);
-
   const setSelectedTelefunTransport = (
     transport: AppSettings["telefunTransport"],
   ) => {
-    if (
-      transport === "openai-webrtc" &&
-      (!isAllowedTelefunWebRtc(webRtcCapability) ||
-        !isTelefunWebRtcModelAllowed(webRtcCapability, selectedTelefunModel))
-    ) {
-      return;
-    }
+    if (transport !== "gemini-live") return;
     setLocalSettings((prev) => ({ ...prev, telefunTransport: transport }));
   };
 
   const setSelectedTelefunModel = (modelId: string) => {
-    const selectedModel = normalizeTelefunLiveModelSelection(modelId);
-    const isAllowedWebRtcPilot =
-      isAllowedTelefunWebRtc(webRtcCapability) &&
-      isTelefunWebRtcModelAllowed(webRtcCapability, selectedModel.model.id);
-    if (
-      selectedModel.model.provider === "openai" &&
-      !isOpenAIReady(providerReadiness) &&
-      !isAllowedWebRtcPilot
-    ) {
-      return;
-    }
+    const selectedModel = normalizeTelefunBrowserSelection(modelId);
     setLocalSettings((prev) => {
       const voiceName = coerceIdentityVoiceForModel({
         modelId: selectedModel.model.id,
@@ -374,7 +250,7 @@ export function useTelefunSettingsDraft({
     const original = JSON.stringify(settings);
 
     // Construct hypothetical settings with current selections
-    const selectedModel = normalizeTelefunLiveModelSelection(
+    const selectedModel = normalizeTelefunBrowserSelection(
       selectedTelefunModel,
       selectedTelefunTransport,
     );
@@ -433,8 +309,6 @@ export function useTelefunSettingsDraft({
       consumerTypes: nextConsumerTypes,
       selectedTelefunModel,
       selectedTelefunTransport,
-      providerReadiness,
-      webRtcCapability,
     });
 
     saveInFlightRef.current = true;

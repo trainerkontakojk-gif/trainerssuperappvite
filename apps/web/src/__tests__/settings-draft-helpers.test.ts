@@ -195,11 +195,16 @@ describe("settings draft commit helpers", () => {
     expect(original.telefunTransport).toBe("gemini-live");
   });
 
-  it("buildTelefunSettingsForSave always replaces a client mismatch with registry transport", () => {
+  it("normalizes every historical OpenAI model to the canonical Gemini pair", () => {
     const original = {
       ...DEFAULT_TELEFUN_SETTINGS,
-      telefunModelId: "gemini-3.1-flash-live-preview",
-      telefunTransport: "gemini-live" as const,
+      telefunModelId: "gpt-realtime-2.1",
+      telefunTransport: "openai-audio" as const,
+      identitySettings: {
+        ...DEFAULT_TELEFUN_SETTINGS.identitySettings,
+        gender: "female" as const,
+        voiceName: "marin",
+      },
     };
 
     const result = buildTelefunSettingsForSave({
@@ -207,19 +212,20 @@ describe("settings draft commit helpers", () => {
       scenarios: original.scenarios,
       consumerTypes: original.consumerTypes,
       selectedTelefunModel: "gpt-realtime-2.1",
+      selectedTelefunTransport: "openai-webrtc",
       providerReadiness: {
         status: "ready",
         openai: { enabled: true, configured: true, ready: true },
       },
     });
 
-    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
-    expect(result.telefunTransport).toBe("openai-audio");
-    expect(result.telefunModelWarningReason).toBeUndefined();
-    expect(original.telefunTransport).toBe("gemini-live");
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe("gemini-live");
+    expect(result.identitySettings.voiceName).toBe("");
+    expect(original.telefunTransport).toBe("openai-audio");
   });
 
-  it("persists an explicitly allowed WebRTC transport without promoting it by default", () => {
+  it("never persists an OpenAI WebRTC transport, even when capability says enabled", () => {
     const original = {
       ...DEFAULT_TELEFUN_SETTINGS,
       telefunModelId: "gpt-realtime-2.1",
@@ -244,12 +250,12 @@ describe("settings draft commit helpers", () => {
       },
     });
 
-    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
-    expect(result.telefunTransport).toBe("openai-webrtc");
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe("gemini-live");
     expect(original.telefunTransport).toBe("openai-audio");
   });
 
-  it("keeps an allowed WebRTC pilot selectable when legacy OpenAI readiness is unavailable", () => {
+  it("normalizes a crafted WebRTC selection while legacy readiness is unavailable", () => {
     const original = {
       ...DEFAULT_TELEFUN_SETTINGS,
       telefunModelId: "gemini-3.1-flash-live-preview",
@@ -274,11 +280,11 @@ describe("settings draft commit helpers", () => {
       },
     });
 
-    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
-    expect(result.telefunTransport).toBe("openai-webrtc");
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe("gemini-live");
   });
 
-  it("falls back from an unavailable explicit WebRTC transport", () => {
+  it("normalizes a transport-only historical selection", () => {
     const original = {
       ...DEFAULT_TELEFUN_SETTINGS,
       telefunModelId: "gpt-realtime-2.1",
@@ -298,11 +304,11 @@ describe("settings draft commit helpers", () => {
       webRtcCapability: null,
     });
 
-    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
-    expect(result.telefunTransport).toBe("openai-audio");
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe("gemini-live");
   });
 
-  it("coerces an incompatible Gemini voice when switching to OpenAI", () => {
+  it("keeps identity voices Gemini-safe", () => {
     const original = {
       ...DEFAULT_TELEFUN_SETTINGS,
       identitySettings: {
@@ -323,7 +329,7 @@ describe("settings draft commit helpers", () => {
       },
     });
 
-    expect(result.identitySettings.voiceName).toBe("marin");
+    expect(result.identitySettings.voiceName).toBe("Kore");
   });
 
   it("fails closed to Gemini when save receives an unavailable OpenAI selection", () => {
@@ -361,9 +367,9 @@ describe("settings draft commit helpers", () => {
       providerReadiness: { status: "loading", openai: null },
     });
 
-    expect(result.telefunModelId).toBe("gpt-realtime-2.1");
-    expect(result.telefunTransport).toBe("openai-audio");
-    expect(result.identitySettings.voiceName).toBe("marin");
+    expect(result.telefunModelId).toBe(DEFAULT_TELEFUN_SETTINGS.telefunModelId);
+    expect(result.telefunTransport).toBe("gemini-live");
+    expect(result.identitySettings.voiceName).toBe("");
   });
 
   it("rejects a new OpenAI selection while provider readiness is loading", () => {
