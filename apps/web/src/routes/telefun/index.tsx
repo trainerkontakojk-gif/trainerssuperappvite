@@ -16,6 +16,7 @@ import {
   normalizeTelefunBrowserSelection,
 } from "./telefunSettings";
 import { SettingsModal } from "./components/SettingsModal";
+import { TelefunMotionFrame } from "./components/TelefunMotionFrame";
 import { PhoneInterface } from "./components/PhoneInterface";
 import { HistoryModal } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
@@ -27,7 +28,6 @@ import {
   parseTelefunLocalHistory,
   shouldPersistTelefunLocalHistory,
 } from "./telefunLocalHistory";
-import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
 import {
   saveTelefunSession,
   scoreTelefunSession,
@@ -761,72 +761,93 @@ export default function TelefunLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="relative z-10 py-6"
+            className="relative z-10"
           >
-            <ModuleWorkspaceIntro
-              eyebrow="Voice Simulation Trainer"
-              title="Latih penanganan keluhan telepon dalam workspace yang fokus."
-              description="Mulai simulasi panggilan telepon dengan konsumen bertenaga AI untuk menguji dan melatih kemampuan penanganan keluhan secara langsung."
-              accentClassName={accentClassName}
-              accentSoftClassName={accentSoftClassName}
-              icon={<Phone className="h-8 w-8 text-violet-600" />}
-              actions={
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={startCall}
-                    disabled={settingsLoading}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all bg-violet-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-600/20"
-                  >
-                    {settingsLoading ? (
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    ) : (
-                      <Play className="h-4 w-4 fill-current" />
-                    )}
-                    <span>
-                      {settingsLoading ? "Memulai..." : "Mulai Panggilan"}
-                    </span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setIsSettingsOpen(true)}
-                    disabled={settingsLoading}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <Settings className="h-4 w-4 opacity-60" />
-                    <span>Pengaturan</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setIsHistoryOpen(true)}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <History className="h-4 w-4 opacity-60" />
-                    <span>Riwayat</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setIsUsageOpen(true)}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <BarChart3 className="h-4 w-4 opacity-60" />
-                    <span>Usage Bulan Ini</span>
-                    {sessionDelta &&
-                      (sessionDelta.costIdr > 0 ||
-                        sessionDelta.totalTokens > 0 ||
-                        sessionDelta.totalCalls > 0) && (
-                        <span className="ml-auto text-[10px] font-black text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">
-                          {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
+              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
+                {/* Kiri — HP dial 157 */}
+                <div className="flex flex-col">
+                  <div className="flex flex-1 flex-col">
+                    <TelefunMotionFrame />
+                  </div>
+                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+                    Simulasi panggilan mirip kondisi nyata. Sesi singkat, evaluasi terstruktur setelah selesai.
+                  </p>
+                </div>
+
+                {/* Kanan — 1 card */}
+                <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                  <div className="space-y-4">
+                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
+                      Latih percakapan telepon. Hadapi keluhan dengan lebih siap.
+                    </h1>
+                    <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                      Telefun — singkatan dari <span className="font-semibold text-foreground">Telephone Fun</span> — adalah simulasi percakapan telepon berbasis AI untuk melatih penanganan keluhan secara terarah. Pilih skenario, lakukan panggilan, lalu tinjau umpan balik setelah sesi.
+                    </p>
+                  </div>
+
+                  <div className="mt-8 border-t border-border/40 pt-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Mulai latihan
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={startCall}
+                        disabled={settingsLoading}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-violet-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-600/20"
+                      >
+                        {settingsLoading ? (
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        ) : (
+                          <Play className="h-4 w-4 fill-current" />
+                        )}
+                        <span>
+                          {settingsLoading ? "Memulai..." : "Mulai panggilan"}
                         </span>
-                      )}
-                  </motion.button>
-                </>
-              }
-            />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setIsSettingsOpen(true)}
+                        disabled={settingsLoading}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <Settings className="h-4 w-4 opacity-60" />
+                        <span>Pengaturan</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setIsHistoryOpen(true)}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <History className="h-4 w-4 opacity-60" />
+                        <span>Riwayat</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setIsUsageOpen(true)}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <BarChart3 className="h-4 w-4 opacity-60" />
+                        <span>Pemakaian bulan ini</span>
+                        {sessionDelta &&
+                          (sessionDelta.costIdr > 0 ||
+                            sessionDelta.totalTokens > 0 ||
+                            sessionDelta.totalCalls > 0) && (
+                            <span className="ml-auto text-xs font-bold text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">
+                              {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                            </span>
+                          )}
+                      </motion.button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
           </motion.div>
         )}
 

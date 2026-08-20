@@ -4,7 +4,6 @@ import {
   Settings,
   History,
   Play,
-  MessageSquare,
   BarChart3,
 } from "lucide-react";
 import type {
@@ -694,36 +693,24 @@ export default function KetikLanding() {
                     <KetikMotionFrame />
                   </div>
                   <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Simulasi chat yang mirip percakapan asli. Latihan singkat, hasil langsung kelihatan.
+                    Simulasi chat mirip percakapan nyata. Sesi singkat, telaah dan skor langsung tersedia.
                   </p>
                 </div>
 
                 {/* Kanan — 1 card */}
                 <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
-                  <div className="space-y-5">
-                    <div
-                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${accentClassName} border-current/15 bg-current/10`}
-                    >
-                      Latihan ketik
-                    </div>
-                    <div className="space-y-3">
-                      <div
-                        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${accentSoftClassName} ${accentClassName}`}
-                      >
-                        <MessageSquare className="h-6 w-6" />
-                      </div>
-                      <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
-                        Latihan chat biar makin lancar
-                      </h1>
-                      <p className="max-w-xl text-base leading-7 text-muted-foreground">
-                        Pilih skenario, mulai simulasi, dan lihat hasilnya langsung. Semua ada di satu tempat.
-                      </p>
-                    </div>
+                  <div className="space-y-4">
+                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
+                      Latih percakapan chat. Balas lebih tepat dan empatik.
+                    </h1>
+                    <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                      Ketik — singkatan dari <span className="font-semibold text-foreground">Kelas Etika &amp; Trik Komunikasi</span> — adalah simulasi percakapan chat berbasis AI untuk melatih ketepatan, empati, dan kepatuhan prosedur. Pilih skenario, jalankan simulasi, lalu tinjau telaah secara langsung.
+                    </p>
                   </div>
 
                   <div className="mt-8 border-t border-border/40 pt-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      Mulai dari sini
+                      Mulai latihan
                     </p>
                     <div className="mt-5 space-y-3">
                       <motion.button
