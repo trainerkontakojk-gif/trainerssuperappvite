@@ -19,7 +19,7 @@ import type {
 } from "@trainers/types";
 import { DEFAULT_KETIK_SETTINGS } from "@trainers/types";
 import { ketikApi } from "./ketikApi";
-import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
+import { KetikMotionFrame } from "./components/KetikMotionFrame";
 import { ChatInterface } from "./components/ChatInterface";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal } from "./components/HistoryModal";
@@ -684,69 +684,104 @@ export default function KetikLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="relative z-10 py-6"
+            className="relative z-10"
           >
-            <ModuleWorkspaceIntro
-              eyebrow="Kelas Etika & Trik Komunikasi"
-              title="Latih komunikasi chat dalam satu workspace yang fokus."
-              description="Mulai simulasi, buka pengaturan, dan tinjau riwayat percakapan dari satu alur kerja yang konsisten dengan modul lain."
-              accentClassName={accentClassName}
-              accentSoftClassName={accentSoftClassName}
-              icon={<MessageSquare className="h-8 w-8" />}
-              actions={
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={startSimulation}
-                    disabled={isLoading}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all bg-emerald-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20"
-                  >
-                    {isLoading ? (
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    ) : (
-                      <Play className="h-4 w-4 fill-current" />
-                    )}
-                    <span>{isLoading ? "Memulai..." : "Mulai Simulasi"}</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <Settings className="h-4 w-4 opacity-60" />
-                    <span>Pengaturan</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setIsHistoryOpen(true)}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <History className="h-4 w-4 opacity-60" />
-                    <span>Riwayat</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => setIsUsageOpen(true)}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <BarChart3 className="h-4 w-4 opacity-60" />
-                    <span>Usage Bulan Ini</span>
-                    {sessionDelta &&
-                      (sessionDelta.costIdr > 0 ||
-                        sessionDelta.totalTokens > 0 ||
-                        sessionDelta.totalCalls > 0) && (
-                        <span className="ml-auto text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                          {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
-                        </span>
-                      )}
-                  </motion.button>
-                </>
-              }
-            />
+            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
+              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
+                {/* Kiri — SVG motion frame */}
+                <div className="flex flex-col lg:sticky lg:top-8 lg:self-start">
+                  <div className="flex-1">
+                    <KetikMotionFrame />
+                  </div>
+                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+                    Simulasi chat yang mirip percakapan asli. Latihan singkat, hasil langsung kelihatan.
+                  </p>
+                </div>
+
+                {/* Kanan — konten */}
+                <div className="flex flex-col gap-6">
+                  {/* Header card */}
+                  <section className="rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                    <div
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${accentClassName} border-current/15 bg-current/10`}
+                    >
+                      Latihan ketik
+                    </div>
+                    <div className="mt-5 space-y-3">
+                      <div
+                        className={`flex h-12 w-12 items-center justify-center rounded-2xl ${accentSoftClassName} ${accentClassName}`}
+                      >
+                        <MessageSquare className="h-6 w-6" />
+                      </div>
+                      <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
+                        Latihan chat biar makin lancar
+                      </h1>
+                      <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                        Pilih skenario, mulai simulasi, dan lihat hasilnya langsung. Semua ada di satu tempat.
+                      </p>
+                    </div>
+                  </section>
+
+                  {/* Actions card */}
+                  <aside className="rounded-[2rem] border border-border/50 bg-card/65 p-6 backdrop-blur-xl lg:p-7">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Mulai dari sini
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={startSimulation}
+                        disabled={isLoading}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-emerald-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20"
+                      >
+                        {isLoading ? (
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        ) : (
+                          <Play className="h-4 w-4 fill-current" />
+                        )}
+                        <span>{isLoading ? "Memulai..." : "Mulai simulasi"}</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <Settings className="h-4 w-4 opacity-60" />
+                        <span>Pengaturan</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setIsHistoryOpen(true)}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <History className="h-4 w-4 opacity-60" />
+                        <span>Riwayat</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => setIsUsageOpen(true)}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <BarChart3 className="h-4 w-4 opacity-60" />
+                        <span>Pemakaian bulan ini</span>
+                        {sessionDelta &&
+                          (sessionDelta.costIdr > 0 ||
+                            sessionDelta.totalTokens > 0 ||
+                            sessionDelta.totalCalls > 0) && (
+                            <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                              {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                            </span>
+                          )}
+                      </motion.button>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </div>
           </motion.div>
         ) : (
           <motion.div
