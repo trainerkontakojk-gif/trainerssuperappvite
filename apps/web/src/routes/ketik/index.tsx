@@ -688,9 +688,9 @@ export default function KetikLanding() {
           >
             <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
               <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
-                {/* Kiri — SVG motion frame */}
-                <div className="flex flex-col lg:sticky lg:top-8 lg:self-start">
-                  <div className="flex-1">
+                {/* Kiri — HP motion frame */}
+                <div className="flex flex-col">
+                  <div className="flex flex-1 flex-col">
                     <KetikMotionFrame />
                   </div>
                   <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
@@ -698,16 +698,15 @@ export default function KetikLanding() {
                   </p>
                 </div>
 
-                {/* Kanan — konten */}
-                <div className="flex flex-col gap-6">
-                  {/* Header card */}
-                  <section className="rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                {/* Kanan — 1 card */}
+                <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                  <div className="space-y-5">
                     <div
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${accentClassName} border-current/15 bg-current/10`}
                     >
                       Latihan ketik
                     </div>
-                    <div className="mt-5 space-y-3">
+                    <div className="space-y-3">
                       <div
                         className={`flex h-12 w-12 items-center justify-center rounded-2xl ${accentSoftClassName} ${accentClassName}`}
                       >
@@ -720,10 +719,9 @@ export default function KetikLanding() {
                         Pilih skenario, mulai simulasi, dan lihat hasilnya langsung. Semua ada di satu tempat.
                       </p>
                     </div>
-                  </section>
+                  </div>
 
-                  {/* Actions card */}
-                  <aside className="rounded-[2rem] border border-border/50 bg-card/65 p-6 backdrop-blur-xl lg:p-7">
+                  <div className="mt-8 border-t border-border/40 pt-6">
                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                       Mulai dari sini
                     </p>
@@ -778,8 +776,8 @@ export default function KetikLanding() {
                           )}
                       </motion.button>
                     </div>
-                  </aside>
-                </div>
+                  </div>
+                </section>
               </div>
             </div>
           </motion.div>

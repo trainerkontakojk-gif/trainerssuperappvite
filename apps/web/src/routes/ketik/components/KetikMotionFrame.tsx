@@ -105,14 +105,14 @@ export function KetikMotionFrame() {
                   </div>
                 </motion.div>
 
-                {/* typing indicator - kiri (konsumen lagi ngetik) */}
+                {/* typing indicator - Rojak lagi ngetik */}
                 <motion.div
                   initial={shouldReduceMotion ? undefined : { opacity: 0 }}
                   animate={shouldReduceMotion ? undefined : { opacity: 1 }}
                   transition={shouldReduceMotion ? undefined : { delay: 1.1, duration: 0.3 }}
-                  className="flex justify-start"
+                  className="flex justify-end"
                 >
-                  <div className="flex items-center gap-1 rounded-full bg-white px-3 py-2 shadow-sm">
+                  <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-2 shadow-sm">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />
