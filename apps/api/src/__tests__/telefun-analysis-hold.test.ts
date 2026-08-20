@@ -71,27 +71,49 @@ const DEFAULT_AI_RESPONSE = {
     speakingRate: {
       score: 7,
       wordsPerMinute: 130,
-      verdict: "Baik",
-      feedback: "Ok",
+      verdict: "Kecepatan ideal dan stabil, mudah dipahami konsumen",
+      feedback:
+        "Kecepatan bicara 130 WPM berada di rentang ideal 130-150 sehingga nyaman didengar. Dampaknya konsumen mudah memahami penjelasan tanpa terkesan terburu-buru. Pertahankan tempo dan tambahkan jeda 1 detik antar kalimat untuk memberi ruang konsumen menyerap informasi.",
     },
-    intonation: { score: 8, verdict: "Baik", feedback: "Ok" },
-    articulation: { score: 9, verdict: "Baik", feedback: "Ok" },
+    intonation: {
+      score: 8,
+      verdict: "Intonasi variatif dan cukup ekspresif, terdengar profesional",
+      feedback:
+        "Intonasi cukup variatif dengan penekanan pada frasa kunci seperti salam pembuka dan penawaran solusi. Hal ini membuat percakapan terasa hidup dan profesional. Tingkatkan variasi nada pada bagian penutup agar konsumen merasakan kehangatan hingga akhir percakapan.",
+    },
+    articulation: {
+      score: 9,
+      verdict: "Artikulasi sangat jelas dan presisi, mudah dipahami",
+      feedback:
+        "Artikulasi sangat jelas, pengucapan vokal dan konsonan presisi termasuk istilah teknis. Dampaknya konsumen tidak perlu meminta pengulangan dan merasa yakin. Pertahankan kejelasan dengan membuka mulut lebih lebar saat mengucapkan kata sulit.",
+    },
     fillerWords: {
       score: 8,
       count: 2,
-      examples: [],
-      verdict: "Baik",
-      feedback: "Ok",
+      examples: ["eh", "anu"],
+      verdict: "Minim filler, hanya dua kata pengisi yang tidak mengganggu",
+      feedback:
+        "Hanya 2 filler terdeteksi ('eh', 'anu') dengan frekuensi rendah sehingga tidak mengganggu profesionalisme. Dampaknya kredibilitas tetap terjaga. Ganti potensi filler berikutnya dengan jeda senyap 1 detik untuk mempertahankan kesan percaya diri.",
     },
     emotionalTone: {
       score: 7,
       dominant: "tenang",
-      verdict: "Baik",
-      feedback: "Ok",
+      verdict: "Nada tenang dan cukup empatik, masih bisa lebih hangat",
+      feedback:
+        "Nada dominan tenang dengan empati cukup terasa saat menyampaikan solusi. Hal ini membantu konsumen merasa didengar dan aman. Tambahkan kehangatan pada sapaan awal dan penutup dengan senyum vokal agar empati lebih tulus terasa.",
     },
-    transcript: "Test",
-    highlights: [],
-    strengths: [],
+    transcript:
+      "Selamat siang, terima kasih telah menghubungi OJK 157. Perkenalkan saya agen yang bertugas. Bisa saya bantu jelaskan kendala yang dialami terkait layanan?".repeat(2),
+    highlights: [
+      "Pembukaan dengan sapaan sopan dan perkenalan jelas yang membangun kepercayaan awal konsumen dalam 30 detik pertama percakapan.",
+      "Penggalian kebutuhan dengan pertanyaan terbuka yang relevan sehingga konsumen dapat menjelaskan kronologi kendala secara runtut dan lengkap.",
+      "Penjelasan solusi langkah demi langkah dengan bahasa sederhana dan konfirmasi pemahaman di setiap tahap sebelum melanjutkan ke informasi berikutnya.",
+    ],
+    strengths: [
+      "Sapaan pembuka yang sopan dan jelas dengan intonasi hangat membangun kesan profesional sejak awal panggilan.",
+      "Artikulasi sangat jelas dan tempo ideal membuat seluruh penjelasan mudah dipahami tanpa perlu pengulangan dari konsumen.",
+      "Nada tenang dan sabar saat konsumen menyampaikan keberatan sehingga konsumen merasa didengar dan tidak tertekan.",
+    ],
   }),
 };
 

@@ -18,6 +18,31 @@ import {
 
 export type { VoiceQualityAssessment };
 
+function isTelefunAssessmentDetailed(assessment: VoiceQualityAssessment): boolean {
+  const feedbacks = [
+    assessment.speakingRate?.feedback,
+    assessment.intonation?.feedback,
+    assessment.articulation?.feedback,
+    assessment.fillerWords?.feedback,
+    assessment.emotionalTone?.feedback,
+  ];
+  if (feedbacks.some((f) => !f || f.trim().length < 35)) return false;
+  const verdicts = [
+    assessment.speakingRate?.verdict,
+    assessment.intonation?.verdict,
+    assessment.articulation?.verdict,
+    assessment.fillerWords?.verdict,
+    assessment.emotionalTone?.verdict,
+  ];
+  if (verdicts.some((v) => !v || v.trim().length < 10)) return false;
+  if (!assessment.transcript || assessment.transcript.trim().length < 20) return false;
+  if (!assessment.highlights || assessment.highlights.length < 3) return false;
+  if (assessment.highlights.some((h) => !h || h.trim().length < 12)) return false;
+  if (!assessment.strengths || assessment.strengths.length < 3) return false;
+  if (assessment.strengths.some((s) => !s || s.trim().length < 10)) return false;
+  return true;
+}
+
 export function isTelefunWebRtcSeekableAgentPath(params: {
   path: unknown;
   userId: string;
@@ -62,9 +87,9 @@ export async function analyzeVoiceQuality(
   const holdMetrics = normalizeTelefunHoldMetrics(sessionMetrics?.hold);
   const holdAssessment = evaluateTelefunHoldAssessment(holdMetrics);
 
-  // 2. Return cached if exists and valid
+  // 2. Return cached if exists, valid, and LENGKAP sesuai 5 indikator (tidak singkat)
   const parsedCached = parseVoiceQualityAssessment(row.voice_assessment);
-  if (parsedCached) {
+  if (parsedCached && isTelefunAssessmentDetailed(parsedCached)) {
     let assessment = parsedCached;
 
     const rawHasHold =
@@ -113,6 +138,12 @@ export async function analyzeVoiceQuality(
       assessment,
     };
   }
+  if (parsedCached && !isTelefunAssessmentDetailed(parsedCached)) {
+    console.warn(
+      "[Telefun] Cached assessment incomplete/too short — re-analyzing per indikator lengkap",
+      { sessionId },
+    );
+  }
 
   if (
     isRetiredTelefunOpenAiRealtimeSelection({
@@ -157,32 +188,65 @@ export async function analyzeVoiceQuality(
     "base64",
   );
 
-  // 4. Call Gemini
+  // 4. Call Gemini — penilaian lengkap sesuai 5 indikator wajib, tidak boleh singkat
   const prompt = `
-    Lakukan analisis pada kualitas suara agen dalam simulasi telemarketing/customer service berikut.
+    TUGAS: Analisis REKAMAN AUDIO AGEN saja (abaikan suara konsumen/AI) untuk simulasi telemarketing/customer service OJK 157.
     Skenario: ${row.scenario_title}
-    
-    Evaluasi berdasarkan:
-    1. Kecepatan Bicara (Speaking Rate): Idealnya 130-150 WPM.
-    2. Intonasi: Variasi nada, antusiasme vs monoton.
-    3. Artikulasi: Kejelasan kata, bergumam vs pengucapan jelas.
-    4. Kata Pengisi (Filler Words): "hm", "anu", "gitu", "eeeh", dll.
-    5. Nada Emosional (Emotional Tone): Empati, kesabaran, rasa percaya diri.
-    
-    Berikan transkrip lengkap dan poin-poin penting (highlights).
-    ATURAN WAJIB:
-    1. SEMUA teks, ulasan (verdict), umpan balik (feedback), poin penting, dan kelebihan WAJIB MENGGUNAKAN BAHASA INDONESIA. Jangan gunakan bahasa Inggris.
-    2. Sifat ulasan harus KRITIS dengan rasio 50% kritik konstruktif dan 50% apresiasi. Beritahu agen secara tegas apa saja yang masih kurang dan bagaimana cara memperbaikinya.
-    3. Semua field score aspek HARUS berada di kisaran 0-10 dan merepresentasikan kualitas, bukan raw metric.
-    4. wordsPerMinute HARUS berisi angka WPM mentah saja (kisaran normal 100-180). Jangan jadikan WPM sebagai score.
-    5. fillerWords.count HARUS berisi jumlah kata pengisi mentah saja (misal: 0, 3, 15). Jangan jadikan count sebagai score.
-    6. Jangan mengarang target radar. Target QA dihitung sistem.
+
+    Anda HARUS menilai 5 INDIKATOR WAJIB di bawah secara LENGKAP dan DETAIL. Jangan singkat, jangan generik. Setiap verdict dan feedback harus spesifik, mengutip perilaku aktual dari rekaman, menjelaskan dampak ke konsumen, dan memberi 1 saran actionable.
+
+    INDIKATOR & RUBRIK PENILAIAN (skor kualitas 0-10 untuk setiap indikator):
+    1. KECEPATAN BICARA (Speaking Rate)
+       - wordsPerMinute = ANGKA MENTAH hasil hitung (jumlah kata di transcript / durasi menit), kisaran normal 100-180. JANGAN isi dengan skor.
+       - score = kualitas: 9-10 = ideal 130-150 WPM sangat nyaman; 7-8 = sedikit di luar ideal (120-129 atau 151-165) masih jelas; 4-6 = terlalu lambat (<120) atau terlalu cepat (>165) mengganggu pemahaman; 0-3 = sangat lambat/cepat tidak profesional.
+       - Feedback WAJIB: sebutkan WPM aktual, bandingkan dengan ideal 130-150, jelaskan dampak ke kenyamanan konsumen, dan beri 1 tips tempo/jeda.
+    2. INTONASI
+       - Variasi nada, antusiasme, penekanan kata kunci, hindari datar/monoton.
+       - Skor: 0-3 = datar/monoton sepanjang sesi; 4-6 = variasi minimal, kadang hidup; 7-8 = variasi baik cukup ekspresif; 9-10 = sangat hidup, antusias, penekanan tepat.
+       - Feedback WAJIB: apakah datar/variatif, contoh frasa dengan nada tertentu, dampak ke kesan profesional, dan 1 tips variasi nada.
+    3. ARTIKULASI
+       - Kejelasan vokal/konsonan, pengucapan istilah, bergumam vs jelas.
+       - Skor: 0-3 = banyak bergumam/tidak jelas; 4-6 = cukup jelas tapi beberapa kata kurang presisi; 7-8 = jelas sebagian besar; 9-10 = sangat jelas dan presisi.
+       - Feedback WAJIB: kejelasan umum, contoh kata yang jelas/kurang jelas, dampak ke pemahaman, dan 1 tips artikulasi (misal buka mulut, latihan kata sulit).
+    4. KATA PENGISI (Filler Words)
+       - count = JUMLAH MENTAH kata pengisi ("hm", "anu", "gitu", "eeeh", "eh", "apa ya", dll). JANGAN isi dengan skor. Hitung dari transcript aktual.
+       - score = kualitas: 9-10 = 0 filler; 7-8 = 1-2 filler wajar; 4-6 = 3-5 filler cukup mengganggu; 0-3 = >6 filler sangat mengganggu.
+       - examples = daftar kata filler AKTUAL yang benar-benar terdengar (verbatim, minimal 1 jika count>0, maksimal 10).
+       - Feedback WAJIB: sebutkan jumlah dan frekuensi, contoh kata yang muncul, dampak ke profesionalisme, dan 1 tips mengganti filler dengan jeda senyap.
+    5. NADA EMOSIONAL (Emotional Tone)
+       - Empati, kesabaran, kehangatan, rasa percaya diri, ketulusan.
+       - dominant = SATU kata nada dominan (contoh: empatik, hangat, tenang, tegas, ragu, datar).
+       - Skor: 0-3 = tidak empatik/ragu/datar; 4-6 = cukup empatik namun kadang datar; 7-8 = empatik, sabar, hangat; 9-10 = sangat empatik, hangat, percaya diri, tulus.
+       - Feedback WAJIB: sebutkan nada dominan, bagaimana emosi terdengar di rekaman, dampak ke kepercayaan konsumen, dan 1 tips mengekspresikan empati lewat nada.
+
+    OUTPUT JSON WAJIB (sesuai schema):
+    - overallScore: rata-rata representatif kelima skor aspek (0-10, boleh 1 desimal), harus konsisten dengan kelima skor — jangan asal.
+    - speakingRate: { score, wordsPerMinute, verdict, feedback }
+    - intonation: { score, verdict, feedback }
+    - articulation: { score, verdict, feedback }
+    - fillerWords: { score, count, examples, verdict, feedback }
+    - emotionalTone: { score, dominant, verdict, feedback }
+    - transcript: TRANSKRIP VERBATIM LENGKAP 100% ucapan agen (jangan ringkas, jangan tambahkan ucapan konsumen, tulis apa adanya sesuai audio; jika durasi >15 detik minimal 20 kata; gunakan ejaan Indonesia benar; tandai [tidak jelas] bila ada bagian tak terdengar).
+    - highlights: array 3-5 string, setiap string = 1 poin penting (15-30 kata) yang merangkum momen penting (pembukaan/sapaan, penggalian kebutuhan, penanganan keberatan/penjelasan solusi, penutup/konfirmasi). Spesifik, bukan generik.
+    - strengths: array 3-5 string, setiap string = 1 kelebihan spesifik (12-25 kata) yang benar-benar terobservasi di rekaman, bukan pujian generik seperti "sudah baik".
+    - holdManagement: JANGAN ISI — sistem mengisi otomatis, abaikan.
+
+    ATURAN KUALITAS WAJIB (JIKA DILANGGAR HASIL DITOLAK):
+    1. SEMUA teks (verdict, feedback, highlights, strengths, transcript, dominant) WAJIB Bahasa Indonesia 100%. Jangan ada Inggris.
+    2. Setiap verdict: 1 kalimat ringkas 8-15 kata yang merangkum kualitas (contoh: "Kecepatan ideal dan stabil, mudah dipahami namun perlu jeda lebih natural"). Jangan hanya "Baik" atau "Cukup".
+    3. Setiap feedback: 2-3 kalimat, MINIMAL 35 kata dan MAKSIMAL 90 kata, harus mengandung: (a) observasi konkret dari audio/transcript, (b) dampak ke konsumen, (c) 1 saran perbaikan yang actionable dan spesifik. Proporsi 50% apresiasi + 50% kritik konstruktif dalam tiap feedback.
+    4. highlights minimal 3 item, strengths minimal 3 item. Jangan kosongkan atau isi dengan 1 kata generik.
+    5. transcript WAJIB lengkap — jangan buat ringkasan 1 kalimat. Jika audio sangat pendek, tetap transkrip apa adanya dan jelaskan keterbatasan di feedback intonasi/artikulasi dengan skor menyesuaikan.
+    6. Skor harus KONSISTEN dengan narasi: jika feedback banyak kritik, skor jangan 9-10; jika banyak pujian, skor jangan 0-3.
+    7. Jangan mengarang WPM atau count dari skor. Hitung WPM dari kata/durasi, hitung count dari transcript.
+    8. Jangan mengarang target radar — target QA dihitung sistem.
+    9. JANGAN berikan jawaban singkat, template, atau generik. Setiap kalimat harus membawa informasi baru yang spesifik dan dapat ditindaklanjuti.
   `;
 
   const response = await generateGeminiContent({
     model: "gemini-3.7-flash",
     systemInstruction:
-      "Anda adalah pelatih vokal profesional dan analis wicara yang tegas dan objektif. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia.",
+      "Anda adalah pelatih vokal senior dan analis wicara profesional dengan 15 tahun pengalaman melatih agent contact center OJK 157 dan telemarketing. Tugas Anda adalah memberikan penilaian yang MENDALAM, DETAIL, dan KONSTRUKTIF — bukan ringkasan singkat. Setiap penilaian harus spesifik, mengutip perilaku aktual dari rekaman, menjelaskan dampaknya ke konsumen, dan memberikan langkah perbaikan yang actionable. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia yang natural, profesional, dan kritis-membangun (50% apresiasi, 50% kritik). Jangan pernah memberikan jawaban generik, singkat, atau asal-asalan.", 
     contents: [
       {
         role: "user",
@@ -297,21 +361,28 @@ export async function generateCoachingSummary(
   const prompt = `
     Berdasarkan simulasi Telefun berikut:
     Skenario: ${row.scenario_title}
-    
-    Data Voice Assessment:
+
+    Data Voice Assessment (5 indikator + transcript, highlights, strengths):
     ${JSON.stringify(row.voice_assessment || {}, null, 2)}
-    
-    Berikan maksimal 5 rekomendasi coaching yang spesifik dan actionable untuk agen ini.
-    Gunakan format JSON array of objects dengan keys "text" dan "priority" (1-5, 5 tertinggi).
-    Contoh: [{"text": "Perbaiki artikulasi pada kata-kata teknis.", "priority": 5}]
-    
-    SEMUA TEKS WAJIB DALAM BAHASA INDONESIA.
+
+    TUGAS: Berikan 3-5 rekomendasi coaching yang SPESIFIK, KONKRET, dan ACTIONABLE sesuai indikator yang nilainya paling rendah atau yang feedback-nya menyebut kekurangan. Jangan generik.
+
+    ATURAN REKOMENDASI:
+    - Setiap rekomendasi harus merujuk ke indikator spesifik (sebutkan: Kecepatan Bicara / Intonasi / Artikulasi / Filler Words / Nada Emosional) atau ke momen di highlights/transcript.
+    - Format setiap text: minimal 15 kata, maksimal 30 kata, berisi: (a) perilaku yang perlu diperbaiki + (b) cara konkret memperbaikinya + (c) dampak jika diperbaiki.
+    - Contoh baik: "Latih kecepatan 130-150 WPM dengan jeda 1 detik antar kalimat agar konsumen lebih mudah memahami penjelasan produk tanpa terkesan terburu-buru." (bukan: "Perbaiki artikulasi.")
+    - Priority 5 = paling kritis/mendesak, 1 = penguatan. Urutkan dari priority tertinggi.
+    - Minimal 3, maksimal 5 rekomendasi. Jangan kurang, jangan lebih.
+    - Gunakan format JSON array of objects dengan keys "text" (string) dan "priority" (number 1-5).
+    - Contoh: [{"text": "Kurangi filler 'anu' dan 'eh' dengan mengganti jeda senyap 1 detik; rekam latihan harian 2 menit untuk membiasakan jeda.", "priority": 5}]
+
+    SEMUA TEKS WAJIB DALAM BAHASA INDONESIA, detail, dan tidak generik.
   `;
 
   const response = await generateGeminiContent({
     model: "gemini-3.7-flash",
     systemInstruction:
-      "Anda adalah pelatih customer service senior. Berikan feedback yang tajam dan membangun dalam Bahasa Indonesia.",
+      "Anda adalah pelatih customer service senior dan mentor QA OJK 157 dengan pengalaman coaching agent. Berikan rekomendasi yang TAJAM, SPESIFIK, dan MEMBANGUN — setiap saran harus actionable, merujuk ke indikator penilaian Telefun yang sudah ditentukan, dan dapat langsung dipraktikkan agen. Hindari saran generik atau singkat. Semua balasan WAJIB Bahasa Indonesia.", 
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     responseMimeType: "application/json",
     responseSchema: {
