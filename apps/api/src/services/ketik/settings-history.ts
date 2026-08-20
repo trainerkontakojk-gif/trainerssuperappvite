@@ -8,7 +8,11 @@ import {
   DEFAULT_KETIK_SETTINGS,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
-import { KETIK_PDKT_MODELS, normalizeModelId } from "../../lib/ai-models";
+import {
+  DEFAULT_AI_MODEL_ID,
+  KETIK_PDKT_MODELS,
+  normalizeModelId,
+} from "../../lib/ai-models";
 import {
   ABSENT_SETTINGS_VERSION,
   guardedUserSettingsWrite,
@@ -19,7 +23,7 @@ const coerceKetikModelId = (modelId?: string) => {
   const normalized = normalizeModelId(modelId);
   return KETIK_PDKT_MODELS.some((model) => model.id === normalized)
     ? normalized
-    : "gemini-3.1-flash-lite";
+    : DEFAULT_AI_MODEL_ID;
 };
 
 const coerceDuration = (duration?: number) => {

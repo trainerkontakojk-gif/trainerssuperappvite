@@ -172,7 +172,7 @@ describe("settings draft commit helpers", () => {
     expect(result.selectedModel).toBe("gpt-5.4-mini");
     expect(coercePdktModelId("deepseek-v4-flash")).toBe("gpt-5.4-mini");
     expect(coercePdktModelId("openrouter/gpt-4o-mini")).toBe("gpt-5.4-mini");
-    expect(coercePdktModelId("unknown-model")).toBe("gemini-3.1-flash-lite");
+    expect(coercePdktModelId("unknown-model")).toBe("gemini-3.7-flash");
   });
 
   it("buildTelefunSettingsForSave derives transport from selected model without mutating localSettings", () => {

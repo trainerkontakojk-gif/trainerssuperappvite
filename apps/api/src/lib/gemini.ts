@@ -2,6 +2,7 @@ import { Content, Modality } from "@google/genai";
 import { randomUUID } from "crypto";
 import {
   AI_MODELS,
+  DEFAULT_AI_MODEL_ID,
   getGeminiClient,
   getProviderFromModelId,
 } from "./ai-models";
@@ -62,7 +63,7 @@ export async function generateGeminiContent(options: {
     if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
     const ai = getGeminiClient();
-    const modelName = options.model || "gemini-3.1-flash-lite";
+    const modelName = options.model || DEFAULT_AI_MODEL_ID;
     const supportsSystemInstruction = !modelName.includes(
       "gemini-3-flash-preview",
     );

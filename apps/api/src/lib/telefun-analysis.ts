@@ -180,7 +180,7 @@ export async function analyzeVoiceQuality(
   `;
 
   const response = await generateGeminiContent({
-    model: "gemini-3.5-flash",
+    model: "gemini-3.7-flash",
     systemInstruction:
       "Anda adalah pelatih vokal profesional dan analis wicara yang tegas dan objektif. Semua balasan WAJIB sepenuhnya dalam Bahasa Indonesia.",
     contents: [
@@ -309,7 +309,7 @@ export async function generateCoachingSummary(
   `;
 
   const response = await generateGeminiContent({
-    model: "gemini-3.1-flash-lite",
+    model: "gemini-3.7-flash",
     systemInstruction:
       "Anda adalah pelatih customer service senior. Berikan feedback yang tajam dan membangun dalam Bahasa Indonesia.",
     contents: [{ role: "user", parts: [{ text: prompt }] }],

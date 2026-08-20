@@ -4,6 +4,7 @@ import { z } from "zod";
 import { User } from "@supabase/supabase-js";
 import {
   AI_MODELS,
+  DEFAULT_AI_MODEL_ID,
   TELEFUN_LIVE_MODELS,
   getHistoricalTelefunRealtimeModel,
   getModelsForModule,
@@ -110,7 +111,7 @@ ai.post(
     const userId = user?.id;
 
     const { modelId, provider } = resolveModelProvider(
-      body.model || "gemini-3.1-flash-lite",
+      body.model || DEFAULT_AI_MODEL_ID,
     );
 
     const callPayload = {

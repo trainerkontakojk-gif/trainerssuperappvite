@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_AI_MODEL_ID } from "./ai-models";
 
 // ── KETIK Types ────────────────────────────────────────
 export type ChatSender = "agent" | "consumer" | "system";
@@ -181,7 +182,7 @@ export const DEFAULT_KETIK_SETTINGS: KetikAppSettings = {
     phoneNumber: "",
     city: "",
   },
-  selectedModel: "gemini-3.1-flash-lite",
+  selectedModel: DEFAULT_AI_MODEL_ID,
   simulationDuration: 5,
   responsePacingMode: "realistic",
 };
@@ -365,7 +366,7 @@ export const generateMessageSchema = z.object({
   consumerTypeId: z.string(),
   consumerTypeDraft: ketikConsumerTypeSchema.optional(),
   identity: z.object({ name: z.string(), city: z.string(), phone: z.string() }),
-  selectedModel: z.string().default("gemini-3.1-flash-lite"),
+  selectedModel: z.string().default(DEFAULT_AI_MODEL_ID),
   simulationDuration: z.number().default(5),
   responsePacingMode: z
     .enum(["realistic", "training_fast"])

@@ -117,6 +117,7 @@ describe("processKetikReviewJob five-dimension contract", () => {
     });
 
     const options = mockGenerateGeminiContent.mock.calls[0][0];
+    expect(options.model).toBe("gemini-3.7-flash");
     expect(options.responseSchema.properties.scores.required).toContain(
       "resolution",
     );

@@ -107,6 +107,11 @@ describe("ai model registry", () => {
     expect(supportsTemperature("gemini-3.7-flash")).toBe(true);
   });
 
+  it("defaults text generation to Gemini 3.7 Flash", () => {
+    expect(DEFAULT_AI_MODEL_ID).toBe("gemini-3.7-flash");
+    expect(normalizeModelId()).toBe("gemini-3.7-flash");
+  });
+
   it("normalizes legacy provider selections while preserving supported and unknown IDs", () => {
     expect(normalizeModelId("gpt-5.4-mini")).toBe("gpt-5.4-mini");
     expect(normalizeModelId("gemini-3.6-flash")).toBe("gemini-3.7-flash");

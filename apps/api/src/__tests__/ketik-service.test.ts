@@ -25,7 +25,7 @@ describe("KETIK Service - Settings", () => {
       });
       const settings = await ketikService.getSettings("user1");
       expect(settings.scenarios).toHaveLength(6);
-      expect(settings.selectedModel).toBe("gemini-3.1-flash-lite");
+      expect(settings.selectedModel).toBe("gemini-3.7-flash");
       expect(settings.simulationDuration).toBe(5);
     });
 
@@ -40,7 +40,7 @@ describe("KETIK Service - Settings", () => {
 
       await expect(ketikService.getSettings("user1")).resolves.toEqual(
         expect.objectContaining({
-          selectedModel: "gemini-3.1-flash-lite",
+          selectedModel: "gemini-3.7-flash",
           simulationDuration: 5,
         }),
       );
@@ -55,7 +55,7 @@ describe("KETIK Service - Settings", () => {
 
       await expect(ketikService.getSettingsSnapshot("user1")).resolves.toEqual({
         settings: expect.objectContaining({
-          selectedModel: "gemini-3.1-flash-lite",
+          selectedModel: "gemini-3.7-flash",
         }),
         version: "absent",
       });

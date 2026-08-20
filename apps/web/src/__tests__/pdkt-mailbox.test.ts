@@ -32,12 +32,12 @@ vi.mock("@tanstack/react-router", () => ({
 
 describe("PDKT Settings Helpers", () => {
   it("configures default model correctly", () => {
-    expect(DEFAULT_PDKT_MODEL_ID).toBe("gemini-3.1-flash-lite");
+    expect(DEFAULT_PDKT_MODEL_ID).toBe("gemini-3.7-flash");
   });
 
   it("coerces invalid model to default", () => {
-    expect(coercePdktModelId(null)).toBe("gemini-3.1-flash-lite");
-    expect(coercePdktModelId("invalid-model")).toBe("gemini-3.1-flash-lite");
+    expect(coercePdktModelId(null)).toBe("gemini-3.7-flash");
+    expect(coercePdktModelId("invalid-model")).toBe("gemini-3.7-flash");
   });
 
   it("coerces writing style mode to default for invalid values", () => {

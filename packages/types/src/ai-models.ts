@@ -39,7 +39,7 @@ export type AiModelModule =
   | "telefun"
   | "default";
 
-export const DEFAULT_AI_MODEL_ID = "gemini-3.1-flash-lite";
+export const DEFAULT_AI_MODEL_ID = "gemini-3.7-flash";
 export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-image";
 export const DEFAULT_TELEFUN_LIVE_MODEL_ID = "gemini-3.1-flash-live-preview";
 
