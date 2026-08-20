@@ -158,7 +158,7 @@ describe("PDKT scenario wizard", () => {
     await user.click(screen.getByRole("button", { name: "Sistem" }));
 
     [
-      "Gemini 3.6 Flash",
+      "Gemini 3.7 Flash",
       "Gemini 3.5 Flash Lite",
       "GPT 5.6 Luna",
       "GPT 5.4 Mini",

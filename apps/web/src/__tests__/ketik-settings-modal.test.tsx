@@ -84,7 +84,7 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     await user.click(systemTabButton);
 
     const expectedModels = [
-      "Gemini 3.6 Flash",
+      "Gemini 3.7 Flash",
       "Gemini 3.5 Flash Lite",
       "GPT 5.6 Luna",
       "GPT 5.4 Mini",

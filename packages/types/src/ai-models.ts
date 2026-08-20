@@ -354,8 +354,8 @@ export function normalizePersistedTelefunSettings<T>(
 
 export const TEXT_MODELS: AiModelInfo[] = [
   {
-    id: "gemini-3.6-flash",
-    name: "Gemini 3.6 Flash",
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
     description: "Model Gemini cepat untuk percakapan dan analisis.",
     provider: "gemini",
     timeoutMs: 180_000,

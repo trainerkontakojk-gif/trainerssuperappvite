@@ -60,12 +60,15 @@ describe("ai model registry", () => {
   it("exposes only direct Gemini and OpenAI active text models", () => {
     expect(
       [
-        "gemini-3.6-flash",
+        "gemini-3.7-flash",
         "gemini-3.5-flash-lite",
         "gpt-5.6-luna",
         "gpt-5.4-mini",
       ].every((id) => KETIK_PDKT_MODELS.some((model) => model.id === id)),
     ).toBe(true);
+    expect(
+      KETIK_PDKT_MODELS.some((model) => model.id === "gemini-3.6-flash"),
+    ).toBe(false);
     expect(resolveModelProvider("gpt-5.6-luna")).toMatchObject({
       modelId: "gpt-5.6-luna",
       provider: "openai",
@@ -101,11 +104,12 @@ describe("ai model registry", () => {
     expect(luna?.supportsTemperature).toBe(false);
     expect(supportsTemperature("gpt-5.6-luna")).toBe(false);
     expect(supportsTemperature("gpt-5.4-mini")).toBe(true);
-    expect(supportsTemperature("gemini-3.6-flash")).toBe(true);
+    expect(supportsTemperature("gemini-3.7-flash")).toBe(true);
   });
 
   it("normalizes legacy provider selections while preserving supported and unknown IDs", () => {
     expect(normalizeModelId("gpt-5.4-mini")).toBe("gpt-5.4-mini");
+    expect(normalizeModelId("gemini-3.6-flash")).toBe("gemini-3.7-flash");
     expect(normalizeModelId("openrouter/gpt-4o-mini")).toBe("gpt-5.4-mini");
     expect(normalizeModelId("legacy-provider/gpt-4o-mini")).toBe(
       "gpt-5.4-mini",
