@@ -9,6 +9,7 @@ import {
   getModelsForModule,
   normalizeModelId,
   resolveModelProvider,
+  supportsTemperature,
 } from "../lib/ai-models";
 
 describe("ai model registry", () => {
@@ -93,6 +94,14 @@ describe("ai model registry", () => {
         (model) => model.capabilities?.imageGenerationMode !== "none",
       ),
     ).toBe(true);
+  });
+
+  it("marks gpt-5.6-luna as a reasoning model without temperature support", () => {
+    const luna = TEXT_MODELS.find((model) => model.id === "gpt-5.6-luna");
+    expect(luna?.supportsTemperature).toBe(false);
+    expect(supportsTemperature("gpt-5.6-luna")).toBe(false);
+    expect(supportsTemperature("gpt-5.4-mini")).toBe(true);
+    expect(supportsTemperature("gemini-3.6-flash")).toBe(true);
   });
 
   it("normalizes legacy provider selections while preserving supported and unknown IDs", () => {

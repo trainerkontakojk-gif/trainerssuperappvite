@@ -83,6 +83,14 @@ export function resolveModelProvider(modelId?: string | null): {
   };
 }
 
+export function supportsTemperature(modelId?: string | null): boolean {
+  const normalized = normalizeModelId(modelId);
+  return (
+    MODEL_REGISTRY.find((model) => model.id === normalized)
+      ?.supportsTemperature ?? true
+  );
+}
+
 export function getModelsForModule(
   module: AiModelModule = "default",
 ): AiModelInfo[] {

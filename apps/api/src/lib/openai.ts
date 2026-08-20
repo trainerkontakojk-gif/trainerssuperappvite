@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { resolveModelProvider } from "./ai-models";
+import { resolveModelProvider, supportsTemperature } from "./ai-models";
 import { logAiUsage, UsageContext } from "./ai-usage";
 import { sanitizeAiResponse } from "./ai-sanitize";
 
@@ -149,8 +149,10 @@ export async function generateOpenAIContent(options: {
     instructions: options.systemInstruction,
     input,
     store: false,
-    temperature: options.temperature ?? 0.7,
   };
+  if (supportsTemperature(modelId)) {
+    body.temperature = options.temperature ?? 0.7;
+  }
   if (options.responseMimeType === "application/json") {
     body.text = options.responseSchema
       ? {

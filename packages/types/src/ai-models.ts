@@ -27,6 +27,8 @@ export interface AiModelInfo {
   capabilities?: AiModelCapabilities;
   availableModules?: readonly AiModelModule[];
   realtime?: AiModelRealtimeMetadata;
+  /** False for reasoning models whose vendor API rejects the temperature parameter. */
+  supportsTemperature?: boolean;
 }
 
 export type AIProvider = "gemini" | "openai";
@@ -374,6 +376,7 @@ export const TEXT_MODELS: AiModelInfo[] = [
     provider: "openai",
     timeoutMs: 180_000,
     capabilities: { supportsText: true, supportsImage: false },
+    supportsTemperature: false,
   },
   {
     id: "gpt-5.4-mini",

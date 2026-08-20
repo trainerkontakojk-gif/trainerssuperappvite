@@ -61,6 +61,39 @@ describe("direct OpenAI Responses API", () => {
     expect(body.text.format.type).toBe("json_object");
   });
 
+  it("omits temperature for reasoning models that do not support it", async () => {
+    process.env.OPENAI_API_KEY = "test-openai-key";
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ output_text: "ok", status: "completed" }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await generateOpenAIContent({
+      model: "gpt-5.6-luna",
+      contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+      temperature: 0.55,
+    });
+
+    expect(result.success).toBe(true);
+    const lunaBody = JSON.parse(
+      vi.mocked(globalThis.fetch).mock.calls[0][1]?.body as string,
+    );
+    expect(lunaBody.temperature).toBeUndefined();
+
+    vi.mocked(globalThis.fetch).mockClear();
+    await generateOpenAIContent({
+      model: "gpt-5.4-mini",
+      contents: [{ role: "user", parts: [{ text: "Hello" }] }],
+      temperature: 0.55,
+    });
+    const miniBody = JSON.parse(
+      vi.mocked(globalThis.fetch).mock.calls[0][1]?.body as string,
+    );
+    expect(miniBody.temperature).toBe(0.55);
+  });
+
   it("logs one successful terminal usage row after retries and maps model to assistant", async () => {
     process.env.OPENAI_API_KEY = "test-openai-key";
     globalThis.fetch = vi.fn()
