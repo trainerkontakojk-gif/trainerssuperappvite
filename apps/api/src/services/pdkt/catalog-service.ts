@@ -113,6 +113,11 @@ const DUMMY_CITIES = [
   "Surabaya", "Bandung", "Medan", "Semarang", "Makassar", "Palembang", "Tangerang",
   "Depok", "Bekasi", "Bogor", "Yogyakarta", "Malang", "Denpasar", "Balikpapan",
   "Samarinda", "Banjarmasin", "Pontianak", "Manado", "Padang", "Pekanbaru",
+  // ── Tambahan variasi (total 50) ──
+  "Bandar Lampung", "Batam", "Cirebon", "Solo", "Kediri", "Jember", "Mataram",
+  "Kupang", "Ambon", "Jayapura", "Sorong", "Banda Aceh", "Bengkulu", "Jambi",
+  "Cilegon", "Serang", "Purwokerto", "Magelang", "Palu", "Kendari",
+  "Gorontalo", "Ternate", "Mamuju", "Gianyar", "Lhokseumawe",
 ];
 
 const DUMMY_PROFILES = [
@@ -136,6 +141,37 @@ const DUMMY_PROFILES = [
   { name: "Maya Putri", email: "maya.putri.travel@gmail.com" },
   { name: "Reza Rahadian", email: "reza.rahadian.actor@gmail.com" },
   { name: "Indah Permatasari", email: "indah.permatasari.model@gmail.com" },
+  // ── Tambahan variasi (total 50) — ragam suku & daerah ──
+  { name: "Lukman Hakim", email: "lukman.hakim96@gmail.com" },
+  { name: "Ayu Kartika", email: "ayu.kartika.ayu@yahoo.com" },
+  { name: "Slamet Riyadi", email: "slamet.riyadi.solo@gmail.com" },
+  { name: "Tuti Alawiyah", email: "tuti.alawiyah.jogja@gmail.com" },
+  { name: "Farhan Maulana", email: "farhan.maulana.lpg@gmail.com" },
+  { name: "Nabila Zahra", email: "nabila.zahra.palembang@outlook.com" },
+  { name: "Gilang Ramadhan", email: "gilang.ramadhan.malang@gmail.com" },
+  { name: "Citra Kirana", email: "citra.kirana.kediri@gmail.com" },
+  { name: "Bayu Anggara", email: "bayu.anggara.batam@gmail.com" },
+  { name: "Wulan Dari", email: "wulan.dari.jambi@yahoo.co.id" },
+  { name: "Teuku Fariz", email: "teuku.fariz.aceh@gmail.com" },
+  { name: "Cut Marlia", email: "cut.marlia.aceh@outlook.com" },
+  { name: "I Made Wirata", email: "i.made.wirata.bali@gmail.com" },
+  { name: "Ni Luh Ayu", email: "niluh.ayu.bali@yahoo.com" },
+  { name: "Ujang Komarudin", email: "ujang.komarudin.bdg@gmail.com" },
+  { name: "Eneng Suryani", email: "eneng.suryani.cirebon@gmail.com" },
+  { name: "La Ode Haris", email: "laode.haris.kendari@gmail.com" },
+  { name: "Wa Ode Sitti", email: "waode.sitti.kendari@yahoo.com" },
+  { name: "Johan Panjaitan", email: "johan.panjaitan.medan@gmail.com" },
+  { name: "Boruk Sihombing", email: "boruk.sihombing.medan@outlook.com" },
+  { name: "Daeng Makkawaru", email: "daeng.makkawaru.mks@gmail.com" },
+  { name: "Andi Tenri", email: "andi.tenri.parepare@yahoo.com" },
+  { name: "Yohanes Korwa", email: "yohanes.korwa.jayapura@gmail.com" },
+  { name: "Maria Matulessy", email: "maria.matulessy.ambon@gmail.com" },
+  { name: "Petrus Ola", email: "petrus.ola.kupang@gmail.com" },
+  { name: "Maria Florida", email: "maria.florida.kupang@yahoo.com" },
+  { name: "Jamaluddin Sulaiman", email: "jamaluddin.ternate@gmail.com" },
+  { name: "Norhalimah", email: "norhalimah.banjarmasin@gmail.com" },
+  { name: "Ahmad Rifai", email: "ahmad.rifai.balikpapan@gmail.com" },
+  { name: "Siti Masitah", email: "siti.masitah.samarinda@outlook.com" },
 ];
 
 // ── Helpers ─────────────────────────────────────────────
