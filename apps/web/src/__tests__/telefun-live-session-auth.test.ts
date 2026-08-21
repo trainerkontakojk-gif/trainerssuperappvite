@@ -116,7 +116,7 @@ describe("LiveSession first-message authentication", () => {
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
       value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [] }),
+        getUserMedia: vi.fn().mockResolvedValue({ getAudioTracks: () => [], getTracks: () => [] }),
       },
     });
     vi.spyOn(LiveSession.prototype as any, "setupRecorders").mockImplementation(
@@ -241,7 +241,7 @@ describe("LiveSession first-message authentication", () => {
   });
 
   it("publishes the exact legacy capture stream and clears it during cleanup", async () => {
-    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const stream = { getAudioTracks: () => [], getTracks: () => [] } as unknown as MediaStream;
     const getUserMedia = vi.fn().mockResolvedValue(stream);
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,

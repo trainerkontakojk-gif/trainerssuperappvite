@@ -169,6 +169,7 @@ export class LiveSession {
           sampleRate: this.audioConfiguration.inputSampleRateHz,
         },
       });
+      this.applyMuteToTracks();
       this.onLocalStream(this.stream);
 
       // 2. Setup Audio Context
@@ -745,9 +746,17 @@ export class LiveSession {
     }
   }
 
+  private applyMuteToTracks(): void {
+    if (!this.stream) return;
+    this.stream.getAudioTracks().forEach((track) => {
+      track.enabled = !this.isMuted;
+    });
+  }
+
   public setMute(muted: boolean) {
     this.isMuted = muted;
     this.emitTimelineEvent("mute_changed", { muted });
+    this.applyMuteToTracks();
   }
 
   public setHold(held: boolean) {
