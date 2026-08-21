@@ -739,10 +739,10 @@ export function ChatInterface({
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
-            className="flex justify-end"
+            className="flex justify-start"
             aria-live="polite"
           >
-            <div className="module-clean-panel rounded-2xl rounded-br-md px-4 py-3">
+            <div className="module-clean-panel rounded-2xl rounded-tl-md px-4 py-3">
               <div className="flex space-x-1">
                 <motion.div
                   animate={{ y: [0, -3, 0] }}
