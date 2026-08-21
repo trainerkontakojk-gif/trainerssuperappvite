@@ -30,9 +30,10 @@ import {
 import {
   classifyTextBand,
   isAgentGivingSolution,
-  isSlowEligible,
+  shouldUseFastSameMinute,
   boundedRandom,
   REALISTIC_RANGES,
+  FAST_SAME_MINUTE_RANGES,
   TRAINING_FAST_RANGES,
   type SessionPhase,
 } from "../lib/pacing";
@@ -99,8 +100,6 @@ export function ChatInterface({
   );
   const isMountedRef = useRef(true);
   const consumerTurnCountRef = useRef(0);
-  const totalSlowCountRef = useRef(0);
-  const consecutiveSlowCountRef = useRef(0);
   const sendGenerationRef = useRef(0);
 
   // ── Character counter ─────────────────────────────────
@@ -373,36 +372,22 @@ export function ChatInterface({
 
         const isFirstConsumerTurn = consumerTurnCountRef.current === 0;
         consumerTurnCountRef.current += 1;
-        const currentConsumerTurn = consumerTurnCountRef.current;
 
-        let firstBand: "short" | "normal" | "long" | "slow" | "greeting_reply" =
+        const firstBand: "short" | "normal" | "long" | "slow" | "greeting_reply" =
           isFirstConsumerTurn
             ? "greeting_reply"
             : classifyTextBand(parts[0]?.text.length || 0);
-        const shouldUseSlow =
-          pacingMode === "realistic" &&
-          parts.length > 0 &&
-          !agentGivingSolution &&
-          isSlowEligible({
-            consumerTurnIndex: currentConsumerTurn,
-            consecutiveSlowCount: consecutiveSlowCountRef.current,
-            totalSlowCount: totalSlowCountRef.current,
-            sessionDurationMinutes: durationMinutes,
-            remainingSeconds: remaining,
-            elapsedSeconds,
-            totalDurationSeconds: durationMinutes * 60,
-          });
 
-        if (shouldUseSlow) {
-          firstBand = "slow";
-          totalSlowCountRef.current += 1;
-          consecutiveSlowCountRef.current += 1;
-        } else {
-          consecutiveSlowCountRef.current = 0;
-        }
+        // Opsi B: ~82% beda menit (45-95s), ~18% cepat menit sama (5-25s)
+        const useFast =
+          pacingMode === "realistic" && shouldUseFastSameMinute({ remainingSeconds: remaining });
 
         const ranges =
-          pacingMode === "realistic" ? REALISTIC_RANGES : TRAINING_FAST_RANGES;
+          pacingMode === "realistic"
+            ? useFast
+              ? FAST_SAME_MINUTE_RANGES
+              : REALISTIC_RANGES
+            : TRAINING_FAST_RANGES;
         let delay = 0;
 
         for (let i = 0; i < parts.length; i += 1) {
@@ -412,7 +397,7 @@ export function ChatInterface({
           const range = ranges[band];
           let plannedDelay = boundedRandom(range.minMs, range.maxMs);
 
-          if (remaining < 20) {
+          if (remaining < 25) {
             plannedDelay = boundedRandom(1000, 3000);
           } else if (isFirst && agentGivingSolution && plannedDelay < 10000) {
             plannedDelay = boundedRandom(10000, Math.max(10000, range.maxMs));
@@ -431,7 +416,7 @@ export function ChatInterface({
             mode: pacingMode as "realistic" | "training_fast",
             band,
             plannedDelayMs: plannedDelay,
-            timerClamped: remaining < 20,
+            timerClamped: remaining < 25,
           };
 
           const timeoutId = window.setTimeout(() => {
