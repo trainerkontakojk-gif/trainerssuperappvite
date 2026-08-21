@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Play, Settings, History, BarChart3 } from "lucide-react";
-import ModuleWorkspaceIntro from "../../components/ModuleWorkspaceIntro";
+import { Play, Settings, History, BarChart3 } from "lucide-react";
+import { PdktMotionFrame } from "./components/PdktMotionFrame";
 import PdktSimulation from "./simulation";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
@@ -268,64 +268,85 @@ export default function PdktLanding() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
-            className="relative z-10 py-6"
+            className="relative z-10"
           >
-            <ModuleWorkspaceIntro
-              eyebrow="Paham Dulu Kasih Tanggapan"
-              title="Buka simulasi email dengan pengalaman workspace yang seragam."
-              description="Atur skenario, telaah riwayat evaluasi, lalu lanjutkan respons email dalam satu workspace terpadu yang konsisten dengan modul lain."
-              accentClassName={accentClassName}
-              accentSoftClassName={accentSoftClassName}
-              icon={<Mail className="h-8 w-8" />}
-              actions={
-                <>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={handleStartSimulation}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all bg-purple-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/20"
-                  >
-                    <Play className="h-4 w-4 fill-current" />
-                    <span>Mulai Simulasi</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={handleOpenSettings}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <Settings className="h-4 w-4 opacity-60" />
-                    <span>Pengaturan</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={handleOpenHistory}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <History className="h-4 w-4 opacity-60" />
-                    <span>Riwayat</span>
-                  </motion.button>
-                  <motion.button
-                    whileHover={{ scale: 1.01, y: -1 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={handleOpenUsage}
-                    className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-[10px] font-black uppercase tracking-[0.18em] transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
-                  >
-                    <BarChart3 className="h-4 w-4 opacity-60" />
-                    <span>Usage Bulan Ini</span>
-                    {sessionDelta &&
-                      (sessionDelta.costIdr > 0 ||
-                        sessionDelta.totalTokens > 0 ||
-                        sessionDelta.totalCalls > 0) && (
-                        <span className="ml-auto text-[10px] font-black text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                          {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
-                        </span>
-                      )}
-                  </motion.button>
-                </>
-              }
-            />
+            <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
+              <div className="grid gap-8 lg:grid-cols-2 lg:items-stretch">
+                {/* Kiri — HP inbox */}
+                <div className="flex flex-col">
+                  <div className="flex flex-1 flex-col">
+                    <PdktMotionFrame />
+                  </div>
+                  <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+                    Daftar email masuk ke konsumen@ojk.go.id. Sesi singkat, telaah langsung tersedia.
+                  </p>
+                </div>
+
+                {/* Kanan — 1 card */}
+                <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
+                  <div className="space-y-4">
+                    <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
+                      Latih balasan email. Pahami dulu, baru tanggapi.
+                    </h1>
+                    <p className="max-w-xl text-base leading-7 text-muted-foreground">
+                      PDKT — singkatan dari <span className="font-semibold text-foreground">Paham Dulu, Kasih Tanggapan</span> — adalah simulasi balasan email berbasis AI untuk melatih pemahaman, analisa, dan ketepatan solusi. Pilih skenario, susun balasan, lalu tinjau telaah secara langsung.
+                    </p>
+                  </div>
+
+                  <div className="mt-8 border-t border-border/40 pt-6">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Mulai latihan
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={handleStartSimulation}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-purple-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/20"
+                      >
+                        <Play className="h-4 w-4 fill-current" />
+                        <span>Mulai simulasi</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={handleOpenSettings}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <Settings className="h-4 w-4 opacity-60" />
+                        <span>Pengaturan</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={handleOpenHistory}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <History className="h-4 w-4 opacity-60" />
+                        <span>Riwayat</span>
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={handleOpenUsage}
+                        className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
+                      >
+                        <BarChart3 className="h-4 w-4 opacity-60" />
+                        <span>Pemakaian bulan ini</span>
+                        {sessionDelta &&
+                          (sessionDelta.costIdr > 0 ||
+                            sessionDelta.totalTokens > 0 ||
+                            sessionDelta.totalCalls > 0) && (
+                            <span className="ml-auto text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
+                              {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                            </span>
+                          )}
+                      </motion.button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
           </motion.div>
         ) : (
           <motion.div

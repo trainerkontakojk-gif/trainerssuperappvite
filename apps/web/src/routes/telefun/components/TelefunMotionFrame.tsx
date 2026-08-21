@@ -56,7 +56,7 @@ export function TelefunMotionFrame() {
                 </div>
 
                 {/* caller */}
-                <div className="flex flex-1 flex-col items-center px-5 pt-7">
+                <div className="flex flex-1 flex-col items-center px-5 pt-5">
                   <motion.p
                     initial={shouldReduceMotion ? undefined : { opacity: 0, y: 4 }}
                     animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
@@ -70,38 +70,38 @@ export function TelefunMotionFrame() {
                     initial={shouldReduceMotion ? undefined : { scale: 0.9, opacity: 0 }}
                     animate={shouldReduceMotion ? undefined : { scale: 1, opacity: 1 }}
                     transition={shouldReduceMotion ? undefined : { delay: 0.2, duration: 0.35 }}
-                    className="relative mt-4"
+                    className="relative mt-3"
                   >
                     <motion.div
                       animate={shouldReduceMotion ? undefined : { scale: [1, 1.2, 1], opacity: [0.18, 0, 0.18] }}
                       transition={shouldReduceMotion ? undefined : { duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
                       className="pointer-events-none absolute inset-0 rounded-full border border-white/15"
-                      style={{ margin: -10 }}
+                      style={{ margin: -8 }}
                     />
                     <motion.div
                       animate={shouldReduceMotion ? undefined : { scale: [1, 1.35, 1], opacity: [0.1, 0, 0.1] }}
                       transition={shouldReduceMotion ? undefined : { duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
                       className="pointer-events-none absolute inset-0 rounded-full border border-white/10"
-                      style={{ margin: -22 }}
+                      style={{ margin: -16 }}
                     />
-                    <div className="relative flex h-[104px] w-[104px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 shadow-2xl shadow-black/30 ring-1 ring-white/10">
-                      <span className="text-[28px] font-semibold tracking-tight text-white">157</span>
+                    <div className="relative flex h-[84px] w-[84px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-zinc-700 to-zinc-800 shadow-2xl shadow-black/30 ring-1 ring-white/10">
+                      <span className="text-[24px] font-semibold tracking-tight text-white">157</span>
                     </div>
-                    <span className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white shadow-md ring-2 ring-[#0a0a14]">HD</span>
+                    <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[8px] font-bold text-white shadow-md ring-2 ring-[#0a0a14]">HD</span>
                   </motion.div>
 
                   <motion.p
                     animate={shouldReduceMotion ? undefined : { opacity: [0.9, 1, 0.9] }}
                     transition={shouldReduceMotion ? undefined : { duration: 1.2, repeat: Infinity }}
-                    className="mt-3 text-center text-[13px] font-medium tabular-nums tracking-wide text-white/90"
+                    className="mt-2 text-center text-[13px] font-medium tabular-nums tracking-wide text-white/90"
                   >
                     00:24
                   </motion.p>
                 </div>
 
                 {/* controls - iOS style 6 buttons */}
-                <div className="px-6 pb-4 pt-2">
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                <div className="px-5 pb-3 pt-1">
+                  <div className="grid grid-cols-3 gap-x-3 gap-y-2.5">
                     {[
                       { k: "mute", label: "bisukan", icon: (
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 14a3 3 0 003-3V6a3 3 0 00-6 0v5a3 3 0 003 3z" fill="white"/><path d="M19 10a7 7 0 01-14 0" stroke="white" strokeWidth="1.6" strokeLinecap="round" fill="none"/><path d="M12 17v3M8 21h8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -123,7 +123,7 @@ export function TelefunMotionFrame() {
                       )},
                     ].map((b) => (
                       <div key={b.k} className="flex flex-col items-center gap-1.5">
-                        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white/14 backdrop-blur">
+                        <div className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-white/14 backdrop-blur">
                           {b.icon}
                         </div>
                         <span className="text-center text-[10px] font-normal leading-none text-white/85">{b.label}</span>
@@ -131,13 +131,13 @@ export function TelefunMotionFrame() {
                     ))}
                   </div>
 
-                  <div className="mt-5 flex flex-col items-center justify-center gap-1">
+                  <div className="mt-4 flex flex-col items-center justify-center gap-1">
                     <motion.button
                       type="button"
                       tabIndex={-1}
                       animate={shouldReduceMotion ? undefined : { scale: [1, 1.02, 1] }}
                       transition={shouldReduceMotion ? undefined : { duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                      className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-[#ff3b30] text-white shadow-lg shadow-black/20"
+                      className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#ff3b30] text-white shadow-lg shadow-black/20"
                     >
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
                         <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.12 1.33.43 2.62.92 3.84a2 2 0 01-.58 2.11l-1.27 1.27a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.58c1.22.49 2.5.8 3.85.92A2 2 0 0122 16.92z" fill="white" transform="rotate(135 12 12)"/>

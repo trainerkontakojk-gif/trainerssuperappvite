@@ -69,14 +69,14 @@ export function KetikMotionFrame() {
                   Hari ini
                 </p>
 
-                {/* bubble Rojak - kanan */}
+                {/* bubble Rojak - kiri (agent) */}
                 <motion.div
                   initial={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
                   animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
                   transition={shouldReduceMotion ? undefined : { delay: 0.3, duration: 0.4 }}
-                  className="flex justify-end"
+                  className="flex justify-start"
                 >
-                  <div className="max-w-[86%] rounded-2xl rounded-br-md bg-emerald-600 px-3.5 py-2.5 shadow-sm">
+                  <div className="max-w-[86%] rounded-2xl rounded-bl-md bg-emerald-600 px-3.5 py-2.5 shadow-sm">
                     <p className="text-[11px] leading-relaxed text-white">
                       Anda telah terhubung dengan Layanan Kontak OJK 157. Selamat pagi. Saya
                       <span className="font-semibold text-white"> Rojak</span> dengan senang hati
@@ -89,14 +89,14 @@ export function KetikMotionFrame() {
                   </div>
                 </motion.div>
 
-                {/* bubble konsumen - kiri */}
+                {/* bubble konsumen - kanan */}
                 <motion.div
                   initial={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
                   animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
                   transition={shouldReduceMotion ? undefined : { delay: 0.7, duration: 0.4 }}
-                  className="flex justify-start"
+                  className="flex justify-end"
                 >
-                  <div className="max-w-[82%] rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 shadow-sm">
+                  <div className="max-w-[82%] rounded-2xl rounded-br-md bg-white px-3.5 py-2.5 shadow-sm">
                     <p className="text-[11px] leading-relaxed text-slate-700">
                       Pagi kak Rojak, saya butuh bantuan terkait pinjaman online saya. Saya
                       tiba-tiba ditagih padahal sudah lunas.
@@ -105,14 +105,14 @@ export function KetikMotionFrame() {
                   </div>
                 </motion.div>
 
-                {/* typing indicator - Rojak lagi ngetik */}
+                {/* typing indicator - konsumen lagi ngetik (kanan) */}
                 <motion.div
                   initial={shouldReduceMotion ? undefined : { opacity: 0 }}
                   animate={shouldReduceMotion ? undefined : { opacity: 1 }}
                   transition={shouldReduceMotion ? undefined : { delay: 1.1, duration: 0.3 }}
                   className="flex justify-end"
                 >
-                  <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-2 shadow-sm">
+                  <div className="flex items-center gap-1 rounded-full bg-white px-3 py-2 shadow-sm">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:0ms]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:150ms]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:300ms]" />

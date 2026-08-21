@@ -35,32 +35,31 @@ describe("PDKT Landing Page", () => {
 
   it("renders workspace intro with correct eyebrow", async () => {
     render(<PdktLanding />);
-    await screen.findByText("Paham Dulu Kasih Tanggapan");
+    await screen.findByText(/Paham Dulu, Kasih Tanggapan/);
   });
 
   it("renders correct heading", async () => {
     render(<PdktLanding />);
-    await screen.findByText(
-      "Buka simulasi email dengan pengalaman workspace yang seragam.",
-    );
+    await screen.findByText(/Latih balasan email. Pahami dulu, baru tanggapi./);
   });
 
   it("renders description containing expected text", async () => {
     render(<PdktLanding />);
-    await screen.findByText(/Atur skenario, telaah riwayat evaluasi/);
+    await screen.findByText(/PDKT — singkatan dari/);
   });
 
   it("renders Workspace actions section", async () => {
     render(<PdktLanding />);
-    await screen.findByText("Workspace actions");
+    await screen.findByText(/Mulai latihan/);
+    await screen.findByText(/Daftar email masuk/);
   });
 
   it("renders action buttons in exact order", async () => {
     render(<PdktLanding />);
-    const mulaiBtn = await screen.findByText("Mulai Simulasi");
+    const mulaiBtn = await screen.findByText(/Mulai simulasi/i);
     const pengaturanBtn = screen.getByText("Pengaturan");
     const riwayatBtn = screen.getByText("Riwayat");
-    const usageBtn = screen.getByText("Usage Bulan Ini");
+    const usageBtn = screen.getByText(/Pemakaian bulan ini/i);
 
     expect(mulaiBtn.parentElement).not.toBeNull();
     expect(pengaturanBtn.parentElement).not.toBeNull();
@@ -85,7 +84,7 @@ describe("PDKT Landing Page", () => {
 
   it("does not render old card grid copy", async () => {
     render(<PdktLanding />);
-    await screen.findByText("Workspace actions");
+    await screen.findByText(/Mulai latihan/);
     expect(screen.queryByText("Tentang PDKT")).toBeNull();
     expect(screen.queryByText("Riwayat Sesi")).toBeNull();
     expect(
@@ -105,7 +104,7 @@ describe("PDKT Landing Page", () => {
     });
     const user = userEvent.setup();
     render(<PdktLanding />);
-    const mulaiBtn = await screen.findByText("Mulai Simulasi");
+    const mulaiBtn = await screen.findByText(/Mulai simulasi/i);
     await user.click(mulaiBtn);
     await screen.findByText(/Pilih email atau buat simulasi baru/);
   });
@@ -129,7 +128,7 @@ describe("PDKT Landing Page", () => {
   it("opens usage modal when Usage Bulan Ini is clicked", async () => {
     const user = userEvent.setup();
     render(<PdktLanding />);
-    const btn = await screen.findByText("Usage Bulan Ini");
+    const btn = await screen.findByText(/Pemakaian bulan ini/i);
     await user.click(btn);
     await screen.findByText(/Estimasi biaya/);
   });

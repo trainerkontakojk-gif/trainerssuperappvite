@@ -125,16 +125,17 @@ describe("KETIK Landing Page", () => {
   it("renders ModuleWorkspaceIntro with correct description text", async () => {
     render(<KetikLanding />);
 
-    await screen.findByText("Mulai Simulasi");
-    expect(screen.getByText("Mulai Simulasi")).toBeDefined();
+    await screen.findByText(/Mulai simulasi/i);
+    expect(screen.getByText(/Mulai simulasi/i)).toBeDefined();
     expect(screen.getByText("Pengaturan")).toBeDefined();
     expect(screen.getByText("Riwayat")).toBeDefined();
-    expect(screen.getByText("Usage Bulan Ini")).toBeDefined();
+    expect(screen.getByText(/Pemakaian bulan ini/i)).toBeDefined();
 
     expect(
-      screen.getByText(
-        /Latih komunikasi chat dalam satu workspace yang fokus\./,
-      ),
+      screen.getByText(/Ketik — singkatan dari/), 
+    ).toBeDefined();
+    expect(
+      screen.getByText(/Latih percakapan chat\. Balas lebih tepat dan empatik\./),
     ).toBeDefined();
   });
 
@@ -160,8 +161,8 @@ describe("KETIK Landing Page", () => {
     const user = userEvent.setup();
     render(<KetikLanding />);
 
-    await screen.findByText("Usage Bulan Ini");
-    await user.click(screen.getByText("Usage Bulan Ini"));
+    await screen.findByText(/Pemakaian bulan ini/i);
+    await user.click(screen.getByText(/Pemakaian bulan ini/i));
     expect(screen.getByText(/Estimasi biaya/)).toBeDefined();
   });
 
@@ -169,8 +170,8 @@ describe("KETIK Landing Page", () => {
     const user = userEvent.setup();
     render(<KetikLanding />);
 
-    await screen.findByText("Mulai Simulasi");
-    await user.click(screen.getByText("Mulai Simulasi"));
+    await screen.findByText(/Mulai simulasi/i);
+    await user.click(screen.getByText(/Mulai simulasi/i));
 
     // Should transition to chat view - check for elapsed timer display (0:00 at start)
     await screen.findByText(/0:00/);
@@ -184,8 +185,8 @@ describe("KETIK Landing Page", () => {
     });
     render(<KetikLanding />);
 
-    await screen.findByText("Mulai Simulasi");
-    await user.click(screen.getByText("Mulai Simulasi"));
+    await screen.findByText(/Mulai simulasi/i);
+    await user.click(screen.getByText(/Mulai simulasi/i));
 
     await waitFor(() => {
       expect(mockWarning).toHaveBeenCalledWith(

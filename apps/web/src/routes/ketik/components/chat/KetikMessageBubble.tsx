@@ -71,14 +71,14 @@ export function KetikMessageBubble({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className={`flex w-full ${isAgent ? "justify-end" : "justify-start"}`}
+      className={`flex w-full ${isAgent ? "justify-start" : "justify-end"}`}
     >
       <div
         className={`relative max-w-[88%] px-4 py-3 text-[15px] leading-7 sm:max-w-[76%] sm:px-5
           ${
             isAgent
-              ? "rounded-2xl rounded-tr-md bg-module-ketik text-white"
-              : "module-clean-panel rounded-2xl rounded-tl-md text-foreground"
+              ? "rounded-2xl rounded-tl-md bg-module-ketik text-white"
+              : "module-clean-panel rounded-2xl rounded-tr-md text-foreground"
           }`}
       >
         <div className="whitespace-pre-wrap break-words font-medium">

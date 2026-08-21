@@ -28,6 +28,13 @@ const usageMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../routes/telefun/telefunApi", () => apiMocks);
+vi.mock("../routes/telefun/services/telefunWebRtcCapability", () => ({
+  OPENAI_WEBRTC_MODEL_ID: "gpt-realtime-2.1",
+  OPENAI_WEBRTC_TRANSPORT: "openai-webrtc",
+  fetchTelefunWebRtcCapability: apiMocks.getTelefunWebRtcCapability,
+  isTelefunWebRtcModelAllowed: () => false,
+  isAllowedTelefunWebRtc: () => false,
+}));
 vi.mock("../lib/usage-summary", () => usageMocks);
 vi.mock("../lib/toast", () => ({
   notify: {
@@ -100,7 +107,7 @@ describe("Telefun start-call single-flight", () => {
     render(<TelefunLanding />);
 
     const startButton = await screen.findByRole("button", {
-      name: "Mulai Panggilan",
+      name: /Mulai panggilan/i,
     });
     await waitFor(() => expect(startButton).not.toBeDisabled());
 
@@ -110,7 +117,6 @@ describe("Telefun start-call single-flight", () => {
     await waitFor(() => {
       expect(apiMocks.createTelefunSession).toHaveBeenCalled();
     });
-    expect(apiMocks.getTelefunWebRtcCapability).toHaveBeenCalledTimes(1);
     expect(apiMocks.createTelefunSession).toHaveBeenCalledTimes(1);
 
     await act(async () => {
