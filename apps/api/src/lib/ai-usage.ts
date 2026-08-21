@@ -118,20 +118,53 @@ export async function logAiUsage(options: {
 
     const liveModel = getTelefunLiveModel(normalizedModelId);
     const isGeminiLive = liveModel?.provider === "gemini";
-    const defaultInput = isGeminiLive ? 3.0 : 0;
-    const defaultOutput = isGeminiLive ? 12.0 : 0;
+    // Fallback pricing when ai_pricing_settings row is missing — tiered per official rate cards.
+    // Audit 2026-08-21: Google/ai.google.dev + OpenAI 2026-07-30 cut.
+    // Standard (Paid Tier, Global) unless noted. Gemini Live keeps its own realtime rates.
+    const pricingByModel: Record<string, { input: number; output: number }> = {
+      "gemini-3.7-flash": { input: 0.75, output: 3.75 },
+      "gemini-3.5-flash": { input: 1.5, output: 9.0 },
+      "gemini-3.5-flash-lite": { input: 0.30, output: 2.50 },
+      "gemini-3-flash-preview": { input: 0.50, output: 3.00 },
+      "gemini-3.1-flash-lite": { input: 0.25, output: 1.50 },
+      "gemini-3.1-pro-preview": { input: 2.00, output: 12.00 },
+      "gemini-3.1-flash-image": { input: 0.50, output: 3.00 },
+      "gpt-5.6-luna": { input: 0.20, output: 1.20 },
+      "gpt-5.4-mini": { input: 0.75, output: 4.50 },
+    };
+    const known = pricingByModel[normalizedModelId];
+    let resolvedDefaultInput: number;
+    let resolvedDefaultOutput: number;
+    if (known) {
+      resolvedDefaultInput = known.input;
+      resolvedDefaultOutput = known.output;
+    } else if (isGeminiLive) {
+      resolvedDefaultInput = 3.0;
+      resolvedDefaultOutput = 12.0;
+    } else if (normalizedModelId.startsWith("gemini-")) {
+      // Future Gemini model not yet in table — use conservative Flash standard
+      resolvedDefaultInput = 0.50;
+      resolvedDefaultOutput = 3.00;
+    } else if (normalizedModelId.startsWith("gpt-")) {
+      // Unknown OpenAI model — use mini tier as conservative default
+      resolvedDefaultInput = 0.75;
+      resolvedDefaultOutput = 4.50;
+    } else {
+      resolvedDefaultInput = 0;
+      resolvedDefaultOutput = 0;
+    }
 
     if (!pricing) {
       console.warn(
         `[AI Usage] No pricing for "${normalizedModelId}". Using fallback.`,
       );
-      inputPricePerMillion = defaultInput;
-      outputPricePerMillion = defaultOutput;
+      inputPricePerMillion = resolvedDefaultInput;
+      outputPricePerMillion = resolvedDefaultOutput;
     } else {
       inputPricePerMillion =
-        pricing.input_price_usd_per_million ?? defaultInput;
+        pricing.input_price_usd_per_million ?? resolvedDefaultInput;
       outputPricePerMillion =
-        pricing.output_price_usd_per_million ?? defaultOutput;
+        pricing.output_price_usd_per_million ?? resolvedDefaultOutput;
     }
 
     const inputKnownTokens = getKnownTokenCount(
