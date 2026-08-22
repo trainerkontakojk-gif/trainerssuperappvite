@@ -1,4 +1,4 @@
-import { ShieldCheck, ShieldAlert, Clock, AlertTriangle } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Clock, AlertTriangle, ListChecks, Play } from "lucide-react";
 import type { TelefunHoldAssessment } from "@trainers/types";
 
 interface HoldAssessmentCardProps {
@@ -108,6 +108,36 @@ export function HoldAssessmentCard({ assessment }: HoldAssessmentCardProps) {
           {assessment.feedback && (
             <p className="mt-2 text-xs text-slate-500 dark:text-white/55">
               {assessment.feedback}
+            </p>
+          )}
+          {assessment.nextSteps && assessment.nextSteps.length > 0 && (
+            <div className="mt-3 rounded-xl border border-amber-200/60 bg-white/60 p-3 dark:border-amber-800/40 dark:bg-slate-900/40">
+              <h4 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                <ListChecks className="h-3.5 w-3.5" aria-hidden />
+                Langkah Perbaikan
+              </h4>
+              <ol className="mt-2 space-y-1.5">
+                {assessment.nextSteps.map((step, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-2 text-xs leading-relaxed text-slate-600 dark:text-white/70"
+                  >
+                    <span className="font-bold text-amber-600 dark:text-amber-400">
+                      {i + 1}.
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+          {assessment.drill && (
+            <p className="mt-3 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-sky-600 dark:text-sky-400">
+              <Play className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+              <span>
+                <span className="font-bold uppercase tracking-wide">Drill:</span>{" "}
+                {assessment.drill}
+              </span>
             </p>
           )}
         </div>

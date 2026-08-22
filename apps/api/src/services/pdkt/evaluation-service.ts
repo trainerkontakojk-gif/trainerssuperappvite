@@ -5,11 +5,15 @@ import {
   PdktEvaluationResult,
   PdktRecipientContext,
   PdktEvaluationScoreBreakdown,
+  PdktDimensionKey,
+  PdktActionItemAI,
+  PdktEvaluationEdu,
 } from "@trainers/types";
 import { UsageContext } from "../../lib/ai-usage";
 import { createAdminClient } from "../../lib/supabase";
 import { parseJsonFromModelText } from "../../lib/ai-json";
 import { DEFAULT_AI_MODEL_ID } from "../../lib/ai-models";
+import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { callAI, isTransientAiError } from "./shared-utils";
 import { buildPdktRecipientConflictHints } from "./evaluation-context";
 import {
@@ -101,8 +105,21 @@ export function buildPdktEvaluationPrompt(input: {
     '  "typos": string[],',
     '  "clarityIssues": string[],',
     '  "contentGaps": string[],',
-    '  "feedback": string',
+    '  "feedback": string,',
+    '  "edu": {',
+    '    "dimensionTips": { "<dimension>": string },',
+    '    "improvementTips": string[],',
+    '    "actionItems": [{ "dimension": string, "text": string, "example": string }],',
+    '    "suggestedRewrite": { "subject": string, "body": string, "highlights": string[] }',
+    "  }",
     "}",
+    "",
+    "ATURAN EDUKASI:",
+    "- Untuk tiap dimensi scoreBreakdown < 75 wajib ada tip pada \"edu\": \"dimensionTips\" (1 kalimat cara memperbaiki).",
+    "- \"improvementTips\" berisi 3-5 langkah prioritas.",
+    "- \"actionItems\" array {dimension,text,example} — JANGAN isi field prioritas; backend yang menentukan urutan.",
+    "- \"suggestedRewrite\": body email balasan yang sudah diperbaiki dengan sapaan/penutup yang menjaga primaryRecipientType dari recipientContext.",
+    "- Semua teks edukasi dalam Bahasa Indonesia.",
   ].join("\n");
 
   const emptyDataBlock = buildPdktPromptDataBlock("evaluation_context", {});
@@ -298,6 +315,192 @@ class InvalidPdktEvaluationResponseError extends Error {
   }
 }
 
+// ── Evaluasi Edukatif: deterministic edu builder ─────────────────
+
+const PDKT_DIMENSION_ORDER: PdktDimensionKey[] = [
+  "recipientDirection",
+  "normative",
+  "clarity",
+  "typo",
+  "template",
+];
+
+const PDKT_DIMENSION_SCORE_KEY: Record<
+  PdktDimensionKey,
+  keyof PdktEvaluationScoreBreakdown
+> = {
+  recipientDirection: "recipientDirectionScore",
+  normative: "normativeResponseScore",
+  clarity: "clarityScore",
+  typo: "typoScore",
+  template: "templateComplianceScore",
+};
+
+const PDKT_EDU_FALLBACK_TIPS: Record<
+  PdktDimensionKey,
+  { critical: string; medium: string }
+> = {
+  recipientDirection: {
+    critical:
+      "Perbaiki arah penerima: sapaan dan penutup harus ditujukan ke perusahaan terlapor, bukan OJK.",
+    medium:
+      "Pastikan sapaan pembuka dan penutup tetap mengarah pada perusahaan terlapor.",
+  },
+  normative: {
+    critical:
+      "Lengkapi narasi OJK yang benar: ucapan terima kasih, arahan kanal pelaporan, dan tindak lanjut sesuai prosedur.",
+    medium: "Perkuat narasi respons OJK sesuai prosedur pengaduan.",
+  },
+  clarity: {
+    critical:
+      "Susun ulang balasan dengan struktur jelas: sapaan, konfirmasi masalah, langkah tindak lanjut, penutup.",
+    medium: "Rapikan struktur kalimat agar lebih mudah dipahami konsumen.",
+  },
+  typo: {
+    critical:
+      "Periksa ejaan dan format sebelum mengirim; gunakan template resmi untuk istilah produk.",
+    medium: "Kurangi salah ketik dengan membaca ulang pesan sebelum kirim.",
+  },
+  template: {
+    critical:
+      "Ikuti struktur template resmi surat balasan OJK 157 secara lengkap.",
+    medium: "Tambahkan elemen template yang belum lengkap (nomor tiket/kanal).",
+  },
+};
+
+function readEduString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function readBounded(value: unknown, max: number): string | null {
+  const text = readEduString(value);
+  return text !== null && text.length <= max ? text : null;
+}
+
+/** Deterministic recipientDirection tip when the conflict failsafe applies. */
+function buildConflictRecipientTip(): string {
+  return 'Sapaan/penutup Anda bergeser ke OJK. Ubah menjadi: "Yth. PT [Nama Perusahaan Terlapor] — tim Pengaduan Konsumen" lalu cukup CC kanal kontak OJK 157.';
+}
+
+export function buildPdktEdu(
+  rawEdu: unknown,
+  scoreBreakdown: PdktEvaluationScoreBreakdown,
+  conflictDetected: boolean,
+): PdktEvaluationEdu {
+  const raw = isPlainObject(rawEdu) ? rawEdu : {};
+
+  // ── dimensionTips (AI narration + deterministic conflict tip) ──
+  const dimensionTips: Partial<Record<PdktDimensionKey, string>> = {};
+  if (isPlainObject(raw.dimensionTips)) {
+    for (const key of PDKT_DIMENSION_ORDER) {
+      const tip = readBounded(
+        (raw.dimensionTips as Record<string, unknown>)[key],
+        PDKT_PROMPT_INPUT_LIMITS.issueText,
+      );
+      if (tip) dimensionTips[key] = sanitizeAiResponse(tip);
+    }
+  }
+  if (conflictDetected && !dimensionTips.recipientDirection) {
+    dimensionTips.recipientDirection = buildConflictRecipientTip();
+  }
+
+  // ── improvementTips (non-authoritative passthrough) ──
+  let improvementTips: string[] | undefined;
+  if (Array.isArray(raw.improvementTips)) {
+    improvementTips = raw.improvementTips
+      .map((tip) => readBounded(tip, PDKT_PROMPT_INPUT_LIMITS.issueText))
+      .filter((tip): tip is string => tip !== null)
+      .slice(0, 5)
+      .map(sanitizeAiResponse);
+    if (improvementTips.length === 0) improvementTips = undefined;
+  }
+
+  // ── actionItems: AI items first, then rule-based fallback per low dim ──
+  const aiItems: PdktActionItemAI[] = [];
+  if (Array.isArray(raw.actionItems)) {
+    for (const item of raw.actionItems.slice(0, 5)) {
+      if (!isPlainObject(item)) continue;
+      const dimension = PDKT_DIMENSION_ORDER.find((k) => k === item.dimension);
+      const text = readBounded(item.text, PDKT_PROMPT_INPUT_LIMITS.issueText);
+      if (!dimension || !text) continue;
+      const example = readBounded(
+        item.example,
+        PDKT_PROMPT_INPUT_LIMITS.issueText,
+      );
+      if (aiItems.some((existing) => existing.dimension === dimension))
+        continue;
+      aiItems.push({
+        dimension,
+        text: sanitizeAiResponse(text),
+        ...(example ? { example: sanitizeAiResponse(example) } : {}),
+      });
+    }
+  }
+
+  for (const key of PDKT_DIMENSION_ORDER) {
+    if (aiItems.some((item) => item.dimension === key)) continue;
+    const score = scoreBreakdown[PDKT_DIMENSION_SCORE_KEY[key]];
+    if (score >= 75) continue;
+    const band = score < 60 ? "critical" : "medium";
+    aiItems.push({
+      dimension: key,
+      text: PDKT_EDU_FALLBACK_TIPS[key][band],
+    });
+  }
+
+  // Deterministic priorityRank: lowest post-failsafe dimension score first,
+  // then fixed dimension order as tie-breaker. AI never supplies priority.
+  const rankedItems = [...aiItems]
+    .sort((a, b) => {
+      const scoreDiff =
+        scoreBreakdown[PDKT_DIMENSION_SCORE_KEY[a.dimension]] -
+        scoreBreakdown[PDKT_DIMENSION_SCORE_KEY[b.dimension]];
+      if (scoreDiff !== 0) return scoreDiff;
+      return (
+        PDKT_DIMENSION_ORDER.indexOf(a.dimension) -
+        PDKT_DIMENSION_ORDER.indexOf(b.dimension)
+      );
+    })
+    .map((item, index) => ({ ...item, priorityRank: index + 1 }));
+
+  // ── suggestedRewrite passthrough (validated + sanitized) ──
+  let suggestedRewrite: PdktEvaluationEdu["suggestedRewrite"] = null;
+  if (isPlainObject(raw.suggestedRewrite)) {
+    const body = readBounded(
+      raw.suggestedRewrite.body,
+      PDKT_PROMPT_INPUT_LIMITS.longText,
+    );
+    if (body) {
+      const subject = readBounded(
+        raw.suggestedRewrite.subject,
+        PDKT_PROMPT_INPUT_LIMITS.shortText,
+      );
+      const highlights = Array.isArray(raw.suggestedRewrite.highlights)
+        ? raw.suggestedRewrite.highlights
+            .map((h) => readBounded(h, PDKT_PROMPT_INPUT_LIMITS.issueText))
+            .filter((h): h is string => h !== null)
+            .slice(0, 5)
+        : undefined;
+      suggestedRewrite = {
+        body: sanitizeAiResponse(body),
+        ...(subject ? { subject: sanitizeAiResponse(subject) } : {}),
+        ...(highlights && highlights.length > 0
+          ? { highlights: highlights.map(sanitizeAiResponse) }
+          : {}),
+      };
+    }
+  }
+
+  return {
+    actionItems: rankedItems,
+    suggestedRewrite,
+    ...(Object.keys(dimensionTips).length > 0 ? { dimensionTips } : {}),
+    ...(improvementTips ? { improvementTips } : {}),
+  };
+}
+
 export async function evaluateAgentResponse(
   config: PdktSessionConfig,
   emails: EmailMessage[],
@@ -311,6 +514,7 @@ export async function evaluateAgentResponse(
   clarityIssues?: string[];
   contentGaps?: string[];
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
+  edu?: PdktEvaluationEdu;
   error?: string;
 }> {
   const modelId = config.selectedModel || DEFAULT_AI_MODEL_ID;
@@ -400,6 +604,18 @@ export async function evaluateAgentResponse(
         ? `${normalizedResult.feedback}\n\nCatatan sistem: deterministic recipient conflict cap diterapkan karena arah penerima bertentangan dengan metadata.`
         : normalizedResult.feedback;
 
+      // Evaluasi Edukatif: deterministic edu layer built from the post-failsafe
+      // breakdown; AI narration never influences score or priority.
+      const edu = scored.scoreBreakdown
+        ? buildPdktEdu(
+            isPlainObject(rawResult)
+              ? (rawResult as Record<string, unknown>).edu
+              : undefined,
+            scored.scoreBreakdown,
+            conflictAnalysis.conflictHints.length > 0,
+          )
+        : undefined;
+
       return {
         success: true,
         score: scored.score,
@@ -408,6 +624,7 @@ export async function evaluateAgentResponse(
         clarityIssues: normalizedResult.clarityIssues,
         contentGaps: normalizedResult.contentGaps,
         feedback,
+        ...(edu ? { edu } : {}),
       };
     } catch (error: unknown) {
       lastError = error;
@@ -515,6 +732,7 @@ export async function processPdktEvaluation(
       clarityIssues: result.clarityIssues || [],
       contentGaps: result.contentGaps || [],
       scoreBreakdown: result.scoreBreakdown,
+      ...(result.edu ? { edu: result.edu } : {}),
     };
 
     const { data: saved, error: updateEndError } = await adminClient

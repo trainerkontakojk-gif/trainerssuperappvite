@@ -237,6 +237,49 @@ export function generateImprovementTip(
   return tips[key];
 }
 
+/**
+ * Evaluasi Edukatif Telefun — deterministic drill per metric (rule-based
+ * backend; never AI-generated). Parametrized by TELEFUN_QA_TARGETS values.
+ */
+export function generateDrill(
+  key: CommunicationMetric["key"],
+  status: string,
+): string | undefined {
+  if (status === "good") return undefined;
+
+  const drills: Record<CommunicationMetric["key"], string> = {
+    speakingRate:
+      "Latihan tempo: baca naskah 2 menit dengan target 130-150 WPM, jeda ±1 detik antar kalimat. Rekam dan hitung ulang WPM.",
+    intonation:
+      "Latihan intonasi: baca kalimat yang sama 3x — datar, penekanan kata kunci, lalu ekspresif. Bandingkan rekamannya.",
+    articulation:
+      "Latihan artikulasi: ucapkan tongue twister dan istilah produk (restrukturisasi, anuitas) perlahan lalu normal, 5 repetisi.",
+    fillers:
+      "Latihan filler: saat tergoda mengatakan 'eh/anu', tahan dan ganti dengan jeda senyap 1 detik. Latih 10 menit per hari.",
+    tone:
+      "Latihan empati: ulangi kalimat empatis dengan nada turun-naik yang hangat sebelum melayani panggilan sungguhan.",
+  };
+
+  return drills[key];
+}
+
+/** Deterministic example phrase per metric — rule-based, bukan dari AI. */
+export const TELEFUN_EXAMPLE_PHRASES: Record<
+  CommunicationMetric["key"],
+  string
+> = {
+  speakingRate:
+    "Bapak/Ibu, berdasarkan informasi yang kami terima, ada beberapa hal yang perlu kami jelaskan.",
+  intonation: "Saya memahami kondisi yang Bapak/Ibu sampaikan.",
+  articulation:
+    "Pengajuan restrukturisasi dapat disampaikan kepada pihak perusahaan pembiayaan.",
+  fillers: "Baik, saya cek terlebih dahulu informasinya.",
+  tone: "Saya memahami situasi ini cukup mengkhawatirkan bagi Bapak/Ibu.",
+};
+
+/** Coaching layer version — bump when drill/examplePhrase rules change. */
+export const TELEFUN_COACHING_VERSION = 1;
+
 function getAspectScore(
   assessment: VoiceQualityAssessment,
   key: CommunicationMetric["key"],
@@ -334,6 +377,7 @@ export function buildCommunicationProfileFromAssessment(
         : getMetricStatus(displayScore, targetScore);
     const explanation = generateExplanation(key, displayScore, status, def, rawValue as number);
     const improvementTip = generateImprovementTip(key, status);
+    const drill = generateDrill(key, status);
 
     return {
       key,
@@ -355,6 +399,8 @@ export function buildCommunicationProfileFromAssessment(
         ? { examples: assessment.fillerWords?.examples ?? [] }
         : {}),
       ...(improvementTip ? { improvementTip } : {}),
+      ...(drill ? { drill } : {}),
+      examplePhrase: TELEFUN_EXAMPLE_PHRASES[key],
     };
   });
 
@@ -377,6 +423,7 @@ export function buildCommunicationProfileFromAssessment(
 
   return {
     metrics,
+    coachingVersion: TELEFUN_COACHING_VERSION,
     overallSummary:
       goodCount === total
         ? "Profil komunikasi Anda sangat baik di seluruh aspek. Pertahankan konsistensi ini."
@@ -391,6 +438,19 @@ export function buildCommunicationProfileFromAssessment(
           ],
     improvementPriorities,
   };
+}
+
+/** Derive the top-3 practice priorities from a profile — deterministic. */
+export function deriveOverallNextSteps(
+  profile: TelefunCommunicationProfile | null | undefined,
+): string[] {
+  if (!profile) return [];
+  const priorities = profile.improvementPriorities.filter(
+    (p) => typeof p === "string" && p.trim().length > 0,
+  );
+  if (priorities.length > 0) return priorities.slice(0, 3);
+  // All metrics good — reinforce strengths instead.
+  return profile.strengths.slice(0, 1);
 }
 
 export function enrichAssessmentWithCommunicationProfile(
@@ -432,11 +492,29 @@ export function enrichAssessmentWithCommunicationProfile(
         (m.key !== "fillers" ||
           (typeof m.rawValue === "number"
             ? m.displayScore === mapFillerCountToRadarBurden(m.rawValue)
-            : false)),
+            : false)) &&
+        // Evaluasi Edukatif: legacy coaching without drill/examplePhrase is
+        // rebuilt automatically (no AI rerun needed).
+        profile.coachingVersion === TELEFUN_COACHING_VERSION &&
+        profile.metrics.every(
+          (m) =>
+            typeof m.examplePhrase === "string" &&
+            m.examplePhrase.length > 0 &&
+            (m.status === "good" ||
+              (typeof m.drill === "string" && m.drill.length > 0)),
+        ),
     );
 
-  if (isValid) return assessment;
+  if (isValid)
+    return {
+      ...assessment,
+      overallNextSteps: deriveOverallNextSteps(profile),
+    };
 
   const newProfile = buildCommunicationProfileFromAssessment(assessment);
-  return { ...assessment, communicationProfile: newProfile };
+  return {
+    ...assessment,
+    communicationProfile: newProfile,
+    overallNextSteps: deriveOverallNextSteps(newProfile),
+  };
 }

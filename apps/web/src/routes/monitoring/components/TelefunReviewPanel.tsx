@@ -436,6 +436,27 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           <div className="border-t border-border mt-6 pt-6" />
           <HoldAssessmentCard assessment={va.holdManagement} />
 
+          {/* Evaluasi Edukatif — drill deterministik per metrik (read-only) */}
+          {communicationProfile?.metrics.some(
+            (m) => m.drill || m.improvementTip,
+          ) && (
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <h4 className="text-[10px] font-black uppercase tracking-wide text-muted-foreground mb-2">
+                Latihan Per Metrik
+              </h4>
+              <ul className="space-y-1.5">
+                {communicationProfile.metrics
+                  .filter((m) => m.drill || m.improvementTip)
+                  .map((m) => (
+                    <li key={m.key} className="text-xs leading-relaxed text-foreground/80">
+                      <span className="font-bold">{m.label}:</span>{" "}
+                      {m.drill ?? m.improvementTip}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Gauge className="w-4 h-4 text-module-telefun" />

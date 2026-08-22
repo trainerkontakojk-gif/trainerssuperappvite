@@ -11,7 +11,16 @@ import {
   RotateCcw,
   ArrowLeft,
 } from "lucide-react";
-import type { PdktMailboxItem } from "@trainers/types";
+import type {
+  PdktMailboxItem,
+  PdktDimensionKey,
+  PdktEvaluationEdu,
+} from "@trainers/types";
+import {
+  PdktActionItemsCard,
+  PdktDimensionTip,
+  PdktSuggestedRewriteCard,
+} from "../../../components/PdktEducationSections";
 import ScenarioImage from "./ScenarioImage";
 import {
   getAttachmentDataUri,
@@ -49,21 +58,33 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
   const evalData = evaluation;
   const evalError = evaluationError;
   const scoreBreakdown = evalData?.scoreBreakdown;
-  const breakdownItems = scoreBreakdown
+  const edu = evalData?.edu as PdktEvaluationEdu | undefined;
+  const breakdownItems: Array<{
+    label: string;
+    value: number;
+    dimension: PdktDimensionKey;
+  }> = scoreBreakdown
     ? [
         {
           label: "Arah Penerima",
           value: scoreBreakdown.recipientDirectionScore,
+          dimension: "recipientDirection" as const,
         },
         {
           label: "Kualitas OJK",
           value: scoreBreakdown.normativeResponseScore,
+          dimension: "normative" as const,
         },
-        { label: "Kejelasan", value: scoreBreakdown.clarityScore },
-        { label: "Typo", value: scoreBreakdown.typoScore },
+        {
+          label: "Kejelasan",
+          value: scoreBreakdown.clarityScore,
+          dimension: "clarity" as const,
+        },
+        { label: "Typo", value: scoreBreakdown.typoScore, dimension: "typo" as const },
         {
           label: "Template",
           value: scoreBreakdown.templateComplianceScore,
+          dimension: "template" as const,
         },
       ]
     : [];
@@ -375,6 +396,11 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                         <div className="mt-1 text-sm font-black text-[var(--fg)]">
                           {item.value}
                         </div>
+                        <PdktDimensionTip
+                          dimension={item.dimension}
+                          value={item.value}
+                          edu={edu}
+                        />
                       </div>
                     ))}
                   </div>
@@ -461,6 +487,17 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {/* Evaluasi Edukatif */}
+                <PdktActionItemsCard edu={edu} />
+                {edu?.dimensionTips?.recipientDirection &&
+                  scoreBreakdown &&
+                  scoreBreakdown.recipientDirectionScore <= 60 && (
+                    <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-700 dark:text-amber-500 font-medium leading-relaxed">
+                      ⚠️ {edu.dimensionTips.recipientDirection}
+                    </div>
+                  )}
+                <PdktSuggestedRewriteCard edu={edu} />
               </div>
             ) : null}
 

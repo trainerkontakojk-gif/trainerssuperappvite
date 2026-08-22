@@ -457,6 +457,20 @@ describe("enrichAssessmentWithCommunicationProfile", () => {
   });
 
   it("keeps existing communicationProfile if present and valid", () => {
+    // Derive a current-generation profile via the canonical builder so it
+    // carries coachingVersion + drill/examplePhrase and passes isValid.
+    const existing = buildCommunicationProfileFromAssessment(
+      makeLegacyAssessment(),
+    );
+    const assessment = {
+      ...makeLegacyAssessment(),
+      communicationProfile: existing,
+    };
+    const enriched = enrichAssessmentWithCommunicationProfile(assessment);
+    expect(enriched.communicationProfile).toBe(existing);
+  });
+
+  it("rebuilds legacy profiles that predate the coaching layer (auto-upgrade)", () => {
     const existing = {
       metrics: [
         {
@@ -546,7 +560,10 @@ describe("enrichAssessmentWithCommunicationProfile", () => {
       communicationProfile: existing as any,
     };
     const enriched = enrichAssessmentWithCommunicationProfile(assessment);
-    expect(enriched.communicationProfile).toBe(existing);
+    // Legacy coaching (no drill/examplePhrase/coachingVersion) must be
+    // upgraded deterministically — no AI rerun.
+    expect(enriched.communicationProfile).not.toBe(existing);
+    expect(enriched.communicationProfile!.coachingVersion).toBe(1);
   });
 
   it("rebuilds existing communicationProfile if stale or invalid", () => {

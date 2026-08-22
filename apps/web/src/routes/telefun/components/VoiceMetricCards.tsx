@@ -1,4 +1,5 @@
 import React from "react";
+import { Play, Volume2 } from "lucide-react";
 import type {
   TelefunCommunicationProfile,
   CommunicationMetric,
@@ -121,6 +122,21 @@ export const VoiceMetricCards: React.FC<VoiceMetricCardsProps> = ({
             {metric.improvementTip && (
               <p className="mt-2 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                 Tip: {metric.improvementTip}
+              </p>
+            )}
+            {metric.drill && (
+              <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-sky-600 dark:text-sky-400">
+                <Play className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                <span>
+                  <span className="font-bold uppercase tracking-wide">Drill:</span>{" "}
+                  {metric.drill}
+                </span>
+              </p>
+            )}
+            {metric.examplePhrase && (
+              <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-slate-50 px-2.5 py-2 text-[11px] italic leading-relaxed text-slate-600 dark:bg-slate-800/60 dark:text-white/70">
+                <Volume2 className="mt-0.5 h-3 w-3 shrink-0 not-italic" aria-hidden />
+                <span>&ldquo;{metric.examplePhrase}&rdquo;</span>
               </p>
             )}
           </div>

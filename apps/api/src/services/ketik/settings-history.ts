@@ -8,6 +8,7 @@ import {
   DEFAULT_KETIK_SETTINGS,
 } from "@trainers/types";
 import { createAdminClient } from "../../lib/supabase";
+import { buildKetikEducation } from "./review-policy";
 import {
   DEFAULT_AI_MODEL_ID,
   KETIK_PDKT_MODELS,
@@ -372,6 +373,18 @@ export async function getReviewDetail(
     strengths: reviewData.strengths,
     weaknesses: reviewData.weaknesses,
     coachingFocus: reviewData.coaching_focus,
+    // Legacy rows (pre-education) get deterministic rule-based guidance from
+    // stored scores — no AI rerun needed.
+    education:
+      reviewData.education ??
+      buildKetikEducation(undefined, {
+        final: history.final_score ?? 0,
+        empathy: history.empathy_score ?? 0,
+        probing: history.probing_score ?? 0,
+        resolution: history.resolution_score ?? 0,
+        typo: history.typo_score ?? 0,
+        compliance: history.compliance_score ?? 0,
+      }),
     createdAt: reviewData.created_at,
   };
 

@@ -40,6 +40,38 @@ export interface PdktEvaluationScoreBreakdown {
   templateComplianceScore: number;
 }
 
+// ── Evaluasi Edukatif (edu layer) ────────────────────────
+export type PdktDimensionKey =
+  | "recipientDirection"
+  | "normative"
+  | "clarity"
+  | "typo"
+  | "template";
+
+/** Shape requested from the model — no priority field from AI. */
+export interface PdktActionItemAI {
+  dimension: PdktDimensionKey;
+  text: string;
+  example?: string;
+}
+
+export interface PdktActionItem extends PdktActionItemAI {
+  /** Backend-deterministic ranking (1..n) — the single source of priority. */
+  priorityRank: number;
+}
+
+export interface PdktEvaluationEdu {
+  dimensionTips?: Partial<Record<PdktDimensionKey, string>>;
+  /** Additional tips — non-authoritative; ordering lives in actionItems[].priorityRank. */
+  improvementTips?: string[];
+  actionItems: PdktActionItem[]; // max 5
+  suggestedRewrite: {
+    subject?: string;
+    body: string;
+    highlights?: string[];
+  } | null;
+}
+
 export type ConsumerNameMentionPattern =
   | "random"
   | "upfront"
@@ -228,6 +260,47 @@ export const pdktGeneratedEmailAiOutputSchema = pdktEmailAiOutputBaseSchema
 export const pdktTemplateAiOutputSchema = pdktEmailAiOutputBaseSchema;
 export const pdktInitialEmailAiOutputSchema = pdktGeneratedEmailAiOutputSchema;
 
+export const pdktEducationAiOutputSchema = z
+  .object({
+    dimensionTips: z
+      .record(z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))
+      .optional(),
+    improvementTips: z
+      .array(z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))
+      .max(5)
+      .optional(),
+    actionItems: z
+      .array(
+        z.object({
+          dimension: z.enum([
+            "recipientDirection",
+            "normative",
+            "clarity",
+            "typo",
+            "template",
+          ]),
+          text: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.issueText),
+          example: z
+            .string()
+            .max(PDKT_PROMPT_INPUT_LIMITS.issueText)
+            .optional(),
+        }),
+      )
+      .max(5)
+      .optional(),
+    suggestedRewrite: z
+      .object({
+        subject: z
+          .string()
+          .max(PDKT_PROMPT_INPUT_LIMITS.shortText)
+          .optional(),
+        body: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.longText),
+        highlights: z.array(z.string()).max(5).optional(),
+      })
+      .nullish(),
+  })
+  .optional();
+
 export const pdktEvaluationAiOutputSchema = z
   .object({
     score: pdktAiScoreSchema,
@@ -242,6 +315,7 @@ export const pdktEvaluationAiOutputSchema = z
       .array(z.string().max(PDKT_PROMPT_INPUT_LIMITS.issueText))
       .max(PDKT_PROMPT_INPUT_LIMITS.issueCount),
     feedback: z.string().max(PDKT_PROMPT_INPUT_LIMITS.feedback),
+    edu: pdktEducationAiOutputSchema,
   })
   .strict();
 
@@ -252,6 +326,7 @@ export interface PdktEvaluationResult {
   clarityIssues: string[];
   contentGaps: string[];
   scoreBreakdown?: PdktEvaluationScoreBreakdown;
+  edu?: PdktEvaluationEdu;
 }
 
 export type MailboxStatus = "open" | "replied" | "deleted";

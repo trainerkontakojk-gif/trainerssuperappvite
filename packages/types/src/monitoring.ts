@@ -1,4 +1,4 @@
-import type { ChatMessage } from "./ketik";
+import type { ChatMessage, KetikEducation } from "./ketik";
 import type {
   EmailMessage,
   PdktEvaluationResult,
@@ -167,6 +167,7 @@ export interface KetikMonitoringReview {
     strengths: string[];
     weaknesses: string[];
     coachingFocus: string[];
+    education?: KetikEducation | null;
     createdAt: string;
   } | null;
   typos: Array<{

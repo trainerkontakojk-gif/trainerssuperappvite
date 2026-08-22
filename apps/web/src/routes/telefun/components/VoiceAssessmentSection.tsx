@@ -337,6 +337,27 @@ export const VoiceAssessmentSection: React.FC<VoiceAssessmentSectionProps> = ({
         </div>
       )}
 
+      {/* 3 Prioritas Latihan Minggu Ini — rule-based dari overallNextSteps */}
+      {assessment.overallNextSteps && assessment.overallNextSteps.length > 0 && (
+        <div className="rounded-2xl border border-amber-200/60 bg-amber-50/50 p-5 dark:border-amber-800/40 dark:bg-amber-950/20">
+          <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            <ListChecks className="h-4 w-4" aria-hidden />
+            3 Prioritas Latihan Minggu Ini
+          </h3>
+          <ol className="space-y-2">
+            {assessment.overallNextSteps.slice(0, 3).map((step, i) => (
+              <li
+                key={i}
+                className="flex gap-2.5 text-xs leading-relaxed text-slate-700 dark:text-white/75"
+              >
+                <span className="font-black text-amber-500">{i + 1}.</span>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       {/* Metric Cards */}
       {communicationProfile && (
         <VoiceMetricCards profile={communicationProfile} />

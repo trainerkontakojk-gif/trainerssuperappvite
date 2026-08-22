@@ -117,6 +117,13 @@ export function evaluateTelefunHoldAssessment(
       exceededCount === 1
         ? `Manajemen hold kurang. 1 hold melewati batas; hold terlama ${formatDuration(longestDurationMs)}.`
         : `Manajemen hold kurang. ${exceededCount} dari ${count} hold melewati batas; hold terlama ${formatDuration(longestDurationMs)}.`;
+    // Rule-based coaching — limits sourced from TELEFUN_*_HOLD_LIMIT_MS,
+    // never hardcoded.
+    const nextSteps = [
+      `Batasi hold pertama maksimal ${Math.round(TELEFUN_FIRST_HOLD_LIMIT_MS / 1000)} detik dan hold berikutnya maksimal ${Math.round(TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS / 1000)} detik.`,
+      "Sebelum hold, beri tahu konsumen alasannya dan perkiraan durasi tunggu.",
+      "Kembali ke saluran tepat waktu dan ucapkan terima kasih atas kesabaran konsumen.",
+    ];
     return {
       status: "exceeded",
       score: 4,
@@ -126,6 +133,8 @@ export function evaluateTelefunHoldAssessment(
       totalDurationMs,
       longestDurationMs,
       exceededCount,
+      nextSteps,
+      drill: `Latihan manajemen hold: simulasi panggilan dengan skenario cek data — jaga setiap hold di bawah ${formatDuration(TELEFUN_SUBSEQUENT_HOLD_LIMIT_MS)} dan selalu beri konteks ke konsumen sebelum menahan.`,
     };
   }
 

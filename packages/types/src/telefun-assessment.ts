@@ -33,6 +33,9 @@ export const telefunHoldAssessmentSchema = z.object({
   totalDurationMs: finiteNumber.nonnegative(),
   longestDurationMs: finiteNumber.nonnegative(),
   exceededCount: finiteNumber.int().nonnegative(),
+  // Evaluasi Edukatif — rule-based backend deterministik (bukan dari AI).
+  nextSteps: z.array(z.string()).optional(),
+  drill: z.string().optional(),
 });
 
 export const telefunVoiceMetricKeySchema = z.enum([
@@ -86,6 +89,9 @@ export const communicationMetricSchema = z.object({
   feedback: z.string(),
   explanation: z.string(),
   improvementTip: z.string().optional(),
+  // Evaluasi Edukatif — rule-based backend deterministik (bukan dari AI).
+  drill: z.string().optional(),
+  examplePhrase: z.string().optional(),
 });
 export type CommunicationMetric = z.infer<typeof communicationMetricSchema>;
 
@@ -94,6 +100,9 @@ export const telefunCommunicationProfileSchema = z.object({
   overallSummary: z.string(),
   strengths: z.array(z.string()),
   improvementPriorities: z.array(z.string()),
+  // Version marker for the deterministic coaching layer; legacy profiles
+  // without it are rebuilt automatically (no AI rerun).
+  coachingVersion: finiteNumber.optional(),
 });
 export type TelefunCommunicationProfile = z.infer<
   typeof telefunCommunicationProfileSchema
@@ -229,6 +238,8 @@ export type VoiceQualityAssessment = Omit<
 > & {
   holdManagement?: TelefunHoldAssessment;
   communicationProfile?: TelefunCommunicationProfile | null;
+  /** 3 prioritas latihan — rule-based, diturunkan backend dari profile. */
+  overallNextSteps?: string[];
 };
 export type TelefunScoreResult = Omit<
   z.output<typeof telefunScoreEnvelopeSchema>,

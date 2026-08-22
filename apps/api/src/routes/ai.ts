@@ -32,6 +32,7 @@ import {
   normalizeTelefunCoachingRecommendations,
 } from "../services/monitoring-history-service";
 import { isTelefunRecordingPathOwnedBySession } from "./telefun/recording-paths";
+import { buildKetikEducation } from "../services/ketik/review-policy";
 import { getAiUsageSummary } from "../services/ai-usage-summary-service";
 import { getBillingRate, upsertBillingRate } from "../lib/ai-billing-settings";
 import {
@@ -335,6 +336,18 @@ ai.get(
                   strengths: reviewResult.data.strengths,
                   weaknesses: reviewResult.data.weaknesses,
                   coachingFocus: reviewResult.data.coaching_focus,
+                  // Legacy rows (pre-education) get deterministic rule-based
+                  // guidance derived from stored scores — no AI rerun.
+                  education:
+                    reviewResult.data.education ??
+                    buildKetikEducation(undefined, {
+                      final: history.final_score ?? 0,
+                      empathy: history.empathy_score ?? 0,
+                      probing: history.probing_score ?? 0,
+                      resolution: history.resolution_score ?? 0,
+                      typo: history.typo_score ?? 0,
+                      compliance: history.compliance_score ?? 0,
+                    }),
                   createdAt: reviewResult.data.created_at,
                 }
               : null,

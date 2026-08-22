@@ -5,6 +5,7 @@ import { sanitizeAiResponse } from "../../lib/ai-sanitize";
 import { UsageContext } from "../../lib/ai-usage";
 import { extractJsonObjectText } from "./shared-utils";
 import {
+  buildKetikEducation,
   buildKetikReviewSystemInstruction,
   KETIK_REVIEW_RESPONSE_SCHEMA,
   normalizeKetikReviewScores,
@@ -87,6 +88,30 @@ function sanitizeKetikReviewResult(result: any): void {
     result.coachingFocus = result.coachingFocus.map((c: any) =>
       typeof c === "string" ? sanitizeAiResponse(c) : c,
     );
+  }
+}
+
+/** Sanitize every AI-generated nested education string (per-string sanitizer). */
+function sanitizeKetikEducation(education: ReturnType<typeof buildKetikEducation>): void {
+  for (const guidance of education.dimensionGuidance) {
+    guidance.diagnosis = sanitizeAiResponse(guidance.diagnosis);
+    guidance.howToFix = sanitizeAiResponse(guidance.howToFix);
+    guidance.exampleRewrite = sanitizeAiResponse(guidance.exampleRewrite);
+  }
+  if (education.overallNextSteps) {
+    education.overallNextSteps = education.overallNextSteps.map((step) =>
+      typeof step === "string" ? sanitizeAiResponse(step) : step,
+    );
+  }
+  if (education.typosEnriched) {
+    for (const typo of education.typosEnriched) {
+      if (typeof typo.contextSentence === "string") {
+        typo.contextSentence = sanitizeAiResponse(typo.contextSentence);
+      }
+      if (typeof typo.whyWrong === "string") {
+        typo.whyWrong = sanitizeAiResponse(typo.whyWrong);
+      }
+    }
   }
 }
 
@@ -175,6 +200,17 @@ export async function processKetikReviewJob(
     });
   }
 
+  // Evaluasi Edukatif: deterministic education layer built from canonical
+  // scores; AI narration (if any) never influences score/verdict/priority.
+  const education = buildKetikEducation(
+    reviewResult.dimensionGuidance ?? reviewResult.education?.dimensionGuidance,
+    reviewResult.scores,
+  );
+  if (Array.isArray(reviewResult.overallNextSteps)) {
+    education.overallNextSteps = reviewResult.overallNextSteps;
+  }
+  sanitizeKetikEducation(education);
+
   if (leaseOwner) {
     const renewedLeaseExpiresAt = new Date(
       Date.now() + 5 * 60 * 1000,
@@ -210,6 +246,7 @@ export async function processKetikReviewJob(
       strengths: reviewResult.strengths,
       weaknesses: reviewResult.weaknesses,
       coaching_focus: reviewResult.coachingFocus,
+      education,
     });
 
   if (reviewInsertError) throw reviewInsertError;

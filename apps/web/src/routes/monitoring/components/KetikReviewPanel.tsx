@@ -22,6 +22,10 @@ import {
   type KetikMonitoringReview,
 } from "../../../lib/api";
 import { getScoreGrade } from "../utils/formatting";
+import {
+  KetikDimensionGuidanceList,
+  KetikPriorityFixes,
+} from "../../../components/KetikEducationSections";
 
 function ScoreBar({ score }: { score: number }) {
   return (
@@ -332,6 +336,8 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             </details>
 
             {/* AI Summary */}
+            <KetikPriorityFixes education={data.review.education} />
+
             <section className="space-y-3">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-primary" />
@@ -426,6 +432,8 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                 </div>
               </section>
             )}
+
+            <KetikDimensionGuidanceList education={data.review.education} />
 
             {/* Coaching Focus */}
             {data.review.coachingFocus &&

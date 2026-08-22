@@ -265,7 +265,58 @@ export interface ChatSession {
   reviewStatus?: "pending" | "processing" | "completed" | "failed";
 }
 
+// ── Evaluasi Edukatif (education layer) ─────────────────
+// AI only narrates diagnosis/howToFix/exampleRewrite; the backend owns
+// label/score/verdict/priorityRank deterministically from canonical scores.
+export type KetikDimensionKey =
+  | "empathy"
+  | "probing"
+  | "resolution"
+  | "typo"
+  | "compliance";
+
+export type KetikDimensionVerdict =
+  | "Sangat Baik"
+  | "Baik"
+  | "Cukup"
+  | "Perlu Coaching";
+
+/** Shape requested from the model — narration fields only. */
+export interface KetikDimensionGuidanceAI {
+  key: KetikDimensionKey;
+  /** 1-2 sentences quoting 3-6 words of the transcript. */
+  diagnosis: string;
+  /** Concrete fix steps, 1-2 sentences. */
+  howToFix: string;
+  /** before -> after rewrite example, max 500 chars. */
+  exampleRewrite: string;
+}
+
+/** Backend-enriched guidance persisted in ketik_session_reviews.education. */
+export interface KetikDimensionGuidance extends KetikDimensionGuidanceAI {
+  label: string;
+  score: number;
+  verdict: KetikDimensionVerdict;
+  priorityRank: 1 | 2 | 3 | 4 | 5;
+}
+
+export interface KetikTypoEnriched {
+  messageId: string;
+  originalWord: string;
+  correctedWord: string;
+  severity: string;
+  contextSentence?: string;
+  whyWrong?: string;
+}
+
+export interface KetikEducation {
+  dimensionGuidance: KetikDimensionGuidance[]; // length 5, sorted by priorityRank
+  overallNextSteps?: string[];
+  typosEnriched?: KetikTypoEnriched[];
+}
+
 export interface KetikSessionReview {
+  education?: KetikEducation | null;
   id: string;
   sessionId: string;
   aiSummary: string;
@@ -377,4 +428,36 @@ export const generateMessageSchema = z.object({
   chatHistory: z.array(chatMessageSchema),
   remainingSeconds: z.number().optional(),
   elapsedSeconds: z.number().optional(),
+});
+
+// ── Evaluasi Edukatif Zod (opsional — backward compatible) ──
+export const ketikDimensionGuidanceAiSchema = z.object({
+  key: z.enum(["empathy", "probing", "resolution", "typo", "compliance"]),
+  diagnosis: z.string().max(500),
+  howToFix: z.string().max(500),
+  exampleRewrite: z.string().max(500),
+});
+
+export const ketikEducationSchema = z.object({
+  dimensionGuidance: z.array(
+    ketikDimensionGuidanceAiSchema.extend({
+      label: z.string(),
+      score: z.number(),
+      verdict: z.enum(["Sangat Baik", "Baik", "Cukup", "Perlu Coaching"]),
+      priorityRank: z.number().int().min(1).max(5),
+    }),
+  ),
+  overallNextSteps: z.array(z.string().max(500)).optional(),
+  typosEnriched: z
+    .array(
+      z.object({
+        messageId: z.string(),
+        originalWord: z.string(),
+        correctedWord: z.string(),
+        severity: z.string(),
+        contextSentence: z.string().max(500).optional(),
+        whyWrong: z.string().max(500).optional(),
+      }),
+    )
+    .optional(),
 });

@@ -20,6 +20,10 @@ import type {
   KetikSessionReview,
   KetikTypoFinding,
 } from "@trainers/types";
+import {
+  KetikDimensionGuidanceList,
+  KetikPriorityFixes,
+} from "../../../components/KetikEducationSections";
 
 function getScoreGrade(score: number) {
   if (score >= 90)
@@ -322,6 +326,8 @@ export function SessionReviewModal({
               </details>
 
               <div className="space-y-6">
+                <KetikPriorityFixes education={review.education} />
+
                 <section className="space-y-3">
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-primary" />
@@ -417,6 +423,8 @@ export function SessionReviewModal({
                     </div>
                   </section>
                 )}
+
+                <KetikDimensionGuidanceList education={review.education} />
 
                 <section className="space-y-3">
                   <div className="flex items-center gap-2">

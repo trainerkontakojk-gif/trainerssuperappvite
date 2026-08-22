@@ -121,7 +121,34 @@ export function normalizePdktEvaluation(value: unknown): PdktEvaluationResult | 
   const { scoreBreakdown: _scoreBreakdown, ...legacyInput } = raw;
   const legacy = pdktEvaluationAiOutputSchema.omit({ scoreBreakdown: true }).safeParse(legacyInput);
   const parsed = full.success ? full.data : legacy.success ? legacy.data : null;
-  return parsed ? parsed : null;
+  if (!parsed) return null;
+  return {
+    score: parsed.score,
+    feedback: parsed.feedback,
+    typos: parsed.typos,
+    clarityIssues: parsed.clarityIssues,
+    contentGaps: parsed.contentGaps,
+    scoreBreakdown: full.success ? full.data.scoreBreakdown : undefined,
+    ...(parsed.edu
+      ? {
+          // Persisted edu was ranked by the backend builder before storage;
+          // re-derive rank from stored order deterministically.
+          edu: {
+            actionItems: (parsed.edu.actionItems ?? []).map((item, index) => ({
+              ...item,
+              priorityRank: index + 1,
+            })),
+            suggestedRewrite: parsed.edu.suggestedRewrite ?? null,
+            ...(parsed.edu.dimensionTips
+              ? { dimensionTips: parsed.edu.dimensionTips }
+              : {}),
+            ...(parsed.edu.improvementTips
+              ? { improvementTips: parsed.edu.improvementTips }
+              : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 export function normalizeTelefunAssessmentWithHold(value: unknown, sessionMetrics: unknown): VoiceQualityAssessment | null {

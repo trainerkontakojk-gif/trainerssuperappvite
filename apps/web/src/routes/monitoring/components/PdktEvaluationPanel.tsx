@@ -17,6 +17,12 @@ import {
   unwrapResponse,
   type PdktMonitoringReview,
 } from "../../../lib/api";
+import type { PdktDimensionKey } from "@trainers/types";
+import {
+  PdktActionItemsCard,
+  PdktDimensionTip,
+  PdktSuggestedRewriteCard,
+} from "../../../components/PdktEducationSections";
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60);
@@ -84,21 +90,33 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   // Informasi konsumen PDKT ditampilkan sekali di header modal
   // (ReviewDetailModal) agar tidak ada card duplikat.
   const scoreBreakdown = evaluation?.scoreBreakdown;
-  const breakdownItems = scoreBreakdown
+  const edu = evaluation?.edu;
+  const breakdownItems: Array<{
+    label: string;
+    value: number;
+    dimension: PdktDimensionKey;
+  }> = scoreBreakdown
     ? [
         {
           label: "Arah Penerima",
           value: scoreBreakdown.recipientDirectionScore,
+          dimension: "recipientDirection" as const,
         },
         {
           label: "Kualitas OJK",
           value: scoreBreakdown.normativeResponseScore,
+          dimension: "normative" as const,
         },
-        { label: "Kejelasan", value: scoreBreakdown.clarityScore },
-        { label: "Typo", value: scoreBreakdown.typoScore },
+        {
+          label: "Kejelasan",
+          value: scoreBreakdown.clarityScore,
+          dimension: "clarity" as const,
+        },
+        { label: "Typo", value: scoreBreakdown.typoScore, dimension: "typo" as const },
         {
           label: "Template",
           value: scoreBreakdown.templateComplianceScore,
+          dimension: "template" as const,
         },
       ]
     : [];
@@ -204,6 +222,11 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
                   <div className="mt-1 text-sm font-black text-foreground">
                     {item.value}
                   </div>
+                  <PdktDimensionTip
+                    dimension={item.dimension}
+                    value={item.value}
+                    edu={edu}
+                  />
                 </div>
               ))}
             </div>
@@ -284,6 +307,17 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               </p>
             </div>
           </div>
+
+          {/* Evaluasi Edukatif */}
+          <PdktActionItemsCard edu={edu} />
+          {edu?.dimensionTips?.recipientDirection &&
+            scoreBreakdown &&
+            scoreBreakdown.recipientDirectionScore <= 60 && (
+              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-600 font-medium leading-relaxed">
+                ⚠️ {edu.dimensionTips.recipientDirection}
+              </div>
+            )}
+          <PdktSuggestedRewriteCard edu={edu} />
         </>
       ) : (
         !loading && (
