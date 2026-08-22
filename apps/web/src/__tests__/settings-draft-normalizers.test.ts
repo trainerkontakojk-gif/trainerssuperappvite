@@ -24,6 +24,7 @@ describe("settings draft normalizers", () => {
         script: undefined,
         isActive: false,
         images: undefined,
+        imageAlts: undefined,
       }),
     ).toEqual({
       category: "Umum",
@@ -32,6 +33,7 @@ describe("settings draft normalizers", () => {
       script: "",
       isActive: false,
       images: [],
+      imageAlts: [],
     });
   });
 

@@ -19,6 +19,7 @@
       "src/__tests__/data-integrity-duplicate-detector.test.ts",
       "src/__tests__/data-integrity-name-consistency.test.ts",
       "src/__tests__/ketik-consumer-response-service.test.ts",
+      "src/__tests__/ketik-image-alt.test.ts",
       "src/__tests__/ketik-prompt-compaction.test.ts",
       "src/__tests__/ketik-review-ai-parser.test.ts",
       "src/__tests__/ketik-review-lifecycle.test.ts",

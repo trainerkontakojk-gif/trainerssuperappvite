@@ -5,6 +5,7 @@ import type { ChatMessage } from "@trainers/types";
 interface KetikMessageBubbleProps {
   message: ChatMessage;
   scenarioImages: string[];
+  scenarioImageAlts?: string[];
   onImageClick: (src: string) => void;
 }
 
@@ -19,6 +20,7 @@ export function renderKetikMessageContent(
   text: string,
   scenarioImages: string[],
   onImageClick: (src: string) => void,
+  scenarioImageAlts?: string[],
 ) {
   const parts = text.split(/(\[SEND_IMAGE\s*:\s*\d+\])/gi);
 
@@ -29,6 +31,7 @@ export function renderKetikMessageContent(
       const imgSrc = scenarioImages[imgIndex];
 
       if (imgSrc) {
+        const altText = scenarioImageAlts?.[imgIndex]?.trim() || `Lampiran skenario ${imgIndex}`;
         return (
           <motion.button
             key={index}
@@ -37,11 +40,11 @@ export function renderKetikMessageContent(
             type="button"
             className="my-2 block w-full overflow-hidden rounded-xl border border-border bg-background text-left transition hover:border-module-ketik focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-module-ketik focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             onClick={() => onImageClick(imgSrc)}
-            aria-label={`Buka lampiran gambar ${imgIndex}`}
+            aria-label={`Buka lampiran gambar ${imgIndex}: ${altText}`}
           >
             <img
               src={imgSrc}
-              alt={`Lampiran skenario ${imgIndex}`}
+              alt={altText}
               className="max-h-64 w-full object-cover"
               loading="lazy"
             />
@@ -61,6 +64,7 @@ export function renderKetikMessageContent(
 export function KetikMessageBubble({
   message,
   scenarioImages,
+  scenarioImageAlts,
   onImageClick,
 }: KetikMessageBubbleProps) {
   const isAgent = message.sender === "agent";
@@ -86,6 +90,7 @@ export function KetikMessageBubble({
             message.text,
             scenarioImages,
             onImageClick,
+            scenarioImageAlts,
           )}
         </div>
         <div

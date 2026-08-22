@@ -42,7 +42,7 @@ import {
   renderKetikMessageContent,
 } from "./chat/KetikMessageBubble";
 import { KetikImageLightbox } from "./chat/KetikImageLightbox";
-import { getKetikScenarioImages } from "./chat/ketikScenarioImages";
+import { getKetikScenarioImages, getKetikScenarioImageAlts } from "./chat/ketikScenarioImages";
 
 interface ChatInterfaceProps {
   config: KetikSessionConfig;
@@ -320,6 +320,7 @@ export function ChatInterface({
         scenarioDraft: {
           ...scenario,
           images: scenario.images?.map(() => ""),
+          imageAlts: scenario.imageAlts,
         },
         consumerTypeId: config.consumerType.id,
         consumerTypeDraft: config.consumerType,
@@ -700,6 +701,7 @@ export function ChatInterface({
                           msg.text,
                           getKetikScenarioImages(scenario),
                           setSelectedImage,
+                          getKetikScenarioImageAlts(scenario),
                         )}
                       </div>
                     ) : null}
@@ -713,6 +715,7 @@ export function ChatInterface({
                 key={msg.id}
                 message={msg}
                 scenarioImages={getKetikScenarioImages(scenario)}
+                scenarioImageAlts={getKetikScenarioImageAlts(scenario)}
                 onImageClick={setSelectedImage}
               />
             );

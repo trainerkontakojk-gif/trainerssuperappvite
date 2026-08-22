@@ -14,6 +14,7 @@ export function normalizeKetikScenarioDraft(
     script: draft.script ?? "",
     isActive: draft.isActive ?? true,
     images: draft.images ?? [],
+    imageAlts: draft.imageAlts ?? [],
   };
 }
 

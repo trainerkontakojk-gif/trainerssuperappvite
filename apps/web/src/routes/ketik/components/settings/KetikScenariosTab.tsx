@@ -180,6 +180,7 @@ export function KetikScenariosTab({
           }
           scenarioForm.setDraft((previous) => ({
             images: [...(previous.images || []), reader.result as string],
+            imageAlts: [...(previous.imageAlts || []), ""],
           }));
           finishRead();
         };
@@ -198,7 +199,20 @@ export function KetikScenariosTab({
   const handleRemoveImage = (indexToRemove: number) => {
     scenarioForm.setDraft((previous) => ({
       images: (previous.images || []).filter((_, idx) => idx !== indexToRemove),
+      imageAlts: (previous.imageAlts || []).filter((_, idx) => idx !== indexToRemove),
     }));
+  };
+
+  const handleAltChange = (index: number, value: string) => {
+    if (value.length > KETIK_PROMPT_LIMITS.imageAlt) return;
+    scenarioForm.setDraft((previous) => {
+      const nextAlts = [...(previous.imageAlts || [])];
+      // ensure length matches images length (pad with empty strings if needed for legacy data)
+      const imgLen = (previous.images || []).length;
+      while (nextAlts.length < imgLen) nextAlts.push("");
+      nextAlts[index] = value;
+      return { imageAlts: nextAlts };
+    });
   };
 
   if (scenarioForm.isOpen) {
@@ -417,21 +431,33 @@ export function KetikScenariosTab({
                 scenarioForm.draft.images.length > 0 && (
                   <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
                     {scenarioForm.draft.images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="relative w-20 h-20 shrink-0 group"
-                      >
-                        <img
-                          src={img}
-                          alt={`Preview ${idx}`}
-                          className="object-cover w-full h-full rounded-md border border-border"
+                      <div key={idx} className="flex flex-col gap-1.5 shrink-0 w-28">
+                        <div className="relative w-28 h-20 group">
+                          <img
+                            src={img}
+                            alt={scenarioForm.draft.imageAlts?.[idx] || `Preview ${idx + 1}`}
+                            className="object-cover w-full h-full rounded-md border border-border"
+                          />
+                          <button
+                            onClick={() => handleRemoveImage(idx)}
+                            className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center shadow transition-opacity"
+                            aria-label={`Hapus gambar ${idx + 1}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          <span className="absolute bottom-1 left-1 bg-foreground/75 text-background text-[10px] font-medium px-1.5 py-0.5 rounded">
+                            #{idx}
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          value={scenarioForm.draft.imageAlts?.[idx] ?? ""}
+                          onChange={(e) => handleAltChange(idx, e.target.value)}
+                          placeholder="Keterangan gambar..."
+                          maxLength={KETIK_PROMPT_LIMITS.imageAlt}
+                          aria-label={`Keterangan gambar ${idx + 1}`}
+                          className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-foreground outline-none placeholder:text-muted-foreground/40"
                         />
-                        <button
-                          onClick={() => handleRemoveImage(idx)}
-                          className="absolute -top-1.5 -right-1.5 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center shadow transition-opacity"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
                       </div>
                     ))}
                   </div>

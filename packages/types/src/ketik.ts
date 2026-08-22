@@ -9,6 +9,7 @@ export const KETIK_PROMPT_LIMITS = {
   scenarioScript: 20_000,
   consumerDescription: 4_000,
   chatMessageText: 20_000,
+  imageAlt: 500,
 } as const;
 
 export interface PacingMeta {
@@ -235,6 +236,7 @@ export interface KetikScenario {
   isActive: boolean;
   script?: string;
   images?: string[];
+  imageAlts?: string[];
 }
 
 export interface KetikSessionConfig {
@@ -293,6 +295,7 @@ export const ketikScenarioSchema = z.object({
   isActive: z.boolean(),
   script: z.string().max(KETIK_PROMPT_LIMITS.scenarioScript).optional(),
   images: z.array(z.string()).optional(),
+  imageAlts: z.array(z.string().max(KETIK_PROMPT_LIMITS.imageAlt)).optional(),
 });
 export const chatMessageSchema = z.object({
   id: z.string(),

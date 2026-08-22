@@ -10,6 +10,7 @@ import { generateOpenAIContent } from "../../lib/openai";
 import { resolveModelProvider } from "../../lib/ai-models";
 import { UsageContext } from "../../lib/ai-usage";
 import {
+  buildKetikImageInstruction,
   buildKetikScenarioDataBlock,
   buildKetikTurnPrompt,
   compactChatHistory,
@@ -151,11 +152,7 @@ export async function generateConsumerResponse(
   userId?: string,
   timing?: SessionTimingContext,
 ): Promise<{ success: boolean; text?: string; error?: string }> {
-  const imagesCount = (scenario as any).images?.length || 0;
-  const imageInstruction =
-    imagesCount > 0
-      ? `Anda memiliki ${imagesCount} lampiran gambar yang bisa dikirim (indeks 0 sampai ${imagesCount - 1}). Gunakan tag [SEND_IMAGE: indeks] untuk mengirimnya.`
-      : "Anda tidak memiliki lampiran gambar untuk dikirim.";
+  const imageInstruction = buildKetikImageInstruction(scenario);
 
   const hasScript = Boolean(scenario.script);
   const scriptInstruction = scenario.script
