@@ -41,6 +41,7 @@ describe("Telefun settings save sequencing", () => {
       result.current.setSelectedTelefunModel(OPENAI_WEBRTC_MODEL_ID);
     });
     act(() => {
+      // Retired transport is ignored; selection stays locked to gemini-live.
       result.current.setSelectedTelefunTransport(OPENAI_WEBRTC_TRANSPORT);
     });
     act(() => {
@@ -49,8 +50,7 @@ describe("Telefun settings save sequencing", () => {
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        telefunModelId: OPENAI_WEBRTC_MODEL_ID,
-        telefunTransport: OPENAI_WEBRTC_TRANSPORT,
+        telefunTransport: "gemini-live",
       }),
     );
     expect(onClose).not.toHaveBeenCalled();

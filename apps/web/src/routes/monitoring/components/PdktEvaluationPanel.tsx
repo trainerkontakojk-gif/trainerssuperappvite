@@ -313,7 +313,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
           {edu?.dimensionTips?.recipientDirection &&
             scoreBreakdown &&
             scoreBreakdown.recipientDirectionScore <= 60 && (
-              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-600 font-medium leading-relaxed">
+              <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-600 dark:text-amber-400 font-medium leading-relaxed">
                 ⚠️ {edu.dimensionTips.recipientDirection}
               </div>
             )}

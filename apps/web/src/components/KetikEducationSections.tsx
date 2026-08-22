@@ -28,7 +28,7 @@ function CopyButton({ text }: { text: string }) {
       type="button"
       onClick={handleCopy}
       aria-label={copied ? "Tersalin" : "Salin contoh"}
-      className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-border/60 bg-card text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors"
+      className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg border border-border/60 bg-card text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:bg-foreground/5 hover:text-foreground transition-colors"
     >
       {copied ? (
         <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -71,7 +71,7 @@ function GuidanceCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-bold text-foreground">{label}</span>
-            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">
+            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
               {verdict}
             </span>
           </div>

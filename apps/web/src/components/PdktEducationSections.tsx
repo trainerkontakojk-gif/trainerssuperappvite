@@ -26,7 +26,7 @@ function CopyInlineButton({ text }: { text: string }) {
           // clipboard unavailable
         }
       }}
-      className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-[var(--border)] bg-[var(--bg)] text-[10px] font-bold uppercase tracking-wider text-[var(--fg3)] hover:text-[var(--fg)] transition-colors"
+      className="inline-flex items-center gap-1 h-9 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg)] text-[10px] font-bold uppercase tracking-wider text-[var(--fg3)] hover:text-[var(--fg)] transition-colors"
     >
       {copied ? (
         <Check className="w-3 h-3 text-emerald-500" />
@@ -130,11 +130,13 @@ function renderHighlights(
       }
     }
     if (!earliest) {
-      parts.push(remaining);
+      parts.push(<span key={`txt-${key++}`}>{remaining}</span>);
       break;
     }
     if (earliest.index > 0) {
-      parts.push(remaining.slice(0, earliest.index));
+      parts.push(
+        <span key={`txt-${key++}`}>{remaining.slice(0, earliest.index)}</span>,
+      );
     }
     parts.push(
       <mark

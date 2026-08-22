@@ -6,6 +6,7 @@ import {
   resolveFinalIdentity,
   MALE_VOICES,
   FEMALE_VOICES,
+  DEFAULT_IDENTITY_POOL,
 } from "../routes/telefun/telefunSettings";
 import {
   GEMINI_LIVE_VOICES_BY_GENDER,
@@ -30,15 +31,10 @@ describe("resolveFinalIdentity gender-first", () => {
 
     expect(identity.gender).toBe("male");
     expect(MALE_VOICES.includes(identity.voiceName as any)).toBe(true);
-    // name should be from a male profile, e.g. "Agus Setiawan", "Budi Hartono", etc.
-    const maleNames = [
-      "Agus Setiawan",
-      "Budi Hartono",
-      "Hendra Wijaya",
-      "Andi Pratama",
-      "Rudi Hermawan",
-      "Dian Permana",
-    ];
+    // name must come from a male profile in the canonical identity pool
+    const maleNames = DEFAULT_IDENTITY_POOL.filter(
+      (profile) => profile.gender === "male",
+    ).map((profile) => profile.name);
     expect(maleNames).toContain(identity.name);
   });
 

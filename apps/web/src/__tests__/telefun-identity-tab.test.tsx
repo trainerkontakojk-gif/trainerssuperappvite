@@ -6,6 +6,7 @@ import {
   DEFAULT_TELEFUN_SETTINGS,
   type TelefunAppSettings,
 } from "../routes/telefun/telefunSettings";
+import { GEMINI_LIVE_VOICES_BY_GENDER } from "@trainers/types";
 
 interface OpenAiIdentityHarnessProps {
   initialGender?: "random" | "male" | "female";
@@ -40,7 +41,7 @@ function OpenAiIdentityHarness({
 }
 
 describe("TelefunIdentityTab provider-aware voices", () => {
-  it("disables OpenAI voice selection for a random persona gender", () => {
+  it("disables voice selection for a random persona gender", () => {
     const { container } = render(<OpenAiIdentityHarness />);
     const voiceSelect = container.querySelectorAll("select")[1];
 
@@ -51,7 +52,7 @@ describe("TelefunIdentityTab provider-aware voices", () => {
     expect(voiceSelect.options[0].textContent).toBe("Acak (Sesuai Gender)");
   });
 
-  it("shows only male OpenAI voices for a male persona", () => {
+  it("shows only male Gemini Live voices for a male persona", () => {
     const { container } = render(
       <OpenAiIdentityHarness initialGender="male" />,
     );
@@ -60,30 +61,32 @@ describe("TelefunIdentityTab provider-aware voices", () => {
     expect(voiceSelect).not.toBeDisabled();
     expect(
       Array.from(voiceSelect.options).map((option) => option.value),
-    ).toEqual(["", "ash", "ballad", "echo", "verse", "cedar"]);
+    ).toEqual(["", ...GEMINI_LIVE_VOICES_BY_GENDER.male]);
   });
 
-  it("shows only female OpenAI voices for a female persona", () => {
+  it("shows only female Gemini Live voices for a female persona", () => {
+    const femaleVoice = GEMINI_LIVE_VOICES_BY_GENDER.female[0];
     const { container } = render(
-      <OpenAiIdentityHarness initialGender="female" initialVoice="marin" />,
+      <OpenAiIdentityHarness
+        initialGender="female"
+        initialVoice={femaleVoice}
+      />,
     );
     const voiceSelect = container.querySelectorAll("select")[1];
 
     expect(voiceSelect).not.toBeDisabled();
-    expect(
-      Array.from(voiceSelect.options).map((option) => option.value),
-    ).toEqual([
+    expect(Array.from(voiceSelect.options).map((option) => option.value)).toEqual([
       "",
-      "coral",
-      "sage",
-      "shimmer",
-      "marin",
+      ...GEMINI_LIVE_VOICES_BY_GENDER.female,
     ]);
   });
 
-  it("clears an OpenAI voice when persona gender changes", () => {
+  it("clears the selected voice when persona gender changes", () => {
     const { container } = render(
-      <OpenAiIdentityHarness initialGender="female" initialVoice="marin" />,
+      <OpenAiIdentityHarness
+        initialGender="female"
+        initialVoice={GEMINI_LIVE_VOICES_BY_GENDER.female[0]}
+      />,
     );
     const [genderSelect] = container.querySelectorAll("select");
 
