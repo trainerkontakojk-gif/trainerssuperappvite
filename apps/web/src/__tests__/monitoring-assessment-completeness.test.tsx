@@ -179,14 +179,15 @@ describe("monitoring completeness regressions", () => {
 
     render(<PdktEvaluationPanel entryId="pdkt-1" />);
 
-    await waitFor(() => expect(screen.getByText("Nama konsumen")).toBeInTheDocument());
-    expect(screen.getAllByText("Tidak tersedia").length).toBeGreaterThan(0);
-    expect(screen.getByText("Bantuan")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Bantuan")).toBeInTheDocument());
+    // Consumer metadata is rendered once by the modal header
+    // (ReviewDetailModal), so the panel must not render a duplicate card.
+    expect(screen.queryByText("Nama konsumen")).not.toBeInTheDocument();
     expect(screen.getByText("Arah Penerima")).toBeInTheDocument();
     expect(screen.queryByText("Lampiran")).not.toBeInTheDocument();
   });
 
-  it("keeps KETIK consumer metadata, zero duration, and complete review visible", async () => {
+  it("renders KETIK review content and no longer duplicates the consumer card inside the panel", async () => {
     mocks.getReview.mockResolvedValue({});
     mocks.unwrapResponse.mockResolvedValue({
       module: "ketik",
@@ -207,12 +208,13 @@ describe("monitoring completeness regressions", () => {
 
     render(<KetikReviewPanel entryId="ketik-1" />);
 
-    await waitFor(() => expect(screen.getByText("Nama konsumen")).toBeInTheDocument());
-    expect(screen.getAllByText("Tidak tersedia").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Ringkasan lengkap/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Ringkasan lengkap/)).toBeInTheDocument());
+    // Consumer metadata is rendered once by the modal header
+    // (ReviewDetailModal), so the panel must not render a duplicate card.
+    expect(screen.queryByText("Nama konsumen")).not.toBeInTheDocument();
   });
 
-  it("keeps KETIK consumer metadata explicit when the consumer name is null", async () => {
+  it("does not render a duplicate consumer card inside the panel when the name is null", async () => {
     mocks.getReview.mockResolvedValue({});
     mocks.unwrapResponse.mockResolvedValue({
       module: "ketik",
@@ -239,10 +241,10 @@ describe("monitoring completeness regressions", () => {
 
     render(<KetikReviewPanel entryId="ketik-1" />);
 
-    await waitFor(() => expect(screen.getByText("Nama konsumen")).toBeInTheDocument());
-    expect(screen.getByText("Tidak tersedia")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/Ringkasan lengkap/)).toBeInTheDocument());
+    // Consumer card is rendered once by the modal header, not by the panel.
+    expect(screen.queryByText("Nama konsumen")).not.toBeInTheDocument();
     expect(screen.queryByText("null")).not.toBeInTheDocument();
-    expect(screen.getByText(/Ringkasan lengkap/)).toBeInTheDocument();
   });
 
   it("shows a restrained legacy notice for Telefun rows without fabricating assessment data", async () => {

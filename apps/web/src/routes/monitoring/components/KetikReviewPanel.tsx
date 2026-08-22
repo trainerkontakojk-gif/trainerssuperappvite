@@ -77,35 +77,9 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
 
   return (
     <div className="space-y-6">
-      <dl className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-3">
-        <div>
-          <dt className="text-[10px] font-bold uppercase text-muted-foreground">
-            Nama konsumen
-          </dt>
-          <dd className="break-words text-sm font-semibold">
-            {session?.consumerName || "Tidak tersedia"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[10px] font-bold uppercase text-muted-foreground">
-            Telepon / Kota
-          </dt>
-          <dd className="break-words text-sm font-semibold">
-            {session?.consumerPhone || "Tidak tersedia"} · {session?.consumerCity || "Tidak tersedia"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-[10px] font-bold uppercase text-muted-foreground">
-            Durasi simulasi
-          </dt>
-          <dd className="text-sm font-semibold">
-            {session?.simulationDuration != null
-              ? `${session.simulationDuration} detik`
-              : "Tidak tersedia"}
-          </dd>
-        </div>
-      </dl>
-      {/* ── Chat Transcript — Primary ─────────────────────────── */}
+      {/* ── Chat Transcript — Primary ───────────────────────────
+          Informasi konsumen KETIK sudah ditampilkan sekali di header
+          modal (ReviewDetailModal) agar tidak ada card duplikat. */}
       {transcriptMessages && transcriptMessages.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center gap-2">

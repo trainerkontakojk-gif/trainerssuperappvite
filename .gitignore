@@ -52,6 +52,8 @@ supabase/.gitignore
 .env.local.remote
 remote_data_public.sql
 supabase/seeds_backup/
+# Laporan billing internal — jangan commit (berisi angka cost sensitif)
+docs/ai-billing-credit-report-*.md
 
 # ── Graphify Knowledge Graph ──
 graphify-out/manifest.json

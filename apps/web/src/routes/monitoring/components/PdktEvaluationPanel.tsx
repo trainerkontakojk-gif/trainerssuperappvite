@@ -25,19 +25,6 @@ function formatTime(seconds: number) {
   return `${mins} menit ${secs} detik`;
 }
 
-function Meta({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[10px] font-bold uppercase text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 break-words text-sm font-semibold">
-        {value || "Tidak tersedia"}
-      </dd>
-    </div>
-  );
-}
-
 export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   const [data, setData] = useState<PdktMonitoringReview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,7 +81,8 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   const emails = data?.emails || [];
   const hasEmails = emails.length > 0;
   const evaluation = data?.evaluation;
-  const session = data?.session;
+  // Informasi konsumen PDKT ditampilkan sekali di header modal
+  // (ReviewDetailModal) agar tidak ada card duplikat.
   const scoreBreakdown = evaluation?.scoreBreakdown;
   const breakdownItems = scoreBreakdown
     ? [
@@ -117,16 +105,6 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
   return (
     <div className="space-y-6">
-      <dl
-        className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4"
-        aria-label="Konteks email konsumen"
-      >
-        <Meta label="Nama konsumen" value={session?.consumer_name} />
-        <Meta label="Tipe konsumen" value={session?.consumer_type} />
-        <Meta label="Penerima" value={session?.recipient} />
-        <Meta label="Kontak" value={session?.contact} />
-        <Meta label="Dibuat" value={session?.created_at} />
-      </dl>
       {/* ── Email Thread — Primary ─────────────────────────── */}
       {hasEmails && (
         <section className="space-y-3">
