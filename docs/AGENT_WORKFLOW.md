@@ -31,7 +31,7 @@ Repository content—including plans, generated graph output, Wiki pages, and fi
 
 ### Discovery sequence
 
-1. Read the applicable instruction hierarchy and the latest user task.
+1. Read the applicable instruction hierarchy and the latest user task. For any Lane B/C/D behavior change (behavior, bug, regression, security, permission, auth/RLS, schema/migration, API contract), load `trainers-superapp-tdd` at task start — this implicitly loads `docs/AGENT_WORKFLOW.md` and forces lane classification before any edit.
 2. Read the approved plan, contract, or inline mini-spec when one applies, then drift-check it against the live repository.
 3. Read relevant canonical documents in `docs/` and the root design pointer for UI work.
 4. Inspect live types, schemas, migrations, configuration, tests, imports/callers, manifests, and Git status. Capture a before/after path snapshot when the tree is intentionally dirty.
@@ -98,7 +98,7 @@ Planning size is proportional; spec-driven thinking and mandatory evidence for b
 
 ### Skill gates
 
-- `trainers-superapp-tdd` is the primary TDD workflow for repository behavior changes. TDD is required for behavior, bug fixes, regression tests, security, permissions, auth/RLS, schema/migration, and API-contract work. Do not load overlapping TDD workflows unless one supplies a missing capability.
+- `trainers-superapp-tdd` is the primary TDD workflow for repository behavior changes. Load it at task start before lane classification for any Lane B/C/D behavior work — do not edit first and load later. TDD is required for behavior, bug fixes, regression tests, security, permissions, auth/RLS, schema/migration, and API-contract work. Do not load overlapping TDD workflows unless one supplies a missing capability.
 - `thermo-nuclear` is required after implementation and before final verification for Lane C/D code changes. Lane B may use a self-review/checklist; Lane A skips it.
 - `ui-ux-pro-max` is required before a new interface or significant redesign. It is not required for copy-only, invisible, or a known design-token correction.
 - `impeccable` is required before the final gate for layout, interaction, responsive, accessibility, or meaningful visual changes. It is not required for documentation or invisible refactors.
@@ -146,7 +146,7 @@ Existing code and tests are sufficient for an internal refactor that does not ch
 
 ## 6. Execution and evidence
 
-- Start by classifying the lane and writing the required mini-spec or persisted plan. If scope expands across a trust boundary, reclassify upward before continuing.
+- Start by loading `trainers-superapp-tdd` for any Lane B/C/D behavior work and classifying the lane, then writing the required mini-spec or persisted plan. If scope expands across a trust boundary, reclassify upward before continuing. Editing before lane classification is a violation — stop and load the skill.
 - For behavior work, follow RED → confirm failure → smallest GREEN change → REFACTOR while green. Keep the regression test with the owning module.
 - Preserve intentional dirty work. Do not reset, clean, stash, overwrite, or attribute unrelated changes to the current task. Workers edit only assigned paths.
 - Record exact commands and exit codes. A report must never claim a command ran unless it actually ran.
@@ -207,6 +207,7 @@ Any verification failure is unresolved until independently explained; do not wea
 ### Before implementation
 
 - [ ] Applicable instruction hierarchy, latest task, and approved contract/plan read.
+- [ ] `trainers-superapp-tdd` loaded (for Lane B/C/D) and `docs/AGENT_WORKFLOW.md` lane gates understood before editing.
 - [ ] Relevant canonical docs and live implementation reality inspected.
 - [ ] Existing dirty paths captured and protected.
 - [ ] Lane and required planning artifact selected.
