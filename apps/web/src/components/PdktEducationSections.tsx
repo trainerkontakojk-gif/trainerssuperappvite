@@ -8,7 +8,8 @@ import type {
 /**
  * Evaluasi Edukatif PDKT — action items (priorityRank dari backend),
  * tips per dimensi, dan contoh balasan yang lebih baik.
- * Fallback rule-based sudah diisi backend untuk histori lama.
+ * actionItems deterministik dihasilkan backend saat evaluasi (termasuk
+ * backfill); tanpa narasi AI (legacy) hanya item prioritas yang tampil.
  */
 
 function CopyInlineButton({ text }: { text: string }) {
@@ -130,7 +131,7 @@ function renderHighlights(
       }
     }
     if (!earliest) {
-      parts.push(<span key={`txt-${key++}`}>{remaining}</span>);
+      parts.push(<span key={`txt-${key}`}>{remaining}</span>);
       break;
     }
     if (earliest.index > 0) {
