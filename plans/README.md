@@ -25,6 +25,8 @@ honor its STOP conditions, and update your row when done.
 | 015  | Reduce Orchestrator Token Cost   | P1       | M      | 013        | DONE   |
 | 016  | Tighten Test Feedback Loop       | P1       | M      | 014        | DONE   |
 | 017  | Make Knowledge Tools Conditional | P1       | S      | 013, 014   | DONE   |
+| 019  | Fix image-size Advisory (audit 2026-08-23) | P1 | S   | —          | BLOCKED (upstream: patched 2.0.3 never published; dep unreachable — see plan) |
+| 018  | Unify Spreadsheet Lib (audit 2026-08-23)   | P2 | M   | —          | DONE   |
 
 ## Dependency notes
 
@@ -40,5 +42,6 @@ honor its STOP conditions, and update your row when done.
 
 ## Findings considered and rejected
 
+- image-size HIGH advisories via pptxgenjs (GHSA-w3rx-r6r6-pgpr, GHSA-5p2g-fcmc-qvqq): risk ACCEPTED 2026-08-23 — patched version 2.0.3 was never published (github/advisory-database#9028), and the dependency is unreachable (0 references in all pptxgenjs bundles; phantom declaration). Re-audit ONLY when `image-size >= 2.0.3` publishes; fix = scoped override `"pptxgenjs>image-size": ^2.0.3` in pnpm-workspace.yaml (NOT package.json `pnpm` field — ignored by pnpm@11). Full evidence in plans/019-fix-image-size-advisory.md § Resolution.
 - Removing TDD or high-risk quality gates: rejected because the goal is proportional verification, not weaker evidence for behavior, security, schema, or API changes.
 - Enabling Turbo remote cache immediately: deferred because cache credentials/infrastructure were not audited; focused and affected local commands have a clearer first-order payoff.
