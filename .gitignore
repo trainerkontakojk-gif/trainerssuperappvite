@@ -55,6 +55,14 @@ supabase/seeds_backup/
 # Laporan billing internal — jangan commit (berisi angka cost sensitif)
 docs/ai-billing-credit-report-*.md
 
+# ── Playwright / E2E ──
+/test-results/
+/playwright-report/
+/blob-report/
+playwright/.cache/
+artifacts/
+coverage/
+
 # ── Graphify Knowledge Graph ──
 graphify-out/manifest.json
 graphify-out/cost.json

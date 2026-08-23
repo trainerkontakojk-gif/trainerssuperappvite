@@ -1,9 +1,18 @@
 import { test, expect } from "@playwright/test";
+import { mockSupabaseAuth } from "./helpers/mockAuth";
 
 test.describe("Trainers SuperApp E2E Flow", () => {
   test("should login, navigate, and verify Profiler data integrity with custom duplicate errors", async ({
     page,
   }) => {
+    // Mock auth — staging-safe, tidak pakai email beneran (handoff.md:422)
+    // Sebelumnya hardcode rina.wijaya@bankmuamalat.co.id (sudah dihapus) — sekarang mock
+    await mockSupabaseAuth(page, {
+      email: "trainer.visual@trainers.local",
+      role: "trainer",
+      fullName: "Trainer Visual",
+    });
+
     // 1. Visit the landing page
     page.on("console", (msg) => console.log("BROWSER CONSOLE:", msg.text()));
     page.on("response", async (response) => {
@@ -24,19 +33,9 @@ test.describe("Trainers SuperApp E2E Flow", () => {
     // Expect the page to have the title/header text of Trainers SuperApp
     await expect(page).toHaveTitle(/Trainers SuperApp/i);
 
-    // 2. Open the login modal
-    const loginBtn = page.locator('button:has-text("Masuk ke Platform")');
-    await expect(loginBtn).toBeVisible();
-    await loginBtn.click();
-
-    // 3. Fill in trainer/admin credentials
-    await page.fill('input[name="email"]', "rina.wijaya@bankmuamalat.co.id");
-    await page.fill('input[name="password"]', "password123");
-
-    // Click 'Masuk sekarang' submit button
-    const submitBtn = page.locator("button.auth-submit");
-    await expect(submitBtn).toBeVisible();
-    await submitBtn.click();
+    // Mock: langsung dianggap login — tidak perlu klik Masuk ke Platform / fill email/password
+    // Karena session sudah ada di localStorage, app akan redirect ke dashboard via authInit
+    await page.goto("/dashboard");
 
     // 4. Wait for redirect to dashboard
     await page.waitForURL("**/dashboard");
