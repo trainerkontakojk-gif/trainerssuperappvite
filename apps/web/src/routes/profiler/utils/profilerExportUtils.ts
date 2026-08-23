@@ -1,6 +1,7 @@
 import type { ProfilerPeserta } from "@trainers/types";
 import { labelJabatan } from "@trainers/types";
 import { getPhotoFrame } from "../../../lib/photo-frame";
+import { toCsv, writeFlatExcel } from "../../../lib/excel-utils";
 import { hitungMasaDinas, hitungUsia } from "./profilerFormatters";
 export { buildSlideHTML } from "./profilerSlideHtml";
 export { downloadPPTX } from "./profilerPptxExport";
@@ -87,11 +88,11 @@ export const downloadExcel = async (
 ) => {
   setGenerating("excel");
   try {
-    const XLSX = await import("xlsx");
-    const ws = XLSX.utils.json_to_sheet(buildRows(peserta));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Peserta");
-    XLSX.writeFile(wb, `${selectedBatch}_peserta.xlsx`);
+    await writeFlatExcel(
+      "Peserta",
+      buildRows(peserta),
+      `${selectedBatch}_peserta.xlsx`
+    );
   } finally {
     setGenerating(null);
   }
@@ -104,9 +105,7 @@ export const downloadCSV = async (
 ) => {
   setGenerating("csv");
   try {
-    const XLSX = await import("xlsx");
-    const ws = XLSX.utils.json_to_sheet(buildRows(peserta));
-    const csv = XLSX.utils.sheet_to_csv(ws);
+    const csv = toCsv(buildRows(peserta));
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

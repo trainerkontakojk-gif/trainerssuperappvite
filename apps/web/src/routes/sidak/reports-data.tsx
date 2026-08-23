@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useApi } from "../../hooks/useApi";
 import { sidakClient, unwrapResponse } from "../../lib/api";
+import { writeFlatExcel } from "../../lib/excel-utils";
 import { Pagination } from "../../components/ui/Pagination";
 import type { AgentDirectoryResponse } from "@trainers/types";
 import {
@@ -78,7 +79,6 @@ export default function SidakReportsData() {
 
   const exportExcel = async () => {
     if (!results || results.length === 0) return;
-    const XLSX = await import("xlsx");
     const rows = results.map((r: any) => ({
       Layanan: SERVICE_LABELS[r.service_type] || r.service_type,
       Periode: `${String(r.qa_periods?.month || "").padStart(2, "0")}/${r.qa_periods?.year || ""}`,
@@ -90,10 +90,7 @@ export default function SidakReportsData() {
       Seharusnya: r.sebaiknya || "",
       Skor: r.nilai,
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data Laporan");
-    XLSX.writeFile(wb, `laporan-data-${year}.xlsx`);
+    await writeFlatExcel("Data Laporan", rows, `laporan-data-${year}.xlsx`);
   };
 
   return (

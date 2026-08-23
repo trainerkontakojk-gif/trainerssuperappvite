@@ -164,88 +164,76 @@ export function useTemuanImport({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || activeIndicators.length === 0) return;
+    if (file.name.toLowerCase().endsWith(".xls")) {
+      setErrorMsg(
+        "Format .xls tidak didukung. Simpan ulang sebagai .xlsx lalu impor kembali.",
+      );
+      return;
+    }
     setImportFile(file);
     setParsing(true);
     try {
-      const XLSX = await import("xlsx");
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const data = new Uint8Array(event.target!.result as ArrayBuffer);
-          const wb = XLSX.read(data, { type: "array" });
-          const sheetName =
-            wb.SheetNames.find((n: string) => n === "Input Temuan") ??
-            wb.SheetNames[0];
-          const ws = wb.Sheets[sheetName];
-          const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
-            header: 1,
-            defval: "",
-          });
-          const paramMap = new Map(
-            activeIndicators.map((indicator) => [
-              formatQAIndicatorName(indicator).toLowerCase().trim(),
-              indicator,
-            ]),
-          );
-          const result: ImportRowType[] = [];
+      const { readWorkbookRaw } = await import("../../../lib/excel-utils");
+      const buffer = await file.arrayBuffer();
+      const { names, sheets } = await readWorkbookRaw(buffer);
+      const sheetName = names.find((n) => n === "Input Temuan") ?? names[0];
+      const rows = sheets[sheetName] ?? [];
+      const paramMap = new Map(
+        activeIndicators.map((indicator) => [
+          formatQAIndicatorName(indicator).toLowerCase().trim(),
+          indicator,
+        ]),
+      );
+      const result: ImportRowType[] = [];
 
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (
-              !row ||
-              (Array.isArray(row) &&
-                row.every((c) => c === "" || c === null || c === undefined))
-            )
-              continue;
-            const no_tiket = String(row[0] ?? "").trim();
-            const paramName = String(row[1] ?? "").trim();
-            const nilaiRaw = row[2];
-            const ketidaksesuaian = String(row[3] ?? "").trim();
-            const sebaiknya = String(row[4] ?? "").trim();
-            let error = "";
-            let indicator_id: string | null = null;
-            let nilai: number | null = null;
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.every((c) => c === "" || c === null || c === undefined))
+          continue;
+        const no_tiket = String(row[0] ?? "").trim();
+        const paramName = String(row[1] ?? "").trim();
+        const nilaiRaw = row[2];
+        const ketidaksesuaian = String(row[3] ?? "").trim();
+        const sebaiknya = String(row[4] ?? "").trim();
+        let error = "";
+        let indicator_id: string | null = null;
+        let nilai: number | null = null;
 
-            const matched = paramMap.get(paramName.toLowerCase());
-            if (!paramName) error = "Parameter kosong";
-            else if (!matched)
-              error = `Parameter "${paramName}" tidak dikenali`;
-            else indicator_id = matched.id;
+        const matched = paramMap.get(paramName.toLowerCase());
+        if (!paramName) error = "Parameter kosong";
+        else if (!matched)
+          error = `Parameter "${paramName}" tidak dikenali`;
+        else indicator_id = matched.id;
 
-            const nilaiNum = Number(nilaiRaw);
-            if (
-              nilaiRaw === "" ||
-              nilaiRaw === null ||
-              nilaiRaw === undefined
-            ) {
-              nilai = 3;
-            } else if (isNaN(nilaiNum) || ![0, 1, 2, 3].includes(nilaiNum)) {
-              error = `Nilai "${nilaiRaw}" tidak valid (harus 0-3)`;
-            } else {
-              nilai = nilaiNum;
-            }
-
-            result.push({
-              rowNum: i + 1,
-              no_tiket,
-              paramName,
-              indicator_id,
-              nilai,
-              ketidaksesuaian,
-              sebaiknya,
-              error,
-            });
-          }
-
-          setImportRows(result);
-          setImportTab("upload");
-        } catch {
-          setErrorMsg("Gagal membaca file Excel.");
+        const nilaiNum = Number(nilaiRaw);
+        if (
+          nilaiRaw === "" ||
+          nilaiRaw === null ||
+          nilaiRaw === undefined
+        ) {
+          nilai = 3;
+        } else if (isNaN(nilaiNum) || ![0, 1, 2, 3].includes(nilaiNum)) {
+          error = `Nilai "${nilaiRaw}" tidak valid (harus 0-3)`;
+        } else {
+          nilai = nilaiNum;
         }
-      };
-      reader.readAsArrayBuffer(file);
+
+        result.push({
+          rowNum: i + 1,
+          no_tiket,
+          paramName,
+          indicator_id,
+          nilai,
+          ketidaksesuaian,
+          sebaiknya,
+          error,
+        });
+      }
+
+      setImportRows(result);
+      setImportTab("upload");
     } catch {
-      setErrorMsg("Gagal membaca file.");
+      setErrorMsg("Gagal membaca file Excel.");
     } finally {
       setParsing(false);
     }

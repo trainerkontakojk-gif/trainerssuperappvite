@@ -153,7 +153,7 @@ export default function SidakInputImportPanel({
             >
               <input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx"
                 className="hidden"
                 onChange={onFileUpload}
                 disabled={disabled}

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useQueryParams } from "../../hooks/useQueryParams";
 import { profilerApi } from "../../lib/profilerService";
-import { generateProfilerTemplate } from "../../lib/excel-utils";
+import { generateProfilerTemplate, readWorkbookRaw } from "../../lib/excel-utils";
 import PageHeroHeader from "../../components/PageHeroHeader";
 import type { ProfilerPeserta } from "@trainers/types";
 import { supabase } from "../../lib/supabase";
@@ -295,11 +295,40 @@ export default function ProfilerImport() {
     setDone(false);
 
     try {
-      const XLSX = await import("xlsx");
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      let rows: Record<string, string>[];
+      if (/\.csv$/i.test(file.name)) {
+        // CSV path (kept after dropping the `xlsx` package): parse with the
+        // in-house RFC-4180 parser, first row = header.
+        const { parseCsv } = await import("../../lib/excel-utils");
+        const table = parseCsv(await file.text());
+        if (table.length === 0) throw new Error("File kosong");
+        const header = table[0].map((h) => h.trim());
+        rows = table.slice(1).map((cells) => {
+          const obj: Record<string, string> = {};
+          header.forEach((h, c) => {
+            obj[h] = cells[c] ?? "";
+          });
+          return obj;
+        });
+      } else {
+        const buffer = await file.arrayBuffer();
+        const { names, sheets } = await readWorkbookRaw(buffer);
+        const table = sheets[names[0]] ?? [];
+        if (table.length === 0) throw new Error("File kosong");
+
+        // Header row -> header/value pairs per data row (replaces xlsx's
+        // sheet_to_json objects). cellDates:true is no longer needed:
+        // readWorkbookRaw renders dates as YYYY-MM-DD strings.
+        const header = table[0].map((h) => String(h ?? "").trim());
+        rows = [];
+        for (let i = 1; i < table.length; i++) {
+          const rowObj: Record<string, string> = {};
+          for (let c = 0; c < header.length; c++) {
+            rowObj[header[c]] = String(table[i][c] ?? "");
+          }
+          rows.push(rowObj);
+        }
+      }
 
       const {
         data: { user },
@@ -328,15 +357,9 @@ export default function ProfilerImport() {
         for (const [rawHeader, rawVal] of Object.entries(row)) {
           const field = HEADER_MAP[rawHeader.trim()];
           if (!field) continue;
-
-          let val = rawVal;
-          if (val instanceof Date) {
-            val = val.toISOString().split("T")[0];
-          } else {
-            val = String(val ?? "").trim();
-          }
-
-          (mapped as any)[field] = val;
+          // Values arrive as plain strings from readWorkbookRaw
+          // (dates already rendered as YYYY-MM-DD).
+          (mapped as any)[field] = String(rawVal ?? "").trim();
         }
 
         const nama = mapped.nama || "";
@@ -393,8 +416,8 @@ export default function ProfilerImport() {
   };
 
   const handleFile = (file: File) => {
-    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      alert("Format file harus .xlsx, .xls, atau .csv");
+    if (!file.name.match(/\.(xlsx|csv)$/i)) {
+      alert("Format file harus .xlsx atau .csv (untuk .xls, simpan ulang sebagai .xlsx)");
       return;
     }
     processFile(file);
@@ -527,7 +550,7 @@ export default function ProfilerImport() {
                         Pilih File
                         <input
                           type="file"
-                          accept=".xlsx,.xls,.csv"
+                          accept=".xlsx,.csv"
                           className="hidden"
                           onChange={(e) => {
                             const f = e.target.files?.[0];

@@ -93,78 +93,230 @@ export interface ParsedRow {
   error?: string;
 }
 
+export interface RawWorkbook {
+  names: string[];
+  /** sheet name -> grid of cell text; rows and columns are 0-indexed here */
+  sheets: Record<string, string[][]>;
+}
+
+/** Normalize any ExcelJS CellValue (primitive, Date, rich text, formula result) to plain text. */
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.text === "string") return obj.text;
+    if (Array.isArray(obj.richText)) {
+      return (obj.richText as { text?: string }[])
+        .map((part) => part?.text ?? "")
+        .join("");
+    }
+    if (obj.result !== undefined && obj.result !== null)
+      return cellText(obj.result);
+  }
+  return "";
+}
+
+/**
+ * Read any .xlsx workbook into a plain text grid using ExcelJS.
+ * Single reading path for the whole app (replaces the frozen `xlsx` package).
+ */
+export async function readWorkbookRaw(data: ArrayBuffer): Promise<RawWorkbook> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(data);
+  const names: string[] = [];
+  const sheets: Record<string, string[][]> = {};
+  wb.eachSheet((ws) => {
+    names.push(ws.name);
+    const rows: string[][] = [];
+    ws.eachRow({ includeEmpty: true }, (row) => {
+      const cells: string[] = [];
+      for (let c = 1; c <= Math.max(row.cellCount, 1); c++) {
+        cells.push(cellText(row.getCell(c).value));
+      }
+      rows.push(cells);
+    });
+    sheets[ws.name] = rows;
+  });
+  return { names, sheets };
+}
+
+/** Build an .xlsx buffer from flat row objects (header = first object's keys, order preserved). */
+export async function buildFlatWorkbookBuffer(
+  sheetName: string,
+  rows: Record<string, unknown>[],
+): Promise<ArrayBuffer> {
+  const ExcelJS = (await import("exceljs")).default;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(sheetName);
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+  if (headers.length > 0) {
+    ws.addRow(headers);
+    for (const r of rows) ws.addRow(headers.map((k) => r[k] ?? ""));
+  }
+  return (await wb.xlsx.writeBuffer()) as ArrayBuffer;
+}
+
+/** Build + download an .xlsx file from flat row objects. */
+export async function writeFlatExcel(
+  sheetName: string,
+  rows: Record<string, unknown>[],
+  fileName: string,
+): Promise<void> {
+  const buffer = await buildFlatWorkbookBuffer(sheetName, rows);
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Escape a single CSV field (quotes fields containing comma, quote or newline). */
+function csvEscape(v: unknown): string {
+  const s = v === null || v === undefined ? "" : String(v);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Serialize flat row objects to RFC-4180-ish CSV (CRLF line endings). */
+export function toCsv(rows: Record<string, unknown>[]): string {
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const lines = [headers.map(csvEscape).join(",")];
+  for (const r of rows) lines.push(headers.map((k) => csvEscape(r[k])).join(","));
+  return lines.join("\r\n");
+}
+
+/** Minimal RFC-4180 CSV parser: quoted fields, escaped quotes, CRLF/LF. */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  const pushField = () => {
+    row.push(field);
+    field = "";
+  };
+  const pushRow = () => {
+    pushField();
+    if (row.length > 1 || row[0] !== "") rows.push(row);
+    row = [];
+  };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else inQuotes = false;
+      } else field += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ",") pushField();
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      pushRow();
+    } else field += ch;
+  }
+  if (field !== "" || row.length > 0) pushRow();
+  return rows;
+}
+
+const XLS_UNSUPPORTED_MESSAGE =
+  "Format .xls tidak didukung. Simpan ulang sebagai .xlsx lalu impor kembali.";
+
 export function parseExcel(
   file: File,
   indicators: QAIndicator[],
   serviceType?: string,
 ): Promise<ParsedRow[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const XLSX = await import("xlsx");
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: "array" });
-        const sheetName =
-          wb.SheetNames.find((n) => n === "Input Temuan") || wb.SheetNames[0];
-        const ws = wb.Sheets[sheetName];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  if (file.name.toLowerCase().endsWith(".xls")) {
+    return Promise.reject(new Error(XLS_UNSUPPORTED_MESSAGE));
+  }
+  return (async () => {
+    const buffer = await file.arrayBuffer();
+    const { names, sheets } = await readWorkbookRaw(buffer);
+    const sheetName = names.find((n) => n === "Input Temuan") ?? names[0];
+    const table = sheets[sheetName] ?? [];
 
-        const filtered = serviceType
-          ? indicators.filter((i) => i.service_type === serviceType)
-          : indicators;
-        const indicatorMap = new Map(
-          filtered.map((indicator) => [
-            formatQAIndicatorName(indicator).toLowerCase(),
-            indicator,
-          ]),
-        );
-
-        const result: ParsedRow[] = [];
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          const parsed: ParsedRow = {
-            row: i + 2,
-            no_tiket: String(row["No Tiket"] || row["no_tiket"] || "").trim(),
-            indicator_name: String(
-              row["Indikator"] ||
-                row["indicator_name"] ||
-                row["indicator_name"] ||
-                "",
-            ).trim(),
-            nilai: parseInt(row["Nilai (0-3)"] || row["nilai"] || "-1", 10),
-            ketidaksesuaian: String(
-              row["Ketidaksesuaian"] || row["ketidaksesuaian"] || "",
-            ).trim(),
-            sebaiknya: String(
-              row["Sebaiknya"] || row["sebaiknya"] || "",
-            ).trim(),
-            service_type: serviceType || undefined,
-          };
-
-          const errors: string[] = [];
-          if (!parsed.no_tiket) errors.push("No Tiket kosong");
-          if (!parsed.indicator_name) errors.push("Indikator kosong");
-          if (isNaN(parsed.nilai) || parsed.nilai < 0 || parsed.nilai > 3)
-            errors.push("Nilai harus 0-3");
-
-          const matched = indicatorMap.get(parsed.indicator_name.toLowerCase());
-          if (matched) {
-            parsed.indicator_id = matched.id;
-          } else if (parsed.indicator_name) {
-            errors.push(`Indikator "${parsed.indicator_name}" tidak ditemukan`);
-          }
-
-          if (errors.length > 0) parsed.error = errors.join("; ");
-          result.push(parsed);
-        }
-        resolve(result);
-      } catch (err) {
-        reject(err);
-      }
+    // Header = first row; map known header names to column indexes,
+    // falling back to the template's positional order (0..4).
+    const header = (table[0] ?? []).map((h) => String(h ?? "").trim());
+    const colIndexFor = (canonical: string[], fallbackIdx: number) => {
+      const found = header.findIndex((h) =>
+        canonical.some((c) => h.toLowerCase() === c.toLowerCase()),
+      );
+      return found >= 0 ? found : fallbackIdx;
     };
-    reader.readAsArrayBuffer(file);
-  });
+    const idxTiket = colIndexFor(["No Tiket"], 0);
+    const idxIndicator = colIndexFor(["Indikator"], 1);
+    const idxNilai = colIndexFor(["Nilai (0-3)"], 2);
+    const idxKtdk = colIndexFor(["Ketidaksesuaian"], 3);
+    const idxSbknya = colIndexFor(["Sebaiknya"], 4);
+
+    const filtered = serviceType
+      ? indicators.filter((i) => i.service_type === serviceType)
+      : indicators;
+    const indicatorMap = new Map(
+      filtered.map((indicator) => [
+        formatQAIndicatorName(indicator).toLowerCase(),
+        indicator,
+      ]),
+    );
+
+    const result: ParsedRow[] = [];
+    for (let i = 1; i < table.length; i++) {
+      const row = table[i];
+      // xlsx's sheet_to_json silently omitted blank rows; keep that behavior.
+      if (row.every((c) => c === "" || c === null || c === undefined))
+        continue;
+      const parsed: ParsedRow = {
+        row: i + 1,
+        no_tiket: String(row[idxTiket] ?? "")
+          .trim()
+          .replace(/^"|"$/g, ""),
+        indicator_name: String(row[idxIndicator] ?? "")
+          .trim()
+          .replace(/^"|"$/g, ""),
+        nilai: parseInt(String(row[idxNilai] ?? "") || "-1", 10),
+        ketidaksesuaian: String(row[idxKtdk] ?? "")
+          .trim()
+          .replace(/^"|"$/g, ""),
+        sebaiknya: String(row[idxSbknya] ?? "")
+          .trim()
+          .replace(/^"|"$/g, ""),
+        service_type: serviceType || undefined,
+      };
+
+      const errors: string[] = [];
+      if (!parsed.no_tiket) errors.push("No Tiket kosong");
+      if (!parsed.indicator_name) errors.push("Indikator kosong");
+      if (isNaN(parsed.nilai) || parsed.nilai < 0 || parsed.nilai > 3)
+        errors.push("Nilai harus 0-3");
+
+      const matched = indicatorMap.get(parsed.indicator_name.toLowerCase());
+      if (matched) {
+        parsed.indicator_id = matched.id;
+      } else if (parsed.indicator_name) {
+        errors.push(`Indikator "${parsed.indicator_name}" tidak ditemukan`);
+      }
+
+      if (errors.length > 0) parsed.error = errors.join("; ");
+      result.push(parsed);
+    }
+    return result;
+  })();
 }
 
 export function validateImportRows(rows: ParsedRow[]): {
