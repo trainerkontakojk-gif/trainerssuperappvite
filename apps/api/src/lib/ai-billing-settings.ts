@@ -1,4 +1,6 @@
-export const DEFAULT_USD_TO_IDR_RATE = 15000;
+import { DEFAULT_USD_TO_IDR_RATE } from "@trainers/types";
+
+export { DEFAULT_USD_TO_IDR_RATE };
 
 type SupabaseAdminLike = {
   from: (table: string) => any;

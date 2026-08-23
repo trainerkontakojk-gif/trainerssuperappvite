@@ -1,20 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
-import { getTelefunLiveModel } from "@trainers/types";
+import {
+  DEFAULT_USD_TO_IDR_RATE,
+  GEMINI_LIVE_PRICING,
+  geminiPerMinuteTotalUsd,
+  getTelefunLiveModel,
+  resolveGeminiLiveFallbackPerMillion,
+} from "@trainers/types";
 import { env } from "./env.js";
 
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
-const DEFAULT_USD_TO_IDR_RATE = 15000;
-const GEMINI_LIVE_PRICING = {
-  inputTextPriceUsdPerMillion: 0.75,
-  inputAudioPriceUsdPerMillion: 3.0,
-  outputTextPriceUsdPerMillion: 4.5,
-  outputAudioPriceUsdPerMillion: 12.0,
-} as const;
-
-const PER_MINUTE_AUDIO_INPUT_USD = 0.005;
-const PER_MINUTE_AUDIO_OUTPUT_USD = 0.018;
-const PER_MINUTE_AUDIO_TOTAL_USD =
-  PER_MINUTE_AUDIO_INPUT_USD + PER_MINUTE_AUDIO_OUTPUT_USD;
 
 function roundUsd(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
@@ -215,7 +209,7 @@ export function calculatePerMinuteCost(
   }
 
   const minutes = Math.max(sessionDurationMs, 0) / 60_000;
-  const costUsd = minutes * PER_MINUTE_AUDIO_TOTAL_USD;
+  const costUsd = minutes * geminiPerMinuteTotalUsd();
 
   return {
     costUsd: roundUsd(costUsd),
@@ -1179,11 +1173,12 @@ export async function flushLiveUsage(
     ]);
 
     const usesGeminiLivePricing = model.realtime.transport === "gemini-live";
+    const geminiFallback =
+      resolveGeminiLiveFallbackPerMillion(usesGeminiLivePricing);
     const inputPricePerMillion =
-      pricing?.input_price_usd_per_million ?? (usesGeminiLivePricing ? 3.0 : 0);
+      pricing?.input_price_usd_per_million ?? geminiFallback.input;
     const outputPricePerMillion =
-      pricing?.output_price_usd_per_million ??
-      (usesGeminiLivePricing ? 12.0 : 0);
+      pricing?.output_price_usd_per_million ?? geminiFallback.output;
 
     const contextTokenCost = calculateLiveUsageCost(
       aggregate,

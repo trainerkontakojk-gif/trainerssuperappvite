@@ -6,6 +6,7 @@
 import {
   getHistoricalTelefunRealtimeModel,
   getTelefunLiveModel,
+  GEMINI_LIVE_PRICING,
 } from "@trainers/types";
 
 export interface ModalityTokenCounts {
@@ -40,13 +41,6 @@ export interface ModalityCostResult {
   outputTextPriceUsdPerMillion: number;
   outputAudioPriceUsdPerMillion: number;
 }
-
-const GEMINI_LIVE_PRICING = {
-  inputTextPriceUsdPerMillion: 0.75,
-  inputAudioPriceUsdPerMillion: 3.0,
-  outputTextPriceUsdPerMillion: 4.5,
-  outputAudioPriceUsdPerMillion: 12.0,
-} as const;
 
 export function resolveModalityPricing(
   modelId: string,

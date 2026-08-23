@@ -1,6 +1,10 @@
 import { createAdminClient } from "./supabase";
 import { normalizeModelId } from "./ai-models";
-import { getTelefunLiveModel, type AIProvider } from "@trainers/types";
+import {
+  getTelefunLiveModel,
+  resolveGeminiLiveFallbackPerMillion,
+  type AIProvider,
+} from "@trainers/types";
 import {
   DEFAULT_USD_TO_IDR_RATE,
   getBillingRate,
@@ -139,8 +143,9 @@ export async function logAiUsage(options: {
       resolvedDefaultInput = known.input;
       resolvedDefaultOutput = known.output;
     } else if (isGeminiLive) {
-      resolvedDefaultInput = 3.0;
-      resolvedDefaultOutput = 12.0;
+      const geminiFallback = resolveGeminiLiveFallbackPerMillion(true);
+      resolvedDefaultInput = geminiFallback.input;
+      resolvedDefaultOutput = geminiFallback.output;
     } else if (normalizedModelId.startsWith("gemini-")) {
       // Future Gemini model not yet in table — use conservative Flash standard
       resolvedDefaultInput = 0.50;
