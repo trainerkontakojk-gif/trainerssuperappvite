@@ -391,6 +391,14 @@ export function buildPdktEdu(
 ): PdktEvaluationEdu {
   const raw = isPlainObject(rawEdu) ? rawEdu : {};
 
+  // Normalisasi skor dimensi: nilai tak valid (missing/NaN/legacy kosong)
+  // diperlakukan sebagai 100 (bukan low-dim) supaya tidak memicu item
+  // maupun perbandingan NaN saat sort. Guard legacy scoreBreakdown.
+  const scoreOf = (key: PdktDimensionKey): number => {
+    const score = scoreBreakdown?.[PDKT_DIMENSION_SCORE_KEY[key]];
+    return typeof score === "number" && Number.isFinite(score) ? score : 100;
+  };
+
   // ── dimensionTips (AI narration + deterministic conflict tip) ──
   const dimensionTips: Partial<Record<PdktDimensionKey, string>> = {};
   if (isPlainObject(raw.dimensionTips)) {
@@ -441,7 +449,7 @@ export function buildPdktEdu(
 
   for (const key of PDKT_DIMENSION_ORDER) {
     if (aiItems.some((item) => item.dimension === key)) continue;
-    const score = scoreBreakdown[PDKT_DIMENSION_SCORE_KEY[key]];
+    const score = scoreOf(key);
     if (score >= 75) continue;
     const band = score < 60 ? "critical" : "medium";
     aiItems.push({
@@ -454,9 +462,7 @@ export function buildPdktEdu(
   // then fixed dimension order as tie-breaker. AI never supplies priority.
   const rankedItems = [...aiItems]
     .sort((a, b) => {
-      const scoreDiff =
-        scoreBreakdown[PDKT_DIMENSION_SCORE_KEY[a.dimension]] -
-        scoreBreakdown[PDKT_DIMENSION_SCORE_KEY[b.dimension]];
+      const scoreDiff = scoreOf(a.dimension) - scoreOf(b.dimension);
       if (scoreDiff !== 0) return scoreDiff;
       return (
         PDKT_DIMENSION_ORDER.indexOf(a.dimension) -

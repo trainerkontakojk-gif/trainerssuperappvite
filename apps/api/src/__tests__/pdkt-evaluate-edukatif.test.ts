@@ -196,4 +196,30 @@ describe("PDKT evaluasi edukatif (edu layer)", () => {
     expect(edu?.actionItems ?? []).toHaveLength(0);
     expect(edu?.suggestedRewrite ?? null).toBeNull();
   });
+
+  it("buildPdktEdu tolerates malformed scoreBreakdown (legacy) without throwing", () => {
+    // Legacy rows bisa menyimpan scoreBreakdown objek kosong / tak valid —
+    // buildPdktEdu tidak boleh throw dan tidak boleh menyusun item dari skor NaN.
+    const eduEmpty = buildPdktEdu(undefined, {} as never, false);
+    expect(eduEmpty?.actionItems ?? []).toHaveLength(0);
+
+    const eduMissing = buildPdktEdu(undefined, undefined as never, false);
+    expect(eduMissing?.actionItems ?? []).toHaveLength(0);
+
+    const eduPartial = buildPdktEdu(
+      undefined,
+      {
+        recipientDirectionScore: 40,
+        normativeResponseScore: undefined,
+        clarityScore: undefined,
+        typoScore: undefined,
+        templateComplianceScore: undefined,
+      } as never,
+      false,
+    );
+    // Hanya dimensi dengan skor valid & <75 yang boleh muncul
+    expect(eduPartial?.actionItems ?? []).toHaveLength(1);
+    expect(eduPartial?.actionItems?.[0]?.dimension).toBe("recipientDirection");
+    expect(eduPartial?.actionItems?.[0]?.priorityRank).toBe(1);
+  });
 });
