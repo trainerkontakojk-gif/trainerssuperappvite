@@ -126,7 +126,7 @@ export async function logAiUsage(options: {
     // Audit 2026-08-21: Google/ai.google.dev + OpenAI 2026-07-30 cut.
     // Standard (Paid Tier, Global) unless noted. Gemini Live keeps its own realtime rates.
     const pricingByModel: Record<string, { input: number; output: number }> = {
-      "gemini-3.7-flash": { input: 0.75, output: 3.75 },
+      "gemini-3.8-flash": { input: 0.75, output: 3.75 },
       "gemini-3.5-flash": { input: 1.5, output: 9.0 },
       "gemini-3.5-flash-lite": { input: 0.30, output: 2.50 },
       "gemini-3-flash-preview": { input: 0.50, output: 3.00 },

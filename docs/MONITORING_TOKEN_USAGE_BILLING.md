@@ -197,7 +197,7 @@ Catatan:
 
 Editor pricing selalu dibangun dari dua sumber:
 
-- registry model kanonik di `AI_MODELS` (`apps/api/src/lib/ai-models.ts`) — hanya memuat runtime direct Gemini/OpenAI. Newly added text model IDs: `gemini-3.7-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Telefun's realtime registry remains separate. Legacy OpenRouter/DeepSeek selections dinormalisasi sebelum masuk editor, jadi tidak tampil sebagai pilihan aktif.
+- registry model kanonik di `AI_MODELS` (`apps/api/src/lib/ai-models.ts`) — hanya memuat runtime direct Gemini/OpenAI. Newly added text model IDs: `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gpt-5.6-luna`, `gpt-5.4-mini`; existing direct Gemini choices remain supported. Legacy `gemini-3.7-flash` / `gemini-3.6-flash` dinormalisasi ke `gemini-3.8-flash` via LEGACY_ALIASES. Telefun's realtime registry remains separate. Legacy OpenRouter/DeepSeek selections dinormalisasi sebelum masuk editor, jadi tidak tampil sebagai pilihan aktif.
 - row yang sudah tersimpan di `ai_pricing_settings`
 
 Perilaku editor:

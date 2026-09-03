@@ -64,7 +64,7 @@ export default function KetikSimulation() {
             city: "Jakarta",
             phone: "08123456789",
           },
-          selectedModel: "gemini-3.7-flash",
+          selectedModel: "gemini-3.8-flash",
           chatHistory: [...messages, agentMsg],
         }),
       });

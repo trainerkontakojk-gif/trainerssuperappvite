@@ -32,7 +32,8 @@ export const DIRECT_GEMINI_MODELS = TEXT_MODELS.filter(
 );
 
 const LEGACY_ALIASES: Record<string, string> = {
-  "gemini-3.6-flash": "gemini-3.7-flash",
+  "gemini-3.7-flash": "gemini-3.8-flash",
+  "gemini-3.6-flash": "gemini-3.8-flash",
   "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite",
   "google/gemini-3.1-flash-lite": "gemini-3.1-flash-lite",
   "openai/gpt-4o-mini": "gpt-5.4-mini",

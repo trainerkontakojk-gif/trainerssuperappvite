@@ -32,7 +32,7 @@ const CONSUMER_NAME_MENTION_PATTERNS = [
   "none",
 ] as const;
 
-export const DEFAULT_PDKT_MODEL_ID = "gemini-3.7-flash";
+export const DEFAULT_PDKT_MODEL_ID = "gemini-3.8-flash";
 
 import { KETIK_PDKT_MODELS as TEXT_MODELS } from "../../lib/aiModels";
 export { TEXT_MODELS };

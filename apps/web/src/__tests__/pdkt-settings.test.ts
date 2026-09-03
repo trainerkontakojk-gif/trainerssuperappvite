@@ -46,7 +46,7 @@ describe("PDKT Settings Helpers", () => {
   };
 
   it("coerces legacy model IDs to supported direct models", () => {
-    expect(coercePdktModelId("invalid-model")).toBe("gemini-3.7-flash");
+    expect(coercePdktModelId("invalid-model")).toBe("gemini-3.8-flash");
     expect(coercePdktModelId("gemini-3.1-pro-preview")).toBe(
       "gemini-3.1-pro-preview",
     );

@@ -39,7 +39,7 @@ export type AiModelModule =
   | "telefun"
   | "default";
 
-export const DEFAULT_AI_MODEL_ID = "gemini-3.7-flash";
+export const DEFAULT_AI_MODEL_ID = "gemini-3.8-flash";
 export const DEFAULT_IMAGE_GENERATION_MODEL_ID = "gemini-3.1-flash-image";
 export const DEFAULT_TELEFUN_LIVE_MODEL_ID = "gemini-3.1-flash-live-preview";
 
@@ -354,8 +354,8 @@ export function normalizePersistedTelefunSettings<T>(
 
 export const TEXT_MODELS: AiModelInfo[] = [
   {
-    id: "gemini-3.7-flash",
-    name: "Gemini 3.7 Flash",
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
     description: "Model Gemini cepat untuk percakapan dan analisis.",
     provider: "gemini",
     timeoutMs: 180_000,

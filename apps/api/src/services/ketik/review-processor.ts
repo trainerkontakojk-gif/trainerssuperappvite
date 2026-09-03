@@ -25,7 +25,7 @@ async function generateKetikReviewAiResponse(options: {
   // Try Gemini first
   try {
     const geminiResp = await generateGeminiContent({
-      model: "gemini-3.7-flash",
+      model: "gemini-3.8-flash",
       systemInstruction: options.systemInstruction,
       contents: options.contents as any,
       responseMimeType: "application/json",

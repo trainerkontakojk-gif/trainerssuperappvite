@@ -925,7 +925,7 @@ export default function PdktSimulation({
     consumerTypes: defaultConsumerTypesFromApi || defaultConsumerTypes,
     enableImageGeneration: true,
     globalConsumerTypeId: "random",
-    selectedModel: "gemini-3.7-flash",
+    selectedModel: "gemini-3.8-flash",
     consumerNameMentionPattern: "random",
     writingStyleMode: "training",
     customIdentity: {

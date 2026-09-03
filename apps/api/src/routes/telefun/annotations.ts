@@ -380,7 +380,7 @@ Jenis momen (moment):
 Berikan maksimal 30 anotasi dan 5 rekomendasi coaching. Deskripsi maksimal 500 karakter.`;
 
     const result = await generateGeminiContent({
-      model: "gemini-3.7-flash",
+      model: "gemini-3.8-flash",
       systemInstruction:
         "Anda adalah pelatih komunikasi profesional. Analisis rekaman telepon dan berikan catatan objektif dalam format JSON. Gunakan Bahasa Indonesia.",
       contents: [

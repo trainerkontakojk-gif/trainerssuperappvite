@@ -326,7 +326,7 @@ describe("processScoringJob OpenAI retirement routing", () => {
 
     expect(result).toMatchObject({ success: true, status: "completed" });
     expect(generateGeminiContent).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gemini-3.7-flash" }),
+      expect.objectContaining({ model: "gemini-3.8-flash" }),
     );
     expect(requestOpenAITelefunAssessment).not.toHaveBeenCalled();
   });
