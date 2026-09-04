@@ -11,7 +11,7 @@ export function isAgentGivingSolution(lastAgentText: string | undefined): boolea
   return lastAgentText.length > 90;
 }
 
-export function isSlowEligible(_params: {
+export function isSlowEligible(params: {
   consumerTurnIndex: number;
   consecutiveSlowCount: number;
   totalSlowCount: number;
@@ -20,40 +20,40 @@ export function isSlowEligible(_params: {
   elapsedSeconds?: number;
   totalDurationSeconds?: number;
 }): boolean {
-  // Deprecated: minute-aware pacing replaces slow injection with fast/delayed distribution.
-  // Kept for backward compat; always false so legacy slow path is not taken.
-  return false;
-}
-
-export const FAST_CHANCE = 0.18;
-
-export function shouldUseFastSameMinute(params: { remainingSeconds: number }): boolean {
-  if (!Number.isFinite(params.remainingSeconds) || params.remainingSeconds < 30) return false;
-  return Math.random() < FAST_CHANCE;
+  const {
+    consumerTurnIndex,
+    consecutiveSlowCount,
+    totalSlowCount,
+    sessionDurationMinutes,
+    remainingSeconds,
+    elapsedSeconds,
+    totalDurationSeconds,
+  } = params;
+  if (consumerTurnIndex < 4) return false;
+  if (consecutiveSlowCount >= 1) return false;
+  if (remainingSeconds < 45) return false;
+  if (
+    elapsedSeconds !== undefined &&
+    totalDurationSeconds !== undefined &&
+    totalDurationSeconds > 0
+  ) {
+    const elapsedRatio = elapsedSeconds / totalDurationSeconds;
+    if (elapsedRatio < 0.25) return false;
+  }
+  const maxSlow =
+    sessionDurationMinutes <= 5 ? 1 : sessionDurationMinutes <= 15 ? 2 : 2;
+  if (totalSlowCount >= maxSlow) return false;
+  return Math.random() < 0.15;
 }
 
 export const REALISTIC_RANGES: Record<string, { minMs: number; maxMs: number }> = {
-  short: { minMs: 45000, maxMs: 65000 },
-  normal: { minMs: 60000, maxMs: 85000 },
-  long: { minMs: 75000, maxMs: 95000 },
-  slow: { minMs: 45000, maxMs: 65000 },
+  short: { minMs: 1000, maxMs: 3000 },
+  normal: { minMs: 5000, maxMs: 10000 },
+  long: { minMs: 10000, maxMs: 20000 },
+  slow: { minMs: 20000, maxMs: 30000 },
   follow_up: { minMs: 1200, maxMs: 2500 },
-  greeting_reply: { minMs: 35000, maxMs: 60000 },
+  greeting_reply: { minMs: 2000, maxMs: 6000 },
 };
-
-export const FAST_SAME_MINUTE_RANGES: Record<string, { minMs: number; maxMs: number }> = {
-  short: { minMs: 5000, maxMs: 12000 },
-  normal: { minMs: 10000, maxMs: 18000 },
-  long: { minMs: 15000, maxMs: 25000 },
-  slow: { minMs: 5000, maxMs: 12000 },
-  follow_up: { minMs: 1200, maxMs: 2500 },
-  greeting_reply: { minMs: 7000, maxMs: 15000 },
-};
-
-export function getRealisticRange(band: string, isFast: boolean): { minMs: number; maxMs: number } {
-  const source = isFast ? FAST_SAME_MINUTE_RANGES : REALISTIC_RANGES;
-  return source[band] ?? source.normal;
-}
 
 export const TRAINING_FAST_RANGES: Record<string, { minMs: number; maxMs: number }> = {
   short: { minMs: 800, maxMs: 1500 },
