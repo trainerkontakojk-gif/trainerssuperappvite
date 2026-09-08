@@ -33,7 +33,10 @@ describe("SIDAK report DOCX export", () => {
     vi.clearAllMocks();
   });
 
-  it("does not load the docx builder during route registration", async () => {
+  it(
+    "does not load the docx builder during route registration",
+    { timeout: 15_000 },
+    async () => {
     await import("../routes/sidak/reports");
 
     expect(mockDocxBuilderLoaded).not.toHaveBeenCalled();

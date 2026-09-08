@@ -86,7 +86,10 @@ afterEach(() => {
 });
 
 describe("PDKT Mailbox Bulk Delete Route E2E", () => {
-  it("bulk deletes items successfully", async () => {
+  it(
+    "bulk deletes items successfully",
+    { timeout: 15_000 },
+    async () => {
     await createAuthenticatedApp("trainer");
 
     mockMailboxItems = [

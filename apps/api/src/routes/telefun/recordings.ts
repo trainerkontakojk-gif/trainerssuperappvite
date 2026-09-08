@@ -19,8 +19,13 @@ import type {
 } from "@trainers/types";
 import {
   enqueueScoring,
+  completeScoringAssessment,
+  failScoringJob,
   isWebRtcScoringReady,
+  newScoringClaim,
   permanentlyFailRetiredOpenAiScoring,
+  TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE,
+  TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
 } from "../../services/telefun-scoring-service";
 import { isTelefunRecordingPathOwnedBySession } from "./recording-paths";
 import {
@@ -96,11 +101,6 @@ function safeRecordingError(code: string): string {
 
 const SCORING_STATE_SELECT =
   "telefun_transport, status, recording_status, recording_error, scoring_ready_at, agent_recording_path, scoring_status, scoring_attempt_count, scoring_next_attempt_at, score, voice_assessment";
-
-function readRpcBoolean(data: unknown): boolean | null {
-  const value = Array.isArray(data) ? data[0] : data;
-  return typeof value === "boolean" ? value : null;
-}
 
 function cachedScoringResponse(session: {
   score?: number | null;
@@ -465,6 +465,7 @@ telefunRecordings.post("/score/:id", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
   const adminClient = createAdminClient();
+  let activeClaimTokenHash: string | null = null;
 
   try {
     // === Ownership Check ===
@@ -528,10 +529,14 @@ telefunRecordings.post("/score/:id", async (c) => {
         return retiredOpenAiScoringResponse(c);
       }
 
-      const { data: retiredClaim, error: retiredClaimError } =
+      const retiredClaim = newScoringClaim();
+      activeClaimTokenHash = retiredClaim.claimTokenHash;
+      const { data: retiredClaimed, error: retiredClaimError } =
         await adminClient.rpc("claim_telefun_scoring", {
           p_session_id: id,
-          p_claim_timeout_seconds: 120,
+          p_claim_timeout_seconds: TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
+          p_claim_token_hash: retiredClaim.claimTokenHash,
+          p_claim_owner: TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE,
         });
       if (retiredClaimError) {
         return c.json(
@@ -545,10 +550,16 @@ telefunRecordings.post("/score/:id", async (c) => {
           503,
         );
       }
-      const claimed = Array.isArray(retiredClaim)
-        ? retiredClaim[0]
-        : retiredClaim;
-      if (claimed !== true || !(await permanentlyFailRetiredOpenAiScoring(id))) {
+      const claimed = Array.isArray(retiredClaimed)
+        ? retiredClaimed[0]
+        : retiredClaimed;
+      if (
+        claimed !== true ||
+        !(await permanentlyFailRetiredOpenAiScoring(
+          id,
+          retiredClaim.claimTokenHash,
+        ))
+      ) {
         return c.json(
           {
             success: false,
@@ -582,10 +593,18 @@ telefunRecordings.post("/score/:id", async (c) => {
     // === Atomic Claim ===
     // Attempt to claim this session for scoring.
     // claim_telefun_scoring returns true only if status was pending/failed/stale-processing
-    // and was atomically transitioned to 'processing'.
+    // and was atomically transitioned to 'processing'. The token fences all
+    // later writes so a superseded claim cannot overwrite the new owner.
+    const manualClaim = newScoringClaim();
+    activeClaimTokenHash = manualClaim.claimTokenHash;
     const { data: claimed, error: claimError } = await adminClient.rpc(
       "claim_telefun_scoring",
-      { p_session_id: id, p_claim_timeout_seconds: 120 },
+      {
+        p_session_id: id,
+        p_claim_timeout_seconds: TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
+        p_claim_token_hash: manualClaim.claimTokenHash,
+        p_claim_owner: TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE,
+      },
     );
 
     const normalizedClaimed = Array.isArray(claimed)
@@ -722,12 +741,14 @@ telefunRecordings.post("/score/:id", async (c) => {
         );
       }
 
-      // Mark scoring as failed
-      const failureRpc = await adminClient.rpc("fail_telefun_scoring", {
-        p_session_id: id,
-        p_error: result.error || "Analysis failed",
-      });
-      if (failureRpc.error || failureRpc.data === false) {
+      // Mark scoring as failed through the same fenced service boundary used by
+      // the worker.
+      const failurePersisted = await failScoringJob(
+        id,
+        result.error || "Analysis failed",
+        activeClaimTokenHash,
+      );
+      if (!failurePersisted) {
         return c.json(
           {
             success: false,
@@ -754,21 +775,18 @@ telefunRecordings.post("/score/:id", async (c) => {
 
     // Mark scoring as completed
     const assessment = result.assessment;
-    let completionData: unknown = null;
+    let completionAccepted = false;
     let completionError: unknown = null;
     try {
-      const completionRpc = await adminClient.rpc("complete_telefun_scoring", {
-        p_session_id: id,
-        p_score: assessment.overallScore,
-        p_voice_assessment: assessment as unknown as Record<string, unknown>,
-      });
-      completionData = completionRpc.data;
-      completionError = completionRpc.error;
-    } catch (_error: unknown) {
-      completionError = new Error("Scoring completion unavailable");
+      completionAccepted = await completeScoringAssessment(
+        id,
+        assessment,
+        activeClaimTokenHash,
+      );
+    } catch (error: unknown) {
+      completionError = error;
     }
-    const completionResult = readRpcBoolean(completionData);
-    if (completionError || completionResult === null) {
+    if (completionError) {
       return c.json(
         {
           success: false,
@@ -781,7 +799,7 @@ telefunRecordings.post("/score/:id", async (c) => {
       );
     }
 
-    if (completionResult === false) {
+    if (!completionAccepted) {
       let current: any = null;
       let stateError: unknown = null;
       try {
@@ -900,11 +918,12 @@ telefunRecordings.post("/score/:id", async (c) => {
 
     // Attempt to mark as failed in catch block; the public response remains bounded.
     try {
-      const failureRpc = await adminClient.rpc("fail_telefun_scoring", {
-        p_session_id: id,
-        p_error: diagnostic,
-      });
-      if (failureRpc.error || failureRpc.data === false) {
+      const failurePersisted = await failScoringJob(
+        id,
+        diagnostic,
+        activeClaimTokenHash,
+      );
+      if (!failurePersisted) {
         return c.json(
           {
             success: false,

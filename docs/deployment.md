@@ -125,9 +125,13 @@ Aturan secret/config:
 - Retired flags are ignored whether absent, malformed, false, or true. Telefun readiness and session acceptance derive from Gemini only.
 - Mengubah Railway env memerlukan redeploy/restart service Telefun; jangan menganggap flag berubah in-process sebelum runtime mendukung reload.
 
-### Telefun Scoring Worker Service
+### Deprecated standalone scoring-worker service (rollout fallback)
 
-Worker scoring berjalan sebagai **service Railway private terpisah** (long-running), di-deploy dari exact SHA yang sama dengan Web/API/Telefun. Bukan cron: loop internal menangani polling/claim/retry. Proses web API tidak pernah menjalankan loop worker (`apps/api/src/index.ts` tidak mengimpor worker).
+Service Railway `@trainers/scoring-worker` hanya dipertahankan sementara sebagai
+fallback saat embedded worker API di-rollout. Jangan jalankan dua worker aktif
+terhadap production queue tanpa migration fencing dan bukti ownership; setelah
+queue drain/retry API terverifikasi, scale-to-zero service ini. Bukan cron: loop
+internal menangani polling/claim/retry.
 
 Start command:
 
@@ -142,7 +146,7 @@ Env vars (nama exact; invalid/disabled config → proses **exit non-zero** denga
 | `TELEFUN_SCORING_WORKER_ENABLED` | ya | `true` | Harus persis `"true"`; selain itu = kill switch, worker exit non-zero tanpa memproses job |
 | `TELEFUN_SCORING_WORKER_INTERVAL_MS` | ya | `30000` | Integer positif `1000..600000` |
 | `TELEFUN_SCORING_WORKER_BATCH_SIZE` | ya | `5` | Integer positif `1..50` |
-| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `120` | Integer positif; claim timeout RPC sekaligus deadline shutdown in-flight |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `300` | Integer `>=300`; claim lease RPC sekaligus deadline shutdown in-flight |
 | `TELEFUN_SCORING_WORKER_HEALTH_PORT` | opsional | `9100` | Integer `1024..65535`; mengaktifkan health internal. Jangan pakai `PORT` publik |
 | `TELEFUN_INTERNAL_TOKEN` | bila health aktif | `<random>` | Shared server-only secret, nilai sama dengan API/Telefun; wajib saat health port diset |
 | `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/release worker (service-role, backend-only) |
@@ -155,7 +159,7 @@ Health endpoint (`GET /health`, bind default `127.0.0.1:<port>`; deployment mem-
 - Payload bounded: `enabled`, `loopAlive`, `lastSuccessfulPollAt`, `lastErrorClass`, `queue {pending,processing,failed}`, `oldestEligiblePendingAgeMs` — tanpa UUID/session/user ID/recording path/prompt/raw error.
 - DB error pada queue fetch **tidak pernah** tampil sebagai empty/healthy: `lastErrorClass` terisi (mis. `DatabaseError`) dan `lastSuccessfulPollAt` stale.
 
-Graceful shutdown (SIGTERM/SIGINT): stop admission → abort analysis (`AbortSignal`, deadline = claim timeout) → bounded wait → bila deadline habis, claim aktif di-*release* ke retryable (`reschedule_telefun_scoring`) **sebelum** exit; late result tidak persist (guard `complete_telefun_scoring`) dan tidak ada AI call kedua (`checkCachedAssessment`). Pastikan grace period orchestrator ≥ claim timeout.
+Graceful shutdown (SIGTERM/SIGINT): stop admission → abort analysis (`AbortSignal`, deadline = claim timeout) → bounded wait → bila deadline habis, coba *release* claim aktif ke retryable (`reschedule_telefun_scoring`) dengan batas kedua sebesar lease. Jika RPC release juga tidak settle, runtime mencatat `claim_release_deferred` dan lease database menjadi recovery backstop; shutdown tetap selesai tanpa retry release kedua. Late result tidak persist (guard `complete_telefun_scoring`) dan tidak ada AI call kedua (`checkCachedAssessment`). Pastikan grace period orchestrator ≥ `2 × TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` agar kedua batas lokal dapat berjalan.
 
 Alert thresholds:
 
@@ -164,6 +168,85 @@ Alert thresholds:
 - **Failed-reschedule spike:** `failed+rescheduled` > 50% batch selama 3 poll berturut-turut.
 
 Kill switch: set `TELEFUN_SCORING_WORKER_ENABLED=false` + redeploy/restart service (exit non-zero, pending jobs/history tidak diubah), atau stop/scale-to-zero service / kirim SIGTERM untuk shutdown graceful.
+
+### Telefun Scoring Worker Runtime
+
+Scoring Telefun sekarang berjalan sebagai **embedded worker di proses `apps/api`**.
+API menjadi satu-satunya process owner untuk HTTP dan polling queue; queue table,
+RPC, retry/backoff, dan status UI tetap dipertahankan. Service Railway
+`@trainers/scoring-worker` adalah **deprecated/rollout fallback**: jangan dihapus
+sebelum API embedded worker terbukti drain queue dan retry di production.
+
+API env (nama exact):
+
+| Variable | Wajib | Value / bound | Notes |
+| --- | --- | --- | --- |
+| `TELEFUN_SCORING_WORKER_ENABLED` | ya untuk mengaktifkan | `true` | Harus persis `"true"`; unset/selain itu membuat API tetap hidup tanpa worker |
+| `TELEFUN_SCORING_WORKER_INTERVAL_MS` | saat aktif | `30000` | Integer `1000..600000`; polling tidak overlap |
+| `TELEFUN_SCORING_WORKER_BATCH_SIZE` | saat aktif | `5` | Integer `1..50` |
+| `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` | opsional | `300` | Lease claim dan bounded shutdown deadline; integer `>=300`, default 300 detik |
+| `SUPABASE_SERVICE_ROLE_KEY` | ya | `eyJ...` | Queue fetch/claim/persist backend-only |
+| `GEMINI_API_KEY` | ya | Gemini credential | Voice scoring Gemini; usage dicatat via `logAiUsage()` |
+
+Claim menggunakan token hash + owner. Completion, failure, dan reschedule hanya
+boleh menulis bila token claim masih cocok, sehingga worker lama yang stale
+tidak dapat menimpa hasil claim baru. Lease 300 detik memberi margin di atas
+timeout provider Gemini sekitar 180 detik. Migration fencing bersifat additive;
+tidak menghapus queue, assessment, usage log, atau recording.
+
+Startup/shutdown:
+
+- API memvalidasi env worker sebelum menerima traffic, lalu memulai embedded loop
+  setelah HTTP listener dibuat. Startup mencatat event bounded berisi enabled,
+  interval, batch, dan lease; error/recovery polling hanya mencatat kelas error.
+- `SIGTERM`/`SIGINT` menghentikan admission, membatalkan in-flight analysis,
+  menunggu claim yang sedang berjalan, dan melepaskan claim secara token-fenced
+  baik saat analysis settle setelah abort maupun saat deadline tercapai, lalu
+  menutup HTTP. Penantian claim dan RPC release masing-masing dibatasi satu
+  lease; jika claim tidak settle, catat `shutdown_recovery_deferred`, dan jika
+  release tidak settle, catat `claim_release_deferred`. Pada kedua kasus,
+  lease database tetap menjadi recovery backstop dan tidak ada retry release
+  kedua.
+- Embedded mode tidak membuka health server kedua. Gunakan `GET /api/health` untuk
+  liveness API; endpoint itu bukan bukti polling worker sehat. Worker queue
+  failures/recovery dibuktikan melalui bounded runtime log dan queue evidence.
+
+Untuk rollout: deploy migration + API embedded worker, verifikasi queue drain,
+retry, dan tidak ada duplicate claim/completion; setelah itu baru set worker
+Railway lama ke scale-to-zero/disabled. Start command standalone tetap disimpan
+sementara untuk rollback terkontrol:
+
+```bash
+pnpm --filter @trainers/api start:telefun-scoring-worker
+```
+
+### Telefun Scoring Worker Production Proof Checklist
+
+Jalankan berurutan; jangan lanjut ke langkah berikutnya bila langkah sebelumnya
+gagal. Checklist ini adalah bukti wajib sebelum worker Railway lama dinonaktifkan
+(lihat juga `docs/rebuild-logs/phase-215-telefun-inprocess-scoring-worker.md`).
+
+- [ ] Catat API deploy SHA Railway yang menjalankan embedded worker.
+- [ ] Apply migration `20260904150000_telefun_scoring_claim_fencing.sql` ke
+      Supabase produksi, lalu verifikasi kolom `scoring_claim_token_hash`,
+      `scoring_claim_owner`, dan signature RPC tokenized via hosted readback.
+- [ ] Set API env: `TELEFUN_SCORING_WORKER_ENABLED=true`,
+      `TELEFUN_SCORING_WORKER_INTERVAL_MS=30000`, `TELEFUN_SCORING_WORKER_BATCH_SIZE=5`,
+      `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS=300`, lalu redeploy/restart.
+- [ ] Verifikasi `GET /api/health` sehat sebagai API liveness, lalu buktikan
+      poll loop embedded melalui event startup, log poll/recovery bounded, dan
+      queue readback; HTTP health API saja bukan bukti worker sehat.
+- [ ] Bukti queue drain: pending scoring jobs berkurang hingga 0 dan status
+      menjadi `completed` dengan `scoring_claim_token_hash`/`scoring_claim_owner`
+      dibersihkan ke `NULL` (completion token-fenced selalu menghapus token).
+- [ ] Bukti retry: jobs yang gagal sementara naik `scoring_attempt_count` dan berhasil
+      diproses ulang tanpa duplicate completion.
+- [ ] Bukti no-duplicate: tidak ada `scoring_status` yang berpindah dari
+      `completed` kembali ke `processing`, dan tidak ada dua `scoring_claim_owner`
+      aktif untuk session yang sama.
+- [ ] Setelah semua bukti di atas tercatat: scale-to-zero/disable service
+      `@trainers/scoring-worker` di Railway. Cleanup compatibility wrapper RPC
+      hanya pada migration terpisah setelah service dihapus.
 
 ### Historical WebRTC cleanup operations
 
@@ -212,7 +295,7 @@ Setelah remux berhasil, player menggunakan signed URL persisten; jika gagal, blo
 | `start:web`     | `pnpm --filter @trainers/web start`               | Web production via `serve`       |
 | `build:web`     | `pnpm turbo run build --filter @trainers/web`     | Build web (TSC + Vite)           |
 | `start:api`     | `pnpm --filter @trainers/api start`               | API production via `tsx`         |
-| `start:telefun-scoring-worker` | `pnpm --filter @trainers/api start:telefun-scoring-worker` | Scoring worker runtime (service terpisah) |
+| `start:telefun-scoring-worker` | `pnpm --filter @trainers/api start:telefun-scoring-worker` | Deprecated standalone scoring worker (rollout fallback) |
 | `build:api`     | `pnpm turbo run build --filter @trainers/api`     | Build API (TSC)                  |
 | `start:telefun` | `pnpm --filter @trainers/telefun start`           | Telefun production via `node`    |
 | `build:telefun` | `pnpm turbo run build --filter @trainers/telefun` | Build Telefun (TSC)              |

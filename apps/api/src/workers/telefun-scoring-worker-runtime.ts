@@ -1,8 +1,8 @@
 /**
  * Telefun Scoring Worker — production runtime
  *
- * Executable entrypoint for the scoring worker service. Owns everything the
- * pure batch processor (`telefun-scoring-worker.ts`) must not:
+ * Reusable scoring worker runtime. Owns everything the pure batch processor
+ * (`telefun-scoring-worker.ts`) must not:
  *
  *  - fail-fast environment validation (disabled/invalid config exits non-zero
  *    with a structured log line; the old code silently no-oped);
@@ -12,24 +12,16 @@
  *    active claim to retryable state BEFORE exit; no late write, no double AI
  *    call — the reclaim guard in `complete_telefun_scoring` +
  *    `checkCachedAssessment` keep that invariant);
- *  - the internal health HTTP server bound to 127.0.0.1, protected by the
- *    shared `TELEFUN_INTERNAL_TOKEN` middleware, non-billable, never opening
- *    a provider connection and never processing jobs.
  *
- * Start:
- *   TELEFUN_SCORING_WORKER_ENABLED=true \
- *   TELEFUN_SCORING_WORKER_INTERVAL_MS=30000 \
- *   TELEFUN_SCORING_WORKER_BATCH_SIZE=5 \
- *   TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS=120 \
- *   TELEFUN_SCORING_WORKER_HEALTH_PORT=9100 \
- *   TELEFUN_INTERNAL_TOKEN=<shared-server-secret> \
- *   pnpm --filter @trainers/api start:telefun-scoring-worker
+ * The standalone process/health adapter lives in
+ * `telefun-scoring-worker-entrypoint.ts`; embedded API startup imports this
+ * file without acquiring process ownership, signal handlers, or a port.
  *
  * Env rules (exact names, fail-fast):
  *   TELEFUN_SCORING_WORKER_ENABLED            "true" enables; anything else exits non-zero
  *   TELEFUN_SCORING_WORKER_INTERVAL_MS        positive integer in 1000..600000 (required)
  *   TELEFUN_SCORING_WORKER_BATCH_SIZE         positive integer in 1..50 (required)
- *   TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS  positive integer (optional, default 120);
+ *   TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS  positive integer (optional, default 300);
  *                                              also the shutdown deadline for an in-flight job
  *   TELEFUN_SCORING_WORKER_HEALTH_PORT        integer in 1024..65535 (optional; enables health)
  *   TELEFUN_INTERNAL_TOKEN                    required when the health server is enabled
@@ -38,12 +30,12 @@
  * env is parsed here only.
  */
 
-import { createHash, timingSafeEqual } from "node:crypto";
-import { Hono } from "hono";
-import { serve } from "@hono/node-server";
 import { createAdminClient } from "../lib/supabase";
 import { processNextBatch, type ScoringWorkerDeps } from "./telefun-scoring-worker";
 import * as scoringService from "../services/telefun-scoring-service";
+import {
+  TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
+} from "../services/telefun-scoring-service";
 import type { ScoringJob, ScoringResult } from "../services/telefun-scoring-service";
 import type { VoiceQualityAssessment } from "@trainers/types";
 
@@ -57,10 +49,13 @@ export const TELEFUN_SCORING_WORKER_BATCH_SIZE_MIN = 1;
 export const TELEFUN_SCORING_WORKER_BATCH_SIZE_MAX = 50;
 export const TELEFUN_SCORING_WORKER_HEALTH_PORT_MIN = 1024;
 export const TELEFUN_SCORING_WORKER_HEALTH_PORT_MAX = 65535;
-export const TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_DEFAULT = 120;
-/** Internal health server binds to loopback by default; deployments may
- *  override with the Railway private-network address. Never `PORT`. */
-export const HEALTH_HOST = "127.0.0.1";
+export const TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_DEFAULT =
+  TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS;
+/** Hard floor: the lease must exceed the Gemini provider timeout (~180s) with
+ *  margin, otherwise a slow job is reclaimed mid-call and billed twice.
+ *  Explicit env values below this are rejected fail-fast. */
+export const TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_MIN =
+  TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS;
 
 // ---------------------------------------------------------------------------
 // Config parsing (fail-fast)
@@ -166,6 +161,13 @@ export function parseWorkerConfig(
       "INVALID_CLAIM_TIMEOUT_SECONDS",
     );
     if (!claim.ok) return claim;
+    if (claim.value < TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_MIN) {
+      return {
+        ok: false,
+        code: "INVALID_CLAIM_TIMEOUT_SECONDS",
+        detail: `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS must be >= ${TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS_MIN} (provider timeout margin; got "${rawClaim}")`,
+      };
+    }
     claimTimeoutSeconds = claim.value;
   }
 
@@ -236,12 +238,12 @@ export interface ScoringWorkerBoundary {
   claimJob(
     sessionId: string,
     timeoutSeconds: number,
-  ): Promise<{ claimed: boolean; session?: any }>;
+  ): Promise<{ claimed: boolean; claimTokenHash?: string | null; session?: any }>;
   checkCachedAssessment(sessionId: string): Promise<VoiceQualityAssessment | null>;
   processScoringJob(job: ScoringJob, signal?: AbortSignal): Promise<ScoringResult>;
   /** Atomic release/reschedule of an active claim back to retryable state
    *  (`reschedule_telefun_scoring`); returns true when accepted. */
-  releaseClaim(sessionId: string, error: string, nextAttemptAt: Date): Promise<boolean>;
+  releaseClaim(sessionId: string, error: string, nextAttemptAt: Date, claimTokenHash?: string | null): Promise<boolean>;
   /** Aggregate queue counts + oldest eligible pending age (no identifiers). */
   fetchQueueStats(): Promise<QueueStats>;
 }
@@ -298,12 +300,13 @@ export function createDefaultBoundary(): ScoringWorkerBoundary {
         job,
         signal,
       ),
-    releaseClaim: async (sessionId, error, nextAttemptAt) => {
+    releaseClaim: async (sessionId, error, nextAttemptAt, claimTokenHash) => {
       const adminClient = createAdminClient();
       const { data, error: rpcError } = await adminClient.rpc("reschedule_telefun_scoring", {
         p_session_id: sessionId,
         p_error: error,
         p_next_attempt_at: nextAttemptAt.toISOString(),
+        p_claim_token_hash: claimTokenHash ?? null,
       });
       if (rpcError || data === false) return false;
       return true;
@@ -321,7 +324,7 @@ export function createDefaultBoundary(): ScoringWorkerBoundary {
 }
 
 // ---------------------------------------------------------------------------
-// Health snapshot + HTTP endpoint
+// Health snapshot
 // ---------------------------------------------------------------------------
 
 export interface WorkerHealthSnapshot {
@@ -331,72 +334,6 @@ export interface WorkerHealthSnapshot {
   lastErrorClass: string | null;
   queue: { pending: number; processing: number; failed: number } | null;
   oldestEligiblePendingAgeMs: number | null;
-}
-
-/** Picks ONLY the bounded contract fields — never identifiers, paths,
- *  prompts, secrets, or raw error messages. */
-export function toHealthPayload(snapshot: WorkerHealthSnapshot): Record<string, unknown> {
-  return {
-    enabled: snapshot.enabled,
-    loopAlive: snapshot.loopAlive,
-    lastSuccessfulPollAt: snapshot.lastSuccessfulPollAt,
-    lastErrorClass: snapshot.lastErrorClass,
-    queue:
-      snapshot.queue === null
-        ? null
-        : {
-            pending: snapshot.queue.pending,
-            processing: snapshot.queue.processing,
-            failed: snapshot.queue.failed,
-          },
-    oldestEligiblePendingAgeMs: snapshot.oldestEligiblePendingAgeMs,
-  };
-}
-
-function safeEqual(provided: string, expected: string): boolean {
-  const a = createHash("sha256").update(provided).digest();
-  const b = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(a, b);
-}
-
-/** Internal health app: `Authorization: Bearer <TELEFUN_INTERNAL_TOKEN>`
- *  (constant-time comparison). Non-billable, never opens a provider
- *  connection, never processes jobs. */
-export function createHealthApp(
-  snapshot: () => WorkerHealthSnapshot,
-  internalToken: string,
-): Hono {
-  const app = new Hono();
-  app.use("/health", async (c, next) => {
-    const header = c.req.header("authorization") ?? "";
-    const provided = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-    if (!safeEqual(provided, internalToken)) {
-      return c.json({ success: false, error: { code: "UNAUTHORIZED" } }, 401);
-    }
-    await next();
-  });
-  app.get("/health", (c) => c.json(toHealthPayload(snapshot())));
-  return app;
-}
-
-export interface HealthServerOptions {
-  port: number;
-  token: string;
-  snapshot: () => WorkerHealthSnapshot;
-  log: (line: string) => void;
-  /** Loopback by default; deployment binds the Railway private address. */
-  host?: string;
-}
-
-export function startHealthServer(options: HealthServerOptions): { close(): void } {
-  const host = options.host ?? HEALTH_HOST;
-  const app = createHealthApp(options.snapshot, options.token);
-  const server = serve({ fetch: app.fetch, port: options.port, hostname: host }, (info) => {
-    options.log(
-      `[TelefunWorker] health server listening on http://${info.address ?? host}:${info.port}`,
-    );
-  });
-  return { close: () => server.close() };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,10 +366,46 @@ export function errorClass(err: unknown): string {
   return "Error";
 }
 
+type SleepPromise = Promise<void> & { cancel?: () => void };
+
+interface ActiveJobContext {
+  job: ScoringJob;
+  promise: Promise<ScoringResult>;
+  result: ScoringResult | null;
+  rejected: boolean;
+}
+
+/**
+ * The production loop owns its timers, so cancellation must wake the loop and
+ * clear the native handle. Test-provided sleeps remain plain promises and are
+ * still supported; they simply opt out of cancellation when they do not
+ * expose a `cancel` method.
+ */
+function createCancellableSleep(ms: number): SleepPromise {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let resolveSleep!: () => void;
+  let settled = false;
+  const promise = new Promise<void>((resolve) => {
+    resolveSleep = () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      resolve();
+    };
+    timer = setTimeout(resolveSleep, ms);
+  }) as SleepPromise;
+  promise.cancel = resolveSleep;
+  return promise;
+}
+
+function cancelSleep(sleep: Promise<void> | null): void {
+  (sleep as SleepPromise | null)?.cancel?.();
+}
+
 export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
   const { config, boundary } = options;
-  const sleep =
-    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const sleep = options.sleep ?? createCancellableSleep;
   const now = options.now ?? (() => new Date());
   const log = options.log ?? ((line: string) => console.log(line));
 
@@ -443,9 +416,13 @@ export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
     loopAlive: false,
     lastSuccessfulPollAt: null as string | null,
     lastErrorClass: null as string | null,
+    pollErrorClass: null as string | null,
+    batchErrorClass: null as string | null,
     queue: null as QueueStats | null,
-    activeJob: null as ScoringJob | null,
-    inFlight: null as Promise<unknown> | null,
+    activeContext: null as ActiveJobContext | null,
+    pollPromise: null as Promise<void> | null,
+    loopSleep: null as Promise<void> | null,
+    shutdownPromise: null as Promise<void> | null,
   };
 
   // Batch-processor deps wired to the injected boundary. The claim timeout is
@@ -454,15 +431,34 @@ export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
     fetchPendingJobs: (limit) => boundary.fetchPendingJobs(limit),
     claimJob: (sessionId) => boundary.claimJob(sessionId, config.claimTimeoutSeconds),
     checkCachedAssessment: (sessionId) => boundary.checkCachedAssessment(sessionId),
+    releaseClaim: (sessionId, error, nextAttemptAt, claimTokenHash) =>
+      boundary.releaseClaim(sessionId, error, nextAttemptAt, claimTokenHash),
     processScoringJob: (job, signal) => {
-      state.activeJob = job;
       const promise = boundary.processScoringJob(job, signal ?? abortController.signal);
-      state.inFlight = promise;
-      const clear = () => {
-        if (state.activeJob === job) state.activeJob = null;
-        if (state.inFlight === promise) state.inFlight = null;
+      const context: ActiveJobContext = {
+        job,
+        promise,
+        result: null,
+        rejected: false,
       };
-      promise.then(clear, clear);
+      state.activeContext = context;
+      promise.then(
+        (result) => {
+          context.result = result;
+          // A settled normal result has completed its own persistence path.
+          // Clear it before the batch can admit a later claim, so a shutdown
+          // deadline for that later claim cannot release the earlier job.
+          if (
+            state.activeContext === context &&
+            !(result.status === "rescheduled" && result.error === "Scoring aborted")
+          ) {
+            state.activeContext = null;
+          }
+        },
+        () => {
+          context.rejected = true;
+        },
+      );
       return promise;
     },
   };
@@ -481,11 +477,20 @@ export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
     } catch (err) {
       // DB queue errors surface as degraded — never as healthy/empty. The
       // poll timestamp stays stale so no-poll alerts fire.
-      state.lastErrorClass = errorClass(err);
+      const nextErrorClass = errorClass(err);
+      if (state.pollErrorClass !== nextErrorClass) {
+        log(
+          JSON.stringify({
+            event: "telefun_scoring_worker.poll_failed",
+            errorClass: nextErrorClass,
+          }),
+        );
+      }
+      state.pollErrorClass = nextErrorClass;
+      state.lastErrorClass = state.batchErrorClass ?? state.pollErrorClass;
       return;
     }
     state.lastSuccessfulPollAt = now().toISOString();
-    state.lastErrorClass = null;
 
     try {
       const stats = await processNextBatch(
@@ -497,58 +502,161 @@ export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
           `[TelefunWorker] Batch: ${stats.processed} processed, ${stats.completed} completed, ${stats.rescheduled} rescheduled, ${stats.failed} failed`,
         );
       }
+      // Queue fetch success alone does not recover a failed cycle. Emit the
+      // recovery transition only after the entire batch has completed.
+      if (state.pollErrorClass !== null || state.batchErrorClass !== null) {
+        log(
+          JSON.stringify({
+            event: "telefun_scoring_worker.poll_recovered",
+          }),
+        );
+        state.pollErrorClass = null;
+        state.batchErrorClass = null;
+        state.lastErrorClass = null;
+      }
     } catch (err) {
-      state.lastErrorClass = errorClass(err);
+      const nextErrorClass = errorClass(err);
+      if (state.batchErrorClass !== nextErrorClass) {
+        log(
+          JSON.stringify({
+            event: "telefun_scoring_worker.batch_failed",
+            errorClass: nextErrorClass,
+          }),
+        );
+      }
+      state.batchErrorClass = nextErrorClass;
+      state.lastErrorClass = state.batchErrorClass ?? state.pollErrorClass;
+    } finally {
+      state.activeContext = null;
     }
   }
 
   async function loop(): Promise<void> {
     state.loopAlive = true;
-    while (!state.shuttingDown) {
-      await pollOnce();
-      if (state.shuttingDown) break;
-      await sleep(config.intervalMs);
+    try {
+      while (!state.shuttingDown) {
+        const pollPromise = pollOnce();
+        state.pollPromise = pollPromise;
+        try {
+          await pollPromise;
+        } finally {
+          if (state.pollPromise === pollPromise) state.pollPromise = null;
+        }
+        if (state.shuttingDown) break;
+        const loopSleep = sleep(config.intervalMs);
+        state.loopSleep = loopSleep;
+        try {
+          await loopSleep;
+        } finally {
+          if (state.loopSleep === loopSleep) state.loopSleep = null;
+        }
+      }
+    } finally {
+      state.loopAlive = false;
     }
-    state.loopAlive = false;
   }
 
   async function shutdown(): Promise<void> {
-    if (state.shuttingDown) return;
-    state.shuttingDown = true;
-    abortController.abort();
+    if (state.shutdownPromise) return state.shutdownPromise;
+    state.shutdownPromise = (async () => {
+      state.shuttingDown = true;
+      abortController.abort();
+      cancelSleep(state.loopSleep);
 
-    const job = state.activeJob;
-    const inFlight = state.inFlight;
-    if (job && inFlight) {
+      const activeContext = state.activeContext;
+      const job = activeContext?.job;
+      const inFlight = activeContext?.promise;
+      const pollPromise = state.pollPromise;
       const deadlineMs = config.claimTimeoutSeconds * 1000;
-      const settled = await Promise.race([
-        inFlight.then(
-          () => true,
-          () => true,
-        ),
-        sleep(deadlineMs).then(() => false),
-      ]);
-      if (!settled) {
-        // Deadline expired before the job settled: atomically release the
-        // active claim back to retryable state BEFORE exit. The late provider
-        // result cannot persist (complete_telefun_scoring rejects when the
-        // row is no longer processing) and we never re-run the job.
+      let settled = true;
+
+      // `pollPromise` includes fetch, claim, and the batch processor. Waiting
+      // for it lets a claim RPC that was already admitted finish and release
+      // its token before shutdown resolves. A hung RPC is bounded by the
+      // lease deadline and leaves an explicit recovery log for the lease.
+      const pendingWork = pollPromise ?? inFlight;
+      if (pendingWork) {
+        const deadlineSleep = sleep(deadlineMs);
+        settled = await Promise.race([
+          pendingWork.then(
+            () => true,
+            () => true,
+          ),
+          deadlineSleep.then(() => false),
+        ]);
+        if (settled) cancelSleep(deadlineSleep);
+      }
+
+      const abortResult =
+        activeContext?.result?.status === "rescheduled" &&
+        activeContext.result.error === "Scoring aborted";
+      const releaseOwnedClaim =
+        !settled || Boolean(activeContext?.rejected) || abortResult;
+
+      if (job && inFlight && releaseOwnedClaim) {
+        // A normal completed/failed/retried result already owns its own
+        // persistence outcome. Release only when shutdown owns the claim:
+        // abort sentinel, rejected processing, or an expired deadline.
         const nextAttemptAt = new Date(now().getTime() + deadlineMs);
-        let released = false;
+        let releaseOutcome:
+          | { kind: "settled"; accepted: boolean }
+          | { kind: "rejected"; error: unknown }
+          | { kind: "timeout" };
         try {
-          released = await boundary.releaseClaim(
-            job.sessionId,
-            "worker shutdown: analysis did not settle within claim timeout",
-            nextAttemptAt,
+          const releasePromise = Promise.resolve(
+            job.claimTokenHash
+              ? boundary.releaseClaim(
+                  job.sessionId,
+                  settled
+                    ? "worker shutdown: active claim settled after abort"
+                    : "worker shutdown: analysis did not settle within claim timeout",
+                  nextAttemptAt,
+                  job.claimTokenHash,
+                )
+              : boundary.releaseClaim(
+                  job.sessionId,
+                  settled
+                    ? "worker shutdown: active claim settled after abort"
+                    : "worker shutdown: analysis did not settle within claim timeout",
+                  nextAttemptAt,
+                ),
           );
+          const releaseDeadline = sleep(deadlineMs);
+          releaseOutcome = await Promise.race([
+            releasePromise.then(
+              (accepted) => ({ kind: "settled" as const, accepted }),
+              (error) => ({ kind: "rejected" as const, error }),
+            ),
+            releaseDeadline.then(() => ({ kind: "timeout" as const })),
+          ]);
+          cancelSleep(releaseDeadline);
         } catch (err) {
+          releaseOutcome = { kind: "rejected", error: err };
+        }
+
+        if (releaseOutcome.kind === "timeout") {
+          // The database lease is now the recovery backstop. Do not keep API
+          // shutdown hostage to an unresponsive Supabase RPC, and never issue
+          // a second release attempt after this point.
+          log(
+            JSON.stringify({
+              event: "telefun_scoring_worker.claim_release_deferred",
+              leaseSeconds: config.claimTimeoutSeconds,
+            }),
+          );
+          return;
+        }
+
+        if (releaseOutcome.kind === "rejected") {
           log(
             JSON.stringify({
               event: "telefun_scoring_worker.claim_release_failed",
-              errorClass: errorClass(err),
+              errorClass: errorClass(releaseOutcome.error),
             }),
           );
         }
+        const released =
+          releaseOutcome.kind === "settled" && releaseOutcome.accepted;
         log(
           JSON.stringify({
             event: released
@@ -557,9 +665,16 @@ export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
             nextAttemptAt: nextAttemptAt.toISOString(),
           }),
         );
+      } else if (!settled && pendingWork) {
+        log(
+          JSON.stringify({
+            event: "telefun_scoring_worker.shutdown_recovery_deferred",
+            leaseSeconds: config.claimTimeoutSeconds,
+          }),
+        );
       }
-    }
-    state.loopAlive = false;
+    })();
+    return state.shutdownPromise;
   }
 
   function getHealthSnapshot(): WorkerHealthSnapshot {
@@ -595,90 +710,55 @@ export function createRuntime(options: RuntimeOptions): ScoringWorkerRuntime {
 }
 
 // ---------------------------------------------------------------------------
-// Entrypoint
+// Embedded worker (for in-process use by apps/api — option B, no standalone
+// service). Unlike main(): never calls process.exit, never registers process
+// signals, never starts a second health server. DISABLED config returns
+// { started: false } so the API stays alive; any other invalid config
+// throws so API startup fails fast before accepting traffic.
 // ---------------------------------------------------------------------------
 
-export interface MainOptions {
-  env?: Record<string, string | undefined>;
+export interface EmbeddedWorkerOptions {
+  env: Record<string, string | undefined>;
   boundary?: ScoringWorkerBoundary;
-  exit?: (code: number) => never;
   log?: (line: string) => void;
-  onSignal?: (handler: () => void) => void;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
 }
 
-export function main(options: MainOptions = {}): void {
-  const env = options.env ?? (process.env as Record<string, string | undefined>);
-  const exit = options.exit ?? ((code: number): never => process.exit(code));
-  const log = options.log ?? ((line: string) => console.error(line));
-  const onSignal =
-    options.onSignal ??
-    ((handler: () => void) => {
-      process.on("SIGTERM", handler);
-      process.on("SIGINT", handler);
-    });
+export type EmbeddedWorkerHandle =
+  | { started: true; runtime: ScoringWorkerRuntime; shutdown: () => Promise<void> }
+  | { started: false };
 
-  const parsed = parseWorkerConfig(env);
+export function startEmbeddedTelefunScoringWorker(
+  options: EmbeddedWorkerOptions,
+): EmbeddedWorkerHandle {
+  const log = options.log ?? ((line: string) => console.log(line));
+  const parsed = parseWorkerConfig(options.env);
   if (!parsed.ok) {
-    log(
-      JSON.stringify({
-        event: "telefun_scoring_worker.config_rejected",
-        code: parsed.code,
-        detail: parsed.detail,
-      }),
+    if (parsed.code === "DISABLED") {
+      log(JSON.stringify({ event: "telefun_scoring_worker.disabled" }));
+      return { started: false };
+    }
+    throw new Error(
+      `telefun_scoring_worker.config_rejected: ${parsed.code} — ${parsed.detail}`,
     );
-    exit(1);
-    return;
   }
-  const config = parsed.config;
-
-  log(
-    JSON.stringify({
-      event: "telefun_scoring_worker.started",
-      intervalMs: config.intervalMs,
-      batchSize: config.batchSize,
-      claimTimeoutSeconds: config.claimTimeoutSeconds,
-      healthPort: config.healthPort,
-    }),
-  );
-
   const runtime = createRuntime({
-    config,
+    config: parsed.config,
     boundary: options.boundary ?? createDefaultBoundary(),
     sleep: options.sleep,
     now: options.now,
     log,
   });
-
-  let shutdownStarted = false;
-  onSignal(() => {
-    if (shutdownStarted) return;
-    shutdownStarted = true;
-    log(JSON.stringify({ event: "telefun_scoring_worker.shutdown_started" }));
-    void runtime.shutdown().then(() => {
-      log(JSON.stringify({ event: "telefun_scoring_worker.shutdown_complete" }));
-      exit(0);
-    });
-  });
-
-  if (config.healthPort !== null && config.internalToken !== null) {
-    startHealthServer({
-      port: config.healthPort,
-      token: config.internalToken,
-      snapshot: () => runtime.getHealthSnapshot(),
-      log,
-    });
-  }
-
+  log(
+    JSON.stringify({
+      event: "telefun_scoring_worker.embedded_started",
+      enabled: parsed.config.enabled,
+      intervalMs: parsed.config.intervalMs,
+      batchSize: parsed.config.batchSize,
+      claimTimeoutSeconds: parsed.config.claimTimeoutSeconds,
+    }),
+  );
   runtime.start();
-}
-
-const isRuntimeEntrypoint =
-  typeof process !== "undefined" &&
-  typeof process.argv?.[1] === "string" &&
-  process.argv[1].includes("telefun-scoring-worker-runtime");
-
-if (isRuntimeEntrypoint) {
-  main();
+  return { started: true, runtime, shutdown: () => runtime.shutdown() };
 }

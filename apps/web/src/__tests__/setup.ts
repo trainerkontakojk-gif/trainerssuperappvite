@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { afterEach, vi } from "vitest";
 
 // Declare process for TypeScript (available at runtime via jsdom/vitest)
 declare const process: { env: Record<string, string | undefined> };
@@ -49,4 +49,12 @@ Object.defineProperty(window, "matchMedia", {
   })),
   writable: true,
   configurable: true,
+});
+
+afterEach(() => {
+  // Keep a timed-out test from leaking globals, spies, timers, or persisted UI state.
+  lsStore.clear();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
 });

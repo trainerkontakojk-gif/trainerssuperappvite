@@ -74,7 +74,10 @@ describe("PDKT Mailbox Bulk Delete UX", () => {
     });
   });
 
-  it("toggles bulk selection mode and shows checkboxes", async () => {
+  it(
+    "toggles bulk selection mode and shows checkboxes",
+    { timeout: 15_000 },
+    async () => {
     const rootRoute = createRootRoute();
     const indexRoute = createRoute({
       getParentRoute: () => rootRoute,

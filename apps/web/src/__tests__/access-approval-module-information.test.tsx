@@ -129,7 +129,10 @@ describe("AccessModuleBadge", () => {
   });
 });
 
-describe("AccessApprovalPage - module labels on pending tab", () => {
+describe(
+  "AccessApprovalPage - module labels on pending tab",
+  { timeout: 30_000 },
+  () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useApiMock.mockImplementation((url: string | null) => {

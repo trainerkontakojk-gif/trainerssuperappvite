@@ -61,9 +61,11 @@
       "src/__tests__/telefun-live-model-registry.test.ts",
       "src/__tests__/telefun-recording-access.test.ts",
       "src/__tests__/telefun-recording-state.test.ts",
+      "src/__tests__/api-runtime.test.ts",
       "src/__tests__/telefun-scoring-errors.test.ts",
       "src/__tests__/telefun-scoring-routing.test.ts",
       "src/__tests__/telefun-scoring-service.test.ts",
+      "src/__tests__/telefun-scoring-claim-fencing.test.ts",
       "src/__tests__/telefun-schema-contract.test.ts",
       "src/__tests__/telefun-phase5-hardening.test.ts",
       "src/__tests__/telefun-routes.test.ts"

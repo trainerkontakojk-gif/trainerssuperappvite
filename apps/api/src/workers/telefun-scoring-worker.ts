@@ -36,9 +36,18 @@ export interface ScoringWorkerDeps {
   claimJob: (
     sessionId: string,
     timeoutSeconds?: number,
-  ) => Promise<{ claimed: boolean; session?: any }>;
+  ) => Promise<{ claimed: boolean; claimTokenHash?: string | null; session?: any }>;
   checkCachedAssessment: (sessionId: string) => Promise<VoiceQualityAssessment | null>;
   processScoringJob: ScoringJobProcessor;
+  /** Atomic release of a just-won claim back to retryable state. Required
+   *  when shutdown fires after claim but before provider admission, otherwise
+   *  the row stays processing until the 300s lease expires. */
+  releaseClaim?: (
+    sessionId: string,
+    error: string,
+    nextAttemptAt: Date,
+    claimTokenHash?: string | null,
+  ) => Promise<boolean>;
 }
 
 export interface BatchProcessOptions {
@@ -89,7 +98,18 @@ export async function processNextBatch(
   for (const job of jobs) {
     if (options.signal?.aborted) break;
 
-    const { claimed, session } = await deps.claimJob(job.sessionId);
+    // Short-circuit completed cache BEFORE claim: a row that already has a
+    // valid assessment needs no DB claim write, no token, and no provider
+    // call. Claiming first would hold a token for work that is already done.
+    const cachedBeforeClaim = await deps.checkCachedAssessment(job.sessionId);
+    if (cachedBeforeClaim) {
+      stats.completed++;
+      continue;
+    }
+
+    if (options.signal?.aborted) break;
+
+    const { claimed, claimTokenHash, session } = await deps.claimJob(job.sessionId);
     if (!claimed) {
       // Already completed or claimed by another worker
       if (session?.scoring_status === "completed") {
@@ -97,23 +117,36 @@ export async function processNextBatch(
       }
       continue;
     }
+    // Thread the claim token so completion/failure/reschedule are fenced to
+    // the claim owner; a superseded worker cannot overwrite the new claim.
+    const claimedJob = claimTokenHash
+      ? { ...job, claimTokenHash }
+      : job;
 
-    // Stop admission: never start a new AI call after the signal fired.
-    if (options.signal?.aborted) break;
-
-    // Check cached assessment before processing
-    const cached = await deps.checkCachedAssessment(job.sessionId);
-    if (cached) {
-      // Assessment already valid from a previous run or concurrent path
-      stats.completed++;
-      continue;
+    // Stop admission: never start a new AI call after the signal fired. A
+    // claim won in this window must be released with its token so the row
+    // returns to retryable state instead of idling until lease expiry.
+    if (options.signal?.aborted) {
+      if (deps.releaseClaim) {
+        try {
+          await deps.releaseClaim(
+            job.sessionId,
+            "worker shutdown: claim won before abort, released before provider admission",
+            new Date(Date.now() + 30_000),
+            claimTokenHash ?? null,
+          );
+        } catch {
+          // Release is best-effort; the 300s lease remains the backstop.
+        }
+      }
+      break;
     }
 
     if (options.signal?.aborted) break;
 
     const result = options.signal
-      ? await deps.processScoringJob(job, options.signal)
-      : await deps.processScoringJob(job);
+      ? await deps.processScoringJob(claimedJob, options.signal)
+      : await deps.processScoringJob(claimedJob);
     stats.processed++;
     if (result.status === "completed") stats.completed++;
     else if (result.status === "failed") stats.failed++;

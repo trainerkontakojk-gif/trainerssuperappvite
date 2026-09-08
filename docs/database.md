@@ -100,6 +100,7 @@ erDiagram
 | `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql`       | Additive Telefun WebRTC attempt/transcript/usage/finalization, recording readiness, scoring lock, and service-role RPCs      |
 | `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql`    | Distributed WebRTC lease/quota, rate-limit windows, orphan cleanup, hashed-user metrics, and precise network/orphan outcomes |
 | `20260811044655_fix_telefun_realtime_lease_renewal.sql`                   | Repair ambiguous lease-expiry reference and add bounded renewal rejection reasons; hosted production canonical verified      |
+| `20260904150000_telefun_scoring_claim_fencing.sql`                       | Embedded API scoring worker lease 300s, claim-token fencing, and additive RPC compatibility signatures                    |
 
 ### 1. `public.profiles`
 

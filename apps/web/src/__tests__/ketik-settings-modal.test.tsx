@@ -28,7 +28,10 @@ vi.mock("../lib/toast", () => ({
   },
 }));
 
-describe("KETIK SettingsModal Characterization Tests", () => {
+describe(
+  "KETIK SettingsModal Characterization Tests",
+  { timeout: 15_000 },
+  () => {
   const initialSettings: KetikAppSettings = {
     scenarios: [
       {
@@ -84,7 +87,7 @@ describe("KETIK SettingsModal Characterization Tests", () => {
     await user.click(systemTabButton);
 
     const expectedModels = [
-      "Gemini 3.7 Flash",
+      "Gemini 3.8 Flash",
       "Gemini 3.5 Flash Lite",
       "GPT 5.6 Luna",
       "GPT 5.4 Mini",

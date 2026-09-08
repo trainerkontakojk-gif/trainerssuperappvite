@@ -19,6 +19,8 @@ const RETIRED_PRICING = {
 
 const mocks = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
+  analyzeVoiceQuality: vi.fn(),
+  generateCoachingSummary: vi.fn(),
   generateOpenAIContent: vi.fn(),
 }));
 
@@ -30,6 +32,17 @@ vi.mock("../lib/supabase", () => ({
 vi.mock("../lib/openai", () => ({
   generateOpenAIContent: mocks.generateOpenAIContent,
 }));
+
+vi.mock("../lib/telefun-analysis", async () => {
+  const actual = await vi.importActual<typeof import("../lib/telefun-analysis")>(
+    "../lib/telefun-analysis",
+  );
+  return {
+    ...actual,
+    analyzeVoiceQuality: mocks.analyzeVoiceQuality,
+    generateCoachingSummary: mocks.generateCoachingSummary,
+  };
+});
 
 import {
   buildTelefunSessionInsertPayload,
@@ -413,6 +426,63 @@ describe("historical OpenAI realtime pricing", () => {
 
     expect(response.status).toBe(200);
     expect(upsert).toHaveBeenCalledOnce();
+  });
+});
+
+describe("active Gemini scoring failure fencing", () => {
+  it("fences an active Gemini analysis failure to the successful claim token", async () => {
+    const session = {
+      user_id: USER_ID,
+      status: "completed",
+      telefun_model_id: null,
+      telefun_transport: "gemini-live",
+      recording_status: "ready",
+      recording_error: null,
+      scoring_ready_at: null,
+      agent_recording_path: "u1/session-1/agent_only.webm",
+      scoring_status: "pending",
+      score: null,
+      voice_assessment: null,
+    };
+    const rpc = vi.fn(async (name: string, _args: Record<string, unknown>) => {
+      if (name === "claim_telefun_scoring") return { data: true, error: null };
+      if (name === "fail_telefun_scoring") return { data: true, error: null };
+      return { data: null, error: null };
+    });
+    const maybeSingle = vi.fn(async () => ({ data: session, error: null }));
+    mocks.createAdminClient.mockReturnValue({
+      rpc,
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({ maybeSingle })),
+        })),
+      })),
+    });
+    mocks.analyzeVoiceQuality.mockResolvedValue({
+      success: false,
+      error: "Gemini assessment failed",
+    });
+
+    const response = await buildApp(telefunRecordings).request(
+      "/score/session-1",
+      { method: "POST" },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      success: false,
+      error: {
+        code: "ANALYSIS_ERROR",
+        message: "Gagal melakukan analisis suara.",
+      },
+    });
+    expect(mocks.analyzeVoiceQuality).toHaveBeenCalledTimes(1);
+    const claimCall = rpc.mock.calls.find(([name]) => name === "claim_telefun_scoring");
+    const failCall = rpc.mock.calls.find(([name]) => name === "fail_telefun_scoring");
+    expect(claimCall?.[1]).toMatchObject({ p_claim_token_hash: expect.any(String) });
+    expect(failCall?.[1]).toMatchObject({
+      p_claim_token_hash: claimCall?.[1].p_claim_token_hash,
+    });
   });
 });
 

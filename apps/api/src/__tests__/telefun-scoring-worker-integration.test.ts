@@ -116,6 +116,71 @@ describe("Telefun scoring worker integration", () => {
     expect(processSpy).not.toHaveBeenCalled();
   });
 
+  it("short-circuits completed cache BEFORE claim (no claim, no provider call)", async () => {
+    // Regression: completed rows must not be claimed at all. Claiming first
+    // wastes a DB write and holds a token for a row that needs no provider
+    // work; the cache check must run before claimJob.
+    const fetchSpy = vi.spyOn(scoringService, "fetchPendingJobs");
+    fetchSpy.mockResolvedValue([{ sessionId: "s1", userId: "u1" }]);
+
+    const claimSpy = vi.spyOn(scoringService, "claimJob");
+    const cacheSpy = vi.spyOn(scoringService, "checkCachedAssessment");
+    cacheSpy.mockResolvedValue({
+      overallScore: 8,
+      speakingRate: { score: 7, wordsPerMinute: 130, verdict: "Baik", feedback: "Ok" },
+      intonation: { score: 8, verdict: "Baik", feedback: "Ok" },
+      articulation: { score: 9, verdict: "Baik", feedback: "Ok" },
+      fillerWords: { score: 8, count: 0, examples: [], verdict: "Baik", feedback: "Ok" },
+      emotionalTone: { score: 7, dominant: "netral", verdict: "Baik", feedback: "Ok" },
+      transcript: "Test",
+      highlights: [],
+      strengths: [],
+    } as any);
+
+    const processSpy = vi.spyOn(scoringService, "processScoringJob");
+
+    const stats = await processNextBatch();
+
+    expect(stats.completed).toBe(1);
+    expect(stats.processed).toBe(0);
+    expect(cacheSpy).toHaveBeenCalledWith("s1");
+    expect(claimSpy).not.toHaveBeenCalled();
+    expect(processSpy).not.toHaveBeenCalled();
+  });
+
+  it("releases the tokenized claim when shutdown fires after claim but before provider admission", async () => {
+    // Regression: a claim won between fetch and abort must be released back
+    // to retryable state with its token, otherwise the row stays processing
+    // until the 300s lease expires.
+    const controller = new AbortController();
+    const releaseSpy = vi.fn(async () => true);
+    const processSpy = vi.fn(async () => ({ success: true, status: "completed" as const }));
+    const claimSpy = vi.fn(async () => {
+      // Shutdown signal arrives right after the claim is won, before the
+      // provider boundary is admitted.
+      controller.abort();
+      return { claimed: true, claimTokenHash: "hash-after-claim" };
+    });
+    const deps = {
+      fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }]),
+      claimJob: claimSpy,
+      checkCachedAssessment: vi.fn(async () => null),
+      processScoringJob: processSpy,
+      releaseClaim: releaseSpy,
+    };
+    const stats = await processNextBatch(deps as any, { signal: controller.signal });
+    expect(claimSpy).toHaveBeenCalledTimes(1);
+    expect(processSpy).not.toHaveBeenCalled();
+    expect(releaseSpy).toHaveBeenCalledTimes(1);
+    expect(releaseSpy).toHaveBeenCalledWith(
+      "s1",
+      expect.any(String),
+      expect.any(Date),
+      "hash-after-claim",
+    );
+    expect(stats.processed).toBe(0);
+  });
+
   it("uses cached assessment when available (no AI call)", async () => {
     const fetchSpy = vi.spyOn(scoringService, "fetchPendingJobs");
     fetchSpy.mockResolvedValue([{ sessionId: "s1", userId: "u1" }]);

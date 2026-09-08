@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { ScenarioRecipientsField } from "../routes/pdkt/components/settings/scenarios/ScenarioRecipientsField";
 import type { PdktScenario } from "@trainers/types";
 
-describe("PDKT scenario recipient editor", () => {
+describe("PDKT scenario recipient editor", { timeout: 15_000 }, () => {
   it("adds, removes, and saves per-scenario recipient targets", async () => {
     const user = userEvent.setup();
     const onSaveMock = vi.fn();

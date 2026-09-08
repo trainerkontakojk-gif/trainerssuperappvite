@@ -128,7 +128,9 @@ describe("Telefun scoring lifecycle migration contract", () => {
       "20260622150000_repair_telefun_scoring_lifecycle_contract.sql";
     const phase4File =
       "20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql";
-    const allowed = new Set([retryFile, terminalFile, phase4File]);
+    const claimFencingFile =
+      "20260904150000_telefun_scoring_claim_fencing.sql";
+    const allowed = new Set([retryFile, terminalFile, phase4File, claimFencingFile]);
     const allFiles = readdirSync(migrationsDir)
       .filter((f) => f.endsWith(".sql") && f > migrationName && !allowed.has(f))
       .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
@@ -413,13 +415,16 @@ describe("Telefun scoring retry migration contract", () => {
       "20260622150000_repair_telefun_scoring_lifecycle_contract.sql";
     const phase4File =
       "20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql";
+    const claimFencingFile =
+      "20260904150000_telefun_scoring_claim_fencing.sql";
     const allFiles = readdirSync(migrationsDir)
       .filter(
         (f) =>
           f.endsWith(".sql") &&
           f > p16Migration &&
           f !== terminalFile &&
-          f !== phase4File,
+          f !== phase4File &&
+          f !== claimFencingFile,
       )
       .map((f) => readFileSync(join(migrationsDir, f), "utf8"))
       .join("\n");

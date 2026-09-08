@@ -9,6 +9,12 @@ let mockDownloadResult: any = {
   data: new Blob(["audio"], { type: "audio/webm" }),
   error: null,
 };
+let mockDeferredMaybeSingle: Promise<any> | null = null;
+let mockDeferredMaybeSingleAt: number | null = null;
+let mockMaybeSingleCallCount = 0;
+let mockInitialReadStarted = false;
+let mockDeferredDownload: Promise<any> | null = null;
+let mockDownloadStarted = false;
 let mockFetchQueryError: Error | null = null;
 
 function buildChain(rowOrList: any, isList: boolean) {
@@ -34,7 +40,21 @@ function buildChain(rowOrList: any, isList: boolean) {
   chain.eq = vi.fn(() => chain);
   chain.in = vi.fn(() => chain);
   chain.or = vi.fn(() => chain);
-  chain.maybeSingle = vi.fn(() => Promise.resolve(result));
+  chain.maybeSingle = vi.fn(() => {
+    mockMaybeSingleCallCount += 1;
+    if (
+      mockDeferredMaybeSingle &&
+      (mockDeferredMaybeSingleAt === null ||
+        mockMaybeSingleCallCount === mockDeferredMaybeSingleAt)
+    ) {
+      mockInitialReadStarted = true;
+      const pending = mockDeferredMaybeSingle;
+      mockDeferredMaybeSingle = null;
+      mockDeferredMaybeSingleAt = null;
+      return pending;
+    }
+    return Promise.resolve(result);
+  });
   chain.limit = vi.fn(() =>
     Promise.resolve(
       mockFetchQueryError
@@ -101,7 +121,10 @@ vi.mock("../lib/supabase", () => ({
     }),
     storage: {
       from: vi.fn(() => ({
-        download: vi.fn(() => Promise.resolve(mockDownloadResult)),
+        download: vi.fn(() => {
+          mockDownloadStarted = true;
+          return mockDeferredDownload ?? Promise.resolve(mockDownloadResult);
+        }),
       })),
     },
   })),
@@ -224,6 +247,24 @@ describe("claimJob", () => {
     mockRpcResult = { data: null, error: new Error("DB error") };
     const result = await claimJob("session-1");
     expect(result.claimed).toBe(false);
+  });
+
+  it("rejects invalid or sub-floor lease values before the RPC boundary", async () => {
+    for (const timeoutSeconds of [Number.NaN, Number.POSITIVE_INFINITY, 120, 180, 299]) {
+      await expect(claimJob("session-1", timeoutSeconds)).rejects.toThrow(
+        "integer >= 300",
+      );
+    }
+    expect(mockRpcs).toEqual([]);
+  });
+
+  it("accepts the shared 300 second lease floor and forwards it unchanged", async () => {
+    mockRpcResult = { data: true, error: null };
+
+    await expect(claimJob("session-1", 300)).resolves.toMatchObject({
+      claimed: true,
+    });
+    expect(mockRpcs[0].args.p_claim_timeout_seconds).toBe(300);
   });
 });
 
@@ -404,6 +445,12 @@ describe("processScoringJob", () => {
     mockRows.clear();
     mockRpcs.length = 0;
     mockRpcResult = { data: null, error: null };
+    mockDeferredMaybeSingle = null;
+    mockDeferredMaybeSingleAt = null;
+    mockMaybeSingleCallCount = 0;
+    mockInitialReadStarted = false;
+    mockDeferredDownload = null;
+    mockDownloadStarted = false;
     mockDownloadResult = {
       data: new Blob(["audio"], { type: "audio/webm" }),
       error: null,
@@ -428,9 +475,15 @@ describe("processScoringJob", () => {
     });
     mockRpcResult = { data: true, error: null };
 
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+    const result = await processScoringJob({
+      sessionId: "s1",
+      userId: "u1",
+      claimTokenHash: "owned-token",
+    });
     expect(result.success).toBe(true);
     expect(result.status).toBe("completed");
+    expect(mockRpcs.find((rpc) => rpc.name === "complete_telefun_scoring")?.args)
+      .toMatchObject({ p_claim_token_hash: "owned-token" });
   });
 
   it("permanently disables a terminal transport-only WebRTC row even after failed capture", async () => {
@@ -506,10 +559,15 @@ describe("processScoringJob", () => {
 
     mockRpcResult = { data: true, error: null };
 
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+    const result = await processScoringJob({
+      sessionId: "s1",
+      userId: "u1",
+      claimTokenHash: "owned-token",
+    });
     expect(result.status).toBe("rescheduled");
     const rescheduleRpc = mockRpcs.find((r) => r.name === "reschedule_telefun_scoring");
     expect(rescheduleRpc).toBeDefined();
+    expect(rescheduleRpc?.args).toMatchObject({ p_claim_token_hash: "owned-token" });
   });
 
   it("fails permanently on permanent error", async () => {
@@ -525,10 +583,41 @@ describe("processScoringJob", () => {
 
     mockRpcResult = { data: true, error: null };
 
-    const result = await processScoringJob({ sessionId: "s1", userId: "u1" });
+    const result = await processScoringJob({
+      sessionId: "s1",
+      userId: "u1",
+      claimTokenHash: "owned-token",
+    });
     expect(result.status).toBe("failed");
     const failRpc = mockRpcs.find((r) => r.name === "fail_telefun_scoring");
     expect(failRpc).toBeDefined();
+    expect(failRpc?.args).toMatchObject({ p_claim_token_hash: "owned-token" });
+  });
+
+  it("keeps the claim token on the exception retry path", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 1,
+    });
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    geminiMock.mockRejectedValueOnce(new Error("provider network unavailable"));
+    mockRpcResult = { data: true, error: null };
+
+    const result = await processScoringJob({
+      sessionId: "s1",
+      userId: "u1",
+      claimTokenHash: "owned-token",
+    });
+
+    expect(result.status).toBe("rescheduled");
+    const rescheduleRpc = mockRpcs.find((r) => r.name === "reschedule_telefun_scoring");
+    expect(rescheduleRpc?.args).toMatchObject({ p_claim_token_hash: "owned-token" });
   });
 
   it("fails permanently after max attempts exceeded", async () => {
@@ -573,6 +662,82 @@ describe("processScoringJob", () => {
     expect(geminiMock).not.toHaveBeenCalled();
   });
 
+  it("does not admit the provider when abort settles the initial state read", async () => {
+    const row = {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 0,
+    };
+    seedSession("s1", row);
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    let resolveInitialRead!: (value: { data: any; error: null }) => void;
+    mockDeferredMaybeSingle = new Promise((resolve) => {
+      resolveInitialRead = resolve;
+    });
+    const controller = new AbortController();
+
+    const pending = processScoringJob(
+      { sessionId: "s1", userId: "u1" },
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(mockInitialReadStarted).toBe(true));
+
+    controller.abort();
+    resolveInitialRead({ data: { id: "s1", ...row }, error: null });
+
+    const result = await pending;
+    expect(result).toEqual({
+      success: false,
+      status: "rescheduled",
+      error: "Scoring aborted",
+    });
+    expect(geminiMock).not.toHaveBeenCalled();
+  });
+
+  it("does not admit the provider when abort settles the audio download", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 0,
+    });
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    let resolveDownload!: (value: { data: Blob; error: null }) => void;
+    mockDeferredDownload = new Promise((resolve) => {
+      resolveDownload = resolve;
+    });
+    const controller = new AbortController();
+
+    const pending = processScoringJob(
+      { sessionId: "s1", userId: "u1" },
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(mockDownloadStarted).toBe(true));
+
+    controller.abort();
+    resolveDownload({
+      data: new Blob(["audio"], { type: "audio/webm" }),
+      error: null,
+    });
+
+    const result = await pending;
+    expect(result).toEqual({
+      success: false,
+      status: "rescheduled",
+      error: "Scoring aborted",
+    });
+    expect(geminiMock).not.toHaveBeenCalled();
+  });
+
   it("does not persist a late provider result once the signal aborts mid-analysis", async () => {
     seedSession("s1", {
       user_id: "u1",
@@ -607,5 +772,88 @@ describe("processScoringJob", () => {
     expect(mockRpcs.map((rpc) => rpc.name)).not.toContain(
       "complete_telefun_scoring",
     );
+  });
+
+  it("does not persist a failure when abort settles the post-analysis state read", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 1,
+    });
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    geminiMock.mockResolvedValueOnce({
+      success: false,
+      error: "Invalid assessment shape from AI",
+    });
+    let resolveStateRead!: (value: { data: any; error: null }) => void;
+    mockDeferredMaybeSingle = new Promise((resolve) => {
+      resolveStateRead = resolve;
+    });
+    mockDeferredMaybeSingleAt = 3;
+    const controller = new AbortController();
+
+    const pending = processScoringJob(
+      { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(mockMaybeSingleCallCount).toBe(3));
+
+    controller.abort();
+    resolveStateRead({
+      data: { id: "s1", ...mockRows.get("s1") },
+      error: null,
+    });
+
+    await expect(pending).resolves.toEqual({
+      success: false,
+      status: "rescheduled",
+      error: "Scoring aborted",
+    });
+    expect(mockRpcs).toEqual([]);
+  });
+
+  it("does not persist a retry when abort settles the exception diagnostic read", async () => {
+    seedSession("s1", {
+      user_id: "u1",
+      scenario_title: "Test",
+      agent_recording_path: "u1/s1/agent_only.webm",
+      voice_assessment: null,
+      session_metrics: null,
+      scoring_status: "processing",
+      scoring_attempt_count: 1,
+    });
+    const geminiMock = (await import("../lib/gemini"))
+      .generateGeminiContent as any;
+    geminiMock.mockRejectedValueOnce(new Error("provider network unavailable"));
+    let resolveDiagnosticRead!: (value: { data: any; error: null }) => void;
+    mockDeferredMaybeSingle = new Promise((resolve) => {
+      resolveDiagnosticRead = resolve;
+    });
+    mockDeferredMaybeSingleAt = 3;
+    const controller = new AbortController();
+
+    const pending = processScoringJob(
+      { sessionId: "s1", userId: "u1", claimTokenHash: "owned-token" },
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(mockMaybeSingleCallCount).toBe(3));
+
+    controller.abort();
+    resolveDiagnosticRead({
+      data: { id: "s1", ...mockRows.get("s1") },
+      error: null,
+    });
+
+    await expect(pending).resolves.toEqual({
+      success: false,
+      status: "rescheduled",
+      error: "Scoring aborted",
+    });
+    expect(mockRpcs).toEqual([]);
   });
 });

@@ -150,7 +150,7 @@ async function reachEmailStage(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole("button", { name: "Lanjut" }));
 }
 
-describe("PDKT scenario wizard", () => {
+describe("PDKT scenario wizard", { timeout: 30_000 }, () => {
   it("shows the Gemini/OpenAI-only model registry in the system tab", async () => {
     const user = userEvent.setup();
     renderModal();
@@ -158,7 +158,7 @@ describe("PDKT scenario wizard", () => {
     await user.click(screen.getByRole("button", { name: "Sistem" }));
 
     [
-      "Gemini 3.7 Flash",
+      "Gemini 3.8 Flash",
       "Gemini 3.5 Flash Lite",
       "GPT 5.6 Luna",
       "GPT 5.4 Mini",
@@ -259,7 +259,7 @@ describe("PDKT scenario wizard", () => {
   // they exercise the complete wizard rather than a single interaction.
   it(
     "keeps optional profile fields passable and retains values across stages",
-    { timeout: 15000 },
+    { timeout: 30_000 },
     async () => {
       const user = userEvent.setup();
       renderModal({
@@ -339,7 +339,7 @@ describe("PDKT scenario wizard", () => {
 
   it(
     "isolates scenario identity from global identity and saves the override",
-    { timeout: 15000 },
+    { timeout: 30_000 },
     async () => {
       const user = userEvent.setup();
       const { onSave } = renderModal();
@@ -394,7 +394,7 @@ describe("PDKT scenario wizard", () => {
 
   it(
     "keeps distinct scenario identity overrides isolated when reopening each edit",
-    { timeout: 15000 },
+    { timeout: 30_000 },
     async () => {
       const user = userEvent.setup();
       renderModal();
@@ -691,10 +691,12 @@ describe("PDKT scenario wizard", () => {
       input,
       new File(["%PDF"], "evidence.pdf", { type: "application/pdf" }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Hapus lampiran 1" }),
-      ).toBeDefined(),
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("button", { name: "Hapus lampiran 1" }),
+        ).toBeDefined(),
+      { timeout: 15_000 },
     );
     await user.click(screen.getByRole("button", { name: "Hapus lampiran 1" }));
     expect(

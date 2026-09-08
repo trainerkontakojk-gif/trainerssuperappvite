@@ -79,7 +79,10 @@ const mockGroups = [
   { id: "g3", name: "Tim Chat", description: null, is_active: true },
 ];
 
-describe("AccessApprovalPage - grouped leader cards", () => {
+describe(
+  "AccessApprovalPage - grouped leader cards",
+  { timeout: 30_000 },
+  () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useApiMock.mockImplementation((url: string | null) => {

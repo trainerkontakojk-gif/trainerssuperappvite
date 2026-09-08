@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -18,22 +18,21 @@ vi.mock("@hono/node-server", () => ({
 
 import {
   aggregateQueueStats,
-  createHealthApp,
   createRuntime,
-  main,
   parseWorkerConfig,
-  startHealthServer,
+  startEmbeddedTelefunScoringWorker,
   type ScoringWorkerBoundary,
   type WorkerConfig,
   type WorkerHealthSnapshot,
 } from "../workers/telefun-scoring-worker-runtime";
+import { createHealthApp, main, startHealthServer } from "../workers/telefun-scoring-worker-entrypoint";
 import type { ScoringJob, ScoringResult } from "../services/telefun-scoring-service";
 
 const VALID_ENV: Record<string, string | undefined> = {
   TELEFUN_SCORING_WORKER_ENABLED: "true",
   TELEFUN_SCORING_WORKER_INTERVAL_MS: "30000",
   TELEFUN_SCORING_WORKER_BATCH_SIZE: "5",
-  TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS: "120",
+  TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS: "300",
   TELEFUN_SCORING_WORKER_HEALTH_PORT: "9100",
   TELEFUN_INTERNAL_TOKEN: "secret-token",
 };
@@ -42,7 +41,7 @@ const CONFIG: WorkerConfig = {
   enabled: true,
   intervalMs: 30000,
   batchSize: 5,
-  claimTimeoutSeconds: 120,
+  claimTimeoutSeconds: 300,
   healthPort: null,
   internalToken: null,
 };
@@ -133,16 +132,30 @@ describe("parseWorkerConfig", () => {
     if (ok.ok) expect(ok.config.batchSize).toBe(50);
   });
 
-  it("defaults claim timeout to 120 and rejects invalid explicit values", () => {
+  it("defaults claim timeout to 300 and rejects invalid explicit values", () => {
     const ok = parseWorkerConfig({ ...VALID_ENV, TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS: undefined });
     expect(ok.ok).toBe(true);
-    if (ok.ok) expect(ok.config.claimTimeoutSeconds).toBe(120);
+    if (ok.ok) expect(ok.config.claimTimeoutSeconds).toBe(300);
 
     for (const claim of ["0", "-1", "abc", "1.5"]) {
       const result = parseWorkerConfig({ ...VALID_ENV, TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS: claim });
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.code).toBe("INVALID_CLAIM_TIMEOUT_SECONDS");
     }
+  });
+
+  it("rejects explicit claim timeout below the 300s lease floor (RED)", () => {
+    // Lease must exceed the Gemini provider timeout (~180s) with margin, or a
+    // slow job is reclaimed mid-call and billed twice. Values below 300 are
+    // rejected fail-fast instead of silently accepted.
+    for (const claim of ["1", "120", "180", "299"]) {
+      const result = parseWorkerConfig({ ...VALID_ENV, TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS: claim });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.code).toBe("INVALID_CLAIM_TIMEOUT_SECONDS");
+    }
+    const ok = parseWorkerConfig({ ...VALID_ENV, TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS: "300" });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.config.claimTimeoutSeconds).toBe(300);
   });
 
   it("rejects invalid health ports and accepts valid ones", () => {
@@ -185,7 +198,7 @@ describe("parseWorkerConfig", () => {
         enabled: true,
         intervalMs: 30000,
         batchSize: 5,
-        claimTimeoutSeconds: 120,
+        claimTimeoutSeconds: 300,
         healthPort: 9100,
         internalToken: "secret-token",
       });
@@ -278,11 +291,17 @@ describe("runtime loop", () => {
   it("surfaces queue DB errors as degraded, never as healthy/empty", async () => {
     const dbError = new Error("relation telefun_history does not exist");
     dbError.name = "DatabaseError";
+    const logs: string[] = [];
     const fetchPendingJobs = vi.fn(async () => {
       throw dbError;
     });
     const boundary = createBoundary({ fetchPendingJobs });
-    const runtime = createRuntime({ config: CONFIG, boundary, sleep: vi.fn(immediateSleep) });
+    const runtime = createRuntime({
+      config: CONFIG,
+      boundary,
+      sleep: vi.fn(immediateSleep),
+      log: (line) => logs.push(line),
+    });
 
     runtime.start();
     await vi.waitFor(() => expect(runtime.getHealthSnapshot().lastErrorClass).toBe("DatabaseError"));
@@ -296,6 +315,12 @@ describe("runtime loop", () => {
     expect(degraded.lastErrorClass).toBe("DatabaseError");
     expect(degraded.queue).toBeNull();
     expect(degraded.oldestEligiblePendingAgeMs).toBeNull();
+    expect(logs).toContain(
+      JSON.stringify({
+        event: "telefun_scoring_worker.poll_failed",
+        errorClass: "DatabaseError",
+      }),
+    );
 
     await runtime.shutdown();
     await runtime.awaitLoop();
@@ -304,6 +329,7 @@ describe("runtime loop", () => {
 
   it("recovers to healthy once the queue query succeeds again", async () => {
     let calls = 0;
+    const logs: string[] = [];
     const dbError = new Error("db down");
     dbError.name = "DatabaseError";
     const fetchPendingJobs = vi.fn(async () => {
@@ -315,7 +341,12 @@ describe("runtime loop", () => {
       fetchPendingJobs,
       fetchQueueStats: vi.fn(async () => ({ pending: 1, processing: 0, failed: 2, oldestEligiblePendingAgeMs: 5000 })),
     });
-    const runtime = createRuntime({ config: CONFIG, boundary, sleep: vi.fn(immediateSleep) });
+    const runtime = createRuntime({
+      config: CONFIG,
+      boundary,
+      sleep: vi.fn(immediateSleep),
+      log: (line) => logs.push(line),
+    });
 
     runtime.start();
     await vi.waitFor(() =>
@@ -327,6 +358,52 @@ describe("runtime loop", () => {
     expect(healthy.lastSuccessfulPollAt).not.toBeNull();
     expect(healthy.queue).toEqual({ pending: 1, processing: 0, failed: 2 });
     expect(healthy.oldestEligiblePendingAgeMs).toBe(5000);
+    expect(logs).toContain(
+      JSON.stringify({ event: "telefun_scoring_worker.poll_recovered" }),
+    );
+
+    await runtime.shutdown();
+    await runtime.awaitLoop();
+  });
+
+  it("declares recovery only after a failed batch completes successfully", async () => {
+    const logs: string[] = [];
+    let processCalls = 0;
+    const processScoringJob = vi.fn(async () => {
+      processCalls++;
+      if (processCalls <= 2) throw new Error("claim persistence unavailable");
+      return { success: true, status: "completed" as const };
+    });
+    const boundary = createBoundary({
+      fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }]),
+      claimJob: vi.fn(async () => ({ claimed: true, claimTokenHash: "token" })),
+      checkCachedAssessment: vi.fn(async () => null),
+      processScoringJob,
+    });
+    const runtime = createRuntime({
+      config: { ...CONFIG, intervalMs: 1000 },
+      boundary,
+      sleep: vi.fn(immediateSleep),
+      log: (line) => logs.push(line),
+    });
+
+    runtime.start();
+    await vi.waitFor(() => expect(processCalls).toBeGreaterThanOrEqual(3));
+
+    const events = logs.flatMap((line) => {
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    });
+    expect(events.filter((event) => event.event === "telefun_scoring_worker.batch_failed")).toHaveLength(1);
+    expect(events.filter((event) => event.event === "telefun_scoring_worker.poll_recovered")).toHaveLength(1);
+    expect(
+      events.findIndex((event) => event.event === "telefun_scoring_worker.poll_recovered"),
+    ).toBeGreaterThan(
+      events.findIndex((event) => event.event === "telefun_scoring_worker.batch_failed"),
+    );
 
     await runtime.shutdown();
     await runtime.awaitLoop();
@@ -404,13 +481,13 @@ describe("runtime loop", () => {
       fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }]),
     });
     const runtime = createRuntime({
-      config: { ...CONFIG, claimTimeoutSeconds: 42 },
+      config: { ...CONFIG, claimTimeoutSeconds: 305 },
       boundary,
       sleep: vi.fn(immediateSleep),
     });
 
     runtime.start();
-    await vi.waitFor(() => expect(claimJob).toHaveBeenCalledWith("s1", 42));
+    await vi.waitFor(() => expect(claimJob).toHaveBeenCalledWith("s1", 305));
 
     await runtime.shutdown();
     await runtime.awaitLoop();
@@ -466,7 +543,174 @@ describe("runtime loop", () => {
     expect(runtime.getHealthSnapshot().loopAlive).toBe(false);
   });
 
-  it("does not release the claim when the in-flight job settles before the deadline", async () => {
+  it("bounds a hung fenced release and records lease recovery without a second release", async () => {
+    vi.useFakeTimers();
+    let resolveLate!: (result: ScoringResult) => void;
+    const lateResult = new Promise<ScoringResult>((resolve) => (resolveLate = resolve));
+    let resolveRelease!: (accepted: boolean) => void;
+    const releaseClaim = vi.fn(
+      () => new Promise<boolean>((resolve) => (resolveRelease = resolve)),
+    );
+    const logs: string[] = [];
+    const boundary = createBoundary({
+      releaseClaim,
+      claimJob: vi.fn(async () => ({
+        claimed: true,
+        claimTokenHash: "token-hash-release-timeout",
+      })),
+      processScoringJob: vi.fn(async () => lateResult),
+      fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }]),
+    });
+    const runtime = createRuntime({
+      config: { ...CONFIG, claimTimeoutSeconds: 5 },
+      boundary,
+      log: (line) => logs.push(line),
+    });
+
+    runtime.start();
+    await vi.waitFor(() => expect(boundary.processScoringJob).toHaveBeenCalledTimes(1));
+    const shutdownPromise = runtime.shutdown();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.waitFor(() => expect(releaseClaim).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(5000);
+    let shutdownSettled = false;
+    void shutdownPromise.then(() => {
+      shutdownSettled = true;
+    });
+    await Promise.resolve();
+
+    try {
+      expect(shutdownSettled).toBe(true);
+      expect(releaseClaim).toHaveBeenCalledTimes(1);
+      expect(logs.map((line) => JSON.parse(line))).toContainEqual({
+        event: "telefun_scoring_worker.claim_release_deferred",
+        leaseSeconds: 5,
+      });
+    } finally {
+      resolveRelease(true);
+      resolveLate({ success: true, status: "completed" });
+      await shutdownPromise;
+      await runtime.awaitLoop();
+      vi.useRealTimers();
+    }
+  });
+
+  it("releases an abort-settled active claim exactly once before shutdown resolves", async () => {
+    let resolveJob!: (result: ScoringResult) => void;
+    const processScoringJob = vi.fn(
+      (_job: ScoringJob, _signal?: AbortSignal) =>
+        new Promise<ScoringResult>((resolve) => (resolveJob = resolve)),
+    );
+    const releaseClaim = vi.fn(async () => true);
+    const boundary = createBoundary({
+      processScoringJob,
+      releaseClaim,
+      claimJob: vi.fn(async () => ({
+        claimed: true,
+        claimTokenHash: "token-hash-abort-settled",
+      })),
+      fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }]),
+    });
+    const sleep = vi.fn(() => new Promise<void>(() => {}));
+    const runtime = createRuntime({
+      config: { ...CONFIG, claimTimeoutSeconds: 5 },
+      boundary,
+      sleep,
+    });
+
+    runtime.start();
+    await vi.waitFor(() => expect(processScoringJob).toHaveBeenCalledTimes(1));
+
+    const shutdownPromise = runtime.shutdown();
+    resolveJob({ success: false, status: "rescheduled", error: "Scoring aborted" });
+    await shutdownPromise;
+
+    expect(releaseClaim).toHaveBeenCalledTimes(1);
+    expect(releaseClaim).toHaveBeenCalledWith(
+      "s1",
+      expect.stringContaining("shutdown"),
+      expect.any(Date),
+      "token-hash-abort-settled",
+    );
+    await runtime.awaitLoop();
+    expect(releaseClaim).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not release a completed job when a later claim hangs through the shutdown deadline", async () => {
+    vi.useFakeTimers();
+    let resolveClaim!: (result: { claimed: boolean; claimTokenHash: string }) => void;
+    let claimCalls = 0;
+    const claimJob = vi.fn(() => {
+      claimCalls += 1;
+      if (claimCalls === 1) {
+        return Promise.resolve({ claimed: true, claimTokenHash: "token-hash-completed" });
+      }
+      return new Promise<{ claimed: boolean; claimTokenHash: string }>((resolve) => (resolveClaim = resolve));
+    });
+    const releaseClaim = vi.fn(async () => true);
+    const processScoringJob = vi.fn(async () => ({ success: true, status: "completed" as const }));
+    const logs: string[] = [];
+    const boundary = createBoundary({
+      claimJob,
+      releaseClaim,
+      processScoringJob,
+      fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }, { sessionId: "s2", userId: "u1" }]),
+    });
+    const runtime = createRuntime({
+      config: { ...CONFIG, claimTimeoutSeconds: 5 },
+      boundary,
+      log: (line) => logs.push(line),
+    });
+
+    try {
+      runtime.start();
+      await vi.waitFor(() => expect(processScoringJob).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(claimJob).toHaveBeenCalledTimes(2));
+
+      const shutdownPromise = runtime.shutdown();
+      await vi.advanceTimersByTimeAsync(5000);
+      await shutdownPromise;
+
+      expect(releaseClaim).not.toHaveBeenCalled();
+      expect(logs.map((line) => JSON.parse(line))).toContainEqual({
+        event: "telefun_scoring_worker.shutdown_recovery_deferred",
+        leaseSeconds: 5,
+      });
+
+      resolveClaim({ claimed: true, claimTokenHash: "token-hash-pending-claim" });
+      await runtime.awaitLoop();
+      expect(releaseClaim).toHaveBeenCalledTimes(1);
+      expect(releaseClaim).toHaveBeenCalledWith("s2", expect.stringContaining("claim won before abort"), expect.any(Date), "token-hash-pending-claim");
+    } finally {
+      resolveClaim?.({ claimed: false, claimTokenHash: "unused" });
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels the default interval timer during shutdown", async () => {
+    vi.useFakeTimers();
+    try {
+      const runtime = createRuntime({
+        config: { ...CONFIG, intervalMs: 1000 },
+        boundary: createBoundary(),
+      });
+      runtime.start();
+      await vi.waitFor(() =>
+        expect(runtime.getHealthSnapshot().lastSuccessfulPollAt).not.toBeNull(),
+      );
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      await runtime.shutdown();
+      await runtime.awaitLoop();
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not release a claim when a normal completed result settles before the deadline", async () => {
     let resolveJob!: (result: ScoringResult) => void;
     const processScoringJob = vi.fn(
       (_job: ScoringJob, _signal?: AbortSignal) =>
@@ -485,12 +729,57 @@ describe("runtime loop", () => {
     await vi.waitFor(() => expect(processScoringJob).toHaveBeenCalledTimes(1));
 
     const shutdownPromise = runtime.shutdown();
-    // The job settles before the deadline elapses.
+    // The job settles normally before the deadline elapses; persistence owns
+    // the claim lifecycle, so shutdown must not issue an extra release RPC.
     resolveJob({ success: true, status: "completed" });
     await shutdownPromise;
     await runtime.awaitLoop();
 
     expect(releaseClaim).not.toHaveBeenCalled();
+  });
+
+  it("shutdown release forwards the active claim token so the reschedule is fenced", async () => {
+    let resolveLate!: (result: ScoringResult) => void;
+    const lateResult = new Promise<ScoringResult>((resolve) => (resolveLate = resolve));
+    const capturedJobs: ScoringJob[] = [];
+    const processScoringJob = vi.fn(async (job: ScoringJob, _signal?: AbortSignal) => {
+      capturedJobs.push(job);
+      return lateResult;
+    });
+    const releaseClaim = vi.fn(async () => true);
+    const boundary = createBoundary({
+      processScoringJob,
+      releaseClaim,
+      claimJob: vi.fn(async () => ({
+        claimed: true,
+        claimTokenHash: "token-hash-shutdown",
+      })),
+      fetchPendingJobs: vi.fn(async () => [{ sessionId: "s1", userId: "u1" }]),
+    });
+    const runtime = createRuntime({
+      config: { ...CONFIG, claimTimeoutSeconds: 5 },
+      boundary,
+      sleep: vi.fn(immediateSleep),
+    });
+
+    runtime.start();
+    await vi.waitFor(() => expect(processScoringJob).toHaveBeenCalledTimes(1));
+    expect(capturedJobs[0].claimTokenHash).toBe("token-hash-shutdown");
+
+    await runtime.shutdown();
+
+    // Fenced reschedule: the shutdown release carries the claim's token hash so
+    // a superseded worker cannot release someone else's claim.
+    expect(releaseClaim).toHaveBeenCalledTimes(1);
+    expect(releaseClaim).toHaveBeenCalledWith(
+      "s1",
+      expect.any(String),
+      expect.any(Date),
+      "token-hash-shutdown",
+    );
+    resolveLate({ success: true, status: "completed" });
+    await runtime.awaitLoop();
+    expect(releaseClaim).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -633,10 +922,72 @@ describe("queue stats aggregation", () => {
 });
 
 describe("process separation", () => {
-  it("keeps the worker out of the API web process (index.ts must not import the worker)", () => {
+  it("owns HTTP + embedded worker via api-runtime (index.ts must not import the worker directly)", () => {
     const here = fileURLToPath(new URL(".", import.meta.url));
     const indexSource = readFileSync(path.resolve(here, "../index.ts"), "utf8");
-    expect(indexSource).not.toMatch(/telefun-scoring-worker/);
-    expect(indexSource).not.toMatch(/workers\//);
+    // Embedded architecture (option B): index.ts owns the process only via
+    // startApiRuntime; the worker is started inside api-runtime, never
+    // directly from the web entrypoint and never via standalone main().
+    expect(indexSource).toMatch(/startApiRuntime/);
+    expect(indexSource).toMatch(/api-runtime/);
+    expect(indexSource).not.toMatch(/telefun-scoring-worker-runtime/);
+    expect(indexSource).not.toMatch(/startEmbeddedTelefunScoringWorker/);
+    expect(indexSource).not.toMatch(/main\s*\(/);
+  });
+
+  it("keeps the embedded worker free of process ownership (no exit/signal/second health server)", () => {
+    const here = fileURLToPath(new URL(".", import.meta.url));
+    const runtimeSource = readFileSync(
+      path.resolve(here, "../workers/telefun-scoring-worker-runtime.ts"),
+      "utf8",
+    );
+    const apiRuntimeSource = readFileSync(path.resolve(here, "../api-runtime.ts"), "utf8");
+    // api-runtime is the sole process owner: it registers signals and sets
+    // the exit code, but never calls process.exit() or starts a health server.
+    expect(apiRuntimeSource).toMatch(/startEmbeddedTelefunScoringWorker/);
+    expect(apiRuntimeSource).not.toMatch(/process\.exit\s*\(/);
+    expect(apiRuntimeSource).not.toMatch(/startHealthServer/);
+    // The embedded starter must not touch process ownership either; only the
+    // standalone main() entrypoint may do so. Slice from the embedded marker
+    // to the end of file so standalone main() above does not pollute the check.
+    const marker = "Embedded worker (for in-process use by apps/api";
+    const embeddedSection = runtimeSource.slice(runtimeSource.indexOf(marker));
+    expect(embeddedSection.length).toBeGreaterThan(0);
+    expect(embeddedSection).not.toMatch(/process\.exit\s*\(/);
+    expect(embeddedSection).not.toMatch(/process\.on\s*\(/);
+    expect(embeddedSection).not.toMatch(/startHealthServer\s*\(/);
+  });
+
+  it("logs bounded embedded startup configuration and never includes secrets", async () => {
+    const logs: string[] = [];
+    const handle = startEmbeddedTelefunScoringWorker({
+      env: { ...VALID_ENV },
+      boundary: createBoundary(),
+      log: (line) => logs.push(line),
+      sleep: vi.fn(immediateSleep),
+    });
+
+    expect(handle.started).toBe(true);
+    if (!handle.started) return;
+    const startup = logs
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .find((line) => line?.event === "telefun_scoring_worker.embedded_started");
+    expect(startup).toEqual({
+      event: "telefun_scoring_worker.embedded_started",
+      enabled: true,
+      intervalMs: 30000,
+      batchSize: 5,
+      claimTimeoutSeconds: 300,
+    });
+    expect(JSON.stringify(startup)).not.toContain("secret-token");
+
+    await handle.shutdown();
+    await handle.runtime.awaitLoop();
   });
 });

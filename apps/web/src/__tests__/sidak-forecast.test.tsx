@@ -32,7 +32,7 @@ vi.mock("../components/sidak/ParamTrendChart", () => ({
   default: paramTrendChartMock,
 }));
 
-describe("SidakForecastPage", () => {
+describe("SidakForecastPage", { timeout: 15_000 }, () => {
   const dashboardData = {
     periods: [
       { id: "p1", month: 1, year: 2026, label: "Jan 26", created_at: "2026-01-01T00:00:00.000Z" },

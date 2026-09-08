@@ -52,6 +52,41 @@ Browser settings/history/recordings
 Historical raw model and transport fields remain visible in history. Settings
 normalization never rewrites historical history rows.
 
+## Scoring runtime
+
+Post-session voice scoring memakai queue durable di Supabase dan kini diproses oleh
+**embedded worker dalam `apps/api`**, bukan process Railway terpisah sebagai
+arsitektur utama. API tetap menerima request sementara loop worker melakukan
+polling setiap 30 detik dengan batch default 5; retry/backoff dan status scoring
+historis tidak berubah.
+
+- API worker aktif bila `TELEFUN_SCORING_WORKER_ENABLED="true"`.
+- `TELEFUN_SCORING_WORKER_INTERVAL_MS` default deployment: `30000`.
+- `TELEFUN_SCORING_WORKER_BATCH_SIZE` default deployment: `5`.
+- `TELEFUN_SCORING_WORKER_CLAIM_TIMEOUT_SECONDS` default: `300` detik; nilai
+  eksplisit harus integer `>=300` di setiap helper/runtime boundary.
+- Setiap claim menyimpan hash token + owner. Completion/failure/reschedule
+  ditolak bila token tidak cocok, sehingga stale worker tidak dapat menimpa
+  claim baru atau menyelesaikan job dua kali.
+- `analyzeVoiceQuality()` hanya membaca audio, memanggil Gemini, dan
+  mengembalikan assessment. Persistensi hasil dilakukan oleh service scoring
+  melalui RPC completion yang token-fenced.
+- `SIGTERM`/`SIGINT` menghentikan admission, menunggu claim yang sedang settle,
+  dan mencoba melepaskan claim aktif secara token-fenced setelah abort atau
+  deadline. Penantian claim dan RPC release masing-masing dibatasi satu lease;
+  `shutdown_recovery_deferred` atau `claim_release_deferred` dicatat saat batas
+  tercapai dan lease database menjadi recovery backstop tanpa retry kedua.
+  Embedded mode tidak membuka health server kedua. Startup dan transisi error /
+  recovery hanya mencatat field bounded (interval, batch, lease, kelas error).
+- `GET /api/health` hanya membuktikan liveness API. Kesehatan polling worker
+  perlu dibuktikan lewat log runtime bounded dan queue readback.
+
+Service Railway `@trainers/scoring-worker` masih disimpan sebagai fallback rollout,
+bukan target arsitektur final. Service tersebut baru boleh di-scale-to-zero
+setelah API embedded worker dan migration fencing terbukti drain queue, retry,
+dan tidak menghasilkan duplicate claim/completion. Tidak ada queue, assessment,
+usage log, recording, atau history yang dihapus.
+
 ## Historical OpenAI Realtime compatibility
 
 Historical `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `openai-audio`, and

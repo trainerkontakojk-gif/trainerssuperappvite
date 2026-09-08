@@ -162,7 +162,17 @@ describe("Telefun analysis with hold assessment", () => {
     expect(result.error).toBe("No agent audio available for assessment");
   });
 
-  it("rejects invalid model output and does not update database", async () => {
+  it("returns a generated assessment without persisting it directly", async () => {
+    mockState.row = BASE_ROW;
+    mockState.geminiResponse = DEFAULT_AI_RESPONSE;
+
+    const result = await analyzeVoiceQuality("s1", "u1");
+
+    expect(result.success).toBe(true);
+    expect(mockState.updates).toEqual([]);
+  });
+
+  it("rejects invalid model output without mutating scoring state", async () => {
     mockState.row = BASE_ROW;
     mockState.geminiResponse = {
       success: true,
@@ -174,23 +184,20 @@ describe("Telefun analysis with hold assessment", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Format hasil analisis tidak valid.");
-    // Code marks scoring as failed (not completed with assessment)
-    expect(mockState.updates).toHaveLength(1);
-    expect(mockState.updates[0]).toHaveProperty("scoring_status", "failed");
-    expect(mockState.updates[0]).toHaveProperty("scoring_last_error");
+    // Persistence belongs to the claim-fenced scoring service.
+    expect(mockState.updates).toEqual([]);
   });
 
-  it("fails closed when a generated assessment cannot be persisted", async () => {
+  it("returns a generated assessment while leaving persistence to the service", async () => {
     mockState.row = BASE_ROW;
     mockState.geminiResponse = DEFAULT_AI_RESPONSE;
     mockState.updateError = new Error("database unavailable");
 
     const result = await analyzeVoiceQuality("s1", "u1");
 
-    expect(result).toEqual({
-      success: false,
-      error: "Gagal menyimpan hasil penilaian suara.",
-    });
+    expect(result.success).toBe(true);
+    expect(result.assessment?.overallScore).toBe(8);
+    expect(mockState.updates).toEqual([]);
   });
 
   it("returns N/A hold when no hold metrics exist", async () => {
@@ -257,17 +264,10 @@ describe("Telefun analysis with hold assessment", () => {
     expect(mockState.geminiResponse).toBeNull(); // no gemini call
     expect(result.assessment?.holdManagement).toBeDefined();
     expect(result.assessment?.holdManagement?.verdict).toBe("Baik");
-    expect(mockState.updates).toContainEqual(
-      expect.objectContaining({
-        score: expect.any(Number),
-        voice_assessment: expect.objectContaining({
-          holdManagement: expect.objectContaining({ verdict: "Baik" }),
-        }),
-      }),
-    );
+    expect(mockState.updates).toEqual([]);
   });
 
-  it("fails closed when cached hold synchronization cannot be persisted", async () => {
+  it("returns normalized cached assessment without direct persistence", async () => {
     const cached: VoiceQualityAssessment = JSON.parse(DEFAULT_AI_RESPONSE.text);
     mockState.row = {
       ...BASE_ROW,
@@ -277,9 +277,8 @@ describe("Telefun analysis with hold assessment", () => {
 
     const result = await analyzeVoiceQuality("s1", "u1");
 
-    expect(result).toEqual({
-      success: false,
-      error: "Gagal menyimpan hasil penilaian suara.",
-    });
+    expect(result.success).toBe(true);
+    expect(result.assessment?.holdManagement).toBeDefined();
+    expect(mockState.updates).toEqual([]);
   });
 });

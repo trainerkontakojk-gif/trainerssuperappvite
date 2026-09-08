@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import { createAdminClient } from "../lib/supabase";
 import {
   analyzeVoiceQuality,
@@ -21,6 +22,47 @@ import {
 export interface ScoringJob {
   sessionId: string;
   userId: string;
+  /** Fencing hash of the claim that owns this job (set by the claimer). */
+  claimTokenHash?: string | null;
+}
+
+/** Shared claim lease: must exceed the provider timeout (gemini-3.8-flash
+ *  timeoutMs = 180s) with margin, otherwise slow jobs get reclaimed mid-call
+ *  and billed twice. */
+export const TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS = 300;
+
+/** Validate the lease at every TypeScript helper boundary, including callers
+ * that bypass the environment parser. A shorter lease can reclaim a slow
+ * provider call and admit duplicate billable work. */
+export function validateScoringClaimTimeoutSeconds(timeoutSeconds: number): number {
+  if (
+    !Number.isFinite(timeoutSeconds) ||
+    !Number.isInteger(timeoutSeconds) ||
+    timeoutSeconds < TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS
+  ) {
+    throw new RangeError(
+      `Scoring claim timeout must be an integer >= ${TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS}`,
+    );
+  }
+  return timeoutSeconds;
+}
+
+/** Default owner labels for claim observability. */
+export const TELEFUN_SCORING_CLAIM_OWNER_WORKER = "scoring-worker";
+export const TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE = "api-route";
+
+/** Generates a per-claim secret token; only the SHA-256 hash is persisted. */
+export function newScoringClaim(): { claimToken: string; claimTokenHash: string } {
+  const claimToken = randomUUID();
+  const claimTokenHash = createHash("sha256").update(claimToken).digest("hex");
+  return { claimToken, claimTokenHash };
+}
+
+export interface ScoringClaimResult {
+  claimed: boolean;
+  claimToken?: string;
+  claimTokenHash?: string;
+  session?: any;
 }
 
 export interface ScoringResult {
@@ -91,14 +133,19 @@ function readRpcBoolean(data: unknown): boolean | null {
 
 export async function claimJob(
   sessionId: string,
-  timeoutSeconds: number = 120,
-): Promise<{ claimed: boolean; session?: any }> {
+  timeoutSeconds: number = TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS,
+  owner: string = TELEFUN_SCORING_CLAIM_OWNER_WORKER,
+): Promise<ScoringClaimResult> {
+  validateScoringClaimTimeoutSeconds(timeoutSeconds);
   const adminClient = createAdminClient();
+  const { claimToken, claimTokenHash } = newScoringClaim();
   const { data: claimed, error } = await adminClient.rpc(
     "claim_telefun_scoring",
     {
       p_session_id: sessionId,
       p_claim_timeout_seconds: timeoutSeconds,
+      p_claim_token_hash: claimTokenHash,
+      p_claim_owner: owner,
     },
   );
 
@@ -115,7 +162,7 @@ export async function claimJob(
     return { claimed: false, session };
   }
 
-  return { claimed: true };
+  return { claimed: true, claimToken, claimTokenHash };
 }
 
 export async function checkCachedAssessment(
@@ -139,11 +186,13 @@ export async function checkCachedAssessment(
 async function ensureFailed(
   sessionId: string,
   errorMsg: string,
+  claimTokenHash?: string | null,
 ): Promise<boolean> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient.rpc("fail_telefun_scoring", {
     p_session_id: sessionId,
     p_error: errorMsg,
+    p_claim_token_hash: claimTokenHash ?? null,
   });
   if (error || data === false) {
     console.error("[Telefun Scoring] Failed to persist failed state");
@@ -159,20 +208,23 @@ async function ensureFailed(
  */
 export async function permanentlyFailRetiredOpenAiScoring(
   sessionId: string,
+  claimTokenHash?: string | null,
 ): Promise<boolean> {
-  return ensureFailed(sessionId, TELEFUN_OPENAI_SCORING_DISABLED_REASON);
+  return ensureFailed(sessionId, TELEFUN_OPENAI_SCORING_DISABLED_REASON, claimTokenHash);
 }
 
 async function ensureRescheduled(
   sessionId: string,
   errorMsg: string,
   nextAttemptAt: Date,
+  claimTokenHash?: string | null,
 ): Promise<void> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient.rpc("reschedule_telefun_scoring", {
     p_session_id: sessionId,
     p_error: errorMsg,
     p_next_attempt_at: nextAttemptAt.toISOString(),
+    p_claim_token_hash: claimTokenHash ?? null,
   });
   if (error || data === false) {
     console.error("[Telefun Scoring] Failed to persist retry state");
@@ -190,16 +242,25 @@ export async function enqueueScoring(sessionId: string): Promise<boolean> {
   return data !== false;
 }
 
-export async function persistScoringAssessment(
+export async function failScoringJob(
+  sessionId: string,
+  errorMsg: string,
+  claimTokenHash?: string | null,
+): Promise<boolean> {
+  return ensureFailed(sessionId, errorMsg, claimTokenHash);
+}
+
+export async function completeScoringAssessment(
   sessionId: string,
   assessment: VoiceQualityAssessment,
-  userId?: string,
+  claimTokenHash?: string | null,
 ): Promise<boolean> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient.rpc("complete_telefun_scoring", {
     p_session_id: sessionId,
     p_score: assessment.overallScore,
     p_voice_assessment: assessment as unknown as Record<string, unknown>,
+    p_claim_token_hash: claimTokenHash ?? null,
   });
   if (error) {
     throw new TransientScoringError(
@@ -207,15 +268,29 @@ export async function persistScoringAssessment(
       "SCORING_PERSISTENCE_UNAVAILABLE",
     );
   }
-
   const accepted = readRpcBoolean(data);
-  if (accepted === true) return true;
   if (accepted === null) {
     throw new TransientScoringError(
       "Scoring result persistence unavailable",
       "SCORING_PERSISTENCE_UNAVAILABLE",
     );
   }
+  return accepted;
+}
+
+export async function persistScoringAssessment(
+  sessionId: string,
+  assessment: VoiceQualityAssessment,
+  userId?: string,
+  claimTokenHash?: string | null,
+): Promise<boolean> {
+  const adminClient = createAdminClient();
+  const accepted = await completeScoringAssessment(
+    sessionId,
+    assessment,
+    claimTokenHash,
+  );
+  if (accepted) return true;
 
   const {
     data: current,
@@ -254,6 +329,7 @@ export async function processScoringJob(
   signal?: AbortSignal,
 ): Promise<ScoringResult> {
   const adminClient = createAdminClient();
+  const claimTokenHash = job.claimTokenHash ?? null;
 
   try {
     if (signal?.aborted) {
@@ -267,6 +343,9 @@ export async function processScoringJob(
       .select(SCORING_STATE_SELECT)
       .eq("id", job.sessionId)
       .maybeSingle();
+    if (signal?.aborted) {
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
     if (initialState && isHistoricalOpenAiScoringModel(initialState)) {
       if (parseVoiceQualityAssessment(initialState.voice_assessment)) {
         return { success: true, status: "completed" };
@@ -281,7 +360,7 @@ export async function processScoringJob(
           error: "SCORING_NOT_READY",
         };
       }
-      if (!(await permanentlyFailRetiredOpenAiScoring(job.sessionId))) {
+      if (!(await permanentlyFailRetiredOpenAiScoring(job.sessionId, claimTokenHash))) {
         throw new TransientScoringError(
           "Scoring result persistence unavailable",
           "SCORING_PERSISTENCE_UNAVAILABLE",
@@ -293,7 +372,7 @@ export async function processScoringJob(
         error: TELEFUN_OPENAI_SCORING_DISABLED_REASON,
       };
     }
-    const result = await analyzeVoiceQuality(job.sessionId, job.userId);
+    const result = await analyzeVoiceQuality(job.sessionId, job.userId, signal);
 
     if (signal?.aborted) {
       // Bounded abort: a late provider result must not be persisted (no late
@@ -307,6 +386,7 @@ export async function processScoringJob(
         job.sessionId,
         result.assessment,
         job.userId,
+        claimTokenHash,
       );
       if (!persisted) {
         throw new TransientScoringError(
@@ -322,6 +402,10 @@ export async function processScoringJob(
       .select(`${SCORING_STATE_SELECT}, scoring_attempt_count`)
       .eq("id", job.sessionId)
       .maybeSingle();
+
+    if (signal?.aborted) {
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
 
     if (!session) {
       return { success: false, status: "failed", error: "Session not found" };
@@ -347,7 +431,10 @@ export async function processScoringJob(
     const attemptCount = session.scoring_attempt_count || 0;
 
     if (errorType === "permanent" || attemptCount >= MAX_SCORING_ATTEMPTS) {
-      await ensureFailed(job.sessionId, errorMsg);
+      if (signal?.aborted) {
+        return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      }
+      await ensureFailed(job.sessionId, errorMsg, claimTokenHash);
       return {
         success: false,
         status: "failed",
@@ -359,7 +446,10 @@ export async function processScoringJob(
     }
 
     const nextAttemptAt = calculateNextAttemptAt(attemptCount);
-    await ensureRescheduled(job.sessionId, errorMsg, nextAttemptAt);
+    if (signal?.aborted) {
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
+    await ensureRescheduled(job.sessionId, errorMsg, nextAttemptAt, claimTokenHash);
 
     return { success: false, status: "rescheduled", error: errorMsg };
   } catch (error: unknown) {
@@ -404,12 +494,27 @@ export async function processScoringJob(
       // read itself is unavailable.
     }
 
+    if (signal?.aborted) {
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
+
     if (errorType === "permanent") {
-      await ensureFailed(job.sessionId, errorMsg);
+      if (signal?.aborted) {
+        return { success: false, status: "rescheduled", error: "Scoring aborted" };
+      }
+      await ensureFailed(job.sessionId, errorMsg, claimTokenHash);
       return { success: false, status: "failed", error: errorMsg };
     }
 
-    await ensureRescheduled(job.sessionId, errorMsg, calculateNextAttemptAt(1));
+    if (signal?.aborted) {
+      return { success: false, status: "rescheduled", error: "Scoring aborted" };
+    }
+    await ensureRescheduled(
+      job.sessionId,
+      errorMsg,
+      calculateNextAttemptAt(1),
+      claimTokenHash,
+    );
     return { success: false, status: "rescheduled", error: errorMsg };
   }
 }

@@ -9,6 +9,8 @@ const state = vi.hoisted(() => ({
 }));
 const mockAnalyzeVoiceQuality = vi.hoisted(() => vi.fn());
 const mockGenerateCoachingSummary = vi.hoisted(() => vi.fn());
+const mockCompleteScoringAssessment = vi.hoisted(() => vi.fn());
+const mockFailScoringJob = vi.hoisted(() => vi.fn());
 
 const validAssessment = {
   overallScore: 0,
@@ -99,7 +101,16 @@ vi.mock("../lib/telefun-analysis", () => ({
 
 vi.mock("../services/telefun-scoring-service", () => ({
   enqueueScoring: vi.fn(),
+  completeScoringAssessment: mockCompleteScoringAssessment,
+  failScoringJob: mockFailScoringJob,
   isWebRtcScoringReady: vi.fn(() => true),
+  newScoringClaim: vi.fn(() => ({
+    claimToken: "test-claim-token",
+    claimTokenHash: "test-claim-token-hash",
+  })),
+  permanentlyFailRetiredOpenAiScoring: vi.fn(async () => true),
+  TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE: "api-route",
+  TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS: 300,
 }));
 
 import { telefunRecordings } from "../routes/telefun/recordings";
@@ -136,6 +147,8 @@ describe("Telefun scoring atomic claim", () => {
       assessment: validAssessment,
     });
     mockGenerateCoachingSummary.mockResolvedValue({ success: true });
+    mockCompleteScoringAssessment.mockResolvedValue(true);
+    mockFailScoringJob.mockResolvedValue(true);
   });
 
   it("dua request paralel hanya menjalankan analisis sekali", async () => {
@@ -160,8 +173,15 @@ describe("Telefun scoring atomic claim", () => {
     expect(first.status).toBe(200);
     expect(mockRpc).toHaveBeenCalledWith("claim_telefun_scoring", {
       p_session_id: "session-1",
-      p_claim_timeout_seconds: 120,
+      p_claim_timeout_seconds: 300,
+      p_claim_token_hash: "test-claim-token-hash",
+      p_claim_owner: "api-route",
     });
+    expect(mockCompleteScoringAssessment).toHaveBeenCalledWith(
+      "session-1",
+      validAssessment,
+      "test-claim-token-hash",
+    );
   });
 
   it("cached score nol tetap dikembalikan tanpa analisis ulang", async () => {

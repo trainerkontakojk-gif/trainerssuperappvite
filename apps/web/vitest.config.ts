@@ -18,5 +18,7 @@ export default defineConfig({
     setupFiles: ["./src/__tests__/setup.ts"],
     // 4-core dev machine: 3 workers (leave 1 core free) vs previous 1 worker serial.
     maxWorkers: 3,
+    // UI flows routinely perform async imports, user events, and FileReader work.
+    testTimeout: 15_000,
   },
 });

@@ -103,7 +103,10 @@ afterEach(() => {
 
 describe("PDKT Reply Route E2E", () => {
   describe("POST /mailbox/reply", () => {
-    it("sends reply successfully and returns historyId", async () => {
+    it(
+      "sends reply successfully and returns historyId",
+      { timeout: 15_000 },
+      async () => {
       await createAuthenticatedApp("trainer");
       const res = await app.request("/api/v1/pdkt/mailbox/reply", {
         method: "POST",

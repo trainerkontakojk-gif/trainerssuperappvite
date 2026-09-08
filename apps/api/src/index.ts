@@ -1,7 +1,5 @@
 import { env } from "./lib/env";
-import { serve } from "@hono/node-server";
 import app from "./app";
+import { startApiRuntime } from "./api-runtime";
 
-serve({ fetch: app.fetch, port: env.PORT }, (info) => {
-  console.log(`[API] Server running on http://localhost:${info.port}`);
-});
+startApiRuntime({ app, port: env.PORT });

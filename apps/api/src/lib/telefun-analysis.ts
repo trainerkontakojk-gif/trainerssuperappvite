@@ -57,6 +57,7 @@ export function isTelefunWebRtcSeekableAgentPath(params: {
 export async function analyzeVoiceQuality(
   sessionId: string,
   userId: string,
+  signal?: AbortSignal,
 ): Promise<{
   success: boolean;
   assessment?: VoiceQualityAssessment;
@@ -73,6 +74,9 @@ export async function analyzeVoiceQuality(
     .eq("id", sessionId)
     .maybeSingle();
 
+  // A shutdown can arrive while the preparation read is in flight. Do not
+  // admit a provider call after that read settles.
+  if (signal?.aborted) return { success: false, error: "Scoring aborted" };
   if (fetchError || !row) return { success: false, error: "Session not found" };
   if (row.user_id !== userId) return { success: false, error: "Unauthorized" };
   const isWebRtc = row.telefun_transport === "openai-webrtc";
@@ -114,24 +118,6 @@ export async function analyzeVoiceQuality(
         };
       }
       assessment = synchronizedAssessment;
-
-      const { error: updateError } = await adminClient
-        .from("telefun_history")
-        .update({
-          voice_assessment: assessment,
-          score: assessment.overallScore,
-        })
-        .eq("id", sessionId);
-      if (updateError) {
-        console.error(
-          "[Telefun] Failed to synchronize cached assessment:",
-          updateError,
-        );
-        return {
-          success: false,
-          error: "Gagal menyimpan hasil penilaian suara.",
-        };
-      }
     }
     return {
       success: true,
@@ -177,6 +163,9 @@ export async function analyzeVoiceQuality(
     .from("telefun-recordings")
     .download(agentPath);
 
+  // Download is another awaited preparation boundary. The provider must not
+  // be admitted when shutdown wins while storage is still resolving.
+  if (signal?.aborted) return { success: false, error: "Scoring aborted" };
   if (downloadError || !audioData) {
     return {
       success: false,
@@ -187,6 +176,8 @@ export async function analyzeVoiceQuality(
   const base64Audio = Buffer.from(await audioData.arrayBuffer()).toString(
     "base64",
   );
+
+  if (signal?.aborted) return { success: false, error: "Scoring aborted" };
 
   // 4. Call Gemini — penilaian lengkap sesuai 5 indikator wajib, tidak boleh singkat
   const prompt = `
@@ -243,6 +234,9 @@ export async function analyzeVoiceQuality(
     9. JANGAN berikan jawaban singkat, template, atau generik. Setiap kalimat harus membawa informasi baru yang spesifik dan dapat ditindaklanjuti.
   `;
 
+  // Keep this check immediately adjacent to the provider boundary. Once the
+  // provider request has started, its logging/cost contract is unchanged.
+  if (signal?.aborted) return { success: false, error: "Scoring aborted" };
   const response = await generateGeminiContent({
     model: "gemini-3.8-flash",
     systemInstruction:
@@ -283,54 +277,12 @@ export async function analyzeVoiceQuality(
         throw new Error("Invalid assessment after hold normalization");
       }
 
-      // Legacy scoring persists its assessment here. WebRTC persists it in
-      // complete_telefun_scoring after the readiness/claim boundary.
-      if (!isWebRtc) {
-        const { error: updateError } = await adminClient
-          .from("telefun_history")
-          .update({
-            voice_assessment: assessment,
-            score: assessment.overallScore,
-            scoring_status: "completed",
-            scoring_completed_at: new Date().toISOString(),
-          })
-          .eq("id", sessionId);
-        if (updateError) {
-          console.error("[Telefun] Failed to save assessment:", updateError);
-          return {
-            success: false,
-            error: "Gagal menyimpan hasil penilaian suara.",
-          };
-        }
-      }
-
       return { success: true, assessment };
     } catch (err) {
       console.error("[Telefun] Parse error for assessment:", err);
-      // Legacy scoring keeps its existing direct failure marker. WebRTC
-      // terminal state is owned by the atomic scoring RPC caller.
-      await adminClient
-        .from("telefun_history")
-        .update({
-          ...(isWebRtc ? {} : { scoring_status: "failed" }),
-          scoring_last_error:
-            err instanceof Error ? err.message : "Parse error",
-        })
-        .eq("id", sessionId)
-        .in("scoring_status", ["processing", "pending"]);
       return { success: false, error: "Format hasil analisis tidak valid." };
     }
   }
-
-  // Mark scoring as failed when Gemini call fails
-  await adminClient
-    .from("telefun_history")
-    .update({
-      ...(isWebRtc ? {} : { scoring_status: "failed" }),
-      scoring_last_error: response.error || "Gemini assessment failed",
-    })
-    .eq("id", sessionId)
-    .in("scoring_status", ["processing", "pending"]);
 
   return {
     success: false,

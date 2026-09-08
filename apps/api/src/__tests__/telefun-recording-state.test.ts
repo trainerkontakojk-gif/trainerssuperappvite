@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   session: {
     user_id: "user-1",
     status: "completed",
+    telefun_model_id: "gpt-realtime-1",
     telefun_transport: "openai-webrtc",
     recording_path: null as string | null,
     agent_recording_path: null as string | null,
@@ -65,6 +66,9 @@ vi.mock("../services/telefun-scoring-service", () => ({
         `${userId}/${sessionId}/agent_only.seekable.webm`),
   ),
   permanentlyFailRetiredOpenAiScoring: mocks.permanentlyFail,
+  newScoringClaim: vi.fn(() => ({ claimToken: "token", claimTokenHash: "hash" })),
+  TELEFUN_SCORING_CLAIM_TIMEOUT_SECONDS: 300,
+  TELEFUN_SCORING_CLAIM_OWNER_API_ROUTE: "api-route",
 }));
 
 import { telefunRecordings } from "../routes/telefun/recordings";
@@ -89,6 +93,7 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
     state.session = {
       user_id: "user-1",
       status: "completed",
+      telefun_model_id: "gpt-realtime-1",
       telefun_transport: "openai-webrtc",
       recording_path: null,
       agent_recording_path: null,
@@ -169,10 +174,13 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
     });
     expect(mocks.rpc).toHaveBeenCalledWith("claim_telefun_scoring", {
       p_session_id: "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
-      p_claim_timeout_seconds: 120,
+      p_claim_timeout_seconds: 300,
+      p_claim_token_hash: "hash",
+      p_claim_owner: "api-route",
     });
     expect(mocks.permanentlyFail).toHaveBeenCalledWith(
       "019f45e3-5fac-7cd2-afeb-8069c2f813b3",
+      "hash",
     );
     expect(mocks.analyze).not.toHaveBeenCalled();
   });
@@ -181,6 +189,7 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
     state.session = {
       user_id: "user-1",
       status: "completed",
+      telefun_model_id: "gpt-realtime-1",
       telefun_transport: "openai-webrtc",
       recording_path: "user-1/session-1/full_call.seekable.webm",
       agent_recording_path: "user-1/session-1/agent_only.seekable.webm",
@@ -205,7 +214,7 @@ describe("Telefun Phase 4 recording and server-owned lifecycle", () => {
       "complete_telefun_scoring",
       expect.anything(),
     );
-    expect(mocks.permanentlyFail).toHaveBeenCalledWith("session-1");
+    expect(mocks.permanentlyFail).toHaveBeenCalledWith("session-1", "hash");
   });
 
   it("rejects deletion of an active WebRTC session before touching storage", async () => {
