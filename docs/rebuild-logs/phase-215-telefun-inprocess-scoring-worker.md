@@ -1,7 +1,7 @@
 # Phase 215 — Telefun in-process scoring worker
 
-**Tanggal:** 2026-09-04  
-**Scope:** `apps/api` scoring queue/runtime, additive Supabase fencing migration, dan dokumentasi deployment.  
+**Tanggal:** 2026-09-04
+**Scope:** `apps/api` scoring queue/runtime, additive Supabase fencing migration, dan dokumentasi deployment.
 **Status:** Implementasi lokal selesai; migration/deployment production belum dijalankan.
 
 ## Tujuan
