@@ -13,8 +13,10 @@ Railway deployment, queue drain, atau paid provider smoke dari perubahan ini.
 
 ## Rekonsiliasi akhir verifikasi lokal (2026-09-08)
 
-Status implementasi lokal: **PASS untuk gate kode dan bukti disposable DB; rollout
-hosted tetap BELUM TERBUKTI**.
+Status implementasi lokal: **PASS untuk gate kode dan bukti disposable DB**.
+Hosted migration, deploy API inert, health check, dan retirement standalone
+service sudah terbukti; aktivasi embedded worker dan paid-provider canary masih
+**BELUM DIOTORISASI/TERBUKTI**.
 
 - Gap TypeScript yang dicatat audit awal sudah ditutup: abort admission,
   shutdown cleanup, lease floor 300, adapter standalone, dan observability
@@ -29,7 +31,8 @@ hosted tetap BELUM TERBUKTI**.
   membuktikan response `ANALYSIS_ERROR` serta hash token claim yang sama pada
   `fail_telefun_scoring`.
 - Gate root lokal lulus: `pnpm typecheck`, `pnpm test:affected`, `pnpm lint`,
-  `pnpm test:core` (491 test), `pnpm build` (3/3 task), dan `git diff --check`.
+  `pnpm test:core` (491 test), `pnpm build` (3/3 task), `pnpm test:full`, dan
+  `git diff --check`.
   Detail command dan log ada di `root-verification.md`.
 - Graphify diperbarui sekali untuk batch implementasi dan sekali lagi pada
   2026-09-08 untuk follow-up test-only; hasil kedua dicatat di
@@ -38,9 +41,9 @@ hosted tetap BELUM TERBUKTI**.
 Temuan `[BLOCKER]` dan `[PENTING]` di bawah mempertahankan jejak audit awal;
 temuan tentang guard Phase 4, lease override, cache-before-claim, rollback
 active claim, dan process ownership sudah tidak menjadi blocker lokal setelah
-perbaikan dan bukti di atas. Full suite/CI, hosted migration/readback, deploy
-artifact parity, queue drain/retry, retirement service Railway lama, dan paid
-provider smoke masih pending.
+perbaikan dan bukti di atas. Full suite lokal, hosted migration/readback, deploy
+artifact parity, dan retirement service Railway lama sudah terbukti. CI hosted,
+queue drain/retry, serta paid-provider smoke masih pending.
 
 ### Yang sudah diperbaiki pada batch TS
 
@@ -161,9 +164,15 @@ setelah perbaikan dan root gates dicatat pada bagian rekonsiliasi akhir.
 ### Wajib sebelum production
 
 - [x] Local Lane D gates: `pnpm typecheck`, `pnpm lint`, `pnpm test:core`, `pnpm build`, dan `git diff --check` — semua exit 0; `test:core` 491 test dan build 3/3 task.
-- [ ] Full-suite/CI pre-merge/release gate.
-- [ ] Apply migration ke project Supabase yang benar + hosted readback (kolom, semua overload, grants, readiness guards, schema cache).
-- [ ] Standalone Railway worker sudah fencing-compatible lease 300 atau dinonaktifkan sebelum embedded worker aktif; tanpa overlap instance lease 120.
+- [x] Full-suite lokal: `pnpm test:full` exit 0. Tidak ada GitHub Actions run
+  yang tercatat untuk branch `main`, sehingga bukti CI hosted tetap tidak ada.
+- [x] Apply migration ke project Supabase production `ruosnjmtywcrghjgqugz` +
+  hosted readback kolom, index, delapan overload, `search_path`, dan grants.
+- [x] Deploy API production commit `e7157cf`: status `SUCCESS`, `/api/health`
+  mengembalikan `200`, dan log memastikan embedded worker disabled.
+- [x] Hapus standalone Railway `@trainers/scoring-worker` dari environment
+  production. Readback pasca-startup singkat: queue tetap 51 completed, 6 failed,
+  27 pending; tidak ada claim maupun AI usage baru.
 - [ ] Catat deploy SHA + bukti DB/log: single claim, stale-token rejection, retry/backoff, queue drain, satu usage record per provider call, token/owner dibersihkan setelah completion.
 
 ### Disarankan

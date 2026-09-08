@@ -2,7 +2,9 @@
 
 **Tanggal:** 2026-09-04
 **Scope:** `apps/api` scoring queue/runtime, additive Supabase fencing migration, dan dokumentasi deployment.
-**Status:** Implementasi lokal selesai; migration/deployment production belum dijalankan.
+**Status:** Migration dan API production sudah ter-deploy; standalone worker sudah
+dihapus, sedangkan embedded worker tetap fail-closed (`ENABLED=false`) menunggu
+otorisasi dan canary provider berbayar.
 
 ## Tujuan
 
@@ -39,8 +41,11 @@ assessment, usage log, recording, atau history.
 - Shutdown release worker meneruskan token claim aktif (`releaseClaim(..., token)`)
   sehingga reschedule ter-fencing; terverifikasi di
   `telefun-scoring-worker-runtime.test.ts`.
-- Railway `@trainers/scoring-worker` belum dimatikan; statusnya fallback rollout
-  sampai embedded worker dibuktikan di production.
+- Railway `@trainers/scoring-worker` dihapus dari environment production pada
+  2026-09-08 setelah API commit `e7157cf` berhasil ter-deploy. Push sempat
+  mengaktifkan ulang standalone worker secara otomatis, tetapi service langsung
+  dihapus; readback sesudahnya menunjukkan queue tidak berubah dan tidak ada AI
+  usage baru.
 
 ## Verifikasi lokal
 
@@ -62,14 +67,15 @@ secara langsung selesai dengan exit 0. Full `pnpm lint`, `pnpm build`, dan
 
 ## Rollout checklist
 
-1. Apply migration ke project Supabase production yang benar dan verifikasi
-   signature/kolom melalui readback.
-2. Deploy API dengan:
-   `TELEFUN_SCORING_WORKER_ENABLED=true`, `INTERVAL_MS=30000`, `BATCH_SIZE=5`,
-   `CLAIM_TIMEOUT_SECONDS=300`.
-3. Buktikan queue drain, retry, satu claim per sesi, dan tidak ada stale
+1. [x] Apply migration ke project Supabase production yang benar dan verifikasi
+   signature/kolom/grant melalui hosted readback.
+2. [x] Deploy API commit `e7157cf`; health endpoint `200` dan log
+   `telefun_scoring_worker.disabled` dengan kill switch eksplisit `false`.
+3. [ ] Setelah otorisasi biaya eksplisit, aktifkan embedded worker dengan
+   `INTERVAL_MS=30000`, `BATCH_SIZE=5`, dan `CLAIM_TIMEOUT_SECONDS=300`.
+4. [ ] Buktikan queue drain, retry, satu claim per sesi, dan tidak ada stale
    completion/completion ganda melalui log + DB.
-4. Scale-to-zero service Railway lama; jangan drop compatibility signatures
-   sebelum service lama benar-benar disabled/deleted.
-5. Rollback hanya dengan kill switch API (`...ENABLED=false`) dan prosedur
+5. [x] Hapus service Railway lama; jangan drop compatibility signatures sampai
+   canary embedded worker selesai.
+6. Rollback hanya dengan kill switch API (`...ENABLED=false`) dan prosedur
    migration terkontrol setelah active token claims settled.
