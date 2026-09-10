@@ -21,11 +21,11 @@ Dokumen ini menjelaskan struktur teknis bagaimana sistem keamanan, pendaftaran, 
 
 Aplikasi memiliki 4 role utama dengan hierarki akses sebagai berikut:
 
-| Role        | Deskripsi         | Hak Akses Utama                                                                                                            |
-| ----------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Admin**   | Pengelola Sistem  | Akses penuh seluruh modul, manajemen user (approve/reject/delete), audit logs, & konfigurasi sistem.                       |
-| **Trainer** | Operasional Utama | Manajemen data Profiler, input & setting QA (SIDAK), monitoring, editor pricing/kurs usage billing, & audit logs terbatas. |
-| **Leader**  | Pengawas Tim      | Melihat dashboard tim, monitoring aktivitas tim, monitoring usage billing lintas akun, melihat data Profiler.              |
+| Role        | Deskripsi         | Hak Akses Utama                                                                                                                                                                                                                                                                                                  |
+| ----------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Admin**   | Pengelola Sistem  | Akses penuh seluruh modul, manajemen user (approve/reject/delete), audit logs, & konfigurasi sistem.                                                                                                                                                                                                             |
+| **Trainer** | Operasional Utama | Manajemen data Profiler, input & setting QA (SIDAK), monitoring, editor pricing/kurs usage billing, & audit logs terbatas.                                                                                                                                                                                       |
+| **Leader**  | Pengawas Tim      | Melihat dashboard tim, monitoring aktivitas tim, monitoring usage billing lintas akun, melihat data Profiler.                                                                                                                                                                                                    |
 | **Agent**   | Pengguna Simulasi | Akses ke modul simulasi (Ketik, PDKT) dan dashboard pribadi. Telefun produksi dan POC WebRTC tetap admin/trainer only. `agent` tidak memiliki akses ke monitoring lintas akun, tetapi tetap dapat melihat quick-view usage miliknya sendiri di modul pribadi (KETIK). PDKT dibatasi untuk trainer/qa/admin saja. |
 
 ## Alur Pendaftaran & Approval
@@ -61,14 +61,14 @@ Setiap halaman atau aksi sensitif dilindungi dengan pengecekan role di backend:
 
 Role enforcement coverage per module (Phase B hardening):
 
-| Module            | Endpoints | Read Roles                             | Write Roles                            |
-| ----------------- | --------- | -------------------------------------- | -------------------------------------- |
-| **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
-| **Profiler**      | 23        | admin, trainer, qa, tl, spv, om        | admin, trainer, qa                     |
-| **PDKT**          | 16        | admin, trainer, qa                     | admin, trainer, qa (AI)                |
-| **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history) | admin, trainer (pricing)           |
+| Module            | Endpoints | Read Roles                                     | Write Roles                                    |
+| ----------------- | --------- | ---------------------------------------------- | ---------------------------------------------- |
+| **SIDAK**         | 15        | admin, trainer, qa, tl, spv, om                | admin, trainer, qa                             |
+| **Profiler**      | 23        | admin, trainer, qa, tl, spv, om                | admin, trainer, qa                             |
+| **PDKT**          | 16        | admin, trainer, qa                             | admin, trainer, qa (AI)                        |
+| **AI Monitoring** | 5         | admin, trainer, leader (aggregation/history)   | admin, trainer (pricing)                       |
 | **KETIK**         | 4         | admin, trainer, leader, qa, tl, spv, om, agent | admin, trainer, leader, qa, tl, spv, om, agent |
-| **Admin**         | 8         | admin only                             | admin only                             |
+| **Admin**         | 8         | admin only                                     | admin only                                     |
 
 Catatan:
 
@@ -175,3 +175,9 @@ Catatan:
 - `apps/web/src/router.tsx` — TanStack Router route definitions
 - `apps/api/src/` — Backend Hono middleware dan routes
 - `docs/AUTH_KNOWN_ISSUE_PROFILE_SCHEMA_DRIFT.md`
+
+## Atribusi Simulasi — Auth & Permission
+
+- Hanya admin/trainer boleh memilih/membuat atribusi `participant`; role lain memakai `self` dan tidak melihat picker.
+- Izin modul tidak memberi izin atribusi. Participant reply PDKT hanya admin/trainer; visibilitas snapshot nama/batch/tim di shared mailbox hanya untuk pembaca berizin (tanpa akses picker/Profiler penuh).
+- Resolver memakai actor middleware + lookup minimal; user-JWT untuk lookup/RPC sesuai RLS; tidak menambah admin client untuk bypass lookup gagal. Existing admin writes tetap butuh validasi actor + snapshot eksplisit.

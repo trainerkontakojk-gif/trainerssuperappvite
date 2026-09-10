@@ -3,7 +3,6 @@ import {
   Mail,
   Search,
   Inbox,
-  Send,
   Trash2,
   Plus,
   Settings,
@@ -90,7 +89,10 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
   };
 
   return (
-    <div className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0">
+    <aside
+      aria-label="Mailbox"
+      className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0"
+    >
       {/* Sidebar Header */}
       <div className="p-4 border-b border-[var(--border)] space-y-4">
         <div className="flex items-center justify-between">
@@ -103,8 +105,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
               <div className="flex items-center gap-1">
                 {selectedBulkIds.size > 0 && (
                   <button
+                    type="button"
                     onClick={onBulkDelete}
-                    className="min-w-10 min-h-10 rounded-lg border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--destructive)] flex items-center justify-center transition-all"
+                    className="min-w-11 min-h-11 rounded-lg border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--destructive)] flex items-center justify-center transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                     title={`Hapus ${selectedBulkIds.size} email terpilih`}
                     aria-label={`Hapus ${selectedBulkIds.size} email terpilih`}
                   >
@@ -112,8 +115,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={onToggleBulkMode}
-                  className="min-h-10 px-3 text-xs font-semibold border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--fg)] rounded-lg transition-all"
+                  className="min-h-11 px-3 text-xs font-semibold border border-[var(--border)] hover:bg-[var(--bg)] text-[var(--fg)] rounded-lg transition-all"
                 >
                   Batal
                 </button>
@@ -121,8 +125,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={onToggleBulkMode}
-                  className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                  className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                   title="Pilih Banyak"
                   aria-label="Pilih Banyak"
                 >
@@ -130,8 +135,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                 </button>
                 {onSettings && (
                   <button
+                    type="button"
                     onClick={onSettings}
-                    className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                    className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                     title="Pengaturan"
                     aria-label="Pengaturan"
                   >
@@ -140,8 +146,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                 )}
                 {onHistory && (
                   <button
+                    type="button"
                     onClick={onHistory}
-                    className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                    className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                     title="Riwayat"
                     aria-label="Riwayat"
                   >
@@ -150,8 +157,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                 )}
                 {onUsage && (
                   <button
+                    type="button"
                     onClick={onUsage}
-                    className="min-w-10 min-h-10 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
+                    className="min-w-11 min-h-11 rounded-lg hover:bg-[var(--bg)] flex items-center justify-center transition-all text-[var(--fg2)] hover:text-[var(--fg)]"
                     title="Usage Bulan Ini"
                     aria-label="Usage Bulan Ini"
                   >
@@ -159,8 +167,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={onNew}
-                  className="min-w-10 min-h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] flex items-center justify-center transition-all hover:bg-[var(--bg)] active:scale-95 ml-1"
+                  className="min-w-11 min-h-11 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] flex items-center justify-center transition-all hover:bg-[var(--bg)] active:scale-95 ml-1"
                   title="Buat Simulasi"
                   aria-label="Buat Simulasi"
                 >
@@ -175,10 +184,11 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--fg3)] group-focus-within:text-[var(--fg)] transition-colors" />
           <input
             type="text"
+            aria-label="Cari email"
             placeholder="Cari email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg py-2.5 pl-9 pr-4 text-xs text-[var(--fg)] focus:border-[var(--fg)] outline-none transition-all placeholder:text-[var(--fg3)]"
+            className="w-full min-h-11 bg-[var(--bg)] border border-[var(--border)] rounded-lg py-2.5 pl-9 pr-4 text-xs text-[var(--fg)] focus:border-[var(--fg)] outline-none transition-all placeholder:text-[var(--fg3)]"
           />
         </div>
 
@@ -191,8 +201,10 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
           ].map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => onFilterChange(tab.id as any)}
-              className={`flex-1 py-1.5 text-[11px] font-medium rounded-md transition-all ${
+              aria-pressed={filter === tab.id}
+              className={`flex-1 min-h-11 py-1.5 text-[11px] font-medium rounded-md transition-all ${
                 filter === tab.id
                   ? "bg-[var(--surface)] text-[var(--fg)] border border-[var(--border)]"
                   : "text-[var(--fg2)] hover:text-[var(--fg)]"
@@ -216,8 +228,9 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
             </p>
             {!(search || filter !== "all") && (
               <button
+                type="button"
                 onClick={onNew}
-                className="mt-4 min-h-10 px-3 text-xs font-medium text-[var(--fg)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition-all"
+                className="mt-4 min-h-11 px-3 text-xs font-medium text-[var(--fg)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg)] transition-all"
               >
                 Buat Email Pertama
               </button>
@@ -232,6 +245,17 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
               return (
                 <div
                   key={item.id}
+                  role={isBulkMode ? "group" : "button"}
+                  tabIndex={isBulkMode ? -1 : 0}
+                  aria-pressed={
+                    !isBulkMode ? selectedId === item.id : undefined
+                  }
+                  aria-label={
+                    !isBulkMode
+                      ? `${item.sender_name}: ${item.subject || "Tanpa subjek"}`
+                      : undefined
+                  }
+                  aria-disabled={isBulkMode && !canDelete ? true : undefined}
                   onClick={() => {
                     if (isBulkMode) {
                       if (canDelete) {
@@ -241,16 +265,28 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                       onSelect(item.id);
                     }
                   }}
-                  className={`w-full text-left p-4 transition-all relative flex gap-3 cursor-pointer ${
+                  onKeyDown={(event) => {
+                    if (
+                      !isBulkMode &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault();
+                      onSelect(item.id);
+                    }
+                  }}
+                  className={`w-full text-left p-4 transition-all relative flex gap-3 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)] ${
                     isBulkMode
                       ? isSelected
                         ? "bg-[var(--bg)]"
                         : "hover:bg-[var(--bg)]"
                       : selectedId === item.id
-                      ? "bg-[var(--bg)] ring-1 ring-inset ring-[var(--border)]"
-                      : "hover:bg-[var(--bg)]"
+                        ? "bg-[var(--bg)] ring-1 ring-inset ring-[var(--border)]"
+                        : "hover:bg-[var(--bg)]"
                   } ${isBulkMode && !canDelete ? "opacity-50" : ""}`}
-                  style={{ cursor: isBulkMode && !canDelete ? "not-allowed" : "pointer" }}
+                  style={{
+                    cursor:
+                      isBulkMode && !canDelete ? "not-allowed" : "pointer",
+                  }}
                 >
                   {isBulkMode && (
                     <div
@@ -262,8 +298,13 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                         checked={isSelected}
                         disabled={!canDelete}
                         onChange={() => onToggleBulkId(item.id)}
+                        aria-label={`Pilih ${item.subject || "email ini"}`}
                         className="w-4 h-4 text-[var(--module-pdkt)] border-[var(--border)] rounded focus:ring-[var(--fg)] cursor-pointer disabled:cursor-not-allowed"
-                        title={!canDelete ? "Anda tidak memiliki izin menghapus email ini" : ""}
+                        title={
+                          !canDelete
+                            ? "Anda tidak memiliki izin menghapus email ini"
+                            : ""
+                        }
                       />
                     </div>
                   )}
@@ -307,12 +348,18 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
                     <div className="mt-2 flex items-center gap-2">
                       {item.status === "open" ? (
                         <span className="inline-flex items-center gap-1 font-medium text-[10px] text-[var(--fg2)]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--module-pdkt)]" />{" "}
+                          <span
+                            aria-hidden="true"
+                            className="w-1.5 h-1.5 rounded-full bg-[var(--module-pdkt)]"
+                          />{" "}
                           Menunggu Balasan
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 font-medium text-[10px] text-[var(--chart-green)]">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--chart-green)]" />{" "}
+                          <span
+                            aria-hidden="true"
+                            className="w-1.5 h-1.5 rounded-full bg-[var(--chart-green)]"
+                          />{" "}
                           Terbalas
                         </span>
                       )}
@@ -324,31 +371,6 @@ export const MailboxSidebar: React.FC<MailboxSidebarProps> = ({
           </div>
         )}
       </div>
-
-      {/* Sidebar Footer */}
-      <div className="p-3 border-t border-[var(--border)] bg-[var(--bg)] flex items-center justify-around">
-        <button
-          className="min-h-10 min-w-10 text-[var(--fg)] hover:bg-[var(--surface)] rounded-lg transition-all flex items-center justify-center"
-          title="Inbox"
-          aria-label="Inbox"
-        >
-          <Inbox className="w-4 h-4" />
-        </button>
-        <button
-          className="min-h-10 min-w-10 text-[var(--fg3)] hover:bg-[var(--surface)] hover:text-[var(--fg)] rounded-lg transition-all flex items-center justify-center"
-          title="Sent (History)"
-          aria-label="Sent (History)"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-        <button
-          className="min-h-10 min-w-10 text-[var(--fg3)] hover:bg-[var(--surface)] hover:text-[var(--fg)] rounded-lg transition-all flex items-center justify-center"
-          title="Trash"
-          aria-label="Trash"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
+    </aside>
   );
 };

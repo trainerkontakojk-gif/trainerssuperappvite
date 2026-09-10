@@ -112,14 +112,14 @@ export function PricingRow({
               <button
                 type="button"
                 onClick={save}
-                className="h-8 rounded-md bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+                className="min-h-11 rounded-md bg-primary px-3 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 Simpan
               </button>
               <button
                 type="button"
                 onClick={cancel}
-                className="h-8 rounded-md bg-muted px-3 text-[11px] font-semibold text-muted-foreground hover:bg-muted/80"
+                className="min-h-11 rounded-md bg-muted px-3 text-[11px] font-semibold text-muted-foreground hover:bg-muted/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               >
                 Batal
               </button>
@@ -127,9 +127,14 @@ export function PricingRow({
           ) : isHistorical ? null : (
             <button
               type="button"
-              aria-expanded={isRealtime ? false : undefined}
+              aria-expanded={isRealtime ? editing : undefined}
+              aria-controls={
+                isRealtime
+                  ? `pricing-rate-details-${entry.model_id}`
+                  : undefined
+              }
               onClick={() => setEditing(true)}
-              className="h-8 rounded-md bg-secondary px-3 text-[11px] font-semibold text-foreground hover:bg-secondary/80"
+              className="min-h-11 rounded-md bg-secondary px-3 text-[11px] font-semibold text-foreground hover:bg-secondary/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Edit
             </button>
@@ -137,7 +142,10 @@ export function PricingRow({
         </td>
       </tr>
       {isRealtime && editing && !isHistorical ? (
-        <tr className="bg-muted/15">
+        <tr
+          id={`pricing-rate-details-${entry.model_id}`}
+          className="bg-muted/15"
+        >
           <td colSpan={5} className="px-6 pb-5 pt-2">
             <fieldset>
               <legend className="mb-3 text-xs font-semibold text-foreground">
@@ -185,7 +193,7 @@ function RateInput({
       step="any"
       value={value}
       onChange={(event) => onChange(Number(event.target.value))}
-      className={`h-8 rounded-md border border-border bg-background px-2 text-right text-xs font-semibold outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/30 ${fullWidth ? "w-full" : "w-24"}`}
+      className={`min-h-11 rounded-md border border-border bg-background px-2 text-right text-xs font-semibold outline-none transition-all focus:border-primary focus:ring-1 focus:ring-primary/30 ${fullWidth ? "w-full" : "w-24"}`}
     />
   );
 }

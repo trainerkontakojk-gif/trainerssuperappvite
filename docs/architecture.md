@@ -355,3 +355,10 @@ Keamanan aplikasi dijaga di beberapa sisi:
 - Resource hints (`modulepreload`, `preconnect`, `dns-prefetch`) ditambahkan di `index.html`.
 - Chunk >200 kB yang bukan vendor stabil dipertimbangkan untuk split lanjutan via `manualChunks`.
 - Jangan tambah library baru tanpa cek bundle impact-nya.
+
+## Atribusi Subjek Simulasi — Arsitektur
+
+- Backend-first: validasi, auth, resolver snapshot, dan AI orchestration di `apps/api`; frontend (`apps/web`) hanya mengirim selection ID, tidak snapshot.
+- Pada PDKT, snapshot participant yang sudah di-resolve didaftarkan sebagai intent opaque melalui service role, lalu dikonsumsi oleh RPC mailbox dengan user JWT. Caller authenticated langsung hanya dapat meminta resolusi live, bukan memasok metadata frozen.
+- Kontrak shared di `packages/types/src/simulation-subject.ts` (selection discriminated union strict, snapshot, normalizer undefined→self, mapper row→unknown tanpa lookup).
+- Rolling: tambah kolom nullable → deploy backend kompatibel → refresh schema cache → deploy frontend setelah semua replica dukung kontrak. Rollback pertahankan kolom/snapshot/wrapper; tanpa drop/backfill ulang.

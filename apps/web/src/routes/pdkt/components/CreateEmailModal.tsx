@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { X, Play, AlertCircle } from "lucide-react";
 import type { PdktScenario } from "@trainers/types";
 
@@ -17,6 +17,65 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
   onCreate,
   isLoading,
 }) => {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+    const getFocusableElements = () => {
+      if (!dialogRef.current) return [] as HTMLElement[];
+      return Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.closest("[hidden]"));
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) return;
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      if (
+        event.shiftKey &&
+        (!active || active === first || !dialog.contains(active))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (!active || active === last || !dialog.contains(active))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const activeScenarios = scenarios.filter((s) => s.isActive);
@@ -30,14 +89,27 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
       />
 
       {/* Dialog content */}
-      <div className="relative w-full max-w-lg bg-[var(--surface)] rounded-xl overflow-hidden border border-[var(--border)] transition-all transform scale-100">
+      <div
+        ref={dialogRef}
+        className="relative w-full max-w-lg bg-[var(--surface)] rounded-xl overflow-hidden border border-[var(--border)] transition-all transform scale-100"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pdkt-create-email-title"
+        aria-busy={isLoading}
+      >
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
-          <h3 className="text-sm font-bold text-[var(--fg)]">
+          <h3
+            id="pdkt-create-email-title"
+            className="text-sm font-bold text-[var(--fg)]"
+          >
             Buat Email Baru
           </h3>
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
-            className="p-2 hover:bg-[var(--bg)] rounded-xl transition-all text-[var(--fg2)]"
+            aria-label="Tutup buat email baru"
+            className="min-h-11 min-w-11 p-2 hover:bg-[var(--bg)] rounded-xl transition-all text-[var(--fg2)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
           >
             <X className="w-5 h-5" />
           </button>
@@ -71,6 +143,7 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
                 return (
                   <button
                     key={scenario.id}
+                    type="button"
                     onClick={() => onCreate(scenario)}
                     disabled={isLoading}
                     className="w-full flex items-start gap-4 p-4 rounded-xl border border-[var(--border)] hover:border-[var(--module-pdkt)] hover:bg-[var(--bg)] text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
@@ -110,17 +183,22 @@ export const CreateEmailModal: React.FC<CreateEmailModalProps> = ({
 
         <div className="px-6 py-4 bg-[var(--bg)] border-t border-[var(--border)] flex justify-end">
           <button
+            type="button"
             onClick={onClose}
-            className="px-6 py-2 rounded-xl text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--surface)] transition-all"
+            className="min-h-11 px-6 py-2 rounded-xl text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--surface)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
           >
             Batal
           </button>
         </div>
 
         {isLoading && (
-          <div className="absolute inset-0 bg-[var(--surface)]/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-10">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--module-pdkt)]/30 border-t-[var(--module-pdkt)] mb-3" />
-            <span className="text-xs font-bold text-[var(--module-pdkt)] animate-pulse">
+          <div
+            className="absolute inset-0 bg-[var(--surface)]/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-10"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="h-8 w-8 animate-spin motion-reduce:animate-none rounded-full border-2 border-[var(--module-pdkt)]/30 border-t-[var(--module-pdkt)] mb-3" />
+            <span className="text-xs font-bold text-[var(--module-pdkt)] animate-pulse motion-reduce:animate-none">
               Menghasilkan Email...
             </span>
           </div>

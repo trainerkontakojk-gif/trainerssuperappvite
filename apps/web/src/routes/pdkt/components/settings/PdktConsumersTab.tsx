@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, Edit2, Trash2, Plus, X, ArrowLeft } from "lucide-react";
+import { Users, Edit2, Trash2, Plus, ArrowLeft } from "lucide-react";
 import { PdktConsumerType } from "@trainers/types";
 import { useCrudForm } from "../../../../hooks/useCrudForm";
 import { type PdktAppSettings as AppSettings } from "../../pdktSettings";
@@ -26,7 +26,6 @@ export function PdktConsumersTab({
   consumerForm,
   setLocalSettings,
 }: PdktConsumersTabProps) {
-
   const handleDeleteConsumer = (id: string) => {
     if (window.confirm("Hapus tipe konsumen ini?")) {
       setLocalSettings((prev) => ({
@@ -82,7 +81,9 @@ export function PdktConsumersTab({
         <div className="bg-card border border-border rounded-xl overflow-hidden relative">
           <div className="px-6 py-4 border-b border-border bg-foreground/[0.01]">
             <h3 className="font-bold text-foreground text-sm tracking-tight">
-              {consumerForm.editingId ? "Edit Karakter" : "Tambah Karakter Baru"}
+              {consumerForm.editingId
+                ? "Edit Karakter"
+                : "Tambah Karakter Baru"}
             </h3>
           </div>
           <div className="p-6 space-y-5">
@@ -93,19 +94,25 @@ export function PdktConsumersTab({
                   type="text"
                   placeholder="Contoh: Konsumen Milenial Galak"
                   value={consumerForm.draft.name || ""}
-                  onChange={(e) => consumerForm.setDraft({ name: e.target.value })}
+                  onChange={(e) =>
+                    consumerForm.setDraft({ name: e.target.value })
+                  }
                 />
               </SettingsField>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 md:col-span-1">
-                <SettingsField label="Tingkat Kesulitan" id="consumer-difficulty">
+                <SettingsField
+                  label="Tingkat Kesulitan"
+                  id="consumer-difficulty"
+                >
                   <SettingsSelect
                     id="consumer-difficulty"
                     value={consumerForm.draft.difficulty || "Medium"}
                     onChange={(e) =>
                       consumerForm.setDraft({
-                        difficulty: e.target.value as PdktConsumerType["difficulty"],
+                        difficulty: e.target
+                          .value as PdktConsumerType["difficulty"],
                       })
                     }
                   >
@@ -122,20 +129,27 @@ export function PdktConsumersTab({
                     type="text"
                     placeholder="Contoh: ketus, menggunakan 'saya', menuntut"
                     value={consumerForm.draft.tone || ""}
-                    onChange={(e) => consumerForm.setDraft({ tone: e.target.value })}
+                    onChange={(e) =>
+                      consumerForm.setDraft({ tone: e.target.value })
+                    }
                   />
                 </SettingsField>
               </div>
             </div>
             <div>
-              <SettingsField label="Deskripsi Karakteristik" id="consumer-description">
+              <SettingsField
+                label="Deskripsi Karakteristik"
+                id="consumer-description"
+              >
                 <textarea
                   id="consumer-description"
                   className="w-full rounded-md border border-border bg-background p-2.5 text-sm text-foreground focus:border-foreground outline-none resize-none transition-colors placeholder:text-muted-foreground/30"
                   rows={4}
                   placeholder="Jelaskan detail perilaku karakter ini agar AI dapat menirunya..."
                   value={consumerForm.draft.description || ""}
-                  onChange={(e) => consumerForm.setDraft({ description: e.target.value })}
+                  onChange={(e) =>
+                    consumerForm.setDraft({ description: e.target.value })
+                  }
                 />
               </SettingsField>
             </div>
@@ -148,7 +162,9 @@ export function PdktConsumersTab({
               </button>
               <button
                 onClick={handleSaveConsumer}
-                disabled={!consumerForm.draft.name || !consumerForm.draft.description}
+                disabled={
+                  !consumerForm.draft.name || !consumerForm.draft.description
+                }
                 className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Simpan
@@ -163,7 +179,7 @@ export function PdktConsumersTab({
   return (
     <div className="space-y-6 pb-10 mt-2">
       {/* Tips Banner */}
-      <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl flex gap-4 items-start backdrop-blur-sm">
+      <div className="flex items-start gap-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <Users className="w-5 h-5 text-primary" />
         </div>
@@ -172,7 +188,10 @@ export function PdktConsumersTab({
             💡 Tips Simulasi
           </h4>
           <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-            Pilih tipe konsumen yang akan disimulasikan. Variasi tingkat kesulitan akan mempengaruhi gaya bahasa dan respon AI. Pilih <span className="text-primary font-bold">Acak</span> untuk tantangan yang berbeda setiap saat.
+            Pilih tipe konsumen yang akan disimulasikan. Variasi tingkat
+            kesulitan akan mempengaruhi gaya bahasa dan respon AI. Pilih{" "}
+            <span className="text-primary font-bold">Acak</span> untuk tantangan
+            yang berbeda setiap saat.
           </p>
         </div>
       </div>
@@ -185,7 +204,8 @@ export function PdktConsumersTab({
           onClick={() => setGlobalConsumerTypeId("random")}
           title="Acak (Random)"
         >
-          Sistem akan memilih tipe konsumen secara acak untuk setiap sesi simulasi untuk variasi maksimal.
+          Sistem akan memilih tipe konsumen secara acak untuk setiap sesi
+          simulasi untuk variasi maksimal.
         </SettingsCardOption>
 
         {/* Consumer Types List */}

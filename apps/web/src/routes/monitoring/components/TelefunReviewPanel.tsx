@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Phone,
   Loader2,
@@ -44,6 +44,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   const [showTranscript, setShowTranscript] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const va = useMemo(() => {
     return data?.voice_assessment
@@ -93,8 +94,15 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <Loader2 className="w-6 h-6 text-module-telefun animate-spin" />
+      <div
+        className="flex flex-col items-center justify-center py-12 gap-3"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2
+          className="w-6 h-6 text-module-telefun animate-spin motion-reduce:animate-none"
+          aria-hidden="true"
+        />
         <p className="text-xs text-muted-foreground font-medium">
           Memuat data penilaian suara...
         </p>
@@ -104,14 +112,21 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <AlertTriangle className="w-6 h-6 text-destructive" />
+      <div
+        className="flex flex-col items-center justify-center py-12 gap-3"
+        role="alert"
+      >
+        <AlertTriangle
+          className="w-6 h-6 text-destructive"
+          aria-hidden="true"
+        />
         <p className="text-xs text-destructive font-medium">{error}</p>
         <button
+          type="button"
           onClick={fetchReview}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-telefun/10 text-module-telefun text-[10px] font-bold hover:bg-module-telefun/20 transition-all"
+          className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-telefun/10 text-module-telefun text-[10px] font-bold hover:bg-module-telefun/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-telefun"
         >
-          <RefreshCw size={10} />
+          <RefreshCw size={10} aria-hidden="true" />
           Coba Lagi
         </button>
       </div>
@@ -294,7 +309,8 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                   Durasi
                 </div>
                 <div className="text-lg font-black">
-                  {Math.floor(data.duration_seconds / 60)}m {data.duration_seconds % 60}d
+                  {Math.floor(data.duration_seconds / 60)}m{" "}
+                  {data.duration_seconds % 60}d
                 </div>
               </div>
             )}
@@ -338,7 +354,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 </p>
               </div>
               <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-chart-green">
-                <Sparkles className="h-3 w-3" />
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
                 <span>{va.overallScore}/10</span>
               </div>
             </div>
@@ -355,7 +371,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                     setZoomOpen(true);
                   }
                 }}
-                className="group relative cursor-pointer rounded-xl p-2 transition-colors hover:bg-muted/30"
+                className="group relative cursor-pointer rounded-xl p-2 transition-colors hover:bg-muted/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-telefun"
               >
                 <VoiceRadarChart profile={communicationProfile} compact />
                 <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -448,7 +464,10 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
                 {communicationProfile.metrics
                   .filter((m) => m.drill || m.improvementTip)
                   .map((m) => (
-                    <li key={m.key} className="text-xs leading-relaxed text-foreground/80">
+                    <li
+                      key={m.key}
+                      className="text-xs leading-relaxed text-foreground/80"
+                    >
                       <span className="font-bold">{m.label}:</span>{" "}
                       {m.drill ?? m.improvementTip}
                     </li>
@@ -540,6 +559,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
           {/* Voice Transcript (collapsible) */}
           <div className="border-t border-border pt-4">
             <button
+              type="button"
               aria-expanded={showTranscript}
               aria-controls="telefun-transcript"
               onClick={() => setShowTranscript(!showTranscript)}
@@ -554,8 +574,17 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
             </button>
             {showTranscript && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
+                initial={
+                  shouldReduceMotion
+                    ? { opacity: 1 }
+                    : { opacity: 0, height: 0 }
+                }
+                animate={
+                  shouldReduceMotion
+                    ? { opacity: 1 }
+                    : { opacity: 1, height: "auto" }
+                }
+                transition={shouldReduceMotion ? { duration: 0 } : undefined}
                 id="telefun-transcript"
                 className="mt-4"
               >
@@ -653,7 +682,10 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
         {data.coaching_recommendations?.length > 0 ? (
           <div className="space-y-2">
             {data.coaching_recommendations.map((recommendation, i) => (
-              <div key={i} className="rounded-xl border border-border bg-muted/30 p-3 text-sm">
+              <div
+                key={i}
+                className="rounded-xl border border-border bg-muted/30 p-3 text-sm"
+              >
                 <span className="mr-2 text-xs font-bold text-muted-foreground">
                   Prioritas {recommendation.priority}
                 </span>

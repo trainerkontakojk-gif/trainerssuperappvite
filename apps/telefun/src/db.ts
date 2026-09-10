@@ -21,7 +21,97 @@ export type {
   WebRtcAttemptClaim,
 } from "./realtime-webrtc/durable-db.js";
 
-export async function createSession(userId: string): Promise<string> {
+type TelefunSessionSubject =
+  | { type: "self"; displayName?: string | null }
+  | {
+      type: "participant";
+      participantId: string;
+      displayName?: string | null;
+      batchName?: string | null;
+      team?: string | null;
+    };
+
+type TelefunActorProfile = {
+  id: string;
+  role: string | null;
+  full_name: string | null;
+  status: string | null;
+  is_deleted: boolean | null;
+};
+
+function isInactiveProfile(profile: TelefunActorProfile): boolean {
+  const status = (profile.status ?? "").trim().toLowerCase();
+  return (
+    profile.is_deleted === true || !["active", "approved"].includes(status)
+  );
+}
+
+/**
+ * Creates a session for the legacy WebSocket-only path or a subject-aware
+ * session when called by a trusted backend flow. The normal web flow resolves
+ * the selection through /telefun/sessions before authenticating the socket.
+ */
+export async function createSession(
+  userId: string,
+  subject?: TelefunSessionSubject,
+): Promise<string> {
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("id, role, full_name, status, is_deleted")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError || !profile || isInactiveProfile(profile)) {
+    console.error(
+      "[Telefun DB] Failed to validate session actor:",
+      profileError,
+    );
+    throw new Error("Akun Telefun tidak aktif atau tidak ditemukan.");
+  }
+
+  let simulationSubject: {
+    type: "self" | "participant";
+    participantId: string | null;
+    displayName: string | null;
+    batchName: string | null;
+    team: string | null;
+  } = {
+    type: "self",
+    participantId: null,
+    displayName: profile.full_name?.trim() || "Diri sendiri",
+    batchName: null,
+    team: null,
+  };
+
+  if (subject?.type === "participant") {
+    if (
+      !["admin", "trainer"].includes((profile.role ?? "").trim().toLowerCase())
+    ) {
+      throw new Error("Hanya admin/trainer yang dapat memilih peserta.");
+    }
+
+    const { data: participant, error: participantError } = await admin
+      .from("profiler_peserta")
+      .select("id, nama, batch_name, tim")
+      .eq("id", subject.participantId)
+      .maybeSingle();
+
+    if (participantError || !participant) {
+      throw new Error("Peserta tidak ditemukan.");
+    }
+    if (!participant.nama?.trim()) {
+      throw new Error("Data peserta tidak valid.");
+    }
+
+    simulationSubject = {
+      type: "participant",
+      participantId: participant.id,
+      displayName: participant.nama.trim(),
+      batchName: participant.batch_name ?? null,
+      team: participant.tim ?? null,
+    };
+  }
+
   const { data, error } = await admin
     .from("telefun_history")
     .insert({
@@ -30,13 +120,18 @@ export async function createSession(userId: string): Promise<string> {
       consumer_name: "Consumer",
       status: "active",
       messages: [],
+      simulation_subject_type: simulationSubject.type,
+      simulation_subject_peserta_id: simulationSubject.participantId,
+      simulation_subject_name: simulationSubject.displayName,
+      simulation_subject_batch_name: simulationSubject.batchName,
+      simulation_subject_team: simulationSubject.team,
     })
     .select("id")
     .single();
 
-  if (error) {
+  if (error || !data?.id) {
     console.error("[Telefun DB] Failed to create session:", error);
-    throw new Error(`Gagal membuat session: ${error.message}`);
+    throw new Error("Gagal membuat session Telefun.");
   }
   return data.id;
 }

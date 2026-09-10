@@ -6,7 +6,12 @@ import {
   SettingsSelect,
 } from "./SettingsPrimitives";
 
-type ConsumerNameMentionPattern = "random" | "upfront" | "middle" | "late" | "none";
+type ConsumerNameMentionPattern =
+  | "random"
+  | "upfront"
+  | "middle"
+  | "late"
+  | "none";
 
 interface PdktIdentityTabProps {
   customSenderName: string;
@@ -38,7 +43,7 @@ export function PdktIdentityTab({
   return (
     <div className="space-y-6 mt-4">
       {/* Header Banner */}
-      <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4 group">
         <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
           <User className="w-24 h-24" />
         </div>
@@ -47,7 +52,9 @@ export function PdktIdentityTab({
             Personalisasi Identitas
           </h3>
           <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-            Atur detail identitas Anda yang akan muncul dalam simulasi email. Data ini akan digunakan AI untuk menyapa dan menandatangani balasan secara otomatis.
+            Atur detail identitas Anda yang akan muncul dalam simulasi email.
+            Data ini akan digunakan AI untuk menyapa dan menandatangani balasan
+            secara otomatis.
           </p>
         </div>
       </div>
@@ -66,7 +73,10 @@ export function PdktIdentityTab({
           </div>
 
           <div className="space-y-3">
-            <SettingsField label="Nama Pengirim (Header)" id="custom-sender-name">
+            <SettingsField
+              label="Nama Pengirim (Header)"
+              id="custom-sender-name"
+            >
               <SettingsInput
                 id="custom-sender-name"
                 type="text"

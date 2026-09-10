@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Mail,
@@ -18,6 +18,7 @@ import {
   getScenarioDescription,
   formatDate,
   formatDuration,
+  getSimulationSubjectMeta,
 } from "../utils/formatting";
 import { useAuthStore } from "../../../store/authStore";
 import { aiClient, getErrorMessage, unwrapResponse } from "../../../lib/api";
@@ -57,6 +58,17 @@ export function HistoryTab({
   const profile = useAuthStore((s) => s.profile);
   const role = profile?.role?.toLowerCase() || "";
   const canDelete = role === "trainer" || role === "admin";
+
+  useEffect(() => {
+    if (!showDatePicker && !activeDropdownId) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setShowDatePicker(false);
+      setActiveDropdownId(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showDatePicker, activeDropdownId]);
 
   const handleDelete = async (entry: UnifiedHistoryEntry) => {
     if (
@@ -114,10 +126,14 @@ export function HistoryTab({
       // Search match
       if (historySearch) {
         const query = historySearch.toLowerCase();
+        const subj = (h as any).simulationSubject;
         const searchableFields = [
           h.scenario_title,
           h.user_email,
           h.consumer_name,
+          subj?.displayName,
+          subj?.batchName,
+          subj?.team,
           h.consumer_phone,
           h.consumer_city,
           h.consumer_gender,
@@ -203,7 +219,7 @@ export function HistoryTab({
               borderColor: "var(--module-ketik-bg)",
             }}
           >
-            <MessageSquare size={12} />
+            <MessageSquare size={12} aria-hidden="true" />
             <span className="uppercase">ketik</span>
           </div>
         );
@@ -217,7 +233,7 @@ export function HistoryTab({
               borderColor: "var(--module-pdkt-bg)",
             }}
           >
-            <Mail size={12} />
+            <Mail size={12} aria-hidden="true" />
             <span className="uppercase">pdkt</span>
           </div>
         );
@@ -231,7 +247,7 @@ export function HistoryTab({
               borderColor: "var(--module-telefun-bg)",
             }}
           >
-            <Phone size={12} />
+            <Phone size={12} aria-hidden="true" />
             <span className="uppercase">telefun</span>
           </div>
         );
@@ -245,16 +261,22 @@ export function HistoryTab({
       case "completed":
         return (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
-            <CheckCircle2 size={12} style={{ color: "var(--chart-green)" }} />
+            <CheckCircle2
+              size={12}
+              aria-hidden="true"
+              style={{ color: "var(--chart-green)" }}
+            />
             <span style={{ color: "var(--chart-green)" }}>Selesai Sukses</span>
           </div>
         );
       case "processing":
+      case "pending":
         return (
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border animate-pulse">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border animate-pulse motion-reduce:animate-none">
             <Loader2
               size={12}
-              className="animate-spin"
+              aria-hidden="true"
+              className="animate-spin motion-reduce:animate-none"
               style={{ color: "var(--chart-amber)" }}
             />
             <span style={{ color: "var(--chart-amber)" }}>Diproses</span>
@@ -263,15 +285,23 @@ export function HistoryTab({
       case "failed":
         return (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
-            <AlertCircle size={12} style={{ color: "var(--chart-red)" }} />
+            <AlertCircle
+              size={12}
+              aria-hidden="true"
+              style={{ color: "var(--chart-red)" }}
+            />
             <span style={{ color: "var(--chart-red)" }}>Gagal</span>
           </div>
         );
       default:
         return (
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit bg-muted text-muted-foreground border border-border">
-            <AlertCircle size={12} className="text-muted-foreground" />
-            <span>Belum Mulai</span>
+            <AlertCircle
+              size={12}
+              aria-hidden="true"
+              className="text-muted-foreground"
+            />
+            <span>Belum Dinilai</span>
           </div>
         );
     }
@@ -279,6 +309,7 @@ export function HistoryTab({
 
   const renderConsumerContext = (entry: UnifiedHistoryEntry) => {
     const name = entry.consumer_name || "Tidak tersedia";
+    const subject = getSimulationSubjectMeta(entry.simulationSubject);
     const context =
       entry.module === "ketik"
         ? [entry.consumer_phone, entry.consumer_city]
@@ -288,13 +319,27 @@ export function HistoryTab({
     const usefulContext = context.filter(Boolean).join(" · ");
 
     return (
-      <div className="min-w-[150px]">
+      <div className="min-w-[180px]" aria-label="Pelaksana dan target simulasi">
         <div className="font-semibold text-foreground">{name}</div>
         <div className="mt-0.5 break-words text-xs font-medium text-muted-foreground">
           {usefulContext || "Tidak tersedia"}
         </div>
+        <div className="mt-1 break-words text-xs font-semibold text-foreground">
+          Target: {subject.label}
+        </div>
+        {(subject.batch || subject.team) && (
+          <div className="mt-0.5 break-words text-xs text-muted-foreground">
+            {[
+              subject.batch && `Batch: ${subject.batch}`,
+              subject.team && `Tim: ${subject.team}`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </div>
+        )}
         <div className="mt-0.5 break-words text-xs font-medium text-muted-foreground/90">
-          {entry.user_email || "-"}
+          Pelaksana: {entry.user_email || "-"}
+          {entry.user_role ? ` · ${entry.user_role}` : ""}
         </div>
       </div>
     );
@@ -302,9 +347,15 @@ export function HistoryTab({
 
   const renderScoresAndMetrics = (entry: UnifiedHistoryEntry) => {
     if (entry.review_status !== "completed") {
+      const message =
+        entry.review_status === "failed"
+          ? "Penilaian gagal"
+          : entry.review_status === "not_started"
+            ? "Belum dinilai"
+            : "Menunggu Penilaian AI...";
       return (
         <div className="text-xs text-muted-foreground italic font-medium">
-          Menunggu Penilaian AI...
+          {message}
         </div>
       );
     }
@@ -448,13 +499,19 @@ export function HistoryTab({
             <div className="grid grid-cols-5 gap-x-4 min-w-[360px]">
               {submetrics.map(({ label, val }) => (
                 <div key={label} className="flex flex-col">
-                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
-                  <span className="text-xs font-semibold text-foreground mt-0.5">{val}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                    {label}
+                  </span>
+                  <span className="text-xs font-semibold text-foreground mt-0.5">
+                    {val}
+                  </span>
                 </div>
               ))}
             </div>
           ) : (
-            <span className="text-xs italic text-muted-foreground">Penilaian suara tidak tersedia</span>
+            <span className="text-xs italic text-muted-foreground">
+              Penilaian suara tidak tersedia
+            </span>
           )}
         </div>
       );
@@ -487,7 +544,7 @@ export function HistoryTab({
         {/* Card 1: Total Sesi */}
         <div className="bg-card rounded-2xl border border-border/40 p-6 flex items-center gap-4 shadow-sm">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary">
-            <MessageSquare size={20} />
+            <MessageSquare size={20} aria-hidden="true" />
           </div>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block">
@@ -508,7 +565,7 @@ export function HistoryTab({
               color: "var(--module-ketik)",
             }}
           >
-            <PenTool size={20} />
+            <PenTool size={20} aria-hidden="true" />
           </div>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block uppercase">
@@ -529,7 +586,7 @@ export function HistoryTab({
               color: "var(--module-pdkt)",
             }}
           >
-            <Mail size={20} />
+            <Mail size={20} aria-hidden="true" />
           </div>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block uppercase">
@@ -550,7 +607,7 @@ export function HistoryTab({
               color: "var(--module-telefun)",
             }}
           >
-            <Phone size={20} />
+            <Phone size={20} aria-hidden="true" />
           </div>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block capitalize">
@@ -577,11 +634,13 @@ export function HistoryTab({
             return (
               <button
                 key={pill.value}
+                type="button"
+                aria-pressed={isActive}
                 onClick={() => {
                   setActiveModule(pill.value);
                   setCurrentPage(1);
                 }}
-                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                className={`min-h-11 px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                   isActive
                     ? "bg-foreground text-background shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
@@ -603,7 +662,7 @@ export function HistoryTab({
               setHistoryStatus(e.target.value as ReviewStatus | "");
               setCurrentPage(1);
             }}
-            className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer min-w-[130px]"
+            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer min-w-[130px]"
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -615,62 +674,91 @@ export function HistoryTab({
           {/* Date Picker Popover */}
           <div className="relative">
             <button
+              type="button"
               onClick={() => setShowDatePicker(!showDatePicker)}
-              className="flex items-center gap-2 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold hover:bg-muted/40 transition-colors text-foreground cursor-pointer min-h-[34px]"
+              aria-haspopup="dialog"
+              aria-expanded={showDatePicker}
+              aria-controls="monitoring-date-filter"
+              className="flex min-h-11 items-center gap-2 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold hover:bg-muted/40 transition-colors text-foreground cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              <Calendar size={14} className="text-muted-foreground" />
+              <Calendar
+                size={14}
+                aria-hidden="true"
+                className="text-muted-foreground"
+              />
               <span>
                 {startDate || endDate
                   ? `${startDate ? formatDateString(startDate) : "Awal"} - ${endDate ? formatDateString(endDate) : "Akhir"}`
                   : "Semua Tanggal"}
               </span>
-              <ChevronDown size={12} className="text-muted-foreground" />
+              <ChevronDown
+                size={12}
+                aria-hidden="true"
+                className="text-muted-foreground"
+              />
             </button>
             {showDatePicker && (
-              <div className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3">
+              <div
+                id="monitoring-date-filter"
+                role="dialog"
+                aria-label="Filter tanggal monitoring"
+                className="absolute right-0 mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 w-64 space-y-3"
+              >
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <label
+                    htmlFor="monitoring-date-start"
+                    className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+                  >
                     Mulai
                   </label>
                   <input
+                    id="monitoring-date-start"
                     type="date"
+                    aria-label="Tanggal mulai"
                     value={startDate}
                     onChange={(e) => {
                       setStartDate(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground"
+                    className="min-h-11 w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  <label
+                    htmlFor="monitoring-date-end"
+                    className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider"
+                  >
                     Selesai
                   </label>
                   <input
+                    id="monitoring-date-end"
                     type="date"
+                    aria-label="Tanggal selesai"
                     value={endDate}
                     onChange={(e) => {
                       setEndDate(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground"
+                    className="min-h-11 w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground"
                   />
                 </div>
                 <div className="flex gap-2 justify-end pt-1">
                   <button
+                    type="button"
                     onClick={() => {
                       setStartDate("");
                       setEndDate("");
                       setCurrentPage(1);
                       setShowDatePicker(false);
                     }}
-                    className="px-2 py-1 text-[10px] font-semibold border border-border rounded hover:bg-muted cursor-pointer"
+                    className="min-h-11 px-2 py-1 text-xs font-semibold border border-border rounded hover:bg-muted cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     Reset
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowDatePicker(false)}
-                    className="px-2.5 py-1 text-[10px] font-semibold bg-foreground text-background rounded hover:bg-foreground/90 cursor-pointer"
+                    className="min-h-11 px-2.5 py-1 text-xs font-semibold bg-foreground text-background rounded hover:bg-foreground/90 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
                     Terapkan
                   </button>
@@ -683,17 +771,19 @@ export function HistoryTab({
           <div className="relative flex-1 md:w-64 md:flex-initial">
             <Search
               size={14}
+              aria-hidden="true"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               aria-label="Cari riwayat monitoring"
+              type="search"
               value={historySearch}
               onChange={(e) => {
                 setHistorySearch(e.target.value);
                 setCurrentPage(1);
               }}
               placeholder="Cari riwayat..."
-              className="w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
+              className="min-h-11 w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground"
             />
           </div>
         </div>
@@ -703,23 +793,49 @@ export function HistoryTab({
       <div className="bg-card rounded-xl border border-border/40 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
+            <caption className="sr-only">Riwayat sesi simulasi</caption>
             <thead>
               <tr className="border-b border-border/60 bg-muted/20 text-muted-foreground/80 text-[11px] font-bold uppercase tracking-wider">
-                <th className="py-3.5 px-6 font-bold">Modul</th>
-                <th className="py-3.5 px-4 font-bold">Status</th>
-                <th className="py-3.5 px-4 font-bold">Skenario</th>
-                <th className="py-3.5 px-4 font-bold">Pengguna</th>
-                <th className="py-3.5 px-4 font-bold">Waktu</th>
-                <th className="py-3.5 px-4 font-bold">Skor & Ringkasan</th>
-                <th className="py-3.5 px-6 font-bold text-right">Aksi</th>
+                <th scope="col" className="py-3.5 px-6 font-bold">
+                  Modul
+                </th>
+                <th scope="col" className="py-3.5 px-4 font-bold">
+                  Status
+                </th>
+                <th scope="col" className="py-3.5 px-4 font-bold">
+                  Skenario
+                </th>
+                <th scope="col" className="py-3.5 px-4 font-bold">
+                  Pengguna & Target
+                </th>
+                <th scope="col" className="py-3.5 px-4 font-bold">
+                  Waktu
+                </th>
+                <th scope="col" className="py-3.5 px-4 font-bold">
+                  Skor & Ringkasan
+                </th>
+                <th scope="col" className="py-3.5 px-6 font-bold text-right">
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/45 text-sm text-foreground">
+              {loading && currentItems.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center">
+                    <span
+                      role="status"
+                      className="text-sm font-medium text-muted-foreground"
+                    >
+                      Memuat riwayat simulasi…
+                    </span>
+                  </td>
+                </tr>
+              )}
               {currentItems.map((entry) => (
                 <tr
                   key={`${entry.module}-${entry.id}`}
-                  className="hover:bg-muted/10 transition-colors group cursor-pointer"
-                  onClick={() => onViewDetail(entry)}
+                  className="hover:bg-muted/10 transition-colors group"
                 >
                   {/* Modul badge */}
                   <td className="py-4 px-6 align-middle">
@@ -771,22 +887,30 @@ export function HistoryTab({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
+                        type="button"
                         onClick={() => onViewDetail(entry)}
-                        className="px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-semibold text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1 cursor-pointer min-h-[30px]"
+                        className="min-h-11 px-3 py-1.5 rounded-lg border border-border bg-background text-xs font-semibold text-foreground hover:bg-muted/40 transition-colors flex items-center gap-1 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                       >
                         Lihat Detail
                       </button>
                       <div className="relative">
                         <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={
+                            activeDropdownId === `${entry.module}-${entry.id}`
+                          }
+                          aria-controls={`history-actions-${entry.module}-${entry.id}`}
                           onClick={() => {
                             const dId = `${entry.module}-${entry.id}`;
                             setActiveDropdownId(
                               activeDropdownId === dId ? null : dId,
                             );
                           }}
-                          className="p-1.5 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer min-h-[30px]"
+                          className="min-h-11 min-w-11 rounded-lg border border-border bg-background p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                          aria-label={`Aksi ${entry.scenario_title}`}
                         >
-                          <MoreVertical size={14} />
+                          <MoreVertical size={14} aria-hidden="true" />
                         </button>
                         {activeDropdownId === `${entry.module}-${entry.id}` && (
                           <>
@@ -794,23 +918,31 @@ export function HistoryTab({
                               className="fixed inset-0 z-40"
                               onClick={() => setActiveDropdownId(null)}
                             />
-                            <div className="absolute right-0 mt-1 w-36 bg-card border border-border/80 rounded-xl shadow-xl z-50 py-1 text-left">
+                            <div
+                              id={`history-actions-${entry.module}-${entry.id}`}
+                              role="menu"
+                              className="absolute right-0 mt-1 w-36 bg-card border border-border/80 rounded-xl shadow-xl z-50 py-1 text-left"
+                            >
                               <button
+                                type="button"
+                                role="menuitem"
                                 onClick={() => {
                                   onViewDetail(entry);
                                   setActiveDropdownId(null);
                                 }}
-                                className="w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer"
+                                className="min-h-11 w-full px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors flex items-center gap-2 cursor-pointer"
                               >
                                 Lihat Detail
                               </button>
                               {canDelete && (
                                 <button
+                                  type="button"
+                                  role="menuitem"
                                   onClick={() => handleDelete(entry)}
                                   disabled={
                                     isDeleting === `${entry.module}-${entry.id}`
                                   }
-                                  className="w-full px-4 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                                  className="min-h-11 w-full px-4 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
                                 >
                                   {isDeleting === `${entry.module}-${entry.id}`
                                     ? "Menghapus..."
@@ -834,6 +966,7 @@ export function HistoryTab({
                   >
                     <MessageSquare
                       size={32}
+                      aria-hidden="true"
                       className="mx-auto mb-3 opacity-20"
                     />
                     <p className="text-sm font-medium">
@@ -858,11 +991,16 @@ export function HistoryTab({
           </div>
 
           {/* Page Controls */}
-          <div className="flex items-center gap-1">
+          <nav
+            aria-label="Paginasi riwayat"
+            className="flex items-center gap-1"
+          >
             <button
+              type="button"
+              aria-label="Halaman sebelumnya"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="px-2 py-1 rounded border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer min-h-[26px]"
+              className="min-h-11 min-w-11 rounded border border-border bg-background px-2 py-1 hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               &lt;
             </button>
@@ -878,8 +1016,11 @@ export function HistoryTab({
               return (
                 <button
                   key={`page-${num}`}
+                  type="button"
+                  aria-current={isCurrent ? "page" : undefined}
+                  aria-label={`Halaman ${num}`}
                   onClick={() => handlePageChange(num as number)}
-                  className={`px-3 py-1 rounded transition-colors cursor-pointer min-h-[26px] ${
+                  className={`min-h-11 min-w-11 px-3 py-1 rounded transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                     isCurrent
                       ? "bg-foreground text-background shadow-sm"
                       : "border border-border bg-background hover:bg-muted"
@@ -890,23 +1031,29 @@ export function HistoryTab({
               );
             })}
             <button
+              type="button"
+              aria-label="Halaman berikutnya"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="px-2 py-1 rounded border border-border bg-background hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer min-h-[26px]"
+              className="min-h-11 min-w-11 rounded border border-border bg-background px-2 py-1 hover:bg-muted disabled:opacity-40 transition-colors cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               &gt;
             </button>
-          </div>
+          </nav>
 
           {/* Page Limit Selector */}
           <div className="flex items-center gap-2">
+            <label htmlFor="monitoring-page-size" className="sr-only">
+              Jumlah hasil per halaman
+            </label>
             <select
+              id="monitoring-page-size"
               value={pageSize}
               onChange={(e) => {
                 setPageSize(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="px-2 py-1 bg-background border border-border/80 rounded text-xs font-semibold outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+              className="min-h-11 px-2 py-1 bg-background border border-border/80 rounded text-xs font-semibold outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
             >
               {[10, 20, 50, 100].map((size) => (
                 <option key={size} value={size}>

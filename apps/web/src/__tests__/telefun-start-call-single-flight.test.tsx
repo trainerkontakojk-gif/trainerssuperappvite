@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_TELEFUN_SETTINGS } from "../routes/telefun/telefunSettings";
+import { useAuthStore } from "../store/authStore";
 import {
   OPENAI_WEBRTC_MODEL_ID,
   OPENAI_WEBRTC_TRANSPORT,
@@ -95,6 +96,35 @@ describe("Telefun start-call single-flight", () => {
     usageMocks.fetchUsageSummary.mockResolvedValue(null);
   });
 
+  it("does not enter the call when authoritative session creation fails", async () => {
+    useAuthStore.setState({
+      session: { user: { id: "manager-1" }, access_token: "test-token" } as any,
+      profile: { id: "manager-1", role: "admin" } as any,
+    });
+    apiMocks.createTelefunSession.mockRejectedValueOnce(
+      new Error("participant unavailable"),
+    );
+
+    render(<TelefunLanding />);
+    const startButton = await screen.findByRole("button", {
+      name: /Mulai panggilan/i,
+    });
+    await waitFor(() => expect(startButton).not.toBeDisabled());
+    await act(async () => {
+      fireEvent.click(startButton);
+    });
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
+
+    await waitFor(() => {
+      expect(apiMocks.createTelefunSession).toHaveBeenCalledTimes(1);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.queryByTestId("phone-interface")).not.toBeInTheDocument();
+  });
+
   it("coalesces overlapping start clicks into one WebRTC session creation", async () => {
     let resolveSession!: (value: { id: string }) => void;
     apiMocks.createTelefunSession.mockImplementation(
@@ -111,6 +141,8 @@ describe("Telefun start-call single-flight", () => {
     });
     await waitFor(() => expect(startButton).not.toBeDisabled());
 
+    fireEvent.click(startButton);
+    fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
     fireEvent.click(startButton);
     fireEvent.click(startButton);
 

@@ -1,8 +1,14 @@
 import { Hono } from "hono";
+import {
+  mapSimulationSubjectRowToSnapshot,
+  simulationSubjectSelectionSchema,
+  type SimulationSubjectSnapshot,
+} from "@trainers/types";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import { User } from "@supabase/supabase-js";
 import { createAdminClient } from "../../lib/supabase";
+import { SimulationSubjectError } from "../../services/simulation-subject-service";
 import {
   DEFAULT_TELEFUN_LIVE_MODEL_ID,
   getTelefunLiveModel,
@@ -19,6 +25,7 @@ import {
   buildTelefunHistoryScoringView,
 } from "../../lib/telefun-feedback";
 import type { TelefunHistoryScoringView } from "@trainers/types";
+import { resolveRequestSimulationSubject } from "../pdkt/route-utils";
 
 type Variables = { user: User; profile: any };
 
@@ -66,14 +73,20 @@ const TELEFUN_OPENAI_DISABLED_ERROR = {
   },
 };
 
-function projectTelefunHistoryRow<T extends {
-  feedback?: unknown;
-  status?: unknown;
-  telefun_transport?: unknown;
-  voice_assessment?: unknown;
-}>(row: T): T & TelefunHistoryScoringView {
+export function projectTelefunHistoryRow<
+  T extends {
+    feedback?: unknown;
+    status?: unknown;
+    telefun_transport?: unknown;
+    voice_assessment?: unknown;
+  },
+>(row: T): T & TelefunHistoryScoringView {
   const enriched = enrichTelefunHistoryFeedback(row);
-  return { ...enriched, ...buildTelefunHistoryScoringView(enriched) };
+  return {
+    ...enriched,
+    ...buildTelefunHistoryScoringView(enriched),
+    simulationSubject: mapSimulationSubjectRowToSnapshot(row),
+  };
 }
 
 export const LIVE_PROMPT_INSTRUCTIONS_MAX_LENGTH = 16_000;
@@ -179,6 +192,7 @@ export const telefunSessionCreatePayloadSchema = z
     telefun_model_id: z.string().optional(),
     telefun_transport: z.string().optional(),
     live_prompt_instructions: livePromptInstructionsSchema,
+    simulationSubject: simulationSubjectSelectionSchema.optional(),
   })
   .superRefine((body, ctx) => {
     if (
@@ -307,6 +321,7 @@ telefunSessions.get("/sessions", async (c) => {
 
 export function buildTelefunSessionInsertPayload(params: {
   userId: string;
+  simulationSubjectSnapshot?: SimulationSubjectSnapshot | null;
   body: {
     scenario_title: string;
     consumer_name: string;
@@ -333,8 +348,20 @@ export function buildTelefunSessionInsertPayload(params: {
     instructions: params.body.live_prompt_instructions,
   });
 
+  const snapshot = params.simulationSubjectSnapshot ?? {
+    type: "self" as const,
+    participantId: null,
+    displayName: null,
+    batchName: null,
+    team: null,
+  };
   return {
     user_id: params.userId,
+    simulation_subject_type: snapshot.type,
+    simulation_subject_peserta_id: snapshot.participantId,
+    simulation_subject_name: snapshot.displayName,
+    simulation_subject_batch_name: snapshot.batchName,
+    simulation_subject_team: snapshot.team,
     scenario_title: params.body.scenario_title,
     consumer_name: params.body.consumer_name,
     consumer_gender: params.body.consumer_gender || "female",
@@ -360,8 +387,13 @@ telefunSessions.post(
     const body = c.req.valid("json");
 
     try {
+      const snapshot = await resolveRequestSimulationSubject(
+        c,
+        body.simulationSubject,
+      );
       const insertPayload = buildTelefunSessionInsertPayload({
         userId: user.id,
+        simulationSubjectSnapshot: snapshot,
         body,
       });
       const adminClient = createAdminClient();
@@ -372,8 +404,17 @@ telefunSessions.post(
         .single();
 
       if (error) throw error;
-      return c.json({ success: true, data });
-    } catch (error: any) {
+      return c.json({ success: true, data: projectTelefunHistoryRow(data) });
+    } catch (error: unknown) {
+      if (error instanceof SimulationSubjectError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: error.code, message: error.message },
+          },
+          error.status as 400,
+        );
+      }
       if (error instanceof TelefunOpenAiDisabledError) {
         return c.json(TELEFUN_OPENAI_DISABLED_ERROR, 400);
       }
@@ -391,7 +432,7 @@ telefunSessions.post(
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message || "Database error.",
+            message: "Gagal membuat sesi Telefun.",
           },
         },
         500,

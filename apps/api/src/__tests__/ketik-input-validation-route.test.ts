@@ -198,7 +198,13 @@ describe("KETIK settings and history input validation", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockPersistSession).toHaveBeenCalledWith("user-1", validHistory);
+    expect(mockPersistSession).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        ...validHistory,
+        simulationSubjectSnapshot: expect.objectContaining({ type: "self" }),
+      }),
+    );
   });
 
   it("accepts a history message at the 20,000-character limit and persists", async () => {
@@ -221,7 +227,10 @@ describe("KETIK settings and history input validation", () => {
     expect(response.status).toBe(200);
     expect(mockPersistSession).toHaveBeenCalledWith(
       "user-1",
-      historyWithLongMessage,
+      expect.objectContaining({
+        ...historyWithLongMessage,
+        simulationSubjectSnapshot: expect.objectContaining({ type: "self" }),
+      }),
     );
   });
 

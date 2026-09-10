@@ -57,12 +57,10 @@ vi.mock("../lib/gemini", () => ({
     success: true,
     text: JSON.stringify({
       subject: "Test Subject",
-      body: Array.from(
-        { length: 5 },
-        () =>
-          "Ini adalah email penipuan yang sangat panjang dan detil untuk memenuhi kebijakan isi. ".repeat(
-            9,
-          ),
+      body: Array.from({ length: 5 }, () =>
+        "Ini adalah email penipuan yang sangat panjang dan detil untuk memenuhi kebijakan isi. ".repeat(
+          9,
+        ),
       ).join("\n\n"),
     }),
   }),
@@ -109,19 +107,43 @@ describe("PDKT Unified Session Create Route", () => {
     "/api/v1/pdkt/generate-template",
     "/api/v1/pdkt/session/init",
     "/api/v1/pdkt/session/create",
-  ])("rejects draft prompt fields above the prompt-specific request limit at %s", async (path) => {
-    await createAuthenticatedApp("trainer");
-    const res = await app.request(path, {
+  ])(
+    "rejects draft prompt fields above the prompt-specific request limit at %s",
+    async (path) => {
+      await createAuthenticatedApp("trainer");
+      const res = await app.request(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenarioDraft: {
+            id: "pinjol",
+            category: "Pinjol",
+            title: "x".repeat(501),
+            description: "Keluhan",
+            isActive: true,
+          },
+          consumerTypeId: "marah",
+          identity: {
+            name: "Budi",
+            email: "budi@mail.com",
+            city: "Jakarta",
+            bodyName: "Budi",
+          },
+        }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockRpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects a participant selection during session init before generating AI output", async () => {
+    await createAuthenticatedApp("agent");
+    const res = await app.request("/api/v1/pdkt/session/init", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        scenarioDraft: {
-          id: "pinjol",
-          category: "Pinjol",
-          title: "x".repeat(501),
-          description: "Keluhan",
-          isActive: true,
-        },
+        scenarioId: "pinjol",
         consumerTypeId: "marah",
         identity: {
           name: "Budi",
@@ -129,10 +151,14 @@ describe("PDKT Unified Session Create Route", () => {
           city: "Jakarta",
           bodyName: "Budi",
         },
+        simulationSubject: {
+          type: "participant",
+          participantId: "123e4567-e89b-12d3-a456-426614174000",
+        },
       }),
     });
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
@@ -165,7 +191,9 @@ describe("PDKT Unified Session Create Route", () => {
     expect(json.success).toBe(true);
     expect(json.data.id).toBe("new-batch-uuid");
     expect(json.data.message).toBeDefined();
-    expect(json.data.message.attachments).toContain("data:image/png;base64,image-mock");
+    expect(json.data.message.attachments).toContain(
+      "data:image/png;base64,image-mock",
+    );
     expect(json.data.message.attachmentSource).toBe("ai");
 
     expect(mockRpc).toHaveBeenCalledWith("submit_pdkt_mailbox_batch", {
@@ -178,6 +206,141 @@ describe("PDKT Unified Session Create Route", () => {
       p_config_snapshot: expect.any(Object),
       p_inbound_email: expect.any(Object),
     });
+  });
+
+  it("returns the resolved subject with init output so the following mailbox save can retain the same selection", async () => {
+    await createAuthenticatedApp("trainer");
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        nama: "Andi",
+        batch_name: "Batch 12",
+        tim: "Tim Alpha",
+      },
+      error: null,
+    });
+
+    const res = await app.request("/api/v1/pdkt/session/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioId: "pinjol",
+        consumerTypeId: "marah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+        enableImageGeneration: false,
+        simulationSubject: {
+          type: "participant",
+          participantId: "123e4567-e89b-12d3-a456-426614174000",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.message).toEqual(
+      expect.objectContaining({ subject: "Test Subject" }),
+    );
+    expect(json.data.simulationSubject).toEqual({
+      type: "participant",
+      participantId: "123e4567-e89b-12d3-a456-426614174000",
+      displayName: "Andi",
+      batchName: "Batch 12",
+      team: "Tim Alpha",
+    });
+    expect(json.data.mailboxDraftToken).toEqual(expect.any(String));
+  });
+
+  it("uses the exact signed init token for the following mailbox batch", async () => {
+    await createAuthenticatedApp("trainer");
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        nama: "Andi",
+        batch_name: "Batch 12",
+        tim: "Tim Alpha",
+      },
+      error: null,
+    });
+
+    const initResponse = await app.request("/api/v1/pdkt/session/init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioId: "pinjol",
+        consumerTypeId: "marah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+        simulationSubject: {
+          type: "participant",
+          participantId: "123e4567-e89b-12d3-a456-426614174000",
+        },
+      }),
+    });
+    const initJson = await initResponse.json();
+    const token = initJson.data.mailboxDraftToken;
+
+    const batchResponse = await app.request("/api/v1/pdkt/mailbox/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mailboxDraftToken: token }),
+    });
+
+    expect(batchResponse.status).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith(
+      "submit_pdkt_mailbox_batch_with_subject",
+      expect.objectContaining({
+        p_subject_type: "participant",
+        p_subject_peserta_id:
+          "123e4567-e89b-12d3-a456-426614174000",
+        p_subject_name: "Andi",
+        p_inbound_email: expect.objectContaining({ subject: "Test Subject" }),
+      }),
+    );
+  });
+
+  it("maps mailbox save conflicts to 409 without discarding the generated email", async () => {
+    await createAuthenticatedApp("trainer");
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: "CONFLICT: idempotency key digunakan untuk target berbeda",
+      },
+    });
+
+    const res = await app.request("/api/v1/pdkt/session/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenarioId: "pinjol",
+        consumerTypeId: "marah",
+        identity: {
+          name: "Budi",
+          email: "budi@mail.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+        enableImageGeneration: false,
+        client_request_id: "req-conflict-001",
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error.code).toBe("CONFLICT");
+    expect(json.error.details.retryable).toBe(true);
+    expect(json.error.details.retryDraft.inbound_email).toEqual(
+      expect.objectContaining({ subject: "Test Subject" }),
+    );
   });
 
   it("drops raw scenarioDraft.identity before session creation and keeps the top-level identity as the runtime source", async () => {

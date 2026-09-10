@@ -126,8 +126,28 @@ export function SettingsCardOption({
 }: SettingsCardOptionProps) {
   return (
     <div
-      onClick={onClick}
-      className={`group cursor-pointer p-4 rounded-xl border transition-colors flex flex-col justify-between ${
+      role="button"
+      tabIndex={0}
+      aria-label={title}
+      aria-pressed={isSelected}
+      onClick={(event) => {
+        if (
+          (event.target as HTMLElement).closest(
+            "button, a, input, select, textarea",
+          )
+        ) {
+          return;
+        }
+        onClick();
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      className={`group cursor-pointer rounded-xl border p-4 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground flex flex-col justify-between ${
         isSelected
           ? "border-primary bg-primary/5"
           : "border-border bg-card/45 hover:bg-foreground/[0.02]"
@@ -142,11 +162,14 @@ export function SettingsCardOption({
         </div>
         <div className="flex items-center shrink-0 gap-2">
           {isSelected ? (
-            <div className="w-4 h-4 rounded-full border border-primary flex items-center justify-center shrink-0">
+            <div
+              aria-hidden="true"
+              className="w-4 h-4 rounded-full border border-primary flex items-center justify-center shrink-0"
+            >
               <div className="w-2.5 h-2.5 rounded-full bg-primary" />
             </div>
           ) : (
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {actions}
             </div>
           )}

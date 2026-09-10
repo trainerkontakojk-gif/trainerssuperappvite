@@ -4,6 +4,27 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { TelefunAuthGate } from "./server-auth.js";
 
+const telefunDbMocks = vi.hoisted(() => ({
+  chain: {
+    select: vi.fn(),
+    eq: vi.fn(),
+    maybeSingle: vi.fn(),
+    insert: vi.fn(),
+    single: vi.fn(),
+  },
+  from: vi.fn(),
+}));
+
+vi.mock("./env.js", () => ({
+  env: {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "service-role",
+  },
+}));
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => telefunDbMocks),
+}));
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const serverSource = readFileSync(join(__dirname, "server.ts"), "utf8");
 
@@ -73,6 +94,25 @@ describe("Telefun first-message auth gate", () => {
       reason: "Invalid Session",
     });
     expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("uses the self-only legacy fallback when no pre-created session ID is supplied", async () => {
+    const createSession = vi.fn(async () => "legacy-session");
+    const getOwnedSessionId = vi.fn();
+    const gate = new TelefunAuthGate({
+      verifyToken: vi.fn(async () => ({
+        success: true,
+        user: { id: "user-1" },
+      })),
+      getOwnedSessionId,
+      createSession,
+    });
+
+    await expect(
+      gate.authenticate({ type: "authenticate", token: "token-1" }),
+    ).resolves.toMatchObject({ ok: true, sessionId: "legacy-session" });
+    expect(createSession).toHaveBeenCalledWith("user-1");
+    expect(getOwnedSessionId).not.toHaveBeenCalled();
   });
 
   it("rejects parallel and duplicate authentication while producing only one success", async () => {
@@ -168,6 +208,59 @@ describe("Telefun first-message auth gate", () => {
     expect(
       sessionEndBranch.indexOf("configurationGate.dispose()"),
     ).toBeLessThan(sessionEndBranch.indexOf("drainCoordinator.startDrain()"));
+  });
+
+  it("validates the active actor and resolves participant data independently before insert", async () => {
+    telefunDbMocks.from.mockReturnValue(telefunDbMocks.chain);
+    telefunDbMocks.chain.select.mockReturnValue(telefunDbMocks.chain);
+    telefunDbMocks.chain.eq.mockReturnValue(telefunDbMocks.chain);
+    telefunDbMocks.chain.insert.mockReturnValue(telefunDbMocks.chain);
+    telefunDbMocks.chain.maybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: "actor-1",
+          role: "trainer",
+          full_name: "Trainer",
+          status: "active",
+          is_deleted: false,
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "participant-1",
+          nama: "Verified Participant",
+          batch_name: "Batch 1",
+          tim: "Team A",
+        },
+        error: null,
+      });
+    telefunDbMocks.chain.single.mockResolvedValueOnce({
+      data: { id: "session-1" },
+      error: null,
+    });
+
+    const { createSession } = await import("./db.js");
+    await expect(
+      createSession("actor-1", {
+        type: "participant",
+        participantId: "participant-1",
+        displayName: "Forged Participant",
+        batchName: "Forged Batch",
+        team: "Forged Team",
+      }),
+    ).resolves.toBe("session-1");
+
+    expect(telefunDbMocks.chain.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: "actor-1",
+        simulation_subject_type: "participant",
+        simulation_subject_peserta_id: "participant-1",
+        simulation_subject_name: "Verified Participant",
+        simulation_subject_batch_name: "Batch 1",
+        simulation_subject_team: "Team A",
+      }),
+    );
   });
 
   it("never logs a Gemini key suffix", () => {

@@ -24,6 +24,7 @@ import {
   KetikDimensionGuidanceList,
   KetikPriorityFixes,
 } from "../../../components/KetikEducationSections";
+import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 
 function getScoreGrade(score: number) {
   if (score >= 90)
@@ -230,6 +231,40 @@ export function SessionReviewModal({
         </header>
 
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+          {(() => {
+            const peserta = formatSimulationSubjectLabel(
+              session.simulationSubject,
+              {
+                includeParticipantDetails: true,
+                unknownLabel: "Peserta tidak tercatat — sesi lama",
+              },
+            );
+            return (
+              <div
+                className="grid grid-cols-1 gap-2 rounded-xl border p-3 text-sm sm:grid-cols-3"
+                aria-label="Atribusi simulasi"
+              >
+                <div>
+                  <span className="text-xs text-muted-foreground">
+                    Peserta:{" "}
+                  </span>
+                  {peserta}
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">
+                    Konsumen:{" "}
+                  </span>
+                  {session.consumerName}
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">
+                    Skenario:{" "}
+                  </span>
+                  {session.scenarioTitle}
+                </div>
+              </div>
+            );
+          })()}
           {review ? (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">

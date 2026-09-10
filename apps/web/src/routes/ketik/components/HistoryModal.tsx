@@ -13,6 +13,8 @@ import {
   Download,
 } from "lucide-react";
 import type { KetikSessionHistoryItem } from "@trainers/types";
+import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
+import { useAuthStore } from "../../../store/authStore";
 import { notify } from "../../../lib/toast";
 import { SessionReplayModal } from "./SessionReplayModal";
 
@@ -20,6 +22,18 @@ function downloadTranscript(session: KetikSessionHistoryItem) {
   const header = [
     "=== TRANSCRIPT SIMULASI KETIK ===",
     `Skema: ${session.scenarioTitle}`,
+    (() => {
+      try {
+        const em =
+          (useAuthStore.getState() as any)?.profile?.email ??
+          (useAuthStore.getState() as any)?.session?.user?.email;
+        if (em) return "Pelaksana: " + em;
+      } catch (_e) {
+        /* auth store unavailable in some contexts */
+      }
+      return "Pelaksana: (akun pemilik sesi)";
+    })(),
+    `Peserta: ${formatSimulationSubjectLabel(session.simulationSubject, { includeParticipantDetails: true })}`,
     `Konsumen: ${session.consumerName}${session.consumerPhone ? ` (${session.consumerPhone})` : ""}${session.consumerCity ? ` - ${session.consumerCity}` : ""}`,
     `Tanggal: ${new Date(session.date).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" })}`,
     session.simulationDuration
@@ -187,6 +201,9 @@ export function HistoryModal({
                         <h3 className="font-black text-base sm:text-lg text-foreground tracking-tight">
                           {session.scenarioTitle}
                         </h3>
+                        <p className="mt-1 max-w-[42ch] truncate text-xs font-medium text-muted-foreground">
+                          Target: Peserta: {formatSimulationSubjectLabel(session.simulationSubject, { includeParticipantDetails: true })}
+                        </p>
                         <div className="flex flex-wrap items-center gap-3 mt-1.5">
                           <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
                             <Calendar className="w-3.5 h-3.5" />

@@ -15,10 +15,12 @@ import type {
   KetikScenario,
   KetikQuickTemplate,
   PacingMeta,
+  SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { KETIK_PROMPT_LIMITS } from "@trainers/types";
 import { ketikApi } from "../ketikApi";
 import { shouldLogKetikGenerationError } from "../lib/ketik-error";
+import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 import {
   IMAGE_TAG_PATTERN,
   IMAGE_TAG_PATTERN_GLOBAL,
@@ -41,7 +43,10 @@ import {
   renderKetikMessageContent,
 } from "./chat/KetikMessageBubble";
 import { KetikImageLightbox } from "./chat/KetikImageLightbox";
-import { getKetikScenarioImages, getKetikScenarioImageAlts } from "./chat/ketikScenarioImages";
+import {
+  getKetikScenarioImages,
+  getKetikScenarioImageAlts,
+} from "./chat/ketikScenarioImages";
 
 interface ChatInterfaceProps {
   config: KetikSessionConfig;
@@ -54,10 +59,17 @@ interface ChatInterfaceProps {
   currentUserId?: string;
   templates?: KetikQuickTemplate[];
   signatureName?: string;
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
 const MAINTENANCE_TEMPLATE =
   "Demikian informasi yang dapat kami sampaikan. Apakah informasinya sudah cukup jelas? Ada hal lain yang dapat kami bantu?";
+
+function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  const safeText = /^\s*[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+}
 
 export function ChatInterface({
   config,
@@ -70,6 +82,7 @@ export function ChatInterface({
   currentUserId,
   templates = [],
   signatureName = "",
+  simulationSubject = null,
 }: ChatInterfaceProps) {
   const durationMinutes = config.simulationDuration || 5;
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
@@ -608,8 +621,23 @@ export function ChatInterface({
               <button
                 type="button"
                 onClick={() => {
+                  const subject = simulationSubject;
+                  const targetLabel = formatSimulationSubjectLabel(subject);
+                  const unavailableRecord =
+                    subject?.type === "participant" && !subject.participantId
+                      ? "Tidak lagi tersedia"
+                      : "Tersedia";
                   const csvContent = [
-                    "Pengirim,Pesan,Waktu",
+                    [
+                      "Pengirim",
+                      "Pesan",
+                      "Waktu",
+                      "Target",
+                      "Batch",
+                      "Tim",
+                      "Pelaksana",
+                      "Record Peserta",
+                    ].join(","),
                     ...messages.map((message) => {
                       const sender =
                         message.sender === "agent"
@@ -617,10 +645,24 @@ export function ChatInterface({
                           : message.sender === "consumer"
                             ? "Konsumen"
                             : "Sistem";
-                      const text = message.text.replace(/"/g, '""');
                       const time = new Date(message.timestamp).toLocaleString();
 
-                      return `"${sender}","${text}","${time}"`;
+                      return [
+                        sender,
+                        message.text,
+                        time,
+                        targetLabel,
+                        subject?.type === "participant"
+                          ? subject.batchName || ""
+                          : "",
+                        subject?.type === "participant"
+                          ? subject.team || ""
+                          : "",
+                        currentUserId || "Akun pemilik sesi",
+                        unavailableRecord,
+                      ]
+                        .map(csvCell)
+                        .join(",");
                     }),
                   ].join("\r\n");
                   const blob = new Blob(["\uFEFF", csvContent], {
@@ -816,9 +858,7 @@ export function ChatInterface({
               <div
                 id="ketik-char-counter"
                 className={`flex items-center justify-end gap-1 px-1 pt-1 text-xs font-medium tabular-nums ${
-                  isOverLimit
-                    ? "text-red-500"
-                    : "text-muted-foreground"
+                  isOverLimit ? "text-red-500" : "text-muted-foreground"
                 }`}
                 role="status"
                 aria-live="polite"
@@ -837,8 +877,8 @@ export function ChatInterface({
                   aria-live="assertive"
                 >
                   <span>
-                    Pesan terlalu panjang ({charCount.toLocaleString()} karakter).
-                    Maksimum {maxChars.toLocaleString()} karakter.
+                    Pesan terlalu panjang ({charCount.toLocaleString()}{" "}
+                    karakter). Maksimum {maxChars.toLocaleString()} karakter.
                   </span>
                 </div>
               )}

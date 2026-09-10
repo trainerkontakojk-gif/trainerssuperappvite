@@ -23,12 +23,29 @@ import {
   PdktDimensionTip,
   PdktSuggestedRewriteCard,
 } from "../../../components/PdktEducationSections";
+import { getSimulationSubjectMeta } from "../utils/formatting";
 
 function formatTime(seconds: number) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   if (mins === 0) return `${secs} detik`;
   return `${mins} menit ${secs} detik`;
+}
+
+function reviewStatusLabel(
+  status: PdktMonitoringReview["review_status"] | undefined,
+): string {
+  switch (status) {
+    case "completed":
+      return "Selesai";
+    case "processing":
+    case "pending":
+      return "Memproses";
+    case "failed":
+      return "Gagal";
+    default:
+      return "Belum dinilai";
+  }
 }
 
 export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
@@ -59,8 +76,15 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <Loader2 className="w-6 h-6 text-module-pdkt animate-spin" />
+      <div
+        className="flex flex-col items-center justify-center py-12 gap-3"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2
+          className="w-6 h-6 text-module-pdkt animate-spin motion-reduce:animate-none"
+          aria-hidden="true"
+        />
         <p className="text-xs text-muted-foreground font-medium">
           Memuat data evaluasi AI...
         </p>
@@ -70,12 +94,19 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <AlertTriangle className="w-6 h-6 text-destructive" />
+      <div
+        className="flex flex-col items-center justify-center py-12 gap-3"
+        role="alert"
+      >
+        <AlertTriangle
+          className="w-6 h-6 text-destructive"
+          aria-hidden="true"
+        />
         <p className="text-xs text-destructive font-medium">{error}</p>
         <button
+          type="button"
           onClick={fetchEvaluation}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-pdkt/10 text-module-pdkt text-[10px] font-bold hover:bg-module-pdkt/20 transition-all"
+          className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-pdkt/10 text-module-pdkt text-xs font-bold hover:bg-module-pdkt/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-pdkt"
         >
           <RefreshCw size={10} />
           Coba Lagi
@@ -112,7 +143,11 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
           value: scoreBreakdown.clarityScore,
           dimension: "clarity" as const,
         },
-        { label: "Typo", value: scoreBreakdown.typoScore, dimension: "typo" as const },
+        {
+          label: "Typo",
+          value: scoreBreakdown.typoScore,
+          dimension: "typo" as const,
+        },
         {
           label: "Template",
           value: scoreBreakdown.templateComplianceScore,
@@ -121,13 +156,64 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
       ]
     : [];
 
+  const subject = getSimulationSubjectMeta(data?.simulationSubject);
+
   return (
     <div className="space-y-6">
+      <section
+        className="rounded-xl border border-border bg-muted/20 p-4"
+        aria-label="Atribusi review PDKT"
+      >
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Target
+            </div>
+            <div className="mt-1 font-semibold text-foreground">
+              {subject.label}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Batch
+            </div>
+            <div className="mt-1 font-semibold text-foreground">
+              {subject.batch || "Tidak tersedia"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Tim
+            </div>
+            <div className="mt-1 font-semibold text-foreground">
+              {subject.team || "Tidak tersedia"}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Pelaksana
+            </div>
+            <div className="mt-1 font-semibold text-foreground">
+              {data?.user_email || "Tidak tersedia"}
+              {data?.user_role ? ` · ${data.user_role}` : ""}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Status
+            </div>
+            <div className="mt-1 font-semibold text-foreground">
+              {reviewStatusLabel(data?.review_status)}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Email Thread — Primary ─────────────────────────── */}
       {hasEmails && (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <Mail className="w-4 h-4 text-module-pdkt" />
+            <Mail className="w-4 h-4 text-module-pdkt" aria-hidden="true" />
             <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
               Thread Email ({emails.length} pesan)
             </h3>
@@ -151,9 +237,17 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
                   >
                     <div className="flex items-center gap-2 mb-2">
                       {isResponse ? (
-                        <Send size={10} className="text-primary" />
+                        <Send
+                          size={10}
+                          className="text-primary"
+                          aria-hidden="true"
+                        />
                       ) : (
-                        <Inbox size={10} className="text-module-pdkt" />
+                        <Inbox
+                          size={10}
+                          className="text-module-pdkt"
+                          aria-hidden="true"
+                        />
                       )}
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
@@ -162,7 +256,9 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
                             : "bg-module-pdkt/10 text-module-pdkt"
                         }`}
                       >
-                        {isResponse ? "Balasan Anda (Agen)" : "Email Masuk (Konsumen)"}
+                        {isResponse
+                          ? "Balasan Anda (Agen)"
+                          : "Email Masuk (Konsumen)"}
                       </span>
                     </div>
                     {email.subject && (
@@ -195,7 +291,9 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
               {data?.time_taken != null && (
                 <p className="text-[10px] text-muted-foreground font-bold mt-1">
                   Selesai dikerjakan dalam{" "}
-                  <span className="text-foreground">{formatTime(data.time_taken)}</span>
+                  <span className="text-foreground">
+                    {formatTime(data.time_taken)}
+                  </span>
                 </p>
               )}
             </div>
@@ -236,20 +334,27 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="p-4 rounded-xl border border-border bg-muted/20">
               <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-chart-red">
-                <AlertCircle size={12} />
+                <AlertCircle size={12} aria-hidden="true" />
                 Typo / Salah Ketik
               </h4>
               {evaluation.typos && evaluation.typos.length > 0 ? (
                 <ul className="space-y-1.5 list-disc list-inside">
                   {evaluation.typos.map((typo, idx) => (
-                    <li key={idx} className="text-xs text-foreground leading-relaxed font-medium">
+                    <li
+                      key={idx}
+                      className="text-xs text-foreground leading-relaxed font-medium"
+                    >
                       {typo}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="text-xs text-muted-foreground italic font-medium flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-chart-green" />
+                  <CheckCircle2
+                    size={12}
+                    className="text-chart-green"
+                    aria-hidden="true"
+                  />
                   Tidak ditemukan typo.
                 </p>
               )}
@@ -257,20 +362,28 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
             <div className="p-4 rounded-xl border border-border bg-muted/20">
               <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-                <MessageSquare size={12} />
+                <MessageSquare size={12} aria-hidden="true" />
                 Kejelasan Kalimat
               </h4>
-              {evaluation.clarityIssues && evaluation.clarityIssues.length > 0 ? (
+              {evaluation.clarityIssues &&
+              evaluation.clarityIssues.length > 0 ? (
                 <ul className="space-y-1.5 list-disc list-inside">
                   {evaluation.clarityIssues.map((issue, idx) => (
-                    <li key={idx} className="text-xs text-foreground leading-relaxed font-medium">
+                    <li
+                      key={idx}
+                      className="text-xs text-foreground leading-relaxed font-medium"
+                    >
                       {issue}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="text-xs text-muted-foreground italic font-medium flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-chart-green" />
+                  <CheckCircle2
+                    size={12}
+                    className="text-chart-green"
+                    aria-hidden="true"
+                  />
                   Kalimat sudah jelas.
                 </p>
               )}
@@ -278,20 +391,27 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
             <div className="p-4 rounded-xl border border-border bg-muted/20">
               <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-module-pdkt">
-                <BookOpen size={12} />
+                <BookOpen size={12} aria-hidden="true" />
                 Relevansi Solusi
               </h4>
               {evaluation.contentGaps && evaluation.contentGaps.length > 0 ? (
                 <ul className="space-y-1.5 list-disc list-inside">
                   {evaluation.contentGaps.map((gap, idx) => (
-                    <li key={idx} className="text-xs text-foreground leading-relaxed font-medium">
+                    <li
+                      key={idx}
+                      className="text-xs text-foreground leading-relaxed font-medium"
+                    >
                       {gap}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="text-xs text-muted-foreground italic font-medium flex items-center gap-1.5">
-                  <CheckCircle2 size={12} className="text-chart-green" />
+                  <CheckCircle2
+                    size={12}
+                    className="text-chart-green"
+                    aria-hidden="true"
+                  />
                   Jawaban relevan.
                 </p>
               )}
@@ -299,7 +419,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
 
             <div className="p-4 rounded-xl border border-border bg-muted/20">
               <h4 className="mb-3 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-                <MessageSquare size={12} />
+                <MessageSquare size={12} aria-hidden="true" />
                 Masukan
               </h4>
               <p className="text-xs text-foreground font-medium leading-relaxed italic">
@@ -323,7 +443,10 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
         !loading && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center">
-              <BookOpen className="w-7 h-7 text-muted-foreground" />
+              <BookOpen
+                className="w-7 h-7 text-muted-foreground"
+                aria-hidden="true"
+              />
             </div>
             <p className="text-sm font-bold text-muted-foreground">
               Evaluasi AI belum tersedia

@@ -41,8 +41,10 @@ vi.mock("../lib/supabase", () => ({
           return chain;
         },
         order: (col: string, _opts?: any) => {
-          if (table === "ketik_history" && !capturedKetikOrder) capturedKetikOrder = col;
-          if (table === "telefun_history" && !capturedTelefunOrder) capturedTelefunOrder = col;
+          if (table === "ketik_history" && !capturedKetikOrder)
+            capturedKetikOrder = col;
+          if (table === "telefun_history" && !capturedTelefunOrder)
+            capturedTelefunOrder = col;
           return chain;
         },
         limit: () => chain,
@@ -56,16 +58,30 @@ vi.mock("../lib/supabase", () => ({
         rangeFrom: 0,
         rangeTo: 199,
         then: (resolve: any) => {
-          const rows = table === "ketik_history" ? mockKetikData
-            : table === "pdkt_history" ? mockPdktData
-            : table === "telefun_history" ? mockTelefunHistoryData
-            : table === "results" ? mockTelefunResultsData
-            : table === "profiles" ? mockProfiles
-            : [];
+          const rows =
+            table === "ketik_history"
+              ? mockKetikData
+              : table === "pdkt_history"
+                ? mockPdktData
+                : table === "telefun_history"
+                  ? mockTelefunHistoryData
+                  : table === "results"
+                    ? mockTelefunResultsData
+                    : table === "profiles"
+                      ? mockProfiles
+                      : [];
           const errorAt = sourceErrors.get(table);
-          resolve(errorAt === chain.rangeFrom
-            ? { data: null, error: { message: `page ${chain.rangeFrom} failed` } }
-            : { data: rows.slice(chain.rangeFrom, chain.rangeTo + 1), error: null });
+          resolve(
+            errorAt === chain.rangeFrom
+              ? {
+                  data: null,
+                  error: { message: `page ${chain.rangeFrom} failed` },
+                }
+              : {
+                  data: rows.slice(chain.rangeFrom, chain.rangeTo + 1),
+                  error: null,
+                },
+          );
         },
       };
       return chain;
@@ -122,6 +138,61 @@ describe("getMonitoringHistory — Telefun schema alignment", () => {
     expect(tf!.score).toBe(8.5);
   });
 
+  it("projects PDKT subject snapshot, actor, and review status without a participant lookup", async () => {
+    const row = {
+      id: "pdkt-attributed",
+      user_id: "user-a",
+      timestamp: "2026-05-22T14:00:00Z",
+      config: {
+        scenarios: [
+          {
+            id: "s1",
+            category: "cat",
+            title: "Skenario",
+            description: "Desc",
+            isActive: true,
+          },
+        ],
+        consumerType: { id: "ct1", name: "Ramah", description: "Desc" },
+        identity: {
+          name: "Budi",
+          email: "budi@example.com",
+          city: "Jakarta",
+          bodyName: "Budi",
+        },
+      },
+      emails: [],
+      evaluation: null,
+      evaluation_status: "processing",
+      evaluation_error: null,
+      time_taken: 30,
+      simulation_subject_type: "participant",
+      simulation_subject_peserta_id: "123e4567-e89b-12d3-a456-426614174000",
+      simulation_subject_name: "Andi",
+      simulation_subject_batch_name: "Batch 12",
+      simulation_subject_team: "Tim Alpha",
+    };
+    mockPdktData.push(row);
+    try {
+      const result = await getMonitoringHistory();
+      const pdkt = result.find((entry) => entry.id === row.id);
+      expect(pdkt).toMatchObject({
+        user_email: "a@test.com",
+        user_role: "agent",
+        review_status: "processing",
+        simulationSubject: {
+          type: "participant",
+          participantId: row.simulation_subject_peserta_id,
+          displayName: "Andi",
+          batchName: "Batch 12",
+          team: "Tim Alpha",
+        },
+      });
+    } finally {
+      mockPdktData.pop();
+    }
+  });
+
   it("returns 200-like shape when KETIK, PDKT, and results are empty", async () => {
     const result = await getMonitoringHistory();
 
@@ -143,17 +214,21 @@ describe("getMonitoringHistory — Telefun schema alignment", () => {
 
   it("pages past the first 200 source rows", async () => {
     const original = mockKetikData.splice(0, mockKetikData.length);
-    mockKetikData.push(...Array.from({ length: 201 }, (_, index) => ({
-      id: `ketik-${index}`,
-      user_id: "user-a",
-      date: `2026-05-${String((index % 28) + 1).padStart(2, "0")}T10:00:00Z`,
-      scenario_title: "Paged",
-      messages: [],
-      final_score: null,
-    })));
+    mockKetikData.push(
+      ...Array.from({ length: 201 }, (_, index) => ({
+        id: `ketik-${index}`,
+        user_id: "user-a",
+        date: `2026-05-${String((index % 28) + 1).padStart(2, "0")}T10:00:00Z`,
+        scenario_title: "Paged",
+        messages: [],
+        final_score: null,
+      })),
+    );
     try {
       const result = await getMonitoringHistory();
-      expect(result.filter((entry) => entry.module === "ketik")).toHaveLength(201);
+      expect(result.filter((entry) => entry.module === "ketik")).toHaveLength(
+        201,
+      );
     } finally {
       mockKetikData.splice(0, mockKetikData.length, ...original);
     }
@@ -162,35 +237,88 @@ describe("getMonitoringHistory — Telefun schema alignment", () => {
   it("rebuilds hold from system metrics and does not adjust the cached overall score twice", () => {
     const assessment = {
       overallScore: 8,
-      speakingRate: { score: 8, verdict: "Baik", feedback: "ok", wordsPerMinute: 120 },
+      speakingRate: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "ok",
+        wordsPerMinute: 120,
+      },
       intonation: { score: 8, verdict: "Baik", feedback: "ok" },
       articulation: { score: 8, verdict: "Baik", feedback: "ok" },
-      fillerWords: { score: 8, verdict: "Baik", feedback: "ok", count: 1, examples: [] },
-      emotionalTone: { score: 8, verdict: "Baik", feedback: "ok", dominant: "netral" },
-      transcript: "", highlights: [], strengths: [],
-      holdManagement: { status: "within_limit", score: 10, verdict: "Baik", feedback: "cached", holdCount: 1, totalDurationMs: 1, longestDurationMs: 1, exceededCount: 0 },
+      fillerWords: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "ok",
+        count: 1,
+        examples: [],
+      },
+      emotionalTone: {
+        score: 8,
+        verdict: "Baik",
+        feedback: "ok",
+        dominant: "netral",
+      },
+      transcript: "",
+      highlights: [],
+      strengths: [],
+      holdManagement: {
+        status: "within_limit",
+        score: 10,
+        verdict: "Baik",
+        feedback: "cached",
+        holdCount: 1,
+        totalDurationMs: 1,
+        longestDurationMs: 1,
+        exceededCount: 0,
+      },
     };
-    const result = normalizeTelefunAssessmentWithHold(assessment, { hold: { intervals: [{ sequence: 1, startedAtMs: 0, endedAtMs: 61000 }] } });
+    const result = normalizeTelefunAssessmentWithHold(assessment, {
+      hold: { intervals: [{ sequence: 1, startedAtMs: 0, endedAtMs: 61000 }] },
+    });
     expect(result?.holdManagement?.status).toBe("exceeded");
     expect(result?.overallScore).toBe(8);
-    expect(normalizeTelefunAssessmentWithHold(assessment, null)?.holdManagement?.status).toBe("not_used");
+    expect(
+      normalizeTelefunAssessmentWithHold(assessment, null)?.holdManagement
+        ?.status,
+    ).toBe("not_used");
   });
 
   it("drops malformed PDKT nested values and keeps valid historical evaluation without breakdown", () => {
     expect(normalizePdktConfig({ identity: { name: "partial" } })).toBeNull();
     expect(normalizePdktEmails([{ id: "bad", body: "ok" }])).toEqual([]);
-    expect(normalizePdktEvaluation({ score: 80, feedback: "ok", typos: [], clarityIssues: [], contentGaps: [], scoreBreakdown: { bad: true } })).toEqual({ score: 80, feedback: "ok", typos: [], clarityIssues: [], contentGaps: [] });
+    expect(
+      normalizePdktEvaluation({
+        score: 80,
+        feedback: "ok",
+        typos: [],
+        clarityIssues: [],
+        contentGaps: [],
+        scoreBreakdown: { bad: true },
+      }),
+    ).toEqual({
+      score: 80,
+      feedback: "ok",
+      typos: [],
+      clarityIssues: [],
+      contentGaps: [],
+    });
   });
 
   it("fails closed when a later source page errors", async () => {
     const original = mockPdktData.splice(0, mockPdktData.length);
-    mockPdktData.push(...Array.from({ length: 201 }, (_, index) => ({
-      id: `pdkt-${index}`,
-      user_id: "user-a",
-      timestamp: "2026-05-21T14:00:00Z",
-      config: {}, emails: [], evaluation: null,
-      evaluation_status: "pending", evaluation_error: null, time_taken: null,
-    })));
+    mockPdktData.push(
+      ...Array.from({ length: 201 }, (_, index) => ({
+        id: `pdkt-${index}`,
+        user_id: "user-a",
+        timestamp: "2026-05-21T14:00:00Z",
+        config: {},
+        emails: [],
+        evaluation: null,
+        evaluation_status: "pending",
+        evaluation_error: null,
+        time_taken: null,
+      })),
+    );
     sourceErrors.set("pdkt_history", 200);
     try {
       await expect(getMonitoringHistory()).rejects.toThrow("pdkt_history");

@@ -19,6 +19,10 @@ import {
   type ScoringWorkerBoundary,
   type ScoringWorkerRuntime,
 } from "./workers/telefun-scoring-worker-runtime";
+import {
+  startPdktMailboxSubjectIntentCleanup,
+  type PdktMailboxSubjectIntentCleanupHandle,
+} from "./services/pdkt/mailbox-subject-intent-cleanup";
 
 type ServeFetch = Parameters<typeof serve>[0]["fetch"];
 
@@ -37,6 +41,7 @@ export interface ApiRuntimeOptions {
   ) => { close: (cb?: (err?: Error) => void) => void };
   onSignal?: (signal: "SIGTERM" | "SIGINT", handler: () => void) => void;
   setExitCode?: (code: number) => void;
+  subjectIntentCleanup?: PdktMailboxSubjectIntentCleanupHandle;
 }
 
 export interface ApiRuntime {
@@ -64,6 +69,9 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
     log(`[API] Server running on http://localhost:${info.port}`);
   });
 
+  const subjectIntentCleanup =
+    options.subjectIntentCleanup ?? startPdktMailboxSubjectIntentCleanup();
+
   const handle = startEmbeddedTelefunScoringWorker({
     env: processEnv,
     boundary: options.boundary,
@@ -82,6 +90,7 @@ export function startApiRuntime(options: ApiRuntimeOptions): ApiRuntime {
   let shutdownPromise: Promise<void> | null = null;
   let shutdownStarted = false;
   async function shutdown(): Promise<void> {
+    subjectIntentCleanup.stop();
     if (worker) await worker.shutdown();
     await new Promise<void>((resolve, reject) => {
       server.close((err?: Error) => {

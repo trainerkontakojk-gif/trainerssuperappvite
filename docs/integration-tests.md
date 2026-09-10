@@ -19,6 +19,7 @@ bash scripts/integration/supabase-bootstrap.sh
 ```
 
 This will:
+
 - Check Docker is running
 - Stop any conflicting Supabase instances
 - Start Supabase (excluding storage-api for stability)
@@ -38,14 +39,14 @@ pnpm --filter @trainers/api test:db-integration
 
 ### Files
 
-| File | Purpose |
-|------|---------|
-| `scripts/integration/supabase-bootstrap.sh` | Bootstrap script for Supabase |
-| `apps/api/.env.integration` | Auto-generated env vars (gitignored) |
-| `apps/api/src/__tests__/helpers/db-integration-client.ts` | Client helpers (service_role, anon, authenticated) |
-| `apps/api/src/__tests__/fixtures/pdkt-mailbox-fixtures.ts` | Fixture data (scenario, config, inbound email) |
-| `apps/api/src/__tests__/pdkt-mailbox-rpc-integration.integration.test.ts` | RPC integration tests (17 test cases) |
-| `apps/api/vitest.config.db-integration.ts` | Vitest config for integration tier |
+| File                                                                      | Purpose                                            |
+| ------------------------------------------------------------------------- | -------------------------------------------------- |
+| `scripts/integration/supabase-bootstrap.sh`                               | Bootstrap script for Supabase                      |
+| `apps/api/.env.integration`                                               | Auto-generated env vars (gitignored)               |
+| `apps/api/src/__tests__/helpers/db-integration-client.ts`                 | Client helpers (service_role, anon, authenticated) |
+| `apps/api/src/__tests__/fixtures/pdkt-mailbox-fixtures.ts`                | Fixture data (scenario, config, inbound email)     |
+| `apps/api/src/__tests__/pdkt-mailbox-rpc-integration.integration.test.ts` | RPC integration tests (17 test cases)              |
+| `apps/api/vitest.config.db-integration.ts`                                | Vitest config for integration tier                 |
 
 ### Test Tier Isolation
 
@@ -68,6 +69,7 @@ supabase start -x storage-api,imgproxy
 ### Auth service errors
 
 The auth service may need a restart after schema changes:
+
 ```bash
 docker restart supabase_auth_trainerssuperappvite
 ```
@@ -75,6 +77,7 @@ docker restart supabase_auth_trainerssuperappvite
 ### Port conflicts
 
 If ports 54321/54322 are already allocated, another Supabase project may be running:
+
 ```bash
 supabase stop --project-id trainers-superapp-next
 ```
@@ -90,11 +93,13 @@ pnpm test:db-integration
 ## Covered Scenarios
 
 ### submit_pdkt_mailbox_batch
+
 - Happy path: inserts full mailbox item with all fields
 - Idempotency: same `client_request_id` + creator returns existing item
 - Unauthorized: anon client is rejected
 
 ### submit_pdkt_mailbox_reply
+
 - Atomic: history row created + mailbox updated in one RPC
 - Idempotent: second reply returns same history_id
 - Deleted mailbox: rejected with error
@@ -102,6 +107,7 @@ pnpm test:db-integration
 - Unauthorized: anon client is rejected
 
 ### soft_delete_pdkt_mailbox_item
+
 - Owner delete: agent can delete own item
 - Admin delete: trainer can delete anyone's item
 - Leader restriction: leader cannot delete another user's item
@@ -109,5 +115,12 @@ pnpm test:db-integration
 - Unauthorized: anon client is rejected
 
 ### RPC Signature & Grants
+
 - Return types verified (UUID, VOID)
 - Authenticated role grant: all three RPCs executable by authenticated user
+
+## Simulation Subject Attribution
+
+- Disposable PG (`simulation-subject-rpc.integration.test.ts`): unknown all-null allowed, partial-null rejected, self+FK rejected, FK delete SET NULL preserves snapshot, immutable trigger rejects attribution change but allows scoring/status updates.
+- PostgREST/JWT/RLS signature resolution untuk RPC baru membutuhkan local Supabase (Docker). Jika Docker down, tandai BLOCKED bukan DONE; jangan klaim bukti dari mock.
+- Overload tidak didukung PostgREST (PGRST203) — RPC baru memakai nama unik `submit_pdkt_mailbox_batch_with_subject`.

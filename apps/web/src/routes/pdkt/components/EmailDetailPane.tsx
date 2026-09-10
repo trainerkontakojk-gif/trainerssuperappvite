@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Reply,
   Trash2,
@@ -27,6 +27,7 @@ import {
   getPdfBlob,
   isPdfAttachment,
 } from "../utils/detectMimeType";
+import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 
 interface EmailDetailPaneProps {
   item: PdktMailboxItem;
@@ -34,7 +35,13 @@ interface EmailDetailPaneProps {
   onDelete: () => void;
   isComposerOpen?: boolean;
   evaluation: any | null;
-  evaluationStatus: "pending" | "processing" | "completed" | "failed" | null;
+  evaluationStatus:
+    | "not_started"
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed"
+    | null;
   evaluationError: string | null;
   onRetryEval: () => void;
   onBackToList?: () => void;
@@ -53,6 +60,31 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
 }) => {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const zoomCloseButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!zoomedImage) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => {
+      zoomCloseButtonRef.current?.focus();
+    });
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setZoomedImage(null);
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        zoomCloseButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleDialogKeyDown);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [zoomedImage]);
 
   const evalStatus = evaluationStatus;
   const evalData = evaluation;
@@ -80,7 +112,11 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
           value: scoreBreakdown.clarityScore,
           dimension: "clarity" as const,
         },
-        { label: "Typo", value: scoreBreakdown.typoScore, dimension: "typo" as const },
+        {
+          label: "Typo",
+          value: scoreBreakdown.typoScore,
+          dimension: "typo" as const,
+        },
         {
           label: "Template",
           value: scoreBreakdown.templateComplianceScore,
@@ -123,11 +159,21 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
     return `Dibuat oleh ${creator.full_name}${role}`;
   };
 
+  const subjectLabel = (() => {
+    if (item.simulationSubject?.type === "self") {
+      return "Untuk diri sendiri saat membalas";
+    }
+    return formatSimulationSubjectLabel(item.simulationSubject, {
+      includeParticipantDetails: true,
+    });
+  })();
+
   // Safe check for emails_thread
   const thread = Array.isArray(item.emails_thread) ? item.emails_thread : [];
   const historyEmails = thread.slice(1);
   const isEvaluationProcessing =
     evalStatus === "processing" || evalStatus === "pending";
+  const isEvaluationNotStarted = evalStatus === "not_started";
   const isEvaluationFailed = evalStatus === "failed";
 
   // Extract inbound email fields safely
@@ -180,14 +226,25 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       {zoomedImage && (
         <div
           className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 cursor-pointer transition-opacity"
-          onClick={() => setZoomedImage(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pratinjau lampiran"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setZoomedImage(null);
+          }}
         >
           <img
             src={zoomedImage}
             alt="Zoomed Attachment"
             className="max-w-full max-h-full rounded-xl object-contain ring-1 ring-white/10"
           />
-          <button className="absolute top-6 right-6 text-white/80 hover:text-white transition-colors">
+          <button
+            ref={zoomCloseButtonRef}
+            type="button"
+            onClick={() => setZoomedImage(null)}
+            aria-label="Tutup pratinjau lampiran"
+            className="absolute top-6 right-6 min-h-11 min-w-11 text-white/80 hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
             <X className="w-8 h-8" />
           </button>
         </div>
@@ -198,8 +255,9 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
         <div className="flex items-center gap-3">
           {onBackToList && (
             <button
+              type="button"
               onClick={onBackToList}
-              className="min-w-10 min-h-10 -ml-2 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-colors md:hidden mr-1"
+              className="min-w-11 min-h-11 -ml-2 flex items-center justify-center hover:bg-[var(--bg)] rounded-lg transition-colors md:hidden mr-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
               title="Kembali ke Daftar Email"
               aria-label="Kembali ke Daftar Email"
             >
@@ -212,7 +270,10 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
             </span>
             {item.status === "replied" && (
               <div className="flex items-center gap-1.5 mt-0.5">
-                <div className="w-1.5 h-1.5 bg-[var(--chart-green)] rounded-full" />
+                <div
+                  aria-hidden="true"
+                  className="w-1.5 h-1.5 bg-[var(--chart-green)] rounded-full"
+                />
                 <span className="font-semibold text-xs text-[var(--chart-green)]">
                   Telah Dibalas
                 </span>
@@ -224,8 +285,9 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
         <div className="flex items-center gap-2">
           {item.status === "open" && (
             <button
+              type="button"
               onClick={onReply}
-              className="min-w-10 min-h-10 text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--bg)] rounded-lg transition-all flex items-center justify-center"
+              className="min-w-11 min-h-11 text-[var(--fg2)] hover:text-[var(--fg)] hover:bg-[var(--bg)] rounded-lg transition-all flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
               title="Balas"
               aria-label="Balas"
             >
@@ -233,9 +295,15 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
             </button>
           )}
           <button
+            type="button"
             onClick={onDelete}
             disabled={item.permissions?.can_delete === false}
-            className={`p-2 rounded-xl transition-all ${
+            aria-label={
+              item.permissions?.can_delete === false
+                ? "Tidak memiliki izin menghapus"
+                : "Hapus email"
+            }
+            className={`min-h-11 min-w-11 p-2 rounded-xl transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)] ${
               item.permissions?.can_delete === false
                 ? "text-[var(--fg3)] opacity-40 cursor-not-allowed"
                 : "text-[var(--fg2)] hover:bg-[var(--bg)] hover:text-[var(--destructive)]"
@@ -274,8 +342,30 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                 <div className="text-xs text-[var(--fg2)] truncate">
                   {item.sender_email}
                 </div>
-                <div className="text-[11px] text-[var(--fg3)] mt-1">
-                  {formatCreatorLabel(item)}
+                <div
+                  className="mt-2 grid gap-x-3 gap-y-1 text-[11px] text-[var(--fg2)] sm:grid-cols-2"
+                  aria-label="Target simulasi"
+                >
+                  <span>
+                    <span className="text-[var(--fg3)]">Target: </span>
+                    {subjectLabel}
+                  </span>
+                  <span>
+                    <span className="text-[var(--fg3)]">Pelaksana: </span>
+                    {formatCreatorLabel(item)}
+                  </span>
+                  {item.simulationSubject?.type === "participant" && (
+                    <>
+                      <span>
+                        <span className="text-[var(--fg3)]">Batch: </span>
+                        {item.simulationSubject.batchName || "Tidak tersedia"}
+                      </span>
+                      <span>
+                        <span className="text-[var(--fg3)]">Tim: </span>
+                        {item.simulationSubject.team || "Tidak tersedia"}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="text-[11px] font-medium text-[var(--fg2)] bg-[var(--bg)] border border-[var(--border)] px-2 py-1 rounded-md whitespace-nowrap">
@@ -331,9 +421,15 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
           <div className="mt-8 pt-6 border-t border-[var(--border)]">
             {isEvaluationProcessing ? (
               <div className="flex flex-col items-center justify-center p-8 bg-[var(--bg)] rounded-xl border border-[var(--border)]">
-                <Loader2 className="w-8 h-8 text-[var(--module-pdkt)] animate-spin mb-3" />
-                <p className="text-xs font-semibold text-[var(--module-pdkt)] animate-pulse">
+                <Loader2 className="w-8 h-8 text-[var(--module-pdkt)] animate-spin motion-reduce:animate-none mb-3" />
+                <p className="text-xs font-semibold text-[var(--module-pdkt)] animate-pulse motion-reduce:animate-none">
                   Menganalisis Jawaban...
+                </p>
+              </div>
+            ) : isEvaluationNotStarted ? (
+              <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--bg)]">
+                <p className="text-xs font-medium text-[var(--fg2)]">
+                  Evaluasi belum dimulai.
                 </p>
               </div>
             ) : isEvaluationFailed ? (
@@ -346,8 +442,9 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                     </h3>
                   </div>
                   <button
+                    type="button"
                     onClick={handleRetryEval}
-                    className="flex items-center gap-1.5 min-h-9 px-3 rounded-lg border border-[var(--border)] text-[var(--fg)] text-xs font-medium hover:bg-[var(--surface)] transition-all"
+                    className="flex min-h-11 items-center gap-1.5 px-3 rounded-lg border border-[var(--border)] text-xs font-medium text-[var(--fg)] hover:bg-[var(--surface)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                   >
                     <RotateCcw className="w-3 h-3" />
                     Coba Lagi
@@ -505,8 +602,11 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
             {historyEmails.length > 0 && (
               <div className="mt-8 pt-6 border-t border-[var(--border)]">
                 <button
+                  type="button"
                   onClick={() => setShowHistory(!showHistory)}
-                  className="flex items-center gap-2 text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] transition-colors mb-4"
+                  aria-expanded={showHistory}
+                  aria-controls="pdkt-thread-history"
+                  className="flex min-h-11 items-center gap-2 text-xs font-semibold text-[var(--fg2)] hover:text-[var(--fg)] transition-colors mb-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                 >
                   Riwayat Percakapan ({historyEmails.length})
                   {showHistory ? (
@@ -517,7 +617,7 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
                 </button>
 
                 {showHistory && (
-                  <div className="space-y-4">
+                  <div id="pdkt-thread-history" className="space-y-4">
                     {historyEmails.map((email: any, idx: number) => (
                       <div
                         key={idx}
@@ -557,8 +657,9 @@ export const EmailDetailPane: React.FC<EmailDetailPaneProps> = ({
       {item.status === "open" && !isComposerOpen && (
         <div className="px-6 py-3 border-t border-[var(--border)] shrink-0 bg-[var(--bg)]">
           <button
+            type="button"
             onClick={onReply}
-            className="flex items-center gap-2 min-h-10 px-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] font-semibold text-xs hover:bg-[var(--bg)] active:scale-95 transition-all"
+            className="flex min-h-11 items-center gap-2 px-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--fg)] hover:bg-[var(--bg)] active:scale-95 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
           >
             <Reply className="w-3.5 h-3.5" />
             Balas

@@ -3,7 +3,9 @@ import { TEXT_MODELS } from "../../pdktSettings";
 
 export interface PdktSystemTabProps {
   writingStyleMode: "realistic" | "training";
-  setWritingStyleMode: React.Dispatch<React.SetStateAction<"realistic" | "training">>;
+  setWritingStyleMode: React.Dispatch<
+    React.SetStateAction<"realistic" | "training">
+  >;
   selectedModel: string;
   setSelectedModel: React.Dispatch<React.SetStateAction<string>>;
 }
@@ -17,7 +19,7 @@ export function PdktSystemTab({
   return (
     <div className="space-y-6 mt-4">
       {/* Header Banner */}
-      <div className="bg-primary/5 border-l-2 border-primary p-4 rounded-r-xl relative overflow-hidden group backdrop-blur-sm">
+      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-primary/5 p-4 group">
         <div className="absolute top-1/2 -translate-y-1/2 right-4 text-primary/5 group-hover:scale-110 transition-transform pointer-events-none">
           <Settings className="w-24 h-24" />
         </div>
@@ -30,7 +32,8 @@ export function PdktSystemTab({
               Pengaturan Sistem
             </h3>
             <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-              Pilih model AI dan mode penulisan yang akan menggerakkan simulasi email ini.
+              Pilih model AI dan mode penulisan yang akan menggerakkan simulasi
+              email ini.
             </p>
           </div>
         </div>
@@ -47,11 +50,18 @@ export function PdktSystemTab({
           </h4>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div
+          className="grid grid-cols-1 gap-3 md:grid-cols-2"
+          role="radiogroup"
+          aria-label="Mode penulisan"
+        >
           {/* Realistic Mode */}
-          <div
+          <button
+            type="button"
+            role="radio"
+            aria-checked={writingStyleMode === "realistic"}
             onClick={() => setWritingStyleMode("realistic")}
-            className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
+            className={`w-full cursor-pointer rounded-xl border p-5 text-left transition-all relative overflow-hidden group focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
               writingStyleMode === "realistic"
                 ? "bg-card border-primary"
                 : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
@@ -79,14 +89,18 @@ export function PdktSystemTab({
               </div>
             </div>
             <p className="text-xs font-medium leading-relaxed text-muted-foreground mt-2">
-              Email mengandung typo, capslock, dan bahasa informal/kurang berpendidikan untuk simulasi yang lebih nyata.
+              Email mengandung typo, capslock, dan bahasa informal/kurang
+              berpendidikan untuk simulasi yang lebih nyata.
             </p>
-          </div>
+          </button>
 
           {/* Latihan Mode */}
-          <div
+          <button
+            type="button"
+            role="radio"
+            aria-checked={writingStyleMode === "training"}
             onClick={() => setWritingStyleMode("training")}
-            className={`cursor-pointer p-5 rounded-xl border transition-all relative overflow-hidden group ${
+            className={`w-full cursor-pointer rounded-xl border p-5 text-left transition-all relative overflow-hidden group focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
               writingStyleMode === "training"
                 ? "bg-card border-primary"
                 : "bg-card/40 border-border/40 hover:border-primary/30 hover:bg-card/70"
@@ -96,7 +110,9 @@ export function PdktSystemTab({
               <h4 className="font-semibold text-sm tracking-tight flex items-center gap-2 text-foreground">
                 <div
                   className={`w-2 h-2 rounded-full ${
-                    writingStyleMode === "training" ? "bg-primary" : "bg-foreground/20"
+                    writingStyleMode === "training"
+                      ? "bg-primary"
+                      : "bg-foreground/20"
                   }`}
                 />
                 Latihan
@@ -112,9 +128,10 @@ export function PdktSystemTab({
               </div>
             </div>
             <p className="text-xs font-medium leading-relaxed text-muted-foreground mt-2">
-              Email menggunakan bahasa yang rapi, terstruktur, dan formal untuk tahap awal pelatihan.
+              Email menggunakan bahasa yang rapi, terstruktur, dan formal untuk
+              tahap awal pelatihan.
             </p>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -129,15 +146,22 @@ export function PdktSystemTab({
           </h4>
         </div>
 
-        <div className="grid grid-cols-1 gap-2.5">
+        <div
+          className="grid grid-cols-1 gap-2.5"
+          role="radiogroup"
+          aria-label="Model AI"
+        >
           {TEXT_MODELS.map((model) => {
             const isSelected = selectedModel === model.id;
             const providerLabel = model.provider;
             return (
-              <div
+              <button
                 key={model.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
                 onClick={() => setSelectedModel(model.id)}
-                className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center justify-between gap-4 group relative overflow-hidden ${
+                className={`w-full cursor-pointer rounded-xl border p-4 text-left transition-all flex items-center justify-between gap-4 group relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
                   isSelected
                     ? "bg-card border-primary opacity-100"
                     : "bg-card/30 border-border/40 opacity-85 hover:opacity-100 hover:bg-card/50"
@@ -165,7 +189,7 @@ export function PdktSystemTab({
                     <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center" />
                   )}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

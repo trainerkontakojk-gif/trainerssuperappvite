@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Heart,
   Zap,
@@ -28,13 +28,25 @@ import {
 } from "../../../components/KetikEducationSections";
 
 function ScoreBar({ score }: { score: number }) {
+  const shouldReduceMotion = useReducedMotion();
   return (
-    <div className="w-full h-1.5 bg-foreground/5 rounded-full overflow-hidden mt-1">
+    <div
+      className="w-full h-1.5 bg-foreground/5 rounded-full overflow-hidden mt-1"
+      role="progressbar"
+      aria-label="Skor dimensi"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={score}
+    >
       <motion.div
         className={`h-full rounded-full ${getScoreGrade(score).bar}`}
-        initial={{ width: 0 }}
+        initial={shouldReduceMotion ? { width: `${score}%` } : { width: 0 }}
         animate={{ width: `${score}%` }}
-        transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+        transition={
+          shouldReduceMotion
+            ? { duration: 0 }
+            : { duration: 0.8, ease: "easeOut", delay: 0.2 }
+        }
       />
     </div>
   );
@@ -77,7 +89,9 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
   }, [fetchReview]);
 
   const session = data?.session;
-  const transcriptMessages = session?.messages?.length ? session.messages : messages;
+  const transcriptMessages = session?.messages?.length
+    ? session.messages
+    : messages;
 
   return (
     <div className="space-y-6">
@@ -87,7 +101,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
       {transcriptMessages && transcriptMessages.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-module-ketik" />
+            <MessageSquare
+              className="w-4 h-4 text-module-ketik"
+              aria-hidden="true"
+            />
             <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
               Transcript Chat ({transcriptMessages.length} pesan)
             </h3>
@@ -112,9 +129,15 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                   >
                     <div className="flex items-center gap-1.5 mb-1.5">
                       {isUser ? (
-                        <User className="w-3 h-3 text-primary" />
+                        <User
+                          className="w-3 h-3 text-primary"
+                          aria-hidden="true"
+                        />
                       ) : (
-                        <Bot className="w-3 h-3 text-module-ketik" />
+                        <Bot
+                          className="w-3 h-3 text-module-ketik"
+                          aria-hidden="true"
+                        />
                       )}
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
@@ -139,8 +162,15 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
 
       {/* ── AI Assessment — Secondary ──────────────────────────── */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
+        <div
+          className="flex flex-col items-center justify-center py-12 gap-3"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2
+            className="w-6 h-6 text-primary animate-spin motion-reduce:animate-none"
+            aria-hidden="true"
+          />
           <p className="text-xs text-muted-foreground font-medium">
             Memuat data penilaian AI...
           </p>
@@ -148,14 +178,21 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
       )}
 
       {error && (
-        <div className="flex flex-col items-center justify-center py-12 gap-3">
-          <AlertTriangle className="w-6 h-6 text-destructive" />
+        <div
+          className="flex flex-col items-center justify-center py-12 gap-3"
+          role="alert"
+        >
+          <AlertTriangle
+            className="w-6 h-6 text-destructive"
+            aria-hidden="true"
+          />
           <p className="text-xs text-destructive font-medium">{error}</p>
           <button
+            type="button"
             onClick={fetchReview}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all"
+            className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <RefreshCw size={10} />
+            <RefreshCw size={10} aria-hidden="true" />
             Coba Lagi
           </button>
         </div>
@@ -166,7 +203,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
         (!data || data.review_status !== "completed" || !data.review) && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
             <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center">
-              <MessageSquare className="w-7 h-7 text-muted-foreground" />
+              <MessageSquare
+                className="w-7 h-7 text-muted-foreground"
+                aria-hidden="true"
+              />
             </div>
             <p className="text-sm font-bold text-muted-foreground">
               Review AI belum tersedia
@@ -189,7 +229,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             {/* Score Cards Grid */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
+                <TrendingUp
+                  className="w-4 h-4 text-primary"
+                  aria-hidden="true"
+                />
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                   Penilaian AI
                 </h3>
@@ -245,7 +288,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
                       <div
                         className={`w-10 h-10 ${grade.bg} ${grade.color} rounded-xl flex items-center justify-center mb-1`}
                       >
-                        <card.icon className="w-5 h-5" />
+                        <card.icon className="w-5 h-5" aria-hidden="true" />
                       </div>
                       <div className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
                         {card.label}
@@ -272,7 +315,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             <div className="bg-primary/5 rounded-[1.5rem] p-6 border border-primary/10 flex flex-col md:flex-row items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
-                  <TrendingUp className="w-7 h-7 text-white" />
+                  <TrendingUp
+                    className="w-7 h-7 text-white"
+                    aria-hidden="true"
+                  />
                 </div>
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
@@ -307,7 +353,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             {/* Rubrik */}
             <details className="group cursor-pointer">
               <summary className="flex items-center gap-2 text-xs text-muted-foreground/80 hover:text-foreground/90 transition-colors list-none select-none">
-                <Info className="w-3.5 h-3.5" />
+                <Info className="w-3.5 h-3.5" aria-hidden="true" />
                 <span className="font-semibold">Rubrik Penilaian</span>
               </summary>
               <div className="flex items-center gap-4 mt-3 flex-wrap">
@@ -340,7 +386,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
 
             <section className="space-y-3">
               <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-primary" />
+                <MessageSquare
+                  className="w-4 h-4 text-primary"
+                  aria-hidden="true"
+                />
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                   Ringkasan AI
                 </h3>
@@ -356,7 +405,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             <div className="grid md:grid-cols-2 gap-6">
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-chart-green" />
+                  <CheckCircle2
+                    className="w-4 h-4 text-chart-green"
+                    aria-hidden="true"
+                  />
                   <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                     Kekuatan
                   </h3>
@@ -378,7 +430,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
               </section>
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-orange-500" />
+                  <AlertTriangle
+                    className="w-4 h-4 text-orange-500"
+                    aria-hidden="true"
+                  />
                   <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                     Area Perbaikan
                   </h3>
@@ -401,7 +456,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
             {data.typos && data.typos.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-500" />
+                  <AlertTriangle
+                    className="w-4 h-4 text-rose-500"
+                    aria-hidden="true"
+                  />
                   <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                     Typo Terdeteksi ({data.typos.length})
                   </h3>
@@ -440,7 +498,10 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
               data.review.coachingFocus.length > 0 && (
                 <section className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-primary" />
+                    <Target
+                      className="w-4 h-4 text-primary"
+                      aria-hidden="true"
+                    />
                     <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
                       Fokus Coaching
                     </h3>

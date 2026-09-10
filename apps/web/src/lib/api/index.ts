@@ -1,4 +1,15 @@
-export { rpcClient, rpcFetch, ketikClient, pdktClient, telefunClient, sidakClient, aiClient, adminClient, profilerClient } from "./rpc-client";
+export {
+  rpcClient,
+  rpcFetch,
+  ketikClient,
+  pdktClient,
+  telefunClient,
+  sidakClient,
+  aiClient,
+  adminClient,
+  profilerClient,
+  profilerSubjectClient,
+} from "./rpc-client";
 export type {
   KetikMonitoringReview,
   MonitoringHistoryEntry,
@@ -6,5 +17,6 @@ export type {
   PricingEntry,
   TelefunMonitoringReview,
   UsageAggregation,
+  SimulationSubjectOption,
 } from "./rpc-client";
 export { unwrapResponse, ApiError, getErrorMessage } from "./unwrap-response";

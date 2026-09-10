@@ -181,6 +181,13 @@ describe("PDKT Mailbox UX", () => {
         evaluation: { score: 88 },
         evaluation_status: "completed",
         time_taken: 42,
+        simulationSubject: {
+          type: "participant",
+          participantId: "participant-1",
+          displayName: "Andi",
+          batchName: "Batch 12",
+          team: "Tim Alpha",
+        },
       },
     ]);
 
@@ -202,6 +209,7 @@ describe("PDKT Mailbox UX", () => {
     expect(
       (await screen.findAllByText("Archived body")).length,
     ).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Target simulasi")).toHaveTextContent("Andi");
 
     mailboxResponse = [...mailboxResponse];
     rerender(<RouterProvider router={router} />);
@@ -515,9 +523,7 @@ describe("EmailDetailPane Component", () => {
     ["raw base64", btoa("%PDF-1.4\\nfixture")],
     ["data URI", `data:application/pdf;base64,${btoa("%PDF-1.4\\nfixture")}`],
   ])("opens %s PDFs through a Blob object URL", (_label, attachment) => {
-    const openMock = vi
-      .spyOn(window, "open")
-      .mockImplementation(() => null);
+    const openMock = vi.spyOn(window, "open").mockImplementation(() => null);
     const createObjectUrlMock = vi
       .spyOn(URL, "createObjectURL")
       .mockReturnValue("blob:pdkt-pdf");
@@ -555,9 +561,7 @@ describe("EmailDetailPane Component", () => {
   it.each(["Enter", " "])(
     "opens a PDF through the Blob boundary on %s keyboard activation",
     (key) => {
-      const openMock = vi
-        .spyOn(window, "open")
-        .mockImplementation(() => null);
+      const openMock = vi.spyOn(window, "open").mockImplementation(() => null);
       const createObjectUrlMock = vi
         .spyOn(URL, "createObjectURL")
         .mockReturnValue("blob:pdkt-pdf-keyboard");
@@ -631,9 +635,7 @@ describe("EmailDetailPane Component", () => {
   });
 
   it("keeps image activation in the zoom modal without PDF navigation", () => {
-    const openMock = vi
-      .spyOn(window, "open")
-      .mockImplementation(() => null);
+    const openMock = vi.spyOn(window, "open").mockImplementation(() => null);
     const image = btoa("\x89PNG\r\n\x1a\nfixture");
     render(
       <EmailDetailPane

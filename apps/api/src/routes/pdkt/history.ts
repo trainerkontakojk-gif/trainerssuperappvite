@@ -1,13 +1,12 @@
 import { Hono } from "hono";
-import { PdktSessionHistory } from "@trainers/types";
+import {
+  PdktSessionHistory,
+  mapSimulationSubjectRowToSnapshot,
+} from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
 import { requireRole } from "../../middleware/role";
 import { createAdminClient } from "../../lib/supabase";
-import {
-  Variables,
-  getUserClient,
-  jsonServerError,
-} from "./route-utils";
+import { Variables, getUserClient, jsonServerError } from "./route-utils";
 
 const history = new Hono<{ Variables: Variables }>();
 
@@ -16,6 +15,7 @@ history.get(
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
   async (c) => {
     const user = c.get("user");
+    const profile = c.get("profile");
     const userClient = getUserClient(c);
 
     try {
@@ -29,7 +29,13 @@ history.get(
 
       return c.json({
         success: true,
-        data: (data || []) as PdktSessionHistory[],
+        data: (data || []).map((row: any) => ({
+          ...row,
+          user_id: row.user_id ?? user.id,
+          user_email: user.email ?? null,
+          user_role: profile?.role ?? null,
+          simulationSubject: mapSimulationSubjectRowToSnapshot(row),
+        })) as PdktSessionHistory[],
       });
     } catch (error: unknown) {
       return jsonServerError(c, error);
@@ -120,7 +126,7 @@ history.post(
       // visibility is delegated to Supabase RLS instead of owner-only filtering.
       let { data, error } = await userClient
         .from("pdkt_history")
-        .select("id")
+        .select("id, user_id")
         .eq("id", historyId)
         .maybeSingle();
 
@@ -137,7 +143,7 @@ history.post(
           const adminClient = createAdminClient();
           const { data: adminData, error: adminError } = await adminClient
             .from("pdkt_history")
-            .select("id")
+            .select("id, user_id")
             .eq("id", historyId)
             .maybeSingle();
 
@@ -161,7 +167,13 @@ history.post(
         );
       }
 
-      const evalPromise = pdktService.processPdktEvaluation(historyId, user.id);
+      // Shared-mailbox retries may be initiated by another permitted actor,
+      // but usage/evaluation ownership remains the original replier.
+      const evaluationActorId = data?.user_id || user.id;
+      const evalPromise = pdktService.processPdktEvaluation(
+        historyId,
+        evaluationActorId,
+      );
       try {
         if (c.executionCtx?.waitUntil) {
           c.executionCtx.waitUntil(evalPromise);

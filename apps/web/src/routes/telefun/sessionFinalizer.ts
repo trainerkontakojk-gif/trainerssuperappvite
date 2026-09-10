@@ -211,6 +211,8 @@ function buildCallRecord(
     configuredDuration: params.sessionConfig?.maxCallDuration
       ? params.sessionConfig.maxCallDuration * 60
       : undefined,
+    simulationSubject: (params.sessionConfig as any)?.simulationSubject ?? null,
+    syncStatus: "synced",
   };
 }
 
@@ -248,7 +250,8 @@ export async function saveTelefunSession(
             blob: fullBlob,
             type: "full_call",
           });
-          if (!uploaded) throw new Error("Full recording upload returned no path.");
+          if (!uploaded)
+            throw new Error("Full recording upload returned no path.");
           return isWebRtcSession ? path : uploaded;
         });
         if (!recordingPath) {
@@ -273,7 +276,8 @@ export async function saveTelefunSession(
             blob: agentBlob,
             type: "agent_only",
           });
-          if (!uploaded) throw new Error("Agent recording upload returned no path.");
+          if (!uploaded)
+            throw new Error("Agent recording upload returned no path.");
           return isWebRtcSession ? path : uploaded;
         });
         if (!agentRecordingPath) {
@@ -347,13 +351,16 @@ export async function saveTelefunSession(
         recordingTransition = {
           ...recordingTransition,
           recordingStatus:
-            queued.remux.data.recordingStatus ?? recordingTransition?.recordingStatus,
+            queued.remux.data.recordingStatus ??
+            recordingTransition?.recordingStatus,
           recordingReady:
-            queued.remux.data.recordingReady ?? recordingTransition?.recordingReady,
+            queued.remux.data.recordingReady ??
+            recordingTransition?.recordingReady,
           scoringReady:
             queued.remux.data.scoringReady ?? recordingTransition?.scoringReady,
           scoringStatus:
-            queued.remux.data.scoringStatus ?? recordingTransition?.scoringStatus,
+            queued.remux.data.scoringStatus ??
+            recordingTransition?.scoringStatus,
         };
       }
       if (queued.removed && queued.remux?.success) {
@@ -412,13 +419,17 @@ export async function saveTelefunSession(
           recordingTransition = {
             ...recordingTransition,
             recordingStatus:
-              remuxResult.data.recordingStatus ?? recordingTransition?.recordingStatus,
+              remuxResult.data.recordingStatus ??
+              recordingTransition?.recordingStatus,
             recordingReady:
-              remuxResult.data.recordingReady ?? recordingTransition?.recordingReady,
+              remuxResult.data.recordingReady ??
+              recordingTransition?.recordingReady,
             scoringReady:
-              remuxResult.data.scoringReady ?? recordingTransition?.scoringReady,
+              remuxResult.data.scoringReady ??
+              recordingTransition?.scoringReady,
             scoringStatus:
-              remuxResult.data.scoringStatus ?? recordingTransition?.scoringStatus,
+              remuxResult.data.scoringStatus ??
+              recordingTransition?.scoringStatus,
           };
         }
       } catch (err) {

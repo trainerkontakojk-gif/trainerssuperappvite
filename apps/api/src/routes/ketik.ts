@@ -5,8 +5,11 @@ import {
   chatMessageSchema,
   generateMessageSchema,
   ketikAppSettingsSchema,
+  simulationSubjectSelectionSchema,
 } from "@trainers/types";
 import * as ketikService from "../services/ketik-service";
+import { SimulationSubjectError } from "../services/simulation-subject-service";
+import { resolveRequestSimulationSubject } from "./pdkt/route-utils";
 import { requireRole } from "../middleware/role";
 import { aiRateLimitMiddleware } from "../middleware/rateLimit";
 import { createAdminClient } from "../lib/supabase";
@@ -181,19 +184,33 @@ ketik.post(
       consumerCity: z.string(),
       messages: z.array(chatMessageSchema),
       simulationDuration: z.number().finite().min(1).max(60).optional(),
+      simulationSubject: simulationSubjectSelectionSchema.optional(),
     }),
   ),
   async (c) => {
     const user = c.get("user");
     const body = c.req.valid("json");
     try {
-      const session = await ketikService.persistSession(user.id, body);
+      const snapshot = await resolveRequestSimulationSubject(
+        c,
+        body.simulationSubject,
+      );
+      const session = await ketikService.persistSession(user.id, {
+        ...body,
+        simulationSubjectSnapshot: snapshot,
+      });
       return c.json({ success: true, data: session });
     } catch (err: any) {
+      if (err instanceof SimulationSubjectError) {
+        return c.json(
+          { success: false, error: { code: err.code, message: err.message } },
+          err.status as 400,
+        );
+      }
       return c.json(
         {
           success: false,
-          error: { code: "INTERNAL_ERROR", message: err.message },
+          error: { code: "INTERNAL_ERROR", message: "Gagal menyimpan sesi." },
         },
         500,
       );
@@ -302,7 +319,9 @@ ketik.post(
       // 2. Check existing job state with lease info (legacy parity)
       const { data: existingJob } = await adminClient
         .from("ketik_review_jobs")
-        .select("status, lease_owner, lease_expires_at, attempt_count, error_message")
+        .select(
+          "status, lease_owner, lease_expires_at, attempt_count, error_message",
+        )
         .eq("session_id", body.sessionId)
         .maybeSingle();
 
@@ -313,7 +332,9 @@ ketik.post(
             .update({ review_status: "completed" })
             .eq("id", body.sessionId);
         }
-        console.log(`[KETIK Review] session=${body.sessionId} status=completed action=skip`);
+        console.log(
+          `[KETIK Review] session=${body.sessionId} status=completed action=skip`,
+        );
         return c.json({
           success: true,
           data: { status: "completed" },
@@ -323,8 +344,7 @@ ketik.post(
       // For processing: check if lease is still active
       if (existingJob?.status === "processing") {
         const leaseExpired =
-          existingJob.lease_expires_at &&
-          existingJob.lease_expires_at < nowIso;
+          existingJob.lease_expires_at && existingJob.lease_expires_at < nowIso;
         if (!leaseExpired) {
           // Active lease — let the existing worker finish
           if (session.review_status !== "processing") {
@@ -333,24 +353,32 @@ ketik.post(
               .update({ review_status: "processing" })
               .eq("id", body.sessionId);
           }
-          console.log(`[KETIK Review] session=${body.sessionId} status=processing action=skip_active_lease`);
+          console.log(
+            `[KETIK Review] session=${body.sessionId} status=processing action=skip_active_lease`,
+          );
           return c.json({
             success: true,
             data: { status: "processing" },
           });
         }
         // Expired lease — reclaim by falling through to processing
-        console.log(`[KETIK Review] session=${body.sessionId} status=processing action=reclaim_expired_lease`);
+        console.log(
+          `[KETIK Review] session=${body.sessionId} status=processing action=reclaim_expired_lease`,
+        );
       }
 
       // For queued: fall through to claim/process directly
       if (existingJob?.status === "queued") {
-        console.log(`[KETIK Review] session=${body.sessionId} status=queued action=claim`);
+        console.log(
+          `[KETIK Review] session=${body.sessionId} status=queued action=claim`,
+        );
       }
 
       // For failed: reset job for retry
       if (existingJob?.status === "failed") {
-        console.log(`[KETIK Review] session=${body.sessionId} status=failed action=retry`);
+        console.log(
+          `[KETIK Review] session=${body.sessionId} status=failed action=retry`,
+        );
         await adminClient
           .from("ketik_review_jobs")
           .update({
@@ -363,7 +391,10 @@ ketik.post(
       }
 
       // 3. Trigger review (handles missing job + enqueue)
-      const triggerResult = await ketikService.triggerKetikAIReview(body.sessionId, user.id);
+      const triggerResult = await ketikService.triggerKetikAIReview(
+        body.sessionId,
+        user.id,
+      );
 
       if (triggerResult?.status === "skipped") {
         console.log(`[KETIK Review] session=${body.sessionId} action=skipped`);
@@ -385,7 +416,9 @@ ketik.post(
         body.workerId || "immediate-web",
       );
 
-      console.log(`[KETIK Review] session=${body.sessionId} action=process result=${processResult.status}${processResult.error ? ` error=${processResult.error}` : ""}`);
+      console.log(
+        `[KETIK Review] session=${body.sessionId} action=process result=${processResult.status}${processResult.error ? ` error=${processResult.error}` : ""}`,
+      );
 
       return c.json({
         success: true,
@@ -396,7 +429,9 @@ ketik.post(
         },
       });
     } catch (err: any) {
-      console.error(`[KETIK Review] session=${body.sessionId} action=error error=${err.message}`);
+      console.error(
+        `[KETIK Review] session=${body.sessionId} action=error error=${err.message}`,
+      );
       return c.json(
         {
           success: false,

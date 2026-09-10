@@ -14,6 +14,9 @@ interface TelefunAuthDependencies {
     sessionId: string,
     userId: string,
   ) => Promise<string | null>;
+  // Subject-aware sessions are created by the authenticated HTTP route before
+  // the WebSocket connects. This one-argument fallback is legacy-only and
+  // intentionally creates a self session when no pre-created ID is supplied.
   createSession: (userId: string) => Promise<string>;
 }
 

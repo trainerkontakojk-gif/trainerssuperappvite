@@ -1,23 +1,13 @@
-import { motion } from "framer-motion";
-import {
-  Eye,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Gauge,
-  Volume2,
-  Mic,
-  Ban,
-  AlertTriangle,
-} from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Eye, Clock } from "lucide-react";
 import {
   type UnifiedHistoryEntry,
   getModuleIcon,
   getModuleBadgeClasses,
   getScoreColor,
-  getScoreGrade,
   formatDuration,
   formatDate,
+  getSimulationSubjectMeta,
 } from "../utils/formatting";
 import { ReviewStatusBadge } from "./ReviewStatusBadge";
 
@@ -178,14 +168,16 @@ interface HistoryCardProps {
 }
 
 export function HistoryCard({ entry, onViewDetail }: HistoryCardProps) {
+  const subjectMeta = getSimulationSubjectMeta(entry.simulationSubject);
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      onClick={() => onViewDetail(entry)}
-      className="group bg-card border border-border/50 rounded-xl p-5 hover:shadow-md hover:border-primary/20 hover:bg-foreground/[0.01] transition-all duration-200 flex flex-col gap-3 cursor-pointer"
+      layout={!shouldReduceMotion}
+      initial={shouldReduceMotion ? undefined : { opacity: 0, y: 12 }}
+      animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
+      exit={shouldReduceMotion ? undefined : { opacity: 0, y: -12 }}
+      className="bg-card border border-border/50 rounded-xl p-5 hover:shadow-md hover:border-primary/20 hover:bg-foreground/[0.01] transition-all duration-200 flex flex-col gap-3"
     >
       {/* Top row: module badge + status + score */}
       <div className="flex items-center justify-between gap-2">
@@ -222,7 +214,7 @@ export function HistoryCard({ entry, onViewDetail }: HistoryCardProps) {
       </div>
 
       {/* Scenario title */}
-      <h3 className="text-sm font-semibold text-foreground line-clamp-1 leading-snug group-hover:text-primary transition-colors">
+      <h3 className="text-sm font-semibold text-foreground line-clamp-1 leading-snug">
         {entry.scenario_title}
       </h3>
 
@@ -241,16 +233,36 @@ export function HistoryCard({ entry, onViewDetail }: HistoryCardProps) {
         </div>
       </div>
 
+      {/* Frozen subject and execution actor metadata */}
+      <div
+        className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/40 pt-2 text-[11px] text-muted-foreground"
+        aria-label="Atribusi simulasi"
+      >
+        <span className="font-medium text-foreground">
+          Target: {subjectMeta.label}
+        </span>
+        {subjectMeta.batch && <span>Batch: {subjectMeta.batch}</span>}
+        {subjectMeta.team && <span>Tim: {subjectMeta.team}</span>}
+        {entry.user_role && (
+          <span className="text-muted-foreground/80">
+            Pelaksana: {entry.user_role}
+          </span>
+        )}
+      </div>
+
       {/* Module-specific AI assessment preview */}
       {entry.module === "ketik" && <KetikAssessment entry={entry} />}
       {entry.module === "pdkt" && <PdktAssessment entry={entry} />}
       {entry.module === "telefun" && <TelefunAssessment entry={entry} />}
 
-      {/* Action button (visual only now) */}
-      <div className="mt-2 w-full px-3 py-2 rounded-lg text-[10px] font-semibold uppercase tracking-wider bg-foreground/[0.03] hover:bg-primary hover:text-primary-foreground text-muted-foreground border border-border/40 transition-all flex items-center justify-center gap-1">
+      <button
+        type="button"
+        onClick={() => onViewDetail(entry)}
+        className="mt-2 min-h-11 w-full px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider bg-foreground/[0.03] hover:bg-primary hover:text-primary-foreground text-muted-foreground border border-border/40 transition-all flex items-center justify-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
         <Eye size={12} />
         Lihat Detail
-      </div>
+      </button>
     </motion.div>
   );
 }

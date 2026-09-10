@@ -99,6 +99,9 @@ export const ketikApi = {
     consumerCity: string;
     messages: ChatMessage[];
     simulationDuration?: number;
+    simulationSubject?:
+      | { type: "self" }
+      | { type: "participant"; participantId: string };
   }) => {
     const res = await ketikClient.history.$post({ json: data });
     return unwrapResponse(res) as Promise<KetikSessionHistoryItem>;

@@ -82,6 +82,8 @@ Workspace untuk latihan korespondensi email yang terstandarisasi dengan sistem p
   - **Async Evaluation**: Penilaian AI berjalan di latar belakang setelah balasan dikirim.
   - **History Replay**: Sesi riwayat tetap dapat dilihat walau mailbox item sudah dihapus (soft-delete).
   - **Idempotency**: Create mailbox dilindungi `client_request_id` untuk mencegah duplikasi.
+  - **Retry tanpa regenerasi**: `/session/init` dan `/session/create` mengembalikan draft mailbox opaque yang ditandatangani server ketika email sudah dibuat tetapi persistence gagal; `/mailbox/batch` memverifikasi token actor-bound dan menyimpan email yang sama tanpa memanggil AI lagi.
+  - **Atribusi sesi**: Target participant, batch, tim, pelaksana, dan status evaluasi memakai snapshot authoritative yang diproyeksikan konsisten di mailbox, history, monitoring review, dan CSV export. Intent snapshot PDKT hanya dapat dibuat backend melalui service role sebelum dipakai RPC user-JWT; direct RPC tidak dapat memalsukan metadata. Legacy tanpa snapshot tetap ditampilkan sebagai target tidak tercatat.
   - **Monitoring detail**: `/monitoring` menampilkan `identity`, `consumer_type`, `recipient/contact`, snapshot config yang allow-list normalized, email thread penuh, evaluasi lengkap, error, dan timing; tidak ada kontrol delete/reply di permukaan monitoring.
 - **Catatan Teknis**:
   - PDKT menggunakan tabel `pdkt_mailbox_items` sebagai penyimpanan utama kotak masuk.
@@ -204,3 +206,11 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Agent Ranking Semantics**: Peringkat lebih tinggi = temuan lebih sedikit; peringkat terakhir = temuan terbanyak; jumlah temuan sama = peringkat sama (tidak ada tie-breaking buatan). Ranking ditampilkan dalam konteks Tim Gabungan dan Tim Leader per tahun+layanan.
   - **KPI Delta**: Persentase kenaikan/penurunan di KPI Dashboard dengan unit yang disesuaikan (persentase relatif untuk count/ratio, poin persentase untuk metrik persen).
 - **Catatan Teknis**: Backend API di `/api/v1/sidak/` (~19 endpoints) di-dekomposisi ke 6 sub-module route handler (`apps/api/src/routes/sidak/{core,dashboard,forecast,temuan,rule-versions,reports}.ts`). Business logic di `apps/api/src/services/sidak-service.ts` — barrel dari 14 sub-modules di `apps/api/src/services/sidak/`. Scoring engine di `apps/api/src/lib/scoring.ts`.
+
+## 7. Atribusi Subjek Simulasi (KETIK/PDKT/Telefun/Monitoring)
+
+- `user_id` tetap akun pelaksana/pemilik sesi; `simulation_subject_*` adalah atribusi peserta, bukan identitas konsumen.
+- Request memakai satu properti `simulationSubject` (`self` | `participant` + UUID). Klien lama tanpa field dinormalisasi ke `self` pada write ingress; read null/absent selalu `unknown` (legacy: "Peserta tidak tercatat — sesi lama").
+- PDKT `self` mailbox relatif kepada pembalas (snapshot diambil saat reply; chip "Untuk diri sendiri saat membalas"). Reply `participant` hanya admin/trainer, target immutable, history menyalin snapshot mailbox.
+- Snapshot immutable setelah persist; `ON DELETE SET NULL` boleh men-null-kan FK tanpa mengubah snapshot. Rename/move batch tidak mengubah snapshot.
+- Pilihan peserta via `GET /api/v1/profiler/peserta/options?search=` (admin/trainer, 2–100 chars, max 20, 4 fields, literal ilike escape).

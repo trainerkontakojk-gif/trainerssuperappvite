@@ -93,7 +93,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSingle.mockResolvedValue({ data: null, error: null });
   mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-  mockRpc.mockResolvedValue({ data: "history-123", error: null });
+  mockRpc.mockImplementation((name: string) =>
+    name === "submit_pdkt_mailbox_reply_with_outcome"
+      ? {
+          data: { history_id: "history-123", created: true },
+          error: null,
+        }
+      : { data: "history-123", error: null },
+  );
   mockUserClients.length = 0;
 });
 
@@ -107,7 +114,54 @@ describe("PDKT Reply Route E2E", () => {
       "sends reply successfully and returns historyId",
       { timeout: 15_000 },
       async () => {
+        await createAuthenticatedApp("trainer");
+        const res = await app.request("/api/v1/pdkt/mailbox/reply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-token",
+          },
+          body: JSON.stringify({
+            mailboxId: "00000000-0000-0000-0000-000000000001",
+            reply: {
+              id: "reply-1",
+              from: "cc@ojk.go.id",
+              to: "user@test.com",
+              subject: "Re: Test",
+              body: "Terima kasih.",
+              timestamp: new Date().toISOString(),
+              isAgent: true,
+            },
+            timeTaken: 60,
+          }),
+        });
+
+        expect(res.status).toBe(200);
+        const json = await res.json();
+        expect(json.success).toBe(true);
+        expect(json.data.historyId).toBe("history-123");
+        expect(mockRpc).toHaveBeenCalledWith(
+          "submit_pdkt_mailbox_reply_with_outcome",
+          {
+            p_mailbox_id: "00000000-0000-0000-0000-000000000001",
+            p_agent_reply: expect.objectContaining({ isAgent: true }),
+            p_time_taken: 60,
+          },
+        );
+      },
+    );
+
+    it("returns an existing reply without starting another evaluation", async () => {
       await createAuthenticatedApp("trainer");
+      mockMaybeSingle.mockResolvedValueOnce({
+        data: { status: "replied", history_id: "history-existing" },
+        error: null,
+      });
+      mockRpc.mockResolvedValueOnce({
+        data: { history_id: "history-existing", created: false },
+        error: null,
+      });
+
       const res = await app.request("/api/v1/pdkt/mailbox/reply", {
         method: "POST",
         headers: {
@@ -117,11 +171,11 @@ describe("PDKT Reply Route E2E", () => {
         body: JSON.stringify({
           mailboxId: "00000000-0000-0000-0000-000000000001",
           reply: {
-            id: "reply-1",
+            id: "reply-retry",
             from: "cc@ojk.go.id",
             to: "user@test.com",
             subject: "Re: Test",
-            body: "Terima kasih.",
+            body: "Retry.",
             timestamp: new Date().toISOString(),
             isAgent: true,
           },
@@ -130,14 +184,13 @@ describe("PDKT Reply Route E2E", () => {
       });
 
       expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(json.success).toBe(true);
-      expect(json.data.historyId).toBe("history-123");
-      expect(mockRpc).toHaveBeenCalledWith("submit_pdkt_mailbox_reply", {
-        p_mailbox_id: "00000000-0000-0000-0000-000000000001",
-        p_agent_reply: expect.objectContaining({ isAgent: true }),
-        p_time_taken: 60,
-      });
+      expect((await res.json()).data.historyId).toBe("history-existing");
+      expect(mockRpc).toHaveBeenCalledWith(
+        "submit_pdkt_mailbox_reply_with_outcome",
+        expect.objectContaining({
+          p_mailbox_id: "00000000-0000-0000-0000-000000000001",
+        }),
+      );
     });
 
     it("returns 403 when role is not allowed", async () => {
@@ -147,7 +200,15 @@ describe("PDKT Reply Route E2E", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mailboxId: "00000000-0000-0000-0000-000000000001",
-          reply: { id: "x", from: "a", to: "b", subject: "", body: "", timestamp: "", isAgent: true },
+          reply: {
+            id: "x",
+            from: "a",
+            to: "b",
+            subject: "",
+            body: "",
+            timestamp: "",
+            isAgent: true,
+          },
           timeTaken: 1,
         }),
       });
@@ -162,7 +223,15 @@ describe("PDKT Reply Route E2E", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mailboxId: "not-a-uuid",
-          reply: { id: "x", from: "a", to: "b", subject: "", body: "", timestamp: "", isAgent: true },
+          reply: {
+            id: "x",
+            from: "a",
+            to: "b",
+            subject: "",
+            body: "",
+            timestamp: "",
+            isAgent: true,
+          },
           timeTaken: 1,
         }),
       });
@@ -233,12 +302,53 @@ describe("PDKT Reply Route E2E", () => {
 
       expect(res.status).toBe(200);
       expect(mockRpc).toHaveBeenCalledWith(
-        "submit_pdkt_mailbox_reply",
+        "submit_pdkt_mailbox_reply_with_outcome",
         expect.objectContaining({
           p_agent_reply: expect.objectContaining({ attachments: [attachment] }),
         }),
       );
     });
+
+    it.each([
+      ["FORBIDDEN: participant reply requires admin/trainer", 403, "FORBIDDEN"],
+      ["Mailbox item not found", 404, "NOT_FOUND"],
+      ["Cannot reply to a deleted email", 409, "CONFLICT"],
+    ])(
+      "maps %s to the stable %s response",
+      async (message, expectedStatus, expectedCode) => {
+        await createAuthenticatedApp("trainer");
+        mockRpc.mockResolvedValueOnce({
+          data: null,
+          error: { message },
+        });
+
+        const res = await app.request("/api/v1/pdkt/mailbox/reply", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer test-token",
+          },
+          body: JSON.stringify({
+            mailboxId: "00000000-0000-0000-0000-000000000001",
+            reply: {
+              id: "reply-mapped-error",
+              from: "cc@ojk.go.id",
+              to: "user@test.com",
+              subject: "Re: Test",
+              body: "Oke.",
+              timestamp: new Date().toISOString(),
+              isAgent: true,
+            },
+            timeTaken: 30,
+          }),
+        });
+
+        expect(res.status).toBe(expectedStatus);
+        const json = await res.json();
+        expect(json.error.code).toBe(expectedCode);
+        expect(json.error.message).not.toContain("FORBIDDEN:");
+      },
+    );
 
     it("returns error when RPC fails", async () => {
       await createAuthenticatedApp("trainer");
@@ -334,23 +444,33 @@ describe("PDKT Reply Route E2E", () => {
         } else {
           lastTableUser = this.lastTable;
           if (this.lastTable === "pdkt_history") {
-            return { data: null, error: { message: "Permission denied", code: "42501" } };
+            return {
+              data: null,
+              error: { message: "Permission denied", code: "42501" },
+            };
           }
           return { data: null, error: null };
         }
       });
 
       mockMaybeSingle.mockImplementation(function (this: any) {
-        lastTableUser = this.lastTable;
+        if (this === mockSupabaseAdmin) {
+          lastTableAdmin = this.lastTable;
+        } else {
+          lastTableUser = this.lastTable;
+        }
         if (this.lastTable === "pdkt_mailbox_items") {
-          return { data: { id: "mailbox-1", history_id: "hist-non-owned" }, error: null };
+          return {
+            data: { id: "mailbox-1", history_id: "hist-non-owned" },
+            error: null,
+          };
         }
         return { data: null, error: null };
       });
 
       const res = await app.request(
         "/api/v1/pdkt/history/eval/hist-non-owned",
-        { headers: { Authorization: "Bearer test-token" } }
+        { headers: { Authorization: "Bearer test-token" } },
       );
 
       expect(res.status).toBe(200);
@@ -359,8 +479,12 @@ describe("PDKT Reply Route E2E", () => {
       expect(json.data.evaluation_status).toBe("completed");
       expect(json.data.evaluation.score).toBe(90);
 
-      expect(lastTableUser).toBe("pdkt_mailbox_items");
-      expect(lastTableAdmin).toBe("pdkt_history");
+      expect(
+        mockUserClients.some(
+          (client) => client.lastTable === "pdkt_mailbox_items",
+        ),
+      ).toBe(true);
+      expect(mockSupabaseAdmin.lastTable).toBe("pdkt_history");
     });
 
     it("returns 404 for non-owned history if not linked to any visible mailbox item", async () => {
@@ -370,7 +494,10 @@ describe("PDKT Reply Route E2E", () => {
         if (this === mockSupabaseAdmin) {
           return { data: null, error: null };
         } else {
-          return { data: null, error: { message: "Permission denied", code: "42501" } };
+          return {
+            data: null,
+            error: { message: "Permission denied", code: "42501" },
+          };
         }
       });
 
@@ -383,7 +510,7 @@ describe("PDKT Reply Route E2E", () => {
 
       const res = await app.request(
         "/api/v1/pdkt/history/eval/hist-non-owned-missing",
-        { headers: { Authorization: "Bearer test-token" } }
+        { headers: { Authorization: "Bearer test-token" } },
       );
 
       expect(res.status).toBe(404);
@@ -422,10 +549,16 @@ describe("PDKT Reply Route E2E", () => {
           return { data: { id: "hist-non-owned" }, error: null };
         } else {
           if (this.lastTable === "pdkt_history") {
-            return { data: null, error: { message: "Permission denied", code: "42501" } };
+            return {
+              data: null,
+              error: { message: "Permission denied", code: "42501" },
+            };
           }
           if (this.lastTable === "pdkt_mailbox_items") {
-            return { data: { id: "mailbox-1", history_id: "hist-non-owned" }, error: null };
+            return {
+              data: { id: "mailbox-1", history_id: "hist-non-owned" },
+              error: null,
+            };
           }
           return { data: null, error: null };
         }
@@ -450,7 +583,10 @@ describe("PDKT Reply Route E2E", () => {
           return { data: null, error: null };
         } else {
           if (this.lastTable === "pdkt_history") {
-            return { data: null, error: { message: "Permission denied", code: "42501" } };
+            return {
+              data: null,
+              error: { message: "Permission denied", code: "42501" },
+            };
           }
           if (this.lastTable === "pdkt_mailbox_items") {
             return { data: null, error: null };

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
+import { createPdktMailboxRetryDraft } from "../services/pdkt/mailbox-retry";
 
 const mockRpc = vi.fn();
 const mockSingle = vi.fn();
@@ -97,9 +98,37 @@ describe("PDKT Mailbox Batch Route E2E", () => {
           sender_email: "test@sender.com",
           subject: "Welcome",
           snippet: "This is a test snippet",
-          scenario_snapshot: { id: "s1", title: "T", description: "D", objective: "O", required_points: [], category: "Sales", isActive: true },
-          config_snapshot: { scenarios: [], consumerType: { id: "c1", name: "C", description: "D", behaviors: [], traits: [] }, writingStyleMode: "training", identity: { name: "N", email: "E", city: "C", bodyName: "N" }, selectedModel: "gpt" },
-          inbound_email: { id: "e1", from: "a@b.com", to: "c@d.com", subject: "S", body: "Test body", timestamp: new Date().toISOString(), isAgent: false },
+          scenario_snapshot: {
+            id: "s1",
+            title: "T",
+            description: "D",
+            objective: "O",
+            required_points: [],
+            category: "Sales",
+            isActive: true,
+          },
+          config_snapshot: {
+            scenarios: [],
+            consumerType: {
+              id: "c1",
+              name: "C",
+              description: "D",
+              behaviors: [],
+              traits: [],
+            },
+            writingStyleMode: "training",
+            identity: { name: "N", email: "E", city: "C", bodyName: "N" },
+            selectedModel: "gpt",
+          },
+          inbound_email: {
+            id: "e1",
+            from: "a@b.com",
+            to: "c@d.com",
+            subject: "S",
+            body: "Test body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
         }),
       });
 
@@ -117,6 +146,58 @@ describe("PDKT Mailbox Batch Route E2E", () => {
         p_config_snapshot: expect.any(Object),
         p_inbound_email: expect.any(Object),
       });
+    });
+
+    it("saves a signed retry draft without accepting a browser-supplied snapshot", async () => {
+      await createAuthenticatedApp("trainer");
+      const draft = createPdktMailboxRetryDraft({
+        actorId: "test-user-id",
+        batch: {
+          sender_name: "Test Sender",
+          sender_email: "test@sender.com",
+          subject: "Frozen subject",
+          snippet: "Snippet",
+          scenario_snapshot: {} as any,
+          config_snapshot: {} as any,
+          inbound_email: {
+            id: "frozen-email",
+            from: "test@sender.com",
+            to: "ojk@example.test",
+            subject: "Frozen subject",
+            body: "Generated once",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
+          simulationSubject: {
+            type: "participant",
+            participantId: "123e4567-e89b-12d3-a456-426614174000",
+          },
+        } as any,
+        simulationSubjectSnapshot: {
+          type: "participant",
+          participantId: "123e4567-e89b-12d3-a456-426614174000",
+          displayName: "Andi",
+          batchName: "Batch 12",
+          team: "Tim Alpha",
+        },
+      });
+
+      const res = await app.request("/api/v1/pdkt/mailbox/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mailboxDraftToken: draft.token }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith(
+        "submit_pdkt_mailbox_batch_with_subject",
+        expect.objectContaining({
+          p_inbound_email: expect.objectContaining({ body: "Generated once" }),
+          p_subject_name: "Andi",
+          p_subject_batch_name: "Batch 12",
+          p_subject_team: "Tim Alpha",
+        }),
+      );
     });
 
     it("rejects an oversized inbound email body before calling the mailbox RPC", async () => {
@@ -245,10 +326,15 @@ describe("PDKT Mailbox Batch Route E2E", () => {
 
     it("sanitizes 'function not found' error but logs it", async () => {
       await createAuthenticatedApp("trainer");
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       mockRpc.mockResolvedValueOnce({
         data: null,
-        error: { message: "function submit_pdkt_mailbox_batch does not exist", code: "42883" },
+        error: {
+          message: "function submit_pdkt_mailbox_batch does not exist",
+          code: "42883",
+        },
       });
 
       const res = await app.request("/api/v1/pdkt/mailbox/batch", {
@@ -260,18 +346,51 @@ describe("PDKT Mailbox Batch Route E2E", () => {
           sender_email: "test@sender.com",
           subject: "Welcome",
           snippet: "Snippet",
-          scenario_snapshot: { id: "s1", title: "T", description: "D", objective: "O", required_points: [], category: "Sales", isActive: true },
-          config_snapshot: { scenarios: [], consumerType: { id: "c1", name: "C", description: "D", behaviors: [], traits: [] }, writingStyleMode: "training", identity: { name: "N", email: "E", city: "C", bodyName: "N" }, selectedModel: "gpt" },
-          inbound_email: { id: "e1", from: "a@b.com", to: "c@d.com", subject: "S", body: "Test body", timestamp: new Date().toISOString(), isAgent: false },
+          scenario_snapshot: {
+            id: "s1",
+            title: "T",
+            description: "D",
+            objective: "O",
+            required_points: [],
+            category: "Sales",
+            isActive: true,
+          },
+          config_snapshot: {
+            scenarios: [],
+            consumerType: {
+              id: "c1",
+              name: "C",
+              description: "D",
+              behaviors: [],
+              traits: [],
+            },
+            writingStyleMode: "training",
+            identity: { name: "N", email: "E", city: "C", bodyName: "N" },
+            selectedModel: "gpt",
+          },
+          inbound_email: {
+            id: "e1",
+            from: "a@b.com",
+            to: "c@d.com",
+            subject: "S",
+            body: "Test body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
         }),
       });
 
       expect(res.status).toBe(500);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error.message).toBe("function submit_pdkt_mailbox_batch does not exist");
-      
-      expect(consoleSpy).toHaveBeenCalledWith("[PDKT /mailbox/batch] Raw error:", expect.any(Object));
+      expect(json.error.message).toBe(
+        "Terjadi kesalahan saat memproses permintaan.",
+      );
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[PDKT /mailbox/batch] Raw error:",
+        expect.any(Object),
+      );
       consoleSpy.mockRestore();
     });
 
@@ -291,16 +410,46 @@ describe("PDKT Mailbox Batch Route E2E", () => {
           sender_email: "test@sender.com",
           subject: "Welcome",
           snippet: "Snippet",
-          scenario_snapshot: { id: "s1", title: "T", description: "D", objective: "O", required_points: [], category: "Sales", isActive: true },
-          config_snapshot: { scenarios: [], consumerType: { id: "c1", name: "C", description: "D", behaviors: [], traits: [] }, writingStyleMode: "training", identity: { name: "N", email: "E", city: "C", bodyName: "N" }, selectedModel: "gpt" },
-          inbound_email: { id: "e1", from: "a@b.com", to: "c@d.com", subject: "S", body: "Test body", timestamp: new Date().toISOString(), isAgent: false },
+          scenario_snapshot: {
+            id: "s1",
+            title: "T",
+            description: "D",
+            objective: "O",
+            required_points: [],
+            category: "Sales",
+            isActive: true,
+          },
+          config_snapshot: {
+            scenarios: [],
+            consumerType: {
+              id: "c1",
+              name: "C",
+              description: "D",
+              behaviors: [],
+              traits: [],
+            },
+            writingStyleMode: "training",
+            identity: { name: "N", email: "E", city: "C", bodyName: "N" },
+            selectedModel: "gpt",
+          },
+          inbound_email: {
+            id: "e1",
+            from: "a@b.com",
+            to: "c@d.com",
+            subject: "S",
+            body: "Test body",
+            timestamp: new Date().toISOString(),
+            isAgent: false,
+          },
         }),
       });
 
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(401);
       const json = await res.json();
       expect(json.success).toBe(false);
-      expect(json.error.message).toBe("Sesi Anda telah berakhir. Silakan login kembali.");
+      expect(json.error.message).toBe(
+        "Sesi Anda telah berakhir. Silakan login kembali.",
+      );
     });
   });
 });

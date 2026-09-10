@@ -19,8 +19,25 @@ export type {
 type RpcResponse<T> = ClientResponse<ApiResponse<T>, number, "json">;
 type MonitoringModule = "ketik" | "pdkt" | "telefun";
 
-export type { MonitoringReviewByModule } from "@trainers/types";
+export type SimulationSubjectOption = {
+  id: string;
+  nama: string;
+  tim: string;
+  batch_name: string;
+};
 
+type ProfilerSubjectClient = {
+  peserta: {
+    options: {
+      $get(args: {
+        query: { search: string };
+        signal?: AbortSignal;
+      }): Promise<RpcResponse<SimulationSubjectOption[]>>;
+    };
+  };
+};
+
+export type { MonitoringReviewByModule } from "@trainers/types";
 
 export type UsageAggregation = {
   user_id: string;
@@ -317,4 +334,7 @@ export const aiClient = (rpcClient as any).v1.ai as unknown as AiClient;
 export const adminClient = (rpcClient as any).v1
   .admin as unknown as AdminClient;
 export const profilerClient = (rpcClient as any).v1.profiler;
+export const profilerSubjectClient = (
+  rpcClient as unknown as { v1: ProfilerSubjectClient }
+).v1;
 export const healthClient = hc<HealthRouteType>(HC_BASE_URL, clientOptions);

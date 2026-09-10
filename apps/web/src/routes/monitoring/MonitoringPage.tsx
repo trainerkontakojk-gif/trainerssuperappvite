@@ -1,11 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  BarChart3,
-  DollarSign,
-  Eye,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { aiClient, unwrapResponse } from "../../lib/api";
 import { mapError, type UnifiedHistoryEntry } from "./utils/formatting";
@@ -97,12 +91,15 @@ export default function MonitoringPage() {
   };
 
   return (
-    <div className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <main className="p-4 lg:p-8 max-w-[var(--content-max-width)] mx-auto space-y-8 w-full animate-in fade-in slide-in-from-bottom-2 duration-500 motion-reduce:animate-none">
       {/* Test & Accessibility Compatibility Elements */}
       <div className="sr-only">
         <span>SIMULATION MONITORING</span>
         <span>Pantau histori simulasi dari satu pusat observasi.</span>
-        <span>Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian lintas modul tanpa kehilangan konteks platform.</span>
+        <span>
+          Lihat performa agen, telusuri transcript sesi, dan baca pola pemakaian
+          lintas modul tanpa kehilangan konteks platform.
+        </span>
       </div>
 
       {/* Breadcrumbs & Header */}
@@ -121,10 +118,19 @@ export default function MonitoringPage() {
       </div>
 
       {/* Modern Underline Tab switcher */}
-      <div className="flex border-b border-border/60 gap-2 w-full mt-2">
+      <div
+        role="tablist"
+        aria-label="Bagian monitoring"
+        className="flex w-full gap-2 overflow-x-auto border-b border-border/60 mt-2"
+      >
         <button
+          type="button"
+          id="monitoring-tab-history"
+          role="tab"
+          aria-selected={tab === "history"}
+          aria-controls="monitoring-panel-history"
           onClick={() => setTab("history")}
-          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`min-h-11 whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
             tab === "history"
               ? "border-primary text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -133,8 +139,13 @@ export default function MonitoringPage() {
           Riwayat Simulasi
         </button>
         <button
+          type="button"
+          id="monitoring-tab-usage"
+          role="tab"
+          aria-selected={tab === "usage"}
+          aria-controls="monitoring-panel-usage"
           onClick={() => setTab("usage")}
-          className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+          className={`min-h-11 whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
             tab === "usage"
               ? "border-primary text-foreground"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -144,8 +155,13 @@ export default function MonitoringPage() {
         </button>
         {canEditPricing && (
           <button
+            type="button"
+            id="monitoring-tab-pricing"
+            role="tab"
+            aria-selected={tab === "pricing"}
+            aria-controls="monitoring-panel-pricing"
             onClick={() => setTab("pricing")}
-            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer ${
+            className={`min-h-11 whitespace-nowrap px-4 py-2 text-xs font-semibold border-b-2 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
               tab === "pricing"
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -158,11 +174,15 @@ export default function MonitoringPage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">
-          <AlertCircle size={14} />
+        <div
+          className="flex items-center gap-2 px-4 py-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20"
+          role="alert"
+        >
+          <AlertCircle size={14} aria-hidden="true" />
           <span>{error}</span>
           <button
-            className="ml-auto text-xs underline hover:opacity-80"
+            type="button"
+            className="ml-auto min-h-11 px-2 text-xs underline hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive"
             onClick={() => setError(null)}
           >
             Tutup
@@ -172,40 +192,65 @@ export default function MonitoringPage() {
 
       {/* Loading Indicator */}
       {loading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+        <div
+          className="flex items-center gap-2 text-sm text-muted-foreground py-4"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin motion-reduce:animate-none" />
           Memuat data...
         </div>
       )}
 
       {/* Tab Content */}
       {tab === "history" && (
-        <HistoryTab
-          historyData={historyData}
-          loading={loading}
-          onViewDetail={handleViewDetail}
-          onRefresh={fetchHistory}
-        />
+        <div
+          id="monitoring-panel-history"
+          role="tabpanel"
+          aria-labelledby="monitoring-tab-history"
+          tabIndex={0}
+        >
+          <HistoryTab
+            historyData={historyData}
+            loading={loading}
+            onViewDetail={handleViewDetail}
+            onRefresh={fetchHistory}
+          />
+        </div>
       )}
       {tab === "usage" && (
-        <UsageTab
-          aggregation={aggregation}
-          loading={loading}
-          year={year}
-          month={month}
-          onYearChange={setYear}
-          onMonthChange={setMonth}
-          module={usageModule}
-          onModuleChange={setUsageModule}
-        />
+        <div
+          id="monitoring-panel-usage"
+          role="tabpanel"
+          aria-labelledby="monitoring-tab-usage"
+          tabIndex={0}
+        >
+          <UsageTab
+            aggregation={aggregation}
+            loading={loading}
+            year={year}
+            month={month}
+            onYearChange={setYear}
+            onMonthChange={setMonth}
+            module={usageModule}
+            onModuleChange={setUsageModule}
+          />
+        </div>
       )}
       {tab === "pricing" && canEditPricing && (
-        <PricingTab
-          pricing={pricing}
-          billingRate={billingRate}
-          onBillingRateChange={setBillingRate}
-          onRefresh={fetchPricing}
-        />
+        <div
+          id="monitoring-panel-pricing"
+          role="tabpanel"
+          aria-labelledby="monitoring-tab-pricing"
+          tabIndex={0}
+        >
+          <PricingTab
+            pricing={pricing}
+            billingRate={billingRate}
+            onBillingRateChange={setBillingRate}
+            onRefresh={fetchPricing}
+          />
+        </div>
       )}
 
       {/* Detail Modal */}
@@ -218,6 +263,6 @@ export default function MonitoringPage() {
           }}
         />
       )}
-    </div>
+    </main>
   );
 }

@@ -89,6 +89,31 @@ describe("ReviewModal recording source", () => {
     expect(screen.getByText(/Tempo stabil/)).toBeDefined();
   });
 
+  it("renders the frozen simulation target and the execution actor", () => {
+    render(
+      <ReviewModal
+        isOpen
+        onClose={vi.fn()}
+        record={{
+          ...baseRecord,
+          userEmail: "trainer@example.com",
+          simulationSubject: {
+            type: "participant",
+            participantId: "123e4567-e89b-12d3-a456-426614174000",
+            displayName: "Andi",
+            batchName: "Batch 12",
+            team: "Tim Alpha",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Target simulasi")).toBeDefined();
+    expect(screen.getByText("Andi")).toBeDefined();
+    expect(screen.getByText("Pelaksana")).toBeDefined();
+    expect(screen.getByText("trainer@example.com")).toBeDefined();
+  });
+
   it("loads replay data only after the replay tab is opened", async () => {
     render(<ReviewModal isOpen onClose={vi.fn()} record={baseRecord} />);
 
@@ -100,7 +125,7 @@ describe("ReviewModal recording source", () => {
       "/telefun/annotations/session-1",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Anotasi Replay" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Anotasi Replay" }));
 
     await waitFor(() => {
       expect(mocks.useApi).toHaveBeenCalledWith(
@@ -185,7 +210,11 @@ describe("ReviewModal recording source", () => {
     first.unmount();
 
     render(
-      <ReviewModal isOpen onClose={vi.fn()} record={{ ...baseRecord, score: 8 }} />,
+      <ReviewModal
+        isOpen
+        onClose={vi.fn()}
+        record={{ ...baseRecord, score: 8 }}
+      />,
     );
     expect(screen.getByText("8/10")).toBeDefined();
   });
@@ -228,7 +257,7 @@ describe("ReviewModal recording source", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Kualitas Suara Agen" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Kualitas Suara Agen" }));
     expect(await screen.findByText("Menunggu Antrian Analisis")).toBeDefined();
     expect(screen.queryByText("0/10")).toBeNull();
   });
@@ -246,7 +275,7 @@ describe("ReviewModal recording source", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Kualitas Suara Agen" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Kualitas Suara Agen" }));
     expect(await screen.findByText("Analisis Gagal")).toBeDefined();
     expect(screen.getByRole("button", { name: "Coba Lagi" })).toBeDefined();
   });

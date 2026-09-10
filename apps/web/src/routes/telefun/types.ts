@@ -1,4 +1,5 @@
 import type {
+  SimulationSubjectSnapshot,
   SessionMetrics,
   VoiceQualityAssessment,
   TelefunTranscriptEntry,
@@ -36,6 +37,10 @@ export interface CallRecord {
   telefunModelId?: string;
   telefunTransport?: string;
   transcript?: TelefunTranscriptEntry[];
+  userId?: string | null;
+  userEmail?: string | null;
+  simulationSubject?: SimulationSubjectSnapshot | null;
+  syncStatus?: "synced" | "unsynced" | "offline";
 }
 
 export interface TelefunScoringStatusLabel {
@@ -65,10 +70,7 @@ export function isTelefunRecordScored(
  * is an observable inconsistency and must not be presented as success).
  */
 export function getTelefunScoringStatusLabel(
-  record: Pick<
-    CallRecord,
-    "scoringStatus" | "score" | "scoringRetryable"
-  >,
+  record: Pick<CallRecord, "scoringStatus" | "score" | "scoringRetryable">,
 ): TelefunScoringStatusLabel | null {
   switch (record.scoringStatus) {
     case "pending":

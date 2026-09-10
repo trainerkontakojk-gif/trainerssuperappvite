@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
+import { useAuthStore } from "../../store/authStore";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Play, Settings, History, BarChart3 } from "lucide-react";
 import { PdktMotionFrame } from "./components/PdktMotionFrame";
 import PdktSimulation from "./simulation";
@@ -10,7 +12,11 @@ import { useApi } from "../../hooks/useApi";
 import { pdktClient, unwrapResponse } from "../../lib/api";
 import type { PdktAppSettings } from "./pdktSettings";
 import { DEFAULT_PDKT_MODEL_ID } from "./pdktSettings";
-import type { PdktScenario, PdktConsumerType } from "@trainers/types";
+import type {
+  PdktScenario,
+  PdktConsumerType,
+  SimulationSubjectSelection,
+} from "@trainers/types";
 import { notify } from "../../lib/toast";
 import {
   pollUsageDelta,
@@ -71,6 +77,15 @@ const defaultConsumerTypes: PdktConsumerType[] = [
 
 export default function PdktLanding() {
   const [view, setView] = useState<"home" | "mailbox">("home");
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const [simulationSubject, setSimulationSubject] =
+    useState<SimulationSubjectSelection>({ type: "self" });
+  const profile = useAuthStore((st) => st.profile);
+  const session = useAuthStore((st) => st.session);
+  const accountKey = session?.user?.id ?? null;
+  const canPickParticipant = ["admin", "trainer"].includes(
+    (profile?.role || "").toLowerCase(),
+  );
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isUsageOpen, setIsUsageOpen] = useState(false);
@@ -84,6 +99,7 @@ export default function PdktLanding() {
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
   const usageSnapshotRef = useRef<UsageSnapshot | null>(null);
   const settingsVersionRef = useRef(createSettingsVersionStore());
+  const shouldReduceMotion = useReducedMotion();
 
   const { data: defaultScenarios } = useApi<PdktScenario[]>("/pdkt/scenarios");
   const { data: defaultConsumerTypesFromApi } = useApi<PdktConsumerType[]>(
@@ -118,6 +134,9 @@ export default function PdktLanding() {
         const mapped = res.map((item: any) => ({
           id: item.id,
           timestamp: item.timestamp,
+          user_id: item.user_id ?? null,
+          user_email: item.user_email ?? null,
+          user_role: item.user_role ?? null,
           config: item.config,
           emails: item.emails || [],
           evaluation: item.evaluation,
@@ -126,6 +145,7 @@ export default function PdktLanding() {
             (item.evaluation ? "completed" : "processing"),
           evaluationError: item.evaluation_error,
           timeTaken: item.time_taken,
+          simulationSubject: item.simulationSubject ?? null,
         }));
         setHistory(mapped);
       }
@@ -229,7 +249,22 @@ export default function PdktLanding() {
     }
   };
 
+  useEffect(() => {
+    setSimulationSubject({ type: "self" });
+    setShowSubjectPicker(false);
+  }, [accountKey, canPickParticipant]);
+
   const handleStartSimulation = async () => {
+    if (!canPickParticipant) {
+      await handleConfirmSubject({ type: "self" });
+      return;
+    }
+    setShowSubjectPicker(true);
+  };
+
+  const handleConfirmSubject = async (sel: SimulationSubjectSelection) => {
+    setSimulationSubject(sel);
+    setShowSubjectPicker(false);
     await captureUsageBaseline();
     setSessionDelta(null);
     setSessionDeltaPending(true);
@@ -265,9 +300,10 @@ export default function PdktLanding() {
         {view === "home" ? (
           <motion.div
             key="home"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }}
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
             className="relative z-10"
           >
             <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:px-8 lg:py-10">
@@ -278,7 +314,8 @@ export default function PdktLanding() {
                     <PdktMotionFrame />
                   </div>
                   <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Daftar email masuk ke konsumen@ojk.go.id. Sesi singkat, telaah langsung tersedia.
+                    Daftar email masuk ke konsumen@ojk.go.id. Sesi singkat,
+                    telaah langsung tersedia.
                   </p>
                 </div>
 
@@ -289,7 +326,13 @@ export default function PdktLanding() {
                       Latih balasan email. Pahami dulu, baru tanggapi.
                     </h1>
                     <p className="max-w-xl text-base leading-7 text-muted-foreground">
-                      PDKT — singkatan dari <span className="font-semibold text-foreground">Paham Dulu, Kasih Tanggapan</span> — adalah simulasi balasan email berbasis AI untuk melatih pemahaman, analisa, dan ketepatan solusi. Pilih skenario, susun balasan, lalu tinjau telaah secara langsung.
+                      PDKT — singkatan dari{" "}
+                      <span className="font-semibold text-foreground">
+                        Paham Dulu, Kasih Tanggapan
+                      </span>{" "}
+                      — adalah simulasi balasan email berbasis AI untuk melatih
+                      pemahaman, analisa, dan ketepatan solusi. Pilih skenario,
+                      susun balasan, lalu tinjau telaah secara langsung.
                     </p>
                   </div>
 
@@ -299,8 +342,15 @@ export default function PdktLanding() {
                     </p>
                     <div className="mt-5 space-y-3">
                       <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        whileHover={
+                          shouldReduceMotion
+                            ? undefined
+                            : { scale: 1.01, y: -1 }
+                        }
+                        whileTap={
+                          shouldReduceMotion ? undefined : { scale: 0.99 }
+                        }
+                        type="button"
                         onClick={handleStartSimulation}
                         className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-purple-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-600/20"
                       >
@@ -308,8 +358,15 @@ export default function PdktLanding() {
                         <span>Mulai simulasi</span>
                       </motion.button>
                       <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        whileHover={
+                          shouldReduceMotion
+                            ? undefined
+                            : { scale: 1.01, y: -1 }
+                        }
+                        whileTap={
+                          shouldReduceMotion ? undefined : { scale: 0.99 }
+                        }
+                        type="button"
                         onClick={handleOpenSettings}
                         className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
                       >
@@ -317,8 +374,15 @@ export default function PdktLanding() {
                         <span>Pengaturan</span>
                       </motion.button>
                       <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        whileHover={
+                          shouldReduceMotion
+                            ? undefined
+                            : { scale: 1.01, y: -1 }
+                        }
+                        whileTap={
+                          shouldReduceMotion ? undefined : { scale: 0.99 }
+                        }
+                        type="button"
                         onClick={handleOpenHistory}
                         className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
                       >
@@ -326,8 +390,15 @@ export default function PdktLanding() {
                         <span>Riwayat</span>
                       </motion.button>
                       <motion.button
-                        whileHover={{ scale: 1.01, y: -1 }}
-                        whileTap={{ scale: 0.99 }}
+                        whileHover={
+                          shouldReduceMotion
+                            ? undefined
+                            : { scale: 1.01, y: -1 }
+                        }
+                        whileTap={
+                          shouldReduceMotion ? undefined : { scale: 0.99 }
+                        }
+                        type="button"
                         onClick={handleOpenUsage}
                         className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-medium transition-all border border-border/50 text-muted-foreground hover:bg-foreground/5"
                       >
@@ -338,7 +409,8 @@ export default function PdktLanding() {
                             sessionDelta.totalTokens > 0 ||
                             sessionDelta.totalCalls > 0) && (
                             <span className="ml-auto text-xs font-bold text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full">
-                              {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                              {formatUsageDeltaLabel(sessionDelta)} sesi
+                              terakhir
                             </span>
                           )}
                       </motion.button>
@@ -351,13 +423,15 @@ export default function PdktLanding() {
         ) : (
           <motion.div
             key="mailbox"
-            initial={{ opacity: 0 }}
+            initial={shouldReduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
             className="fixed inset-0 z-[100] flex flex-col overflow-hidden transition-colors duration-500 bg-background"
           >
             <div className="w-full h-full relative flex flex-col bg-card">
               <PdktSimulation
+                simulationSubject={simulationSubject}
                 onBack={() => setView("home")}
                 onBeforeActivity={captureUsageBaseline}
                 onAfterActivity={computeUsageDeltaNow}
@@ -367,6 +441,14 @@ export default function PdktLanding() {
         )}
       </AnimatePresence>
 
+      {showSubjectPicker && (
+        <SimulationSubjectPicker
+          accountKey={accountKey}
+          canPickParticipant={canPickParticipant}
+          onConfirm={handleConfirmSubject}
+          onCancel={() => setShowSubjectPicker(false)}
+        />
+      )}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

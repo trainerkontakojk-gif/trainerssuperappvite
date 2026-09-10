@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_AI_MODEL_ID } from "./ai-models";
+import type { SimulationSubjectSnapshot } from "./simulation-subject";
 
 // ── KETIK Types ────────────────────────────────────────
 export type ChatSender = "agent" | "consumer" | "system";
@@ -204,6 +205,7 @@ export interface KetikSessionHistoryItem {
   typoScore?: number;
   complianceScore?: number;
   reviewStatus?: "pending" | "processing" | "completed" | "failed";
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
 export interface KetikReviewDetail {
@@ -263,6 +265,7 @@ export interface ChatSession {
   typoScore?: number;
   complianceScore?: number;
   reviewStatus?: "pending" | "processing" | "completed" | "failed";
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
 // ── Evaluasi Edukatif (education layer) ─────────────────

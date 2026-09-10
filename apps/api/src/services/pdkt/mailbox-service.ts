@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
+  mapSimulationSubjectRowToSnapshot,
   PdktMailboxItem,
   PdktMailboxBatch,
   PdktMailboxReply,
+  type SimulationSubjectSnapshot,
 } from "@trainers/types";
 import { supabaseAdmin } from "../../lib/supabase";
 
@@ -14,15 +17,84 @@ type BulkDeleteResult = {
   errors: string[];
 };
 
+type StatusError = Error & { status: number };
+
+function statusError(status: number, message: string): StatusError {
+  const error = new Error(message) as StatusError;
+  error.status = status;
+  return error;
+}
+
+function throwMappedMailboxRpcError(
+  error: { message?: string | null; code?: string | null } | null | undefined,
+  fallbackMessage: string,
+): never {
+  const message = error?.message || fallbackMessage;
+  const normalized = message.toLowerCase();
+  const code = error?.code?.toUpperCase();
+  if (code === "PGRST301" || code === "401" || normalized.includes("jwt expired")) {
+    throw statusError(401, "Sesi Anda telah berakhir. Silakan login kembali.");
+  }
+  if (code === "42501") {
+    throw statusError(403, "Anda tidak memiliki izin untuk melakukan tindakan ini.");
+  }
+  if (code === "PGRST116") {
+    throw statusError(404, "Email mailbox tidak ditemukan.");
+  }
+  if (code === "23505") {
+    throw statusError(409, "Data sudah ada, tidak dapat membuat duplikat.");
+  }
+  if (
+    normalized.includes("duplicate key") ||
+    normalized.includes("unique constraint") ||
+    normalized.includes("conflict") ||
+    normalized.includes("already exists")
+  ) {
+    throw statusError(
+      409,
+      normalized.includes("idempotency")
+        ? "Idempotency key digunakan untuk target berbeda."
+        : "Data sudah ada, tidak dapat membuat duplikat.",
+    );
+  }
+  if (normalized.includes("participant reply requires")) {
+    throw statusError(
+      403,
+      "Hanya admin/trainer yang dapat membalas email bertarget peserta.",
+    );
+  }
+  if (normalized.includes("participant attribution requires")) {
+    throw statusError(403, "Hanya admin/trainer yang dapat memilih peserta.");
+  }
+  if (
+    normalized.includes("forbidden") ||
+    normalized.includes("permission") ||
+    normalized.includes("policy")
+  ) {
+    throw statusError(
+      403,
+      "Anda tidak memiliki izin untuk melakukan tindakan ini.",
+    );
+  }
+  if (
+    normalized.includes("mailbox item not found") ||
+    normalized.includes("not_found")
+  ) {
+    throw statusError(404, "Email mailbox tidak ditemukan.");
+  }
+  if (normalized.includes("cannot reply to a deleted")) {
+    throw statusError(409, "Email yang sudah dihapus tidak dapat dibalas.");
+  }
+  if (normalized.includes("validation_error")) {
+    throw statusError(400, "Data mailbox tidak valid.");
+  }
+  console.error("[PDKT] Mailbox RPC failed:", error);
+  throw statusError(500, fallbackMessage);
+}
+
 type BulkDeleteOutcome =
   | { status: "success" }
   | { status: "failure"; error: string };
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "Unknown error";
-}
 
 /**
  * Checks if an actor can delete a mailbox item.
@@ -59,7 +131,8 @@ export async function fetchMailboxItems(
     .limit(100);
 
   if (error) {
-    throw new Error(error.message || "Gagal mengambil data mailbox.");
+    console.error("[PDKT] Mailbox fetch failed:", error);
+    throw new Error("Gagal mengambil data mailbox.");
   }
 
   if (!data || data.length === 0) {
@@ -113,6 +186,7 @@ export async function fetchMailboxItems(
       ...item,
       created_by_user,
       permissions,
+      simulationSubject: mapSimulationSubjectRowToSnapshot(item),
     } as PdktMailboxItem;
   });
 }
@@ -121,10 +195,126 @@ export async function fetchMailboxItems(
  * Create a new mailbox item using the submit_pdkt_mailbox_batch RPC.
  * Supports idempotency via client_request_id.
  */
+export type PdktMailboxWritePayload = PdktMailboxBatch & {
+  /** Authoritative snapshot resolved by the API before generation/save. */
+  simulationSubjectSnapshot?: SimulationSubjectSnapshot;
+};
+
+async function createPdktMailboxSubjectIntent(
+  actorId: string,
+  snapshot: SimulationSubjectSnapshot,
+  clientRequestId: string,
+): Promise<string> {
+  if (
+    snapshot.type !== "participant" ||
+    !snapshot.participantId ||
+    !snapshot.displayName?.trim()
+  ) {
+    throw statusError(400, "Snapshot peserta tidak valid.");
+  }
+
+  const token = randomUUID();
+  const { error } = await supabaseAdmin
+    .from("pdkt_mailbox_subject_intents")
+    .insert({
+      token,
+      actor_id: actorId,
+      subject_type: "participant",
+      subject_peserta_id: snapshot.participantId,
+      subject_name: snapshot.displayName,
+      subject_batch_name: snapshot.batchName,
+      subject_team: snapshot.team,
+      client_request_id: clientRequestId,
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    });
+
+  if (error) {
+    console.error("[PDKT] Failed to register subject snapshot intent:", error);
+    throw statusError(503, "Gagal menyiapkan snapshot peserta.");
+  }
+  return token;
+}
+
 export async function createMailboxItem(
   supabaseClient: SupabaseClient,
-  payload: PdktMailboxBatch,
+  payload: PdktMailboxWritePayload,
+  actorId?: string,
 ): Promise<string> {
+  const subject = payload.simulationSubject ?? { type: "self" as const };
+  if (
+    payload.simulationSubjectSnapshot &&
+    (payload.simulationSubjectSnapshot.type !== subject.type ||
+      (payload.simulationSubjectSnapshot.type === "participant" &&
+        (subject.type !== "participant" ||
+          subject.participantId !==
+            payload.simulationSubjectSnapshot.participantId)))
+  ) {
+    throw statusError(400, "Pilihan peserta tidak cocok dengan snapshot sesi.");
+  }
+  if (subject.type === "participant") {
+    const clientRequestId = payload.client_request_id || `pdkt-${randomUUID()}`;
+    const snapshot = payload.simulationSubjectSnapshot;
+    let snapshotToken: string | null = null;
+    if (snapshot?.type === "participant") {
+      if (!actorId) {
+        throw statusError(
+          500,
+          "Snapshot peserta harus dibuat melalui konteks terautentikasi.",
+        );
+      }
+      // The intent is actor-bound by the authenticated RPC. The API caller
+      // supplies the user JWT; the service role only registers the
+      // already-resolved snapshot.
+      snapshotToken = await createPdktMailboxSubjectIntent(
+        actorId,
+        snapshot,
+        clientRequestId,
+      );
+    }
+    const { data, error } = await supabaseClient.rpc(
+      "submit_pdkt_mailbox_batch_with_subject",
+      {
+        p_client_request_id: clientRequestId,
+        p_sender_name: payload.sender_name,
+        p_sender_email: payload.sender_email,
+        p_subject: payload.subject,
+        p_snippet: payload.snippet,
+        p_scenario_snapshot: payload.scenario_snapshot,
+        p_config_snapshot: payload.config_snapshot,
+        p_inbound_email: payload.inbound_email,
+        p_subject_type: "participant",
+        p_subject_peserta_id: subject.participantId,
+        // Without an intent the RPC resolves the current participant row;
+        // caller-controlled snapshot fields are never sent as authority.
+        p_subject_name: snapshotToken ? (snapshot?.displayName ?? null) : null,
+        p_subject_batch_name: snapshotToken
+          ? (snapshot?.batchName ?? null)
+          : null,
+        p_subject_team: snapshotToken ? (snapshot?.team ?? null) : null,
+        p_subject_snapshot_token: snapshotToken,
+      },
+    );
+    if (error) {
+      const msg = error.message || "";
+      if (msg.includes("FORBIDDEN: participant attribution")) {
+        throw statusError(
+          403,
+          "Hanya admin/trainer yang dapat memilih peserta.",
+        );
+      }
+      if (
+        msg.includes("NOT_FOUND: participant") ||
+        msg.includes("NOT_FOUND: peserta")
+      ) {
+        throw statusError(404, "Peserta tidak ditemukan.");
+      }
+      if (msg.includes("VALIDATION_ERROR: participant")) {
+        throw statusError(400, "Pilihan peserta tidak valid.");
+      }
+      throwMappedMailboxRpcError(error, "Gagal membuat item mailbox.");
+    }
+    return data;
+  }
   const { data, error } = await supabaseClient.rpc(
     "submit_pdkt_mailbox_batch",
     {
@@ -140,7 +330,7 @@ export async function createMailboxItem(
   );
 
   if (error) {
-    throw new Error(error.message || "Gagal membuat item mailbox.");
+    throwMappedMailboxRpcError(error, "Gagal membuat item mailbox.");
   }
 
   return data;
@@ -171,9 +361,10 @@ export async function softDeleteMailboxItem(
   }
 
   if (!canDeletePdktMailboxItem(actor, item)) {
-    const err = new Error("Anda hanya dapat menghapus email yang Anda buat sendiri.");
-    (err as any).status = 403;
-    throw err;
+    throw statusError(
+      403,
+      "Anda hanya dapat menghapus email yang Anda buat sendiri.",
+    );
   }
 
   const { error: deleteError } = await supabaseClient.rpc(
@@ -184,14 +375,46 @@ export async function softDeleteMailboxItem(
   );
 
   if (deleteError) {
-    throw new Error(deleteError.message || "Gagal menghapus item mailbox.");
+    throwMappedMailboxRpcError(deleteError, "Gagal menghapus item mailbox.");
   }
 }
 
 /**
- * Submit an agent reply to a mailbox item using the submit_pdkt_mailbox_reply RPC.
- * Returns the history_id for evaluation polling.
+ * Submit an agent reply and return the row-lock outcome from the database.
+ * The outcome RPC is distinct from the legacy UUID RPC so direct callers keep
+ * their existing contract while API retries can avoid duplicate evaluations.
  */
+export async function submitMailboxReplyWithOutcome(
+  supabaseClient: SupabaseClient,
+  payload: PdktMailboxReply,
+  _actorId?: string,
+): Promise<{ historyId: string; created: boolean }> {
+  const { data: outcome, error } = await supabaseClient.rpc(
+    "submit_pdkt_mailbox_reply_with_outcome",
+    {
+      p_mailbox_id: payload.mailboxId,
+      p_agent_reply: payload.reply,
+      p_time_taken: payload.timeTaken,
+    },
+  );
+
+  if (error) {
+    throwMappedMailboxRpcError(error, "Gagal mengirim balasan mailbox.");
+  }
+
+  if (
+    !outcome ||
+    typeof outcome !== "object" ||
+    typeof outcome.history_id !== "string" ||
+    outcome.history_id.trim().length === 0 ||
+    typeof outcome.created !== "boolean"
+  ) {
+    throw new Error("Gagal mengirim balasan mailbox.");
+  }
+
+  return { historyId: outcome.history_id, created: outcome.created };
+}
+
 export async function submitMailboxReply(
   supabaseClient: SupabaseClient,
   payload: PdktMailboxReply,
@@ -206,13 +429,11 @@ export async function submitMailboxReply(
   );
 
   if (error) {
-    throw new Error(error.message || "Gagal mengirim balasan mailbox.");
+    throwMappedMailboxRpcError(error, "Gagal mengirim balasan mailbox.");
   }
-
   if (typeof historyId !== "string" || historyId.trim().length === 0) {
     throw new Error("Gagal mengirim balasan mailbox.");
   }
-
   return historyId;
 }
 
@@ -270,17 +491,19 @@ export async function bulkSoftDeleteMailboxItems(
       );
 
       if (deleteError) {
+        console.error("[PDKT] Bulk mailbox delete failed:", deleteError);
         return {
           status: "failure",
-          error: `Gagal menghapus email ${item.id}: ${deleteError.message}`,
+          error: `Gagal menghapus email ${item.id}.`,
         };
       }
 
       return { status: "success" };
     } catch (error: unknown) {
+      console.error("[PDKT] Bulk mailbox delete failed:", error);
       return {
         status: "failure",
-        error: `Gagal menghapus email ${item.id}: ${getErrorMessage(error)}`,
+        error: `Gagal menghapus email ${item.id}.`,
       };
     }
   });
@@ -291,12 +514,15 @@ export async function bulkSoftDeleteMailboxItems(
 
     return {
       status: "failure",
-      error: `Gagal menghapus email ${ids[index]}: ${getErrorMessage(result.reason)}`,
+      error: `Gagal menghapus email ${ids[index]}.`,
     };
   });
 
   const errors = outcomes
-    .filter((outcome): outcome is Extract<BulkDeleteOutcome, { status: "failure" }> => outcome.status === "failure")
+    .filter(
+      (outcome): outcome is Extract<BulkDeleteOutcome, { status: "failure" }> =>
+        outcome.status === "failure",
+    )
     .map((outcome) => outcome.error);
 
   return {

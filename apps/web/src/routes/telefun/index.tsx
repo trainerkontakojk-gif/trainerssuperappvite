@@ -18,11 +18,17 @@ import {
 import { SettingsModal } from "./components/SettingsModal";
 import { TelefunMotionFrame } from "./components/TelefunMotionFrame";
 import { PhoneInterface } from "./components/PhoneInterface";
+import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
+import { useAuthStore } from "../../store/authStore";
 import { HistoryModal } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
 import { notify } from "../../lib/toast";
 import { ApiError } from "../../lib/api";
 import type { CallRecord } from "./types";
+import type {
+  SimulationSubjectSelection,
+  SimulationSubjectSnapshot,
+} from "@trainers/types";
 import {
   canOverwriteTelefunLocalHistory,
   parseTelefunLocalHistory,
@@ -95,8 +101,12 @@ export default function TelefunLanding() {
   const [isUsageOpen, setIsUsageOpen] = useState(false);
   const [reviewRecord, setReviewRecord] = useState<CallRecord | null>(null);
 
+  type ActiveTelefunSessionConfig = TelefunAppSettings & {
+    simulationSubject?: SimulationSubjectSnapshot | null;
+    simulationSubjectSelection?: SimulationSubjectSelection;
+  };
   const [activeSessionConfig, setActiveSessionConfig] =
-    useState<TelefunAppSettings | null>(null);
+    useState<ActiveTelefunSessionConfig | null>(null);
   const [activeAccessToken, setActiveAccessToken] = useState<string | null>(
     null,
   );
@@ -109,9 +119,17 @@ export default function TelefunLanding() {
 
   const [sessionDelta, setSessionDelta] = useState<UsageDelta | null>(null);
   const [sessionDeltaPending, setSessionDeltaPending] = useState(false);
+  const authSession = useAuthStore((st) => st.session);
+  const authProfile = useAuthStore((st) => st.profile);
+  const accountKey = authSession?.user?.id ?? null;
+  const canPickParticipant = ["admin", "trainer"].includes(
+    authProfile?.role?.trim().toLowerCase() || "",
+  );
   const sessionBaselineRef = useRef<UsageSnapshot | null>(null);
   const sessionRunIdRef = useRef(0);
   const startCallInFlightRef = useRef(false);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const frozenSubjectRef = useRef<SimulationSubjectSelection>({ type: "self" });
   const optimisticRecordIdRef = useRef<string | null>(null);
   const [retainedObjectUrlOwner] = useState(() =>
     createRetainedObjectUrlOwner(),
@@ -179,6 +197,11 @@ export default function TelefunLanding() {
       sessionReconcilerRef.current = null;
     };
   }, [applyAuthoritativeRecord]);
+
+  useEffect(() => {
+    frozenSubjectRef.current = { type: "self" };
+    setShowSubjectPicker(false);
+  }, [accountKey, canPickParticipant]);
 
   useEffect(() => {
     pageMountedRef.current = true;
@@ -329,7 +352,6 @@ export default function TelefunLanding() {
 
     const randomScenario =
       activeScenarios[Math.floor(Math.random() * activeScenarios.length)];
-    setActiveScenario(randomScenario);
 
     const consumerType =
       settings.preferredConsumerTypeId === "random"
@@ -350,7 +372,7 @@ export default function TelefunLanding() {
     );
     const voiceName = identity.voiceName || settings.voiceName;
 
-    const sessionConfig: TelefunAppSettings = {
+    const sessionConfig: ActiveTelefunSessionConfig = {
       ...settings,
       telefunModelId: normalizedSelection.model.id,
       telefunTransport: "gemini-live",
@@ -362,18 +384,6 @@ export default function TelefunLanding() {
       voiceName,
       resolvedIdentity: identity,
     };
-
-    const runId = ++sessionRunIdRef.current;
-    setSessionDelta(null);
-    sessionBaselineRef.current = null;
-
-    fetchUsageSummary("telefun")
-      .then((data) => {
-        if (data && runId === sessionRunIdRef.current) {
-          sessionBaselineRef.current = data;
-        }
-      })
-      .catch(() => {});
 
     try {
       const res = await createTelefunSession({
@@ -390,21 +400,51 @@ export default function TelefunLanding() {
         response_pacing_mode: settings.responsePacingMode,
         telefun_model_id: sessionConfig.telefunModelId,
         telefun_transport: sessionConfig.telefunTransport,
+        simulationSubject: frozenSubjectRef.current,
       });
-      if (res?.id) {
-        setActiveSessionId(res.id);
-        sessionConfig.sessionId = res.id;
+      if (!res.id) {
+        notify.error("Gagal membuat sesi panggilan. Silakan coba lagi.");
+        return;
       }
-    } catch (e) {
-      console.warn("Failed to create session upfront", e);
+
+      setActiveSessionId(res.id);
+      sessionConfig.sessionId = res.id;
+      sessionConfig.simulationSubject = res.simulationSubject ?? null;
+      sessionConfig.simulationSubjectSelection = frozenSubjectRef.current;
+    } catch {
+      console.warn("Failed to create session upfront");
+      notify.error("Gagal membuat sesi panggilan. Silakan coba lagi.");
+      return;
     }
+
+    setActiveScenario(randomScenario);
+    const runId = ++sessionRunIdRef.current;
+    setSessionDelta(null);
+    sessionBaselineRef.current = null;
+    fetchUsageSummary("telefun")
+      .then((data) => {
+        if (data && runId === sessionRunIdRef.current) {
+          sessionBaselineRef.current = data;
+        }
+      })
+      .catch(() => {});
 
     setActiveSessionConfig(sessionConfig);
     setActiveAccessToken(token);
     setView("chat");
   };
 
-  const startCall = async () => {
+  const requestStartCall = () => {
+    if (!canPickParticipant) {
+      void startCall({ type: "self" });
+      return;
+    }
+    setShowSubjectPicker(true);
+  };
+
+  const startCall = async (selection?: SimulationSubjectSelection) => {
+    if (selection) frozenSubjectRef.current = selection;
+    setShowSubjectPicker(false);
     if (startCallInFlightRef.current) return;
     startCallInFlightRef.current = true;
     try {
@@ -451,6 +491,9 @@ export default function TelefunLanding() {
           consumer_phone:
             sessionConfig?.resolvedIdentity?.phone || "08123456789",
           consumer_city: sessionConfig?.resolvedIdentity?.city || "Jakarta",
+          simulationSubject:
+            sessionConfig?.simulationSubjectSelection ??
+            frozenSubjectRef.current,
           persona_config: {
             consumerType:
               sessionConfig?.activeConsumerType?.name ||
@@ -534,6 +577,8 @@ export default function TelefunLanding() {
         scenarioTitle:
           finalScenario?.title || sessionConfig?.scenarioTitle || "Custom",
         duration,
+        simulationSubject: sessionConfig?.simulationSubject ?? null,
+        syncStatus: "unsynced",
       };
 
       setReviewRecord(fallbackRecord);
@@ -595,13 +640,12 @@ export default function TelefunLanding() {
 
     const savedSessionForScoring =
       savedSession && !savedSession.saveFailed ? savedSession : null;
-    const scoringTask =
-      savedSessionForScoring?.agentRecordingPath
-        ? scoreTelefunSession({
-            sessionId: finalSessionId,
-            agentRecordingPath: savedSessionForScoring.agentRecordingPath,
-            transport: sessionConfig?.telefunTransport,
-          })
+    const scoringTask = savedSessionForScoring?.agentRecordingPath
+      ? scoreTelefunSession({
+          sessionId: finalSessionId,
+          agentRecordingPath: savedSessionForScoring.agentRecordingPath,
+          transport: sessionConfig?.telefunTransport,
+        })
           .then((scoring) => {
             if (scoring.scoringStatus === "failed") {
               notify.warning("Sesi tersimpan, analisis suara belum tersedia.");
@@ -715,6 +759,14 @@ export default function TelefunLanding() {
 
   return (
     <>
+      {showSubjectPicker && (
+        <SimulationSubjectPicker
+          accountKey={accountKey}
+          canPickParticipant={canPickParticipant}
+          onConfirm={(sel: SimulationSubjectSelection) => startCall(sel)}
+          onCancel={() => setShowSubjectPicker(false)}
+        />
+      )}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -771,7 +823,8 @@ export default function TelefunLanding() {
                     <TelefunMotionFrame />
                   </div>
                   <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Simulasi panggilan mirip kondisi nyata. Sesi singkat, evaluasi terstruktur setelah selesai.
+                    Simulasi panggilan mirip kondisi nyata. Sesi singkat,
+                    evaluasi terstruktur setelah selesai.
                   </p>
                 </div>
 
@@ -779,10 +832,17 @@ export default function TelefunLanding() {
                 <section className="flex flex-1 flex-col rounded-[2rem] border border-border/50 bg-card/75 p-7 shadow-xl shadow-black/5 backdrop-blur-xl lg:p-8">
                   <div className="space-y-4">
                     <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-balance lg:text-4xl">
-                      Latih percakapan telepon. Hadapi keluhan dengan lebih siap.
+                      Latih percakapan telepon. Hadapi keluhan dengan lebih
+                      siap.
                     </h1>
                     <p className="max-w-xl text-base leading-7 text-muted-foreground">
-                      Telefun — singkatan dari <span className="font-semibold text-foreground">Telephone Fun</span> — adalah simulasi percakapan telepon berbasis AI untuk melatih penanganan keluhan secara terarah. Pilih skenario, lakukan panggilan, lalu tinjau umpan balik setelah sesi.
+                      Telefun — singkatan dari{" "}
+                      <span className="font-semibold text-foreground">
+                        Telephone Fun
+                      </span>{" "}
+                      — adalah simulasi percakapan telepon berbasis AI untuk
+                      melatih penanganan keluhan secara terarah. Pilih skenario,
+                      lakukan panggilan, lalu tinjau umpan balik setelah sesi.
                     </p>
                   </div>
 
@@ -794,7 +854,7 @@ export default function TelefunLanding() {
                       <motion.button
                         whileHover={{ scale: 1.01, y: -1 }}
                         whileTap={{ scale: 0.99 }}
-                        onClick={startCall}
+                        onClick={requestStartCall}
                         disabled={settingsLoading}
                         className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-violet-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-600/20"
                       >
@@ -839,7 +899,8 @@ export default function TelefunLanding() {
                             sessionDelta.totalTokens > 0 ||
                             sessionDelta.totalCalls > 0) && (
                             <span className="ml-auto text-xs font-bold text-violet-600 bg-violet-100 px-2 py-0.5 rounded-full">
-                              {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                              {formatUsageDeltaLabel(sessionDelta)} sesi
+                              terakhir
                             </span>
                           )}
                       </motion.button>

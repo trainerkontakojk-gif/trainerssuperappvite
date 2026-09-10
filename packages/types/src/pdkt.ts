@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { DEFAULT_AI_MODEL_ID } from "./ai-models";
+import type { SimulationSubjectSnapshot } from "./simulation-subject";
+import { simulationSubjectSelectionSchema } from "./simulation-subject";
 
 // ── PDKT Types ────────────────────────────────────────
 export const PDKT_PROMPT_INPUT_LIMITS = {
@@ -21,9 +23,7 @@ export type WritingStyleMode = "realistic" | "training";
 
 export type PdktPrimaryRecipientType = "ojk" | "reported_company";
 
-export type PdktReplyIntent =
-  | "reply_to_company_with_ojk_cc"
-  | "reply_to_ojk";
+export type PdktReplyIntent = "reply_to_company_with_ojk_cc" | "reply_to_ojk";
 
 export interface PdktRecipientContext {
   primaryRecipientType: PdktPrimaryRecipientType;
@@ -143,10 +143,7 @@ export const pdktPromptRecipientContextSchema = z.object({
   ccRecipients: z
     .array(boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.emailAddress))
     .max(PDKT_PROMPT_INPUT_LIMITS.recipientCount),
-  replyIntent: z.enum([
-    "reply_to_company_with_ojk_cc",
-    "reply_to_ojk",
-  ]),
+  replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
 });
 
 export const pdktPromptConsumerTypeSchema = pdktConsumerTypeSchema.extend({
@@ -170,7 +167,9 @@ export const pdktPromptScenarioSchema = pdktScenarioSchema
     script: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText).optional(),
     sampleEmailTemplate: z
       .object({
-        subject: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.shortText).optional(),
+        subject: boundedPromptString(
+          PDKT_PROMPT_INPUT_LIMITS.shortText,
+        ).optional(),
         body: boundedPromptString(PDKT_PROMPT_INPUT_LIMITS.longText),
       })
       .optional(),
@@ -192,10 +191,7 @@ export const pdktSessionConfigSchema = z.object({
       primaryRecipientType: z.enum(["ojk", "reported_company"]),
       primaryRecipientAddress: z.string(),
       ccRecipients: z.array(z.string()),
-      replyIntent: z.enum([
-        "reply_to_company_with_ojk_cc",
-        "reply_to_ojk",
-      ]),
+      replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
     })
     .optional(),
   enableImageGeneration: z.boolean().default(true),
@@ -249,9 +245,7 @@ const pdktEmailAiOutputBaseSchema = z
 export const pdktGeneratedEmailAiOutputSchema = pdktEmailAiOutputBaseSchema
   .extend({
     imagePrompts: z
-      .array(
-        z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.imagePrompt),
-      )
+      .array(z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.imagePrompt))
       .max(PDKT_PROMPT_INPUT_LIMITS.imagePromptCount)
       .optional(),
   })
@@ -290,10 +284,7 @@ export const pdktEducationAiOutputSchema = z
       .optional(),
     suggestedRewrite: z
       .object({
-        subject: z
-          .string()
-          .max(PDKT_PROMPT_INPUT_LIMITS.shortText)
-          .optional(),
+        subject: z.string().max(PDKT_PROMPT_INPUT_LIMITS.shortText).optional(),
         body: z.string().min(1).max(PDKT_PROMPT_INPUT_LIMITS.longText),
         highlights: z.array(z.string()).max(5).optional(),
       })
@@ -365,10 +356,7 @@ export const emailMessageSchema = z.object({
       primaryRecipientType: z.enum(["ojk", "reported_company"]),
       primaryRecipientAddress: z.string(),
       ccRecipients: z.array(z.string()),
-      replyIntent: z.enum([
-        "reply_to_company_with_ojk_cc",
-        "reply_to_ojk",
-      ]),
+      replyIntent: z.enum(["reply_to_company_with_ojk_cc", "reply_to_ojk"]),
     })
     .optional(),
   attachments: z.array(z.string()).optional(),
@@ -415,6 +403,7 @@ export interface PdktMailboxItem {
   source_mailbox_item_id?: string | null;
   created_by_user?: PdktMailboxCreator | null;
   permissions?: PdktMailboxPermissions;
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
 export interface PdktMailboxCreator {
@@ -431,15 +420,28 @@ export interface PdktMailboxPermissions {
 export interface PdktSessionHistory {
   id: string;
   timestamp: string;
+  user_id?: string | null;
+  user_email?: string | null;
+  user_role?: string | null;
   config: PdktSessionConfig;
   emails: EmailMessage[];
   evaluation: PdktEvaluationResult | null;
-  evaluationStatus: "pending" | "processing" | "completed" | "failed";
+  evaluationStatus:
+    | "not_started"
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed";
   evaluationError?: string | null;
   evaluationStartedAt?: string | null;
   evaluationCompletedAt?: string | null;
   timeTaken: number | null;
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
+
+export const pdktMailboxRetryRequestSchema = z.object({
+  mailboxDraftToken: z.string().min(1),
+});
 
 export const generateEmailSchema = z.object({
   scenarioId: z.string().optional(),
@@ -485,6 +487,7 @@ export const pdktMailboxBatchSchema = z.object({
   scenario_snapshot: pdktScenarioSchema,
   config_snapshot: pdktSessionConfigSchema,
   inbound_email: emailMessageSchema,
+  simulationSubject: simulationSubjectSelectionSchema.optional(),
 });
 export type PdktMailboxBatch = z.infer<typeof pdktMailboxBatchSchema>;
 

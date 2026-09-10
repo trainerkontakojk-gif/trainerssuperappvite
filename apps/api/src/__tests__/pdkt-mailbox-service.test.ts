@@ -8,6 +8,7 @@ vi.mock("../lib/supabase", () => ({
     in: vi.fn().mockResolvedValue({ data: [], error: null }),
     single: vi.fn().mockResolvedValue({ data: {}, error: null }),
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    insert: vi.fn().mockResolvedValue({ data: null, error: null }),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
   },
   createAdminClient: vi.fn().mockReturnThis(),
@@ -15,13 +16,20 @@ vi.mock("../lib/supabase", () => ({
 
 import {
   submitMailboxReply,
+  submitMailboxReplyWithOutcome,
   createMailboxItem,
   softDeleteMailboxItem,
   fetchMailboxItems,
   canDeletePdktMailboxItem,
   bulkSoftDeleteMailboxItems,
 } from "../services/pdkt/mailbox-service";
-import type { PdktMailboxReply, EmailMessage, PdktSessionConfig, PdktScenario, PdktMailboxBatch } from "@trainers/types";
+import type {
+  PdktMailboxReply,
+  EmailMessage,
+  PdktSessionConfig,
+  PdktScenario,
+  PdktMailboxBatch,
+} from "@trainers/types";
 
 function buildMockClient(overrides: Record<string, any> = {}) {
   const m: any = {
@@ -76,7 +84,11 @@ describe("submitMailboxReply", () => {
 
   it("calls submit_pdkt_mailbox_reply RPC with correct payload", async () => {
     const client = buildMockClient();
-    const payload: PdktMailboxReply = { mailboxId, reply: makeReply(), timeTaken: 60 };
+    const payload: PdktMailboxReply = {
+      mailboxId,
+      reply: makeReply(),
+      timeTaken: 60,
+    };
     const result = await submitMailboxReply(client, payload);
     expect(result).toBe("history-1");
     expect(client.rpc).toHaveBeenCalledWith("submit_pdkt_mailbox_reply", {
@@ -93,9 +105,13 @@ describe("submitMailboxReply", () => {
         error: { message: "function not found", code: "PGRST202" },
       }),
     });
-    const payload: PdktMailboxReply = { mailboxId, reply: makeReply(), timeTaken: 60 };
+    const payload: PdktMailboxReply = {
+      mailboxId,
+      reply: makeReply(),
+      timeTaken: 60,
+    };
     await expect(submitMailboxReply(client, payload)).rejects.toThrow(
-      "function not found",
+      "Gagal mengirim balasan mailbox.",
     );
   });
 
@@ -106,7 +122,11 @@ describe("submitMailboxReply", () => {
         error: { code: "PGRST202" } as any,
       }),
     });
-    const payload: PdktMailboxReply = { mailboxId, reply: makeReply(), timeTaken: 60 };
+    const payload: PdktMailboxReply = {
+      mailboxId,
+      reply: makeReply(),
+      timeTaken: 60,
+    };
     await expect(submitMailboxReply(client, payload)).rejects.toThrow(
       "Gagal mengirim balasan mailbox.",
     );
@@ -116,9 +136,35 @@ describe("submitMailboxReply", () => {
     const client = buildMockClient({
       rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     });
-    const payload: PdktMailboxReply = { mailboxId, reply: makeReply(), timeTaken: 60 };
+    const payload: PdktMailboxReply = {
+      mailboxId,
+      reply: makeReply(),
+      timeTaken: 60,
+    };
     await expect(submitMailboxReply(client, payload)).rejects.toThrow(
       "Gagal mengirim balasan mailbox.",
+    );
+  });
+
+  it("does not mark a concurrent retry as newly created", async () => {
+    const client = buildMockClient({
+      rpc: vi.fn().mockResolvedValue({
+        data: { history_id: "history-1", created: false },
+        error: null,
+      }),
+    });
+
+    const payload: PdktMailboxReply = {
+      mailboxId,
+      reply: makeReply(),
+      timeTaken: 60,
+    };
+    await expect(
+      submitMailboxReplyWithOutcome(client, payload, "user-1"),
+    ).resolves.toEqual({ historyId: "history-1", created: false });
+    expect(client.rpc).toHaveBeenCalledWith(
+      "submit_pdkt_mailbox_reply_with_outcome",
+      expect.any(Object),
     );
   });
 });
@@ -126,8 +172,18 @@ describe("submitMailboxReply", () => {
 describe("createMailboxItem", () => {
   const mockConfig: PdktSessionConfig = {
     scenarios: [mockScenario],
-    consumerType: { id: "ramah", name: "Ramah", description: "Sopan", difficulty: "Easy" },
-    identity: { name: "Budi", email: "budi@mail.com", city: "Jakarta", bodyName: "Budi" },
+    consumerType: {
+      id: "ramah",
+      name: "Ramah",
+      description: "Sopan",
+      difficulty: "Easy",
+    },
+    identity: {
+      name: "Budi",
+      email: "budi@mail.com",
+      city: "Jakarta",
+      bodyName: "Budi",
+    },
     enableImageGeneration: false,
     selectedModel: "gemini-3.1-flash-lite",
     resolvedConsumerNameMentionPattern: "none",
@@ -186,16 +242,69 @@ describe("createMailboxItem", () => {
       inbound_email: mockInbound,
     };
     await createMailboxItem(client, payload);
-    expect(client.rpc).toHaveBeenCalledWith("submit_pdkt_mailbox_batch", expect.objectContaining({
-      p_client_request_id: "idemp-123",
-    }));
+    expect(client.rpc).toHaveBeenCalledWith(
+      "submit_pdkt_mailbox_batch",
+      expect.objectContaining({
+        p_client_request_id: "idemp-123",
+      }),
+    );
   });
 
-  it("throws error when RPC call fails", async () => {
+  it("registers a backend-only intent for a frozen participant snapshot", async () => {
+    const client = buildMockClient({
+      rpc: vi.fn().mockResolvedValue({ data: "mailbox-3", error: null }),
+    });
+    const { supabaseAdmin } = await import("../lib/supabase");
+    const payload = {
+      client_request_id: "snapshot-123",
+      sender_name: "Budi Santoso",
+      sender_email: "budi@mail.com",
+      subject: "Pengaduan",
+      snippet: "Saya mau lapor",
+      scenario_snapshot: mockScenario,
+      config_snapshot: mockConfig,
+      inbound_email: mockInbound,
+      simulationSubject: {
+        type: "participant" as const,
+        participantId: "123e4567-e89b-12d3-a456-426614174000",
+      },
+      simulationSubjectSnapshot: {
+        type: "participant" as const,
+        participantId: "123e4567-e89b-12d3-a456-426614174000",
+        displayName: "Andi",
+        batchName: "Batch 12",
+        team: "Tim Alpha",
+      },
+    } as any;
+
+    await expect(createMailboxItem(client, payload, "user-1")).resolves.toBe(
+      "mailbox-3",
+    );
+    expect((supabaseAdmin as any).insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor_id: "user-1",
+        subject_name: "Andi",
+        client_request_id: "snapshot-123",
+      }),
+    );
+    expect(client.rpc).toHaveBeenCalledWith(
+      "submit_pdkt_mailbox_batch_with_subject",
+      expect.objectContaining({
+        p_subject_snapshot_token: expect.any(String),
+        p_subject_name: "Andi",
+      }),
+    );
+  });
+
+  it("maps the concurrent idempotency unique violation to a conflict", async () => {
     const client = buildMockClient({
       rpc: vi.fn().mockResolvedValue({
         data: null,
-        error: { message: "duplicate key", code: "23505" },
+        error: {
+          message:
+            'duplicate key value violates unique constraint "uq_pdkt_mailbox_canonical_client_req"',
+          code: "23505",
+        },
       }),
     });
     const payload: PdktMailboxBatch = {
@@ -207,7 +316,9 @@ describe("createMailboxItem", () => {
       config_snapshot: mockConfig,
       inbound_email: mockInbound,
     };
-    await expect(createMailboxItem(client, payload)).rejects.toThrow("duplicate key");
+    await expect(createMailboxItem(client, payload)).rejects.toMatchObject({
+      status: 409,
+    });
   });
 });
 
@@ -228,7 +339,9 @@ describe("softDeleteMailboxItem", () => {
         error: null,
       }),
     });
-    const err = await softDeleteMailboxItem(client, "id-1", agentActor).catch(e => e);
+    const err = await softDeleteMailboxItem(client, "id-1", agentActor).catch(
+      (e) => e,
+    );
     expect(err.message).toContain("hanya dapat menghapus");
     expect(err.status).toBe(403);
   });
@@ -265,45 +378,54 @@ describe("softDeleteMailboxItem", () => {
 
 describe("canDeletePdktMailboxItem", () => {
   it("returns true for admin role", () => {
-    expect(canDeletePdktMailboxItem(
-      { id: "x", role: "admin" },
-      { user_id: "other" },
-    )).toBe(true);
+    expect(
+      canDeletePdktMailboxItem(
+        { id: "x", role: "admin" },
+        { user_id: "other" },
+      ),
+    ).toBe(true);
   });
 
   it("returns true for trainer role", () => {
-    expect(canDeletePdktMailboxItem(
-      { id: "x", role: "trainer" },
-      { user_id: "other" },
-    )).toBe(true);
+    expect(
+      canDeletePdktMailboxItem(
+        { id: "x", role: "trainer" },
+        { user_id: "other" },
+      ),
+    ).toBe(true);
   });
 
   it("returns true when actor is the creator", () => {
-    expect(canDeletePdktMailboxItem(
-      { id: "user-1", role: "agent" },
-      { created_by_user_id: "user-1" },
-    )).toBe(true);
+    expect(
+      canDeletePdktMailboxItem(
+        { id: "user-1", role: "agent" },
+        { created_by_user_id: "user-1" },
+      ),
+    ).toBe(true);
   });
 
   it("returns false for agent who is not the creator", () => {
-    expect(canDeletePdktMailboxItem(
-      { id: "user-1", role: "agent" },
-      { created_by_user_id: "user-2" },
-    )).toBe(false);
+    expect(
+      canDeletePdktMailboxItem(
+        { id: "user-1", role: "agent" },
+        { created_by_user_id: "user-2" },
+      ),
+    ).toBe(false);
   });
 
   it("falls back to user_id when created_by_user_id is null", () => {
-    expect(canDeletePdktMailboxItem(
-      { id: "user-1", role: "agent" },
-      { created_by_user_id: null, user_id: "user-1" },
-    )).toBe(true);
+    expect(
+      canDeletePdktMailboxItem(
+        { id: "user-1", role: "agent" },
+        { created_by_user_id: null, user_id: "user-1" },
+      ),
+    ).toBe(true);
   });
 
   it("handles null role", () => {
-    expect(canDeletePdktMailboxItem(
-      { id: "x", role: null },
-      { user_id: "other" },
-    )).toBe(false);
+    expect(
+      canDeletePdktMailboxItem({ id: "x", role: null }, { user_id: "other" }),
+    ).toBe(false);
   });
 });
 
@@ -318,9 +440,13 @@ describe("fetchMailboxItems", () => {
 
   it("throws on error", async () => {
     const client = buildMockClient({
-      limit: vi.fn().mockResolvedValue({ data: null, error: { message: "fail" } }),
+      limit: vi
+        .fn()
+        .mockResolvedValue({ data: null, error: { message: "fail" } }),
     });
-    await expect(fetchMailboxItems(client, agentActor)).rejects.toThrow("fail");
+    await expect(fetchMailboxItems(client, agentActor)).rejects.toThrow(
+      "Gagal mengambil data mailbox.",
+    );
   });
 });
 
@@ -333,7 +459,9 @@ describe("bulkSoftDeleteMailboxItems", () => {
 
   it("throws when items fetch fails", async () => {
     const client = buildMockClient({
-      in: vi.fn().mockResolvedValue({ data: null, error: { message: "DB error" } }),
+      in: vi
+        .fn()
+        .mockResolvedValue({ data: null, error: { message: "DB error" } }),
     });
     await expect(
       bulkSoftDeleteMailboxItems(client, ["id-1"], agentActor),
@@ -343,11 +471,21 @@ describe("bulkSoftDeleteMailboxItems", () => {
   it("reports individual item failures for unauthorized items", async () => {
     const client = buildMockClient({
       in: vi.fn().mockResolvedValue({
-        data: [{ id: "id-1", user_id: "other-user", created_by_user_id: "other-user" }],
+        data: [
+          {
+            id: "id-1",
+            user_id: "other-user",
+            created_by_user_id: "other-user",
+          },
+        ],
         error: null,
       }),
     });
-    const result = await bulkSoftDeleteMailboxItems(client, ["id-1"], agentActor);
+    const result = await bulkSoftDeleteMailboxItems(
+      client,
+      ["id-1"],
+      agentActor,
+    );
     expect(result.successCount).toBe(0);
     expect(result.failureCount).toBe(1);
     expect(result.errors[0]).toContain("tidak diizinkan");
@@ -358,13 +496,21 @@ describe("bulkSoftDeleteMailboxItems", () => {
       in: vi.fn().mockResolvedValue({
         data: [
           { id: "my-item", user_id: "user-1", created_by_user_id: "user-1" },
-          { id: "other-item", user_id: "other-user", created_by_user_id: "other-user" },
+          {
+            id: "other-item",
+            user_id: "other-user",
+            created_by_user_id: "other-user",
+          },
         ],
         error: null,
       }),
       rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     });
-    const result = await bulkSoftDeleteMailboxItems(client, ["my-item", "other-item"], agentActor);
+    const result = await bulkSoftDeleteMailboxItems(
+      client,
+      ["my-item", "other-item"],
+      agentActor,
+    );
     expect(result.successCount).toBe(1);
     expect(result.failureCount).toBe(1);
   });

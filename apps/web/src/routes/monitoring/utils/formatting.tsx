@@ -1,5 +1,7 @@
 import { MessageCircle, Mail, Phone } from "lucide-react";
 import type { MonitoringHistoryEntry } from "../../../lib/api/rpc-client";
+import type { SimulationSubjectSnapshot } from "@trainers/types";
+import { formatSimulationSubjectLabel } from "../../../lib/simulation-subject-display";
 
 export type ReviewStatus =
   | "not_started"
@@ -9,6 +11,24 @@ export type ReviewStatus =
   | "failed";
 
 export type UnifiedHistoryEntry = MonitoringHistoryEntry;
+
+export function formatSimulationSubject(
+  subject: SimulationSubjectSnapshot | null | undefined,
+): string {
+  return formatSimulationSubjectLabel(subject, {
+    unknownLabel: "Peserta tidak tercatat — sesi lama",
+  });
+}
+
+export function getSimulationSubjectMeta(
+  subject: SimulationSubjectSnapshot | null | undefined,
+): { label: string; batch: string | null; team: string | null } {
+  return {
+    label: formatSimulationSubject(subject),
+    batch: subject?.type === "participant" ? subject.batchName : null,
+    team: subject?.type === "participant" ? subject.team : null,
+  };
+}
 
 export function formatIdr(value: number): string {
   return `Rp ${Math.round(value).toLocaleString()}`;
@@ -40,11 +60,19 @@ export function formatDate(iso: string): string {
 export function getModuleIcon(module: string) {
   switch (module) {
     case "ketik":
-      return <MessageCircle size={14} className="text-module-ketik" />;
+      return (
+        <MessageCircle
+          size={14}
+          aria-hidden="true"
+          className="text-module-ketik"
+        />
+      );
     case "pdkt":
-      return <Mail size={14} className="text-module-pdkt" />;
+      return <Mail size={14} aria-hidden="true" className="text-module-pdkt" />;
     case "telefun":
-      return <Phone size={14} className="text-module-telefun" />;
+      return (
+        <Phone size={14} aria-hidden="true" className="text-module-telefun" />
+      );
     default:
       return null;
   }

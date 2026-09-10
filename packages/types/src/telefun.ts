@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from "./common";
 import type { TelefunTransport } from "./ai-models";
+import type { SimulationSubjectSnapshot } from "./simulation-subject";
 import type { VoiceQualityAssessment } from "./telefun-assessment";
 import type { TelefunTranscriptEntry } from "./telefun-transcript";
 
@@ -149,6 +150,7 @@ export interface TelefunHistory {
   telefun_model_id?: string | null;
   telefun_transport?: TelefunTransport | null;
   created_at: string;
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
 export interface TelefunCoachingSummary {

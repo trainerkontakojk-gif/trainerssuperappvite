@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   X,
   User,
@@ -8,7 +8,7 @@ import {
   Save,
   RotateCcw,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { usePdktSettingsDraft } from "./settings/usePdktSettingsDraft";
 import { PdktSystemTab } from "./settings/PdktSystemTab";
 import { PdktScenariosTab } from "./settings/PdktScenariosTab";
@@ -73,6 +73,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     defaultConsumerTypes,
   });
 
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const frame = requestAnimationFrame(() => {
+      dialogRef.current
+        ?.querySelector<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        )
+        ?.focus();
+    });
+    const getFocusableElements = () => {
+      if (!dialogRef.current) return [] as HTMLElement[];
+      return Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.closest("[hidden]"));
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        event.shiftKey &&
+        (!active || active === first || !dialog.contains(active))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (!active || active === last || !dialog.contains(active))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown);
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [isOpen]);
+
   const requestClose = () => {
     if (isSaving) return;
     if (
@@ -114,16 +168,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
           />
           <motion.div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
+            tabIndex={-1}
             aria-labelledby={
               scenarioForm.isOpen
                 ? "scenario-wizard-title"
                 : "settings-modal-title"
             }
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={
+              shouldReduceMotion
+                ? { opacity: 1 }
+                : { opacity: 0, scale: 0.95, y: 20 }
+            }
+            animate={
+              shouldReduceMotion
+                ? { opacity: 1 }
+                : { opacity: 1, scale: 1, y: 0 }
+            }
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { opacity: 0, scale: 0.95, y: 20 }
+            }
+            transition={shouldReduceMotion ? { duration: 0 } : undefined}
             className={`relative w-full max-w-4xl max-h-[86vh] rounded-2xl flex flex-col overflow-hidden bg-card border border-border ${scenarioForm.isOpen ? "fixed inset-0 max-w-none max-h-none min-h-dvh h-dvh rounded-none pb-[env(safe-area-inset-bottom)] sm:relative sm:inset-auto sm:max-w-5xl sm:max-h-[86vh] sm:min-h-0 sm:h-[90vh] sm:rounded-2xl" : ""}`}
           >
             {/* Modal Header */}
@@ -145,10 +214,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={requestClose}
                 disabled={isSaving}
                 aria-label="Tutup pengaturan"
-                className="w-8 h-8 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border disabled:cursor-not-allowed disabled:opacity-50"
+                className="min-h-11 min-w-11 flex items-center justify-center bg-foreground/5 hover:bg-foreground/10 rounded-lg text-foreground/75 hover:text-foreground transition-all border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -165,6 +235,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   return (
                     <button
                       key={tab.id}
+                      type="button"
+                      aria-current={isActive ? "page" : undefined}
                       onClick={() => setActiveTab(tab.id)}
                       className={`flex items-center gap-3 px-3 py-2.5 text-[13px] font-medium rounded-lg transition-colors whitespace-nowrap md:w-full text-left shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
                         isActive
@@ -186,10 +258,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeTab}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.15 }}
+                    initial={
+                      shouldReduceMotion
+                        ? { opacity: 1 }
+                        : { opacity: 0, y: 10 }
+                    }
+                    animate={
+                      shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
+                    }
+                    exit={
+                      shouldReduceMotion
+                        ? { opacity: 0 }
+                        : { opacity: 0, y: -10 }
+                    }
+                    transition={
+                      shouldReduceMotion ? { duration: 0 } : { duration: 0.15 }
+                    }
                   >
                     {activeTab === "scenarios" && (
                       <PdktScenariosTab
@@ -264,6 +348,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               className="px-6 py-4 border-t border-border flex justify-between items-center bg-card shrink-0"
             >
               <button
+                type="button"
                 onClick={handleResetDefaults}
                 disabled={isSaving}
                 className="flex items-center gap-2 text-xs font-medium text-red-500/80 hover:text-red-500 transition-colors px-3 py-1.5 rounded-md hover:bg-red-500/5 disabled:cursor-not-allowed disabled:opacity-50"
@@ -273,16 +358,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </button>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={requestClose}
                   disabled={isSaving}
-                  className="px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 px-4 py-2 rounded-md text-sm font-medium text-foreground/80 hover:bg-foreground/5 hover:text-foreground transition-colors border border-transparent disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Batal
                 </button>
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 px-5 py-2 bg-foreground text-background rounded-md text-[13px] font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   {isSaving ? "Menyimpan..." : "Simpan Perubahan"}

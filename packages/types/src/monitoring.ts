@@ -1,4 +1,5 @@
 import type { ChatMessage, KetikEducation } from "./ketik";
+import type { SimulationSubjectSnapshot } from "./simulation-subject";
 import type {
   EmailMessage,
   PdktEvaluationResult,
@@ -147,10 +148,15 @@ export interface MonitoringHistoryEntry extends MonitoringConsumerMetadata {
   telefun_assessment?: MonitoringTelefunAssessment;
   telefun_coaching?: MonitoringTelefunCoaching;
   telefun_legacy?: boolean;
+  simulationSubject?: SimulationSubjectSnapshot | null;
 }
 
 export interface KetikMonitoringReview {
   module: "ketik";
+  user_id?: string | null;
+  user_email?: string | null;
+  user_role?: string | null;
+  simulationSubject?: SimulationSubjectSnapshot | null;
   review_status: MonitoringReviewStatus;
   scores: MonitoringScoreSummary;
   session: {
@@ -182,10 +188,24 @@ export interface KetikMonitoringReview {
 
 export interface PdktMonitoringReview {
   module: "pdkt";
+  user_id: string | null;
+  user_email: string | null;
+  user_role: string | null;
+  simulationSubject: SimulationSubjectSnapshot | null;
   review_status: MonitoringReviewStatus;
-  session: (Pick<MonitoringPdktSession, "config" | "emails" | "consumer_name" | "consumer_type" | "recipient" | "contact"> & {
-    created_at: string | null;
-  }) | null;
+  session:
+    | (Pick<
+        MonitoringPdktSession,
+        | "config"
+        | "emails"
+        | "consumer_name"
+        | "consumer_type"
+        | "recipient"
+        | "contact"
+      > & {
+        created_at: string | null;
+      })
+    | null;
   evaluation: PdktEvaluationResult | null;
   emails: MonitoringEmailMessage[];
   evaluation_error: string | null;
@@ -194,6 +214,10 @@ export interface PdktMonitoringReview {
 
 export interface TelefunMonitoringReview {
   module: "telefun";
+  user_id?: string | null;
+  user_email?: string | null;
+  user_role?: string | null;
+  simulationSubject?: SimulationSubjectSnapshot | null;
   review_status: MonitoringReviewStatus;
   score: number | null;
   recording_path: string | null;

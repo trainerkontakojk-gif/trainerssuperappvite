@@ -1,4 +1,9 @@
 import {
+  mapSimulationSubjectRowToSnapshot,
+  parseSimulationSubjectSnapshot,
+  type SimulationSubjectSnapshot,
+} from "@trainers/types";
+import {
   KetikAppSettings,
   KetikSessionHistoryItem,
   KetikReviewDetail,
@@ -154,7 +159,7 @@ export async function getHistory(
   const res1 = await adminClient
     .from("ketik_history")
     .select(
-      "id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status",
+      "id, date, created_at, scenario_title, consumer_name, consumer_phone, consumer_city, messages, simulation_duration, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, review_status, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
     )
     .eq("user_id", userId)
     .order("date", { ascending: false })
@@ -197,6 +202,9 @@ export async function getHistory(
         simulationDuration: item.metadata?.simulation_duration,
         finalScore: item.score,
         reviewStatus: item.status || "pending",
+        simulationSubject: parseSimulationSubjectSnapshot(
+          item.metadata?.simulation_subject,
+        ),
       }));
     }
     return [];
@@ -218,6 +226,7 @@ export async function getHistory(
     typoScore: item.typo_score,
     complianceScore: item.compliance_score,
     reviewStatus: item.review_status,
+    simulationSubject: mapSimulationSubjectRowToSnapshot(item),
   }));
 }
 
@@ -230,6 +239,7 @@ export async function persistSession(
     consumerCity: string;
     messages: ChatMessage[];
     simulationDuration?: number;
+    simulationSubjectSnapshot?: SimulationSubjectSnapshot | null;
   },
 ): Promise<KetikSessionHistoryItem> {
   const adminClient = createAdminClient();
@@ -243,6 +253,14 @@ export async function persistSession(
     consumer_city: params.consumerCity,
     messages: params.messages,
     simulation_duration: params.simulationDuration,
+    simulation_subject_type: params.simulationSubjectSnapshot?.type ?? "self",
+    simulation_subject_peserta_id:
+      params.simulationSubjectSnapshot?.participantId ?? null,
+    simulation_subject_name:
+      params.simulationSubjectSnapshot?.displayName ?? null,
+    simulation_subject_batch_name:
+      params.simulationSubjectSnapshot?.batchName ?? null,
+    simulation_subject_team: params.simulationSubjectSnapshot?.team ?? null,
   };
 
   const { data, error } = await adminClient
@@ -266,6 +284,7 @@ export async function persistSession(
         scenario_title: params.scenarioTitle,
         consumer_name: params.consumerName,
         simulation_duration: params.simulationDuration,
+        simulation_subject: params.simulationSubjectSnapshot ?? null,
       },
     });
   } catch (err) {
@@ -285,6 +304,7 @@ export async function persistSession(
     messages: data.messages || params.messages,
     simulationDuration: data.simulation_duration,
     reviewStatus: data.review_status || "pending",
+    simulationSubject: mapSimulationSubjectRowToSnapshot(data),
   };
 }
 

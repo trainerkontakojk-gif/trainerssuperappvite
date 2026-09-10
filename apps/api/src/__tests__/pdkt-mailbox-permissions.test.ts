@@ -123,13 +123,15 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
         neq: vi.fn().mockReturnThis(),
         or: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue({ data: mockMailboxItems, error: null }),
+        limit: vi
+          .fn()
+          .mockResolvedValue({ data: mockMailboxItems, error: null }),
       };
 
-      const result = await pdktService.fetchMailboxItems(
-        mockSupabase as any,
-        { id: "agent-1", role: "agent" },
-      );
+      const result = await pdktService.fetchMailboxItems(mockSupabase as any, {
+        id: "agent-1",
+        role: "agent",
+      });
 
       expect(mockSupabase.from).toHaveBeenCalledWith("pdkt_mailbox_items");
       expect(mockSupabase.neq).toHaveBeenCalledWith("status", "deleted");
@@ -138,7 +140,9 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
       );
       expect(mockSupabase.limit).toHaveBeenCalledWith(100);
       expect(mockSupabaseAdmin.from).toHaveBeenCalledWith("profiles");
-      expect(mockProfilesQuery.select).toHaveBeenCalledWith("id, full_name, role");
+      expect(mockProfilesQuery.select).toHaveBeenCalledWith(
+        "id, full_name, role",
+      );
       expect(mockProfilesQuery.in).toHaveBeenCalledWith("id", [
         "agent-1",
         "agent-2",
@@ -214,7 +218,9 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
         });
         expect.fail("Should have thrown 403 error");
       } catch (err: any) {
-        expect(err.message).toContain("Anda hanya dapat menghapus email yang Anda buat sendiri.");
+        expect(err.message).toContain(
+          "Anda hanya dapat menghapus email yang Anda buat sendiri.",
+        );
         expect(err.status).toBe(403);
       }
 
@@ -248,9 +254,12 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
       expect(result.errors[0]).toContain("tidak diizinkan untuk dihapus");
       expect(result.errors[1]).toContain("tidak ditemukan");
       expect(mockSupabase.rpc).toHaveBeenCalledTimes(1);
-      expect(mockSupabase.rpc).toHaveBeenCalledWith("soft_delete_pdkt_mailbox_item", {
-        p_mailbox_id: "m-1",
-      });
+      expect(mockSupabase.rpc).toHaveBeenCalledWith(
+        "soft_delete_pdkt_mailbox_item",
+        {
+          p_mailbox_id: "m-1",
+        },
+      );
     });
 
     it("returns deterministic best-effort summary when an RPC rejects", async () => {
@@ -263,7 +272,8 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
         from: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         in: vi.fn().mockResolvedValue({ data: mockItems, error: null }),
-        rpc: vi.fn()
+        rpc: vi
+          .fn()
           .mockRejectedValueOnce(new Error("network dropped"))
           .mockResolvedValueOnce({ error: null }),
       };
@@ -278,7 +288,7 @@ describe("PDKT Mailbox Permissions and Shared Policy", () => {
         successCount: 1,
         failureCount: 2,
         errors: [
-          "Gagal menghapus email m-1: network dropped",
+          "Gagal menghapus email m-1.",
           "Email dengan ID m-missing tidak ditemukan.",
         ],
       });

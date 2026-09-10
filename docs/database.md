@@ -100,7 +100,8 @@ erDiagram
 | `20260801120000_telefun_openai_webrtc_phase4_durable_lifecycle.sql`       | Additive Telefun WebRTC attempt/transcript/usage/finalization, recording readiness, scoring lock, and service-role RPCs      |
 | `20260801142542_telefun_openai_webrtc_phase5_production_hardening.sql`    | Distributed WebRTC lease/quota, rate-limit windows, orphan cleanup, hashed-user metrics, and precise network/orphan outcomes |
 | `20260811044655_fix_telefun_realtime_lease_renewal.sql`                   | Repair ambiguous lease-expiry reference and add bounded renewal rejection reasons; hosted production canonical verified      |
-| `20260904150000_telefun_scoring_claim_fencing.sql`                       | Embedded API scoring worker lease 300s, claim-token fencing, and additive RPC compatibility signatures                    |
+| `20260904150000_telefun_scoring_claim_fencing.sql`                        | Embedded API scoring worker lease 300s, claim-token fencing, and additive RPC compatibility signatures                       |
+| `20260910000000_simulation_subject_attribution.sql`                       | Persist immutable simulation-subject snapshots across KETIK/PDKT/Telefun and extend the authenticated PDKT mailbox batch RPC |
 
 ### 1. `public.profiles`
 
@@ -312,3 +313,13 @@ Untuk memuat ulang schema cache PostgREST:
 2. Jalankan perintah `NOTIFY pgrst, 'reload schema';`
 
 Ini sering terjadi pada environment _hosted_ setelah proses migrasi yang menambahkan fitur secara ad-hoc tanpa me-restart service PostgREST. Codebase aplikasi ini secara defensif menangani error `42703` dan `PGRST204` (seperti pada logging AI Usage), namun perbaikan ideal tetaplah memastikan schema dan cache remote tetap termutakhir.
+
+## Atribusi Subjek Simulasi
+
+- Kolom nullable (tanpa DEFAULT/backfill) pada `ketik_history`, `pdkt_history`, `telefun_history`, `pdkt_mailbox_items`: `simulation_subject_type` (`self`|`participant`), `simulation_subject_peserta_id` UUID FK `profiler_peserta.id ON DELETE SET NULL`, `simulation_subject_name/batch_name/team` TEXT.
+- CHECK eksplisit NULL: unknown all-null; self ID null + batch/team null (mailbox self name null); participant nama nonblank (ID boleh null setelah delete).
+- Index partial `(simulation_subject_peserta_id, date/timestamp/created_at DESC)` where ID not null.
+- Trigger `enforce_simulation_subject_immutable()` menolak perubahan atribusi setelah insert; mengizinkan FK cleanup (ID→NULL saja) dan update non-atribusi (scoring/status).
+- RPC: `submit_pdkt_mailbox_batch_with_subject` (unique name, hindari overload PostgREST PGRST203); legacy 8-param `submit_pdkt_mailbox_batch` kini explicit self; `submit_pdkt_mailbox_reply` menyalin atribusi mailbox ke history (self dari profil pembalas). Revoke PUBLIC/anon, grant authenticated.
+- Snapshot participant yang sudah di-resolve API didaftarkan sebagai intent opaque di `pdkt_mailbox_subject_intents` melalui service role, lalu dikonsumsi RPC user-JWT. Direct caller hanya boleh menghilangkan metadata snapshot (RPC me-resolve baris peserta saat ini), sehingga tidak dapat memalsukan snapshot frozen.
+- PDKT `/session/init` dan `/session/create` dapat mengembalikan draft mailbox retry bertanda tangan, actor-bound, dan kedaluwarsa. Draft dikirim kembali melalui RPC mailbox yang sama tanpa regenerasi AI; `client_request_id` dibuat bila caller lama tidak menyediakannya agar retry tetap idempotent.

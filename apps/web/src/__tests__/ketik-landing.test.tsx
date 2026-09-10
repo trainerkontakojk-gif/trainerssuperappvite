@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useAuthStore } from "../store/authStore";
 
-const { mockGetSettings, mockGenerate, mockWarning } = vi.hoisted(() => ({
-  mockGetSettings: vi.fn(),
-  mockGenerate: vi.fn(),
-  mockWarning: vi.fn(),
-}));
+const { mockGetSettings, mockGenerate, mockWarning, mockPersist } = vi.hoisted(
+  () => ({
+    mockGetSettings: vi.fn(),
+    mockGenerate: vi.fn(),
+    mockWarning: vi.fn(),
+    mockPersist: vi.fn(),
+  }),
+);
 
 // Mock modules before imports
 vi.mock("../routes/ketik/ketikApi", () => ({
@@ -17,7 +20,7 @@ vi.mock("../routes/ketik/ketikApi", () => ({
     saveSettings: vi.fn().mockResolvedValue(undefined),
     clearHistory: vi.fn().mockResolvedValue(undefined),
     deleteSession: vi.fn().mockResolvedValue(undefined),
-    persistSession: vi.fn().mockResolvedValue({}),
+    persistSession: mockPersist,
     startReview: vi.fn().mockResolvedValue({}),
     getReviewStatus: vi
       .fn()
@@ -108,6 +111,7 @@ describe("KETIK Landing Page", () => {
     mockGetSettings.mockReset().mockResolvedValue(defaultSettings);
     mockGenerate.mockReset().mockResolvedValue({ text: "Test response" });
     mockWarning.mockReset();
+    mockPersist.mockReset().mockResolvedValue({});
     // Mock localStorage
     const store: Record<string, string> = { auth_token: "test-token" };
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(
@@ -117,8 +121,8 @@ describe("KETIK Landing Page", () => {
       store[key] = value;
     });
     useAuthStore.setState({
-      session: { access_token: "test-token" } as any,
-      profile: { id: "u1" } as any,
+      session: { user: { id: "u1" }, access_token: "test-token" } as any,
+      profile: { id: "u1", role: "trainer" } as any,
     });
   });
 
@@ -131,11 +135,11 @@ describe("KETIK Landing Page", () => {
     expect(screen.getByText("Riwayat")).toBeDefined();
     expect(screen.getByText(/Pemakaian bulan ini/i)).toBeDefined();
 
+    expect(screen.getByText(/Ketik — singkatan dari/)).toBeDefined();
     expect(
-      screen.getByText(/Ketik — singkatan dari/), 
-    ).toBeDefined();
-    expect(
-      screen.getByText(/Latih percakapan chat\. Balas lebih tepat dan empatik\./),
+      screen.getByText(
+        /Latih percakapan chat\. Balas lebih tepat dan empatik\./,
+      ),
     ).toBeDefined();
   });
 
@@ -172,9 +176,46 @@ describe("KETIK Landing Page", () => {
 
     await screen.findByText(/Mulai simulasi/i);
     await user.click(screen.getByText(/Mulai simulasi/i));
+    // Picker appears; confirm self to start
+    await screen.findByText(/Pilih peserta latihan/);
+    await user.click(screen.getByRole("button", { name: /^Mulai$/ }));
 
     // Should transition to chat view - check for elapsed timer display (0:00 at start)
     await screen.findByText(/0:00/);
+  });
+
+  it("preserves the active transcript and target when saving fails", async () => {
+    const user = userEvent.setup();
+    let rejectSave!: (error: Error) => void;
+    mockPersist.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject;
+        }),
+    );
+    render(<KetikLanding />);
+
+    await screen.findByText(/Mulai simulasi/i);
+    await user.click(screen.getByText(/Mulai simulasi/i));
+    await screen.findByText(/Pilih peserta latihan/);
+    await user.click(screen.getByRole("button", { name: /^Mulai$/ }));
+    const endButton = await screen.findByRole("button", {
+      name: "Akhiri sesi KETIK",
+    });
+    await user.click(endButton);
+    await waitFor(() => expect(mockPersist).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      rejectSave(new Error("save unavailable"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Akhiri sesi KETIK" }),
+      ).toBeEnabled();
+    });
+    expect(screen.getByText(/iMessage with/)).toBeInTheDocument();
+    expect(mockPersist).toHaveBeenCalledTimes(1);
   });
 
   it("opens settings and warns when no consumer types are available", async () => {
@@ -187,6 +228,8 @@ describe("KETIK Landing Page", () => {
 
     await screen.findByText(/Mulai simulasi/i);
     await user.click(screen.getByText(/Mulai simulasi/i));
+    await screen.findByText(/Pilih peserta latihan/);
+    await user.click(screen.getByRole("button", { name: /^Mulai$/ }));
 
     await waitFor(() => {
       expect(mockWarning).toHaveBeenCalledWith(

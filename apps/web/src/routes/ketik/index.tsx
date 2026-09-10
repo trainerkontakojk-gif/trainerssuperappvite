@@ -1,11 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Settings,
-  History,
-  Play,
-  BarChart3,
-} from "lucide-react";
+import { Settings, History, Play, BarChart3 } from "lucide-react";
 import type {
   KetikAppSettings,
   KetikSessionHistoryItem,
@@ -25,6 +20,8 @@ import { HistoryModal } from "./components/HistoryModal";
 import { UsageModal } from "../../components/UsageModal";
 import { SessionReviewModal } from "./components/SessionReviewModal";
 import { useAuthStore } from "../../store/authStore";
+import { SimulationSubjectPicker } from "../../components/simulation/SimulationSubjectPicker";
+import type { SimulationSubjectSelection } from "@trainers/types";
 import { notify } from "../../lib/toast";
 import {
   pollUsageDelta,
@@ -41,9 +38,10 @@ export default function KetikLanding() {
   const session = useAuthStore((s) => s.session);
   const userId = session?.user?.id;
   const profile = useAuthStore((s) => s.profile);
-  const canStartReview = ["admin", "trainer", "qa"].includes(
-    profile?.role || "",
-  );
+  const normalizedRole = profile?.role?.trim().toLowerCase() || "";
+  const canStartReview = ["admin", "trainer", "qa"].includes(normalizedRole);
+  const accountKey = userId ?? null;
+  const canPickParticipant = ["admin", "trainer"].includes(normalizedRole);
   const [view, setView] = useState<"home" | "chat">("home");
   const [settings, setSettings] = useState<KetikAppSettings>(
     DEFAULT_KETIK_SETTINGS,
@@ -85,6 +83,8 @@ export default function KetikLanding() {
 
   const sessionBaselineRef = useRef<any>(null);
   const sessionRunIdRef = useRef(0);
+  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
+  const frozenSubjectRef = useRef<SimulationSubjectSelection>({ type: "self" });
   const reviewStartedAtRef = useRef<number>(0);
 
   useEffect(() => {
@@ -231,7 +231,20 @@ export default function KetikLanding() {
     }
   };
 
-  const startSimulation = async () => {
+  useEffect(() => {
+    frozenSubjectRef.current = { type: "self" };
+    setShowSubjectPicker(false);
+  }, [accountKey, canPickParticipant]);
+
+  const requestStartSimulation = () => {
+    if (!canPickParticipant) {
+      void startSimulation({ type: "self" });
+      return;
+    }
+    setShowSubjectPicker(true);
+  };
+
+  const startSimulation = async (selection?: SimulationSubjectSelection) => {
     if (!session?.access_token) {
       notify.error("Sesi Anda telah berakhir. Silakan login kembali.");
       return;
@@ -283,6 +296,8 @@ export default function KetikLanding() {
     setReviewMessages([]);
     setSessionDelta(null);
     sessionBaselineRef.current = null;
+    if (selection) frozenSubjectRef.current = selection;
+    setShowSubjectPicker(false);
     const runId = ++sessionRunIdRef.current;
     setIsLoading(true);
 
@@ -314,6 +329,7 @@ export default function KetikLanding() {
           consumerCity: currentConfig.identity.city,
           messages,
           simulationDuration: currentConfig.simulationDuration,
+          simulationSubject: frozenSubjectRef.current,
         });
 
         const newSession: KetikSessionHistoryItem = {
@@ -326,6 +342,7 @@ export default function KetikLanding() {
           messages: session.messages,
           simulationDuration: session.simulationDuration,
           reviewStatus: session.reviewStatus ?? "pending",
+          simulationSubject: session.simulationSubject ?? null,
         };
 
         setHistory((prev) => [newSession, ...prev]);
@@ -335,7 +352,11 @@ export default function KetikLanding() {
         setSelectedTypos([]);
       } catch (error) {
         console.error("Error ending session:", error);
-        notify.error("Gagal menyimpan sesi.");
+        setIsLoading(false);
+        notify.error(
+          "Gagal menyimpan sesi. Transkrip dipertahankan, coba lagi tanpa mengubah target.",
+        );
+        return;
       } finally {
         setIsLoading(false);
       }
@@ -693,7 +714,8 @@ export default function KetikLanding() {
                     <KetikMotionFrame />
                   </div>
                   <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                    Simulasi chat mirip percakapan nyata. Sesi singkat, telaah dan skor langsung tersedia.
+                    Simulasi chat mirip percakapan nyata. Sesi singkat, telaah
+                    dan skor langsung tersedia.
                   </p>
                 </div>
 
@@ -704,7 +726,14 @@ export default function KetikLanding() {
                       Latih percakapan chat. Balas lebih tepat dan empatik.
                     </h1>
                     <p className="max-w-xl text-base leading-7 text-muted-foreground">
-                      Ketik — singkatan dari <span className="font-semibold text-foreground">Kelas Etika &amp; Trik Komunikasi</span> — adalah simulasi percakapan chat berbasis AI untuk melatih ketepatan, empati, dan kepatuhan prosedur. Pilih skenario, jalankan simulasi, lalu tinjau telaah secara langsung.
+                      Ketik — singkatan dari{" "}
+                      <span className="font-semibold text-foreground">
+                        Kelas Etika &amp; Trik Komunikasi
+                      </span>{" "}
+                      — adalah simulasi percakapan chat berbasis AI untuk
+                      melatih ketepatan, empati, dan kepatuhan prosedur. Pilih
+                      skenario, jalankan simulasi, lalu tinjau telaah secara
+                      langsung.
                     </p>
                   </div>
 
@@ -716,7 +745,7 @@ export default function KetikLanding() {
                       <motion.button
                         whileHover={{ scale: 1.01, y: -1 }}
                         whileTap={{ scale: 0.99 }}
-                        onClick={startSimulation}
+                        onClick={requestStartSimulation}
                         disabled={isLoading}
                         className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl px-5 text-sm font-semibold transition-all bg-emerald-600 text-white hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-600/20"
                       >
@@ -725,7 +754,9 @@ export default function KetikLanding() {
                         ) : (
                           <Play className="h-4 w-4 fill-current" />
                         )}
-                        <span>{isLoading ? "Memulai..." : "Mulai simulasi"}</span>
+                        <span>
+                          {isLoading ? "Memulai..." : "Mulai simulasi"}
+                        </span>
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.01, y: -1 }}
@@ -758,7 +789,8 @@ export default function KetikLanding() {
                             sessionDelta.totalTokens > 0 ||
                             sessionDelta.totalCalls > 0) && (
                             <span className="ml-auto text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                              {formatUsageDeltaLabel(sessionDelta)} sesi terakhir
+                              {formatUsageDeltaLabel(sessionDelta)} sesi
+                              terakhir
                             </span>
                           )}
                       </motion.button>
@@ -789,6 +821,7 @@ export default function KetikLanding() {
                   currentUserId=""
                   templates={settings.quickTemplates}
                   signatureName={settings.identitySettings.signatureName}
+                  simulationSubject={selectedSessionForReview?.simulationSubject}
                 />
               )}
             </div>
@@ -818,6 +851,14 @@ export default function KetikLanding() {
         sessionDeltaPending={sessionDeltaPending}
       />
 
+      {showSubjectPicker && (
+        <SimulationSubjectPicker
+          accountKey={accountKey}
+          canPickParticipant={canPickParticipant}
+          onConfirm={(sel) => startSimulation(sel)}
+          onCancel={() => setShowSubjectPicker(false)}
+        />
+      )}
       {selectedSessionForReview && (
         <SessionReviewModal
           isOpen={isReviewOpen}

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import {
   pdktMailboxBatchPromptSchema,
@@ -8,13 +9,30 @@ import {
 } from "@trainers/types";
 import * as pdktService from "../../services/pdkt-service";
 import { requireRole } from "../../middleware/role";
+import { SimulationSubjectError } from "../../services/simulation-subject-service";
+import {
+  PDKT_MAILBOX_RETRY_TOKEN_MAX_LENGTH,
+  PdktMailboxRetryError,
+  verifyPdktMailboxRetryToken,
+} from "../../services/pdkt/mailbox-retry";
 import { aiRateLimitMiddleware } from "../../middleware/rateLimit";
 import {
   Variables,
   getUserClient,
   jsonAiError,
   jsonServerError,
+  resolveRequestSimulationSubject,
 } from "./route-utils";
+
+const pdktMailboxBatchRequestSchema = z.union([
+  pdktMailboxBatchPromptSchema,
+  z.object({
+    mailboxDraftToken: z
+      .string()
+      .min(1)
+      .max(PDKT_MAILBOX_RETRY_TOKEN_MAX_LENGTH),
+  }),
+]);
 
 const mailbox = new Hono<{ Variables: Variables }>();
 
@@ -41,19 +59,62 @@ mailbox.get(
 mailbox.post(
   "/batch",
   requireRole("admin", "trainer", "leader", "tl", "spv", "om", "agent"),
-  zValidator("json", pdktMailboxBatchPromptSchema),
+  zValidator("json", pdktMailboxBatchRequestSchema),
   async (c) => {
     const body = c.req.valid("json");
+    const user = c.get("user");
     const userClient = getUserClient(c);
 
     try {
-      const data = await pdktService.createMailboxItem(userClient, body);
+      if ("mailboxDraftToken" in body) {
+        const draft = verifyPdktMailboxRetryToken(
+          body.mailboxDraftToken,
+          user.id,
+        );
+        const data = await pdktService.createMailboxItem(
+          userClient,
+          {
+            ...draft.batch,
+            simulationSubjectSnapshot: draft.simulationSubjectSnapshot,
+          },
+          user.id,
+        );
+        return c.json({ success: true, data });
+      }
+
+      const simulationSubject = await resolveRequestSimulationSubject(
+        c,
+        body.simulationSubject,
+      );
+      const data = await pdktService.createMailboxItem(
+        userClient,
+        {
+          ...body,
+          simulationSubjectSnapshot: simulationSubject,
+        },
+        user.id,
+      );
       return c.json({ success: true, data });
     } catch (error: unknown) {
+      if (error instanceof SimulationSubjectError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: error.code, message: error.message },
+          },
+          error.status as 400,
+        );
+      }
+      if (error instanceof PdktMailboxRetryError) {
+        return jsonServerError(c, error);
+      }
       console.error("[PDKT /mailbox/batch] Raw error:", error);
       console.error("[PDKT /mailbox/batch] Error detail:", {
         message: error instanceof Error ? error.message : String(error),
-        code: typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined,
+        code:
+          typeof error === "object" && error !== null
+            ? (error as { code?: unknown }).code
+            : undefined,
         details:
           typeof error === "object" && error !== null
             ? (error as { details?: unknown }).details
@@ -121,27 +182,36 @@ mailbox.post(
   zValidator("json", pdktMailboxReplyPromptSchema),
   async (c) => {
     const body = c.req.valid("json");
-    const user = c.get("user");
     const userClient = getUserClient(c);
 
     try {
-      const historyId = await pdktService.submitMailboxReply(userClient, body);
+      const reply = await pdktService.submitMailboxReplyWithOutcome(
+        userClient,
+        body,
+      );
+      const historyId = reply.historyId;
 
-      // Process evaluation in background (fire-and-forget, graceful on test context)
-      const evalPromise = pdktService.processPdktEvaluation(historyId, user.id);
-      try {
-        if (c.executionCtx?.waitUntil) {
-          c.executionCtx.waitUntil(evalPromise);
-        } else {
+      // Only the database row-lock winner receives created=true, so a retry
+      // never starts evaluation a second time or shifts usage ownership.
+      if (reply.created) {
+        const evalPromise = pdktService.processPdktEvaluation(
+          historyId,
+          c.get("user").id,
+        );
+        try {
+          if (c.executionCtx?.waitUntil) {
+            c.executionCtx.waitUntil(evalPromise);
+          } else {
+            evalPromise.catch((err) =>
+              console.error("[PDKT Async Eval Error]", err),
+            );
+          }
+        } catch (_execCtxErr) {
+          // No ExecutionContext (e.g. app.request() in tests) — silently ignore
           evalPromise.catch((err) =>
             console.error("[PDKT Async Eval Error]", err),
           );
         }
-      } catch (_execCtxErr) {
-        // No ExecutionContext (e.g. app.request() in tests) — silently ignore
-        evalPromise.catch((err) =>
-          console.error("[PDKT Async Eval Error]", err),
-        );
       }
 
       return c.json({ success: true, data: { historyId } });
@@ -149,7 +219,10 @@ mailbox.post(
       console.error("[PDKT /mailbox/reply] Raw error:", error);
       console.error("[PDKT /mailbox/reply] Error detail:", {
         message: error instanceof Error ? error.message : String(error),
-        code: typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined,
+        code:
+          typeof error === "object" && error !== null
+            ? (error as { code?: unknown }).code
+            : undefined,
         details:
           typeof error === "object" && error !== null
             ? (error as { details?: unknown }).details

@@ -36,6 +36,7 @@ const SidakReportsAi = lazy(() => import("./routes/sidak/reports-ai"));
 const KetikLanding = lazy(() => import("./routes/ketik/index"));
 const PdktLanding = lazy(() => import("./routes/pdkt/index"));
 const PdktSimulation = lazy(() => import("./routes/pdkt/simulation"));
+const PdktHistory = lazy(() => import("./routes/pdkt/history"));
 const MonitoringPage = lazy(() => import("./routes/monitoring"));
 const TelefunLanding = lazy(() => import("./routes/telefun/index"));
 const AccountPage = lazy(() => import("./routes/account"));
@@ -327,9 +328,8 @@ const pdktSimulationRoute = createRoute({
 const pdktHistoryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pdkt/history",
-  beforeLoad: () => {
-    throw redirect({ to: "/pdkt" });
-  },
+  component: PdktHistory,
+  beforeLoad: requireRole(["trainer", "leader", "admin", "agent"]),
 });
 
 const monitoringRoute = createRoute({

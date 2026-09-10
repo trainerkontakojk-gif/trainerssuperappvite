@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllPages } from "../lib/supabase-pagination";
 import { getLeaderScopeSnapshot } from "./leader-access-service";
 import { checkProfilerPhotoUrl } from "./profiler-photo-storage";
@@ -244,7 +245,8 @@ export async function renameFolder(
     .from("profiler_peserta")
     .update({ batch_name: name })
     .eq("batch_name", oldName);
-  if (pesertaErr) console.error("Gagal update batch_name peserta:", pesertaErr.message);
+  if (pesertaErr)
+    console.error("Gagal update batch_name peserta:", pesertaErr.message);
 
   return data;
 }
@@ -263,7 +265,8 @@ export async function deleteFolder(id: string): Promise<void> {
     .from("profiler_peserta")
     .delete()
     .eq("batch_name", folder.name);
-  if (pesertaErr) throw new Error("Gagal menghapus data peserta: " + pesertaErr.message);
+  if (pesertaErr)
+    throw new Error("Gagal menghapus data peserta: " + pesertaErr.message);
 
   // 3. Hapus folder
   const { error } = await supabaseAdmin
@@ -436,19 +439,14 @@ export async function getUpcomingBirthdays(
     .filter((r) => r.tgl_lahir)
     .map((r) => {
       const dob = new Date(r.tgl_lahir!);
-      const next = new Date(
-        today.getFullYear(),
-        dob.getMonth(),
-        dob.getDate(),
-      );
+      const next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
       if (next < today) next.setFullYear(today.getFullYear() + 1);
       const daysUntil = Math.round(
         (next.getTime() - today.getTime()) / 86400000,
       );
       const nextYear =
         today.getMonth() > dob.getMonth() ||
-        (today.getMonth() === dob.getMonth() &&
-          today.getDate() > dob.getDate())
+        (today.getMonth() === dob.getMonth() && today.getDate() > dob.getDate())
           ? today.getFullYear() + 1
           : today.getFullYear();
       const age = nextYear - dob.getFullYear();
@@ -463,6 +461,47 @@ export async function getUpcomingBirthdays(
     });
 
   return enriched.sort((a, b) => a.daysUntil - b.daysUntil).slice(0, limit);
+}
+
+export type ProfilerPesertaOption = Pick<
+  ProfilerPeserta,
+  "id" | "nama" | "tim" | "batch_name"
+>;
+
+export function escapePesertaSearchLiteral(input: string): string {
+  return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+export async function searchPesertaOptions(
+  search: string,
+  accessibleIds?: string[] | null,
+  client: SupabaseClient = supabaseAdmin,
+): Promise<ProfilerPesertaOption[]> {
+  const trimmed = (search ?? "").trim();
+  if (trimmed.length < 2 || trimmed.length > 100) {
+    throw new Error("Pencarian minimal 2 dan maksimal 100 karakter");
+  }
+  if (
+    accessibleIds !== null &&
+    accessibleIds !== undefined &&
+    accessibleIds.length === 0
+  ) {
+    return [];
+  }
+  const escaped = escapePesertaSearchLiteral(trimmed);
+  let query = client
+    .from("profiler_peserta")
+    .select("id, nama, tim, batch_name")
+    .ilike("nama", `%${escaped}%`)
+    .order("nama", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(20);
+  if (accessibleIds !== null && accessibleIds !== undefined) {
+    query = query.in("id", accessibleIds);
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ProfilerPesertaOption[];
 }
 
 export async function getPesertaById(
@@ -851,17 +890,23 @@ function mapReorderError(message: string): Error {
     lower.includes("akses ditolak") ||
     lower.includes("permission denied")
   ) {
-    return new Error("Konfigurasi reorder belum sinkron. Hubungi administrator.");
+    return new Error(
+      "Konfigurasi reorder belum sinkron. Hubungi administrator.",
+    );
   }
   if (
     lower.includes("duplikat") ||
     lower.includes("payload reorder tidak valid") ||
     lower.includes("invalid")
   ) {
-    return new Error("Payload urutan tidak valid. Muat ulang data lalu coba lagi.");
+    return new Error(
+      "Payload urutan tidak valid. Muat ulang data lalu coba lagi.",
+    );
   }
   if (lower.includes("tidak ditemukan") || lower.includes("tidak ter-update")) {
-    return new Error("Sebagian peserta tidak ditemukan. Muat ulang folder lalu coba lagi.");
+    return new Error(
+      "Sebagian peserta tidak ditemukan. Muat ulang folder lalu coba lagi.",
+    );
   }
   return new Error(message || "Gagal menyimpan urutan peserta");
 }

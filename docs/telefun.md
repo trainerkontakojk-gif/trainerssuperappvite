@@ -99,12 +99,12 @@ pricing views. They are not an admission path.
 The only retained Telefun OpenAI provider operation is cleanup for an
 already-owned historical WebRTC call:
 
-| Method | Path | Behavior |
-| --- | --- | --- |
-| `POST` | `/telefun/realtime/openai/webrtc/sessions/:sessionId/call` | Always `404`; no auth, body parse, provider, SDP, media, or start work. |
-| `OPTIONS` for `POST` | same | Always `404`. |
-| `OPTIONS` for `DELETE` | same | Exact-origin cleanup CORS only. |
-| `DELETE` | same | Authenticated owner-bound cleanup only. |
+| Method                 | Path                                                       | Behavior                                                                |
+| ---------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `POST`                 | `/telefun/realtime/openai/webrtc/sessions/:sessionId/call` | Always `404`; no auth, body parse, provider, SDP, media, or start work. |
+| `OPTIONS` for `POST`   | same                                                       | Always `404`.                                                           |
+| `OPTIONS` for `DELETE` | same                                                       | Exact-origin cleanup CORS only.                                         |
+| `DELETE`               | same                                                       | Authenticated owner-bound cleanup only.                                 |
 
 `DELETE` requires an exact allowed origin, bearer token, active
 admin/trainer profile, ownership, historical `openai-webrtc` transport, and a
@@ -160,13 +160,13 @@ retired.
 
 ### Telefun service
 
-| Variable | Meaning |
-| --- | --- |
-| `GEMINI_API_KEY` | Required Gemini Live credential. |
-| `OPENAI_API_KEY` | Optional, server-only historical hangup credential; never enables Telefun OpenAI Realtime. |
+| Variable                           | Meaning                                                                                                              |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                   | Required Gemini Live credential.                                                                                     |
+| `OPENAI_API_KEY`                   | Optional, server-only historical hangup credential; never enables Telefun OpenAI Realtime.                           |
 | `TELEFUN_OPENAI_WEBRTC_ORPHAN_KEY` | Optional server-only key for encrypted historical cleanup references. Missing/invalid values fail cleanup retryably. |
-| `ALLOWED_ORIGINS` | Exact production origins; applies to the cleanup `DELETE` CORS boundary. |
-| `TELEFUN_INTERNAL_TOKEN` | Independent internal scoring-worker health credential; it does not enable OpenAI scoring. |
+| `ALLOWED_ORIGINS`                  | Exact production origins; applies to the cleanup `DELETE` CORS boundary.                                             |
+| `TELEFUN_INTERNAL_TOKEN`           | Independent internal scoring-worker health credential; it does not enable OpenAI scoring.                            |
 
 All `TELEFUN_OPENAI*` enablement, cohort, allowlist, and model-rollout inputs
 are retired no-ops. They must not be used in deployment instructions or as a
@@ -209,3 +209,9 @@ in `docs/rebuild-logs/` and the historical ADR/audit files as evidence only.
 They do **not** describe a supported runtime, deployment configuration, scoring
 flow, browser transport, or provider test plan. This document supersedes their
 active-operation guidance.
+
+## Simulation subject attribution
+
+- `POST /telefun/sessions` menerima `simulationSubject` opsional (`self` | `participant` + UUID); omit → `self`. Response/list/detail memproyeksikan `simulationSubject` camelCase via `projectTelefunHistoryRow` (server wins).
+- Kolom `simulation_subject_*` nullable di `telefun_history` (FK `SET NULL`, CHECK eksplisit, trigger immutable + validasi snapshot vs role). `apps/telefun/src/db.ts:createSession` menerima subject opsional (default self).
+- Frontend simpan selection + snapshot di active-session config; fallback creation kirim selection (fresh lookup waktu fallback); record lokal tanpa konfirmasi bertanda `unsynced`, tidak diklaim authoritative.

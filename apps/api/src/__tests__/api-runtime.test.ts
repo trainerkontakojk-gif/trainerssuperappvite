@@ -120,6 +120,7 @@ describe("startApiRuntime", () => {
       setExitCode: (code: number) => {
         exitCodes.push(code);
       },
+      subjectIntentCleanup: { stop: vi.fn() },
     });
     return { runtime, signals, exitCodes };
   }

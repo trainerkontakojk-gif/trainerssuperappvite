@@ -25,6 +25,7 @@ export default function ScenarioImage({
         onClick,
         role: "button",
         tabIndex: 0,
+        "aria-label": isPdf ? "PDF" : alt,
         onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -33,6 +34,9 @@ export default function ScenarioImage({
         },
       }
     : {};
+  const interactiveClass = onClick
+    ? "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+    : "";
 
   if (variant === "fullscreen") {
     if (isPdf) {
@@ -58,7 +62,7 @@ export default function ScenarioImage({
   if (isPdf) {
     return (
       <div
-        className={`relative min-w-20 min-h-20 bg-[var(--bg)] rounded-lg border border-[var(--border)] overflow-hidden flex flex-col items-center justify-center gap-1 text-[var(--fg)] ${className}`}
+        className={`relative min-w-20 min-h-20 bg-[var(--bg)] rounded-lg border border-[var(--border)] overflow-hidden flex flex-col items-center justify-center gap-1 text-[var(--fg)] ${interactiveClass} ${className}`}
         {...interactiveProps}
       >
         <FileText className="w-5 h-5 text-[var(--fg2)]" />
@@ -72,10 +76,15 @@ export default function ScenarioImage({
   if (variant === "thumbnail") {
     return (
       <div
-        className={`relative min-w-20 min-h-20 bg-[var(--bg)] rounded-lg overflow-hidden flex items-center justify-center ${className}`}
+        className={`relative min-w-20 min-h-20 bg-[var(--bg)] rounded-lg overflow-hidden flex items-center justify-center ${interactiveClass} ${className}`}
         {...interactiveProps}
       >
-        <img src={src} alt={alt} className="object-contain w-full h-full" />
+        <img
+          src={src}
+          alt={alt}
+          aria-hidden={onClick ? true : undefined}
+          className="object-contain w-full h-full"
+        />
       </div>
     );
   }
@@ -83,10 +92,15 @@ export default function ScenarioImage({
   // variant === 'grid'
   return (
     <div
-      className={`relative aspect-[4/3] bg-[var(--bg)] rounded-lg border border-[var(--border)] overflow-hidden flex items-center justify-center ${className}`}
+      className={`relative aspect-[4/3] bg-[var(--bg)] rounded-lg border border-[var(--border)] overflow-hidden flex items-center justify-center ${interactiveClass} ${className}`}
       {...interactiveProps}
     >
-      <img src={src} alt={alt} className="object-contain w-full h-full" />
+      <img
+        src={src}
+        alt={alt}
+        aria-hidden={onClick ? true : undefined}
+        className="object-contain w-full h-full"
+      />
     </div>
   );
 }

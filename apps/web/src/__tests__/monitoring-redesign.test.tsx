@@ -57,7 +57,15 @@ const pdktEntry: UnifiedHistoryEntry = {
   score: 85,
   history: [{ type: "received", subject: "Undian", body: "Selamat!" }],
   user_email: "agent2@test.com",
+  user_role: "trainer",
   review_status: "completed",
+  simulationSubject: {
+    type: "participant",
+    participantId: "123e4567-e89b-12d3-a456-426614174000",
+    displayName: "Andi",
+    batchName: "Batch 12",
+    team: "Tim Alpha",
+  },
   pdkt_evaluation: {
     score: 85,
     feedback: "Jawaban sudah relevan dan jelas",
@@ -77,8 +85,19 @@ const telefunAssessment = parseVoiceQualityAssessment({
   },
   intonation: { score: 7, verdict: "Baik", feedback: "Stabil" },
   articulation: { score: 8, verdict: "Baik", feedback: "Artikulasi jelas" },
-  fillerWords: { score: 8, count: 3, examples: [], verdict: "Baik", feedback: "Sedikit" },
-  emotionalTone: { score: 8, dominant: "Empati", verdict: "Baik", feedback: "Empatik" },
+  fillerWords: {
+    score: 8,
+    count: 3,
+    examples: [],
+    verdict: "Baik",
+    feedback: "Sedikit",
+  },
+  emotionalTone: {
+    score: 8,
+    dominant: "Empati",
+    verdict: "Baik",
+    feedback: "Empatik",
+  },
   transcript: "",
   strengths: ["Artikulasi jelas"],
   highlights: ["De-eskalasi berhasil"],
@@ -166,6 +185,32 @@ describe("HistoryCard — module-specific assessment previews", () => {
     expect(screen.getByText(/Jawaban sudah relevan/)).toBeTruthy();
   });
 
+  it("renders subject, batch/team, actor role, and review status together", () => {
+    render(<HistoryCard entry={pdktEntry} onViewDetail={onViewDetail} />);
+    expect(screen.getByText(/Andi/)).toBeTruthy();
+    expect(screen.getByText(/Batch 12/)).toBeTruthy();
+    expect(screen.getByText(/Tim Alpha/)).toBeTruthy();
+    expect(screen.getByText(/trainer/)).toBeTruthy();
+    expect(screen.getByText("Selesai")).toBeTruthy();
+  });
+
+  it("marks a deleted participant record without rewriting the frozen name", () => {
+    render(
+      <HistoryCard
+        entry={{
+          ...pdktEntry,
+          simulationSubject: {
+            ...pdktEntry.simulationSubject!,
+            participantId: null,
+          },
+        }}
+        onViewDetail={onViewDetail}
+      />,
+    );
+
+    expect(screen.getByText(/Andi \(record peserta tidak lagi tersedia\)/)).toBeTruthy();
+  });
+
   it("renders PDKT without typos as 'Tanpa typo'", () => {
     const cleanPdkt = {
       ...pdktEntry,
@@ -190,7 +235,9 @@ describe("HistoryCard — module-specific assessment previews", () => {
   });
 
   it("renders 'Belum dinilai' placeholder when no assessment data", () => {
-    render(<HistoryCard entry={noAssessmentEntry} onViewDetail={onViewDetail} />);
+    render(
+      <HistoryCard entry={noAssessmentEntry} onViewDetail={onViewDetail} />,
+    );
     expect(screen.getByText("Belum dinilai")).toBeTruthy();
   });
 

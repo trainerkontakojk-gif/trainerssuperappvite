@@ -1,17 +1,13 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
-import {
-  X,
-  Phone,
-  MessageCircle,
-  Mail,
-} from "lucide-react";
+import { X, Phone, MessageCircle, Mail } from "lucide-react";
 import {
   type UnifiedHistoryEntry,
   getModuleBadgeClasses,
   getScoreColor,
   formatDuration,
   formatDate,
+  getSimulationSubjectMeta,
 } from "../utils/formatting";
 import { ReviewStatusBadge } from "./ReviewStatusBadge";
 import { KetikReviewPanel } from "./KetikReviewPanel";
@@ -23,7 +19,13 @@ interface ReviewDetailModalProps {
   onClose: () => void;
 }
 
-function Metadata({ label, value }: { label: string; value?: string | number | null }) {
+function Metadata({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
   return (
     <div className="min-w-0">
       <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -39,6 +41,12 @@ function Metadata({ label, value }: { label: string; value?: string | number | n
 export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -57,7 +65,7 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -75,14 +83,22 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
       const activeElement = document.activeElement as HTMLElement | null;
 
       if (event.shiftKey) {
-        if (!activeElement || !dialogRef.current?.contains(activeElement) || activeElement === firstElement) {
+        if (
+          !activeElement ||
+          !dialogRef.current?.contains(activeElement) ||
+          activeElement === firstElement
+        ) {
           event.preventDefault();
           lastElement.focus();
         }
         return;
       }
 
-      if (!activeElement || !dialogRef.current?.contains(activeElement) || activeElement === lastElement) {
+      if (
+        !activeElement ||
+        !dialogRef.current?.contains(activeElement) ||
+        activeElement === lastElement
+      ) {
         event.preventDefault();
         firstElement.focus();
       }
@@ -96,7 +112,7 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
         previouslyFocused.focus();
       }
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div
@@ -104,36 +120,57 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
       role="presentation"
     >
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
+        initial={shouldReduceMotion ? undefined : { opacity: 0 }}
+        animate={shouldReduceMotion ? undefined : { opacity: 1 }}
+        exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+        onClick={() => onCloseRef.current()}
         className="absolute inset-0 bg-black/20 backdrop-blur-sm"
       />
       <motion.div
         ref={dialogRef}
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl"
+        initial={
+          shouldReduceMotion ? undefined : { opacity: 0, scale: 0.95, y: 20 }
+        }
+        animate={
+          shouldReduceMotion ? undefined : { opacity: 1, scale: 1, y: 0 }
+        }
+        exit={
+          shouldReduceMotion ? undefined : { opacity: 0, scale: 0.95, y: 20 }
+        }
+        className="relative flex max-h-[90vh] max-h-dvh w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border/50 bg-card shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="review-detail-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-foreground/[0.02] shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 border-b border-border bg-foreground/[0.02] shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             {entry.module === "ketik" && (
-              <MessageCircle size={16} className="text-module-ketik shrink-0" />
+              <MessageCircle
+                size={16}
+                aria-hidden="true"
+                className="text-module-ketik shrink-0"
+              />
             )}
             {entry.module === "pdkt" && (
-              <Mail size={16} className="text-module-pdkt shrink-0" />
+              <Mail
+                size={16}
+                aria-hidden="true"
+                className="text-module-pdkt shrink-0"
+              />
             )}
             {entry.module === "telefun" && (
-              <Phone size={16} className="text-module-telefun shrink-0" />
+              <Phone
+                size={16}
+                aria-hidden="true"
+                className="text-module-telefun shrink-0"
+              />
             )}
             <div className="min-w-0">
-              <h2 id="review-detail-title" className="text-sm font-black tracking-tight truncate">
+              <h2
+                id="review-detail-title"
+                className="text-sm font-black tracking-tight truncate"
+              >
                 {entry.scenario_title}
               </h2>
               <div className="flex items-center gap-2 mt-0.5">
@@ -151,14 +188,40 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
           </div>
           <button
             ref={closeButtonRef}
+            type="button"
             aria-label="Tutup detail monitoring"
             onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-foreground/5 flex items-center justify-center transition-colors shrink-0"
+            className="min-h-11 min-w-11 rounded-full hover:bg-foreground/5 flex items-center justify-center transition-colors shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
+        {(() => {
+          const subject = getSimulationSubjectMeta(entry.simulationSubject);
+          return (
+            <dl
+              className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-5"
+              aria-label="Atribusi simulasi"
+            >
+              <Metadata
+                label="Target"
+                value={subject.label}
+              />
+              <Metadata label="Batch" value={subject.batch} />
+              <Metadata label="Tim" value={subject.team} />
+              <Metadata
+                label="Pelaksana"
+                value={
+                  [entry.user_email, entry.user_role]
+                    .filter(Boolean)
+                    .join(" · ") || null
+                }
+              />
+              <Metadata label="Konsumen" value={entry.consumer_name} />
+            </dl>
+          );
+        })()}
         {/* Body — Each panel now renders its own content (transcript + AI assessment) */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <dl
@@ -205,7 +268,9 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
           {entry.module === "ketik" && (
             <KetikReviewPanel
               entryId={entry.id}
-              messages={Array.isArray(entry.history) ? entry.history : undefined}
+              messages={
+                Array.isArray(entry.history) ? entry.history : undefined
+              }
             />
           )}
           {entry.module === "pdkt" && (
@@ -217,8 +282,8 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border bg-foreground/[0.02] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border bg-foreground/[0.02] px-6 py-4 shrink-0">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block">
                 Durasi
@@ -247,9 +312,10 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
             </div>
           </div>
           <button
+            type="button"
             aria-label="Tutup detail monitoring"
-            onClick={onClose}
-            className="px-5 py-2 bg-foreground text-background rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all"
+            onClick={() => onCloseRef.current()}
+            className="min-h-11 rounded-xl bg-foreground px-5 py-2 text-xs font-black uppercase tracking-widest text-background hover:opacity-90 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             Tutup
           </button>

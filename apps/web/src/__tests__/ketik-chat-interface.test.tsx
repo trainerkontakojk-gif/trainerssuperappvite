@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   KetikScenario,
   KetikSessionConfig,
+  SimulationSubjectSnapshot,
 } from "@trainers/types";
 
 const { mockGenerate } = vi.hoisted(() => ({
@@ -52,6 +53,14 @@ const initialMessages: ChatMessage[] = [
     timestamp: "2026-07-11T00:00:00.000Z",
   },
 ];
+
+const participantSubject: SimulationSubjectSnapshot = {
+  type: "participant",
+  participantId: "123e4567-e89b-12d3-a456-426614174000",
+  displayName: "Andi",
+  batchName: "Batch 12",
+  team: "Tim Alpha",
+};
 
 function renderChat(
   overrides: Partial<React.ComponentProps<typeof ChatInterface>> = {},
@@ -200,7 +209,11 @@ describe("KETIK ChatInterface CSV export", () => {
         downloadedFileName = this.download;
       });
 
-    renderChat({ isReviewMode: true, initialMessages });
+    renderChat({
+      isReviewMode: true,
+      initialMessages,
+      simulationSubject: participantSubject,
+    });
     fireEvent.click(
       screen.getByRole("button", { name: "Download transcript CSV" }),
     );
@@ -216,6 +229,9 @@ describe("KETIK ChatInterface CSV export", () => {
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
     const csv = new TextDecoder().decode(bytes.slice(3));
     expect(csv.startsWith("Pengirim,Pesan,Waktu")).toBe(true);
+    expect(csv).toContain("Target");
+    expect(csv).toContain("Andi");
+    expect(csv).toContain("Batch 12");
     expect(csv).toContain(
       '"Konsumen","Pengaduan kartu kredit – nasabah José #1, ""urgent""\nBaris 2"',
     );

@@ -6,13 +6,14 @@ import { CreateEmailModal } from "./components/CreateEmailModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal, type SessionHistory } from "./components/HistoryModal";
 import { useApi } from "../../hooks/useApi";
-import { pdktClient, unwrapResponse } from "../../lib/api";
+import { ApiError, pdktClient, unwrapResponse } from "../../lib/api";
 import type {
   PdktMailboxItem,
   PdktScenario,
   PdktConsumerType,
   PdktIdentity,
   EmailMessage,
+  SimulationSubjectSelection,
 } from "@trainers/types";
 import { Link } from "@tanstack/react-router";
 import { Plus, ArrowLeft, AlertCircle, RefreshCw } from "lucide-react";
@@ -72,12 +73,14 @@ const defaultConsumerTypes: PdktConsumerType[] = [
 const EVALUATION_RETRY_START_GRACE_MS = 15_000;
 
 interface PdktSimulationProps {
+  simulationSubject?: SimulationSubjectSelection;
   onBack?: () => void;
   onBeforeActivity?: () => Promise<void>;
   onAfterActivity?: () => void;
 }
 
 export default function PdktSimulation({
+  simulationSubject = { type: "self" },
   onBack,
   onBeforeActivity,
   onAfterActivity,
@@ -87,6 +90,12 @@ export default function PdktSimulation({
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isStartingNew, setIsStartingNew] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
+  const [isRetryingMailboxSave, setIsRetryingMailboxSave] = useState(false);
+  const [pendingMailboxRetry, setPendingMailboxRetry] = useState<{
+    token: string;
+    message: EmailMessage;
+    subjectLabel?: string;
+  } | null>(null);
 
   // Bulk selection states
   const [selectedBulkIds, setSelectedBulkIds] = useState<Set<string>>(
@@ -120,7 +129,12 @@ export default function PdktSimulation({
       string,
       {
         result: any | null;
-        status: "pending" | "processing" | "completed" | "failed";
+        status:
+          | "not_started"
+          | "pending"
+          | "processing"
+          | "completed"
+          | "failed";
         error: string | null;
       }
     >
@@ -217,6 +231,9 @@ export default function PdktSimulation({
         const mapped = res.map((item: any) => ({
           id: item.id,
           timestamp: item.timestamp,
+          user_id: item.user_id ?? null,
+          user_email: item.user_email ?? null,
+          user_role: item.user_role ?? null,
           config: item.config,
           emails: item.emails || [],
           evaluation: item.evaluation,
@@ -225,6 +242,7 @@ export default function PdktSimulation({
             (item.evaluation ? "completed" : "processing"),
           evaluationError: item.evaluation_error,
           timeTaken: item.time_taken,
+          simulationSubject: item.simulationSubject ?? null,
         }));
         setHistory(mapped);
       }
@@ -547,6 +565,7 @@ export default function PdktSimulation({
         last_activity_at: ts,
         time_taken: session.timeTaken ?? null,
         permissions: { can_delete: false },
+        simulationSubject: session.simulationSubject ?? null,
       };
 
       setEvaluations((prev) => {
@@ -567,6 +586,33 @@ export default function PdktSimulation({
     }
     setIsHistoryOpen(false);
   }; // Start new simulation session
+  const handleRetryMailboxSave = async () => {
+    if (!pendingMailboxRetry) return;
+    setIsRetryingMailboxSave(true);
+    try {
+      const mailboxId = (await unwrapResponse(
+        await pdktClient.mailbox.batch.$post({
+          json: { mailboxDraftToken: pendingMailboxRetry.token },
+        }),
+      )) as string;
+      await refetch();
+      await fetchHistory();
+      setPendingMailboxRetry(null);
+      setReplayItem(null);
+      setFilter("open");
+      setSelectedId(mailboxId);
+      notify.success("Email berhasil disimpan ke mailbox.");
+    } catch (err) {
+      notify.error(
+        err instanceof Error
+          ? err.message
+          : "Draft email belum berhasil disimpan. Coba lagi.",
+      );
+    } finally {
+      setIsRetryingMailboxSave(false);
+    }
+  };
+
   const handleStartNew = async (scenario: PdktScenario) => {
     setIsStartingNew(true);
     try {
@@ -608,6 +654,7 @@ export default function PdktSimulation({
               config.resolvedConsumerNameMentionPattern,
             writingStyleMode: config.writingStyleMode,
             client_request_id: clientRequestId,
+            simulationSubject,
           },
         }),
       )) as { id: string; message: EmailMessage };
@@ -620,7 +667,45 @@ export default function PdktSimulation({
       setIsNewModalOpen(false);
     } catch (err) {
       console.error("[PDKT] Failed to start new simulation:", err);
-      notify.error("Gagal memulai simulasi baru.");
+      const details =
+        err instanceof ApiError
+          ? err.details
+          : err && typeof err === "object" && "details" in err
+            ? (err as { details?: unknown }).details
+            : null;
+      const retryDraft =
+        details && typeof details === "object" && "retryDraft" in details
+          ? (details as { retryDraft?: unknown }).retryDraft
+          : null;
+      const retryToken =
+        retryDraft && typeof retryDraft === "object" && "token" in retryDraft
+          ? (retryDraft as { token?: unknown }).token
+          : null;
+      const retryMessage =
+        retryDraft &&
+        typeof retryDraft === "object" &&
+        "inbound_email" in retryDraft
+          ? (retryDraft as { inbound_email?: unknown }).inbound_email
+          : null;
+      if (
+        typeof retryToken === "string" &&
+        retryMessage &&
+        typeof retryMessage === "object"
+      ) {
+        setPendingMailboxRetry({
+          token: retryToken,
+          message: retryMessage as EmailMessage,
+          subjectLabel:
+            typeof (retryMessage as { subject?: unknown }).subject === "string"
+              ? (retryMessage as { subject: string }).subject
+              : undefined,
+        });
+        notify.error(
+          "Email sudah dibuat, tetapi belum tersimpan. Draft aman dan siap dicoba lagi.",
+        );
+      } else {
+        notify.error("Gagal memulai simulasi baru.");
+      }
     } finally {
       setIsStartingNew(false);
     }
@@ -792,17 +877,20 @@ export default function PdktSimulation({
           <div className="flex items-center gap-3">
             {onBack ? (
               <button
+                type="button"
                 onClick={onBack}
-                className="min-h-10 min-w-10 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center"
+                className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                 title="Kembali ke Laman Utama"
+                aria-label="Kembali ke Laman Utama"
               >
                 <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
               </button>
             ) : (
               <Link
                 to="/pdkt"
-                className="min-h-10 min-w-10 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center"
+                className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                 title="Kembali ke Laman Utama"
+                aria-label="Kembali ke Laman Utama"
               >
                 <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
               </Link>
@@ -817,7 +905,7 @@ export default function PdktSimulation({
         <div className="flex flex-1 overflow-hidden p-4 gap-4">
           <div className="flex-1 flex bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden relative">
             {/* Sidebar Skeleton (w-80) */}
-            <div className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0 animate-pulse">
+            <div className="w-full md:w-80 border-r border-[var(--border)] flex flex-col h-full bg-[var(--surface)] shrink-0 animate-pulse motion-reduce:animate-none">
               {/* Header skeleton */}
               <div className="p-4 border-b border-[var(--border)] space-y-4">
                 <div className="flex items-center justify-between">
@@ -852,7 +940,7 @@ export default function PdktSimulation({
             </div>
 
             {/* Main Detail Pane Skeleton */}
-            <div className="hidden md:flex flex-1 flex-col min-w-0 bg-[var(--surface)] animate-pulse">
+            <div className="hidden md:flex flex-1 flex-col min-w-0 bg-[var(--surface)] animate-pulse motion-reduce:animate-none">
               {/* Detail Header skeleton */}
               <div className="p-6 border-b border-[var(--border)] flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -905,8 +993,9 @@ export default function PdktSimulation({
             <p className="text-xs text-[var(--fg2)] leading-relaxed">{error}</p>
           </div>
           <button
+            type="button"
             onClick={refetch}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--inv-bg)] text-[var(--inv-fg)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all"
+            className="inline-flex min-h-11 items-center gap-2 px-5 py-2.5 bg-[var(--inv-bg)] text-[var(--inv-fg)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Coba Lagi
@@ -943,17 +1032,20 @@ export default function PdktSimulation({
         <div className="flex items-center gap-3">
           {onBack ? (
             <button
+              type="button"
               onClick={onBack}
-              className="min-h-10 min-w-10 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center"
+              className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
               title="Kembali ke Laman Utama"
+              aria-label="Kembali ke Laman Utama"
             >
               <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
             </button>
           ) : (
             <Link
               to="/pdkt"
-              className="min-h-10 min-w-10 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center"
+              className="min-h-11 min-w-11 hover:bg-[var(--bg)] rounded-lg transition-colors flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
               title="Kembali ke Laman Utama"
+              aria-label="Kembali ke Laman Utama"
             >
               <ArrowLeft className="w-5 h-5 text-[var(--fg2)]" />
             </Link>
@@ -963,6 +1055,44 @@ export default function PdktSimulation({
           </h1>
         </div>
       </div>
+
+      {pendingMailboxRetry && (
+        <div
+          className="flex shrink-0 flex-col gap-3 border-b border-[var(--chart-amber)]/30 bg-[var(--surface)] px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <div className="min-w-0">
+            <p className="font-semibold text-[var(--fg)]">
+              Email belum tersimpan
+            </p>
+            <p className="truncate text-xs text-[var(--fg2)]">
+              {pendingMailboxRetry.subjectLabel || "Email yang dibuat"} — tidak
+              ada AI generation ulang saat retry.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleRetryMailboxSave()}
+              disabled={isRetryingMailboxSave}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--inv-bg)] px-3.5 text-xs font-semibold text-[var(--inv-fg)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isRetryingMailboxSave ? "animate-spin motion-reduce:animate-none" : ""}`}
+              />
+              {isRetryingMailboxSave ? "Menyimpan..." : "Coba simpan lagi"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPendingMailboxRetry(null)}
+              disabled={isRetryingMailboxSave}
+              className="min-h-11 rounded-lg border border-[var(--border)] px-3 text-xs font-medium text-[var(--fg2)] hover:bg-[var(--bg)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4">
@@ -1033,14 +1163,16 @@ export default function PdktSimulation({
                 </p>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setIsNewModalOpen(true)}
-                    className="mt-4 px-4 py-2 bg-[var(--inv-bg)] text-[var(--inv-fg)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all"
+                    className="mt-4 min-h-11 px-4 py-2 bg-[var(--inv-bg)] text-[var(--inv-fg)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                   >
                     Simulasi Baru
                   </button>
                   <button
+                    type="button"
                     onClick={() => setIsSettingsOpen(true)}
-                    className="mt-4 px-4 py-2 border border-[var(--border)] text-[var(--fg)] rounded-lg text-xs font-semibold hover:bg-[var(--bg)] transition-all"
+                    className="mt-4 min-h-11 px-4 py-2 border border-[var(--border)] text-[var(--fg)] rounded-lg text-xs font-semibold hover:bg-[var(--bg)] transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
                   >
                     Pengaturan
                   </button>

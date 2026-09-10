@@ -2,11 +2,14 @@ import { telefunClient, unwrapResponse } from "../../lib/api";
 import type { TelefunAppSettings } from "./telefunSettings";
 import type { CallRecord } from "./types";
 import { validateAssessment } from "../../lib/voiceAssessmentUtils";
-import type {
-  SessionMetrics,
-  TelefunScoringStatus,
+import type { SessionMetrics, TelefunScoringStatus } from "@trainers/types";
+import {
+  mapSimulationSubjectRowToSnapshot,
+  parseTelefunTranscript,
+  simulationSubjectSnapshotSchema,
+  type SimulationSubjectSelection,
+  type SimulationSubjectSnapshot,
 } from "@trainers/types";
-import { parseTelefunTranscript } from "@trainers/types";
 
 export interface TelefunSessionRow {
   id: string;
@@ -41,6 +44,14 @@ export interface TelefunSessionRow {
   telefun_transport?: string | null;
   live_prompt_instructions?: string | null;
   messages?: unknown;
+  user_id?: string | null;
+  user_email?: string | null;
+  simulationSubject?: SimulationSubjectSnapshot | null;
+  simulation_subject_type?: string | null;
+  simulation_subject_peserta_id?: string | null;
+  simulation_subject_name?: string | null;
+  simulation_subject_batch_name?: string | null;
+  simulation_subject_team?: string | null;
 }
 
 export interface CreateTelefunSessionInput {
@@ -57,6 +68,7 @@ export interface CreateTelefunSessionInput {
   telefun_model_id?: string;
   telefun_transport?: string;
   live_prompt_instructions?: string | null;
+  simulationSubject?: SimulationSubjectSelection;
 }
 
 export async function getTelefunSettings(): Promise<Record<
@@ -125,6 +137,9 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
       : undefined;
 
   const transcript = parseTelefunTranscript(row.messages);
+  const parsedSubject = simulationSubjectSnapshotSchema.safeParse(
+    row.simulationSubject,
+  );
 
   return {
     id: row.id,
@@ -156,6 +171,11 @@ export function mapTelefunSessionRow(row: TelefunSessionRow): CallRecord {
     telefunModelId: row.telefun_model_id ?? undefined,
     telefunTransport: row.telefun_transport ?? undefined,
     transcript,
+    userId: row.user_id ?? null,
+    userEmail: row.user_email ?? null,
+    simulationSubject: parsedSubject.success
+      ? parsedSubject.data
+      : mapSimulationSubjectRowToSnapshot(row),
   };
 }
 
@@ -186,9 +206,7 @@ export function upsertTelefunSessionRecord(
   const merged = [
     record,
     ...history.filter((existing) => existing.id !== record.id),
-  ].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return {
     history: merged,

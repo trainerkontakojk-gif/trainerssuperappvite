@@ -1,9 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  BarChart3,
-  Search,
-  Clock,
-} from "lucide-react";
+import { BarChart3, Search, Clock } from "lucide-react";
 import { formatIdr } from "../utils/formatting";
 import { MODULE_OPTIONS } from "./constants";
 
@@ -113,7 +109,7 @@ export function UsageTab({
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={loading}>
       {/* KPI Summary - Unified 4 Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Aktivitas AI */}
@@ -124,11 +120,17 @@ export function UsageTab({
             </span>
             <p className="text-2xl font-bold tracking-tight text-foreground">
               {totalSummary.calls.toLocaleString()}{" "}
-              <span className="text-xs text-muted-foreground font-normal">Calls</span>
+              <span className="text-xs text-muted-foreground font-normal">
+                Calls
+              </span>
             </p>
           </div>
           <p className="text-[11px] text-muted-foreground/80 mt-2.5 flex items-center gap-1">
-            <Clock size={12} className="text-muted-foreground/60" />
+            <Clock
+              size={12}
+              aria-hidden="true"
+              className="text-muted-foreground/60"
+            />
             {aggregation.length} Pengguna Aktif
           </p>
         </div>
@@ -154,7 +156,10 @@ export function UsageTab({
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Simulasi
             </span>
-            <p className="text-2xl font-bold tracking-tight" style={{ color: 'var(--chart-green)' }}>
+            <p
+              className="text-2xl font-bold tracking-tight"
+              style={{ color: "var(--chart-green)" }}
+            >
               Rp {Math.round(totalSummary.simulationCost).toLocaleString()}
             </p>
           </div>
@@ -169,7 +174,10 @@ export function UsageTab({
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground block mb-1">
               Biaya Penilaian AI
             </span>
-            <p className="text-2xl font-bold tracking-tight" style={{ color: 'var(--chart-amber)' }}>
+            <p
+              className="text-2xl font-bold tracking-tight"
+              style={{ color: "var(--chart-amber)" }}
+            >
               Rp {Math.round(totalSummary.reviewCost).toLocaleString()}
             </p>
           </div>
@@ -182,10 +190,15 @@ export function UsageTab({
       {/* Sleek Filter Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-muted/30 p-2 rounded-xl border border-border/40">
         <div className="flex items-center gap-2 flex-wrap">
+          <label htmlFor="monitoring-usage-month" className="sr-only">
+            Bulan
+          </label>
           <select
+            id="monitoring-usage-month"
+            aria-label="Bulan penggunaan"
             value={month}
             onChange={(e) => onMonthChange(Number(e.target.value))}
-            className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
           >
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
@@ -193,10 +206,15 @@ export function UsageTab({
               </option>
             ))}
           </select>
+          <label htmlFor="monitoring-usage-year" className="sr-only">
+            Tahun
+          </label>
           <select
+            id="monitoring-usage-year"
+            aria-label="Tahun penggunaan"
             value={year}
             onChange={(e) => onYearChange(Number(e.target.value))}
-            className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
           >
             {[2025, 2026, 2027].map((y) => (
               <option key={y} value={y}>
@@ -204,10 +222,15 @@ export function UsageTab({
               </option>
             ))}
           </select>
+          <label htmlFor="monitoring-usage-module" className="sr-only">
+            Modul
+          </label>
           <select
+            id="monitoring-usage-module"
+            aria-label="Modul penggunaan"
             value={module}
             onChange={(e) => onModuleChange(e.target.value)}
-            className="px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
+            className="min-h-11 px-3 py-2 bg-background border border-border/80 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-foreground cursor-pointer"
           >
             {MODULE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -221,19 +244,23 @@ export function UsageTab({
           <div className="relative flex-1 md:w-64 md:flex-initial">
             <Search
               size={14}
+              aria-hidden="true"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
+              type="search"
+              aria-label="Cari pengguna penggunaan AI"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Cari pengguna..."
-              className="w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              className="min-h-11 w-full pl-9 pr-3 py-2 bg-background border border-border/80 rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
           {selectedUser && (
             <button
+              type="button"
               onClick={() => setSelectedUser(null)}
-              className="text-xs text-primary font-semibold hover:underline"
+              className="min-h-11 px-2 text-xs text-primary font-semibold hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               Semua User
             </button>
@@ -243,82 +270,127 @@ export function UsageTab({
 
       {/* Usage Table */}
       <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-muted/30 border-b border-border/50">
-              <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                Pengguna
-              </th>
-              <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                Call
-              </th>
-              <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                Token
-              </th>
-              <th className="px-6 py-3.5 text-right font-bold uppercase tracking-widest opacity-80" style={{ color: 'var(--chart-green)' }}>
-                Simulasi (Rp)
-              </th>
-              <th className="px-6 py-3.5 text-right font-bold uppercase tracking-widest opacity-80" style={{ color: 'var(--chart-amber)' }}>
-                Penilaian AI (Rp)
-              </th>
-              <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                Total Biaya (Rp)
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40">
-            {filteredAgg.map((a) => (
-              <tr
-                key={a.user_id}
-                className="hover:bg-foreground/[0.015] transition-colors cursor-pointer"
-                onClick={() =>
-                  setSelectedUser(
-                    selectedUser === a.user_id ? null : a.user_id,
-                  )
-                }
-              >
-                <td className="px-6 py-4">
-                  <span
-                    className={`font-semibold text-sm ${selectedUser === a.user_id ? "text-primary" : "text-foreground"}`}
-                  >
-                    {a.user_name || "Unknown"}
-                  </span>
-                  <span className="text-muted-foreground/70 ml-2 font-mono text-[10px]">
-                    {a.user_email}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right font-medium text-foreground">{a.total_calls}</td>
-                <td className="px-6 py-4 text-right font-medium text-foreground">
-                  {a.total_tokens.toLocaleString()}
-                </td>
-                <td className="px-6 py-4 text-right font-semibold" style={{ color: 'var(--chart-green)' }}>
-                  {(a.simulation_cost_idr || 0) > 0
-                    ? formatIdr(a.simulation_cost_idr)
-                    : "-"}
-                </td>
-                <td className="px-6 py-4 text-right font-semibold" style={{ color: 'var(--chart-amber)' }}>
-                  {(a.review_cost_idr || 0) > 0
-                    ? formatIdr(a.review_cost_idr)
-                    : "-"}
-                </td>
-                <td className="px-6 py-4 text-right text-primary font-bold">
-                  {formatIdr(a.total_cost_idr)}
-                </td>
-              </tr>
-            ))}
-            {filteredAgg.length === 0 && !loading && (
-              <tr>
-                <td
-                  colSpan={6}
-                  className="px-6 py-16 text-center text-muted-foreground"
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <caption className="sr-only">
+              Ringkasan penggunaan AI per pengguna
+            </caption>
+            <thead>
+              <tr className="bg-muted/30 border-b border-border/50">
+                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                  Pengguna
+                </th>
+                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                  Call
+                </th>
+                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                  Token
+                </th>
+                <th
+                  className="px-6 py-3.5 text-right font-bold uppercase tracking-widest opacity-80"
+                  style={{ color: "var(--chart-green)" }}
                 >
-                  <BarChart3 size={32} className="mx-auto mb-3 opacity-20" />
-                  <p className="text-sm">Belum ada data penggunaan.</p>
-                </td>
+                  Simulasi (Rp)
+                </th>
+                <th
+                  className="px-6 py-3.5 text-right font-bold uppercase tracking-widest opacity-80"
+                  style={{ color: "var(--chart-amber)" }}
+                >
+                  Penilaian AI (Rp)
+                </th>
+                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                  Total Biaya (Rp)
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {filteredAgg.map((a) => (
+                <tr
+                  key={a.user_id}
+                  tabIndex={0}
+                  aria-label={`Tampilkan rincian penggunaan ${a.user_name || a.user_email || "pengguna"}`}
+                  className="hover:bg-foreground/[0.015] focus-visible:bg-foreground/[0.015] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary transition-colors cursor-pointer"
+                  onClick={() =>
+                    setSelectedUser(
+                      selectedUser === a.user_id ? null : a.user_id,
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedUser(
+                        selectedUser === a.user_id ? null : a.user_id,
+                      );
+                    }
+                  }}
+                >
+                  <td className="px-6 py-4">
+                    <span
+                      className={`font-semibold text-sm ${selectedUser === a.user_id ? "text-primary" : "text-foreground"}`}
+                    >
+                      {a.user_name || "Unknown"}
+                    </span>
+                    <span className="text-muted-foreground/70 ml-2 font-mono text-[10px]">
+                      {a.user_email}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right font-medium text-foreground">
+                    {a.total_calls}
+                  </td>
+                  <td className="px-6 py-4 text-right font-medium text-foreground">
+                    {a.total_tokens.toLocaleString()}
+                  </td>
+                  <td
+                    className="px-6 py-4 text-right font-semibold"
+                    style={{ color: "var(--chart-green)" }}
+                  >
+                    {(a.simulation_cost_idr || 0) > 0
+                      ? formatIdr(a.simulation_cost_idr)
+                      : "-"}
+                  </td>
+                  <td
+                    className="px-6 py-4 text-right font-semibold"
+                    style={{ color: "var(--chart-amber)" }}
+                  >
+                    {(a.review_cost_idr || 0) > 0
+                      ? formatIdr(a.review_cost_idr)
+                      : "-"}
+                  </td>
+                  <td className="px-6 py-4 text-right text-primary font-bold">
+                    {formatIdr(a.total_cost_idr)}
+                  </td>
+                </tr>
+              ))}
+              {loading && filteredAgg.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <span
+                      role="status"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Memuat data penggunaan…
+                    </span>
+                  </td>
+                </tr>
+              )}
+              {filteredAgg.length === 0 && !loading && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-6 py-16 text-center text-muted-foreground"
+                  >
+                    <BarChart3
+                      size={32}
+                      aria-hidden="true"
+                      className="mx-auto mb-3 opacity-20"
+                    />
+                    <p className="text-sm">Belum ada data penggunaan.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Per-User Breakdown */}
@@ -329,42 +401,139 @@ export function UsageTab({
               Rincian Per Model untuk User Terpilih
             </span>
           </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-muted/10 border-b border-border/50">
-                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                  Model
-                </th>
-                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                  Modul
-                </th>
-                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                  Kategori
-                </th>
-                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                  Call
-                </th>
-                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                  Token
-                </th>
-                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                  Biaya
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40 bg-foreground/[0.005]">
-              {filteredAgg
-                .flatMap((a) =>
-                  a.models.map((m) => ({
-                    model_id: m.model_id,
-                    module: m.module,
-                    action_category: m.action_category,
-                    calls: m.calls,
-                    total_tokens: m.total_tokens,
-                    cost_idr: m.cost_idr,
-                  })),
-                )
-                .map((m, i) => (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <caption className="sr-only">
+                Rincian penggunaan per model untuk pengguna terpilih
+              </caption>
+              <thead>
+                <tr className="bg-muted/10 border-b border-border/50">
+                  <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                    Model
+                  </th>
+                  <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                    Modul
+                  </th>
+                  <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                    Kategori
+                  </th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                    Call
+                  </th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                    Token
+                  </th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                    Biaya
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40 bg-foreground/[0.005]">
+                {filteredAgg
+                  .flatMap((a) =>
+                    a.models.map((m) => ({
+                      model_id: m.model_id,
+                      module: m.module,
+                      action_category: m.action_category,
+                      calls: m.calls,
+                      total_tokens: m.total_tokens,
+                      cost_idr: m.cost_idr,
+                    })),
+                  )
+                  .map((m, i) => (
+                    <tr
+                      key={i}
+                      className="hover:bg-foreground/[0.015] transition-colors"
+                    >
+                      <td className="px-6 py-3.5 font-mono text-[10px] font-semibold text-foreground">
+                        {m.model_id}
+                      </td>
+                      <td className="px-6 py-3.5">
+                        <span className="inline-flex px-2 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
+                          {m.module}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3.5">
+                        {m.action_category === "simulation" ? (
+                          <span
+                            className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                            style={{
+                              backgroundColor: "var(--chart-green)",
+                              color: "white",
+                            }}
+                          >
+                            Simulasi
+                          </span>
+                        ) : m.action_category === "review" ? (
+                          <span
+                            className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                            style={{
+                              backgroundColor: "var(--chart-amber)",
+                              color: "white",
+                            }}
+                          >
+                            Penilaian
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                            Lainnya
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3.5 text-right font-medium text-foreground">
+                        {m.calls}
+                      </td>
+                      <td className="px-6 py-3.5 text-right font-medium text-foreground">
+                        {m.total_tokens.toLocaleString()}
+                      </td>
+                      <td className="px-6 py-3.5 text-right text-primary font-bold">
+                        {formatIdr(m.cost_idr)}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* All Models Overview */}
+      {!selectedUser && allModels.length > 0 && (
+        <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
+          <div className="px-6 py-3.5 border-b border-border/50 bg-muted/20">
+            <span className="text-xs font-semibold tracking-tight text-foreground">
+              Keseluruhan Penggunaan Per Model AI
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <caption className="sr-only">
+                Keseluruhan penggunaan per model AI
+              </caption>
+              <thead>
+                <tr className="bg-muted/10 border-b border-border/50">
+                  <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                    Model
+                  </th>
+                  <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                    Modul
+                  </th>
+                  <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
+                    Kategori
+                  </th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                    Call
+                  </th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                    Token
+                  </th>
+                  <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
+                    Biaya
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {allModels.map((m, i) => (
                   <tr
                     key={i}
                     className="hover:bg-foreground/[0.015] transition-colors"
@@ -379,11 +548,23 @@ export function UsageTab({
                     </td>
                     <td className="px-6 py-3.5">
                       {m.action_category === "simulation" ? (
-                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-green)', color: 'white' }}>
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                          style={{
+                            backgroundColor: "var(--chart-green)",
+                            color: "white",
+                          }}
+                        >
                           Simulasi
                         </span>
                       ) : m.action_category === "review" ? (
-                        <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-amber)', color: 'white' }}>
+                        <span
+                          className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                          style={{
+                            backgroundColor: "var(--chart-amber)",
+                            color: "white",
+                          }}
+                        >
                           Penilaian
                         </span>
                       ) : (
@@ -403,82 +584,9 @@ export function UsageTab({
                     </td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* All Models Overview */}
-      {!selectedUser && allModels.length > 0 && (
-        <div className="bg-card border border-border/50 rounded-xl overflow-hidden shadow-sm">
-          <div className="px-6 py-3.5 border-b border-border/50 bg-muted/20">
-            <span className="text-xs font-semibold tracking-tight text-foreground">
-              Keseluruhan Penggunaan Per Model AI
-            </span>
+              </tbody>
+            </table>
           </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-muted/10 border-b border-border/50">
-                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                  Model
-                </th>
-                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                  Modul
-                </th>
-                <th className="px-6 py-3.5 text-left font-semibold text-muted-foreground uppercase tracking-wider">
-                  Kategori
-                </th>
-                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                  Call
-                </th>
-                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                  Token
-                </th>
-                <th className="px-6 py-3.5 text-right font-semibold text-muted-foreground uppercase tracking-wider">
-                  Biaya
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {allModels.map((m, i) => (
-                <tr
-                  key={i}
-                  className="hover:bg-foreground/[0.015] transition-colors"
-                >
-                  <td className="px-6 py-3.5 font-mono text-[10px] font-semibold text-foreground">
-                    {m.model_id}
-                  </td>
-                  <td className="px-6 py-3.5">
-                    <span className="inline-flex px-2 py-0.5 rounded bg-muted text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
-                      {m.module}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3.5">
-                    {m.action_category === "simulation" ? (
-                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-green)', color: 'white' }}>
-                        Simulasi
-                      </span>
-                    ) : m.action_category === "review" ? (
-                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: 'var(--chart-amber)', color: 'white' }}>
-                        Penilaian
-                      </span>
-                    ) : (
-                      <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
-                        Lainnya
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-3.5 text-right font-medium text-foreground">{m.calls}</td>
-                  <td className="px-6 py-3.5 text-right font-medium text-foreground">
-                    {m.total_tokens.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-3.5 text-right text-primary font-bold">
-                    {formatIdr(m.cost_idr)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       )}
     </div>

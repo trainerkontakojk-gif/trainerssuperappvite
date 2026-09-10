@@ -4,6 +4,7 @@ import { User } from "@supabase/supabase-js";
 import { requireRole } from "../middleware/role";
 import * as profilerService from "../services/profiler-service";
 import { logActivity } from "../services/activity-log-service";
+import { getUserClient } from "./pdkt/route-utils";
 
 type Variables = { user: User; profile: any };
 
@@ -234,7 +235,10 @@ profiler.get(
   async (c) => {
     const excludeBatch = c.req.query("exclude_batch");
     const scope = await resolveKtpScope(c);
-    const pool = await profilerService.getGlobalPesertaPool(excludeBatch, scope);
+    const pool = await profilerService.getGlobalPesertaPool(
+      excludeBatch,
+      scope,
+    );
     return c.json({ success: true, data: pool });
   },
 );
@@ -243,9 +247,7 @@ profiler.get(
   "/peserta/upcoming-birthdays",
   requireRole("admin", "trainer", "leader"),
   async (c) => {
-    const limit = c.req.query("limit")
-      ? parseInt(c.req.query("limit")!)
-      : 5;
+    const limit = c.req.query("limit") ? parseInt(c.req.query("limit")!) : 5;
     const scope = await resolveKtpScope(c);
     const data = await profilerService.getUpcomingBirthdays(limit, scope);
     return c.json({ success: true, data });
@@ -262,6 +264,39 @@ profiler.get(
     return c.json({ success: true, data: peserta });
   },
 );
+
+profiler.get("/peserta/options", requireRole("admin", "trainer"), async (c) => {
+  const raw = (c.req.query("search") ?? "").trim();
+  if (raw.length < 2 || raw.length > 100) {
+    return c.json(
+      {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Pencarian minimal 2 dan maksimal 100 karakter",
+        },
+      },
+      400,
+    );
+  }
+  try {
+    const scope = await resolveKtpScope(c);
+    const data = await profilerService.searchPesertaOptions(
+      raw,
+      scope,
+      getUserClient(c),
+    );
+    return c.json({ success: true, data });
+  } catch (_e: any) {
+    return c.json(
+      {
+        success: false,
+        error: { code: "SEARCH_ERROR", message: "Gagal mencari peserta." },
+      },
+      500,
+    );
+  }
+});
 
 profiler.get(
   "/peserta/:id",
@@ -442,13 +477,13 @@ profiler.post("/peserta/copy", requireRole("admin", "trainer"), async (c) => {
       },
       400,
     );
-    try {
-      const peserta = await profilerService.copyPesertaToFolder(
-        parsed.data.peserta_ids,
-        parsed.data.target_batch_name,
-      );
-      return c.json({ success: true, data: peserta }, 201);
-    } catch (e: any) {
+  try {
+    const peserta = await profilerService.copyPesertaToFolder(
+      parsed.data.peserta_ids,
+      parsed.data.target_batch_name,
+    );
+    return c.json({ success: true, data: peserta }, 201);
+  } catch (e: any) {
     return c.json(
       { success: false, error: { code: "COPY_ERROR", message: e.message } },
       400,
@@ -456,49 +491,45 @@ profiler.post("/peserta/copy", requireRole("admin", "trainer"), async (c) => {
   }
 });
 
-profiler.post(
-  "/peserta/move",
-  requireRole("admin", "trainer"),
-  async (c) => {
-    const body = await c.req.json();
-    const parsed = z
-      .object({
-        peserta_ids: z.array(z.string().uuid()).min(1),
-        target_batch_name: z.string().min(1),
-      })
-      .safeParse(body);
-    if (!parsed.success)
-      return c.json(
-        {
-          success: false,
-          error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
-        },
-        400,
-      );
-    try {
-      const moved = await profilerService.movePesertaToBatch(
-        parsed.data.peserta_ids,
-        parsed.data.target_batch_name,
-      );
-      await logActivity({
-        user_id: c.get("user").id,
-        user_name: c.get("user").email ?? "",
-        action: `Memindahkan ${parsed.data.peserta_ids.length} peserta ke batch: ${parsed.data.target_batch_name}`,
-        module: "KTP",
-        type: "edit",
-      });
-      return c.json({ success: true, data: { moved } });
-    } catch (e: any) {
-      return c.json(
-        {
-          success: false,
-          error: { code: "MOVE_ERROR", message: e.message },
-        },
-        400,
-      );
-    }
-  },
-);
+profiler.post("/peserta/move", requireRole("admin", "trainer"), async (c) => {
+  const body = await c.req.json();
+  const parsed = z
+    .object({
+      peserta_ids: z.array(z.string().uuid()).min(1),
+      target_batch_name: z.string().min(1),
+    })
+    .safeParse(body);
+  if (!parsed.success)
+    return c.json(
+      {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "Data tidak valid" },
+      },
+      400,
+    );
+  try {
+    const moved = await profilerService.movePesertaToBatch(
+      parsed.data.peserta_ids,
+      parsed.data.target_batch_name,
+    );
+    await logActivity({
+      user_id: c.get("user").id,
+      user_name: c.get("user").email ?? "",
+      action: `Memindahkan ${parsed.data.peserta_ids.length} peserta ke batch: ${parsed.data.target_batch_name}`,
+      module: "KTP",
+      type: "edit",
+    });
+    return c.json({ success: true, data: { moved } });
+  } catch (e: any) {
+    return c.json(
+      {
+        success: false,
+        error: { code: "MOVE_ERROR", message: e.message },
+      },
+      400,
+    );
+  }
+});
 
 profiler.put("/peserta/reorder", requireRole("admin", "trainer"), async (c) => {
   const body = await c.req.json();
