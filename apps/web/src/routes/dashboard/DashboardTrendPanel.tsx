@@ -321,7 +321,7 @@ export default function DashboardTrendPanel({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
       {/* Chart Panel */}
-      <div className="lg:col-span-2 rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-sm p-8 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="lg:col-span-2 rounded-[2rem] border border-border/40 bg-card/30 backdrop-blur-sm p-8 shadow-sm overflow-visible animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/5 text-primary rounded-lg border border-primary/10">
@@ -502,9 +502,19 @@ export default function DashboardTrendPanel({
                     borderRadius: "16px",
                     fontSize: "12px",
                     fontWeight: "bold",
+                    whiteSpace: "nowrap",
                     boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
                     color: "var(--foreground)",
                   }}
+                  itemStyle={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    paddingTop: "2px",
+                    paddingBottom: "2px",
+                  }}
+                  wrapperStyle={{ zIndex: 30 }}
                   formatter={(value: any, name: any, props: any) => {
                     const isForecastSeries = String(props.dataKey).startsWith(
                       "forecast_",

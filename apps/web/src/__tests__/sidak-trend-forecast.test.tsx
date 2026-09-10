@@ -5,6 +5,10 @@ import ParamTrendChart from "../components/sidak/ParamTrendChart";
 import { sidakClient, unwrapResponse } from "../lib/api";
 import React from "react";
 
+const { tooltipProps } = vi.hoisted(() => ({
+  tooltipProps: vi.fn(),
+}));
+
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
   AreaChart: ({ children, data }: any) => (
@@ -19,7 +23,10 @@ vi.mock("recharts", () => ({
     />
   ),
   CartesianGrid: () => null,
-  Tooltip: () => null,
+  Tooltip: (props: any) => {
+    tooltipProps(props);
+    return null;
+  },
   XAxis: () => null,
   YAxis: () => null,
   ReferenceLine: () => null,
@@ -123,6 +130,34 @@ describe("DashboardTrendPanel Forecast", () => {
     );
 
     expect(screen.getByText(/Update Prediksi/i)).toBeInTheDocument();
+  });
+
+  it("keeps the findings tooltip readable at the chart card edge", () => {
+    render(
+      <DashboardTrendPanel
+        serviceTrendMap={{ all: mockTrendData } as any}
+        availableYears={[2026]}
+        selectedYear={2026}
+        trendStartMonth={1}
+        trendEndMonth={2}
+        trendLoading={false}
+        localTrendData={null}
+        onYearChange={() => {}}
+        onRangeChange={() => {}}
+      />,
+    );
+
+    const chartPanel = screen
+      .getByRole("heading", { name: "Tren Temuan QA" })
+      .closest("div.lg\\:col-span-2");
+    expect(chartPanel).not.toHaveClass("overflow-hidden");
+
+    const latestTooltipProps = tooltipProps.mock.calls.at(-1)?.[0];
+    expect(latestTooltipProps.itemStyle).toMatchObject({
+      display: "flex",
+      alignItems: "center",
+    });
+    expect(latestTooltipProps.wrapperStyle).toMatchObject({ zIndex: 30 });
   });
 
   it("calls forecast API when button is clicked", async () => {
