@@ -48,8 +48,24 @@ function reviewStatusLabel(
   }
 }
 
-export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
-  const [data, setData] = useState<PdktMonitoringReview | null>(null);
+interface PdktEvaluationPanelProps {
+  entryId: string;
+  review?: PdktMonitoringReview | null;
+  reviewLoading?: boolean;
+  reviewError?: string | null;
+  onRetry?: () => void;
+}
+
+export function PdktEvaluationPanel({
+  entryId,
+  review,
+  reviewLoading,
+  reviewError,
+  onRetry,
+}: PdktEvaluationPanelProps) {
+  const hasExternalState =
+    review !== undefined || reviewLoading !== undefined || reviewError !== undefined;
+  const [data, setData] = useState<PdktMonitoringReview | null>(review ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,8 +87,14 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
   }, [entryId]);
 
   useEffect(() => {
+    if (hasExternalState) {
+      setData(review ?? null);
+      setLoading(reviewLoading ?? false);
+      setError(reviewError ?? null);
+      return;
+    }
     fetchEvaluation();
-  }, [fetchEvaluation]);
+  }, [fetchEvaluation, hasExternalState, review, reviewError, reviewLoading]);
 
   if (loading) {
     return (
@@ -105,7 +127,7 @@ export function PdktEvaluationPanel({ entryId }: { entryId: string }) {
         <p className="text-xs text-destructive font-medium">{error}</p>
         <button
           type="button"
-          onClick={fetchEvaluation}
+          onClick={onRetry ?? fetchEvaluation}
           className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-pdkt/10 text-module-pdkt text-xs font-bold hover:bg-module-pdkt/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-pdkt"
         >
           <RefreshCw size={10} />

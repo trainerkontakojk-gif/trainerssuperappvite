@@ -16,6 +16,11 @@ export type {
   PdktMonitoringReview,
   PricingEntry,
   TelefunMonitoringReview,
+  SidakSimulationDetail,
+  SidakSimulationModule,
+  SidakSimulationPage,
+  SidakSimulationSummary,
+  MonitoringReviewByModule,
   UsageAggregation,
   SimulationSubjectOption,
 } from "./rpc-client";

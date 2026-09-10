@@ -116,6 +116,12 @@ Starting from this hardening, **metadata endpoints are scoped** for leaders:
 5. **Agent Detail (`getAgentDetail`)**: Only queries temuan in allowed service types
 6. **Request validation**: If a leader requests a service outside their allowed set, the backend normalizes to the allowed service instead of leaking an empty first-load state
 
+### SIDAK Agent Simulation History
+
+`GET /sidak/agents/:id/simulations` and its detail endpoint use the same approved SIDAK scope, with the following service mapping: `chat` to KETIK, `email` to PDKT, and `call` to Telefun. A leader with an empty or unavailable scope is denied. `module=all` is reduced to the mapped modules in the scope, and an explicit module outside the scope is rejected before any history detail is read.
+
+The detail endpoint requires an exact `simulation_subject_type = participant` and `simulation_subject_peserta_id` match to the agent URL. It therefore excludes self, legacy, and deleted-FK rows. A leader with approved `call` access can receive a Telefun signed recording URL only after the scope check and existing owner/session path validation. The URL keeps the existing 3,600-second TTL; revoking approval blocks new URLs while an existing URL remains valid until expiry. See [`SIDAK_SIMULATION_HISTORY.md`](SIDAK_SIMULATION_HISTORY.md) for the complete contract.
+
 ### SIDAK Folder Filter Enforcement
 
 - `folder_ids` parameter in `getDashboardData()` is now **actually enforced** — batch names are resolved from folder IDs and the temuan query filters on `profiler_peserta.batch_name`

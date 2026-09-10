@@ -60,10 +60,23 @@ interface KetikReviewPanelProps {
     text?: string;
     content?: string;
   }>;
+  review?: KetikMonitoringReview | null;
+  reviewLoading?: boolean;
+  reviewError?: string | null;
+  onRetry?: () => void;
 }
 
-export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
-  const [data, setData] = useState<KetikMonitoringReview | null>(null);
+export function KetikReviewPanel({
+  entryId,
+  messages,
+  review,
+  reviewLoading,
+  reviewError,
+  onRetry,
+}: KetikReviewPanelProps) {
+  const hasExternalState =
+    review !== undefined || reviewLoading !== undefined || reviewError !== undefined;
+  const [data, setData] = useState<KetikMonitoringReview | null>(review ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,8 +98,14 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
   }, [entryId]);
 
   useEffect(() => {
+    if (hasExternalState) {
+      setData(review ?? null);
+      setLoading(reviewLoading ?? false);
+      setError(reviewError ?? null);
+      return;
+    }
     fetchReview();
-  }, [fetchReview]);
+  }, [fetchReview, hasExternalState, review, reviewError, reviewLoading]);
 
   const session = data?.session;
   const transcriptMessages = session?.messages?.length
@@ -189,7 +208,7 @@ export function KetikReviewPanel({ entryId, messages }: KetikReviewPanelProps) {
           <p className="text-xs text-destructive font-medium">{error}</p>
           <button
             type="button"
-            onClick={fetchReview}
+            onClick={onRetry ?? fetchReview}
             className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <RefreshCw size={10} aria-hidden="true" />

@@ -25,6 +25,7 @@ This file is navigation, not a second workflow or tool-policy source. Use the ow
 - [`SIDAK_LOGIC_AND_SCORING.md`](SIDAK_LOGIC_AND_SCORING.md) — SIDAK scoring and aggregation rules.
 - [`SIDAK_SCORING_GUARDRAILS.md`](SIDAK_SCORING_GUARDRAILS.md) — safeguards for scoring changes.
 - [`LEADER_APPROVAL_ACCESS.md`](LEADER_APPROVAL_ACCESS.md) — leader approval-based KTP/SIDAK access.
+- [`SIDAK_SIMULATION_HISTORY.md`](SIDAK_SIMULATION_HISTORY.md) — SIDAK agent simulation history API, attribution, and leader recording scope.
 - [`telefun.md`](telefun.md) — Telefun module contract and operations.
 - [`TELEFUN_ASSESSMENT_CONTRACT.md`](TELEFUN_ASSESSMENT_CONTRACT.md) — Telefun assessment trust boundary and score contract.
 - [`integration-tests.md`](integration-tests.md) — PDKT Mailbox RPC integration tests.

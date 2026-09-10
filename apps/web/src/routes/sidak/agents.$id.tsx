@@ -14,6 +14,7 @@ import AgentComparisonTable from "../../components/sidak/AgentComparisonTable";
 import AgentTemuanTab from "../../components/sidak/AgentTemuanTab";
 import EditTemuanModal from "../../components/sidak/EditTemuanModal";
 import QaStatePanel from "../../components/sidak/QaStatePanel";
+import SidakSimulationHistory from "../../components/sidak/SidakSimulationHistory";
 import TabSkeleton from "../../components/sidak/TabSkeleton";
 import { useRef, useEffect } from "react";
 
@@ -306,6 +307,11 @@ export default function SidakAgentDetailPage() {
             <TabSkeleton />
           )}
         </div>
+      </div>
+
+      {/* Simulation history is independent of the audit period and service filters. */}
+      <div className="px-6 lg:px-8">
+        <SidakSimulationHistory key={id} agentId={id} />
       </div>
 
       {/* Edit Modal */}

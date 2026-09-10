@@ -186,7 +186,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Settings** (`/sidak/settings`): Service weights configuration dengan versioned rules per service+periode.
   - **Periods** (`/sidak/periods`): Manajemen periode audit.
   - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian dan dynamic load-more copy.
-  - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, ranking Tim Gabungan/Tim Leader, forecast 3 bulan (konteks tahun+layanan), ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
+  - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, seluruh konten audit, lalu quick list lima Riwayat Simulasi terbaru (KETIK/PDKT/Telefun) di bagian paling bawah, ranking Tim Gabungan/Tim Leader, forecast 3 bulan (konteks tahun+layanan), ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
   - **Reports** (`/sidak/reports`): Data vs AI report selection.
   - **Reports Data** (`/sidak/reports-data`): Filter form + tabel temuan dengan kolom Layanan, Periode, Agen, Nomor Tiket, Parameter, Temuan, dan Skor + Excel export. Nomor tiket dinormalisasi dan ditampilkan dengan format monospace; isi Temuan dibungkus utuh tanpa truncation agar tetap terbaca.
   - **Reports AI** (`/sidak/reports-ai`): AI-powered report generation.
@@ -205,7 +205,8 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Rank Change Indicator**: Perubahan posisi ranking (▲ +X / ▼ -X) dengan dynamic context subtitle "Sebelumnya Posisi X".
   - **Agent Ranking Semantics**: Peringkat lebih tinggi = temuan lebih sedikit; peringkat terakhir = temuan terbanyak; jumlah temuan sama = peringkat sama (tidak ada tie-breaking buatan). Ranking ditampilkan dalam konteks Tim Gabungan dan Tim Leader per tahun+layanan.
   - **KPI Delta**: Persentase kenaikan/penurunan di KPI Dashboard dengan unit yang disesuaikan (persentase relatif untuk count/ratio, poin persentase untuk metrik persen).
-- **Catatan Teknis**: Backend API di `/api/v1/sidak/` (~19 endpoints) di-dekomposisi ke 6 sub-module route handler (`apps/api/src/routes/sidak/{core,dashboard,forecast,temuan,rule-versions,reports}.ts`). Business logic di `apps/api/src/services/sidak-service.ts` — barrel dari 14 sub-modules di `apps/api/src/services/sidak/`. Scoring engine di `apps/api/src/lib/scoring.ts`.
+  - **Riwayat Simulasi**: Filter hanya berdasarkan atribusi `participant` yang cocok dengan `profiler_peserta.id`; detail memakai review Monitoring bersama dan tidak memicu AI. Filter audit tahun/bulan/layanan tidak mengubah daftar simulasi.
+  - **Catatan Teknis**: Backend API di `/api/v1/sidak/` di-dekomposisi ke route handler (`apps/api/src/routes/sidak/{core,dashboard,forecast,temuan,rule-versions,reports,simulations}.ts`). Riwayat simulasi memakai `apps/api/src/services/sidak/agent-simulations.ts` dan scope `simulation-access.ts`; renderer detail tetap memakai komponen Monitoring bersama. Scoring engine di `apps/api/src/lib/scoring.ts`.
 
 ## 7. Atribusi Subjek Simulasi (KETIK/PDKT/Telefun/Monitoring)
 

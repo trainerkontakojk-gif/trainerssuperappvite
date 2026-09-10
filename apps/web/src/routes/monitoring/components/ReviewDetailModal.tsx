@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { X, Phone, MessageCircle, Mail } from "lucide-react";
+import type { SimulationSubjectSnapshot } from "@trainers/types";
 import {
   type UnifiedHistoryEntry,
   getModuleBadgeClasses,
@@ -9,6 +10,7 @@ import {
   formatDate,
   getSimulationSubjectMeta,
 } from "../utils/formatting";
+import type { MonitoringReviewByModule } from "../../../lib/api";
 import { ReviewStatusBadge } from "./ReviewStatusBadge";
 import { KetikReviewPanel } from "./KetikReviewPanel";
 import { PdktEvaluationPanel } from "./PdktEvaluationPanel";
@@ -17,6 +19,11 @@ import { TelefunReviewPanel } from "./TelefunReviewPanel";
 interface ReviewDetailModalProps {
   entry: UnifiedHistoryEntry;
   onClose: () => void;
+  durationSeconds?: number | null;
+  reviewData?: MonitoringReviewByModule[UnifiedHistoryEntry["module"]] | null;
+  reviewLoading?: boolean;
+  reviewError?: string | null;
+  onRetry?: () => void;
 }
 
 function Metadata({
@@ -38,7 +45,111 @@ function Metadata({
   );
 }
 
-export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
+interface LoadedReviewMetadata {
+  simulationSubject: SimulationSubjectSnapshot | null | undefined;
+  userEmail: string | null | undefined;
+  userRole: string | null | undefined;
+  consumerName: string | null | undefined;
+  consumerPhone: string | null | undefined;
+  consumerCity: string | null | undefined;
+  consumerGender: string | null | undefined;
+  consumerType: string | null | undefined;
+  recipient: string | null | undefined;
+  contact: string | null | undefined;
+  simulationDuration: number | null | undefined;
+}
+
+function getLoadedReviewMetadata(
+  reviewData: MonitoringReviewByModule[UnifiedHistoryEntry["module"]] | null | undefined,
+): LoadedReviewMetadata {
+  if (!reviewData) {
+    return {
+      simulationSubject: null,
+      userEmail: null,
+      userRole: null,
+      consumerName: null,
+      consumerPhone: null,
+      consumerCity: null,
+      consumerGender: null,
+      consumerType: null,
+      recipient: null,
+      contact: null,
+      simulationDuration: null,
+    };
+  }
+
+  if (reviewData.module === "ketik") {
+    return {
+      simulationSubject: reviewData.simulationSubject,
+      userEmail: reviewData.user_email,
+      userRole: reviewData.user_role,
+      consumerName: reviewData.session?.consumerName,
+      consumerPhone: reviewData.session?.consumerPhone,
+      consumerCity: reviewData.session?.consumerCity,
+      consumerGender: null,
+      consumerType: null,
+      recipient: null,
+      contact: null,
+      simulationDuration: reviewData.session?.simulationDuration,
+    };
+  }
+
+  if (reviewData.module === "pdkt") {
+    return {
+      simulationSubject: reviewData.simulationSubject,
+      userEmail: reviewData.user_email,
+      userRole: reviewData.user_role,
+      consumerName: reviewData.session?.consumer_name,
+      consumerPhone: null,
+      consumerCity: null,
+      consumerGender: null,
+      consumerType: reviewData.session?.consumer_type,
+      recipient: reviewData.session?.recipient,
+      contact: reviewData.session?.contact,
+      simulationDuration: reviewData.time_taken,
+    };
+  }
+
+  return {
+    simulationSubject: reviewData.simulationSubject,
+    userEmail: reviewData.user_email,
+    userRole: reviewData.user_role,
+    consumerName: reviewData.consumer_name,
+    consumerPhone: reviewData.consumer_phone,
+    consumerCity: reviewData.consumer_city,
+    consumerGender: reviewData.consumer_gender,
+    consumerType: reviewData.persona_config?.consumerType,
+    recipient: null,
+    contact: null,
+    simulationDuration: reviewData.duration_seconds,
+  };
+}
+
+export function ReviewDetailModal({
+  entry,
+  onClose,
+  durationSeconds,
+  reviewData,
+  reviewLoading,
+  reviewError,
+  onRetry,
+}: ReviewDetailModalProps) {
+  const loadedMetadata = getLoadedReviewMetadata(reviewData);
+  const simulationSubject = entry.simulationSubject ?? loadedMetadata.simulationSubject;
+  const userEmail = entry.user_email ?? loadedMetadata.userEmail;
+  const userRole = entry.user_role ?? loadedMetadata.userRole;
+  const consumerName = entry.consumer_name ?? loadedMetadata.consumerName;
+  const consumerPhone = entry.consumer_phone ?? loadedMetadata.consumerPhone;
+  const consumerCity = entry.consumer_city ?? loadedMetadata.consumerCity;
+  const consumerGender = entry.consumer_gender ?? loadedMetadata.consumerGender;
+  const consumerType = entry.consumer_type ?? loadedMetadata.consumerType;
+  const recipient = entry.recipient ?? loadedMetadata.recipient;
+  const contact = entry.contact ?? loadedMetadata.contact;
+  const simulationDuration =
+    entry.ketik_session?.simulation_duration ?? loadedMetadata.simulationDuration;
+  const displayedDuration = durationSeconds === undefined
+    ? entry.duration_seconds
+    : durationSeconds;
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const onCloseRef = useRef(onClose);
@@ -181,7 +292,7 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
                 </span>
                 <ReviewStatusBadge status={entry.review_status} />
                 <span className="text-[10px] text-muted-foreground">
-                  {entry.user_email || "-"}
+                  {userEmail || "-"}
                 </span>
               </div>
             </div>
@@ -198,7 +309,7 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
         </div>
 
         {(() => {
-          const subject = getSimulationSubjectMeta(entry.simulationSubject);
+          const subject = getSimulationSubjectMeta(simulationSubject);
           return (
             <dl
               className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-5"
@@ -213,12 +324,12 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
               <Metadata
                 label="Pelaksana"
                 value={
-                  [entry.user_email, entry.user_role]
+                  [userEmail, userRole]
                     .filter(Boolean)
                     .join(" · ") || null
                 }
               />
-              <Metadata label="Konsumen" value={entry.consumer_name} />
+              <Metadata label="Konsumen" value={consumerName} />
             </dl>
           );
         })()}
@@ -228,16 +339,16 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
             className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-4"
             aria-label="Informasi konsumen"
           >
-            <Metadata label="Nama konsumen" value={entry.consumer_name} />
+            <Metadata label="Nama konsumen" value={consumerName} />
             {entry.module === "ketik" && (
               <>
-                <Metadata label="Telepon" value={entry.consumer_phone} />
-                <Metadata label="Kota" value={entry.consumer_city} />
+                <Metadata label="Telepon" value={consumerPhone} />
+                <Metadata label="Kota" value={consumerCity} />
                 <Metadata
                   label="Durasi simulasi"
                   value={
-                    entry.ketik_session?.simulation_duration != null
-                      ? `${entry.ketik_session.simulation_duration} detik`
+                    simulationDuration != null
+                      ? `${simulationDuration} detik`
                       : null
                   }
                 />
@@ -245,19 +356,19 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
             )}
             {entry.module === "pdkt" && (
               <>
-                <Metadata label="Tipe konsumen" value={entry.consumer_type} />
-                <Metadata label="Penerima" value={entry.recipient} />
-                <Metadata label="Kontak" value={entry.contact} />
+                <Metadata label="Tipe konsumen" value={consumerType} />
+                <Metadata label="Penerima" value={recipient} />
+                <Metadata label="Kontak" value={contact} />
               </>
             )}
             {entry.module === "telefun" && (
               <>
-                <Metadata label="Telepon" value={entry.consumer_phone} />
-                <Metadata label="Kota" value={entry.consumer_city} />
+                <Metadata label="Telepon" value={consumerPhone} />
+                <Metadata label="Kota" value={consumerCity} />
                 <Metadata
                   label="Tipe / Gender"
                   value={
-                    [entry.consumer_type, entry.consumer_gender]
+                    [consumerType, consumerGender]
                       .filter(Boolean)
                       .join(" · ") || null
                   }
@@ -271,13 +382,35 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
               messages={
                 Array.isArray(entry.history) ? entry.history : undefined
               }
+              review={
+                reviewData?.module === "ketik" ? reviewData : reviewData === null ? null : undefined
+              }
+              reviewLoading={reviewLoading}
+              reviewError={reviewError}
+              onRetry={onRetry}
             />
           )}
           {entry.module === "pdkt" && (
-            <PdktEvaluationPanel entryId={entry.id} />
+            <PdktEvaluationPanel
+              entryId={entry.id}
+              review={
+                reviewData?.module === "pdkt" ? reviewData : reviewData === null ? null : undefined
+              }
+              reviewLoading={reviewLoading}
+              reviewError={reviewError}
+              onRetry={onRetry}
+            />
           )}
           {entry.module === "telefun" && (
-            <TelefunReviewPanel entryId={entry.id} />
+            <TelefunReviewPanel
+              entryId={entry.id}
+              review={
+                reviewData?.module === "telefun" ? reviewData : reviewData === null ? null : undefined
+              }
+              reviewLoading={reviewLoading}
+              reviewError={reviewError}
+              onRetry={onRetry}
+            />
           )}
         </div>
 
@@ -289,7 +422,9 @@ export function ReviewDetailModal({ entry, onClose }: ReviewDetailModalProps) {
                 Durasi
               </span>
               <span className="text-lg font-black">
-                {formatDuration(entry.duration_seconds)}
+                {displayedDuration === null
+                  ? "Tidak tersedia"
+                  : formatDuration(displayedDuration)}
               </span>
             </div>
             <div>

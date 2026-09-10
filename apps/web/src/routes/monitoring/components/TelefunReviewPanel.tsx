@@ -37,8 +37,24 @@ import { TelefunTranscript } from "../../telefun/components/TelefunTranscript";
 import { parseTelefunTranscript } from "@trainers/types";
 import { HoldAssessmentCard } from "../../telefun/components/HoldAssessmentCard";
 
-export function TelefunReviewPanel({ entryId }: { entryId: string }) {
-  const [data, setData] = useState<TelefunMonitoringReview | null>(null);
+interface TelefunReviewPanelProps {
+  entryId: string;
+  review?: TelefunMonitoringReview | null;
+  reviewLoading?: boolean;
+  reviewError?: string | null;
+  onRetry?: () => void;
+}
+
+export function TelefunReviewPanel({
+  entryId,
+  review,
+  reviewLoading,
+  reviewError,
+  onRetry,
+}: TelefunReviewPanelProps) {
+  const hasExternalState =
+    review !== undefined || reviewLoading !== undefined || reviewError !== undefined;
+  const [data, setData] = useState<TelefunMonitoringReview | null>(review ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -89,8 +105,15 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
   }, [entryId]);
 
   useEffect(() => {
+    if (hasExternalState) {
+      setData(review ?? null);
+      setLoading(reviewLoading ?? false);
+      setError(reviewError ?? null);
+      setAudioError(false);
+      return;
+    }
     fetchReview();
-  }, [fetchReview]);
+  }, [fetchReview, hasExternalState, review, reviewError, reviewLoading]);
 
   if (loading) {
     return (
@@ -123,7 +146,7 @@ export function TelefunReviewPanel({ entryId }: { entryId: string }) {
         <p className="text-xs text-destructive font-medium">{error}</p>
         <button
           type="button"
-          onClick={fetchReview}
+          onClick={onRetry ?? fetchReview}
           className="flex min-h-11 items-center gap-1.5 px-3 py-1.5 rounded-lg bg-module-telefun/10 text-module-telefun text-[10px] font-bold hover:bg-module-telefun/20 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-module-telefun"
         >
           <RefreshCw size={10} aria-hidden="true" />

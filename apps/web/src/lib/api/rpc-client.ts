@@ -7,6 +7,9 @@ import type {
   ApiResponse,
   MonitoringHistoryEntry,
   MonitoringReviewByModule,
+  SidakSimulationDetail,
+  SidakSimulationModule,
+  SidakSimulationPage,
 } from "@trainers/types";
 
 export type {
@@ -18,6 +21,13 @@ export type {
 
 type RpcResponse<T> = ClientResponse<ApiResponse<T>, number, "json">;
 type MonitoringModule = "ketik" | "pdkt" | "telefun";
+
+export type {
+  SidakSimulationDetail,
+  SidakSimulationModule,
+  SidakSimulationPage,
+  SidakSimulationSummary,
+} from "@trainers/types";
 
 export type SimulationSubjectOption = {
   id: string;
@@ -223,6 +233,29 @@ type AiClient = {
   };
 };
 
+type SidakClient = {
+  "agents/:id/simulations": {
+    $get(args: {
+      param: { id: string };
+      query: {
+        module: "all" | SidakSimulationModule;
+        cursor?: string;
+      };
+      signal?: AbortSignal;
+    }): Promise<RpcResponse<SidakSimulationPage>>;
+  };
+  "agents/:id/simulations/:module/:historyId": {
+    $get(args: {
+      param: {
+        id: string;
+        module: SidakSimulationModule;
+        historyId: string;
+      };
+      signal?: AbortSignal;
+    }): Promise<RpcResponse<SidakSimulationDetail>>;
+  };
+};
+
 /**
  * Base URL for the Hono RPC client.
  *
@@ -329,7 +362,8 @@ export const rpcClient = hc<AppType>(HC_BASE_URL, clientOptions);
 export const ketikClient = (rpcClient as any).v1.ketik;
 export const pdktClient = (rpcClient as any).v1.pdkt;
 export const telefunClient = (rpcClient as any).v1.telefun;
-export const sidakClient = (rpcClient as any).v1.sidak;
+export const sidakClient = (rpcClient as any).v1.sidak as SidakClient &
+  Record<string, any>;
 export const aiClient = (rpcClient as any).v1.ai as unknown as AiClient;
 export const adminClient = (rpcClient as any).v1
   .admin as unknown as AdminClient;

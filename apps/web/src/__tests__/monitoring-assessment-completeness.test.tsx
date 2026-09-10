@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { VoiceQualityAssessment, TelefunTranscriptEntry } from "@trainers/types";
 import type {
   KetikMonitoringReview,
+  PdktMonitoringReview,
   TelefunMonitoringReview,
 } from "../lib/api";
 import { HistoryTab } from "../routes/monitoring/components/HistoryTab";
@@ -447,5 +448,62 @@ describe("monitoring completeness regressions", () => {
     await user.tab({ shift: true });
     expect(closeButtons[1]).toHaveFocus();
     expect(outerTrigger).not.toHaveFocus();
+  });
+
+  it("uses preloaded SIDAK review metadata in the shared modal", async () => {
+    const review: PdktMonitoringReview = {
+      module: "pdkt",
+      user_id: "operator-1",
+      user_email: "operator@example.com",
+      user_role: "trainer",
+      simulationSubject: {
+        type: "participant",
+        participantId: "participant-1",
+        displayName: "Peserta Detail",
+        batchName: "Batch Detail",
+        team: "Tim Detail",
+      },
+      review_status: "completed",
+      session: {
+        config: null,
+        emails: [],
+        consumer_name: "Nina Detail",
+        consumer_type: "VIP",
+        recipient: "finance@example.com",
+        contact: "+62 811 0000 0000",
+        created_at: "2026-09-10T10:00:00.000Z",
+      },
+      evaluation: null,
+      emails: [],
+      evaluation_error: null,
+      time_taken: 42,
+    };
+
+    render(
+      <ReviewDetailModal
+        entry={{
+          ...baseEntry("pdkt"),
+          user_email: undefined,
+          user_role: undefined,
+          simulationSubject: null,
+          consumer_name: undefined,
+          consumer_type: undefined,
+          recipient: undefined,
+          contact: undefined,
+        }}
+        onClose={() => undefined}
+        reviewData={review}
+        reviewLoading={false}
+      />,
+    );
+
+    expect(screen.getAllByText("Peserta Detail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Batch Detail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Tim Detail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Nina Detail").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("VIP").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("finance@example.com").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("+62 811 0000 0000").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("operator@example.com · trainer").length).toBeGreaterThan(0);
   });
 });

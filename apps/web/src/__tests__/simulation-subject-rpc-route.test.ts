@@ -18,7 +18,7 @@ describe("simulation subject RPC route", () => {
     const [input] = fetchMock.mock.calls[0] ?? [];
     const requestUrl =
       input instanceof Request ? input.url : String(input ?? "");
-    const url = new URL(requestUrl, window.location.origin);
+    const url = new URL(requestUrl, "http://localhost");
 
     expect(url.pathname).toBe("/api/v1/profiler/peserta/options");
     expect(url.searchParams.get("search")).toBe("Ferry");

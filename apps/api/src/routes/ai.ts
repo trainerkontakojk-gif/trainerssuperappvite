@@ -10,15 +10,7 @@ import {
   getModelsForModule,
   resolveModelProvider,
 } from "../lib/ai-models";
-import {
-  mapSimulationSubjectRowToSnapshot,
-  parseTelefunTranscript,
-} from "@trainers/types";
-import type {
-  AiModelModule,
-  PdktMonitoringReview,
-  TelefunMonitoringReview,
-} from "@trainers/types";
+import type { AiModelModule } from "@trainers/types";
 import { generateGeminiContent } from "../lib/gemini";
 import { generateOpenAIContent } from "../lib/openai";
 import { requireRole } from "../middleware/role";
@@ -26,17 +18,12 @@ import { createAdminClient } from "../lib/supabase";
 import { getWibMonthBounds } from "../lib/timezone";
 import {
   getMonitoringHistory,
-  normalizeKetikMessages,
-  normalizePdktConfig,
-  normalizePdktEmails,
-  normalizePdktEvaluation,
-  normalizePdktMetadata,
-  normalizeReviewStatus,
-  normalizeTelefunAssessmentWithHold,
-  normalizeTelefunCoachingRecommendations,
 } from "../services/monitoring-history-service";
-import { isTelefunRecordingPathOwnedBySession } from "./telefun/recording-paths";
-import { buildKetikEducation } from "../services/ketik/review-policy";
+import {
+  getMonitoringReviewDetail,
+  MonitoringReviewDataError,
+  MonitoringReviewNotFoundError,
+} from "../services/monitoring-review-service";
 import { getAiUsageSummary } from "../services/ai-usage-summary-service";
 import { getBillingRate, upsertBillingRate } from "../lib/ai-billing-settings";
 import {
@@ -57,65 +44,9 @@ type Variables = { user: User; profile: any };
 const ai = new Hono<{ Variables: Variables }>();
 const monitoringHistoryModuleSchema = z.enum(["ketik", "pdkt", "telefun"]);
 const monitoringHistoryIdSchema = z.string().uuid();
-const TELEFUN_RECORDING_SIGNED_URL_TTL_SECONDS = 3600;
-
-function normalizePersonaConfig(
-  value: unknown,
-): { consumerType: string } | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const consumerType = (value as Record<string, unknown>).consumerType;
-  return typeof consumerType === "string" ? { consumerType } : null;
-}
 
 function canSignCrossUserRecording(profile: any): boolean {
   return ["admin", "trainer"].includes(profile?.role);
-}
-
-function isOwnedTelefunRecordingPath(
-  path: unknown,
-  userId: unknown,
-  sessionId: string,
-  type: "full_call" | "agent_only",
-): path is string {
-  return (
-    typeof userId === "string" &&
-    typeof path === "string" &&
-    isTelefunRecordingPathOwnedBySession({ path, userId, sessionId, type })
-  );
-}
-
-async function readActorProjection(
-  admin: ReturnType<typeof createAdminClient>,
-  userId: unknown,
-): Promise<{ email: string | null; role: string | null }> {
-  if (typeof userId !== "string") return { email: null, role: null };
-  const { data } = await admin
-    .from("profiles")
-    .select("email, role")
-    .eq("id", userId)
-    .maybeSingle();
-  return {
-    email: typeof data?.email === "string" ? data.email : null,
-    role: typeof data?.role === "string" ? data.role : null,
-  };
-}
-
-async function createTelefunRecordingUrl(
-  admin: ReturnType<typeof createAdminClient>,
-  path: string | null | undefined,
-): Promise<string | null> {
-  if (typeof path !== "string") return null;
-
-  const { data, error } = await admin.storage
-    .from("telefun-recordings")
-    .createSignedUrl(path, TELEFUN_RECORDING_SIGNED_URL_TTL_SECONDS);
-
-  if (error || !data?.signedUrl) {
-    console.warn("[monitoring] Failed to sign Telefun recording URL:", error);
-    return null;
-  }
-
-  return data.signedUrl;
 }
 
 ai.get("/models", (c) => {
@@ -295,443 +226,56 @@ ai.get(
   "/monitoring/history/:module/:id/review",
   requireRole("admin", "trainer", "leader"),
   async (c) => {
-    const { module, id } = c.req.param();
-    const admin = createAdminClient();
+    const parsedModule = monitoringHistoryModuleSchema.safeParse(c.req.param("module"));
+    const parsedId = monitoringHistoryIdSchema.safeParse(c.req.param("id"));
 
-    try {
-      if (module === "ketik") {
-        const { data: history, error: historyError } = await admin
-          .from("ketik_history")
-          .select(
-            "review_status, final_score, empathy_score, probing_score, resolution_score, typo_score, compliance_score, consumer_name, consumer_phone, consumer_city, simulation_duration, messages, user_id, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
-          )
-          .eq("id", id)
-          .single();
-
-        if (historyError) {
-          const notFound = historyError.code === "PGRST116";
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: notFound ? "NOT_FOUND" : "DB_ERROR",
-                message: notFound
-                  ? "Sesi KETIK tidak ditemukan."
-                  : "Gagal membaca sesi KETIK.",
-              },
-            },
-            notFound ? 404 : 500,
-          );
-        }
-        if (!history)
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "NOT_FOUND",
-                message: "Sesi KETIK tidak ditemukan.",
-              },
-            },
-            404,
-          );
-
-        const ketikActor = await readActorProjection(admin, history.user_id);
-        const ketikSubject = mapSimulationSubjectRowToSnapshot(history);
-
-        if (history.review_status !== "completed") {
-          return c.json({
-            success: true,
-            data: {
-              module: "ketik",
-              user_id: history.user_id ?? null,
-              user_email: ketikActor.email,
-              user_role: ketikActor.role,
-              simulationSubject: ketikSubject,
-              review_status: history.review_status || "not_started",
-              scores: {
-                final: history.final_score,
-                empathy: history.empathy_score,
-                probing: history.probing_score,
-                resolution: history.resolution_score,
-                typo: history.typo_score,
-                compliance: history.compliance_score,
-              },
-              session: {
-                consumerName: history.consumer_name ?? null,
-                consumerPhone: history.consumer_phone ?? null,
-                consumerCity: history.consumer_city ?? null,
-                simulationDuration: history.simulation_duration ?? null,
-                messages: normalizeKetikMessages(history.messages),
-              },
-            },
-          });
-        }
-
-        const [reviewResult, typosResult] = await Promise.all([
-          admin
-            .from("ketik_session_reviews")
-            .select("*")
-            .eq("session_id", id)
-            .maybeSingle(),
-          admin.from("ketik_typo_findings").select("*").eq("session_id", id),
-        ]);
-
-        if (reviewResult.error || typosResult.error) {
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "DB_ERROR",
-                message: "Gagal membaca hasil review KETIK.",
-              },
-            },
-            500,
-          );
-        }
-
-        return c.json({
-          success: true,
-          data: {
-            module: "ketik",
-            user_id: history.user_id ?? null,
-            user_email: ketikActor.email,
-            user_role: ketikActor.role,
-            simulationSubject: ketikSubject,
-            review_status: "completed",
-            scores: {
-              final: history.final_score,
-              empathy: history.empathy_score,
-              probing: history.probing_score,
-              resolution: history.resolution_score,
-              typo: history.typo_score,
-              compliance: history.compliance_score,
-            },
-            review: reviewResult.data
-              ? {
-                  id: reviewResult.data.id,
-                  sessionId: reviewResult.data.session_id,
-                  aiSummary: reviewResult.data.ai_summary,
-                  strengths: reviewResult.data.strengths,
-                  weaknesses: reviewResult.data.weaknesses,
-                  coachingFocus: reviewResult.data.coaching_focus,
-                  // Legacy rows (pre-education) get deterministic rule-based
-                  // guidance derived from stored scores — no AI rerun.
-                  education:
-                    reviewResult.data.education ??
-                    buildKetikEducation(undefined, {
-                      final: history.final_score ?? 0,
-                      empathy: history.empathy_score ?? 0,
-                      probing: history.probing_score ?? 0,
-                      resolution: history.resolution_score ?? 0,
-                      typo: history.typo_score ?? 0,
-                      compliance: history.compliance_score ?? 0,
-                    }),
-                  createdAt: reviewResult.data.created_at,
-                }
-              : null,
-            session: {
-              consumerName: history.consumer_name ?? null,
-              consumerPhone: history.consumer_phone ?? null,
-              consumerCity: history.consumer_city ?? null,
-              simulationDuration: history.simulation_duration ?? null,
-              messages: normalizeKetikMessages(history.messages),
-            },
-            typos: (typosResult.data || []).map((t: any) => ({
-              id: t.id,
-              sessionId: t.session_id,
-              messageId: t.message_id,
-              originalWord: t.original_word,
-              correctedWord: t.corrected_word,
-              severity: t.severity,
-            })),
-          },
-        });
-      }
-
-      if (module === "pdkt") {
-        const { data: history, error: historyError } = await admin
-          .from("pdkt_history")
-          .select(
-            "evaluation, evaluation_status, evaluation_error, time_taken, emails, config, timestamp, created_at, user_id, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
-          )
-          .eq("id", id)
-          .single();
-
-        if (historyError || !history) {
-          const notFound =
-            !history ||
-            (historyError as { code?: string } | null)?.code === "PGRST116";
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: notFound ? "NOT_FOUND" : "DB_ERROR",
-                message: notFound
-                  ? "Sesi PDKT tidak ditemukan."
-                  : "Gagal membaca sesi PDKT.",
-              },
-            },
-            notFound ? 404 : 500,
-          );
-        }
-
-        const config = normalizePdktConfig(history.config);
-        const emails = normalizePdktEmails(history.emails);
-        const metadata = normalizePdktMetadata(history.config, emails);
-        let actorEmail: string | null = null;
-        let actorRole: string | null = null;
-        if (typeof history.user_id === "string") {
-          const { data: actor } = await admin
-            .from("profiles")
-            .select("email, role")
-            .eq("id", history.user_id)
-            .maybeSingle();
-          actorEmail = typeof actor?.email === "string" ? actor.email : null;
-          actorRole = typeof actor?.role === "string" ? actor.role : null;
-        }
-
-        const data: PdktMonitoringReview = {
-          module: "pdkt",
-          user_id: history.user_id ?? null,
-          user_email: actorEmail,
-          user_role: actorRole,
-          simulationSubject: mapSimulationSubjectRowToSnapshot(history),
-          review_status: normalizeReviewStatus(history.evaluation_status),
-          session: {
-            config,
-            emails,
-            created_at: history.created_at ?? history.timestamp ?? null,
-            consumer_name: metadata.consumer_name ?? null,
-            consumer_type: metadata.consumer_type ?? null,
-            recipient: metadata.recipient ?? null,
-            contact: metadata.contact ?? null,
-          },
-          evaluation: normalizePdktEvaluation(history.evaluation),
-          evaluation_error: history.evaluation_error || null,
-          time_taken: history.time_taken ?? null,
-          emails,
-        };
-        return c.json({ success: true, data });
-      }
-
-      if (module === "telefun") {
-        const { data: history, error: historyError } = await admin
-          .from("telefun_history")
-          .select(
-            "id, user_id, score, recording_path, agent_recording_path, scenario_title, duration_seconds, voice_assessment, session_metrics, ai_summary, strengths, weaknesses, coaching_focus, messages, consumer_name, consumer_phone, consumer_city, consumer_gender, persona_config, simulation_subject_type, simulation_subject_peserta_id, simulation_subject_name, simulation_subject_batch_name, simulation_subject_team",
-          )
-          .eq("id", id)
-          .single();
-
-        let legacy = false;
-        let telefunHistory = history;
-        if (historyError && historyError.code !== "PGRST116") {
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "DB_ERROR",
-                message: "Gagal membaca sesi Telefun.",
-              },
-            },
-            500,
-          );
-        }
-        if (!telefunHistory) {
-          const { data: legacyRow, error: legacyError } = await admin
-            .from("results")
-            .select("id, module, score, details, history, created_at")
-            .eq("id", id)
-            .eq("module", "telefun")
-            .maybeSingle();
-          if (legacyError)
-            return c.json(
-              {
-                success: false,
-                error: {
-                  code: "DB_ERROR",
-                  message: "Gagal membaca riwayat Telefun.",
-                },
-              },
-              500,
-            );
-          if (!legacyRow)
-            return c.json(
-              {
-                success: false,
-                error: {
-                  code: "NOT_FOUND",
-                  message: "Sesi Telefun tidak ditemukan.",
-                },
-              },
-              404,
-            );
-          const details =
-            legacyRow.details && typeof legacyRow.details === "object"
-              ? legacyRow.details
-              : {};
-          telefunHistory = {
-            id,
-            user_id: null,
-            score: typeof legacyRow.score === "number" ? legacyRow.score : null,
-            recording_path: null,
-            agent_recording_path: null,
-            session_metrics: null,
-            scenario_title:
-              typeof details.scenario_title === "string"
-                ? details.scenario_title
-                : typeof details.scenario === "string"
-                  ? details.scenario
-                  : "Simulasi Telepon",
-            duration_seconds:
-              typeof details.duration === "number" &&
-              Number.isFinite(details.duration)
-                ? details.duration
-                : null,
-            voice_assessment: null,
-            ai_summary: null,
-            strengths: null,
-            weaknesses: null,
-            coaching_focus: null,
-            messages: Array.isArray(legacyRow.history) ? legacyRow.history : [],
-            consumer_name: null,
-            consumer_phone: null,
-            consumer_city: null,
-            consumer_gender: null,
-            persona_config: null,
-            simulation_subject_type: null,
-            simulation_subject_peserta_id: null,
-            simulation_subject_name: null,
-            simulation_subject_batch_name: null,
-            simulation_subject_team: null,
-          };
-          legacy = true;
-        }
-        if (!telefunHistory) {
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "NOT_FOUND",
-                message: "Sesi Telefun tidak ditemukan.",
-              },
-            },
-            404,
-          );
-        }
-
-        const telefunActor = await readActorProjection(
-          admin,
-          telefunHistory.user_id,
-        );
-        const telefunSubject =
-          mapSimulationSubjectRowToSnapshot(telefunHistory);
-        const voiceAssessment = legacy
-          ? null
-          : normalizeTelefunAssessmentWithHold(
-              telefunHistory.voice_assessment,
-              telefunHistory.session_metrics,
-            );
-        const normalizedScore =
-          voiceAssessment &&
-          typeof voiceAssessment === "object" &&
-          typeof voiceAssessment.overallScore === "number"
-            ? voiceAssessment.overallScore
-            : telefunHistory.score;
-
-        const transcript = parseTelefunTranscript(telefunHistory.messages);
-        const { data: coachingSummary, error: coachingError } = await admin
-          .from("telefun_coaching_summary")
-          .select("recommendations, generated_at")
-          .eq("session_id", id)
-          .maybeSingle();
-        if (coachingError) {
-          return c.json(
-            {
-              success: false,
-              error: {
-                code: "DB_ERROR",
-                message: "Gagal membaca coaching Telefun.",
-              },
-            },
-            500,
-          );
-        }
-        const profile = c.get("profile");
-        const ownedFullPath = isOwnedTelefunRecordingPath(
-          telefunHistory.recording_path,
-          telefunHistory.user_id,
-          id,
-          "full_call",
-        )
-          ? telefunHistory.recording_path
-          : null;
-        const ownedAgentPath = isOwnedTelefunRecordingPath(
-          telefunHistory.agent_recording_path,
-          telefunHistory.user_id,
-          id,
-          "agent_only",
-        )
-          ? telefunHistory.agent_recording_path
-          : null;
-        const recordingUrl = canSignCrossUserRecording(profile)
-          ? await createTelefunRecordingUrl(
-              admin,
-              ownedFullPath || ownedAgentPath,
-            )
-          : null;
-
-        const data: TelefunMonitoringReview = {
-          module: "telefun",
-          user_id: telefunHistory.user_id ?? null,
-          user_email: telefunActor.email,
-          user_role: telefunActor.role,
-          simulationSubject: telefunSubject,
-          review_status:
-            typeof normalizedScore === "number" ? "completed" : "not_started",
-          score: normalizedScore,
-          recording_path: ownedFullPath,
-          agent_recording_path: ownedAgentPath,
-          recording_url: recordingUrl,
-          scenario_title: telefunHistory.scenario_title,
-          duration_seconds: telefunHistory.duration_seconds,
-          voice_assessment: voiceAssessment || null,
-          transcript,
-          ai_summary: telefunHistory.ai_summary || null,
-          strengths: telefunHistory.strengths || null,
-          weaknesses: telefunHistory.weaknesses || null,
-          coaching_focus: telefunHistory.coaching_focus || null,
-          coaching_recommendations: normalizeTelefunCoachingRecommendations(
-            coachingSummary?.recommendations,
-          ),
-          coaching_generated_at: coachingSummary?.generated_at ?? null,
-          consumer_name: telefunHistory.consumer_name ?? null,
-          consumer_phone: telefunHistory.consumer_phone ?? null,
-          consumer_city: telefunHistory.consumer_city ?? null,
-          consumer_gender: telefunHistory.consumer_gender ?? null,
-          persona_config: normalizePersonaConfig(telefunHistory.persona_config),
-          telefun_legacy: legacy,
-        };
-        return c.json({ success: true, data });
-      }
-
+    if (!parsedModule.success || !parsedId.success) {
       return c.json(
         {
           success: false,
           error: {
             code: "BAD_REQUEST",
-            message: `Modul tidak dikenal: ${module}`,
+            message: !parsedModule.success
+              ? `Modul tidak dikenal: ${c.req.param("module")}`
+              : "ID sesi tidak valid.",
           },
         },
         400,
       );
-    } catch (error: any) {
+    }
+
+    try {
+      const data = await getMonitoringReviewDetail({
+        module: parsedModule.data,
+        historyId: parsedId.data,
+        canSignTelefunRecording: canSignCrossUserRecording(c.get("profile")),
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      if (error instanceof MonitoringReviewNotFoundError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: error.message },
+          },
+          404,
+        );
+      }
+      if (error instanceof MonitoringReviewDataError) {
+        return c.json(
+          {
+            success: false,
+            error: { code: "DB_ERROR", message: error.message },
+          },
+          500,
+        );
+      }
       return c.json(
         {
           success: false,
           error: {
             code: "DB_ERROR",
-            message: error?.message || "Gagal memuat detail review monitoring.",
+            message: "Gagal memuat detail review monitoring.",
           },
         },
         500,

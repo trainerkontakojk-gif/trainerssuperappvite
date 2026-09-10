@@ -177,8 +177,8 @@ Struktur folder monorepo:
 │   ├── api/                    # Backend Hono API server
 │   │   ├── src/
 │   │   │   ├── routes/         # Hono route handlers — decomposed per module:
-│   │   │   │   ├── sidak.ts    #   barrel (import + route registration 5 sub-modules)
-│   │   │   │   ├── sidak/      #   sub-modules: core, dashboard, temuan, rule-versions, reports
+│   │   │   │   ├── sidak.ts    #   barrel (import + route registration 7 sub-modules)
+│   │   │   │   ├── sidak/      #   sub-modules: core, dashboard, forecast, temuan, rule-versions, reports, simulations
 │   │   │   │   ├── telefun.ts  #   barrel (import + route registration 4 sub-modules)
 │   │   │   │   ├── telefun/    #   sub-modules: sessions, recordings, settings, annotations
 │   │   │   │   ├── ketik.ts    #   KETIK endpoints
@@ -232,7 +232,7 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 
 - Logic database tidak diletakkan langsung di dalam komponen UI frontend.
 - Semua query kompleks berada di `apps/api/src/services/` (contoh: `sidak-service.ts` — barrel dari 13 sub-modules, `profiler-service.ts`).
-- Route handlers didekomposisi per modul: sub-modul di `apps/api/src/routes/sidak/` (5 file), `apps/api/src/routes/telefun/` (4 file), dan `apps/api/src/routes/pdkt/` (6 file), dengan barrel file `sidak.ts`/`telefun.ts`/`pdkt.ts` sebagai entry point.
+- Route handlers didekomposisi per modul: sub-modul di `apps/api/src/routes/sidak/` (7 file), `apps/api/src/routes/telefun/` (4 file), dan `apps/api/src/routes/pdkt/` (6 file), dengan barrel file `sidak.ts`/`telefun.ts`/`pdkt.ts` sebagai entry point.
 - Frontend mengonsumsi API via Hono RPC client (`hc<AppType>`) untuk full type-safety.
 - Hybrid Client Pattern untuk Supabase:
   - Default: Gunakan User JWT untuk menghormati RLS.
@@ -240,9 +240,10 @@ Proyek ini mengutamakan pola **Centralized Service Layer** di backend:
 - Monitoring lintas akun dan usage billing menggunakan server-side access via admin client, bukan direct browser read terhadap tabel sensitif.
 - History simulasi KETIK/PDKT menggunakan tabel modul masing-masing sebagai sumber utama.
 - Module settings (KETIK, PDKT, Telefun) disimpan namespaced di `user_settings.settings.<module>` agar tidak saling timpa. Setiap modul wajib membaca existing settings sebelum menulis.
+- **SIDAK Simulation History**: Agent detail reads canonical KETIK/PDKT/Telefun history through `apps/api/src/routes/sidak/simulations.ts`. The service filters exact participant attribution, resolves leader service scope before reading history, and loads transcript/review only for the detail request. Monitoring detail panels are reused as renderers through preloaded review data.
 - **SIDAK Dashboard Performance**: Endpoint dashboard utama menghitung ringkasan secara real-time dari data temuan mentah via scoring engine aplikasi. Materialized view (`mv_qa_period_summary`) dan tabel cache/summary (`qa_dashboard_period_summary`) dipelihara terpisah untuk kompatibilitas database, workflows backfill, dan offline analytics, namun tidak digunakan pada read-path dashboard utama.
 - **SIDAK Dashboard Forecast**: Prediksi dashboard menggunakan batch forecast persistence dengan SHA-256 fingerprinting. 3-state lifecycle (`missing`/`fresh`/`stale`) dengan visual attention effects. Angka menggunakan regresi linear deterministik, narasi menggunakan Gemini 3.1 Flash Lite. Snapshot disimpan di tabel `sidak_dashboard_forecast_snapshots` dengan akses terbatas ke `service_role` saja. `cacheOnly` lookup di mount page — Gemini hanya dipanggil saat user klik "Perbarui Prediksi".
-- **Soft-delete Exclusion**: Semua query SIDAK (dashboard, agents, data reports) otomatis mengecualikan peserta yang terhubung ke profile soft-deleted/inactive, dengan opsi `show_archived=true` untuk override.
+- **Soft-delete Exclusion**: Semua query SIDAK (dashboard, agents, data reports) otomatis mengecualikan peserta yang terhubung ke profile soft-deleted/inactive, dengan opsi `show_archived=true` untuk override. Riwayat simulasi memakai atribusi sesi exact dan tidak memakai fallback legacy.
 
 ## AI Integration Pattern
 
