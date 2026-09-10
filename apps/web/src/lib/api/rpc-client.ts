@@ -334,7 +334,5 @@ export const aiClient = (rpcClient as any).v1.ai as unknown as AiClient;
 export const adminClient = (rpcClient as any).v1
   .admin as unknown as AdminClient;
 export const profilerClient = (rpcClient as any).v1.profiler;
-export const profilerSubjectClient = (
-  rpcClient as unknown as { v1: ProfilerSubjectClient }
-).v1;
+export const profilerSubjectClient = profilerClient as ProfilerSubjectClient;
 export const healthClient = hc<HealthRouteType>(HC_BASE_URL, clientOptions);
