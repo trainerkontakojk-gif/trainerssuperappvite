@@ -187,7 +187,7 @@ Platform analytics kualitas untuk memantau performa agent secara mendalam.
   - **Ranking** (`/sidak/ranking`): Ranking agent berdasarkan skor dan defect, dengan rank change indicator (▲/▼) dan dynamic context subtitle.
   - **Settings** (`/sidak/settings`): Service weights configuration dengan versioned rules per service+periode.
   - **Periods** (`/sidak/periods`): Manajemen periode audit.
-  - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian dan dynamic load-more copy.
+  - **Agents** (`/sidak/agents`): Direktori agent dengan pencarian nama/tim/batch, filter batch yang dapat di-scroll, toggle data terfilter/semua data, kartu skor dan tren berbasis shadcn/ui, skeleton loading, state kosong, serta retry saat API gagal. Menampilkan 24 kartu awal dengan tombol load-more dinamis.
   - **Agent Detail** (`/sidak/agents/$id`): Full-width Agent Audit Dossier dengan compact score strip, seluruh konten audit, lalu quick list lima Riwayat Simulasi terbaru (KETIK/PDKT/Telefun) di bagian paling bawah, ranking Tim Gabungan/Tim Leader, forecast 3 bulan (konteks tahun+layanan), ticket impact table, root-cause coaching panel, trend benchmark comparison table, dan per-service pills.
   - **Reports** (`/sidak/reports`): Data vs AI report selection.
   - **Reports Data** (`/sidak/reports-data`): Filter form + tabel temuan dengan kolom Layanan, Periode, Agen, Nomor Tiket, Parameter, Temuan, dan Skor + Excel export. Nomor tiket dinormalisasi dan ditampilkan dengan format monospace; isi Temuan dibungkus utuh tanpa truncation agar tetap terbaca.

@@ -80,4 +80,21 @@ describe("Sidak agents load-more copy", () => {
       screen.queryByRole("button", { name: /Muat \d+ agen lagi/ }),
     ).not.toBeInTheDocument();
   });
+
+  it("shows an actionable error state when the directory request fails", () => {
+    const refetch = vi.fn();
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Network error",
+      refetch,
+    });
+
+    render(<SidakAgentsPage />);
+
+    expect(screen.getByText("Gagal memuat daftar agen")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Coba lagi" }),
+    ).toBeInTheDocument();
+  });
 });
